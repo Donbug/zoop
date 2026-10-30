@@ -50,20 +50,14 @@ export function MetricValue({ metric }: { metric: StatsMetric }) {
 }
 
 /** 산식: '15 / 37노출'. 비율을 숨겼으면 기준을 함께 적는다. */
-export function MetricBasis({
-  metric,
-  minSample,
-}: {
-  metric: StatsMetric;
-  minSample: number;
-}) {
+export function MetricBasis({ metric }: { metric: StatsMetric }) {
   if (metric.kind === 'count' || metric.availability === 'unavailable')
     return <span className="text-zoop-faint">–</span>;
   return (
     <span className="whitespace-nowrap tabular-nums">
       {countOrDash(metric.numerator)} / {countOrDash(metric.denominator)}
       {unitLabel(metric.unit)}
-      {metric.sampleHidden && ` (분모 ${minSample} 미만이라 비율 숨김)`}
+      {metric.sampleHidden && ' (표본 부족)'}
     </span>
   );
 }

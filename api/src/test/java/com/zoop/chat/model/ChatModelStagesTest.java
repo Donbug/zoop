@@ -337,7 +337,9 @@ class ChatModelStagesTest {
                 {"sections":[{"support":null,"prohibitedAdvice":"no"},{"support":"supported","prohibitedAdvice":"hold"}]}""");
         var sections = List.of(new ChatGeneratedAnswer.Section("general_knowledge", "PER은…", List.of("r1"), List.of()),
                 new ChatGeneratedAnswer.Section("evidence_grounded", "공급합니다.", List.of("r2"), List.of(EV_A)));
-        ChatSemanticVerdicts verdicts = stages.verify(run(root("q")), sections, List.of(citation(EV_A, "인용")));
+        ChatRun run = run(root("q"));
+        ChatSemanticVerdicts verdicts = stages.verify(run, sections, List.of(citation(EV_A, "인용")),
+                ChatModels.ServerFacts.withoutTools(run, sections));
         assertEquals(new ChatSemanticVerdicts.Verdict(null, "no"), verdicts.sections().get(0));
         assertEquals(new ChatSemanticVerdicts.Verdict("supported", "hold"), verdicts.sections().get(1));
         assertEquals("news-provider-1", calls.getFirst().input().get("citations").get(0).get("sourceId").stringValue());
@@ -349,8 +351,10 @@ class ChatModelStagesTest {
                 {"sections":[{"support":"supported","prohibitedAdvice":"no"}]}""");
         var doc = new Citation("zoop_doc", EV_B, "## 2. 보유 기간\n\n탈퇴하면 지웁니다.", null, null, "policy.privacy",
                 "2026-10-13.1", 10, 30, "개인정보 처리방침 · 2. 보유 기간", null, null, null);
-        stages.verify(run(root("q")), List.of(new ChatGeneratedAnswer.Section("zoop_documented", "탈퇴하면 지워집니다.",
-                List.of("r1"), List.of(EV_B))), List.of(doc));
+        ChatRun run = run(root("q"));
+        var sections = List.of(new ChatGeneratedAnswer.Section("zoop_documented", "탈퇴하면 지워집니다.",
+                List.of("r1"), List.of(EV_B)));
+        stages.verify(run, sections, List.of(doc), ChatModels.ServerFacts.withoutTools(run, sections));
         JsonNode sent = calls.getFirst().input();
         assertEquals("zoop-docs", sent.get("citations").get(0).get("sourceId").stringValue());
         assertEquals("zoop_documented", sent.get("sections").get(0).get("basis").stringValue());

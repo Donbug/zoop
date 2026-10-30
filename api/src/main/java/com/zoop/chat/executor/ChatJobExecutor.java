@@ -3,6 +3,8 @@ package com.zoop.chat.executor;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +22,7 @@ import com.zoop.chat.repository.ChatRunningJob;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.repository.NewChatToolCall;
 import com.zoop.chat.service.FrozenSelection;
+import com.zoop.chat.tool.ChatCapability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -65,6 +68,8 @@ public class ChatJobExecutor {
     private static final Set<String> OUTCOMES = Set.of("answered", "clarification", "guidance", "insufficient_evidence");
     private static final int MAX_CHOICES = 6;
     private static final int RECOVERY_BATCH = 50;
+    /** The web search quotas turn over at KST midnight. */
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final Logger log = LoggerFactory.getLogger(ChatJobExecutor.class);
 
     private final ChatRepository chats;
@@ -321,7 +326,7 @@ public class ChatJobExecutor {
         @Override
         public int toolCallsLeft() {
             Integer made = recorded(() -> transaction.execute(status ->
-                    runs.countJobToolCalls(claim.job().id(), claim.attemptNo())));
+                    runs.countJobToolCalls(claim.job().id(), claim.attemptNo(), false)));
             return MAX_TOOL_CALLS - (made == null ? MAX_TOOL_CALLS : made);
         }
 
@@ -368,9 +373,23 @@ public class ChatJobExecutor {
                 Instant now = clock.instant();
                 if (runs.lockOwned(claim.job().id(), claim.ownerToken(), now).isEmpty()) return null;
                 int first = runs.countToolCalls(claim.job().id(), claim.attemptNo());
-                // The budget is the job's: a rerun counts what its earlier attempts made.
-                if (runs.countJobToolCalls(claim.job().id(), claim.attemptNo()) + calls.size() > MAX_TOOL_CALLS) {
+                int web = (int) calls.stream().filter(c -> ChatCapability.WEB_GROUP.equals(c.registryGroup())).count();
+                // The budgets are the job's: a rerun counts what its earlier attempts made.
+                if (runs.countJobToolCalls(claim.job().id(), claim.attemptNo(), false) + calls.size() - web
+                        > MAX_TOOL_CALLS) {
                     throw new IllegalArgumentException("tool plan exceeds " + MAX_TOOL_CALLS + " calls per job");
+                }
+                if (web > 0) {
+                    if (runs.countJobToolCalls(claim.job().id(), claim.attemptNo(), true) + web > MAX_WEB_CALLS) {
+                        throw new ChatWebBudgetExhausted(ChatWebBudgetExhausted.Budget.JOB);
+                    }
+                    // Thrown inside the transaction, so nothing taken or reserved stays.
+                    String exhausted = runs.takeWebSearchQuota(claim.job().memberId(), LocalDate.ofInstant(now, KST), web,
+                            MEMBER_DAILY_WEB_CALLS, PROJECT_DAILY_WEB_CALLS);
+                    if (exhausted != null) {
+                        throw new ChatWebBudgetExhausted("member".equals(exhausted) ? ChatWebBudgetExhausted.Budget.MEMBER
+                                : ChatWebBudgetExhausted.Budget.PROJECT);
+                    }
                 }
                 List<NewChatToolCall> rows = new ArrayList<>();
                 for (int i = 0; i < calls.size(); i++) {
@@ -459,7 +478,8 @@ public class ChatJobExecutor {
 
     private static ChatResult withMessageId(ChatResult r, String messageId) {
         return new ChatResult(r.outcome(), messageId, r.answer(), r.sections(), r.answerBasis(), r.reason(), r.sources(),
-                r.citations(), r.graphTargets(), r.applied(), r.choices(), r.action(), r.limitations(), r.metadata());
+                r.citations(), r.graphTargets(), r.applied(), r.choices(), r.action(), r.limitations(), r.metadata(),
+                r.answerStatus(), r.notices());
     }
 
     private ArrayNode attempts(String json) {

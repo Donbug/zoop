@@ -94,10 +94,6 @@
   background: var(--color-zoop-ink);
   border-radius: 4px;
 }
-.relationship-header nav button {
-  font-family: 'Inter Variable', sans-serif;
-  font-weight: 400;
-}
 .relationship-user-tools {
   margin-left: auto;
   display: flex;
@@ -222,8 +218,51 @@
   min-width: 0;
   width: auto;
 }
+.company-panel-resizer {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 8px;
+  width: 8px;
+  margin-inline: -4px;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+.company-panel-resizer::after {
+  position: absolute;
+  inset-block: 12px;
+  left: 3px;
+  width: 2px;
+  border-radius: 2px;
+  background: transparent;
+  content: '';
+  transition: background-color 120ms ease-out;
+}
+.company-panel-resizer:hover::after,
+.company-panel-resizer:focus-visible::after {
+  background: var(--color-zoop-muted);
+}
+.company-panel-resizer:focus-visible {
+  outline: 2px solid var(--color-zoop-ink);
+  outline-offset: 1px;
+}
+@media (max-width: 767px) {
+  .company-panel-resizer {
+    display: none;
+  }
+}
 .company-panel-header {
-  padding: 16px 16px 4px;
+  /* D-GRP-03 keeps the identity and actions distinct; D-AUT-01 spacing is the rhythm reference. */
+  padding: 16px 16px 12px;
+}
+.company-panel .company-actions {
+  gap: 12px;
+}
+.company-panel .company-actions > * {
+  height: auto;
+  min-height: 40px;
+  padding: 8px 12px;
+  line-height: 18px;
 }
 .company-panel-title {
   display: flex;
@@ -448,7 +487,9 @@
 }
 .company-metrics summary {
   display: flex;
+  min-height: 40px;
   justify-content: space-between;
+  align-items: center;
   list-style: none;
 }
 .company-metrics summary::after {
@@ -464,22 +505,35 @@
   font-size: 11px;
 }
 .company-list {
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
 .company-list li + li {
-  border-top: 0.667px solid var(--color-zoop-soft);
+  margin-top: 8px;
+}
+.company-list li {
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--color-zoop-soft);
 }
 .company-list button {
   width: 100%;
-  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
   text-align: left;
 }
 .company-list a,
 .company-document {
   display: block;
-  padding: 8px 0;
+  padding: 12px;
   color: inherit;
   text-decoration: none;
+}
+.company-list li > .py-2 {
+  padding-inline: 12px;
 }
 .company-list b,
 .company-list span {
@@ -638,12 +692,12 @@
   display: inline-block;
   flex-shrink: 0;
   width: 16px;
-  height: 1px;
+  height: 2px;
   background: var(--color-zoop-ink);
 }
 .legend-line.dashed {
   background: none;
-  border-top: 0.667px dashed var(--color-zoop-faint);
+  border-top: 1.333px dashed var(--color-zoop-faint);
 }
 .legend-line.follows {
   background: var(--color-zoop-ink);
@@ -651,10 +705,11 @@
 .legend-line.arrow::after {
   content: '';
   display: block;
-  margin: -2px 0 0 13px;
-  border-left: 4px solid var(--color-zoop-ink);
-  border-top: 2.667px solid transparent;
-  border-bottom: 2.667px solid transparent;
+  /* 6px wide, 8px tall: right end of the 16px swatch, centred on the 2px line. */
+  margin: -3px 0 0 10px;
+  border-left: 6px solid var(--color-zoop-ink);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
 }
 .legend-size {
   font-size: 11px;

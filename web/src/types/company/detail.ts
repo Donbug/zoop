@@ -57,6 +57,7 @@ export type Quote =
         dayHigh: number | null;
         fiftyTwoWeekLow: number | null;
         fiftyTwoWeekHigh: number | null;
+        marketCap?: number | null;
       };
     };
 export type PricePoint = {

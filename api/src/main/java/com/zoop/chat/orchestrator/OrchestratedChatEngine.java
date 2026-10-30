@@ -6,6 +6,7 @@ import com.zoop.chat.dto.ChatAppliedItem;
 import com.zoop.chat.dto.ChatAppliedPeriod;
 import com.zoop.chat.dto.ChatLimitation;
 import com.zoop.chat.dto.ChatResult;
+import com.zoop.chat.dto.ChatNotice;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.executor.ChatEngine;
 import com.zoop.chat.executor.ChatEngineOutcome;
@@ -199,10 +200,15 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
 
         var retrieved = new ChatRetrieval.Outcome(Map.of(), Map.of(), Set.of(), null, null);
         ChatGeneratedAnswer agentAnswer = null;
+        List<String> agentNotices = List.of();
+        boolean directStart = false;
         List<ChatCapability> agentTools = agentTools(confirmed);
         if (agentTools != null && !agent.available()) {
             // Preflight/circuit decisions happen before the first agent step. The direct path begins here; a failure after an
-            // agent step has started is never replaced with direct results in this run.
+            // agent step has started is never replaced with direct results in this run. A concept question that went to
+            // the agent only for its search is answered without the web, and says so.
+            if (webOnly(agentTools)) agentNotices = List.of("web_unavailable");
+            else directStart = true;
             agentTools = null;
             route.put("agentPreflight", "unavailable");
         }
@@ -240,6 +246,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                     .forEach(p -> results.put(p.id(), ran.results()));
             retrieved = new ChatRetrieval.Outcome(results, Map.of(), Set.of(), null, null);
             agentAnswer = ran.answer();
+            agentNotices = ran.notices();
             route.put("path", "agent").put("agentSteps", ran.steps()).put("approvedCalls", ran.approved())
                     .put("deniedCalls", ran.denied());
         } else if (confirmed.requirements().stream().anyMatch(p -> p.mode() == Mode.TOOLS)) {
@@ -252,6 +259,10 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             retrieved = retrieval.run(run, control, confirmed);
             if (retrieved.failed() != null) throw new Stop(toolFailure(retrieved.failed()));
             if (retrieved.stop() != null) return stopped(run, route, retrieved.stop());
+            if (retrieved.faulted() != null) {
+                route.putArray("toolFaults").addAll(strings(retrieved.limitations().entrySet().stream()
+                        .filter(e -> ChatRetrieval.TOOL_UNAVAILABLE.equals(e.getValue())).map(Map.Entry::getKey).toList()));
+            }
         }
 
         Map<String, Planned> byId = new LinkedHashMap<>();
@@ -272,6 +283,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                     retrieved.noneFound().contains(p.id()), p.parent(), avoid));
         }
         route.set("limited", json(limited));
+        // A fault that leaves nothing answered is the job's failure, never hidden as missing evidence.
+        if (branches.isEmpty() && retrieved.faulted() != null) throw new Stop(toolFailure(retrieved.faulted()));
         if (branches.isEmpty()) {
             boolean unanswerable = limited.values().stream().allMatch(k -> k.equals("investment_advice") || k.equals("out_of_scope"));
             if (unanswerable) {
@@ -319,8 +332,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
 
         control.phase("verifying");
         List<Citation> allCited = List.copyOf(cited.values());
+        ChatModels.ServerFacts facts = ChatModels.ServerFacts.capture(run, passed.sections(), branches);
         ChatSemanticVerdicts verdicts = model(control, limits.verify(), limits.server(),
-                () -> verifier.verify(run, passed.sections(), allCited));
+                () -> verifier.verify(run, passed.sections(), allCited, facts));
         Set<String> held = held(passed.sections(), verdicts);
         if (held == null) return validationFailed();
         route.putArray("heldRequirements").addAll(strings(held));
@@ -331,6 +345,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         passed.sections().stream().filter(s -> !kept.contains(s)).forEach(s -> insufficient.addAll(s.requirementIds()));
         // A requirement still answered by a kept section of its own is answered; a joining section goes with any held part.
         insufficient.removeIf(id -> kept.stream().anyMatch(s -> s.requirementIds().contains(id)));
+        if (kept.isEmpty() && retrieved.faulted() != null) throw new Stop(toolFailure(retrieved.faulted()));
         if (kept.isEmpty()) {
             // The most specific cause the server knows: a limit it hit, then a verdict, then a lookup that found nothing.
             List<String> unanswered = insufficient.stream().filter(id -> byId.get(id).parent() == null).toList();
@@ -362,12 +377,18 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 limitations.add(ChatResults.scopeCut(byId.get(id).label()));
             }
         }
-        retrieved.outside().forEach((id, how) -> {
+        // A reference point outside the member's companies was read all the same: the only note that leaves nothing
+        // unanswered, so it alone does not make the answer partial.
+        int anchorNotes = 0;
+        for (var entry : retrieved.outside().entrySet()) {
+            String id = entry.getKey();
             // Answered on the member's companies, though the question also named one that is not: say so beside it.
             if (explicit(decision, id) && kept.stream().anyMatch(s -> s.requirementIds().contains(id))) {
-                limitations.add(ChatResults.outsideScope(how, byId.get(id).label()));
+                limitations.add(ChatResults.outsideScope(entry.getValue(), byId.get(id).label()));
+                if (entry.getValue() == ChatRetrieval.Outside.ANCHOR) anchorNotes++;
             }
-        });
+        }
+        boolean partial = limitations.size() > anchorNotes;
 
         Set<String> answered = new HashSet<>();
         kept.forEach(s -> answered.addAll(s.requirementIds()));
@@ -377,8 +398,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 .forEach(b -> b.results().forEach(r -> r.items().forEach(i -> reachable.add(i.id()))));
         var targets = passed.graphTargets().stream().filter(g -> reachable.contains(g.id())).toList();
         ChatResult result = ChatResults.answered(run, kept, keptCitations, targets,
-                items(retrieved, answered, "company"), items(retrieved, answered, "issue"), limitations,
-                overrode(run, confirmed, answered), writtenPeriod(run, confirmed, answered), clock.instant());
+                items(retrieved, answered, "company"), items(retrieved, answered, "issue"), limitations, partial,
+                notices(directStart, agentNotices), overrode(run, confirmed, answered),
+                writtenPeriod(run, confirmed, answered), clock.instant());
         route.put("outcome", "answered");
         return new ChatEngineOutcome.Completed(result, route);
     }
@@ -514,8 +536,37 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             }
             tools.addAll(p.capabilities());
         }
+        // The web (web search design 1) is the first support of a concept (Q02: one search, tried by default) and the last
+        // resort of a fact question (Q03~Q08: approved only once the internal reads left something unmet). A question
+        // with a service-rule part (Q01) is never offered it: its answer may not rest on the web, and a search cannot yet
+        // be tied to the part it serves.
+        boolean concept = plan.requirements().stream().anyMatch(p -> p.mode() == Mode.GENERAL);
+        boolean fact = plan.requirements().stream().anyMatch(p -> p.mode() == Mode.TOOLS
+                && p.types().stream().anyMatch(WEB_TYPES::contains));
+        boolean rules = plan.requirements().stream().anyMatch(p -> p.types().contains(ChatQueryType.Q01));
+        if ((concept || fact) && !rules && exposed.contains(ChatCapability.WEB_SEARCH)) {
+            // A concept question with no read of its own goes to the agent for its search alone.
+            tools.add(ChatCapability.WEB_SEARCH);
+        }
         return tools.isEmpty() ? null : List.copyOf(tools);
     }
+
+    /** Whether the agent was offered nothing but the web: a concept question with no read of its own. */
+    private static boolean webOnly(List<ChatCapability> tools) {
+        return tools != null && tools.equals(List.of(ChatCapability.WEB_SEARCH));
+    }
+
+    /** What the answer went on without: a direct start, and the web faults of an agent run. */
+    private static List<ChatNotice> notices(boolean directStart, List<String> agentNotices) {
+        List<ChatNotice> notices = new ArrayList<>();
+        if (directStart) notices.add(ChatResults.notice("mcp_direct_start"));
+        agentNotices.forEach(code -> notices.add(ChatResults.notice(code)));
+        return notices;
+    }
+
+    /** The question types whose unmet requirements may fall back on the web (web search design 1). */
+    private static final Set<ChatQueryType> WEB_TYPES = Set.of(ChatQueryType.Q03, ChatQueryType.Q04, ChatQueryType.Q05,
+            ChatQueryType.Q06, ChatQueryType.Q07, ChatQueryType.Q08);
 
     /** The answerable requirements of the plan as the agent sees them: reads with their resolved targets, general parts. */
     private static List<ChatModels.AgentRequirement> agentRequirements(ChatPlan.Run plan) {

@@ -73,13 +73,37 @@ class ChatMcpSendGateTest {
     }
 
     @Test
+    void aWebHitGoesOnlyUnderItsProvidersGrant() {
+        var at = java.time.Instant.parse("2026-10-30T01:00:00Z");
+        var hits = List.of(
+                new com.zoop.chat.tool.ChatWebResult("web-" + "a".repeat(32), "https://news.example.com/a",
+                        "news.example.com", "[합성] HBM", "snippet a", null, "synthetic", at),
+                new com.zoop.chat.tool.ChatWebResult("web-" + "b".repeat(32), "https://news.example.com/b",
+                        "news.example.com", "[합성] EUV", "snippet b", null, "other", at));
+        var output = new ChatToolOutput("web:synthetic", hits.stream()
+                .map(h -> new ChatToolItem(h.id(), "web_result", h.title(), List.of(), List.of())).toList(),
+                List.of(), false, false, List.of(), hits);
+
+        var none = gate(ChatCompanyProfiles.SOURCE_ID).pass(null, output);
+        assertTrue(none.output().webResults().isEmpty() && none.output().items().isEmpty());
+        assertEquals(new ChatMcpSendGate.Withheld(2, 0, 0, 2), none.withheld());
+
+        var synthetic = gate(ChatMcpSendGate.webSource("synthetic")).pass(null, output);
+        assertEquals(List.of("web-" + "a".repeat(32)),
+                synthetic.output().webResults().stream().map(h -> h.id()).toList());
+        assertEquals(List.of("web-" + "a".repeat(32)), synthetic.output().items().stream().map(ChatToolItem::id).toList(),
+                "a hit's item goes with the hit");
+        assertEquals(new ChatMcpSendGate.Withheld(1, 0, 0, 1), synthetic.withheld());
+    }
+
+    @Test
     void everythingGrantedPassesUnchanged() {
         var output = new ChatToolOutput("gv-1", List.of(
                 new ChatToolItem("KRX:000660", "company", "SK하이닉스", List.of("KRX:000660"), List.of("ev-a"))),
                 List.of("ev-a"), false, false);
         var passed = gate(ChatCompanyProfiles.SOURCE_ID, "granted-news").pass(null, output);
         assertSame(output, passed.output());
-        assertEquals(new ChatMcpSendGate.Withheld(0, 0, 0), passed.withheld());
+        assertEquals(new ChatMcpSendGate.Withheld(0, 0, 0, 0), passed.withheld());
         assertEquals(List.of(List.of("ev-a")), asked);
     }
 
@@ -94,7 +118,7 @@ class ChatMcpSendGateTest {
         assertEquals(List.of("ev-a"), out.paths().getFirst().steps().getFirst().evidenceIds());
         assertEquals("gv-1", out.dataVersion());
         assertTrue(out.nextAllowed());
-        assertEquals(new ChatMcpSendGate.Withheld(4, 2, 0), passed.withheld());
+        assertEquals(new ChatMcpSendGate.Withheld(4, 2, 0, 0), passed.withheld());
         assertEquals(List.of(List.of("ev-a", "ev-b", "ev-c")), asked, "every evidence id is placed once");
     }
 

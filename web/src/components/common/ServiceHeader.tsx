@@ -45,13 +45,6 @@ export default function ServiceHeader({
       </nav>
       <div className="relationship-user-tools">
         <button
-          disabled
-          aria-label="AI 기능"
-          title="현재 담당 구현 범위 밖 기능"
-        >
-          <GraphIcon name="ai" size={16} />
-        </button>
-        <button
           aria-label="화면 모드"
           title="라이트·다크 화면 전환"
           onClick={toggleTheme}

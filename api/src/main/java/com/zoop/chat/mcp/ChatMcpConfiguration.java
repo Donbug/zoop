@@ -81,15 +81,23 @@ public class ChatMcpConfiguration {
     @Bean
     @ConditionalOnProperty(name = "zoop.chat.mcp.agent-enabled", havingValue = "true")
     ChatMcpAgent chatMcpAgent(ObjectProvider<ChatModels.Agent> agent, ChatMcpTools tools, ChatMcpGrants grants,
-            ChatSendGrants sendGrants, ChatExecutionRepository runs, ObjectProvider<HttpChatStageClient> client, Clock clock,
-            @Value("${zoop.ai.chat-client.mode:replay}") String mode) {
+            ChatSendGrants sendGrants, ChatExecutionRepository runs, ChatToolRunner runner,
+            ObjectProvider<HttpChatStageClient> client, Clock clock,
+            @Value("${zoop.ai.chat-client.mode:replay}") String mode,
+            @Value("${zoop.chat.web.enabled:false}") boolean web) {
+        // Until an answer can cite a web hit (web_reported, web_result), what Luna read on the web could reach an answer
+        // with nothing to check it against: the two stay apart (api/docs/chat-web-search.md).
+        if (web) {
+            throw new IllegalStateException("zoop.chat.web.enabled and zoop.chat.mcp.agent-enabled cannot be on together "
+                    + "until web results can be cited");
+        }
         ChatModels.Agent stages = agent.getIfAvailable();
         HttpChatStageClient transport = client.getIfAvailable();
         if (stages == null || transport == null) {
             throw new IllegalStateException("zoop.chat.mcp.agent-enabled needs the chat model stages (zoop.ai.chat-client.enabled)");
         }
         var circuit = "replay".equals(mode) ? null : new ChatMcpCircuitBreaker(transport::probeMcp, clock);
-        return new ChatMcpAgent(stages, tools, grants, sendGrants.recipient(), runs, PROTOCOL_JSON, circuit);
+        return new ChatMcpAgent(stages, tools, grants, sendGrants.recipient(), runs, runner, circuit);
     }
 
     @Bean(destroyMethod = "")

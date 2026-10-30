@@ -2006,7 +2006,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getConversation",
       "severity": "difference",
-      "message": "목표만 175 · BFF만 32 · 형식/필수/권한 변경 23",
+      "message": "목표만 187 · BFF만 32 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2027,7 +2027,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCurrentConversation",
       "severity": "difference",
-      "message": "목표만 175 · BFF만 32 · 형식/필수/권한 변경 23",
+      "message": "목표만 187 · BFF만 32 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2041,7 +2041,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "submitQuestion",
       "severity": "difference",
-      "message": "목표만 295 · BFF만 34 · 형식/필수/권한 변경 42",
+      "message": "목표만 319 · BFF만 34 · 형식/필수/권한 변경 42",
       "source": ""
     },
     {
@@ -2055,7 +2055,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getQuestionJob",
       "severity": "difference",
-      "message": "목표만 192 · BFF만 23 · 형식/필수/권한 변경 23",
+      "message": "목표만 204 · BFF만 23 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2069,7 +2069,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "retryQuestionJob",
       "severity": "difference",
-      "message": "목표만 285 · BFF만 34 · 형식/필수/권한 변경 39",
+      "message": "목표만 309 · BFF만 34 · 형식/필수/권한 변경 39",
       "source": ""
     },
     {
@@ -2083,7 +2083,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "cancelQuestionJob",
       "severity": "difference",
-      "message": "목표만 223 · BFF만 23 · 형식/필수/권한 변경 23",
+      "message": "목표만 235 · BFF만 23 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {

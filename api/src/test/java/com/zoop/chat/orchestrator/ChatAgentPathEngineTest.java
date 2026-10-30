@@ -55,6 +55,8 @@ class ChatAgentPathEngineTest {
             EV_HYNIX, citation(EV_HYNIX), EV_NVDA, citation(EV_NVDA));
     private ChatRouteDecision decision;
     private ChatGeneratedAnswer directAnswer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
+    /** Evidence the direct company read returns for {@link #HYNIX}; none by default. */
+    private List<String> directEvidence = List.of();
     private ChatSemanticVerdicts verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
     private int verifierCalls;
     /** The engine's clock; the router moves it on by {@link #routerTakes}, as a router call spends time. */
@@ -74,6 +76,7 @@ class ChatAgentPathEngineTest {
         final List<Boolean> closing = new ArrayList<>();
         ChatGeneratedAnswer answer;
         List<ChatToolResult> results = List.of();
+        List<String> notices = List.of();
         boolean available = true;
         ChatModels.Failure failure;
 
@@ -100,7 +103,7 @@ class ChatAgentPathEngineTest {
             // One step through the engine's guard and limit, like the real path.
             closing.add(steps.closing());
             steps.run(() -> new ChatModels.AgentStep("resp_1", List.of(), answer));
-            return new Outcome(answer, results, 1, 1, 0);
+            return new Outcome(answer, results, 1, 1, 0, notices);
         }
     }
 
@@ -132,6 +135,70 @@ class ChatAgentPathEngineTest {
         assertEquals(1, verifierCalls);
         assertEquals(List.of("retrieving", "verifying"), control.phases);
         assertEquals(3, control.modelCalls, "router, one agent step, verifier");
+    }
+
+    @Test
+    void aFactQuestionsAgentRunIsOfferedTheWebAndItsWebFaultsBecomeNotices() {
+        // D-AI-02: the web is offered beside the internal reads of a fact question; the answer says what it went without.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH));
+        agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of(),
+                List.of());
+        agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
+        agent.notices = List.of("web_unavailable", "web_budget_exhausted");
+
+        ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+
+        assertEquals(List.of(List.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH)), agent.allowed);
+        assertEquals("complete", result.answerStatus(), "a web fault leaves nothing unanswered");
+        assertEquals(List.of("web_unavailable", "web_budget_exhausted"),
+                result.notices().stream().map(n -> n.code()).toList());
+    }
+
+    @Test
+    void aConceptQuestionGoesToTheAgentForItsSearchAndWithoutItSaysTheWebWasNotUsed() {
+        // D-AI-02: a concept (Q02) is the web's first use; it has no read of its own, so the agent gets the search alone.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH));
+        agent.answer = new ChatGeneratedAnswer(List.of(new Section("general_knowledge", "HBM은 쌓은 D램이에요.",
+                List.of("r1"), List.of())), List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
+
+        ChatResult viaAgent = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertEquals(List.of(List.of(ChatCapability.WEB_SEARCH)), agent.allowed);
+        assertTrue(generated.isEmpty(), "the direct generator is not called");
+        assertEquals("general_knowledge", viaAgent.answerBasis());
+
+        // The agent cannot start: the concept is answered on the direct path, without the web, and says so.
+        agent.available = false;
+        directAnswer = agent.answer;
+        ChatResult direct = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertEquals(1, generated.size());
+        assertEquals(List.of("web_unavailable"), direct.notices().stream().map(n -> n.code()).toList(),
+                "not mcp_direct_start: there was nothing to read but the web");
+
+        // Without the web, a concept question stays on the direct path as before.
+        generated.clear();
+        var plain = new Agent(Set.of(ChatCapability.COMPANY_READ));
+        assertInstanceOf(ChatEngineOutcome.Completed.class, engine(plain).answer(run(), new Control(Duration.ofSeconds(60))));
+        assertTrue(plain.requirements.isEmpty());
+        assertEquals(1, generated.size());
+    }
+
+    @Test
+    void aQuestionWithAServiceRulePartIsNeverOfferedTheWeb() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q01, 0.9, ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH));
+        agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of(),
+                List.of());
+        agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
+        engine(agent).answer(run(), new Control(Duration.ofSeconds(60)));
+        assertEquals(List.of(List.of(ChatCapability.COMPANY_READ)), agent.allowed);
     }
 
     @Test
@@ -194,6 +261,38 @@ class ChatAgentPathEngineTest {
                 engine(new Agent(Set.of())).answer(run(), new Control(Duration.ofSeconds(60)))).routeSummary();
         assertEquals("direct", plain.path("path").asString());
         assertTrue(plain.path("agentPreflight").isMissingNode());
+    }
+
+    @Test
+    void aDirectStartAnswerIsCompleteAndCarriesTheDirectStartNotice() {
+        // D-AI-02: the member sees why the answer came by the server's own path, and that it is still a full answer.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of(HYNIX)));
+        directEvidence = List.of(EV_HYNIX);
+        directAnswer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of(),
+                List.of());
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ));
+        agent.available = false;
+
+        ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+
+        assertEquals("answered", result.outcome());
+        assertEquals("complete", result.answerStatus());
+        assertEquals(List.of("mcp_direct_start"), result.notices().stream().map(n -> n.code()).toList());
+        assertTrue(result.notices().getFirst().labels().isEmpty(), "it concerns the whole run");
+
+        // An agent answer, or a direct run that never was an agent candidate, has no notice.
+        agent.available = true;
+        agent.answer = directAnswer;
+        agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
+        var viaAgent = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertEquals("complete", viaAgent.answerStatus());
+        assertTrue(viaAgent.notices().isEmpty());
+        var plain = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(new Agent(Set.of())).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertTrue(plain.notices().isEmpty());
     }
 
     @Test
@@ -286,7 +385,9 @@ class ChatAgentPathEngineTest {
         ChatTool company = new ChatTool() {
             public ChatCapability capability() { return ChatCapability.COMPANY_READ; }
             public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
-                return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
+                if (directEvidence.isEmpty()) return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
+                return new ChatToolOutput(scope.graphVersionId(), List.of(new ChatToolItem(HYNIX, "company", "기업",
+                        List.of(HYNIX), directEvidence)), directEvidence, false, false);
             }
         };
         ChatTool issue = new ChatTool() {
@@ -306,7 +407,7 @@ class ChatAgentPathEngineTest {
             generated.add(context);
             return directAnswer;
         };
-        ChatModels.Verifier verifier = (run, sections, citations) -> {
+        ChatModels.Verifier verifier = (run, sections, citations, facts) -> {
             verifierCalls++;
             return verdicts;
         };

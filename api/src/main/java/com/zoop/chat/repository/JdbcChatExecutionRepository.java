@@ -1,6 +1,8 @@
 package com.zoop.chat.repository;
 
 import java.sql.Array;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -148,12 +150,44 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
     }
 
     @Override
-    public int countJobToolCalls(String jobId, int attemptNo) {
+    public int countJobToolCalls(String jobId, int attemptNo, boolean web) {
         Integer count = jdbc.queryForObject("""
                 SELECT count(*) FROM chat_tool_calls
-                 WHERE chat_job_id = :id AND (attempt_no = :attempt OR status <> 'cancelled')
-                """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo), Integer.class);
+                 WHERE chat_job_id = :id
+                   AND (registry_group = 'web-search') = :web
+                   AND (:web OR attempt_no = :attempt OR status <> 'cancelled')
+                """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo).addValue("web", web),
+                Integer.class);
         return count == null ? 0 : count;
+    }
+
+    @Override
+    public String takeWebSearchQuota(String memberId, java.time.LocalDate day, int calls, int memberCap, int projectCap) {
+        var params = new MapSqlParameterSource().addValue("day", day).addValue("member", memberId)
+                .addValue("memberKey", "member:" + memberId).addValue("calls", calls)
+                .addValue("memberCap", memberCap).addValue("projectCap", projectCap);
+        jdbc.update("""
+                INSERT INTO chat_web_search_quotas (quota_date, subject_key, member_id, used)
+                VALUES (:day, 'project', NULL, 0), (:day, :memberKey, :member, 0)
+                ON CONFLICT (quota_date, subject_key) DO NOTHING
+                """, params);
+        // The project row first, then the member's: every caller locks them in the same order.
+        if (jdbc.update("""
+                UPDATE chat_web_search_quotas SET used = used + :calls
+                 WHERE quota_date = :day AND subject_key = 'project' AND used + :calls <= :projectCap
+                """, params) != 1) return "project";
+        if (jdbc.update("""
+                UPDATE chat_web_search_quotas SET used = used + :calls
+                 WHERE quota_date = :day AND subject_key = :memberKey AND used + :calls <= :memberCap
+                """, params) != 1) {
+            // Give the project's back: the caller refuses the reservation, and nothing may stay taken.
+            jdbc.update("""
+                    UPDATE chat_web_search_quotas SET used = used - :calls
+                     WHERE quota_date = :day AND subject_key = 'project'
+                    """, params);
+            return "member";
+        }
+        return null;
     }
 
     @Override
@@ -211,29 +245,34 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
                 .addValue("nextAllowed", end.nextAllowed()).addValue("result", end.result())) == 1;
     }
 
+    /** A kept result with its reservation and owner, which is what binds it back to the run that made the call. */
+    private static final String KEPT_TOOL_RESULT = """
+            SELECT c.chat_job_id, s.member_id, c.attempt_no, c.tool_call_id, c.capability_id,
+                   c.request_meta::text AS request_meta, c.input_digest, c.result::text AS result
+              FROM chat_tool_calls c JOIN chat_jobs j ON j.id = c.chat_job_id JOIN chat_sessions s ON s.id = j.session_id
+             WHERE c.chat_job_id = :id AND c.attempt_no = :attempt AND c.status = 'succeeded' AND c.result IS NOT NULL
+            """;
+
+    private static ChatKeptToolResult keptToolResult(ResultSet rs, int index) throws SQLException {
+        return new ChatKeptToolResult(rs.getString("chat_job_id"), rs.getString("member_id"), rs.getInt("attempt_no"),
+                rs.getString("tool_call_id"), rs.getString("capability_id"), rs.getString("request_meta"),
+                rs.getString("input_digest"), rs.getString("result"));
+    }
+
     @Override
     public List<ChatKeptToolResult> keptToolResults(String jobId, int attemptNo) {
-        return jdbc.query("""
-                SELECT tool_call_id, capability_id, result::text AS result FROM chat_tool_calls
-                 WHERE chat_job_id = :id AND attempt_no = :attempt AND status = 'succeeded' AND result IS NOT NULL
-                 ORDER BY call_index
-                """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo),
-                (rs, index) -> new ChatKeptToolResult(rs.getString("tool_call_id"), rs.getString("capability_id"),
-                        rs.getString("result")));
+        return jdbc.query(KEPT_TOOL_RESULT + " ORDER BY c.call_index",
+                new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo),
+                JdbcChatExecutionRepository::keptToolResult);
     }
 
     @Override
     public Optional<ChatKeptToolResult> findKeptToolResult(String jobId, int attemptNo, String capabilityId,
             String inputDigest) {
-        return jdbc.query("""
-                SELECT tool_call_id, capability_id, result::text AS result FROM chat_tool_calls
-                 WHERE chat_job_id = :id AND attempt_no = :attempt AND capability_id = :capability AND input_digest = :digest
-                   AND status = 'succeeded' AND result IS NOT NULL
-                 ORDER BY call_index LIMIT 1
-                """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo)
-                .addValue("capability", capabilityId).addValue("digest", inputDigest),
-                (rs, index) -> new ChatKeptToolResult(rs.getString("tool_call_id"), rs.getString("capability_id"),
-                        rs.getString("result"))).stream().findFirst();
+        return jdbc.query(KEPT_TOOL_RESULT + " AND c.capability_id = :capability AND c.input_digest = :digest"
+                + " ORDER BY c.call_index LIMIT 1", new MapSqlParameterSource().addValue("id", jobId)
+                .addValue("attempt", attemptNo).addValue("capability", capabilityId).addValue("digest", inputDigest),
+                JdbcChatExecutionRepository::keptToolResult).stream().findFirst();
     }
 
     @Override

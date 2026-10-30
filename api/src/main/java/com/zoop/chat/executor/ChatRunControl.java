@@ -41,9 +41,11 @@ public interface ChatRunControl {
 
     /**
      * Records a confirmed plan's calls as {@code reserved} {@code chat_tool_calls} rows of this attempt, continuing its call
-     * index, and returns their tool-call ids in order. A job holds at most {@link #MAX_TOOL_CALLS} calls across plan
+     * index, and returns their tool-call ids in order. A job holds at most {@link #MAX_TOOL_CALLS} internal calls across plan
      * revisions and attempts ({@link #toolCallsLeft}); a plan that would exceed it is refused with
-     * {@link IllegalArgumentException} and nothing is reserved.
+     * {@link IllegalArgumentException} and nothing is reserved. Web searches among the calls also take the job's
+     * {@link #MAX_WEB_CALLS} and the KST day's member and project quotas in the same step; too few left of any refuses the
+     * whole plan with {@link ChatWebBudgetExhausted}, and nothing is reserved or taken.
      */
     List<String> reserveToolCalls(int planRevision, List<ChatToolCallReservation> calls);
 
@@ -79,9 +81,18 @@ public interface ChatRunControl {
     String RESULTS_OVER_BUDGET = "job_results_too_large";
 
     /**
-     * Tool calls one job may make across its attempts, supplementary rounds, failures and agent approvals included (MCP
-     * actions contract 3.2: 8 per job, at most 6 internal and 2 web). Every bound read is internal until a web search tool
-     * exists, so the cap is the internal 6; the 2 web calls come with that tool, counted apart.
+     * Internal tool calls one job may make across its attempts, supplementary rounds, failures and agent approvals included
+     * (MCP actions contract 3.2: 8 per job, at most 6 internal and 2 web). Web searches are counted apart
+     * ({@link #MAX_WEB_CALLS}).
      */
     int MAX_TOOL_CALLS = 6;
+
+    /** Web searches one job may make, counted like {@link #MAX_TOOL_CALLS} but apart from the internal reads. */
+    int MAX_WEB_CALLS = 2;
+
+    /** Web searches one member may make per KST day, across jobs (web search design 3). */
+    int MEMBER_DAILY_WEB_CALLS = 20;
+
+    /** Web searches the whole project may make per KST day. */
+    int PROJECT_DAILY_WEB_CALLS = 500;
 }

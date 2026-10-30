@@ -64,7 +64,7 @@ public sealed interface ChatPlan {
         /** Id and label suffixes of a member-scope source. */
         static final String SCOPE_ID = "-s";
         static final String SCOPE_LABEL = " — 내 종목";
-        /** The longest label the answer stage takes, in code points (zoop-ai-chat-1 {@code Branch.label}). */
+        /** The longest label the answer stage takes, in code points (zoop-ai-chat-2 {@code Branch.label}). */
         static final int MAX_LABEL = ChatJobRequest.MAX_QUESTION;
 
         public Planned {

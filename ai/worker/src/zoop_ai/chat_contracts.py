@@ -1,13 +1,13 @@
 """Versioned process contract of the chatbot model stages (`zoop-ai-chat`), separate from the S1 document contract.
 
-Three stages, each one provider call (ZOOP-AIG-001 6.3.2: router and post-verification keep their own question sets, policy
+Four stages, each one provider call (ZOOP-AIG-001 6.3.2: router and post-verification keep their own question sets, policy
 versions, purposes, receipts and failure states apart from S1):
 
 - `chat-router`: native Jev, typed Noul probabilities per requirement for the Q01-Q08 tags, the bound capabilities and
   prohibited advice.
 - `chat-answer`: Luna `answer-generator`, a strict JSON answer by sections over the branch context.
-- `chat-verification`: native Jev, per section a support Choice (sections with quotes only: evidence and ZOOP document
-  sections) and a prohibited-advice Noul.
+- `chat-verification`: native Jev, per grounded section a support Choice over quotes and server observations, and a
+  prohibited-advice Noul for every section.
 - `chat-agent`: one step of a Luna Responses run that calls the ZOOP MCP tools (ZOOP-AIG-001 v0.11 6.3, MCP actions contract
   3.4). Every tool call is held for the application's approval (`require_approval=always`): a step ends either at approval
   requests or with the final answer, and the application resumes the stored response with its decisions. This runtime never
@@ -20,13 +20,13 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Field, model_validator
 
 from .contracts import Wire
 
-CHAT_SCHEMA_VERSION = "zoop-ai-chat-1"
+CHAT_SCHEMA_VERSION = "zoop-ai-chat-2"
 ChatStage = Literal["chat-router", "chat-answer", "chat-verification", "chat-agent"]
 QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
 # `zoop_documented` rests on ZOOP's own approved documents (policies), `evidence_grounded` on public evidence.
@@ -296,19 +296,133 @@ class AgentAnswer(Wire):
         return self
 
 
+class RequestBinding(Wire):
+    """Application invocation, not a member identifier; the service validates it before principal namespacing."""
+    invocation_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{8,96}$")
+    graph_version_id: str | None = Field(max_length=200)
+    as_of: str | None
+
+    @model_validator(mode="after")
+    def dated(self):
+        if self.as_of is not None and datetime.fromisoformat(self.as_of).tzinfo is None:
+            raise ValueError("asOf requires timezone")
+        return self
+
+
+class MemberCompany(Wire):
+    company_id: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=300)
+    held: bool
+    watched: bool
+
+    @model_validator(mode="after")
+    def membership(self):
+        if not self.held and not self.watched:
+            raise ValueError("a member company is held or watched")
+        if ":" not in self.company_id or self.company_id.startswith("member:"):
+            raise ValueError("company id required")
+        return self
+
+
+class PortfolioFact(Wire):
+    kind: Literal["portfolio_scope"]
+    requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
+    timing: Literal["current_request_read"]
+    query_scope: Literal["current_member", "named_companies"]
+    company_ids: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(max_length=5)
+    companies: list[MemberCompany] = Field(max_length=5)
+    truncated: bool
+    company_limit: Literal[5]
+
+    @model_validator(mode="after")
+    def scoped(self):
+        ids = [c.company_id for c in self.companies]
+        if len(set(ids)) != len(ids) or len(set(self.company_ids)) != len(self.company_ids):
+            raise ValueError("company ids must be distinct")
+        if self.query_scope == "current_member" and self.company_ids:
+            raise ValueError("current member scope has no named targets")
+        if self.query_scope == "named_companies" and (
+                not self.company_ids or not set(ids) <= set(self.company_ids)):
+            raise ValueError("named membership is limited to queried companies")
+        if any(":" not in i or i.startswith("member:") for i in self.company_ids):
+            raise ValueError("company id required")
+        return self
+
+
+class GraphChange(Wire):
+    id: str = Field(min_length=1, max_length=200)
+    kind: Literal["company", "issue", "edge"]
+    name: str = Field(min_length=1, max_length=300)
+    change: Literal["added", "removed"]
+
+
+class ComparisonFact(Wire):
+    kind: Literal["graph_comparison"]
+    requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
+    from_version: str = Field(min_length=1, max_length=200)
+    to_version: str = Field(min_length=1, max_length=200)
+    as_of: str | None
+    since: str | None
+    query_scope: Literal["whole_graph", "targets"]
+    target_ids: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(max_length=5)
+    evidence_limit: int = Field(ge=1, le=MAX_CITATIONS)
+    change_limit: Literal[40]
+    evidence_restricted: bool
+    changes: list[GraphChange] = Field(max_length=40)
+    truncated: bool
+
+    @model_validator(mode="after")
+    def scoped(self):
+        if (self.query_scope == "whole_graph") != (not self.target_ids):
+            raise ValueError("comparison targets must match query scope")
+        if len(set(self.target_ids)) != len(self.target_ids) or any(
+                i.startswith(("member:", "ev-")) or i == "graph:public" for i in self.target_ids):
+            raise ValueError("comparison target ids invalid")
+        for value in (self.as_of, self.since):
+            if value is not None and datetime.fromisoformat(value).tzinfo is None:
+                raise ValueError("comparison time requires timezone")
+        if self.from_version == self.to_version and self.changes:
+            raise ValueError("one version cannot differ from itself")
+        return self
+
+
+ServerFact = Annotated[PortfolioFact | ComparisonFact, Field(discriminator="kind")]
+
+
 class VerifySection(Wire):
+    section_id: str = Field(pattern=r"^s([0-9]|1[01])$")
+    requirement_ids: list[Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")]] = Field(
+        min_length=1, max_length=MAX_REQUIREMENTS)
     basis: Basis
     text: str = Field(min_length=1, max_length=MAX_TEXT)
     evidence_ids: list[str] = Field(max_length=MAX_CITATIONS)
+    server_facts: list[ServerFact] = Field(max_length=72)
 
 
 class VerificationInput(Wire):
+    request_binding: RequestBinding
     sections: list[VerifySection] = Field(min_length=1, max_length=MAX_SECTIONS)
     citations: list[Quote] = Field(max_length=MAX_CITATIONS)
 
     @model_validator(mode="after")
     def cited_exist(self):
         known = {c.evidence_id for c in self.citations}
+        if len(known) != len(self.citations):
+            raise ValueError("citation ids must be distinct")
+        for index, section in enumerate(self.sections):
+            if section.section_id != f"s{index}":
+                raise ValueError("section ids must match their ordered positions")
+            if len(set(section.requirement_ids)) != len(section.requirement_ids):
+                raise ValueError("section requirement ids must be distinct")
+            if section.basis != "evidence_grounded" and section.server_facts:
+                raise ValueError("only evidence sections may use server facts")
+            for fact in section.server_facts:
+                if fact.requirement_id not in section.requirement_ids:
+                    raise ValueError("server fact belongs to another branch")
+                if isinstance(fact, ComparisonFact) and (
+                        fact.to_version != self.request_binding.graph_version_id
+                        or fact.as_of != self.request_binding.as_of):
+                    raise ValueError("comparison belongs to another version or asOf")
         for section in self.sections:
             if section.basis == "general_knowledge" and section.evidence_ids:
                 raise ValueError("a general section cites nothing")
@@ -333,14 +447,19 @@ INPUTS: dict[str, type[Wire]] = {"chat-router": RouterInput, "chat-answer": Answ
 class StageRequest(Wire):
     """What the application asks of one stage. `invocation_id` identifies the attempt's stage: the same id with the same input
     returns the stored outcome and never sends again; the same id with another input is refused."""
-    schema_version: Literal["zoop-ai-chat-1"]
+    schema_version: Literal["zoop-ai-chat-2"]
     invocation_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{8,160}$")
     stage: ChatStage
     mode: Literal["replay", "live"]
     input: dict[str, Any]
 
     def parsed(self) -> Wire:
-        return INPUTS[self.stage].model_validate(self.input)
+        parsed = INPUTS[self.stage].model_validate(self.input)
+        if isinstance(parsed, VerificationInput):
+            invocation = parsed.request_binding.invocation_id
+            if self.invocation_id != invocation and self.invocation_id.partition(":")[2] != invocation:
+                raise ValueError("verification belongs to another invocation")
+        return parsed
 
     def quotes(self) -> list[Quote]:
         parsed = self.parsed()
@@ -379,7 +498,7 @@ class StageFailure(Wire):
 
 
 class StageResult(Wire):
-    schema_version: Literal["zoop-ai-chat-1"]
+    schema_version: Literal["zoop-ai-chat-2"]
     invocation_id: str
     stage: ChatStage
     status: Literal["succeeded", "failed"]

@@ -1,5 +1,13 @@
 import BriefingRoundIssuePanel from '@/components/graph/BriefingRoundIssuePanel';
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import {
   GraphAppearanceContext,
   type GraphAppearance,
@@ -16,7 +24,6 @@ import GraphIcon from '@/components/graph/GraphIcon';
 import GraphTutorial from '@/components/graph/GraphTutorial';
 import { tutorialTarget } from '@/components/graph/tutorial/tutorial-target';
 import GraphFocusControls from '@/components/graph/GraphFocusControls';
-import GraphHelp from '@/components/graph/GraphHelp';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import CompanyPathPanel from '@/components/graph/CompanyPathPanel';
 import { companyPath } from '@/components/graph/company-path';
@@ -82,6 +89,22 @@ import { readSocialLinkResult } from '@/components/common/socialLinkResult';
 // and keeps it when the same member's session is restored after a reload.
 const FILTER_KEY = 'zoop.graph.personal-filter';
 const SIDEBAR_KEY = 'zoop:sidebar-open';
+const COMPANY_PANEL_WIDTH_KEY = 'zoop:graph-company-panel-width';
+const COMPANY_PANEL_MIN_WIDTH = 280;
+const COMPANY_PANEL_DEFAULT_WIDTH = 320;
+const COMPANY_PANEL_MAX_WIDTH = 560;
+function readCompanyPanelWidth() {
+  try {
+    const saved = Number(localStorage.getItem(COMPANY_PANEL_WIDTH_KEY));
+    return Number.isFinite(saved) &&
+      saved >= COMPANY_PANEL_MIN_WIDTH &&
+      saved <= COMPANY_PANEL_MAX_WIDTH
+      ? saved
+      : COMPANY_PANEL_DEFAULT_WIDTH;
+  } catch {
+    return COMPANY_PANEL_DEFAULT_WIDTH;
+  }
+}
 function readSidebarPreference(): boolean | null {
   try {
     const saved = localStorage.getItem(SIDEBAR_KEY);
@@ -209,6 +232,9 @@ function MapWorkspace({
   const [sidebarPreference, setSidebarPreference] = useState(
     readSidebarPreference,
   );
+  const [companyPanelWidth, setCompanyPanelWidth] = useState(
+    readCompanyPanelWidth,
+  );
   const [wideViewport, setWideViewport] = useState(
     () =>
       typeof window.matchMedia === 'function' &&
@@ -235,6 +261,51 @@ function MapWorkspace({
     } catch {
       /* Keep this visit's preference. */
     }
+  }
+  function maxCompanyPanelWidth(handle: HTMLElement) {
+    const bodyWidth = handle.parentElement?.getBoundingClientRect().width ?? 0;
+    if (bodyWidth === 0) return COMPANY_PANEL_MAX_WIDTH;
+    const holdingsWidth =
+      document.getElementById('holdings-sidebar')?.getBoundingClientRect()
+        .width ?? 0;
+    return Math.max(
+      COMPANY_PANEL_MIN_WIDTH,
+      Math.min(COMPANY_PANEL_MAX_WIDTH, bodyWidth - holdingsWidth - 300),
+    );
+  }
+  function changeCompanyPanelWidth(
+    width: number,
+    max = COMPANY_PANEL_MAX_WIDTH,
+  ) {
+    const next = Math.round(
+      Math.min(max, Math.max(COMPANY_PANEL_MIN_WIDTH, width)),
+    );
+    setCompanyPanelWidth(next);
+    try {
+      localStorage.setItem(COMPANY_PANEL_WIDTH_KEY, String(next));
+    } catch {
+      /* Keep this visit's preference. */
+    }
+  }
+  function resizeCompanyPanel(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.buttons === 0) return;
+    const body = event.currentTarget.parentElement;
+    if (!body) return;
+    changeCompanyPanelWidth(
+      body.getBoundingClientRect().right - event.clientX,
+      maxCompanyPanelWidth(event.currentTarget),
+    );
+  }
+  function handleCompanyPanelResizeKeyDown(
+    event: ReactKeyboardEvent<HTMLDivElement>,
+  ) {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const delta = event.key === 'ArrowLeft' ? 16 : -16;
+    changeCompanyPanelWidth(
+      companyPanelWidth + delta,
+      maxCompanyPanelWidth(event.currentTarget),
+    );
   }
   const [collapsedPath, setCollapsedPath] = useState<string | null>(null);
   const [filterHost, setFilterHost] = useState<HTMLDivElement | null>(null);
@@ -332,7 +403,7 @@ function MapWorkspace({
                 ? `지도에서 강조된 「${target.issue.label}」 사건을 누르세요. ${target.company.label} 상세의 같은 사건을 눌러도 영향 경로를 열 수 있어요.`
                 : tutorialStep === 4
                   ? '영향 경로 패널의 강조된 「근거 N건 보기」를 눌러 실제 기사·공시를 확인하세요.'
-                  : '「AI에게 묻기」로 선택한 기업·사건을 질문에 연결할 수 있어요. 강조된 버튼을 누르면 AI 창을 열지 않고 튜토리얼을 마쳐요.';
+                  : '「AI에게 질문」 버튼으로 선택한 기업·사건을 질문에 연결할 수 있어요. 강조된 버튼을 누르면 AI 창을 열지 않고 튜토리얼을 마쳐요.';
 
   useEffect(() => {
     if (
@@ -1003,7 +1074,6 @@ function MapWorkspace({
               </>
             )}
             <div className="relationship-toolbar-help">
-              <GraphHelp disabled={tutorialOpen} />
               <button
                 onClick={() => setNotice(notice === 'info' ? '' : 'info')}
                 aria-label="지도 데이터 안내"
@@ -1263,6 +1333,29 @@ function MapWorkspace({
                 />
               </div>
             )}
+            {companyNode &&
+              !impactIssueId &&
+              !pathFrom &&
+              !pathIsCollapsed &&
+              !tutorialOpen && (
+                <div
+                  role="separator"
+                  aria-label="기업 패널 너비 조절"
+                  aria-controls="company-detail-panel"
+                  aria-orientation="vertical"
+                  aria-valuemin={COMPANY_PANEL_MIN_WIDTH}
+                  aria-valuemax={COMPANY_PANEL_MAX_WIDTH}
+                  aria-valuenow={companyPanelWidth}
+                  aria-valuetext={`${companyPanelWidth}픽셀`}
+                  tabIndex={0}
+                  className="company-panel-resizer"
+                  onPointerDown={(event) =>
+                    event.currentTarget.setPointerCapture(event.pointerId)
+                  }
+                  onPointerMove={resizeCompanyPanel}
+                  onKeyDown={handleCompanyPanelResizeKeyDown}
+                />
+              )}
             <MapDetailSheet
               tutorialLocked={Boolean(
                 tutorialOpen && tutorialStep && tutorialStep < 5,
@@ -1314,6 +1407,7 @@ function MapWorkspace({
                 <CompanyDetailPanel
                   key={companyNode.id}
                   companyId={companyNode.id}
+                  panelWidth={companyPanelWidth}
                   companyDetailHref={(id) =>
                     companyDetailRouteFromMap(id, params.toString())
                   }
@@ -1335,15 +1429,6 @@ function MapWorkspace({
                   onFocus={() =>
                     updateQuery({ focus: companyNode.id, hops: '1' })
                   }
-                  onConnections={() => {
-                    updateQuery({
-                      path: companyNode.id,
-                      select: null,
-                      focus: null,
-                      hops: null,
-                      impact: null,
-                    });
-                  }}
                   onSelectRelation={(companyId) => {
                     const edge = data?.edges.find(
                       (item) =>

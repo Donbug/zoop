@@ -57,6 +57,8 @@
 
 ### 구현된 도구 결정 기록 (현재 코드 기준)
 
+Q06 `briefing.read`(2026-10-30, `chat-tools/v7`): 요구 문구의 날짜(오늘·어제·날짜)와 회차(아침·출근 → 출근, 저녁·퇴근 → 퇴근)로 발행 회차를 서버가 정하고(`briefing:<date>[:<edition>]`, 둘 다 없으면 최신 발행 회차), 질문이 기업을 지목하면 그 기업이 관련된 이슈만 남긴다. 공개 브리핑 조회(`GET /api/v1/briefings`)를 그대로 거쳐 권리·정정·제공 중단이 같게 적용되고, 발행되지 않았거나 중단된 회차, 질문 시점(asOf) 뒤에 발행된 회차는 읽을 이슈가 없다. 이슈의 근거는 실행의 고정 그래프 버전·asOf에서 지금 인용할 수 있는 것만 넘긴다. 회차를 요구 문구에서 정하므로 agent 경로(MCP)에는 노출하지 않는다.
+
 아래는 이미 구현된 direct 경로(`chat-tools/v5`)의 사용자 승인 결정이다. MCP 전환 뒤에도 같은 Tool Service의 동작 기준으로 유지하며, 목표 변경(예: Q07 `portfolio.scope.read`의 Java server-only 실행)은 2026-10-28 절을 따른다.
 
 Q05 기간 비교의 잠정 결정(2026-10-27, 사용자 승인, 평가 세트로 보정 전): (7) 비교 기준은 질문에 적힌 기간이다. 정해진 한국어 표현(오늘·어제·그제, 이번 주·지난주, 이번 달·지난달, N일·N주·N달 전, 최근 N일·N주, `YYYY-MM-DD`, `M월 D일`)만 서버가 KST로 결정론적으로 해석하고(`ChatPeriods`), 여러 표현은 가장 이른 시작부터 가장 늦은 끝까지 한 기간으로 묶는다. 기간 시작 시각(KST 자정)에 공개돼 있던 지도와 작업이 고정한 지도를 비교한다. 질문에 기간이 없으면 회원이 고른 기간, 그것도 없으면 고정 지도 직전에 공개됐던 지도와 비교한다. 해석한 기간은 결과의 `applied.period`(`basis=question`, `expression`)로 보인다. (8) `graph.version.diff`는 대상(기업·사건)을 지목하면 그와 관련된 변화만, 아니면 지도 전체 변화를 최대 40건 돌려주고, 추가된 항목만 지금 고정 지도의 근거를 싣는다. 비교할 이전 공개 지도가 없으면 "변화 없음"이 아니라 잘린 조회(`truncated`)다. 레지스트리는 `chat-tools/v3`다.
@@ -97,7 +99,7 @@ flowchart LR
 | 1 저장·job 수명주기 | 부분 구현 | recovery artifact와 실제 `save_only` 복구 |
 | 2 오케스트레이터 | 부분 구현 | 8/6/2·45초 deadline, 요청 cache·single-flight, 서버 requirement coverage |
 | 3 router·Luna agent | 부분 구현 | Jev router는 구현, Luna Responses MCP 실행은 미구현 |
-| 4 읽기 도구 | 부분 구현 | Q03 일부, Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`) 구현, Q01 일부·Q06·Q08 미연결 |
+| 4 읽기 도구 | 부분 구현 | Q03 일부, Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`, 2026-10-30) 구현, Q01 일부·Q08·`briefing.evidence` 미연결 |
 | 5 생성·출력 검증 | 부분 구현 | 구간 단위 생성·검증은 구현, claim 단위 검증·token guard 미구현 |
 | 6 웹 | 구현 | OpenAPI 타입 생성 seam, 실제 백엔드와의 종단 확인 |
 | 7 평가·출시 | 부분 구현 | 고정 평가 세트 v1(대본 실행)만 있음. 실제 모델·데이터 평가와 임계값 보정, 보안·종단·배포 증명 |
@@ -146,6 +148,8 @@ flowchart LR
 현재 상태(2026-10-28, AI 쪽): `zoop-ai-chat-1`에 새 단계 `chat-agent`를 추가했다(기존 `chat-answer`는 direct 시작 경로용으로 유지). 한 단계 = Luna Responses 요청 1회(`/responses`, `gpt-6-luna`·`medium`·`store=true`, ZOOP MCP 도구 하나·`require_approval=always`·`allowed_tools`, grant는 도구의 `authorization`으로 매 단계 전송, 서버 URL은 요청이 아닌 운영자 설정 `ZOOP_AI_CHAT_MCP_SERVER_URL`만, 답변 형식은 `chat-answer`와 같은 `ChatAnswer` strict schema)이며, 첫 단계는 turns·requirements를, 이어지는 단계는 `continuation.previousResponseId`와 Java의 승인 결정을 `mcp_approval_response`로만 전달한다. 결과는 `approval_required`(보류된 호출 목록, 답변 없음) 또는 `completed`(최종 답변과 그 단계의 MCP 호출 요약)다. AI runtime은 승인하지 않고, 다른 서버·허용 밖 도구·알 수 없는 출력 항목·`incomplete`는 확정 실패다. MCP grant 토큰은 공급자에만 전송하고 ledger 식별값·digest·저장 원응답에서 제외한다. 단계마다 Java가 새 invocation id를 쓰므로 기존 1회 전송·unknown 규칙이 단계별로 그대로 적용된다. 생성 OpenAPI(`docs/api/internal-ai-openapi.*`)를 갱신했다. 실제 Responses·MCP 응답 형태는 합성 replay로만 확인했으며 승인된 소량 live spike에서 확인한다.
 
 현재 상태(2026-10-29, Java 쪽): agent 경로를 연결했다(`ZOOP_CHAT_AGENT_ENABLED` 기본 꺼짐, `/mcp`·모델 단계 필요, MCP 서버 URL은 AI 쪽 운영자 설정 `ZOOP_AI_CHAT_MCP_SERVER_URL`). 라우터·계획은 그대로이고, 읽기가 모두 독립 1단계이며 MCP로 노출된 계획만 agent 경로다(Q07 본인 범위·의존 단계·읽기 없는 계획은 direct). Java가 grant를 발급하고 `chat-agent` 단계를 부르며, 요구마다 planner가 해석한 대상 ID를 `targets`로 넘긴다. 승인 요청은 run의 허용 도구이면서 `ChatMcpTools.approve`가 예약에 성공한 것만 승인하고, 승인 라운드는 최대 3회이며 마지막·시간 부족 시 모두 거부해 다음 단계가 답을 쓰게 한다. `/mcp`는 성공 결과 봉투를 `chat_tool_calls.result`(migration `V20261028140000`)에 남기고, 오케스트레이터는 그 결과로 branch를 만들어 기존 결정론 검사·인용·Jev 검증·결과 생성을 그대로 거친다. agent 후보 plan은 첫 Responses 단계 전에 AI service health를 확인하고, 실패·circuit open이면 direct로 시작한다. endpoint별 인스턴스 circuit은 최근 5회 중 연결 실패 3회에 30초 열리고 하나의 half-open probe로 닫으며, 실행 중 `mcp_unreachable`는 다음 run에만 반영하고 같은 run의 direct 대체는 없다. 인증·정책·grant·schema·DB 오류는 연결 통계에서 제외한다. 단계 대기 한도는 `min(35초, 남은 시간 − 검증·서버)`, 10초 미만이면 `deadline_guard`다. `/mcp` 결과는 원장 기록·반환 전에 운영자 챗봇 grant 레지스트리(AI runtime과 같은 파일)로 출처마다 `chat-agent` 목적·agent 수신자의 모델 전송 grant를 확인하고, 허용되지 않은 항목·근거 ID·경로는 통째로 빼고 개수만 `withheld`로 남긴다(판단할 수 없으면 호출 거부). 예산(2026-10-29): job 단위 호출 상한 6회(8/6/2의 내부 몫, 웹 2회는 웹 검색 도구와 함께, rerun 포함), agent 라운드당 승인 4건(job 동시 4), fan-out 5 초과 계획은 direct, agent run 45초(run 기한을 앞당겨 검증·저장까지 강제)·Luna 합산 35초(job 기한 60초는 direct 경로용으로 유지). 같은 attempt의 같은 요청은 한 번만 읽고 재사용(`cachedFrom`, 재사용 시 전송 gate 재검사, 인스턴스 안 single-flight), job당 남긴 결과 1 MiB(기록 시 job 행 잠금). 남은 것: 승인 요청의 요구 매핑, live spike([챗봇 MCP 엔드포인트](../../api/docs/chat-mcp.md) 5절).
+
+현재 상태(2026-10-29, 검증 서버 사실): 단계 계약이 `zoop-ai-chat-2`다(grant registry는 v1 그대로). `chat-verification` 입력은 `requestBinding`(호출 ID·고정 버전·asOf)과 구간별 `sectionId`·`requirementIds`·`serverFacts`를 받는다. Java는 성공한 현재 조회에서만 `portfolio_scope`(Q07)와 `graph_comparison`(Q05)을 만들고, direct 경로는 읽은 결과에서, agent 경로는 `chat_tool_calls` 장부의 결과를 예약 기록과 대조해 복원한 결과에서 같은 규칙으로 만든다. 사실은 기사 인용이 아니며 회원 ID·계좌·수량·금액을 담지 않고, 검증 단계에서 회원 범위를 다시 조회하지 않는다. 실제 모델의 판정 품질은 확인하지 않았다(합성 replay·로컬 가짜 Jev 수신자만 사용).
 
 ### 단계 4 — Tool Service, MCP 서버, 웹
 

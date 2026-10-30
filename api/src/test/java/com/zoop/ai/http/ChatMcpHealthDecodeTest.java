@@ -35,7 +35,7 @@ class ChatMcpHealthDecodeTest {
     }
 
     private static ChatMcpHealth decode(String mcp, String reason) {
-        return HttpChatStageClient.decodeHealth(WireJson.parse("{\"schemaVersion\":\"zoop-ai-chat-1\",\"mcp\":\""
+        return HttpChatStageClient.decodeHealth(WireJson.parse("{\"schemaVersion\":\"zoop-ai-chat-2\",\"mcp\":\""
                 + mcp + "\",\"reason\":" + reason + "}", "body"));
     }
 }

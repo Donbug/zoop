@@ -183,7 +183,8 @@ export default function EventDetailPanel({
                   : `근거 ${evidenceCount}건 보기`}
               </button>
               <button onClick={() => action('focus')}>
-                <GraphIcon name="fit" size={14} />이 노드 중심으로 보기
+                <GraphIcon name="fit" size={14} />
+                이슈 중심 그래프
               </button>
               <button onClick={() => action('ai')}>
                 <GraphIcon name="ai" size={14} />
