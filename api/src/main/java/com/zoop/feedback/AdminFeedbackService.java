@@ -1,6 +1,8 @@
 package com.zoop.feedback;
 
 import com.zoop.auth.service.CsrfKeyRing;
+import com.zoop.briefing.query.BriefingQueryService;
+import com.zoop.briefing.storage.BriefingRoundRepository;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.Canonical;
@@ -29,19 +31,24 @@ public class AdminFeedbackService {
   private final ObjectMapper mapper;
   private final CsrfKeyRing keys;
   private final Clock clock;
+  private final BriefingRoundRepository rounds;
+  private final BriefingQueryService publicRead;
 
   public AdminFeedbackService(
-      JdbcTemplate jdbc, ObjectMapper mapper, CsrfKeyRing keys, Clock clock) {
+      JdbcTemplate jdbc, ObjectMapper mapper, CsrfKeyRing keys, Clock clock,
+      BriefingRoundRepository rounds, BriefingQueryService publicRead) {
     this.jdbc = jdbc;
     this.mapper = mapper;
     this.keys = keys;
     this.clock = clock;
+    this.rounds = rounds;
+    this.publicRead = publicRead;
   }
 
   public ObjectNode summary(String window, String start, String end) {
     var p = Period.parse(window, start, end, clock.instant());
     List<Object> args = new ArrayList<>();
-    String where = where(p, args);
+    String where = readableWhere(p, args);
     var data =
         jdbc.queryForList(
             "SELECT f.feature,(f.updated_at AT TIME ZONE 'Asia/Seoul')::date AS"
@@ -102,7 +109,7 @@ public class AdminFeedbackService {
     int limit = pos != null ? pos.limit() : requestedLimit == null ? 50 : requestedLimit;
     var p = Period.parse(window, start, end, pos == null ? clock.instant() : pos.asOf());
     List<Object> args = new ArrayList<>();
-    String where = where(p, args) + " AND f.value='down'";
+    String where = readableWhere(p, args) + " AND f.value='down'";
     Long total = jdbc.queryForObject("SELECT count(*)" + FROM + where, Long.class, args.toArray());
     if (pos != null) {
       where += " AND (f.updated_at,f.id COLLATE \"C\")<(?,? COLLATE \"C\")";
@@ -181,6 +188,21 @@ public class AdminFeedbackService {
                         member.getBytes(java.nio.charset.StandardCharsets.UTF_8))
                     .orElseThrow())
             .substring(0, 20);
+  }
+
+  /** Filter BEFORE grouping, counts and keyset paging; one current rights check per candidate round. */
+  private String readableWhere(Period p, List<Object> args) {
+    String where = where(p, args);
+    var candidates = jdbc.queryForList("SELECT DISTINCT r.id" + FROM + where, args.toArray());
+    List<String> readable = new ArrayList<>();
+    for (var candidate : candidates) {
+      String id = (String) candidate.get("id");
+      var round = rounds.findById(id).orElseThrow();
+      if (publicRead.isCurrentlyReadable(round, "admin-feedback")) readable.add(id);
+    }
+    if (readable.isEmpty()) return where + " AND false";
+    args.addAll(readable);
+    return where + " AND r.id IN (" + String.join(",", Collections.nCopies(readable.size(), "?")) + ")";
   }
 
   private static String where(Period p, List<Object> args) {

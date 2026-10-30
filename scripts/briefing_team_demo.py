@@ -327,7 +327,7 @@ def run(args):
                         raise DemoError('frontend_start_failed')
                     try:
                         get(web + '/package.json')
-                        verify(web, index)  # The frontend proxy must return the same stored publications.
+                        verify(web, index, files)  # The frontend proxy must return the same stored publications.
                         break
                     except Exception:
                         time.sleep(.3)

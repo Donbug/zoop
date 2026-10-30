@@ -17,7 +17,7 @@ FS066-01/02, D-BRF-01, A-ADM-02b. 도움 됨·안 됨과 선택 사유를 실제
 - `GET /api/v1/admin/feedback/summary?window=7d|30d|all&start=YYYY-MM-DD&end=YYYY-MM-DD`
 - `GET /api/v1/admin/feedback/dislikes?...&limit=50&cursor=...`
 
-현재 제공 중이며 버전이 일치하는 각 회원·대상의 마지막 up/down만 집계한다. 취소·중단·과거 버전은 제외한다. 기간·일별 추이는 KST 마지막 변경일 기준이며 start/end는 양끝 날짜를 포함한다. 명시 날짜가 window보다 우선한다. 도움 됨 비율은 `up/(up+down)`이며 **평가 5건 미만은 비율을 숨긴다**. 동일 회원이 서로 다른 대상을 평가하면 각각 세므로 순 사용자 비율이 아니다. 챗봇 저장 원장은 이번 범위에 포함하지 않으며 `unsupported`로 표시한다.
+현재 제공 중이며 버전이 일치하는 각 회원·대상의 마지막 up/down만 집계한다. 취소·중단·과거 버전은 제외한다. 집계·비율·일별 추이·사유 목록과 페이지 수를 계산하기 전에 공개 조회와 같은 현재 원문 권한(만료·철회·접근 중단 및 이전 비교 원문의 권한 포함)을 회차별로 검사한다. 권한이 복구되면 기존 평가 행을 수정하지 않고 다시 집계한다. DB·권한 저장소 장애는 성공한 빈 결과로 바꾸지 않는다. 기간·일별 추이는 KST 마지막 변경일 기준이며 start/end는 양끝 날짜를 포함한다. 명시 날짜가 window보다 우선한다. 도움 됨 비율은 `up/(up+down)`이며 **평가 5건 미만은 비율을 숨긴다**. 동일 회원이 서로 다른 대상을 평가하면 각각 세므로 순 사용자 비율이 아니다. 챗봇 저장 원장은 이번 범위에 포함하지 않으며 `unsupported`로 표시한다.
 
 관리자 사유는 기존 prototype 마스킹 기준(회원 표시 이름·이메일, 이메일·전화·주민등록·카드·계좌 패턴)에 맞춰 읽을 때 사본만 가린다. 날짜는 계좌번호로 가리지 않으며 저장 원문·본인 조회는 그대로 유지한다. 정규식으로 임의의 모든 개인정보를 찾아낼 수 있는 것은 아니다.
 
@@ -34,3 +34,5 @@ FS066-01/02, D-BRF-01, A-ADM-02b. 도움 됨·안 됨과 선택 사유를 실제
 검증: `DB_URL=jdbc:postgresql://.../<disposable-db> DB_USERNAME=... DB_PASSWORD=... ./api/gradlew -p api authIntegrationTest --tests com.zoop.feedback.FeedbackPostgresTest`. 실제 HTTP·PostgreSQL로 소유권, CSRF, 버전, 중복 요청, 취소, 회차별 이슈, 집계·사유·KST 기간·서명 커서를 검증한다. 프론트는 `web/tests/briefing/briefingPersonalFeedback.test.tsx` 및 `web/tests/admin/adminInsights.test.tsx`를 사용한다.
 
 팀원용 `scripts/briefing_team_demo.py`는 기존 저장 응답 해시를 바꾸지 않는다. 새 `feedbackVersion` 필드만 검증한 발행 DB 사본의 graphVersion/원문 SHA와 별도로 대조한 뒤 원래 응답 digest를 검사한다. 다른 문안·지표·근거·시각·추가 필드는 여전히 불일치로 실패한다.
+
+리뷰 회귀: 팀원 실행 도구의 API·프론트 프록시 검증 모두 동일 발행 파일에 feedbackVersion을 결속한다. 저장 사유를 빈 값으로 수정하면 down 평가를 유지하며 reason=null을 전송하고, 저장 성공 후 입력을 닫는다. 실패 시 이전 사유와 재시도 입력을 보존한다.

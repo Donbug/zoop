@@ -117,7 +117,7 @@ function MemberFeedback({
         targetId,
         value: next,
         targetVersion: targetVersion ?? null,
-        reason: next === 'down' ? (withReason ?? null) : null,
+        reason: next === 'down' ? withReason?.trim() || null : null,
       });
       if (
         !active.current ||
@@ -135,7 +135,7 @@ function MemberFeedback({
       setStoredReason(item.reason);
       setReason(item.reason ?? '');
       onSaved?.(item);
-      setReasonOpen(item.value === 'down' && !withReason);
+      setReasonOpen(item.value === 'down' && withReason === undefined);
       if (item.value !== 'down') setReason('');
     } catch (error) {
       if (
@@ -152,8 +152,7 @@ function MemberFeedback({
   function submitReason(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = reason.trim();
-    if (text) void send('down', text);
-    else setReasonOpen(false);
+    void send('down', text);
   }
 
   const toggle = (kind: 'up' | 'down', label: string) => (

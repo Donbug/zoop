@@ -206,6 +206,76 @@ class FeedbackPostgresTest {
   }
 
   @Test
+  void currentRightsFilterCountsTrendReasonsAndExistingCursorWithoutChangingStoredVotes() throws Exception {
+    var owner = member();
+    var admin = admin();
+    vote(owner, ROUND, "down", "회차에 남긴 이유", "synthetic-graph-v1");
+    vote(owner, ROUND + "/" + EVENT, "down", "이슈에 남긴 이유", "synthetic-graph-v1");
+    String before = jdbc.queryForObject(
+        "SELECT jsonb_agg(to_jsonb(f) ORDER BY id)::text FROM briefing_feedback f", String.class);
+    var first = request("GET", "/api/v1/admin/feedback/dislikes?limit=1", admin, null);
+    String cursor = first.json().path("nextCursor").asText();
+    assertFalse(cursor.isBlank());
+    for (String mode : List.of("expired", "revoked", "private")) {
+      var grants = JSON.readTree(resource("grants.json"));
+      var grant = (tools.jackson.databind.node.ObjectNode) grants.path("grants").get(0);
+      if (mode.equals("expired")) grant.put("expiresAt", "2000-01-01T00:00:00Z");
+      if (mode.equals("revoked")) grant.put("enabled", false);
+      Files.writeString(GRANTS, JSON.writeValueAsString(grants));
+      if (mode.equals("private")) jdbc.update("UPDATE articles SET access_status='private'");
+      var summary = summary(admin);
+      for (int i = 0; i < 2; i++) {
+        assertEquals(0, summary.at("/features/" + i + "/total").asInt(), mode);
+        assertTrue(summary.at("/features/" + i + "/rate").isNull(), mode);
+        assertTrue(summary.at("/features/" + i + "/days").isEmpty(), mode);
+      }
+      for (String page : List.of("", "?cursor=" + cursor)) {
+        var hidden = request("GET", "/api/v1/admin/feedback/dislikes" + page, admin, null);
+        assertEquals(200, hidden.status(), mode);
+        assertEquals(0, hidden.json().path("total").asInt(), mode);
+        assertTrue(hidden.json().path("items").isEmpty(), mode);
+        assertTrue(hidden.json().path("nextCursor").isNull(), mode);
+        assertFalse(hidden.body().contains("남긴 이유"), mode);
+      }
+      assertEquals(before, jdbc.queryForObject(
+          "SELECT jsonb_agg(to_jsonb(f) ORDER BY id)::text FROM briefing_feedback f", String.class));
+      Files.writeString(GRANTS, resource("grants.json"));
+      jdbc.update("UPDATE articles SET access_status='available'");
+      assertEquals(1, summary(admin).at("/features/0/total").asInt());
+      assertEquals(2, request("GET", "/api/v1/admin/feedback/dislikes", admin, null).json().path("total").asInt());
+    }
+  }
+
+  @Test
+  void unavailableRightsRegistryFailsInsteadOfReportingSuccessfulZeroVotes() throws Exception {
+    var admin = admin();
+    vote(member(), ROUND, "down", "보존할 이유", "synthetic-graph-v1");
+    Files.writeString(GRANTS, "invalid registry");
+    for (String endpoint : List.of("summary", "dislikes")) {
+      var result = request("GET", "/api/v1/admin/feedback/" + endpoint, admin, null);
+      assertEquals(503, result.status());
+      assertFalse(result.body().contains("보존할 이유"));
+    }
+    assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM briefing_feedback", Integer.class));
+  }
+
+  @Test
+  void clearingDislikeReasonPersistsNullAndKeepsTheVote() throws Exception {
+    var owner = member();
+    var admin = admin();
+    vote(owner, ROUND, "down", "지울 사유", "synthetic-graph-v1");
+    assertEquals(200, vote(owner, ROUND, "down", null, "synthetic-graph-v1").status());
+    var mine = request("GET", "/api/v1/feedback?feature=briefing_round&targetIds=" + ROUND, owner, null);
+    assertEquals("down", mine.json().at("/items/0/value").asText());
+    assertTrue(mine.json().at("/items/0/reason").isNull());
+    assertEquals(1, summary(admin).at("/features/0/down").asInt());
+    var reasons = request("GET", "/api/v1/admin/feedback/dislikes", admin, null);
+    assertEquals(1, reasons.json().path("total").asInt());
+    assertTrue(reasons.json().at("/items/0/reason").isNull());
+    assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM briefing_feedback", Integer.class));
+  }
+
+  @Test
   void adminSummaryDislikesMinSampleAndPrivacyUseCurrentNonCancelledVotes() throws Exception {
     var admin = admin();
     for (int i = 0; i < 5; i++)
