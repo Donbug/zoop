@@ -753,6 +753,13 @@ test('connected member displays mock holding without replacing null values', asy
   open(pinned);
   await screen.findByText('20주');
   expect(screen.getByText('-', { selector: 'dd' })).toBeTruthy();
+  // D-COM-01 N-x: same currency format as the price; null stays '미제공'.
+  expect(screen.getByText('100원', { selector: 'dd' })).toBeTruthy();
+  expect(
+    screen.getByText('미제공 시세 미제공', { selector: 'dd' }),
+  ).toBeTruthy();
+  expect(screen.getByText('100원 ~ 130원', { selector: 'dd' })).toBeTruthy();
+  expect(screen.getByText('미제공 ~ 미제공', { selector: 'dd' })).toBeTruthy();
   const region = screen.getByRole('region', { name: '가상 계좌 보유' });
   expect(within(region).getAllByText(/모의/).length).toBeGreaterThan(0);
   // D-COM-01 / F6: private valuation timestamps retain the original machine values.
@@ -2370,3 +2377,41 @@ test.each([
     );
   },
 );
+
+test('D-COM-01 N-x formats an available holding value and keeps an unknown buy currency', async () => {
+  useAuthStore.getState().setSession({
+    authenticated: true,
+    kind: 'member',
+    user: {
+      id: 'synthetic-member',
+      email: 'synthetic@example.test',
+      displayName: '가상',
+    },
+    setup: { completed: true, tutorialCompleted: false },
+    csrfToken: 'synthetic',
+    expiresAt: null,
+  });
+  server.on('GET', '/api/v1/portfolio', () =>
+    json({
+      connected: true,
+      holdings: [
+        {
+          companyId: id,
+          quantity: 20,
+          avgPrice: 1500,
+          avgPriceCurrency: null,
+          marketValue: 2400,
+          weight: 1,
+          quote: { status: 'available', currency: 'KRW' },
+        },
+      ],
+      mockAsOf: old,
+      valuation: null,
+      metadata,
+    }),
+  );
+  open(pinned);
+  await screen.findByText('20주');
+  expect(screen.getByText('2,400원', { selector: 'dd' })).toBeTruthy();
+  expect(screen.getByText('1,500 통화 미상', { selector: 'dd' })).toBeTruthy();
+});

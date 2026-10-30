@@ -332,4 +332,25 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
       screen.getByRole('button', { name: '재시도' }).hasAttribute('disabled'),
     ).toBe(false);
   });
+
+  it('D-GRP-03 N-e 직접 이슈의 정확한 시각은 KST로, 날짜만 있는 값은 그대로 보인다', () => {
+    const [first, second] = company.directIssues;
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      data: {
+        ...state.data,
+        company: {
+          ...company,
+          directIssues: [
+            { ...first, eventTime: '2026-10-08T00:30:00Z' },
+            { ...second, eventTime: '2026-10-07' },
+          ],
+        },
+      },
+    });
+    renderPanel();
+    expect(screen.getByText(/2026-10-08 09:30 KST · 근거/)).toBeTruthy();
+    expect(screen.getByText(/^2026-10-07 · 근거/)).toBeTruthy();
+    expect(screen.queryByText(/2026-10-08T00:30:00Z/)).toBeNull();
+  });
 });

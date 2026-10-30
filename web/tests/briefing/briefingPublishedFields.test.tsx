@@ -372,3 +372,16 @@ describe('D-BRF-01 비교 이슈 지도 링크', () => {
     expect(screen.queryByRole('link', { name: '새 합성 이슈' })).toBeNull();
   });
 });
+
+describe('D-BRF-01 N-y 발생 시각', () => {
+  it.each([
+    ['2026-10-08T00:30:00Z', 'datetime' as const, '발생 2026-10-08 09:30 KST'],
+    ['2026-10-07', 'day' as const, '발생 2026-10-07'],
+    [null, 'unknown' as const, '발생 시각 미상'],
+  ])('%s(%s)는 %s로 보인다', async (eventTime, timePrecision, label) => {
+    setup(briefing({ items: [item({ eventTime, timePrecision })] }), false);
+    expect(await screen.findByText(label)).toBeTruthy();
+    if (timePrecision === 'datetime')
+      expect(screen.queryByText(`발생 ${eventTime}`)).toBeNull();
+  });
+});
