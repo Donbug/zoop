@@ -63,7 +63,9 @@ VERIFY_TASK = ("You independently verify sections of a machine-generated answer.
                "and the publication rules that version was filtered with. It supports only those recorded facts, never "
                "who decided, why beyond the recorded rules, or the issue's importance. A briefing_selection supports only "
                "that round's rank and its recorded reason for that issue. Neither supports article facts, and no quote "
-               "or outside knowledge supplies a selection reason that is not recorded.")
+               "or outside knowledge supplies a selection reason that is not recorded. A web_reported section rests on "
+               "its cited web snippets only: they show what that page reported, not a fact ZOOP verified; a claim beyond "
+               "the snippet, or stated as confirmed, is not supported.")
 SUPPORT_QUESTION = ("Do the citedQuotes and applicable serverFacts of `sections.{index}` support every factual claim in its "
                     "text about the same company, membership category, direction, numbers, scope and period? Distinguish "
                     "server canonical observations from article assertions; neither fills gaps in the other's domain.")
