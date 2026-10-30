@@ -133,9 +133,36 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
         job.row = with(job.row, job.row.status(), job.row.phase(), runs, attempts, at, null);
     }
 
+    /** Kept verified results by {@code jobId/attemptNo}. */
+    final Map<String, com.zoop.chat.repository.ChatRecoveryResult> kept = new LinkedHashMap<>();
+    /** How many more completions fail as a lost database connection. */
+    int failingCompletes;
+    boolean refuseKeeping;
+
+    @Override
+    public boolean keepVerified(String jobId, String ownerToken, int attemptNo, String result, String routeSummary, Instant at) {
+        if (refuseKeeping) throw new org.springframework.dao.DataAccessResourceFailureException("connection lost");
+        if (!owned(jobs.get(jobId), ownerToken, at)) return false;
+        return kept.putIfAbsent(jobId + "/" + attemptNo, new com.zoop.chat.repository.ChatRecoveryResult(result, routeSummary)) == null;
+    }
+
+    @Override
+    public Optional<com.zoop.chat.repository.ChatRecoveryResult> verifiedResult(String jobId, int attemptNo) {
+        return Optional.ofNullable(kept.get(jobId + "/" + attemptNo));
+    }
+
+    @Override
+    public void dropVerified(String jobId) {
+        kept.keySet().removeIf(key -> key.startsWith(jobId + "/"));
+    }
+
     @Override
     public boolean complete(String jobId, String ownerToken, Instant at, String outcome, String messageId, String result,
             String resultSchemaVersion, String routeSummary, String routeSchemaVersion, String attempts) {
+        if (failingCompletes > 0) {
+            failingCompletes--;
+            throw new org.springframework.dao.DataAccessResourceFailureException("connection lost");
+        }
         Job job = jobs.get(jobId);
         if (!owned(job, ownerToken, at)) return false;
         job.row = withOutcome(with(job.row, "completed", null, job.row.runs(), attempts, at, at), outcome, result, null);
