@@ -9,8 +9,7 @@ import { useCompanyData } from '@/hooks/useCompanyData';
 import type { GraphNode } from '@/types/map/graph';
 import type { WatchSync } from '@/types/map';
 import IssueDocumentSentiments from './IssueDocumentSentiments';
-import { exactTime } from '@/util/event-time';
-import { formatKst } from '@/util/format';
+import { eventTimeText } from '@/util/event-time';
 
 type RelatedCompany = { id: string; name: string; sharedIssueCount: number };
 type Props = {
@@ -441,9 +440,8 @@ export default function CompanyDetailPanel(props: Props) {
                     >
                       <b>{issue.title}</b>
                       <span>
-                        {exactTime(issue.eventTime)
-                          ? formatKst(issue.eventTime)
-                          : (issue.eventTime ?? '시각 미상')}{' '}
+                        {eventTimeText(issue.eventTime, issue.timePrecision) ??
+                          '시각 미상'}{' '}
                         · 근거 {issue.evidenceCount}건
                       </span>
                     </button>

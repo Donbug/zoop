@@ -22,6 +22,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import {
   bucketKey,
   impactEdges,
+  money,
   requestTime,
   timeRange,
 } from '@/components/company/detail-model';
@@ -755,9 +756,7 @@ test('connected member displays mock holding without replacing null values', asy
   expect(screen.getByText('-', { selector: 'dd' })).toBeTruthy();
   // D-COM-01 N-x: same currency format as the price; null stays '미제공'.
   expect(screen.getByText('100원', { selector: 'dd' })).toBeTruthy();
-  expect(
-    screen.getByText('미제공 시세 미제공', { selector: 'dd' }),
-  ).toBeTruthy();
+  expect(screen.getByText('시세 미제공', { selector: 'dd' })).toBeTruthy();
   expect(screen.getByText('100원 ~ 130원', { selector: 'dd' })).toBeTruthy();
   expect(screen.getByText('미제공 ~ 미제공', { selector: 'dd' })).toBeTruthy();
   const region = screen.getByRole('region', { name: '가상 계좌 보유' });
@@ -2414,4 +2413,11 @@ test('D-COM-01 N-x formats an available holding value and keeps an unknown buy c
   await screen.findByText('20주');
   expect(screen.getByText('2,400원', { selector: 'dd' })).toBeTruthy();
   expect(screen.getByText('1,500 통화 미상', { selector: 'dd' })).toBeTruthy();
+});
+
+test('D-COM-01 N-x keeps fractional won and formats other currencies like the price', () => {
+  expect(money(71234.56, 'KRW')).toBe('71,234.56원');
+  expect(money(71000, 'KRW')).toBe('71,000원');
+  expect(money(12.5, 'USD')).toBe('$12.50');
+  expect(money(null, 'KRW')).toBe('미제공');
 });

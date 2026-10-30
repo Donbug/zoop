@@ -377,11 +377,13 @@ describe('D-BRF-01 N-y 발생 시각', () => {
   it.each([
     ['2026-10-08T00:30:00Z', 'datetime' as const, '발생 2026-10-08 09:30 KST'],
     ['2026-10-07', 'day' as const, '발생 2026-10-07'],
+    // 시간대가 없는 시각은 해석하지 않고 받은 값을 그대로 보인다.
+    ['2026-10-08T09:30:00', 'datetime' as const, '발생 2026-10-08T09:30:00'],
     [null, 'unknown' as const, '발생 시각 미상'],
   ])('%s(%s)는 %s로 보인다', async (eventTime, timePrecision, label) => {
     setup(briefing({ items: [item({ eventTime, timePrecision })] }), false);
     expect(await screen.findByText(label)).toBeTruthy();
-    if (timePrecision === 'datetime')
+    if (timePrecision === 'datetime' && eventTime?.endsWith('Z'))
       expect(screen.queryByText(`발생 ${eventTime}`)).toBeNull();
   });
 });

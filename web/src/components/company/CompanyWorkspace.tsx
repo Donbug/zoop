@@ -641,12 +641,7 @@ export default function CompanyWorkspace() {
           {quote.data?.status === 'available' && (
             <>
               <strong className="text-2xl">
-                {quote.data.quote.price === null
-                  ? '미제공'
-                  : formatMoney(
-                      quote.data.quote.price,
-                      quote.data.quote.currency,
-                    )}
+                {money(quote.data.quote.price, quote.data.quote.currency)}
               </strong>
               <span>
                 {' '}
@@ -705,7 +700,7 @@ export default function CompanyWorkspace() {
                   <dt>평균 매입가</dt>
                   <dd>
                     {holding.avgPriceCurrency
-                      ? formatMoney(holding.avgPrice, holding.avgPriceCurrency)
+                      ? money(holding.avgPrice, holding.avgPriceCurrency)
                       : `${number(holding.avgPrice)} 통화 미상`}
                   </dd>
                   <dt>평가 금액</dt>
@@ -713,7 +708,9 @@ export default function CompanyWorkspace() {
                     {holding.quote.status === 'available' &&
                     holding.quote.currency
                       ? money(holding.marketValue, holding.quote.currency)
-                      : `${number(holding.marketValue)} 시세 미제공`}
+                      : holding.marketValue == null
+                        ? '시세 미제공'
+                        : `${number(holding.marketValue)} 시세 미제공`}
                   </dd>
                   <dt>자산 비중</dt>
                   <dd>

@@ -353,4 +353,29 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     expect(screen.getByText(/^2026-10-07 · 근거/)).toBeTruthy();
     expect(screen.queryByText(/2026-10-08T00:30:00Z/)).toBeNull();
   });
+
+  it('D-GRP-03 N-e 직접 이슈 시각은 받은 정밀도까지만 보인다', () => {
+    const [first, second] = company.directIssues;
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      data: {
+        ...state.data,
+        company: {
+          ...company,
+          directIssues: [
+            {
+              ...first,
+              eventTime: '2026-01-01T00:00:00+09:00',
+              timePrecision: 'year',
+            },
+            { ...second, eventTime: null, timePrecision: 'unknown' },
+          ],
+        },
+      },
+    });
+    renderPanel();
+    expect(screen.getByText(/^2026 · 근거/)).toBeTruthy();
+    expect(screen.queryByText(/00:00 KST/)).toBeNull();
+    expect(screen.getByText(/^시각 미상 · 근거/)).toBeTruthy();
+  });
 });
