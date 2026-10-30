@@ -261,7 +261,7 @@ export default function DashboardSummary() {
   return (
     <div className="flex flex-col gap-6 py-8 text-zoop-ink">
       <PageHeader title="대시보드" />
-      {data && (
+      {/* {data && (
         <p className="text-xs text-zoop-muted">
           갱신{' '}
           {new Date(data.generatedAt).toLocaleTimeString('ko-KR', {
@@ -270,7 +270,7 @@ export default function DashboardSummary() {
           })}{' '}
           · 10초마다 자동 갱신
         </p>
-      )}
+      )} */}
       {dashboard.refreshError && (
         <p role="status" className="text-xs text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.

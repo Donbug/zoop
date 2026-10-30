@@ -119,7 +119,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
             if (outcome.completed()) {
                 List<ChatToolResult> results = kept(run);
                 return new Outcome(outcome.answer(), results, step, approved, denied,
-                        webNotices(results, webApproved, notices));
+                        webNotices(results, webApproved, notices, withheldWeb(run)));
             }
             if (rounds > MAX_ROUNDS) {
                 throw new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, "the agent kept asking after its last round");
@@ -175,17 +175,32 @@ public final class ChatMcpAgent implements ChatAgentPath {
     }
 
     /** The web faults of a finished run, in a fixed order. */
-    static List<String> webNotices(List<ChatToolResult> results, int webApproved, Set<String> refused) {
+    static List<String> webNotices(List<ChatToolResult> results, int webApproved, Set<String> refused,
+            Set<String> withheld) {
         List<ChatToolResult> searches = results.stream()
                 .filter(r -> ChatCapability.WEB_SEARCH.id().equals(r.capabilityId())).toList();
         Set<String> notices = new LinkedHashSet<>();
-        // An approved search with no kept result failed, timed out or never came back.
-        if (searches.size() < webApproved) notices.add(WEB_UNAVAILABLE);
-        if (searches.stream().anyMatch(r -> r.webResults().isEmpty() && !Boolean.TRUE.equals(r.truncated()))) {
+        // An approved search with no kept result failed, timed out or never came back. A successful provider response whose
+        // hits were all withheld by the send grant is unavailable to the answer too, never "no results".
+        if (searches.size() < webApproved || !withheld.isEmpty()) notices.add(WEB_UNAVAILABLE);
+        if (searches.stream().anyMatch(r -> r.webResults().isEmpty() && !Boolean.TRUE.equals(r.truncated())
+                && !withheld.contains(r.toolCallId()))) {
             notices.add(WEB_NO_RESULTS);
         }
         notices.addAll(refused);
         return List.copyOf(notices);
+    }
+
+    /** Web calls whose provider returned hits but the model-send grant withheld them all. */
+    private Set<String> withheldWeb(ChatRun run) {
+        Set<String> withheld = new LinkedHashSet<>();
+        for (ChatKeptToolResult kept : runs.keptToolResults(run.jobId(), run.attemptNo())) {
+            if (!ChatCapability.WEB_SEARCH.id().equals(kept.capabilityId())) continue;
+            if (mapper.readTree(kept.result()).path("withheld").path("webResults").asInt(0) > 0) {
+                withheld.add(kept.toolCallId());
+            }
+        }
+        return withheld;
     }
 
     /**

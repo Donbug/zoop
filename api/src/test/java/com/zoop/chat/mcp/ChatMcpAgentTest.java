@@ -149,6 +149,10 @@ class ChatMcpAgentTest {
 
     /** Registers the web search (synthetic provider, granted) beside a company read that finds nothing. */
     private void useWeb() {
+        useWeb(true);
+    }
+
+    private void useWeb(boolean grantWebResults) {
         runner.close();
         ChatTool empty = new ChatTool() {
             @Override
@@ -164,8 +168,11 @@ class ChatMcpAgentTest {
         var registry = new ChatToolRegistry(List.of(empty,
                 new com.zoop.chat.tool.ChatWebSearchTool(new com.zoop.chat.tool.SyntheticWebSearchProvider(), clock)));
         runner = new ChatToolRunner(registry);
-        Path file = ChatSendGrantsTest.write(dir.resolve("web-grants.json"), ChatCompanyProfiles.SOURCE_ID,
-                ChatMcpSendGate.GRAPH_SOURCE_ID, ChatMcpSendGate.webSource("synthetic"));
+        Path file = grantWebResults
+                ? ChatSendGrantsTest.write(dir.resolve("web-grants.json"), ChatCompanyProfiles.SOURCE_ID,
+                        ChatMcpSendGate.GRAPH_SOURCE_ID, ChatMcpSendGate.webSource("synthetic"))
+                : ChatSendGrantsTest.write(dir.resolve("web-grants.json"), ChatCompanyProfiles.SOURCE_ID,
+                        ChatMcpSendGate.GRAPH_SOURCE_ID);
         var gate = new ChatMcpSendGate(new ChatSendGrants(file.toString(), ChatSendGrantsTest.RECIPIENT, clock),
                 (run, ids) -> Map.of());
         tools = new ChatMcpTools(registry, runner, executor, gate, mapper);
@@ -268,6 +275,23 @@ class ChatMcpAgentTest {
         assertEquals(List.of(ChatMcpAgent.WEB_UNAVAILABLE, ChatMcpAgent.WEB_NO_RESULTS, ChatMcpAgent.WEB_BUDGET_EXHAUSTED),
                 outcome.notices());
         assertEquals(ANSWER, outcome.answer(), "the answer goes on");
+    }
+
+    @Test
+    void webHitsWithheldByTheSendGrantAreUnavailableNotNoResults() {
+        useWeb(false);
+        luna.script.add(n -> held("c1", "company_read", Map.of("targets", List.of("KRX:000660"))));
+        luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(search("w1", "HBM")), null));
+        luna.script.add(n -> done());
+
+        var outcome = runWithWeb();
+
+        assertEquals(List.of(ChatMcpAgent.WEB_UNAVAILABLE), outcome.notices());
+        assertTrue(outcome.results().stream().filter(r -> "web.search".equals(r.capabilityId()))
+                .allMatch(r -> r.webResults().isEmpty()), "withheld hits never reach the model or final answer check");
+        String kept = store.toolCalls(JOB).stream().filter(c -> "web.search".equals(c.row.capabilityId()))
+                .findFirst().orElseThrow().end.result();
+        assertEquals(2, mapper.readTree(kept).path("withheld").path("webResults").asInt());
     }
 
     @Test

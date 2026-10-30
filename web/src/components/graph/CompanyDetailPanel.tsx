@@ -13,6 +13,7 @@ import IssueDocumentSentiments from './IssueDocumentSentiments';
 type RelatedCompany = { id: string; name: string; sharedIssueCount: number };
 type Props = {
   companyId: string;
+  panelWidth?: number;
   companyDetailHref?: (id: string) => string;
   context?: EventContext;
   fallback: GraphNode;
@@ -27,7 +28,6 @@ type Props = {
   tutorialAi?: boolean;
   tutorialSaving?: boolean;
   onFocus: () => void;
-  onConnections: () => void;
   onSelectRelation?: (companyId: string) => void;
   onAskAi: () => void;
 };
@@ -142,7 +142,9 @@ export default function CompanyDetailPanel(props: Props) {
 
   return (
     <aside
+      id="company-detail-panel"
       className={`company-panel ${ui.shell}`}
+      style={props.panelWidth ? { width: `${props.panelWidth}px` } : undefined}
       data-screen-id="D-GRP-03"
       aria-label={`${name} 기업 상세`}
       onKeyDown={(event) => {
@@ -255,9 +257,7 @@ export default function CompanyDetailPanel(props: Props) {
       {company && (
         <div className={`company-panel-scroll ${ui.scroll}`}>
           {/* 기업 머리 바로 아래에 주요 동작을 둔다(시세 박스보다 먼저). */}
-          <div
-            className={`company-actions ${ui.actions} [&>:last-child]:col-span-2`}
-          >
+          <div className={`company-actions ${ui.actions}`}>
             <Link
               to={
                 props.companyDetailHref?.(company.id) ??
@@ -279,14 +279,13 @@ export default function CompanyDetailPanel(props: Props) {
                 로그인 후 관심 추가
               </Link>
             )}
-            <button onClick={props.onFocus}>이 기업 중심으로 보기</button>
-            <button onClick={props.onConnections}>다른 기업과 연결 보기</button>
+            <button onClick={props.onFocus}>기업 중심 그래프</button>
             <button
-              className={`col-span-2 bg-panel-ink! text-white! ${props.tutorialAi ? 'tutorial-target tutorial-ai-target' : ''}`}
+              className={`bg-panel-ink! text-white! ${props.tutorialAi ? 'tutorial-target tutorial-ai-target' : ''}`}
               disabled={props.tutorialSaving}
               onClick={props.onAskAi}
             >
-              AI에게 이 기업 묻기
+              AI에게 질문
             </button>
           </div>
           {watchError && (
@@ -371,56 +370,51 @@ export default function CompanyDetailPanel(props: Props) {
               retry={() => setRetry((value) => value + 1)}
             />
           </details>
-          <section className={ui.sectionFrame}>
-            <div className="company-section-title">
-              <h3>가상 계좌 보유</h3>
-            </div>
-            {!props.token ? (
-              <p className="company-unavailable">
-                <Link to="/login" state={{ from: location }}>
-                  로그인
-                </Link>
-                하면 보유 정보를 확인할 수 있습니다.
-              </p>
-            ) : data.holding ? (
-              <div className="company-holding">
-                <span>
-                  수량 <b>{number(data.holding.quantity)}주</b>
-                </span>
-                <span>
-                  평균 단가{' '}
-                  <b>
-                    {number(data.holding.avgPrice)}{' '}
-                    {data.holding.avgPriceCurrency}
-                  </b>
-                </span>
-                <span>
-                  평가액{' '}
-                  <b>
-                    {data.holding.marketValue === null
-                      ? '제공되지 않음'
-                      : number(data.holding.marketValue)}
-                  </b>
-                </span>
-                <span>
-                  비중{' '}
-                  <b>
-                    {data.holding.weight === null
-                      ? '통화 혼합으로 계산 안 함'
-                      : `${data.holding.weight}%`}
-                  </b>
-                </span>
+          {(data.holding || errors.holding) && (
+            <section className={ui.sectionFrame}>
+              <div className="company-section-title">
+                <h3>가상 계좌 보유</h3>
               </div>
-            ) : (
-              <p className="company-unavailable">
-                이 기업의 모의 보유 내역이 없습니다.
-              </p>
-            )}
-            <SectionError
-              message={errors.holding}
-              retry={() => setRetry((value) => value + 1)}
-            />
-          </section>
+              {data.holding ? (
+                <div className="company-holding">
+                  <span>
+                    수량 <b>{number(data.holding.quantity)}주</b>
+                  </span>
+                  <span>
+                    평균 단가{' '}
+                    <b>
+                      {number(data.holding.avgPrice)}{' '}
+                      {data.holding.avgPriceCurrency}
+                    </b>
+                  </span>
+                  <span>
+                    평가액{' '}
+                    <b>
+                      {data.holding.marketValue === null
+                        ? '제공되지 않음'
+                        : number(data.holding.marketValue)}
+                    </b>
+                  </span>
+                  <span>
+                    비중{' '}
+                    <b>
+                      {data.holding.weight === null
+                        ? '-'
+                        : `${data.holding.weight}%`}
+                    </b>
+                  </span>
+                </div>
+              ) : errors.holding ? null : (
+                <p className="company-unavailable">
+                  이 기업의 모의 보유 내역이 없습니다.
+                </p>
+              )}
+              <SectionError
+                message={errors.holding}
+                retry={() => setRetry((value) => value + 1)}
+              />
+            </section>
+          )}
           <section className={ui.sectionFrame}>
             <div className="company-section-title">
               <h3>직접 관련 사건</h3>
@@ -506,7 +500,7 @@ export default function CompanyDetailPanel(props: Props) {
               <span>{props.relatedCompanies.length}</span>
             </div>
             {props.relatedCompanies.length ? (
-              <ul className="company-list">
+              <ul className="company-list company-related-companies">
                 {props.relatedCompanies.slice(0, 5).map((related) => (
                   <li key={related.id}>
                     <button
