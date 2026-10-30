@@ -24,15 +24,15 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .handoff import Handoff, HandoffPaths, Store, open_legacy_history
-from .handoff_contracts import MAX_COMMAND, SCHEMA, ExtractionFailure, Manifest, Selector, canonical
-from .handoff_round import RoundPaths, freeze_round
+from .handoff_contracts import ID, MAX_COMMAND, SCHEMA, ExtractionFailure, Manifest, Selector, canonical
+from .handoff_round import RoundPaths, check_files_dir, freeze_round
 from .ingestion_contracts import IngestionFailure
 
 COMMANDS = ("freeze", "freeze-round", "recover", "inspect", "export")
 SOURCED = frozenset({"freeze", "export"})                  # commands that consult the source ledgers, grants and the operator files
 WRITERS = {"freeze": "create", "recover": "write"}          # everything else opens the ledger read-only
 PLAN_ID = re.compile(r"s2plan-[0-9a-f]{64}")
-ROUND_FLAGS = ("round_id", "plan_id", "plan_root", "files_dir")
+ROUND_FLAGS = ("round_id", "plan_id", "plan_root", "files_dir", "recovery_attempt_id")
 
 
 def _error(code: str, detail: dict | None = None) -> int:
@@ -57,6 +57,7 @@ def main() -> int:
     parser.add_argument("--plan-id", help="freeze-round: the immutable plan (s2plan-...) admitted for that round; omitted for a slot without a new plan")
     parser.add_argument("--plan-root", type=Path, help="freeze-round: the directory holding the plan directories (with --plan-id)")
     parser.add_argument("--files-dir", type=Path, help="freeze-round: where the narrowed canonical.json and decisions.json of the handoff are installed (--canonical/--decisions are then the MASTER files)")
+    parser.add_argument("--recovery-attempt-id", help="freeze-round: explicit operator attempt identity after terminal failure; the same inputs and identity reuse the same handoff")
     args = parser.parse_args()
     store = None
     try:
@@ -68,13 +69,15 @@ def main() -> int:
                 or (args.issue_summary_state_dir is not None and args.command not in ("freeze", "freeze-round")) \
                 or (any(a is not None for a in round_args) and not rounded) \
                 or (rounded and (not args.round_id or len(args.round_id) > 200 or args.files_dir is None or (args.plan_id is None) != (args.plan_root is None)
-                                 or (args.plan_id is not None and not PLAN_ID.fullmatch(args.plan_id)))):
+                                 or (args.plan_id is not None and not PLAN_ID.fullmatch(args.plan_id))
+                                 or (args.recovery_attempt_id is not None and not re.fullmatch(ID, args.recovery_attempt_id)))):
             raise ExtractionFailure("input_or_configuration_invalid")
         if rounded:
+            paths = RoundPaths(*flags, files_dir=args.files_dir, plan_root=args.plan_root, summaries=args.issue_summary_state_dir)
+            check_files_dir(paths.files_dir, args.state_dir, paths.canonical, paths.decisions)
             roots = (args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, *([args.issue_summary_state_dir] if args.issue_summary_state_dir else []))
             store = Store(args.state_dir, *roots, mode="create")
-            paths = RoundPaths(*flags, files_dir=args.files_dir, plan_root=args.plan_root, summaries=args.issue_summary_state_dir)
-            print(canonical(freeze_round(store, paths, args.round_id, args.plan_id)))
+            print(canonical(freeze_round(store, paths, args.round_id, args.plan_id, args.recovery_attempt_id)))
             return 0
         raw = sys.stdin.buffer.read(MAX_COMMAND + 1)
         if len(raw) > MAX_COMMAND:

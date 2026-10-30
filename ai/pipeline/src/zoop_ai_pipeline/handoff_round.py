@@ -12,7 +12,7 @@ Selection (a pure function of the three ledgers plus the master canonical regist
 
 Narrowing (mechanical): the handoff's canonical registry and decisions are the master's entries selected byte-for-byte (no entry is created, merged or reworded). The only
 text that differs from the master is a shorter `fieldVerdicts` array or a `null` `summary` of an issue entry, each made of unchanged elements. The files are staged privately,
-frozen through the unchanged strict path and installed in `--files-dir` only after the handoff row exists.
+frozen through the unchanged strict path and installed in `--files-dir` only when the handoff is ready.
 """
 from __future__ import annotations
 
@@ -386,14 +386,23 @@ def _install(directory: Path, name: str, raw: bytes) -> None:
         os.close(dirfd)
 
 
-def check_files_dir(directory: Path, state: Path) -> Path:
-    """The absolute install directory, proven disjoint from the handoff ledger and free of symlink components. Pure path checks: nothing is created."""
+def check_files_dir(directory: Path, state: Path, canonical_path: Path, decisions_path: Path) -> Path:
+    """Validate both install targets against the state and master paths before opening writable state or staging files."""
     directory, state = Path(os.path.abspath(directory)), Path(os.path.abspath(state))
+    masters = (Path(os.path.abspath(canonical_path)), Path(os.path.abspath(decisions_path)))
     if directory == state or directory.is_relative_to(state) or state.is_relative_to(directory):
         raise ExtractionFailure("state_namespace_conflict")
     for parent in [*reversed(directory.parents), directory]:
-        if parent.exists() and parent.is_symlink():
+        if parent.is_symlink():
             raise ExtractionFailure("state_namespace_invalid")
+        if parent.exists() and not parent.is_dir():
+            raise ExtractionFailure("state_namespace_conflict")
+    for name in ("canonical.json", "decisions.json"):
+        target = directory / name
+        if os.path.lexists(target) and (target.is_symlink() or not target.is_file()):
+            raise ExtractionFailure("state_namespace_conflict")
+        if any(target == master or (target.exists() and master.exists() and target.samefile(master)) for master in masters):
+            raise ExtractionFailure("state_namespace_conflict")
     return directory
 
 
@@ -415,9 +424,9 @@ def bindings_hash(path: Path) -> str:
         raise ExtractionFailure("bindings_invalid") from None
 
 
-def freeze_round(store: Store, paths: RoundPaths, round_id: str, plan_id: str | None) -> dict:
-    """Select, narrow, freeze and install. Nothing is written unless the selection is complete and every strict freeze check passes."""
-    files_dir = check_files_dir(paths.files_dir, store.root)
+def freeze_round(store: Store, paths: RoundPaths, round_id: str, plan_id: str | None, recovery_attempt_id: str | None = None) -> dict:
+    """Select, narrow and freeze; install only ready results. An explicit recovery attempt selects a separate deterministic handoff identity."""
+    files_dir = check_files_dir(paths.files_dir, store.root, paths.canonical, paths.decisions)
     registry, decisions_raw, decisions = read_master(paths)
     bindings = bindings_hash(paths.bindings)
     units = plan_units(paths.plan_root, plan_id, round_id) if plan_id else set()
@@ -474,7 +483,8 @@ def freeze_round(store: Store, paths: RoundPaths, round_id: str, plan_id: str | 
     final = Decisions.model_validate_json(decisions_final)
     files = {"canonical": byte_hash(canonical_raw), "decisions": byte_hash(decisions_final), "bindings": bindings}
     body = {"schemaVersion": SCHEMA, "sourceKind": kinds[0], "policyVersion": POLICY, "sources": sorted(pins, key=lambda p: p["relation"]["jobId"]), "files": files}
-    manifest = Manifest.model_validate_json(canonical({**body, "handoffId": "hr-" + digest(body)}))
+    identity = body if recovery_attempt_id is None else {**body, "recoveryAttemptId": recovery_attempt_id}
+    manifest = Manifest.model_validate_json(canonical({**body, "handoffId": "hr-" + digest(identity)}))
     pinned = any(d.summary is not None for d in final.issues)
     with _staging() as stage_name:
         stage = Path(stage_name)
@@ -483,10 +493,8 @@ def freeze_round(store: Store, paths: RoundPaths, round_id: str, plan_id: str | 
         hp = HandoffPaths(paths.relation, paths.extraction, paths.ingestion, paths.sources, stage / "canonical.json", stage / "decisions.json", paths.bindings,
                           summaries=paths.summaries if pinned else None)
         frozen = Handoff(store, hp).freeze(manifest)
-    if frozen["state"] != "failed":
+    if frozen["state"] == "ready":
         files_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if not files_dir.is_dir():
-            raise ExtractionFailure("state_namespace_conflict")
         _install(files_dir, "canonical.json", canonical_raw)
         _install(files_dir, "decisions.json", decisions_final)
     return {"schemaVersion": SCHEMA, "roundId": round_id, "handoffId": manifest.handoff_id, "freeze": frozen, "selection": selection, "files": files,

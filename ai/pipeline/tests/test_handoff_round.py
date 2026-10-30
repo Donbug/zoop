@@ -11,6 +11,7 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -116,12 +117,17 @@ class RoundRig:
             argv += ["--issue-summary-state-dir", str(summaries)]
         return [*argv, *extra]
 
-    def invoke(self, argv: list[str], stdin: bytes = b"", *, expected: int = 0) -> dict:
-        out = io.StringIO()
-        with mock.patch.object(sys, "argv", argv), mock.patch.object(sys, "stdin", io.TextIOWrapper(io.BytesIO(stdin))), contextlib.redirect_stdout(out):
-            code = cli.main()
-        text = out.getvalue()
-        assert code == expected, text[:3000]
+    def invoke(self, argv: list[str], stdin: bytes = b"", *, expected: int = 0, process: bool = False) -> dict:
+        if process:
+            completed = subprocess.run([sys.executable, "-m", "zoop_ai_pipeline.handoff_cli", *argv[1:]], input=stdin, capture_output=True, timeout=30)
+            code, text = completed.returncode, completed.stdout.decode()
+            assert code == expected, (text[:3000], completed.stderr.decode()[:3000])
+        else:
+            out = io.StringIO()
+            with mock.patch.object(sys, "argv", argv), mock.patch.object(sys, "stdin", io.TextIOWrapper(io.BytesIO(stdin))), contextlib.redirect_stdout(out):
+                code = cli.main()
+            text = out.getvalue()
+            assert code == expected, text[:3000]
         assert text.endswith("\n") and text.count("\n") == 1, text[:500]
         return json.loads(text)
 
@@ -324,6 +330,89 @@ def test_freeze_round_refuses_without_a_declared_slot_or_any_mapped_job(tmp_path
     assert not rig.files.exists() and rig.snapshot()["handoffs"] == []
 
 
+@pytest.mark.parametrize(("master", "target"), [
+    ("canonical", "canonical"), ("canonical", "decisions"), ("decisions", "canonical"), ("decisions", "decisions"),
+])
+def test_master_install_collision_is_refused_before_any_write(units, tmp_path, master, target):
+    units.round("r1", 1, ["a"])
+    units.relate("a")
+    rig = light_rig(tmp_path, units, ["a"])
+    if master == "decisions":
+        rig.freeze_round("round-r1")
+    else:
+        rig.files.mkdir()
+    for name in ("canonical", "decisions"):
+        shutil.copyfile(rig.root / f"master-{name}.json", rig.files / f"{name}.json")
+    collision = rig.files / f"{target}.json"
+    shutil.copyfile(rig.root / f"master-{master}.json", collision)
+    argv = rig.argv("freeze-round", "--round-id", "round-r1", "--files-dir", str(rig.files))
+    argv[argv.index(f"--{master}") + 1] = str(collision)
+    before = hs.ledger_snapshot(tmp_path)
+    refused = rig.invoke(argv, expected=2, process=True)
+    assert refused["error"]["code"] == "state_namespace_conflict"
+    assert hs.ledger_snapshot(tmp_path) == before
+
+
+@pytest.fixture
+def interrupted_round(units, tmp_path):
+    units.round("r1", 1, ["a"])
+    units.relate("a")
+    rig = light_rig(tmp_path, units, ["a"])
+    original = rig.freeze_round("round-r1")
+    installed = {name: (rig.files / name).read_bytes() for name in ("canonical.json", "decisions.json")}
+    units.round("r2", 2, ["b"])
+    units.relate("b")
+    rig.write(canonical_doc={"schemaVersion": "zoop-graph-canonical-1", "entries": units.entries(["a", "b"])})
+    sources = {name: hs.ledger_snapshot(units.kit.root / name) for name in ("ingestion", "extraction", "relation")}
+    argv = rig.argv("freeze-round", "--round-id", "round-r2", "--files-dir", str(rig.files))
+    crash = subprocess.run([sys.executable, "-c",
+                            "import os; from zoop_ai_pipeline.handoff import Handoff; from zoop_ai_pipeline.handoff_cli import main; "
+                            "Handoff._after_reserve = lambda self: os._exit(73); main()", *argv[1:]], capture_output=True, timeout=30)
+    assert crash.returncode == 73, (crash.stdout, crash.stderr)
+    yield rig, original, installed
+    assert {name: hs.ledger_snapshot(units.kit.root / name) for name in sources} == sources
+
+
+def test_reserved_repeat_preserves_the_installed_pair(interrupted_round):
+    rig, original, installed = interrupted_round
+    reserved = rig.freeze_round("round-r2")
+    assert reserved["freeze"]["state"] == "reserved" and reserved["freeze"]["attempts"] == []
+    assert {name: (rig.files / name).read_bytes() for name in installed} == installed
+    assert rig.export(original["handoffId"])["delivery"]["status"] == "current"
+    assert rig.freeze_round("round-r3")["freeze"] == reserved["freeze"]
+
+
+def test_explicit_recovery_attempt_preserves_failed_history(interrupted_round):
+    rig, original, installed = interrupted_round
+    reserved = rig.freeze_round("round-r2")
+    selector = json_bytes({"schemaVersion": "zoop-ai-handoff-1", "handoffId": reserved["handoffId"]})
+    ledger_argv = ["zoop-ai-handoff", "recover", "--state-dir", str(rig.state)]
+    failed = rig.invoke(ledger_argv, selector, process=True)
+    assert failed["state"] == "failed" and failed["failure"] == {"code": "handoff_artifact_missing"}
+    assert failed["attempts"] == [{"n": 1, "kind": "recover", "outcome": "artifact-missing", "code": "handoff_artifact_missing"}]
+    assert rig.freeze_round("round-r3")["freeze"] == failed
+    assert {name: (rig.files / name).read_bytes() for name in installed} == installed
+    with contextlib.closing(handoff_round.Store(rig.state, mode="read")) as store:
+        failed_row = dict(store.handoff(failed["handoffId"]))
+        failed_attempts = [dict(attempt) for attempt in store.attempts(failed["handoffId"])]
+    argv = rig.argv("freeze-round", "--round-id", "round-r3", "--files-dir", str(rig.files), "--recovery-attempt-id", "operator-recovery-1")
+    recovered = rig.invoke(argv, process=True)
+    assert recovered["freeze"]["state"] == "ready" and recovered["handoffId"] != failed["handoffId"]
+    assert jobs_of(recovered) == ["rel-a", "rel-b"]
+    assert rig.invoke(argv, process=True)["freeze"] == recovered["freeze"]
+    argv[argv.index("--round-id") + 1] = "round-r4"
+    assert rig.invoke(argv, process=True)["freeze"] == recovered["freeze"]
+    ready_snapshot = rig.snapshot()
+    assert rig.freeze_round("round-r4")["freeze"] == failed
+    assert rig.snapshot() == ready_snapshot
+    assert rig.invoke([ledger_argv[0], "inspect", *ledger_argv[2:]], selector, process=True) == failed
+    with contextlib.closing(handoff_round.Store(rig.state, mode="read")) as store:
+        assert dict(store.handoff(failed["handoffId"])) == failed_row
+        assert [dict(attempt) for attempt in store.attempts(failed["handoffId"])] == failed_attempts
+    assert rig.snapshot()["handoffs"] == sorted([(original["handoffId"], "ready"), (failed["handoffId"], "failed"), (recovered["handoffId"], "ready")])
+    assert rig.export(recovered["handoffId"])["delivery"]["status"] == "current"
+
+
 # ---------------------------------------------------------------- the authored issue world through freeze-round ----------------------
 
 def rich_world(tmp_path_factory, **options):
@@ -516,8 +605,11 @@ def test_freeze_round_flags_are_validated_before_anything_is_opened(tmp_path):
         rig.argv("freeze-round", "--round-id", "r" * 201, "--files-dir", str(tmp_path / "f")),
         rig.argv("freeze", "--round-id", "r"),                                                                        # round flags belong to freeze-round only
         rig.argv("export", "--files-dir", str(tmp_path / "f")),
+        rig.argv("freeze", "--recovery-attempt-id", "operator-1"),
+        ["zoop-ai-handoff", "recover", "--state-dir", str(rig.state), "--recovery-attempt-id", "operator-1"],
     ]
     whole = rig.argv("freeze-round", "--round-id", "r", "--files-dir", str(tmp_path / "f"))
+    cases.extend([*whole, "--recovery-attempt-id", attempt] for attempt in ("", "a" * 201, "../x", "attempt\n"))
     at = whole.index("--bindings")
     cases.append(whole[:at] + whole[at + 2:])                                                                          # a source flag missing
     for argv in cases:
