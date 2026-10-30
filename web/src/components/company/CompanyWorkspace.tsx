@@ -34,6 +34,7 @@ import type {
   Prices,
   Portfolio,
   Events,
+  Event,
   EventDetail,
   Financials,
   Impact,
@@ -45,6 +46,8 @@ import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import CompanyCatalog from './CompanyCatalog';
 import CompanyDocumentPanel from './CompanyDocumentPanel';
 import CompanyGraphPreview from './CompanyGraphPreview';
+import CompanyEventDetails from './CompanyEventDetails';
+import { eventRangeDate, widerCompanyPeriod } from './company-event-period';
 import {
   periods,
   exactTime,
@@ -497,6 +500,18 @@ export default function CompanyWorkspace() {
       ![...events.data.items, ...events.data.unknownTimeItems].some(
         (item) => item.id === eventId,
       );
+    const wider = outside
+      ? widerCompanyPeriod(
+          event.data?.eventTime,
+          period,
+          asOf,
+          eventsQuery.get('from'),
+        )
+      : null;
+    if (wider) {
+      updateQuery({ period: wider, bucket: null }, { replace: true });
+      return;
+    }
     if (!unknownTab && !gone && !outside) return;
     const messages = [];
     if (unknownTab) messages.push('요청한 탭이 없어 사건 탭을 보여 드려요');
@@ -531,9 +546,31 @@ export default function CompanyWorkspace() {
     event.data,
     events.data,
     events.loading,
+    period,
   ]);
+  const relation = ['INVOLVES', 'STRUCTURALLY_RELATED_TO'].includes(
+    params.get('relation') ?? '',
+  )
+    ? params.get('relation')!
+    : 'all';
+  const keepRelation = (item: Event) =>
+    relation === 'all' || item.relationTypes.includes(relation);
+  const visibleItems = (events.data?.items ?? []).filter(keepRelation);
+  const visibleUnknown = (events.data?.unknownTimeItems ?? []).filter(
+    keepRelation,
+  );
+  // latestReportedAt also covers dated events; it only stands in when no event date is known.
+  const latestEventTime = events.data?.metadata.latestEventTime;
+  const widerEmptyPeriod = widerCompanyPeriod(
+    eventRangeDate(latestEventTime)
+      ? latestEventTime
+      : events.data?.metadata.latestReportedAt,
+    period,
+    asOf,
+    eventsQuery.get('from'),
+  );
   const groups = new Map<string, Events['items']>();
-  for (const item of events.data?.items ?? []) {
+  for (const item of visibleItems) {
     const key = bucketKey(item, period);
     groups.set(key, [...(groups.get(key) ?? []), item]);
   }
@@ -935,6 +972,32 @@ export default function CompanyWorkspace() {
         <section aria-label="시세 차트" data-screen-id="D-COM-06">
           <h2 className="sr-only">시세 차트·기준 시점</h2>
           <nav aria-label="차트 기간" className="items-center gap-3!">
+            <div
+              role="group"
+              aria-label="관계로 거르기"
+              className="inline-flex overflow-hidden rounded-[3px] border border-zoop-line"
+            >
+              {(
+                [
+                  ['all', '전체'],
+                  ['INVOLVES', '직접 관련'],
+                  ['STRUCTURALLY_RELATED_TO', '구조적 관련'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  aria-pressed={relation === value}
+                  onClick={() =>
+                    updateQuery({
+                      relation: value === 'all' ? null : value,
+                      bucket: null,
+                    })
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <div className="inline-flex overflow-hidden rounded-[3px] border border-zoop-line">
               {periods.map((p) => (
                 <button
@@ -1084,13 +1147,58 @@ export default function CompanyWorkspace() {
                 ))}
                 <p className="text-xs text-zoop-muted">
                   {periods.find((p) => p.value === period)?.label} · 사건{' '}
-                  {events.data.items.length}건 · 시점 미상 제외{' '}
+                  {visibleItems.length}건 · 시점 미상 제외{' '}
                   {events.data.metadata.excludedUnknownTime ?? 0}건
                 </p>
-                {!groups.size && (
-                  <p className="text-xs text-zoop-muted">
-                    해당 기간에 공개·유효한 사건이 없어요.
-                  </p>
+                {!groups.size && !visibleUnknown.length && (
+                  <div role="status">
+                    <p className="text-xs text-zoop-muted">
+                      {relation === 'all'
+                        ? '해당 기간에 공개·유효한 사건이 없어요.'
+                        : '이 관계의 사건이 없어요'}
+                    </p>
+                    {relation !== 'all' ? (
+                      <button onClick={() => updateQuery({ relation: null })}>
+                        전체 보기
+                      </button>
+                    ) : (
+                      <>
+                        {events.data.metadata.latestEventTime ? (
+                          <p>
+                            가장 최근 사건은{' '}
+                            {eventRangeDate(
+                              events.data.metadata.latestEventTime,
+                            )}
+                            에 일어났어요.
+                          </p>
+                        ) : (
+                          events.data.metadata.latestReportedAt && (
+                            <p>
+                              일어난 때를 확인한 사건은 없고, 가장 최근 보도는{' '}
+                              {eventRangeDate(
+                                events.data.metadata.latestReportedAt,
+                              )}
+                              이에요.
+                            </p>
+                          )
+                        )}
+                        {widerEmptyPeriod && (
+                          <button
+                            onClick={() =>
+                              updateQuery({ period: widerEmptyPeriod })
+                            }
+                          >
+                            {
+                              periods.find((p) => p.value === widerEmptyPeriod)!
+                                .label
+                            }
+                            {widerEmptyPeriod === '1y' ? '으로' : '로'} 넓혀
+                            보기
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 )}
                 {/* FS041: 시간 버킷마다 사건 수를 보이고 사건 카드를 나열한다. 차트 ⚡ 표식이나 버킷을 고르면 그 버킷을 강조한다. */}
                 <ol className="flex flex-col">
@@ -1195,12 +1303,10 @@ export default function CompanyWorkspace() {
                     {sortedGroups.length - shownGroups.length}개 날짜)
                   </button>
                 )}
-                {events.data.unknownTimeItems.length > 0 && (
+                {visibleUnknown.length > 0 && (
                   <details>
-                    <summary>
-                      시점 미상 사건 {events.data.unknownTimeItems.length}건
-                    </summary>
-                    {events.data.unknownTimeItems.map((item) => (
+                    <summary>시점 미상 사건 {visibleUnknown.length}건</summary>
+                    {visibleUnknown.map((item) => (
                       <p key={item.id}>
                         <button onClick={() => selectEvent(item)}>
                           {item.title}
@@ -1220,6 +1326,12 @@ export default function CompanyWorkspace() {
                 {event.data && (
                   <article>
                     <h3>{event.data.title}</h3>
+                    <CompanyEventDetails
+                      event={event.data}
+                      owner={owner}
+                      asOf={asOf}
+                      graphVersion={version}
+                    />
                     <p>
                       근거 인용 {event.data.evidenceIds.length}건 · 문서{' '}
                       {
@@ -1347,8 +1459,20 @@ export default function CompanyWorkspace() {
               data={graph.data}
               highlighted={highlighted}
               onSelect={(node, kind) => {
-                if (kind === 'issue')
+                if (kind === 'issue') {
+                  const eventTime = graph.data?.nodes.find(
+                    (item) => item.id === node,
+                  )?.eventTime;
                   updateQuery({
+                    // prototype pickGraphIssue: an issue without a known time falls back to 1y.
+                    period: eventTime
+                      ? (widerCompanyPeriod(
+                          eventTime,
+                          period,
+                          asOf,
+                          eventsQuery.get('from'),
+                        ) ?? period)
+                      : '1y',
                     event: node,
                     document: null,
                     evidence: null,
@@ -1359,7 +1483,7 @@ export default function CompanyWorkspace() {
                         )
                       : null,
                   });
-                else {
+                } else {
                   const next = new URLSearchParams(params);
                   next.delete('event');
                   next.delete('bucket');
@@ -1412,8 +1536,19 @@ export default function CompanyWorkspace() {
                 <ol>
                   {impact.data.steps.map((step, i) => (
                     <li key={`${step.id}:${i}`}>
-                      {step.id} · {step.reason} · 근거 {step.evidenceIds.length}
-                      건
+                      {graph.data?.nodes.find((node) => node.id === step.id)
+                        ?.label ??
+                        event.data?.companies?.find(
+                          (company) => company.id === step.id,
+                        )?.name ??
+                        (step.id === id
+                          ? company.data?.name
+                          : step.id === event.data?.id
+                            ? event.data.title
+                            : null) ??
+                        RELATION_LABEL[step.id] ??
+                        step.id}{' '}
+                      · {step.reason} · 근거 {step.evidenceIds.length}건
                     </li>
                   ))}
                 </ol>
