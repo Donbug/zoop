@@ -103,6 +103,7 @@ def run(req: StageRequest, tmp: Path, endpoint: Endpoint | None = None, env: dic
 def test_the_first_step_sends_the_question_with_the_zoop_mcp_tool_held_for_approval():
     body = chat_agent.build_request(AgentInput.model_validate(agent_input()), "gpt-6-luna", "medium", URL)
     assert body["model"] == "gpt-6-luna" and body["store"] is True and body["reasoning"] == {"effort": "medium"}
+    assert body["max_output_tokens"] == 8000
     assert body["instructions"] == chat_agent.PROMPT and "previous_response_id" not in body
     # The official remote MCP authentication: the raw grant in the tool's own `authorization`, no headers, no scheme prefix.
     assert body["tools"] == [{"type": "mcp", "server_label": "zoop", "server_url": URL, "authorization": TOKEN,
@@ -228,6 +229,10 @@ def test_a_continuation_step_ends_with_the_final_answer_and_the_calls_the_provid
     ({**approval_response(), "output": [{"type": "mcp_approval_request", "id": "mcpr_1", "server_label": "zoop",
                                          "name": "company_read", "arguments": "[1]"}]}, "agent_arguments_invalid"),
     (final_response(answer(), status="incomplete"), "agent_incomplete"),
+    ({**final_response(answer(), status="incomplete"), "incomplete_details": {"reason": "max_output_tokens"}},
+     "output_budget_exceeded"),
+    ({**final_response(answer()), "usage": {"input_tokens": 100, "output_tokens": 3001,
+                                            "output_tokens_details": {"reasoning_tokens": 1000}}}, "output_budget_exceeded"),
     (final_response(answer(sections=[{"basis": "general_knowledge", "text": "x", "requirementIds": ["r9"],
                                       "evidenceIds": []}])), "answer_requirement_unknown"),
     (final_response({"sections": "nope"}), "answer_schema_invalid"),

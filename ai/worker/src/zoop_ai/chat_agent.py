@@ -24,11 +24,11 @@ from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import ValidationError
 
-from .chat_contracts import (PROVIDER_ID, AgentAnswer, AgentInput, ApprovalRequest, ChatAnswer, McpCallSummary,
-                             MAX_APPROVALS, MAX_MCP_CALLS)
+from .chat_contracts import (OUTPUT_BUDGET_EXCEEDED, PROVIDER_ID, AgentAnswer, AgentInput, ApprovalRequest, ChatAnswer,
+                             McpCallSummary, MAX_APPROVALS, MAX_MCP_CALLS, MAX_OUTPUT_TOKENS)
 from .contracts import canonical, digest
 
-PROMPT_REVISION = "zoop-chat-agent-2026-10-28-1"
+PROMPT_REVISION = "zoop-chat-agent-2026-10-30-1"
 # Pinned like the answer stage; the agent runs at medium effort until high has proven quality and the 45 s limit (MCP actions
 # contract 3.2).
 MODEL = "gpt-6-luna"
@@ -57,7 +57,8 @@ PROMPT = (
     "각 구간의 requirementIds는 그 구간이 답하는 요구다. 근거가 부족해 답할 수 없는 요구는 구간 없이 "
     "insufficientRequirementIds에 넣는다. 모든 요구는 구간과 insufficientRequirementIds 중 정확히 한 곳에 속한다. "
     "전체 인용은 서로 다른 evidenceId maxCitations개 이하다. 매수·매도·보유 권유, 목표 주가, 가격·수익 예측, 수익 보장을 "
-    "쓰지 않는다. graphTargetIds에는 본문이 실제로 가리키는 도구 결과 items의 company·issue id만 넣는다. 한국어로 간결하게 쓴다."
+    "쓰지 않는다. graphTargetIds에는 본문이 실제로 가리키는 도구 결과 items의 company·issue id만 넣는다. 한국어로 간결하게 "
+    "쓰고, 답변 전체는 공백 포함 2,000자를 넘기지 않는다."
 )
 
 
@@ -96,6 +97,7 @@ def build_request(payload: AgentInput, model: str, reasoning_effort: str | None,
     request: dict[str, Any] = {
         "model": model,
         "store": True,
+        "max_output_tokens": MAX_OUTPUT_TOKENS,
         "instructions": PROMPT,
         "tools": [_tool(payload, url)],
         "text": {"format": {"type": "json_schema", "name": "chat_answer", "strict": True, "schema": schema()}},
@@ -201,7 +203,9 @@ def interpret(raw: Any, payload: AgentInput) -> AgentAnswer:
         return AgentAnswer(response_id=response_id, status="approval_required", approval_requests=approvals,
                            mcp_calls=calls, answer=None)
     if raw.get("status") == "incomplete":
-        raise ValueError("agent_incomplete")
+        details = raw.get("incomplete_details")
+        cut = isinstance(details, dict) and details.get("reason") == "max_output_tokens"
+        raise ValueError(OUTPUT_BUDGET_EXCEEDED if cut else "agent_incomplete")
     if raw.get("status") != "completed":
         raise ValueError("agent_response_invalid")
     if refused:

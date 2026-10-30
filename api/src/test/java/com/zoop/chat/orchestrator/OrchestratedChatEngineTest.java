@@ -625,6 +625,15 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
+    void aTokenLimitAsksToNarrowTheQuestionInsteadOfRerunningIt() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
+        routerFailure = new ChatModels.Failure(ChatModels.Failure.Fate.REFUSED, ChatModels.INPUT_BUDGET_EXCEEDED, "input");
+        assertFailed("budget_exceeded", "context_too_large", false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        routerFailure = new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, ChatModels.OUTPUT_BUDGET_EXCEEDED, "output");
+        assertFailed("budget_exceeded", "output_limit", false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+    }
+
+    @Test
     void modelFailuresAreRerunOnlyWhenNothingMayHaveBeenProcessed() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
         routerFailure = new ChatModels.Failure(ChatModels.Failure.Fate.UNKNOWN, "timed out after sending");

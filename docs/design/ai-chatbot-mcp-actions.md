@@ -87,6 +87,8 @@ MCP 자격 증명은 OpenAI 모델 API 키와 별개다. job·실행 세대·sub
 
 모델 측 요청 1건에도 여러 추론·도구 왕복이 있을 수 있다. 모델/도구 토큰·continuation·reasoning 사용량을 실제 영수증으로 합산하고, 서버가 예약하는 모델 출력 비용은 reasoning도 포함한다. 2,000은 최종 답변 길이 상한이며 reasoning 비용까지 그 안이라고 가정하지 않는다. 모델이 초과 호출을 시도하면 gate가 거부하고 실행기가 신규 실행을 종료한다.
 
+토큰 상한 구현(2026-10-30): 공급자 출력 상한은 reasoning을 포함하므로 Luna 요청에 8,000(답변 2,000 + reasoning 몫 6,000, spike 뒤 재조정)을 보내고, 받은 뒤 출력에서 reasoning을 뺀 값이 2,000을 넘거나 출력 상한에서 잘린 답은 버려 `budget_exceeded/output_limit`으로 끝낸다. direct 답변은 입력 전체를 한 번에 보내므로 추정치(토크나이저 없이 ASCII 4자·그 외 1.3자당 1토큰)가 24,000을 넘으면 보내지 않고 `budget_exceeded/context_too_large`다. agent는 입력이 공급자 쪽에서 늘어나므로 Java가 단계별 보고값을 합산한다. 다음 단계 입력은 직전 단계 이상이므로, 합계 + 직전 입력이 24,000을 넘으면 더 보내지 않고 `context_too_large`, 합계 + 직전 입력 2배가 넘으면 새 도구를 거부해 다음 단계가 답을 쓴다. 한 단계의 도구 결과로 입력이 크게 늘면 사후에야 알 수 있어 그 단계의 초과는 막지 못하고, 공급자가 사용량을 보고하지 않으면 합산하지 않는다.
+
 ### 3.3 요청 단위 캐시와 중복 억제
 
 캐시 키는 `jobId + executionGeneration + logicalToolId + schema/policyRevision + canonicalArguments + subject/scopeDigest + graphVersion + asOf`다. 기본 인자·기간·집합 순서를 정규화하되 의미 있는 순서·페이지 cursor·선택 evidence 범위는 보존한다. requirementId만 다른 동일 조회는 한 결과에 요구 매핑을 합친다. 서로 다른 회원·작업·버전의 캐시는 공유하지 않는다.

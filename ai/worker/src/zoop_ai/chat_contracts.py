@@ -42,6 +42,19 @@ MAX_QUESTION = 4000
 MAX_TEXT = 12000
 MAX_PATHS = 20
 MAX_PATH_STEPS = 6
+# ZOOP-AIG-001 6.3.3: Luna's accumulated input and the final answer, whose length does not count reasoning. The provider's output
+# cap does count it, so it leaves reasoning a share of its own, provisional until the live spike measures it.
+MAX_INPUT_TOKENS = 24000
+MAX_ANSWER_TOKENS = 2000
+MAX_OUTPUT_TOKENS = 8000
+INPUT_BUDGET_EXCEEDED = "input_budget_exceeded"
+OUTPUT_BUDGET_EXCEEDED = "output_budget_exceeded"
+
+
+def estimated_tokens(text: str) -> int:
+    """A generous estimate before sending, with no tokenizer at hand: about 4 ASCII characters and 1.3 others to a token."""
+    ascii_chars = sum(1 for char in text if ord(char) < 128)
+    return ascii_chars // 4 + (len(text) - ascii_chars) * 3 // 4
 
 
 class ChatGrant(Wire):
