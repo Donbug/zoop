@@ -265,45 +265,42 @@ function HoldingsList({
   }
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <section aria-label="보유 종목">
-        <h3 className="px-4 pt-3 text-xs font-bold text-zoop-muted">
-          보유 종목
-        </h3>
-        {portfolio.status === 'loading' && (
-          <p role="status" className="px-4 py-4 text-xs">
-            보유 종목을 불러오는 중이에요.
-          </p>
-        )}
-        {portfolio.status === 'error' && (
-          <p role="alert" className="px-4 py-4 text-xs">
-            보유 종목을 불러오지 못했어요.{' '}
-            <button onClick={portfolio.reload} className="underline">
-              다시 시도
-            </button>
-          </p>
-        )}
-        {portfolio.status === 'success' &&
-          (portfolio.data.holdings.length ? (
-            <ul>
-              {portfolio.data.holdings.map((h) =>
-                row(
-                  h.companyId,
-                  h.name,
-                  logoOf(h.companyId),
-                  `${h.quantity.toLocaleString('ko-KR')}주`,
-                  false,
-                ),
-              )}
-            </ul>
-          ) : (
-            <p className="px-4 py-4 text-xs">
-              보유 종목이 없어요.{' '}
-              <Link to="/my" className="underline">
-                가상 계좌 연결하기
-              </Link>
+      {!(
+        portfolio.status === 'success' && portfolio.data.holdings.length === 0
+      ) && (
+        <section aria-label="보유 종목">
+          <h3 className="px-4 pt-3 text-xs font-bold text-zoop-muted">
+            보유 종목
+          </h3>
+          {portfolio.status === 'loading' && (
+            <p role="status" className="px-4 py-4 text-xs">
+              보유 종목을 불러오는 중이에요.
             </p>
-          ))}
-      </section>
+          )}
+          {portfolio.status === 'error' && (
+            <p role="alert" className="px-4 py-4 text-xs">
+              보유 종목을 불러오지 못했어요.{' '}
+              <button onClick={portfolio.reload} className="underline">
+                다시 시도
+              </button>
+            </p>
+          )}
+          {portfolio.status === 'success' &&
+            portfolio.data.holdings.length > 0 && (
+              <ul>
+                {portfolio.data.holdings.map((h) =>
+                  row(
+                    h.companyId,
+                    h.name,
+                    logoOf(h.companyId),
+                    `${h.quantity.toLocaleString('ko-KR')}주`,
+                    false,
+                  ),
+                )}
+              </ul>
+            )}
+        </section>
+      )}
       <section ref={watchSection} aria-label="관심 종목">
         <h3 className="px-4 pt-3 text-xs font-bold text-zoop-muted">
           관심 종목

@@ -27,8 +27,8 @@ const steps = [
   },
   {
     id: 'D-GRP-T5',
-    title: 'AI에게 묻기',
-    body: '선택한 기업·사건·관계를 질문에 연결하면 현재 보고 있는 맥락을 바탕으로 답을 받을 수 있어요.',
+    title: 'AI에게 질문',
+    body: '강조된 ‘AI에게 질문’ 버튼을 누르면 선택한 기업·사건·관계를 질문에 연결할 수 있어요. 튜토리얼을 마친 뒤 현재 맥락을 바탕으로 답을 받아보세요.',
     tip: 'AI 답변은 투자 권유가 아니며, 근거 문서를 함께 확인해 주세요.',
   },
 ] as const;
@@ -70,7 +70,7 @@ export default function GraphTutorial({
       className={`order-first flex ${compact ? 'w-full' : 'w-[260px]'} shrink-0 flex-col self-start rounded-[6px] border border-panel-line bg-white p-4 font-panel text-panel-ink shadow-[0_0_0_0.5px_rgb(26_26_26/0.08)] max-sm:w-full`}
     >
       <div>
-        <p className="flex items-center gap-1.5 text-[11px] leading-[16.5px] text-panel-muted">
+        <p className="flex items-center gap-2 text-[13px] leading-5 text-panel-muted">
           <img
             src="/graph-assets/tutorial-help.svg"
             width="13"
@@ -79,22 +79,22 @@ export default function GraphTutorial({
           />
           튜토리얼 {step}/5
         </p>
-        <h2 className="mt-1 text-[17px] leading-[25.5px] font-bold tracking-[-0.25px]">
+        <h2 className="mt-2 text-[20px] leading-[30px] font-bold">
           {current.title}
         </h2>
       </div>
-      <div className="mt-2 flex flex-col">
-        <p className="text-[12px] leading-[19px] text-panel-secondary">
+      <div className="mt-4 flex flex-col gap-3">
+        <p className="text-[14px] leading-[23px] text-panel-secondary">
           {instruction ?? current.body}
         </p>
-        <p className="mt-2 text-[11px] leading-[17px] text-panel-muted">
+        <p className="text-[13px] leading-[21px] text-panel-muted">
           {practice
             ? step === 5
               ? 'AI 답변은 투자 권유가 아니며 근거를 함께 확인해 주세요.'
-              : '강조된 동작을 완료하면 자동으로 다음 단계로 넘어가요. 언제든 건너뛸 수 있어요.'
+              : '' // : '강조된 동작을 완료하면 자동으로 다음 단계로 넘어가요. 언제든 건너뛸 수 있어요.'
             : current.tip}
         </p>
-        <div className="mt-3" aria-label={`전체 5단계 중 ${step}단계`}>
+        <div className="mt-1" aria-label={`전체 5단계 중 ${step}단계`}>
           <div className="mb-3 grid grid-cols-5 gap-1" aria-hidden="true">
             {steps.map((item, index) => (
               <span
@@ -125,14 +125,14 @@ export default function GraphTutorial({
               <button
                 data-tutorial-action="retry"
                 onClick={onReload}
-                className="h-8 px-2 text-[11px] underline"
+                className="h-9 px-2 text-[12px] underline"
               >
                 지도 다시 불러오기
               </button>
             )}
             {step > 1 && !practice ? (
               <button
-                className="h-8 rounded-panel border border-panel-line px-3 text-[12px] font-semibold hover:bg-panel-soft"
+                className="h-9 rounded-panel border border-panel-line px-3 text-[13px] font-semibold hover:bg-panel-soft"
                 onClick={() => onStepChange((step - 1) as GraphTutorialStep)}
                 disabled={saving}
               >
@@ -141,7 +141,7 @@ export default function GraphTutorial({
             ) : null}
             {(!practice || step === 5) && (
               <button
-                className="h-8 rounded-panel bg-panel-ink px-3 text-[12px] font-semibold text-white disabled:bg-panel-muted"
+                className="h-9 rounded-panel bg-panel-ink px-3 text-[13px] font-semibold text-white disabled:bg-panel-muted"
                 onClick={() =>
                   step === 5
                     ? onFinish()
@@ -154,7 +154,7 @@ export default function GraphTutorial({
             )}
             {step < 5 && (
               <button
-                className="ml-auto h-8 rounded-panel border border-panel-line px-2 text-[11px] font-semibold text-panel-secondary hover:bg-panel-soft"
+                className="ml-auto h-9 rounded-panel border border-panel-line px-2 text-[12px] font-semibold text-panel-secondary hover:bg-panel-soft"
                 data-tutorial-action="skip"
                 onClick={onSkip}
                 disabled={saving}
