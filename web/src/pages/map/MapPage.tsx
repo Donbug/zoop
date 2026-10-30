@@ -730,6 +730,16 @@ function MapWorkspace({
     const sameSnapshot =
       (!target.graphVersion || target.graphVersion === shownVersion) &&
       (target.asOf ?? null) === (asOf ?? null);
+    if (target.kind === 'path') {
+      const ends = target.id.split(',');
+      if (
+        !sameSnapshot ||
+        !ends.every((id) => data?.nodes.some((node) => node.id === id))
+      )
+        return false;
+      updateQuery({ path: target.id, focus: null, hops: null, select: null });
+      return true;
+    }
     if (sameSnapshot) {
       if (!data?.nodes.some((node) => node.id === target.id)) return false;
       updateQuery({ focus: target.id, hops: '1', path: null });
