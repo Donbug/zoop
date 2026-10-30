@@ -7,6 +7,127 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.aiExecutions": {
+      "type": "array"
+    },
+    "response:200:application/json.aiExecutions:required": false,
+    "response:200:application/json.aiExecutions[]": {
+      "type": "object"
+    },
+    "response:200:application/json.aiExecutions[].attemptNo": {
+      "type": "integer"
+    },
+    "response:200:application/json.aiExecutions[].attemptNo:required": true,
+    "response:200:application/json.aiExecutions[].errorCode": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.aiExecutions[].errorCode:required": true,
+    "response:200:application/json.aiExecutions[].feature": {
+      "type": "string",
+      "enum": [
+        "briefing",
+        "briefing-outlook"
+      ]
+    },
+    "response:200:application/json.aiExecutions[].feature:required": true,
+    "response:200:application/json.aiExecutions[].finishedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "response:200:application/json.aiExecutions[].finishedAt:required": true,
+    "response:200:application/json.aiExecutions[].id": {
+      "type": "string"
+    },
+    "response:200:application/json.aiExecutions[].id:required": true,
+    "response:200:application/json.aiExecutions[].inputTokens": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "response:200:application/json.aiExecutions[].inputTokens:required": true,
+    "response:200:application/json.aiExecutions[].mode": {
+      "type": "string",
+      "enum": [
+        "live",
+        "replay",
+        "save_only"
+      ]
+    },
+    "response:200:application/json.aiExecutions[].mode:required": true,
+    "response:200:application/json.aiExecutions[].model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.aiExecutions[].model:required": true,
+    "response:200:application/json.aiExecutions[].origin": {
+      "type": "string",
+      "enum": [
+        "runtime",
+        "archive"
+      ]
+    },
+    "response:200:application/json.aiExecutions[].origin:required": true,
+    "response:200:application/json.aiExecutions[].outputTokens": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "response:200:application/json.aiExecutions[].outputTokens:required": true,
+    "response:200:application/json.aiExecutions[].stage": {
+      "type": "string"
+    },
+    "response:200:application/json.aiExecutions[].stage:required": true,
+    "response:200:application/json.aiExecutions[].startedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "response:200:application/json.aiExecutions[].startedAt:required": true,
+    "response:200:application/json.aiExecutions[].status": {
+      "type": "string"
+    },
+    "response:200:application/json.aiExecutions[].status:required": true,
+    "response:200:application/json.aiExecutions[].transmissionConfirmed": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "response:200:application/json.aiExecutions[].transmissionConfirmed:required": true,
+    "response:200:application/json.attemptsLog[].failureStage:required": false,
+    "response:200:application/json.attemptsLog[].failureStage<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.attemptsLog[].failureStage<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.attemptsLog[].outcome:required": false,
+    "response:200:application/json.attemptsLog[].outcome<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.attemptsLog[].outcome<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.historyAvailability": {
+      "type": "string",
+      "enum": [
+        "recorded",
+        "unrecorded"
+      ]
+    },
+    "response:200:application/json.historyAvailability:required": false,
     "response:200:application/json.published<anyOf:0>.items[].summary<anyOf:0>": {
       "type": "object"
     },

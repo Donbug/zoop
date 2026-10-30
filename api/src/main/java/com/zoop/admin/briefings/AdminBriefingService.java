@@ -31,11 +31,12 @@ public class AdminBriefingService {
     private final ObjectMapper mapper;
     private final CsrfKeyRing keys;
     private final Clock clock;
+    private final BriefingReprocessPolicy reprocess;
 
     public AdminBriefingService(JdbcAdminBriefingRepository repository, BriefingRoundRepository publications,
-            ObjectMapper mapper, CsrfKeyRing keys, Clock clock) {
+            ObjectMapper mapper, CsrfKeyRing keys, Clock clock, BriefingReprocessPolicy reprocess) {
         this.repository = repository; this.publications = publications;
-        this.mapper = mapper; this.keys = keys; this.clock = clock;
+        this.mapper = mapper; this.keys = keys; this.clock = clock; this.reprocess = reprocess;
     }
 
     public ObjectNode list(String admin, String from, String to, String cursor, Integer requestedLimit) {
@@ -74,12 +75,25 @@ public class AdminBriefingService {
             field(c, "adminEmail", change.get("admin_email_snapshot"));
         }
         var attempts = result.putArray("attemptsLog");
+        result.put("historyAvailability", repository.attempts(id).isEmpty() && round.publishedAt()!=null ? "unrecorded" : "recorded");
         for (var attempt : repository.attempts(id)) {
             ObjectNode a = attempts.addObject();
+            JsonNode recordedStages=json(attempt.get("stages"));
+            field(a,"outcome",recordedStages.path("outcome").asText(null));
+            field(a,"failureStage",recordedStages.path("failureStage").asText(null));
             field(a, "n", attempt.get("attempt_no")); field(a, "trigger", attempt.get("trigger"));
             field(a, "startedAt", at(attempt, "started_at")); field(a, "finishedAt", at(attempt, "finished_at"));
             field(a, "status", attempt.get("status")); field(a, "failureReason", safeReason(attempt.get("failure_reason")));
             field(a, "adminEmail", attempt.get("admin_email_snapshot"));
+        }
+        var calls=result.putArray("aiExecutions");
+        for(var execution:repository.executions(id)){
+            var call=calls.addObject();
+            for(String key:List.of("id","feature","stage","status","model")) field(call,key,execution.get(key));
+            field(call,"origin",execution.get("recording_origin"));field(call,"attemptNo",execution.get("attempt_no"));field(call,"mode",execution.get("execution_mode"));
+            field(call,"startedAt",at(execution,"started_at"));field(call,"finishedAt",at(execution,"finished_at"));
+            field(call,"inputTokens",execution.get("input_tokens"));field(call,"outputTokens",execution.get("output_tokens"));
+            field(call,"transmissionConfirmed",execution.get("transmission_confirmed"));field(call,"errorCode",safeReason(execution.get("error_code")));
         }
         return result;
     }
@@ -98,7 +112,9 @@ public class AdminBriefingService {
         field(out, "failureReason", safeReason(r.get("failure_reason")));
         out.put("delayed", Set.of("scheduled", "generating", "verifying").contains(r.get("status"))
                 && at(r, "scheduled_at").isBefore(now));
-        out.put("reprocessable", false).put("blockedReason", READ_ONLY_REASON);
+        String blocked = reprocess.blocked((String)r.get("id"));
+        out.put("reprocessable", blocked == null).put("blockedReason", blocked);
+        field(out,"reprocessState",reprocess.latestState((String)r.get("id")));
         out.putNull("suspension");
         if (Boolean.TRUE.equals(r.get("suspended"))) {
             ObjectNode s = out.putObject("suspension");

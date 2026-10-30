@@ -21,7 +21,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 @Service
 public class MemberFeedbackService {
-  private static final Set<String> FEATURES = Set.of("briefing_round", "briefing_issue");
+  private static final Set<String> FEATURES = Set.of("briefing_round", "briefing_issue", "chatbot_answer", "news_summary");
   private static final String PURPOSE = "member-feedback-cursor-v1";
   private final JdbcTemplate jdbc;
   private final BriefingRoundRepository rounds;
@@ -30,6 +30,7 @@ public class MemberFeedbackService {
   private final ObjectMapper mapper;
   private final CsrfKeyRing keys;
   private final Clock clock;
+  private final AiResultFeedbackService aiResults;
 
   public MemberFeedbackService(
       JdbcTemplate jdbc,
@@ -38,7 +39,7 @@ public class MemberFeedbackService {
       FeedbackVersion versions,
       ObjectMapper mapper,
       CsrfKeyRing keys,
-      Clock clock) {
+      Clock clock, AiResultFeedbackService aiResults) {
     this.jdbc = jdbc;
     this.rounds = rounds;
     this.publicRead = publicRead;
@@ -46,6 +47,7 @@ public class MemberFeedbackService {
     this.mapper = mapper;
     this.keys = keys;
     this.clock = clock;
+    this.aiResults = aiResults;
   }
 
   @Transactional
@@ -73,6 +75,7 @@ public class MemberFeedbackService {
       reason = reason.strip();
       if (reason.isEmpty()) reason = null;
     }
+    if (AiResultFeedbackService.FEATURES.contains(feature)) return aiResults.put(member,feature,target,version,value,reason);
     var owners =
         jdbc.queryForList("SELECT status FROM members WHERE id=? FOR SHARE", member.memberId());
     if (owners.isEmpty() || !"active".equals(owners.getFirst().get("status")))
@@ -162,9 +165,15 @@ public class MemberFeedbackService {
     List<Object> args = new ArrayList<>(List.of(member, Timestamp.from(asOf)));
     StringBuilder sql =
         new StringBuilder(
-            "SELECT f.* FROM briefing_feedback f JOIN briefing_rounds r ON r.id=f.round_id WHERE"
-                + " f.member_id=? AND f.updated_at<=? AND f.target_version="
-                + FeedbackVersion.SQL);
+            "SELECT f.* FROM (SELECT b.id,b.member_id,b.feature,b.target_id,b.target_version,b.value,b.reason,b.created_at,b.updated_at FROM briefing_feedback b JOIN briefing_rounds r ON r.id=b.round_id WHERE b.target_version="
+                + FeedbackVersion.SQL + " UNION ALL SELECT a.id,a.member_id,a.feature,a.target_id,a.target_version,a.value,a.reason,a.created_at,a.updated_at FROM ai_result_feedback a WHERE false) f WHERE f.member_id=? AND f.updated_at<=?");
+    var eligible = feature == null || AiResultFeedbackService.FEATURES.contains(feature) ? aiResults.currentRows(member,asOf).stream().map(r -> r.get("id").toString()).toList() : List.<String>of();
+    if (!eligible.isEmpty()) {
+      String ids = String.join(",", Collections.nCopies(eligible.size(), "?"));
+      int index = sql.indexOf("WHERE false");
+      sql.replace(index,index+"WHERE false".length(),"WHERE a.id IN ("+ids+")");
+      args.addAll(0,eligible);
+    }
     if (feature != null) {
       sql.append(" AND f.feature=?");
       args.add(feature);

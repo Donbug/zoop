@@ -118,7 +118,7 @@ export type InsightCompanyDetail = {
 };
 
 export type FeedbackFeature =
-  'chatbot_answer' | 'briefing_round' | 'briefing_issue';
+  'chatbot_answer' | 'news_summary' | 'briefing_round' | 'briefing_issue';
 
 /** 미리 정한 기간 또는 직접 고른 KST 날짜(start·end가 있으면 window보다 우선) */
 export type FeedbackPeriod = {

@@ -2887,6 +2887,29 @@ DB에 저장된 회차만 예정 시각·ID 내림차순으로 조회한다. 날
 
 nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하지 않는다. 필수 필드는 null 허용 여부와 별개다. JSON 필드 이름·중첩 참조의 정본은 OpenAPI다.
 
+<a id="schema-briefingaiexecution"></a>
+
+### BriefingAiExecution
+
+모델 호출 메타데이터만 반환한다. archive는 원래 시작 시각과 시도 번호를 알 수 없는 과거 영수증 일부이며 전체 사용량으로 외삽하지 않는다. live 중 전송 확인만 실제 호출 수에 포함하고 비용은 청구 자료가 없으면 미확인이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| feature | 필수 | string {briefing, briefing-outlook} |  |
+| stage | 필수 | string |  |
+| status | 필수 | string |  |
+| model | 필수 | string, null |  |
+| origin | 필수 | string {runtime, archive} |  |
+| mode | 필수 | string {live, replay, save_only} |  |
+| attemptNo | 필수 | integer |  |
+| startedAt | 필수 | string, null (date-time) |  |
+| finishedAt | 필수 | string, null (date-time) |  |
+| inputTokens | 필수 | integer, null |  |
+| outputTokens | 필수 | integer, null |  |
+| transmissionConfirmed | 필수 | boolean, null |  |
+| errorCode | 필수 | string, null |  |
+
 <a id="schema-companystatement"></a>
 
 ### CompanyStatement
@@ -3632,6 +3655,8 @@ AI 사용 회원 수(getAiUsage.members). 화면은 각 값을 totalMembers로 �
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| outcome | 선택 | string / null |  |
+| failureStage | 선택 | string / null |  |
 | n | 필수 | integer |  |
 | trigger | 필수 | string {scheduler, admin} |  |
 | startedAt | 필수 | string (date-time) |  |
@@ -4698,6 +4723,7 @@ The selection frozen when the question was first received.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| feedbackVersion | 선택 | string / null | 저장·검증 완료 answered 답변의 평가 버전. 응답 본문이 바뀌면 달라지며 요청별 metadata는 제외한다. member feedback에는 result.messageId와 이 값을 그대로 보낸다. |
 | id | 필수 | string |  |
 | sessionId | 필수 | string |  |
 | seq | 필수 | integer |  |
@@ -5134,9 +5160,9 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | window | 필수 | string | 생성 시각 기준 직전 7일의 반개구간 [generatedAt-7d, generatedAt). |
-| requests | 필수 | integer | 기간 안에 접수된 사용자 요청 수. AI 공급자 실행 시도 횟수와 구분한다. |
-| succeeded | 필수 | integer | 기간 안에 접수되어 성공으로 종료된 사용자 요청 수. |
-| failed | 필수 | integer | 기간 안에 접수되어 실패로 종료된 사용자 요청 수. 재시도는 최초 사용자 요청 한 건으로 센다. 성공·실패가 미확정인 요청은 두 값에서 제외한다. |
+| requests | 필수 | integer, null | 기간 안에 접수된 사용자 요청 수. AI 공급자 실행 시도 횟수와 구분한다. |
+| succeeded | 필수 | integer, null | 기간 안에 접수되어 성공으로 종료된 사용자 요청 수. |
+| failed | 필수 | integer, null | 기간 안에 접수되어 실패로 종료된 사용자 요청 수. 재시도는 최초 사용자 요청 한 건으로 센다. 성공·실패가 미확정인 요청은 두 값에서 제외한다. |
 | features | 필수 | [DashboardAiFeature](#schema-dashboardaifeature)[] |  |
 
 <a id="schema-dashboardaifeature"></a>
@@ -5149,8 +5175,8 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | --- | --- | --- | --- |
 | feature | 필수 | string |  |
 | label | 필수 | string |  |
-| requests | 필수 | integer | 해당 AI 기능에 접수된 사용자 요청 수. |
-| failed | 필수 | integer | 해당 기능에서 실패로 종료된 사용자 요청 수. |
+| requests | 필수 | integer, null | 해당 AI 기능에 접수된 사용자 요청 수. |
+| failed | 필수 | integer, null | 해당 기능에서 실패로 종료된 사용자 요청 수. |
 
 <a id="schema-dashboardaudit"></a>
 
@@ -5653,7 +5679,7 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| feature | 필수 | string {chatbot_answer, briefing_round, briefing_issue} |  |
+| feature | 필수 | string {chatbot_answer, news_summary, briefing_round, briefing_issue} |  |
 | label | 필수 | string |  |
 | up | 필수 | integer |  |
 | down | 필수 | integer |  |
@@ -5670,7 +5696,7 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| feature | 필수 | string {chatbot_answer, briefing_round, briefing_issue} |  |
+| feature | 필수 | string {chatbot_answer, news_summary, briefing_round, briefing_issue} |  |
 | targetId | 필수 | string |  |
 | targetVersion | 필수 | string / null | Result version the rating is linked to; null for chatbot answers (an answer never changes) |
 | value | 필수 | string {up, down, none} |  |
@@ -5713,10 +5739,10 @@ same request again never toggles anything.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| feature | 필수 | string {chatbot_answer, briefing_round, briefing_issue} |  |
+| feature | 필수 | string {chatbot_answer, news_summary, briefing_round, briefing_issue} |  |
 | targetId | 필수 | string |  |
 | value | 필수 | string {up, down, none} |  |
-| targetVersion | 선택 | string / null | 브리핑은 응답의 feedbackVersion(구버전 응답은 graphVersion)을 그대로 전송합니다. graphVersion이 없는 허용된 과거 재생본은 publication:원문SHA256입니다. 현재 발행본과 다르면 409. |
+| targetVersion | 선택 | string / null | chatbot_answer는 result.messageId와 ChatJob.feedbackVersion, news_summary는 evidenceId와 documentSummary.resultVersion을 그대로 전송합니다. 현재 읽기 권한과 버전을 확인하며 none 취소는 기존 버전만 허용합니다. 브리핑은 응답의 feedbackVersion(구버전 응답은 graphVersion)을 그대로 전송합니다. graphVersion이 없는 허용된 과거 재생본은 publication:원문SHA256입니다. 현재 발행본과 다르면 409. |
 | reason | 선택 | string / null | 안 됨(down)에만 선택 입력, 최대 200자. 취소(none)는 삭제하지 않고 사유를 비웁니다. |
 
 <a id="schema-fielddecisionout"></a>
@@ -7044,6 +7070,8 @@ only while the rule has never been changed (a rule switched back to its default 
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| historyAvailability | 선택 | string {recorded, unrecorded} | 생성 시도 원장 유무. 과거 영수증의 일부 수집은 원래 생성 시도의 복원을 뜻하지 않는다. |
+| aiExecutions | 선택 | [BriefingAiExecution](#schema-briefingaiexecution)[] |  |
 | id | 필수 | string |  |
 | date | 필수 | string (date) |  |
 | edition | 필수 | string {morning, evening} |  |

@@ -33,9 +33,15 @@ public final class BriefingUsageLedger {
 
     public BriefingUsageLedger(NamedParameterJdbcTemplate jdbc, PlatformTransactionManager manager, Path artifactRoot,
             Duration lease) {
+        this(jdbc, manager, artifactRoot, lease, false);
+    }
+
+    /** Admin admission joins its audit/idempotency transaction; model observations retain independent commits. */
+    public BriefingUsageLedger(NamedParameterJdbcTemplate jdbc, PlatformTransactionManager manager, Path artifactRoot,
+            Duration lease, boolean joinTransaction) {
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(manager);
-        tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        tx.setPropagationBehavior(joinTransaction ? TransactionDefinition.PROPAGATION_REQUIRED : TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.files = ArtifactFileStore.at(artifactRoot);
         this.leaseSeconds = Math.toIntExact(lease.toSeconds());
         require(leaseSeconds >= 30 && leaseSeconds <= 900, "invalid_lease");

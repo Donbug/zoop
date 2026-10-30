@@ -314,16 +314,12 @@ describe('A-ADM-04 브리핑 운영 (FS070·FS071)', () => {
     expect(
       within(form).getByText(/무료\(모델을 다시 부르지 않아요\)/),
     ).toBeTruthy();
-    await user.click(
-      within(form).getByRole('button', { name: '재처리 요청(무료)' }),
-    );
+    await user.click(within(form).getByRole('button', { name: '재처리 요청' }));
     expect(within(form).getByText('사유를 입력해 주세요.')).toBeTruthy();
     expect(server.calls('POST', REPROCESS)).toHaveLength(0);
 
     await user.type(within(form).getByLabelText('재처리 사유'), '원장 복구됨');
-    await user.click(
-      within(form).getByRole('button', { name: '재처리 요청(무료)' }),
-    );
+    await user.click(within(form).getByRole('button', { name: '재처리 요청' }));
 
     expect(await within(panel).findByText('재처리를 요청했어요.')).toBeTruthy();
     expect(server.calls('POST', REPROCESS)[0].body).toEqual({
@@ -347,9 +343,7 @@ describe('A-ADM-04 브리핑 운영 (FS070·FS071)', () => {
     const form = within(panel).getByRole('form', { name: '브리핑 재처리' });
     await user.type(within(form).getByLabelText('재처리 사유'), reason);
     const submit = () =>
-      user.click(
-        within(form).getByRole('button', { name: '재처리 요청(무료)' }),
-      );
+      user.click(within(form).getByRole('button', { name: '재처리 요청' }));
     await submit();
     return { user, panel, form, submit };
   }
@@ -912,7 +906,7 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
       screen.getByRole('meter', { name: 'AI 기능을 쓴 회원 비율' }),
     ).toBeTruthy();
     const tokens = screen.getByRole('group', {
-      name: '전체 날짜별 토큰 사용량 (←→로 날짜 이동)',
+      name: '전체 기록된 날짜별 토큰 사용량 (←→로 날짜 이동)',
     });
     // 날짜는 오래된 것부터 그린다.
     const bars = within(tokens).getAllByRole('img');
@@ -944,7 +938,7 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
 
     // 실제 청구액이 있는 기능(브리핑)과 추정만 있는 기능(챗봇)을 함께 더한다.
     const allCost = screen.getByRole('group', {
-      name: '전체 날짜별 AI 비용 (←→로 날짜 이동)',
+      name: '전체 기록된 날짜별 AI 비용 (←→로 날짜 이동)',
     });
     expect(
       within(allCost).getAllByRole('img')[1].getAttribute('aria-label'),
@@ -954,14 +948,14 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     expect(location()).toBe('/admin/ai?view=briefing');
     expect(screen.getByText('측정 안 함 / 전체 200명')).toBeTruthy();
     const briefing = screen.getByRole('group', {
-      name: '브리핑 날짜별 토큰 사용량 (←→로 날짜 이동)',
+      name: '브리핑 기록된 날짜별 토큰 사용량 (←→로 날짜 이동)',
     });
     const briefingBars = within(briefing).getAllByRole('img');
     expect(briefingBars[0].getAttribute('aria-label')).toBe(
       '10월 23일 입력 자료 없음, 출력 자료 없음, 모델 호출 자료 없음',
     );
     const cost = screen.getByRole('group', {
-      name: '브리핑 날짜별 AI 비용 (←→로 날짜 이동)',
+      name: '브리핑 기록된 날짜별 AI 비용 (←→로 날짜 이동)',
     });
     expect(within(cost).getAllByRole('img')[1].getAttribute('aria-label')).toBe(
       '10월 24일 실제 0.01 USD',
@@ -975,7 +969,7 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     await user.click(screen.getByRole('tab', { name: 'AI 챗봇' }));
     expect(screen.getByText('15%')).toBeTruthy();
     const chatCost = screen.getByRole('group', {
-      name: 'AI 챗봇 날짜별 AI 비용 (←→로 날짜 이동)',
+      name: 'AI 챗봇 기록된 날짜별 AI 비용 (←→로 날짜 이동)',
     });
     expect(
       within(chatCost).getAllByRole('img')[0].getAttribute('aria-label'),

@@ -1985,7 +1985,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getConversation",
       "severity": "difference",
-      "message": "목표만 187 · BFF만 32 · 형식/필수/권한 변경 23",
+      "message": "목표만 190 · BFF만 32 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2006,7 +2006,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCurrentConversation",
       "severity": "difference",
-      "message": "목표만 187 · BFF만 32 · 형식/필수/권한 변경 23",
+      "message": "목표만 190 · BFF만 32 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2020,7 +2020,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "submitQuestion",
       "severity": "difference",
-      "message": "목표만 319 · BFF만 34 · 형식/필수/권한 변경 42",
+      "message": "목표만 325 · BFF만 34 · 형식/필수/권한 변경 42",
       "source": ""
     },
     {
@@ -2034,7 +2034,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getQuestionJob",
       "severity": "difference",
-      "message": "목표만 204 · BFF만 23 · 형식/필수/권한 변경 23",
+      "message": "목표만 207 · BFF만 23 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2048,7 +2048,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "retryQuestionJob",
       "severity": "difference",
-      "message": "목표만 309 · BFF만 34 · 형식/필수/권한 변경 39",
+      "message": "목표만 315 · BFF만 34 · 형식/필수/권한 변경 39",
       "source": ""
     },
     {
@@ -2062,7 +2062,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "cancelQuestionJob",
       "severity": "difference",
-      "message": "목표만 235 · BFF만 23 · 형식/필수/권한 변경 23",
+      "message": "목표만 238 · BFF만 23 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2370,7 +2370,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAdminBriefingRound",
       "severity": "difference",
-      "message": "목표만 309 · BFF만 37 · 형식/필수/권한 변경 30",
+      "message": "목표만 348 · BFF만 37 · 형식/필수/권한 변경 30",
       "source": ""
     },
     {
@@ -2440,7 +2440,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getMyFeedback",
       "severity": "difference",
-      "message": "목표만 120 · BFF만 21 · 형식/필수/권한 변경 9",
+      "message": "목표만 120 · BFF만 21 · 형식/필수/권한 변경 10",
       "source": ""
     },
     {
@@ -2454,7 +2454,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "setFeedback",
       "severity": "difference",
-      "message": "목표만 160 · BFF만 12 · 형식/필수/권한 변경 10",
+      "message": "목표만 160 · BFF만 12 · 형식/필수/권한 변경 12",
       "source": ""
     },
     {
@@ -2524,7 +2524,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getFeedbackSummary",
       "severity": "difference",
-      "message": "목표만 114 · BFF만 21 · 형식/필수/권한 변경 8",
+      "message": "목표만 114 · BFF만 21 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {

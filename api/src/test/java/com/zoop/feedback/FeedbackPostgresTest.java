@@ -296,7 +296,9 @@ class FeedbackPostgresTest {
     assertEquals(0.8, result.at("/features/0/rate").asDouble());
     assertEquals(0, result.at("/features/1/total").asInt());
     assertTrue(result.at("/features/1/rate").isNull());
-    assertEquals("chatbot_answer", result.at("/unsupported/0/feature").asText());
+    assertEquals(0, result.path("unsupported").size());
+    assertEquals("chatbot_answer", result.at("/features/2/feature").asText());
+    assertEquals("news_summary", result.at("/features/3/feature").asText());
     var dislikes = request("GET", "/api/v1/admin/feedback/dislikes?window=all", admin, null);
     assertEquals(200, dislikes.status());
     assertEquals(1, dislikes.json().path("total").asInt());

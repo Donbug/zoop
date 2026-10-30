@@ -8477,6 +8477,7 @@ paths:
           - "목차의 요구 번호 42는 기준일 재무·실적(요구 42)이며 FS042 시점 그래프와 의미가 다르다. 재무 폐기 선언이 없어 별도 유보하며 시점 그래프 의미의 승인 범위는 팀 최종 확인이 필요하다."
           - "날짜 정밀도만 있는 사건을 정확한 조회 asOf로 바꾸는 기준과 이력 보존 기간을 팀이 확인해야 한다."
 components:
+
   securitySchemes:
     memberSession:
       type: "apiKey"
@@ -8489,6 +8490,82 @@ components:
       name: "zoop_admin_session"
       description: "관리자 세션 및 작업별 권한 검증."
   schemas:
+
+    BriefingAiExecution:
+      type: object
+      description: 모델 호출 메타데이터만 반환한다. archive는 원래 시작 시각과 시도 번호를 알 수 없는 과거 영수증 일부이며 전체
+        사용량으로 외삽하지 않는다. live 중 전송 확인만 실제 호출 수에 포함하고 비용은 청구 자료가 없으면 미확인이다.
+      properties:
+        id:
+          type: string
+        feature:
+          type: string
+          enum:
+          - briefing
+          - briefing-outlook
+        stage:
+          type: string
+        status:
+          type: string
+        model:
+          type:
+          - string
+          - 'null'
+        origin:
+          type: string
+          enum:
+          - runtime
+          - archive
+        mode:
+          type: string
+          enum:
+          - live
+          - replay
+          - save_only
+        attemptNo:
+          type: integer
+        startedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        finishedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        inputTokens:
+          type:
+          - integer
+          - 'null'
+        outputTokens:
+          type:
+          - integer
+          - 'null'
+        transmissionConfirmed:
+          type:
+          - boolean
+          - 'null'
+        errorCode:
+          type:
+          - string
+          - 'null'
+      required:
+      - id
+      - feature
+      - stage
+      - status
+      - model
+      - origin
+      - mode
+      - attemptNo
+      - startedAt
+      - finishedAt
+      - inputTokens
+      - outputTokens
+      - transmissionConfirmed
+      - errorCode
+
     CompanyStatement:
       type: object
       required: [text, evidenceIds]
@@ -9988,6 +10065,14 @@ components:
         - "relationType"
     AttemptOut:
       properties:
+        outcome:
+          anyOf:
+            - type: "string"
+            - type: "null"
+        failureStage:
+          anyOf:
+            - type: "string"
+            - type: "null"
         n:
           type: "integer"
         trigger:
@@ -12106,6 +12191,11 @@ components:
       description: "The selection frozen when the question was first received."
     ChatJob:
       properties:
+        feedbackVersion:
+          anyOf:
+            - type: "string"
+            - type: "null"
+          description: "저장·검증 완료 answered 답변의 평가 버전. 응답 본문이 바뀌면 달라지며 요청별 metadata는 제외한다. member feedback에는 result.messageId와 이 값을 그대로 보낸다."
         id:
           type: "string"
         sessionId:
@@ -13224,13 +13314,13 @@ components:
           const: "7d"
           description: "생성 시각 기준 직전 7일의 반개구간 [generatedAt-7d, generatedAt)."
         requests:
-          type: "integer"
+          type: ["integer", "null"]
           description: "기간 안에 접수된 사용자 요청 수. AI 공급자 실행 시도 횟수와 구분한다."
         succeeded:
-          type: "integer"
+          type: ["integer", "null"]
           description: "기간 안에 접수되어 성공으로 종료된 사용자 요청 수."
         failed:
-          type: "integer"
+          type: ["integer", "null"]
           description: "기간 안에 접수되어 실패로 종료된 사용자 요청 수. 재시도는 최초 사용자 요청 한 건으로 센다. 성공·실패가 미확정인 요청은 두 값에서 제외한다."
         features:
           items:
@@ -13250,10 +13340,10 @@ components:
         label:
           type: "string"
         requests:
-          type: "integer"
+          type: ["integer", "null"]
           description: "해당 AI 기능에 접수된 사용자 요청 수."
         failed:
-          type: "integer"
+          type: ["integer", "null"]
           description: "해당 기능에서 실패로 종료된 사용자 요청 수."
       type: "object"
       required:
@@ -14353,6 +14443,7 @@ components:
           type: "string"
           enum:
             - "chatbot_answer"
+            - "news_summary"
             - "briefing_round"
             - "briefing_issue"
         label:
@@ -14391,6 +14482,7 @@ components:
           type: "string"
           enum:
             - "chatbot_answer"
+            - "news_summary"
             - "briefing_round"
             - "briefing_issue"
         targetId:
@@ -14486,6 +14578,7 @@ components:
           type: "string"
           enum:
             - "chatbot_answer"
+            - "news_summary"
             - "briefing_round"
             - "briefing_issue"
         targetId:
@@ -14504,7 +14597,7 @@ components:
               type: "string"
             -
               type: "null"
-          description: "브리핑은 응답의 feedbackVersion(구버전 응답은 graphVersion)을 그대로 전송합니다. graphVersion이 없는 허용된 과거 재생본은 publication:원문SHA256입니다. 현재 발행본과 다르면 409."
+          description: "chatbot_answer는 result.messageId와 ChatJob.feedbackVersion, news_summary는 evidenceId와 documentSummary.resultVersion을 그대로 전송합니다. 현재 읽기 권한과 버전을 확인하며 none 취소는 기존 버전만 허용합니다. 브리핑은 응답의 feedbackVersion(구버전 응답은 graphVersion)을 그대로 전송합니다. graphVersion이 없는 허용된 과거 재생본은 publication:원문SHA256입니다. 현재 발행본과 다르면 409."
         reason:
           anyOf:
             -
@@ -17400,6 +17493,18 @@ components:
       description: "An application publication rule; the id carries its version (``<ruleId>@<version>``). A rule can only keep\nalready eligible content off the public graph. It never publishes a HOLD, never turns a HOLD into an approval and never\nchanges an AI judgement input: content is published only by an AI pass inside a handoff or by an administrator allow\nfollowed by a new handoff, import and activation. ``changedAt``/``changedBy``/``reason`` are the latest change, null\nonly while the rule has never been changed (a rule switched back to its default keeps its latest change).\n``history`` is every change, newest first."
     RoundDetail:
       properties:
+        reprocessState:
+          type: ["string", "null"]
+          enum: ["queued", "running", "completed", "failed", null]
+          description: "최근 재처리 작업 상태. completed는 결과 저장 완료이며 발행 여부는 publishedAt으로 확인한다."
+        historyAvailability:
+          type: "string"
+          enum: ["recorded", "unrecorded"]
+          description: "생성 시도 원장 유무. 과거 영수증의 일부 수집은 원래 생성 시도의 복원을 뜻하지 않는다."
+        aiExecutions:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/BriefingAiExecution"
         id:
           type: "string"
         date:
@@ -17550,6 +17655,10 @@ components:
         - "nextCursor"
     RoundOut:
       properties:
+        reprocessState:
+          type: ["string", "null"]
+          enum: ["queued", "running", "completed", "failed", null]
+          description: "최근 재처리 작업 상태. completed는 결과 저장 완료이며 발행 여부는 publishedAt으로 확인한다."
         id:
           type: "string"
         date:

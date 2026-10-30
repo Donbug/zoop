@@ -33,150 +33,87 @@ public class AdminFeedbackService {
   private final Clock clock;
   private final BriefingRoundRepository rounds;
   private final BriefingQueryService publicRead;
+  private final AiResultFeedbackService aiResults;
 
   public AdminFeedbackService(
       JdbcTemplate jdbc, ObjectMapper mapper, CsrfKeyRing keys, Clock clock,
-      BriefingRoundRepository rounds, BriefingQueryService publicRead) {
+      BriefingRoundRepository rounds, BriefingQueryService publicRead, AiResultFeedbackService aiResults) {
     this.jdbc = jdbc;
     this.mapper = mapper;
     this.keys = keys;
     this.clock = clock;
     this.rounds = rounds;
     this.publicRead = publicRead;
+    this.aiResults = aiResults;
   }
+
+  private static final List<String> FEATURES=List.of("briefing_round","briefing_issue","chatbot_answer","news_summary");
 
   public ObjectNode summary(String window, String start, String end) {
-    var p = Period.parse(window, start, end, clock.instant());
-    List<Object> args = new ArrayList<>();
-    String where = readableWhere(p, args);
-    var data =
-        jdbc.queryForList(
-            "SELECT f.feature,(f.updated_at AT TIME ZONE 'Asia/Seoul')::date AS"
-                + " day,f.value,count(*) n"
-                + FROM
-                + where
-                + " GROUP BY f.feature,day,f.value ORDER BY day",
-            args.toArray());
-    ObjectNode result = header(p);
-    result
-        .put("minSample", MIN_SAMPLE)
-        .put("basis", "회원별·대상별 마지막 평가를 집계합니다. 취소·제공 중단·과거 버전은 제외하며 로컬 미리보기 평가는 포함하지 않습니다.");
-    var features = result.putArray("features");
-    for (String feature : List.of("briefing_round", "briefing_issue")) {
-      ObjectNode item = features.addObject().put("feature", feature).put("label", label(feature));
-      long up = 0, down = 0;
-      Map<String, long[]> days = new TreeMap<>();
-      for (var row : data)
-        if (feature.equals(row.get("feature"))) {
-          long n = ((Number) row.get("n")).longValue();
-          boolean positive = "up".equals(row.get("value"));
-          if (positive) up += n;
-          else down += n;
-          days.computeIfAbsent(row.get("day").toString(), k -> new long[2])[positive ? 0 : 1] += n;
-        }
-      item.put("up", up)
-          .put("down", down)
-          .put("total", up + down)
-          .put("sampleHidden", up + down > 0 && up + down < MIN_SAMPLE);
-      rate(item, up, down);
-      var trend = item.putArray("days");
-      days.forEach(
-          (day, v) -> {
-            var d = trend.addObject().put("date", day).put("up", v[0]).put("down", v[1]);
-            rate(d, v[0], v[1]);
-          });
+    var p=Period.parse(window,start,end,clock.instant());
+    var rows=currentRows(p);
+    ObjectNode result=header(p).put("minSample",MIN_SAMPLE)
+        .put("basis","회원별·대상별 마지막 평가를 집계합니다. 취소·제공 중단·과거 버전·현재 열 수 없는 결과와 로컬 미리보기 평가는 제외합니다.");
+    var features=result.putArray("features");
+    for(String feature:FEATURES){
+      ObjectNode item=features.addObject().put("feature",feature).put("label",label(feature));
+      long up=0,down=0;Map<String,long[]> days=new TreeMap<>();
+      for(var row:rows)if(feature.equals(row.get("feature"))){
+        boolean positive="up".equals(row.get("value"));if(positive)up++;else down++;
+        String day=((Timestamp)row.get("updated_at")).toInstant().atZone(KST).toLocalDate().toString();
+        days.computeIfAbsent(day,k->new long[2])[positive?0:1]++;
+      }
+      item.put("up",up).put("down",down).put("total",up+down).put("sampleHidden",up+down>0&&up+down<MIN_SAMPLE);
+      rate(item,up,down);var trend=item.putArray("days");
+      days.forEach((day,counts)->{var d=trend.addObject().put("date",day).put("up",counts[0]).put("down",counts[1]);rate(d,counts[0],counts[1]);});
     }
-    result
-        .putArray("unsupported")
-        .addObject()
-        .put("feature", "chatbot_answer")
-        .put("label", "AI 챗봇 답변")
-        .put("reason", "챗봇 평가 저장 원장은 아직 연결되지 않았습니다.");
-    return result;
+    result.putArray("unsupported");return result;
   }
 
-  public ObjectNode dislikes(
-      String admin,
-      String window,
-      String start,
-      String end,
-      String cursor,
-      Integer requestedLimit) {
-    if (requestedLimit != null && (requestedLimit < 1 || requestedLimit > 100)) invalid();
-    String filters =
-        Canonical.sha256(window + ":" + String.valueOf(start) + ":" + String.valueOf(end));
-    var pos = FeedbackCursor.decode(mapper, keys, PURPOSE, cursor, admin, filters, requestedLimit);
-    int limit = pos != null ? pos.limit() : requestedLimit == null ? 50 : requestedLimit;
-    var p = Period.parse(window, start, end, pos == null ? clock.instant() : pos.asOf());
-    List<Object> args = new ArrayList<>();
-    String where = readableWhere(p, args) + " AND f.value='down'";
-    Long total = jdbc.queryForObject("SELECT count(*)" + FROM + where, Long.class, args.toArray());
-    if (pos != null) {
-      where += " AND (f.updated_at,f.id COLLATE \"C\")<(?,? COLLATE \"C\")";
-      try {
-        args.add(Timestamp.from(Instant.parse(pos.first())));
-      } catch (RuntimeException e) {
-        throw new CustomException(ErrorCode.INVALID_CURSOR);
-      }
-      args.add(pos.last());
+  /** Evaluate readability before totals, aggregation and pagination, across all four result kinds. */
+  private List<Map<String,Object>> currentRows(Period p){
+    List<Object> args=new ArrayList<>();String where=readableWhere(p,args);
+    var rows=new ArrayList<>(jdbc.queryForList("""
+      SELECT f.*,r.round_date,r.edition,m.email AS owner_email,m.display_name AS owner_name,
+        (SELECT i->>'title' FROM jsonb_array_elements(r.published_payload->'items') i WHERE i->>'eventId'=f.event_id) issue_title
+      """+FROM+where,args.toArray()));
+    for(var row:aiResults.currentRows(null,p.asOf())){
+      var at=((Timestamp)row.get("updated_at")).toInstant();
+      if(!Set.of("up","down").contains(row.get("value")) || p.from()!=null&&at.isBefore(p.from()) || p.to()!=null&&!at.isBefore(p.to()))continue;
+      rows.add(row);
     }
-    args.add(limit + 1);
-    var rows =
-        jdbc.queryForList(
-            """
-            SELECT f.*,r.round_date,r.edition,m.email AS owner_email,m.display_name AS owner_name,
-                (SELECT i->>'title' FROM jsonb_array_elements(r.published_payload->'items') i WHERE i->>'eventId'=f.event_id) issue_title
-            """
-                + FROM
-                + where
-                + " ORDER BY f.updated_at DESC,f.id COLLATE \"C\" DESC LIMIT ?",
-            args.toArray());
-    ObjectNode result = mapper.createObjectNode().put("total", total).putNull("nextCursor");
-    var items = result.putArray("items");
-    rows.stream()
-        .limit(limit)
-        .forEach(
-            row -> {
-              String feature = (String) row.get("feature");
-              String title =
-                  row.get("round_date")
-                      + " "
-                      + ("morning".equals(row.get("edition")) ? "출근" : "퇴근")
-                      + " 브리핑";
-              if (row.get("issue_title") != null) title += " · " + row.get("issue_title");
-              items
-                  .addObject()
-                  .put("at", ((Timestamp) row.get("updated_at")).toInstant().toString())
-                  .put("feature", feature)
-                  .put("featureLabel", label(feature))
-                  .put("targetId", (String) row.get("target_id"))
-                  .put("targetLabel", title)
-                  .put(
-                      "reason",
-                      FeedbackReasonMasker.mask(
-                          (String) row.get("reason"),
-                          (String) row.get("owner_email"),
-                          (String) row.get("owner_name")))
-                  .put("voter", voter((String) row.get("member_id")))
-                  .putNull("sessionId");
-            });
-    if (rows.size() > limit) {
-      var last = rows.get(limit - 1);
-      result.put(
-          "nextCursor",
-          FeedbackCursor.encode(
-              mapper,
-              keys,
-              PURPOSE,
-              admin,
-              filters,
-              limit,
-              p.asOf(),
-              ((Timestamp) last.get("updated_at")).toInstant().toString(),
-              (String) last.get("id")));
+    return rows;
+  }
+
+  public ObjectNode dislikes(String admin,String window,String start,String end,String cursor,Integer requestedLimit){
+    if(requestedLimit!=null&&(requestedLimit<1||requestedLimit>100))invalid();
+    String filters=Canonical.sha256(window+":"+String.valueOf(start)+":"+String.valueOf(end));
+    var pos=FeedbackCursor.decode(mapper,keys,PURPOSE,cursor,admin,filters,requestedLimit);
+    int limit=pos!=null?pos.limit():requestedLimit==null?50:requestedLimit;
+    var p=Period.parse(window,start,end,pos==null?clock.instant():pos.asOf());
+    var rows=currentRows(p).stream().filter(r->"down".equals(r.get("value")))
+        .sorted(Comparator.<Map<String,Object>,Instant>comparing(r->((Timestamp)r.get("updated_at")).toInstant()).reversed()
+            .thenComparing(r->cursorId(r),Comparator.reverseOrder())).toList();
+    long total=rows.size();
+    if(pos!=null){
+      final Instant at;
+      try{at=Instant.parse(pos.first());}catch(RuntimeException e){throw new CustomException(ErrorCode.INVALID_CURSOR);}
+      rows=rows.stream().filter(r->{int cmp=((Timestamp)r.get("updated_at")).toInstant().compareTo(at);return cmp<0||cmp==0&&cursorId(r).compareTo(pos.last())<0;}).toList();
     }
+    ObjectNode result=mapper.createObjectNode().put("total",total).putNull("nextCursor");var items=result.putArray("items");
+    for(var row:rows.stream().limit(limit).toList()){
+      String feature=row.get("feature").toString();
+      String title=AiResultFeedbackService.FEATURES.contains(feature)?label(feature):row.get("round_date")+" "+("morning".equals(row.get("edition"))?"출근":"퇴근")+" 브리핑";
+      if(row.get("issue_title")!=null)title+=" · "+row.get("issue_title");
+      items.addObject().put("id",row.get("id").toString()).put("feature",feature).put("featureLabel",label(feature))
+        .put("targetId",row.get("target_id").toString()).put("targetVersion",row.get("target_version").toString())
+        .put("targetLabel",title).put("reason",FeedbackReasonMasker.mask((String)row.get("reason"),(String)row.get("owner_email"),(String)row.get("owner_name")))
+        .put("at",((Timestamp)row.get("updated_at")).toInstant().toString()).put("voter",voter(row.get("member_id").toString())).putNull("sessionId");
+    }
+    if(rows.size()>limit){var last=rows.get(limit-1);result.put("nextCursor",FeedbackCursor.encode(mapper,keys,PURPOSE,admin,filters,limit,p.asOf(),((Timestamp)last.get("updated_at")).toInstant().toString(),cursorId(last)));}
     return result;
   }
+  private static String cursorId(Map<String,Object> row){return row.get("feature")+"/"+row.get("id");}
 
   private String voter(String member) {
     return "voter-"
@@ -234,7 +171,7 @@ public class AdminFeedbackService {
   }
 
   private static String label(String feature) {
-    return feature.equals("briefing_round") ? "브리핑 회차" : "브리핑 핵심 이슈";
+    return switch(feature){case "briefing_round" -> "브리핑 회차";case "briefing_issue" -> "브리핑 핵심 이슈";case "chatbot_answer" -> "AI 챗봇 답변";case "news_summary" -> "뉴스 요약";default -> throw new CustomException(ErrorCode.INVALID_REQUEST);};
   }
 
   private static void invalid() {

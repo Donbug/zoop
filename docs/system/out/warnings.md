@@ -287,18 +287,18 @@
 | BFF_PATH_DIFFERENCE | difference | createConversation | 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | createConversation | 목표만 161 · BFF만 12 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getConversation | 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getConversation | 목표만 187 · BFF만 32 · 형식/필수/권한 변경 23 |  |
+| BFF_FIELD_DIFFERENCE | difference | getConversation | 목표만 190 · BFF만 32 · 형식/필수/권한 변경 23 |  |
 | TARGET_ONLY_API | difference | deleteConversation | DELETE /api/v1/chat/sessions/{id}: 직접 대응 BFF 없음 |  |
 | BFF_PATH_DIFFERENCE | difference | getCurrentConversation | 목표 /api/v1/chat/sessions/current ↔ BFF /api/chat/sessions/current |  |
-| BFF_FIELD_DIFFERENCE | difference | getCurrentConversation | 목표만 187 · BFF만 32 · 형식/필수/권한 변경 23 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCurrentConversation | 목표만 190 · BFF만 32 · 형식/필수/권한 변경 23 |  |
 | BFF_PATH_DIFFERENCE | difference | submitQuestion | 목표 /api/v1/chat/sessions/{id}/jobs ↔ BFF /api/chat/sessions/{id}/jobs |  |
-| BFF_FIELD_DIFFERENCE | difference | submitQuestion | 목표만 319 · BFF만 34 · 형식/필수/권한 변경 42 |  |
+| BFF_FIELD_DIFFERENCE | difference | submitQuestion | 목표만 325 · BFF만 34 · 형식/필수/권한 변경 42 |  |
 | BFF_PATH_DIFFERENCE | difference | getQuestionJob | 목표 /api/v1/chat/jobs/{job_id} ↔ BFF /api/chat/jobs/{job_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getQuestionJob | 목표만 204 · BFF만 23 · 형식/필수/권한 변경 23 |  |
+| BFF_FIELD_DIFFERENCE | difference | getQuestionJob | 목표만 207 · BFF만 23 · 형식/필수/권한 변경 23 |  |
 | BFF_PATH_DIFFERENCE | difference | retryQuestionJob | 목표 /api/v1/chat/jobs/{job_id}/retry ↔ BFF /api/chat/jobs/{job_id}/retry |  |
-| BFF_FIELD_DIFFERENCE | difference | retryQuestionJob | 목표만 309 · BFF만 34 · 형식/필수/권한 변경 39 |  |
+| BFF_FIELD_DIFFERENCE | difference | retryQuestionJob | 목표만 315 · BFF만 34 · 형식/필수/권한 변경 39 |  |
 | BFF_PATH_DIFFERENCE | difference | cancelQuestionJob | 목표 /api/v1/chat/jobs/{job_id}/cancel ↔ BFF /api/chat/jobs/{job_id}/cancel |  |
-| BFF_FIELD_DIFFERENCE | difference | cancelQuestionJob | 목표만 235 · BFF만 23 · 형식/필수/권한 변경 23 |  |
+| BFF_FIELD_DIFFERENCE | difference | cancelQuestionJob | 목표만 238 · BFF만 23 · 형식/필수/권한 변경 23 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminSession | 목표 /api/v1/admin/auth/session ↔ BFF /api/admin/auth/session |  |
 | BFF_FIELD_DIFFERENCE | difference | getAdminSession | 목표만 110 · BFF만 2 · 형식/필수/권한 변경 1 |  |
 | BFF_PATH_DIFFERENCE | difference | logInAdmin | 목표 /api/v1/admin/auth/login ↔ BFF /api/admin/auth/login |  |
@@ -342,7 +342,7 @@
 | BFF_PATH_DIFFERENCE | difference | listAdminBriefingRounds | 목표 /api/v1/admin/briefings ↔ BFF /api/admin/briefings |  |
 | BFF_FIELD_DIFFERENCE | difference | listAdminBriefingRounds | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 15 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminBriefingRound | 목표 /api/v1/admin/briefings/{round_id} ↔ BFF /api/admin/briefings/{round_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getAdminBriefingRound | 목표만 309 · BFF만 37 · 형식/필수/권한 변경 30 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAdminBriefingRound | 목표만 348 · BFF만 37 · 형식/필수/권한 변경 30 |  |
 | BFF_PATH_DIFFERENCE | difference | reprocessBriefingRound | 목표 /api/v1/admin/briefings/{round_id}/reprocess ↔ BFF /api/admin/briefings/{round_id}/reprocess |  |
 | BFF_FIELD_DIFFERENCE | difference | reprocessBriefingRound | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 16 |  |
 | BFF_PATH_DIFFERENCE | difference | appendBriefingCorrection | 목표 /api/v1/admin/briefings/{round_id}/corrections ↔ BFF /api/admin/briefings/{round_id}/corrections |  |
@@ -352,9 +352,9 @@
 | BFF_PATH_DIFFERENCE | difference | recordInteractionEvents | 목표 /api/v1/telemetry ↔ BFF /api/telemetry |  |
 | BFF_FIELD_DIFFERENCE | difference | recordInteractionEvents | 목표만 206 · BFF만 28 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | getMyFeedback | 목표 /api/v1/feedback ↔ BFF /api/feedback |  |
-| BFF_FIELD_DIFFERENCE | difference | getMyFeedback | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 9 |  |
+| BFF_FIELD_DIFFERENCE | difference | getMyFeedback | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 10 |  |
 | BFF_PATH_DIFFERENCE | difference | setFeedback | 목표 /api/v1/feedback ↔ BFF /api/feedback |  |
-| BFF_FIELD_DIFFERENCE | difference | setFeedback | 목표만 160 · BFF만 12 · 형식/필수/권한 변경 10 |  |
+| BFF_FIELD_DIFFERENCE | difference | setFeedback | 목표만 160 · BFF만 12 · 형식/필수/권한 변경 12 |  |
 | BFF_PATH_DIFFERENCE | difference | getInsightsOverview | 목표 /api/v1/admin/insights/overview ↔ BFF /api/admin/insights/overview |  |
 | BFF_FIELD_DIFFERENCE | difference | getInsightsOverview | 목표만 124 · BFF만 21 · 형식/필수/권한 변경 10 |  |
 | BFF_PATH_DIFFERENCE | difference | getInsightsSummary | 목표 /api/v1/admin/insights/summary ↔ BFF /api/admin/insights/summary |  |
@@ -364,7 +364,7 @@
 | BFF_PATH_DIFFERENCE | difference | getCompanyInsights | 목표 /api/v1/admin/insights/companies/{company_id} ↔ BFF /api/admin/insights/companies/{company_id} |  |
 | BFF_FIELD_DIFFERENCE | difference | getCompanyInsights | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 15 |  |
 | BFF_PATH_DIFFERENCE | difference | getFeedbackSummary | 목표 /api/v1/admin/feedback/summary ↔ BFF /api/admin/feedback/summary |  |
-| BFF_FIELD_DIFFERENCE | difference | getFeedbackSummary | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 8 |  |
+| BFF_FIELD_DIFFERENCE | difference | getFeedbackSummary | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | listDislikedResults | 목표 /api/v1/admin/feedback/dislikes ↔ BFF /api/admin/feedback/dislikes |  |
 | BFF_FIELD_DIFFERENCE | difference | listDislikedResults | 목표만 115 · BFF만 23 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | listMaskedTranscripts | 목표 /api/v1/admin/transcripts ↔ BFF /api/admin/transcripts |  |

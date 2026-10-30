@@ -22,6 +22,13 @@
       ]
     },
     "response:200:application/json.jobs[].context.graphVersion:required": true,
+    "response:200:application/json.jobs[].feedbackVersion:required": false,
+    "response:200:application/json.jobs[].feedbackVersion<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs[].feedbackVersion<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.jobs[].phase:required": true,
     "response:200:application/json.jobs[].phase<anyOf:0>": {
       "type": "string",

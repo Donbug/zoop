@@ -54,8 +54,17 @@ public class JdbcAdminBriefingRepository {
 
     List<Map<String, Object>> attempts(String id) {
         return jdbc.queryForList("""
-                SELECT attempt_no,trigger,started_at,finished_at,status,failure_reason,admin_email_snapshot
+                SELECT id,attempt_no,trigger,started_at,finished_at,status,stages,failure_reason,admin_email_snapshot
                 FROM briefing_attempts WHERE round_id=? AND purpose='generation' ORDER BY attempt_no
                 """, id);
+    }
+
+    List<Map<String,Object>> executions(String id) {
+        return jdbc.queryForList("""
+          SELECT e.id,a.attempt_no,e.feature,e.stage,e.execution_mode,e.status,e.model,e.started_at,e.finished_at,
+              e.input_tokens,e.output_tokens,e.transmission_confirmed,e.error_code,e.recording_origin
+          FROM ai_executions e JOIN briefing_attempts a ON a.id=e.briefing_attempt_id
+          WHERE a.round_id=? ORDER BY e.started_at,e.id
+          """,id);
     }
 }

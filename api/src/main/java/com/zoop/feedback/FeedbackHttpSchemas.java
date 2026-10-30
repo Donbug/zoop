@@ -13,7 +13,7 @@ public final class FeedbackHttpSchemas {
       name = "FeedbackVote",
       requiredProperties = {"feature", "targetId", "value"})
   public record Vote(
-      @Schema(allowableValues = {"briefing_round", "briefing_issue"}) String feature,
+      @Schema(allowableValues = {"briefing_round", "briefing_issue", "chatbot_answer", "news_summary"}) String feature,
       @Schema(minLength = 1, maxLength = 600) String targetId,
       @Schema(
               nullable = true,

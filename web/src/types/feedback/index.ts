@@ -2,7 +2,7 @@
 // 한 사람이 결과마다 평가 하나다. 원하는 최종 상태(up·down·none)를 보내므로 다시 보내도 토글되지 않는다.
 
 export type FeedbackFeature =
-  'chatbot_answer' | 'briefing_round' | 'briefing_issue';
+  'chatbot_answer' | 'news_summary' | 'briefing_round' | 'briefing_issue';
 
 export type FeedbackValue = 'up' | 'down' | 'none';
 

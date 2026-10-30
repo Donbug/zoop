@@ -11,7 +11,10 @@
       "type": "object"
     },
     "response:200:application/json.ai<anyOf:0>.failed": {
-      "type": "integer"
+      "type": [
+        "integer",
+        "null"
+      ]
     },
     "response:200:application/json.ai<anyOf:0>.failed:required": true,
     "response:200:application/json.ai<anyOf:0>.features": {
@@ -22,7 +25,10 @@
       "type": "object"
     },
     "response:200:application/json.ai<anyOf:0>.features[].failed": {
-      "type": "integer"
+      "type": [
+        "integer",
+        "null"
+      ]
     },
     "response:200:application/json.ai<anyOf:0>.features[].failed:required": true,
     "response:200:application/json.ai<anyOf:0>.features[].feature": {
@@ -34,15 +40,24 @@
     },
     "response:200:application/json.ai<anyOf:0>.features[].label:required": true,
     "response:200:application/json.ai<anyOf:0>.features[].requests": {
-      "type": "integer"
+      "type": [
+        "integer",
+        "null"
+      ]
     },
     "response:200:application/json.ai<anyOf:0>.features[].requests:required": true,
     "response:200:application/json.ai<anyOf:0>.requests": {
-      "type": "integer"
+      "type": [
+        "integer",
+        "null"
+      ]
     },
     "response:200:application/json.ai<anyOf:0>.requests:required": true,
     "response:200:application/json.ai<anyOf:0>.succeeded": {
-      "type": "integer"
+      "type": [
+        "integer",
+        "null"
+      ]
     },
     "response:200:application/json.ai<anyOf:0>.succeeded:required": true,
     "response:200:application/json.ai<anyOf:0>.window": {

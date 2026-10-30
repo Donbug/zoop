@@ -354,6 +354,25 @@
         "type": "string"
       }
     },
+    "response:200:application/json.features[].feature": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "chatbot_answer",
+          "news_summary",
+          "briefing_round",
+          "briefing_issue"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "chatbot_answer",
+          "briefing_round",
+          "briefing_issue"
+        ]
+      }
+    },
     "response:401:application/json.error.code": {
       "target": {
         "type": "string",
