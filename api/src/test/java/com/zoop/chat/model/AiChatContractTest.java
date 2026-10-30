@@ -229,7 +229,10 @@ class AiChatContractTest {
                         assertEquals(List.of("KRX:005930", "NASDAQ:NVDA"), query.targets());
                         return new ChatToolOutput("gv-earlier.." + scope.graphVersionId(), List.of(
                                 new ChatToolItem("iss-new", "issue", "[새로 생김] 공급 계약", List.of("KRX:005930"), List.of(EVIDENCE)),
-                                new ChatToolItem("iss-old", "issue", "[사라짐] 이전 사건", List.of("NASDAQ:NVDA"), List.of())),
+                                new ChatToolItem("iss-old", "issue", "[사라짐] 이전 사건", List.of("NASDAQ:NVDA"), List.of()),
+                                new ChatToolItem("edge-stable", "edge",
+                                        "[새로 생김] " + "가".repeat(298) + "\uD840\uDC00" + "끝".repeat(20),
+                                        List.of("KRX:005930", "NASDAQ:NVDA"), List.of(EVIDENCE))),
                                 List.of(EVIDENCE), true, false);
                     }
                 }));

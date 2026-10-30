@@ -28,6 +28,9 @@ from .chat_wire import ANSWERS, CHAT_SCHEMA, INVOCATION_ID, ChatMcpHealth, ChatS
 
 SLOTS = 4
 SLOT_WAIT = 1.0
+# Probes have their own slots: a busy stage pool (agent steps hold one for up to 33 s) never makes a reachable MCP server look
+# unproven. A probe sends nothing to a model and holds its slot for at most its deadline.
+PROBE_SLOTS = 2
 # The worker's own client timeout per stage plus process start and ledger writes.
 STAGE_DEADLINE = {"chat-router": 4.0 + 3.0, "chat-answer": 25.0 + 3.0, "chat-verification": 6.0 + 3.0, "chat-agent": 30.0 + 3.0}
 # The probe's own 3 s client timeout plus process start.
@@ -105,10 +108,12 @@ class ChatProcess:
 
 
 class ChatStages:
-    def __init__(self, config: ServiceConfig, process: ChatProcess, *, slots: int = SLOTS, slot_wait: float = SLOT_WAIT):
+    def __init__(self, config: ServiceConfig, process: ChatProcess, *, slots: int = SLOTS, slot_wait: float = SLOT_WAIT,
+                 probe_slots: int = PROBE_SLOTS):
         assert config.chat is not None
         self._chat, self._process = config.chat, process
         self._slots, self._slot_wait = threading.BoundedSemaphore(slots), slot_wait
+        self._probe_slots = threading.BoundedSemaphore(probe_slots)
 
     def invoke(self, principal: str, stage: str, request: ChatStageRequest, seen: Observation) -> tuple[int, ChatStageResult]:
         if request.stage != stage:
@@ -151,12 +156,12 @@ class ChatStages:
     def probe_mcp(self, seen: Observation) -> ChatMcpHealth:
         """The MCP server's reachability as the installed runtime probes it. It sends no grant, runs nothing and calls no model, so it shares
         no ledger; a probe that cannot run, or whose child ends abnormally, is an error and never a health answer."""
-        if not self._slots.acquire(timeout=self._slot_wait):
+        if not self._probe_slots.acquire(timeout=self._slot_wait):
             raise ApiError(503, "service_busy", retry_after=1)
         try:
             outcome = self._process.probe(PROBE_DEADLINE)
         finally:
-            self._slots.release()
+            self._probe_slots.release()
         seen.runtime.append({"command": "probe-mcp", "kind": outcome.kind, "exit": outcome.exit_code, "code": outcome.code})
         if outcome.kind == "result":
             try:

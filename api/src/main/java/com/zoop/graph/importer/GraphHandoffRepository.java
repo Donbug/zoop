@@ -14,8 +14,8 @@ import com.zoop.document.analysis.repository.EvidenceRow;
  * transaction; the decisions (what must match, when to fail) belong to the importer, not to the repository.
  *
  * <p>Nothing here can activate a version: there is no statement that writes {@code graph_activations}, sets
- * {@code graph_versions.active} or changes an article's current version. And nothing here repairs a row: evidence and versions
- * are inserted or left exactly as they are.
+ * {@code graph_versions.active} or changes an article's current version. And nothing here repairs a row: evidence, versions
+ * and sources are inserted or left exactly as they are.
  */
 public interface GraphHandoffRepository {
 
@@ -60,6 +60,15 @@ public interface GraphHandoffRepository {
      */
     void insertStagedVersion(NewStagedVersion version);
 
+    /**
+     * The bundles a version is composed of ({@code graph_version_sources}), in ordinal order. Empty only for a version that has
+     * no composition row at all (never for one this importer staged or the migration backfilled).
+     */
+    List<Source> sources(String versionId);
+
+    /** Records one bundle of a version's composition; the version row exists and no row has this ordinal or handoff yet. */
+    void insertSource(NewSource source);
+
     /** One publication rule: its versioned id and its definition as stored (JSON text). */
     record RuleRow(String id, String definition) {
     }
@@ -86,6 +95,18 @@ public interface GraphHandoffRepository {
     /** {@code ruleRevision} is {@code null} for a version staged before rules existed (or a fixture). */
     record StagedVersion(String id, String kind, boolean active, String snapshotArtifactId, String createdBy, Long ruleRevision,
             long reviewRevision) {
+    }
+
+    /**
+     * One bundle of a version's composition. {@code bundleSnapshotArtifactId} is the bundle's rule-free projection
+     * ({@code graph_bundle_snapshot}), {@code null} for a version staged before the composition table existed.
+     */
+    record Source(int ordinal, String handoffId, String receiptArtifactId, String bundleSnapshotArtifactId) {
+    }
+
+    /** The composition row the importer writes with a version; see {@link Source}. */
+    record NewSource(String versionId, int ordinal, String handoffId, String receiptArtifactId,
+            String bundleSnapshotArtifactId) {
     }
 
     /**

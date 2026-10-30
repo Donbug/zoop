@@ -395,7 +395,8 @@ public final class ChatMcpTools {
         return new ChatToolResult(node.path("schemaVersion").asString(), kept.toolCallId(), kept.capabilityId(),
                 node.path("dataVersion").asString(null), mapper.convertValue(node.path("items"), ITEMS),
                 mapper.convertValue(node.path("evidenceIds"), STRINGS),
-                node.path("truncated").isBoolean() ? node.path("truncated").asBoolean() : null,
+                node.path("truncated").isBoolean()
+                        ? node.path("truncated").asBoolean() || node.path("withheld").path("items").asInt(0) > 0 : null,
                 node.path("nextAllowed").isBoolean() ? node.path("nextAllowed").asBoolean() : null, null,
                 node.has("paths") ? mapper.convertValue(node.path("paths"), PATHS) : List.of());
     }

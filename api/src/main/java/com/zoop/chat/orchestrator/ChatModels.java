@@ -164,7 +164,11 @@ public final class ChatModels {
                 String prefix = item.label().startsWith("[새로 생김] ") ? "[새로 생김] "
                         : item.label().startsWith("[사라짐] ") ? "[사라짐] " : null;
                 if (prefix == null) throw invalidFacts();
-                changes.add(new GraphChange(item.id(), item.kind(), bounded(item.label().substring(prefix.length())),
+                String name = item.label().substring(prefix.length());
+                if (name.codePointCount(0, name.length()) > 300) {
+                    name = name.substring(0, name.offsetByCodePoints(0, 299)) + "…";
+                }
+                changes.add(new GraphChange(item.id(), item.kind(), bounded(name),
                         prefix.equals("[새로 생김] ") ? "added" : "removed"));
             }
             return new ComparisonFact(requirement, earlier, run.graphVersionId(), run.context().asOf(), query.since(),

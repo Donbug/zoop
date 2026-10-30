@@ -46,6 +46,8 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -345,10 +347,15 @@ class ChatMcpAgentTest {
         assertEquals(observed.getFirst(), observed.getLast(), "the same read gives the same fact on both paths");
     }
 
-    @Test
-    void aRepeatedIdenticalReadIsOneFactNotTwo() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void aRepeatedIdenticalReadIsOneFactNotTwo(boolean withheld) {
+        if (withheld) ChatSendGrantsTest.write(dir.resolve("chat-grants.json"), ChatSendGrantsTest.EVIDENCE_SOURCE);
         luna.script.add(n -> held("mcpr_1", "graph_version_diff", Map.of("targets", List.of("KRX:000660"))));
-        luna.script.add(n -> held("mcpr_2", "graph_version_diff", Map.of("targets", List.of("KRX:000660"))));
+        luna.script.add(n -> {
+            ChatSendGrantsTest.gate(dir);
+            return held("mcpr_2", "graph_version_diff", Map.of("targets", List.of("KRX:000660")));
+        });
         luna.script.add(n -> done());
         var attached = executor.attach(JOB, 1).orElseThrow();
         List<List<ChatModels.ServerFact>> observed = new ArrayList<>();
@@ -360,6 +367,7 @@ class ChatMcpAgentTest {
         }
         assertEquals(2, store.keptToolResults(JOB, 1).size(), "the repeat is its own call, served from the first read");
         assertEquals(1, observed.getFirst().size());
+        assertEquals(withheld, ((ChatModels.ComparisonFact) observed.getFirst().getFirst()).truncated());
     }
 
     @Test
@@ -375,24 +383,45 @@ class ChatMcpAgentTest {
             engine.answer(attached.run(), attached.control());
         }
         var kept = store.keptToolResults(JOB, 1).getFirst();
-        assertFalse(runner.restore(attached.run(), kept).truncated());
+        assertFalse(runner.restore(attached.run(), List.of(kept)).getFirst().truncated());
 
         var envelope = (ObjectNode) mapper.readTree(kept.result());
-        envelope.put("cachedFrom", "tc-0");
         envelope.putObject("withheld").put("reason", "source_grant_denied").put("items", 0).put("evidenceIds", 1)
                 .put("paths", 0);
         assertFalse(restored(attached, kept, envelope).truncated(), "withheld evidence leaves the change list whole");
         ((ObjectNode) envelope.get("withheld")).put("items", 1);
         assertTrue(restored(attached, kept, envelope).truncated(), "a withheld change leaves the list incomplete");
+        var cachedEnvelope = envelope.deepCopy();
+        cachedEnvelope.remove("withheld");
+        cachedEnvelope.put("toolCallId", "cached-1").put("cachedFrom", kept.toolCallId());
+        var cached = withEnvelope(kept, cachedEnvelope);
+        cachedEnvelope.put("toolCallId", "cached-2").put("cachedFrom", "cached-1");
+        var repeated = withEnvelope(kept, cachedEnvelope);
+        for (String incomplete : List.of("withheld", "truncated", "complete")) {
+            var origin = envelope.deepCopy();
+            if (!incomplete.equals("withheld")) origin.remove("withheld");
+            origin.put("truncated", incomplete.equals("truncated"));
+            var restored = runner.restore(attached.run(), List.of(repeated, cached, withEnvelope(kept, origin)));
+            assertEquals(List.of(!incomplete.equals("complete"), !incomplete.equals("complete"),
+                    !incomplete.equals("complete")), restored.stream().map(ChatToolResult::truncated).toList());
+        }
+        assertThrows(ChatModels.Failure.class, () -> runner.restore(attached.run(), List.of(repeated, cached)));
+        cachedEnvelope.put("toolCallId", kept.toolCallId()).put("cachedFrom", "cached-2");
+        assertThrows(ChatModels.Failure.class, () -> runner.restore(attached.run(),
+                List.of(repeated, cached, withEnvelope(kept, cachedEnvelope))));
         envelope.put("unknown", true);
         assertThrows(ChatModels.Failure.class, () -> restored(attached, kept, envelope));
     }
 
     private ChatToolResult restored(ChatJobExecutor.Attached attached, ChatKeptToolResult kept,
             ObjectNode envelope) {
-        return runner.restore(attached.run(), new ChatKeptToolResult(kept.jobId(), kept.memberId(), kept.attemptNo(),
-                kept.toolCallId(), kept.capabilityId(), kept.requestMeta(), kept.inputDigest(),
-                mapper.writeValueAsString(envelope)));
+        return runner.restore(attached.run(), List.of(withEnvelope(kept, envelope))).getFirst();
+    }
+
+    private ChatKeptToolResult withEnvelope(ChatKeptToolResult kept, ObjectNode envelope) {
+        return new ChatKeptToolResult(kept.jobId(), kept.memberId(), kept.attemptNo(),
+                envelope.get("toolCallId").asString(), kept.capabilityId(), kept.requestMeta(), kept.inputDigest(),
+                mapper.writeValueAsString(envelope));
     }
 
     @Test
@@ -436,8 +465,16 @@ class ChatMcpAgentTest {
                 new ChatKeptToolResult(JOB, kept.memberId(), 1, kept.toolCallId(), kept.capabilityId(),
                         kept.requestMeta().replace("gv-1", "stale"), kept.inputDigest(), kept.result()),
                 new ChatKeptToolResult(JOB, kept.memberId(), 1, kept.toolCallId(), kept.capabilityId(),
-                        kept.requestMeta().replace("KRX:000660", "NASDAQ:NVDA"), kept.inputDigest(), kept.result()));
-        for (var wrong : forged) assertThrows(ChatModels.Failure.class, () -> runner.restore(run, wrong));
+                        kept.requestMeta().replace("KRX:000660", "NASDAQ:NVDA"), kept.inputDigest(), kept.result()),
+                new ChatKeptToolResult(JOB, kept.memberId(), 1, kept.toolCallId(), kept.capabilityId(),
+                        kept.requestMeta().replace("2026-10-27", "2026-10-26"), kept.inputDigest(), kept.result()));
+        var cachedEnvelope = (ObjectNode) mapper.readTree(kept.result());
+        cachedEnvelope.put("toolCallId", "cached-foreign").put("cachedFrom", kept.toolCallId());
+        var cached = withEnvelope(kept, cachedEnvelope);
+        for (var wrong : forged) {
+            assertThrows(ChatModels.Failure.class, () -> runner.restore(run, List.of(wrong)));
+            assertThrows(ChatModels.Failure.class, () -> runner.restore(run, List.of(cached, wrong)));
+        }
     }
 
     private static ChatTool tool(ChatCapability capability) {

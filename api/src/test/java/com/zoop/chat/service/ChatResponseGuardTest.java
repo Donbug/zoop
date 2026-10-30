@@ -58,6 +58,8 @@ class ChatResponseGuardTest {
                 && shown.graphTargets().isEmpty());
         assertEquals(job.result().messageId(), shown.messageId());
         assertEquals(job.result().limitations(), shown.limitations());
+        assertEquals("complete", job.result().answerStatus());
+        assertEquals("guidance", shown.answerStatus(), "only the fixed sentence is shown");
     }
 
     @Test

@@ -33,6 +33,9 @@ import tools.jackson.databind.JsonNode;
  */
 final class ReviewTargetReader {
     static final Pattern EVENT_CANDIDATE_ID = Pattern.compile("evc-[a-f0-9]{64}");
+    /** The S2 document contract: a document id of 1 to 200 characters and its exact document version. */
+    private static final Pattern DOCUMENT_ID = Pattern.compile(".{1,200}", Pattern.DOTALL);
+    private static final Pattern VERSION = Pattern.compile("[a-f0-9]{64}");
     private static final Pattern SOURCE_REVISION = Pattern.compile("0|[1-9][0-9]{0,8}");
     /** A source id as the AI writes it (any language), without control characters or surrounding blanks. */
     private static final Pattern REF = Pattern.compile("[^\\p{Cntrl}\\s](?:[^\\p{Cntrl}]{0,198}[^\\p{Cntrl}\\s])?");
@@ -59,7 +62,23 @@ final class ReviewTargetReader {
     record Company(String sourceId, String name, String role) {
     }
 
-    record Projection(List<Row> rows, int unknownEvents, int skipped) {
+    /**
+     * @param pending  the relations left out because they have no verdict yet
+     * @param document the document the S2 job analysed ({@link #analysed}); null when its result does not name it readably
+     */
+    record Projection(List<Row> rows, int unknownEvents, int skipped, int pending, Document document) {
+        /** Every item was read and has a verdict: the rows are the whole analysis, so it may stand in for an older one. */
+        boolean complete() {
+            return skipped == 0 && pending == 0;
+        }
+    }
+
+    /**
+     * The document an S2 job analysed, as the service names it on each of its event candidates ({@code eventCandidates[].document},
+     * the job's incoming document): the identity two analyses of the same document share whatever plan, job or snapshot they ran
+     * under (#132). The service relays no raw version and no binding.
+     */
+    record Document(String documentId, String documentVersion) {
     }
 
     private record Event(boolean listed, Set<String> companies, String issueId, String title, String action, String target,
@@ -91,6 +110,7 @@ final class ReviewTargetReader {
         List<Relation> alone = new ArrayList<>();
         int unknown = 0;
         int skipped = events.skipped();
+        int pending = 0;
         for (JsonNode item : items.values()) {
             Relation relation;
             try {
@@ -99,7 +119,10 @@ final class ReviewTargetReader {
                 skipped++;
                 continue;
             }
-            if (relation.status() == null) continue;
+            if (relation.status() == null) {
+                pending++;
+                continue;
+            }
             String owner = null;
             boolean blocked = false;
             boolean missing = false;
@@ -120,7 +143,28 @@ final class ReviewTargetReader {
         List<Row> rows = new ArrayList<>();
         grouped.forEach((event, relations) -> candidate(rows, event, events.byId().get(event), relations));
         for (Relation relation : alone) candidate(rows, relation.id(), null, List.of(relation));
-        return new Projection(rows, unknown, skipped);
+        return new Projection(rows, unknown, skipped, pending, analysed(s2));
+    }
+
+    /**
+     * {@link Document} of the S2 result: the one document every event candidate names, rejected ones included. Null when there is
+     * no candidate (a job that found nothing names no document), when two candidates name different documents, or when one is not
+     * in the contract's form.
+     */
+    static Document analysed(Obj s2) {
+        Document found = null;
+        try {
+            for (Obj item : s2.objects("eventCandidates")) {
+                Obj document = item.object("document");
+                Document named = new Document(matching(document.string("documentId"), DOCUMENT_ID),
+                        matching(document.string("documentVersion"), VERSION));
+                if (found != null && !found.equals(named)) return null;
+                found = named;
+            }
+        } catch (Malformed unreadable) {
+            return null;
+        }
+        return found;
     }
 
     private static Events events(Obj s2) {

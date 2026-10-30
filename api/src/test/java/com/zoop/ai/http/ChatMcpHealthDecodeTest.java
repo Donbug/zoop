@@ -19,6 +19,7 @@ class ChatMcpHealthDecodeTest {
         assertNull(reachable.reason());
         assertEquals(ChatMcpHealth.Reason.TIMEOUT, decode("unreachable", "\"mcp_timeout\"").reason());
         assertEquals(ChatMcpHealth.Reason.CONNECT_FAILED, decode("unreachable", "\"mcp_connect_failed\"").reason());
+        assertEquals(ChatMcpHealth.Reason.UNAVAILABLE, decode("unreachable", "\"mcp_unavailable\"").reason());
         ChatMcpHealth unexpected = decode("unreachable", "\"mcp_status_unexpected\"");
         assertFalse(unexpected.reachable());
         assertEquals(ChatMcpHealth.Reason.STATUS_UNEXPECTED, unexpected.reason());

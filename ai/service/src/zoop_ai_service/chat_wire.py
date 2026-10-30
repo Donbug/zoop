@@ -66,8 +66,9 @@ class ChatMcpHealth(ChatView):
     with no grant that the endpoint itself must refuse as unauthenticated. Nothing is run and no model is called."""
     schema_version: Literal["zoop-ai-chat-2"]
     mcp: Literal["reachable", "unreachable"]
-    reason: Literal["mcp_timeout", "mcp_connect_failed", "mcp_status_unexpected"] | None = Field(
-        default=None, description="Why it is unreachable: no answer in time, no connection, or an answer that is not the endpoint's own refusal.")
+    reason: Literal["mcp_timeout", "mcp_connect_failed", "mcp_unavailable", "mcp_status_unexpected"] | None = Field(
+        default=None, description="Why it is unreachable: no answer in time, no connection, a gateway in front answering 502/503/504 for a "
+                                  "backend it could not reach, or any other answer that is not the endpoint's own refusal.")
 
     @model_validator(mode="after")
     def reason_when_unreachable(self):

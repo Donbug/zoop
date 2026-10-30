@@ -111,7 +111,8 @@ FACT_VERIFICATION_INPUT = {
          "targetIds": ["KRX:005930", "NASDAQ:NVDA"], "evidenceLimit": 20, "changeLimit": 40,
          "evidenceRestricted": False, "truncated": True,
          "changes": [{"id": "iss-new", "kind": "issue", "name": "공급 계약", "change": "added"},
-                     {"id": "iss-old", "kind": "issue", "name": "이전 사건", "change": "removed"}]}]}],
+                     {"id": "iss-old", "kind": "issue", "name": "이전 사건", "change": "removed"},
+                     {"id": "edge-stable", "kind": "edge", "name": "가" * 298 + "\U00020000…", "change": "added"}]}]}],
     "citations": [QUOTE],
 }
 

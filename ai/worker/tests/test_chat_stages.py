@@ -225,6 +225,7 @@ def test_canonical_facts_do_not_bypass_quote_grants(tmp_path):
     lambda p: p["sections"][0]["serverFacts"][0].update(memberId="unrelated-member"),
     lambda p: p["sections"][0]["serverFacts"][0]["companies"][0].update(quantity=100),
     lambda p: p["sections"][0]["serverFacts"][1].update(articleBody="not allowed"),
+    lambda p: p["sections"][0]["serverFacts"][1]["changes"][0].update(name="가" * 301),
     lambda p: p["sections"][0]["serverFacts"][0].update(queryScope="named_companies", companyIds=["member:self"]),
     lambda p: p["sections"][0]["serverFacts"][0].update(companies=p["sections"][0]["serverFacts"][0]["companies"] * 3),
     lambda p: p["sections"][0]["serverFacts"][0]["companies"][0].update(held=False, watched=False),

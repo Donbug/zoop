@@ -89,6 +89,45 @@ class ChatMcpCircuitBreakerTest {
         assertFalse(circuit.allowAgent(), "runtime MCP connection failures affect only following runs");
     }
 
+    @Test
+    void aReachableProbeStandsForTenSecondsUntilAConnectionFails() {
+        var clock = new MutableClock();
+        var calls = new AtomicInteger();
+        var answer = new AtomicReference<ChatMcpHealth>(UP);
+        var circuit = new ChatMcpCircuitBreaker(() -> {
+            calls.incrementAndGet();
+            return answer.get();
+        }, clock);
+        assertTrue(circuit.allowAgent());
+        clock.now = clock.now.plusSeconds(9);
+        assertTrue(circuit.allowAgent());
+        assertTrue(calls.get() == 1, "back-to-back runs reuse the fresh probe");
+        clock.now = clock.now.plusSeconds(1);
+        assertTrue(circuit.allowAgent());
+        assertTrue(calls.get() == 2, "after ten seconds the next run probes again");
+
+        // A failure seen in a run ends the reuse at once: the next run probes.
+        circuit.agentFailed("mcp_unreachable");
+        answer.set(DOWN);
+        assertFalse(circuit.allowAgent());
+        assertTrue(calls.get() == 3);
+    }
+
+    @Test
+    void aGatewayAnsweringForABackendItCouldNotReachIsAConnectionFailure() {
+        var clock = new MutableClock();
+        var calls = new AtomicInteger();
+        var circuit = new ChatMcpCircuitBreaker(() -> {
+            calls.incrementAndGet();
+            return new ChatMcpHealth(false, ChatMcpHealth.Reason.UNAVAILABLE);
+        }, clock);
+        assertFalse(circuit.allowAgent());
+        assertFalse(circuit.allowAgent());
+        assertFalse(circuit.allowAgent());
+        assertFalse(circuit.allowAgent(), "three 502/503/504 answers open the circuit");
+        assertTrue(calls.get() == 3, "an open circuit does not probe");
+    }
+
     private static final class MutableClock extends Clock {
         Instant now = Instant.parse("2026-10-29T00:00:00Z");
 

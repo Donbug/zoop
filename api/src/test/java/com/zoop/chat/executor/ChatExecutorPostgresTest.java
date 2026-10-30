@@ -564,7 +564,7 @@ class ChatExecutorPostgresTest {
         attached.control().toolCallFinished(id, new ChatToolCallEnd("succeeded", null, "gv-0..gv-1", List.of(), false,
                 false, mapper.writeValueAsString(envelope)));
 
-        var restored = tools.restore(run, runs.keptToolResults(jobId, 1).getFirst());
+        var restored = tools.restore(run, runs.keptToolResults(jobId, 1)).getFirst();
 
         assertTrue(restored.provenance().belongsTo(run));
         assertFalse(restored.provenance().belongsTo(executor.attach(jobId, 1).orElseThrow().run()), "another run object");
