@@ -128,6 +128,9 @@ public class GraphRoundAdminCommandService {
         String code = round.failureCode().orElse("");
         if (code.startsWith("import")) return GraphRoundStage.HANDOFF_READY;
         if (code.startsWith("freeze") || code.startsWith("bindings")) return GraphRoundStage.ANALYSIS_DONE;
+        // R4's wait for a still-running job timed out: keep reading that job. R3's analysis_queue_timeout (no job yet), a finished
+        // job (analysis_failed) and a rejected plan are queued again from plan_ready.
+        if (code.equals("analysis_timeout")) return GraphRoundStage.ANALYSIS_QUEUED;
         if (code.startsWith("analysis") || code.startsWith("plan_rejected")) return GraphRoundStage.PLAN_READY;
         return GraphRoundStage.SCHEDULED;
     }

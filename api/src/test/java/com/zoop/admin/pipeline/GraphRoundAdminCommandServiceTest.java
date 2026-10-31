@@ -118,6 +118,24 @@ class GraphRoundAdminCommandServiceTest {
         GraphRound claimed = rounds.claim("round-20261030T0935", "worker", Duration.ofMinutes(2), NOW).orElseThrow();
         rounds.advance(claimed, GraphRoundPatch.fail("import:handoff_withheld"), Outcome.FAILED, "import:handoff_withheld", null, null, NOW);
         assertEquals("handoff_ready", service.retry("round-20261030T0935", "key-3", ADMIN, "req").stage());
+        rounds.create("round-20261030T1105", Instant.parse("2026-10-30T02:05:00Z"), "system:scheduler", NOW);
+        GraphRound waited = rounds.claim("round-20261030T1105", "worker", Duration.ofMinutes(2), NOW).orElseThrow();
+        rounds.advance(waited, GraphRoundPatch.fail("analysis_timeout"), Outcome.FAILED, "analysis_timeout", null, null, NOW);
+        assertEquals("analysis_queued", service.retry("round-20261030T1105", "key-3b", ADMIN, "req").stage(),
+                "a timed-out wait keeps reading the running job; a finished job (analysis_failed) resumes at plan_ready");
+        rounds.create("round-20261030T1135", Instant.parse("2026-10-30T02:35:00Z"), "system:scheduler", NOW);
+        GraphRound finished = rounds.claim("round-20261030T1135", "worker", Duration.ofMinutes(2), NOW).orElseThrow();
+        rounds.advance(finished, GraphRoundPatch.fail("analysis_failed:worker_deadline"), Outcome.FAILED, "analysis_failed:worker_deadline",
+                null, null, NOW);
+        assertEquals("plan_ready", service.retry("round-20261030T1135", "key-3c", ADMIN, "req").stage());
+        rounds.create("round-20261030T1205", Instant.parse("2026-10-30T03:05:00Z"), "system:scheduler", NOW);
+        GraphRound noJob = rounds.claim("round-20261030T1205", "worker", Duration.ofMinutes(2), NOW).orElseThrow();
+        rounds.advance(noJob, GraphRoundPatch.fail("analysis_queue_timeout"), Outcome.FAILED, "analysis_queue_timeout", null, null, NOW);
+        assertEquals("plan_ready", service.retry("round-20261030T1205", "key-3d", ADMIN, "req").stage(),
+                "R3's bound has no job to read: queued again from plan_ready");
+        // The event's failedAt wins over the code family: an R3 wait that timed out is recorded as plan_ready by the worker.
+        failed("round-20261030T1235", Instant.parse("2026-10-30T03:35:00Z"), GraphRoundStage.PLAN_READY, "analysis_timeout");
+        assertEquals("plan_ready", service.retry("round-20261030T1235", "key-3e", ADMIN, "req").stage());
 
         assertEquals(ErrorCode.RESOURCE_NOT_FOUND,
                 assertThrows(CustomException.class, () -> service.retry("round-20261030T1005", "key-4", ADMIN, "req")).getErrorCode());

@@ -41,9 +41,12 @@ import tools.jackson.databind.node.ObjectNode;
  * <li>R2 {@code run_requested} → {@code GET round-runs/{id}}: {@code ready} → {@code plan_ready} with the plan and the AI
  *     ingestion round; {@code no_new_material} → {@code analysis_done} (a carry-only freeze still follows, #407 app change
  *     2); {@code failed} → {@code failed(run_failed:<code>)}</li>
- * <li>R3 {@code plan_ready} → the analyze_plan job under the system actor → {@code analysis_queued}</li>
- * <li>R4 {@code analysis_queued} → the job's state: succeeded → {@code analysis_done}; failed/cancelled →
- *     {@code failed(analysis_failed:<code>)}; the wait is bounded by {@code analysis-wait-deadline}</li>
+ * <li>R3 {@code plan_ready} → the analyze_plan job under the system actor → {@code analysis_queued}; a queue that stays
+ *     unavailable past the attempt bound fails with {@code analysis_queue_timeout} (resuming here)</li>
+ * <li>R4 {@code analysis_queued} → the job's state: succeeded → {@code analysis_done}; failed/cancelled/missing →
+ *     {@code failed(analysis_failed:<code>)} resuming at {@code plan_ready} (a retry queues the job's retry, never reads the
+ *     finished job again); the wait is bounded by {@code analysis-wait-deadline} and its {@code analysis_timeout} resumes
+ *     here</li>
  * <li>R5 {@code analysis_done} → {@code POST round-handoffs} with the plan (if any), the ingestion round (if any) and the app's
  *     bindings (every registered version) → {@code freeze_requested}</li>
  * <li>R6 {@code freeze_requested} → {@code GET round-handoffs/{id}}: {@code ready} → {@code handoff_ready} with the pins;
@@ -229,13 +232,14 @@ public final class GraphRoundWorker {
         } catch (CustomException refused) {
             ErrorCode code = refused.getErrorCode();
             if (code == ErrorCode.SOURCE_UNAVAILABLE || code == ErrorCode.MODEL_UNAVAILABLE) {
-                return wait(round, "analysis_queue_unavailable", detail, properties.waitRetryAfter(), "analysis_timeout");
+                return wait(round, "analysis_queue_unavailable", detail, properties.waitRetryAfter(), "analysis_queue_timeout");
             }
             return fail(round, "plan_rejected:" + code.name().toLowerCase(Locale.ROOT), detail);
         } catch (RuntimeException unexpected) {
-            // Counted like any other wait, so a repeatable error ends in analysis_timeout instead of a silent loop.
+            // Counted like any other wait, so a repeatable error ends in analysis_queue_timeout instead of a silent loop. The
+            // code differs from R4's analysis_timeout: this round has no job yet, so a retry resumes here, at plan_ready.
             detail.put("error", unexpected.getClass().getSimpleName());
-            return wait(round, "analysis_queue_error", detail, properties.waitRetryAfter(), "analysis_timeout");
+            return wait(round, "analysis_queue_error", detail, properties.waitRetryAfter(), "analysis_queue_timeout");
         }
     }
 
@@ -254,8 +258,11 @@ public final class GraphRoundWorker {
         return switch (status.state()) {
             case SUCCEEDED -> record(round, GraphRoundPatch.advanceTo(GraphRoundStage.ANALYSIS_DONE), Outcome.ADVANCED,
                     "analysis_done", detail);
-            case FAILED, CANCELLED -> fail(round, "analysis_failed" + status.code().map(code -> ":" + code).orElse(""), detail);
-            case MISSING -> fail(round, "analysis_failed:job_missing", detail);
+            // A finished or vanished job is not read again: a retry resumes at plan_ready, where queueAnalysis follows the job's
+            // retry chain (or opens a new job) under the system actor. Only the wait for a still-running job resumes here.
+            case FAILED, CANCELLED -> fail(round, "analysis_failed" + status.code().map(code -> ":" + code).orElse(""), detail,
+                    GraphRoundStage.PLAN_READY);
+            case MISSING -> fail(round, "analysis_failed:job_missing", detail, GraphRoundStage.PLAN_READY);
             case QUEUED, RUNNING -> waitBounded(round, "analysis_running", detail, properties.waitRetryAfter(), "analysis_timeout",
                     analysisAttempts());
         };
@@ -378,25 +385,41 @@ public final class GraphRoundWorker {
     }
 
     private GraphRound fail(GraphRound round, String code, ObjectNode detail) {
+        return fail(round, code, detail, round.stage());
+    }
+
+    /** {@code resumeAt}: the open stage a retry of this failure resumes at (the failure event's {@code failedAt}). */
+    private GraphRound fail(GraphRound round, String code, ObjectNode detail, GraphRoundStage resumeAt) {
         ObjectNode written = detail == null ? nodes.objectNode() : detail;
-        written.put("failedAt", round.stage().wire());
+        written.put("failedAt", resumeAt.wire());
         log.warn("graph round {} failed at {}: {}", round.roundId(), round.stage().wire(), code);
         return record(round, GraphRoundPatch.fail(code), Outcome.FAILED, code, written);
     }
 
     /**
-     * Fenced on this owner's lease: the lease is renewed first (same owner, token kept) and the write carries that token; when
-     * the renewal fails, another holder took the row and nothing is written. Either way the row is returned as it is now.
+     * Fenced on the lease this step started under: the lease is extended first ({@link #renew}) and the write carries its
+     * token. When the extension fails this run lost the row (another holder took it, or took it and finished) and the step's
+     * result is dropped; the row is returned as it is now and {@link #progress} stops.
      */
     private GraphRound record(GraphRound round, GraphRoundPatch patch, Outcome outcome, String code, ObjectNode detail) {
         return renew(round)
-                .map(current -> rounds.advance(current, patch, outcome, code, null, detail, clock.instant()).orElseGet(() -> current(round)))
-                .orElseGet(() -> current(round));
+                .map(held -> rounds.advance(held, patch, outcome, code, null, detail, clock.instant()).orElseGet(() -> lost(round)))
+                .orElseGet(() -> lost(round));
     }
 
-    /** The lease renewed by its holder before a write or an import (the token is kept), or empty when another holder has it. */
+    /**
+     * The lease extended for its holder before a write or an import ({@link GraphRoundRepository#extend}): the row must still
+     * carry this step's owner and token at this step's stage. A lease that merely expired while the call was in flight, with
+     * nobody taking the row, is extended with its token kept, so a long call does not lose its result; a row another holder
+     * took (a new token) or moved is not, and nothing is written over what happened meanwhile.
+     */
     private Optional<GraphRound> renew(GraphRound round) {
-        return rounds.claim(round.roundId(), owner, properties.lease(), clock.instant());
+        return rounds.extend(round, properties.lease(), clock.instant());
+    }
+
+    private GraphRound lost(GraphRound round) {
+        log.warn("graph round {}: the lease was lost at {}; this step's result is dropped", round.roundId(), round.stage().wire());
+        return current(round);
     }
 
     /** The row as it is now, whoever holds it. */

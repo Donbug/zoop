@@ -89,6 +89,20 @@ public final class InMemoryGraphRoundRepository implements GraphRoundRepository 
     }
 
     @Override
+    public Optional<GraphRound> extend(GraphRound held, Duration lease, Instant now) {
+        Lease mine = held.lease().orElseThrow(() -> new IllegalArgumentException("the round must be claimed first"));
+        GraphRound round = rows.get(held.roundId());
+        boolean same = round != null && round.stage() == held.stage()
+                && round.lease().map(l -> l.owner().equals(mine.owner()) && l.token() == mine.token()).orElse(false);
+        if (!same) return Optional.empty();
+        GraphRound extended = with(round, round.stage(), round.failureCode().orElse(null), round.attempts(),
+                round.nextAttemptAt().orElse(null), Optional.of(new Lease(mine.owner(), now.plus(lease), mine.token())),
+                round.graphVersionId().orElse(null), round.versionCommittedAt(), now);
+        rows.put(held.roundId(), extended);
+        return Optional.of(extended);
+    }
+
+    @Override
     public void release(String roundId, String owner) {
         GraphRound round = rows.get(roundId);
         if (round != null && round.lease().map(l -> l.owner().equals(owner)).orElse(false)) {

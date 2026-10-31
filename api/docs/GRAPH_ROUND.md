@@ -22,7 +22,7 @@ slot 도래 → R1 round-run 요청 → R2 계획 조회 → R3 analyze_plan 접
 
 trigger로 `graph_rounds`는 DELETE와 식별 열(`round_id`·`slot_at`·`started_by`·`created_at`) 변경, 끝난 회차(`imported`·`skipped`)의 단계 변경(`failed`는 retry로 재개되므로 제외), `graph_version_id`를 다른 값으로 바꾸는 변경(FK의 SET NULL과 retry의 NULL은 허용), `version_committed_at`을 한 번 쓴 뒤 바꾸거나 비우는 변경을 거절하고, `graph_round_events`는 UPDATE·DELETE를 거절합니다. 두 표는 영구 보존입니다(회차 단위 감사 이력). 시험은 TRUNCATE로 정리합니다.
 
-`JdbcGraphRoundRepository`(`com.zoop.graph.round`)는 짧은 트랜잭션만 씁니다: `claim`(lease를 잡아야 외부 호출을 한다. 같은 owner는 갱신, 다른 owner는 lease 만료 뒤에만. 새 lease마다 `lease_token`을 발급하고 같은 owner의 갱신은 token을 유지. 끝난 회차 `imported`·`skipped`는 잡을 수 없고 `failed`는 retry를 위해 잡을 수 있다), `advance`(행 변경 + 이벤트 추가를 한 트랜잭션에), `link`(수입 트랜잭션 안에서 `graph_version_id`와 `version_committed_at`(첫 commit 시각, 이후 유지) 기록), `due`(미완료·다음 시도 시각이 지난 회차, 오래된 슬롯부터), `page`(관리자 목록, 최신 슬롯부터), `newestImported`(수입 순서 보호의 기준: `stage='imported'` 또는 `version_committed_at`이 있는 가장 최근 슬롯. 연결이 비워진 뒤에도 센다).
+`JdbcGraphRoundRepository`(`com.zoop.graph.round`)는 짧은 트랜잭션만 씁니다: `claim`(lease를 잡아야 외부 호출을 한다. 같은 owner는 갱신, 다른 owner는 lease 만료 뒤에만. `extend`(worker가 쓰기·수입 직전에 하는 **조건부 연장**: 행이 아직 그 단계에서 같은 owner·token을 가질 때만 `lease_until`을 늘린다. token을 새로 발급하지 않으므로 만료됐지만 아무도 가져가지 않은 lease는 token을 유지한 채 연장되어 긴 호출의 결과가 보존되고, 다른 인스턴스가 가져갔거나 단계가 바뀐 행은 연장되지 않아 worker가 그 단계의 결과를 버린다). 새 lease마다 `lease_token`을 발급하고 같은 owner의 갱신은 token을 유지. 끝난 회차 `imported`·`skipped`는 잡을 수 없고 `failed`는 retry를 위해 잡을 수 있다), `advance`(행 변경 + 이벤트 추가를 한 트랜잭션에), `link`(수입 트랜잭션 안에서 `graph_version_id`와 `version_committed_at`(첫 commit 시각, 이후 유지) 기록), `due`(미완료·다음 시도 시각이 지난 회차, 오래된 슬롯부터), `page`(관리자 목록, 최신 슬롯부터), `newestImported`(수입 순서 보호의 기준: `stage='imported'` 또는 `version_committed_at`이 있는 가장 최근 슬롯. 연결이 비워진 뒤에도 센다).
 
 **fencing.** `advance`와 `link`는 호출자가 claim한 행(그 `lease_token`)과 그때의 stage를 WHERE 조건으로 씁니다(`round_id = ? AND stage = <예상 stage> AND lease_token = ?`). lease가 만료되어 다른 인스턴스가 행을 가져갔거나 행이 이미 다른 단계로 갔으면 아무것도 쓰지 않고(이벤트도 없음) `advance`는 빈 Optional, `link`는 false를 돌려주며 호출자는 행을 다시 읽습니다. 종결 단계로 가면 lease 세 열을 모두 비웁니다.
 
@@ -34,13 +34,13 @@ trigger로 `graph_rounds`는 DELETE와 식별 열(`round_id`·`slot_at`·`starte
 |---|---|---|---|---|
 | R1 `scheduled` | `POST /internal/v1/round-runs {roundId}` (멱등 키 = roundId) | 202/200 → `run_requested` (freeze 전용 슬롯은 호출 없이 `analysis_done`, 이벤트 `freeze_only`) | 409 `round_busy`(서비스 `Retry-After`, 상한 `busy-retry-after`), 5xx, 전송 실패 | 그 밖의 4xx → `run_refused:<code>`; 대기 상한 → `run_timeout` |
 | R2 `run_requested` | `GET round-runs/{roundId}` | `ready` → `plan_ready`(`plan_id`·`plan_digest`·`ingestion_round_id`); `no_new_material` → `analysis_done`(이벤트 `no_new_material`) | `running` | `failed` → `run_failed:<code>` |
-| R3 `plan_ready` | `AnalysisJobService.createForSystem`(system actor, command key `analyze-plan:<binding>:<planId>`) | → `analysis_queued`(`analysis_job_id`; 이미 있던 job이면 이벤트 `analysis_job_reused`) | worker·binding 미설정(`SOURCE_UNAVAILABLE`) | 그 밖의 거절 → `plan_rejected:<code>` |
-| R4 `analysis_queued` | job 상태 읽기 | `succeeded` → `analysis_done` | queued·running(상한 `analysis-wait-deadline`, 기본 2시간) | `failed`·`cancelled` → `analysis_failed:<code>`; 상한 → `analysis_timeout` |
+| R3 `plan_ready` | `AnalysisJobService.createForSystem`(system actor, command key `analyze-plan:<binding>:<planId>`) | → `analysis_queued`(`analysis_job_id`; 이미 있던 job이면 이벤트 `analysis_job_reused`) | worker·binding 미설정(`SOURCE_UNAVAILABLE`); 상한 `max-attempts-per-stage` → `analysis_queue_timeout`(retry는 `plan_ready`: 아직 job이 없음) | 그 밖의 거절 → `plan_rejected:<code>` |
+| R4 `analysis_queued` | job 상태 읽기 | `succeeded` → `analysis_done` | queued·running(상한 `analysis-wait-deadline`, 기본 2시간) | `failed`·`cancelled`·없음 → `analysis_failed:<code>`(retry는 `plan_ready`부터: 끝난 job을 다시 읽지 않고 job의 retry를 접수); 상한 → `analysis_timeout`(retry는 여기서: 아직 도는 job을 계속 읽음) |
 | R5 `analysis_done` | `POST /internal/v1/round-handoffs {roundId, ingestionRoundId?, planId?, bindings}` (bindings = `DocumentBindingsScope.ALL` export 전체, A-10) | 202/200 → `freeze_requested`(바로 `ready`면 `handoff_ready`) | 409 `round_busy`, 5xx, 전송 실패, bindings `database_unavailable` | 그 밖의 4xx → `freeze_refused:<code>`; bindings 한도 → `bindings_failed:<code>` |
 | R6 `freeze_requested` | `GET round-handoffs/{roundId}` | `ready` → `handoff_ready`(handoffId·두 digest, detail에 선택 결과 상태별 개수) | `running`, `analysis_incomplete` | `no_public_material` → `skipped`; `failed` → `freeze_failed:<code>`; 상한 → `freeze_timeout` |
 | R7 `handoff_ready` | bridge(아래 절) | `imported` | 수입 대기 사유 | `import:<code>` |
 
-실패 이벤트의 detail에는 `failedAt`(멈춘 단계)이 들어가고 retry가 그 단계부터 재개합니다. 회차는 분석 시간이 슬롯을 넘어도 다음 슬롯의 회차와 함께 열려 있으며(D-R4), `analyze_plan` worker가 하나라 R3·R4는 들어온 순서대로 직렬입니다. AI ingestion 회차 id(`slot-…`, `ingestion_round_id`)는 R2가 돌려주고 R5가 넘깁니다. 계약은 #387 댓글(2026-10-30 조정안, AI 동의)과 `RoundRunClient`·`RoundHandoffClient`에 있고 wire 스키마 이름은 `zoop-ai-round-run-1`·`zoop-ai-round-handoff-1`(제안값)입니다.
+실패 이벤트의 detail에는 `failedAt`(retry가 재개할 단계. 보통 멈춘 단계이고, 끝나거나 사라진 분석 job의 실패만 `plan_ready`)이 들어가고 retry가 그 단계부터 재개합니다. 회차는 분석 시간이 슬롯을 넘어도 다음 슬롯의 회차와 함께 열려 있으며(D-R4), `analyze_plan` worker가 하나라 R3·R4는 들어온 순서대로 직렬입니다. AI ingestion 회차 id(`slot-…`, `ingestion_round_id`)는 R2가 돌려주고 R5가 넘깁니다. 계약은 #387 댓글(2026-10-30 조정안, AI 동의)과 `RoundRunClient`·`RoundHandoffClient`에 있고 wire 스키마 이름은 `zoop-ai-round-run-1`·`zoop-ai-round-handoff-1`(제안값)입니다.
 
 ## 수입 bridge (R7, `GraphRoundImportBridge`)
 
@@ -91,16 +91,16 @@ trigger로 `graph_rounds`는 DELETE와 식별 열(`round_id`·`slot_at`·`starte
 
 ## 시험
 
-- `GraphRoundRepositoryPostgresTest`(`graph-postgres`): migration·제약·guard trigger(식별·끝난 회차 재개·버전 연결 변경), lease와 token(갱신 유지·인계 시 새 token), fenced advance(옛 holder·stale stage → 기록 없음), `link`(트랜잭션 밖 거절·rollback에 따라 취소·fencing·`newestImported`가 연결만 된 미완료 행을 봄), retry 뒤에도 `version_committed_at`과 순서 기준이 남음(열은 한 번만 씀), due·page.
+- `GraphRoundRepositoryPostgresTest`(`graph-postgres`): migration·제약·guard trigger(식별·끝난 회차 재개·버전 연결 변경), lease와 token(갱신 유지·인계 시 새 token·조건부 연장 `extend`), fenced advance(옛 holder·stale stage → 기록 없음), `link`(트랜잭션 밖 거절·rollback에 따라 취소·fencing·`newestImported`가 연결만 된 미완료 행을 봄), retry 뒤에도 `version_committed_at`과 순서 기준이 남음(열은 한 번만 씀), due·page.
 - `GraphRoundImportBridgeTest`: staged→imported, unchanged, `skipped_superseded`, 버전 commit 뒤 단계 변경 전 중단 → 옛 슬롯 skipped·다음 시도 unchanged로 완료, 수입 중 lease 인계 → 수입 취소·기록 없음·새 holder가 수입, withheld→failed, busy→waiting→`import_timeout`, 준비 안 된·claim 안 된 회차 거절.
 - `GraphHandoffImportPostgresIntegrationTest`(`graph-postgres`): 실제 테이블에서 같은 복구 시나리오(연결 fencing으로 수입 rollback, 최신 회차 버전 commit 뒤 중단 → 복구 실패·새 freeze로 retry(연결 비움, commit 기록 유지) → 옛 슬롯 skipped → 같은 핀으로 최신 회차 unchanged 완료, 버전 1개).
 - `GraphRoundImportConfigurationTest`: 꺼짐·웹 전용·설정 닫힘(snapshot source, read client, CLI 경로, import-source, operator).
 - `GraphRoundSchedulerConfigurationTest`: 꺼짐이면 스케줄러·상태 없음, 켜면 스케줄러가 overview의 `GraphRoundStatus`, round 클라이언트·analyze-plan 미설정·달력 오류는 설정 이름으로 기동 거절.
 - `GraphRoundClockTest`: 하루 18+1 슬롯(KST), 반열린 구간·자정 넘김, 다음 슬롯, 회차 id 형식, 달력 검증.
-- `GraphRoundWorkerTest`(가짜 AI 라우트·큐·bridge): 정규 슬롯 R1→R7 전진과 이벤트·선택 결과 개수, 새 자료 없음·freeze 전용 슬롯의 계획 없는 freeze와 `no_public_material`→`skipped`, `round_busy`(`Retry-After`)·전송 실패 대기와 4xx 거절(`failedAt`), 단계 상한 `run_timeout`과 분석 상한 `analysis_timeout`, 분석 실패·계획 거절·큐 미설정, lookback 열기와 다른 인스턴스 lease 존중.
+- `GraphRoundWorkerTest`(가짜 AI 라우트·큐·bridge): 정규 슬롯 R1→R7 전진과 이벤트·선택 결과 개수, 새 자료 없음·freeze 전용 슬롯의 계획 없는 freeze와 `no_public_material`→`skipped`, `round_busy`(`Retry-After`)·전송 실패 대기와 4xx 거절(`failedAt`), 단계 상한 `run_timeout`과 분석 상한 `analysis_timeout`, 분석 실패·계획 거절·큐 미설정, lookback 열기와 다른 인스턴스 lease 존중. lease 만료 뒤 다른 인스턴스가 인계해 실패·해제까지 마친 행에 늦은 결과를 쓰지 않음(새 claim은 다시 놓음), 만료만 된 lease는 token을 유지한 채 연장되어 결과 보존, 끝난 분석 job의 실패는 `failedAt=plan_ready`, R3 상한은 `analysis_queue_timeout`(`failedAt=plan_ready`).
 - `HttpRoundClientTest`(loopback stub): 요청 본문·멱등 키·bindings 포함, 상태 문서 닫힘·상태별 필수 필드, 오류 envelope, 5xx 뒤 `requestMaybeProcessed`.
 - `GraphRoundAdminServiceTest`: 목록 순서·필터·커서, 상세·타임라인·404, overview 섹션.
-- `GraphRoundAdminCommandServiceTest`: retry 재개 단계(이벤트 `failedAt`·코드 계열), lease 해제·멱등 재생·열린 회차 409, 수동 시작(현재 분·지정 슬롯·중복 409·형식 422), 스케줄러 없음 404.
+- `GraphRoundAdminCommandServiceTest`: retry 재개 단계(이벤트 `failedAt`·코드 계열), lease 해제·멱등 재생·열린 회차 409, 수동 시작(현재 분·지정 슬롯·중복 409·형식 422), 스케줄러 없음 404. `analysis_timeout`은 `analysis_queued`, `analysis_failed`·`analysis_queue_timeout`은 `plan_ready`로 재개, 이벤트 `failedAt`이 코드 계열보다 우선.
 - `AnalyzePlanPersistencePostgresTest`(`auth-postgres`): `createForSystem`이 system actor로 계획·job·감사 행을 만들고 같은 계획은 재사용, 실패한 job은 retry job 1개.
 - `PipelineOverviewPostgresTest`(`auth-postgres`): 기존 검사 + `rounds` 섹션(`enabled=false`, null 시각, 배열)이 직렬화됨.
 

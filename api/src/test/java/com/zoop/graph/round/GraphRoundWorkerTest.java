@@ -257,6 +257,23 @@ class GraphRoundWorkerTest {
         assertEquals("advanced:analysis_job_reused", codes(R0935).get(1));
         tick(Instant.parse("2026-10-30T00:38:00Z"));                   // attempt 2 = bound → analysis_timeout
         assertEquals(Optional.of("analysis_timeout"), round(R0935).failureCode());
+        assertEquals("analysis_queued", rounds.events(R0935).getLast().detail().orElseThrow().get("failedAt").stringValue(),
+                "the job is still running: a retry keeps reading it");
+
+        // R3: the queue stays unavailable past the stage bound (3): a different code, resuming at plan_ready (no job yet).
+        String r1005 = "round-20261030T1005";
+        rounds.seed(r1005, Instant.parse("2026-10-30T01:05:00Z"), GraphRoundStage.PLAN_READY, null, null, null, 0);
+        rounds.advance(rounds.claim(r1005, "worker-a", Duration.ofMinutes(2), now.get()).orElseThrow(),
+                GraphRoundPatch.advanceTo(GraphRoundStage.PLAN_READY).plan(PLAN, DIGEST), Outcome.ADVANCED, null, null, null, now.get());
+        queue.onQueue = () -> {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
+        };
+        tick(Instant.parse("2026-10-30T01:05:10Z"));
+        tick(Instant.parse("2026-10-30T01:06:30Z"));
+        tick(Instant.parse("2026-10-30T01:08:00Z"));
+        assertEquals(Optional.of("analysis_queue_timeout"), round(r1005).failureCode());
+        assertEquals("plan_ready", rounds.events(r1005).getLast().detail().orElseThrow().get("failedAt").stringValue());
+        assertTrue(round(r1005).analysisJobId().isEmpty());
     }
 
     @Test
@@ -284,7 +301,47 @@ class GraphRoundWorkerTest {
         queue.states.put("job-3", new RoundAnalysisQueue.JobStatus(RoundAnalysisQueue.JobState.FAILED, Optional.of("worker_deadline")));
         tick(Instant.parse("2026-10-30T00:36:00Z"));
         assertEquals(Optional.of("analysis_failed:worker_deadline"), round(R0935).failureCode());
-        assertEquals("analysis_queued", rounds.events(R0935).getLast().detail().orElseThrow().get("failedAt").stringValue());
+        assertEquals("plan_ready", rounds.events(R0935).getLast().detail().orElseThrow().get("failedAt").stringValue(),
+                "a retry queues the job's retry from plan_ready instead of reading the failed job again");
+        assertEquals(Optional.of("job-3"), round(R0935).analysisJobId(), "the failed job stays on the row for the admin view");
+    }
+
+    @Test
+    void aStepWhoseLeaseExpiredAndWasTakenOverAndEvenFinishedByAnotherWorkerWritesNothing() {
+        // worker-a reads a ready run while its lease runs out; worker-c takes the row, fails it and releases the lease.
+        rounds.seed(R0935, S0935, GraphRoundStage.RUN_REQUESTED, null, null, null, 0);
+        runs.answer(R0935, ready());
+        GraphRound mine = rounds.claim(R0935, "worker-a", Duration.ofMinutes(2), now.get()).orElseThrow();
+        Instant later = now.get().plus(Duration.ofMinutes(3));
+        GraphRound theirs = rounds.claim(R0935, "worker-c", Duration.ofMinutes(10), later).orElseThrow();
+        rounds.advance(theirs, GraphRoundPatch.fail("run_failed:x"), Outcome.FAILED, "run_failed:x", null, null, later);
+        rounds.release(R0935, "worker-c");
+        now.set(later.plusSeconds(1));
+
+        worker.progress(mine);
+
+        GraphRound row = round(R0935);
+        assertEquals(GraphRoundStage.FAILED, row.stage(), "worker-a's late ready answer did not revive the round");
+        assertEquals(Optional.of("run_failed:x"), row.failureCode());
+        assertTrue(row.planId().isEmpty());
+        assertTrue(row.lease().isEmpty(), "the fresh claim worker-a's renewal made was released again");
+        assertEquals(List.of("failed:run_failed:x"), codes(R0935), "no event from worker-a");
+
+        // The lease merely expired while the call was in flight and nobody took the row: the token is still this step's, so the
+        // extension holds and the result is kept (a long AI call does not lose its answer).
+        rounds.seed(R0905, S0905, GraphRoundStage.RUN_REQUESTED, null, null, null, 0);
+        runs.answerAlways(R0905, ready());
+        queue.onQueue = () -> {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
+        };
+        GraphRound expired = rounds.claim(R0905, "worker-a", Duration.ofMinutes(2), now.get()).orElseThrow();
+        now.set(now.get().plus(Duration.ofMinutes(5)));
+        worker.progress(expired);
+        GraphRound kept = round(R0905);
+        assertEquals(Optional.of(PLAN), kept.planId(), "the late ready answer was written under the kept token");
+        assertEquals(GraphRoundStage.PLAN_READY, kept.stage());
+        assertEquals(expired.lease().orElseThrow().token(), kept.lease().orElseThrow().token());
+        assertEquals(now.get().plus(Duration.ofMinutes(2)), kept.lease().orElseThrow().until(), "extended, not re-issued");
     }
 
     @Test

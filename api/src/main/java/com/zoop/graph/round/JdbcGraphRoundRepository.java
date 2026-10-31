@@ -105,6 +105,18 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
                 """, new MapSqlParameterSource("id", roundId).addValue("owner", owner));
     }
 
+    @Override
+    public Optional<GraphRound> extend(GraphRound held, Duration lease, Instant now) {
+        GraphRound.Lease mine = held.lease().orElseThrow(() -> new IllegalArgumentException("the round must be claimed first"));
+        return first(jdbc.query("""
+                UPDATE graph_rounds SET lease_until = :until, updated_at = :now
+                WHERE round_id = :id AND stage = :stage AND lease_owner = :owner AND lease_token = :token
+                RETURNING
+                """ + COLUMNS, new MapSqlParameterSource("id", held.roundId()).addValue("stage", held.stage().wire())
+                .addValue("owner", mine.owner()).addValue("token", mine.token()).addValue("until", stamp(now.plus(lease)))
+                .addValue("now", stamp(now)), JdbcGraphRoundRepository::round));
+    }
+
     /**
      * Fenced on the expected stage and the lease token: a row that moved on, or whose lease another holder took, is left as it is
      * and no event is written. The lease is kept while the round stays open and dropped with a terminal stage.

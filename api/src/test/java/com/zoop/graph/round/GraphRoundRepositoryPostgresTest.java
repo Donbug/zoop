@@ -122,6 +122,13 @@ class GraphRoundRepositoryPostgresTest {
         assertTrue(taken.lease().orElseThrow().token() != token, "a take-over is a new lease");
         rounds.release(ROUND_1, "task-a"); // not the holder: no effect
         assertTrue(rounds.find(ROUND_1).orElseThrow().lease().isPresent());
+        // The conditional extension (the worker's renewal before a write): the old holder gets nothing, the holder keeps its
+        // token even after its lease expired as long as nobody took the row, and no token is issued.
+        assertTrue(rounds.extend(first, Duration.ofMinutes(2), NOW.plus(Duration.ofMinutes(4))).isEmpty(), "task-b holds it");
+        GraphRound extended = rounds.extend(taken, Duration.ofMinutes(2), NOW.plus(Duration.ofMinutes(10))).orElseThrow();
+        assertEquals(taken.lease().orElseThrow().token(), extended.lease().orElseThrow().token());
+        assertEquals(NOW.plus(Duration.ofMinutes(12)), extended.lease().orElseThrow().until());
+        assertEquals("task-b", extended.lease().orElseThrow().owner());
 
         // Fencing: the old holder's late outcome is refused, and no event is written for it.
         assertTrue(rounds.advance(first, GraphRoundPatch.advanceTo(GraphRoundStage.RUN_REQUESTED), Outcome.ADVANCED, null,
