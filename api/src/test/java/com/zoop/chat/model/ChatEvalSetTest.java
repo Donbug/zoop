@@ -557,9 +557,26 @@ public class ChatEvalSetTest {
         final IssueNameResolver issues;
         final ChatCitationSource citations;
         final ChatToolRegistry registry;
+        private final List<com.zoop.chat.tool.ChatTool> tools;
         /** The real read tools on the synthetic graph, for a test that drives them another way. */
         public ChatToolRegistry registry() {
             return registry;
+        }
+
+        /** The same tools with one more, such as the web search the direct path never plans. */
+        public ChatToolRegistry registryWith(com.zoop.chat.tool.ChatTool extra) {
+            List<com.zoop.chat.tool.ChatTool> all = new ArrayList<>(tools);
+            all.add(faultable(extra));
+            return new ChatToolRegistry(all);
+        }
+
+        public ChatCitationSource citations() {
+            return citations;
+        }
+
+        /** Takes these capabilities' data down until the next call. */
+        public void unavailable(Set<String> capabilities) {
+            unavailable = Set.copyOf(capabilities);
         }
 
         /** The member's companies for the case being run (cases run one after another). */
@@ -633,7 +650,7 @@ public class ChatEvalSetTest {
                     return Optional.ofNullable(policies.get(docId));
                 }
             };
-            registry = new ChatToolRegistry(Stream.<com.zoop.chat.tool.ChatTool>of(new CompanyReadTool(reader, access, companyProfiles),
+            tools = Stream.<com.zoop.chat.tool.ChatTool>of(new CompanyReadTool(reader, access, companyProfiles),
                     new IssueReadTool(reader, access), new EvidenceResolveTool(reader, access),
                     new GraphPathTool(reader, access), new ZoopPolicyReadTool(docs),
                     new GraphVersionDiffTool(reader, versions, access, Clock.fixed(NOW, ZoneOffset.UTC)),
@@ -648,7 +665,8 @@ public class ChatEvalSetTest {
                     new SelectionRuleReadTool((version, asOf, issue) -> new GraphContextLookup(
                             reader.readPinned(version, asOf, asOf != null).graph()).find(issue)
                             .filter(t -> "issue".equals(t.kind())).map(GraphContextLookup.Target::label),
-                            publications(set), briefings(set), access)).map(this::faultable).toList());
+                            publications(set), briefings(set), access)).map(this::faultable).toList();
+            registry = new ChatToolRegistry(tools);
         }
 
         /** The tool, failing as data that cannot be read now while the case names its capability. */
