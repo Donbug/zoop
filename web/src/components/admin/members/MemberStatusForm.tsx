@@ -77,16 +77,16 @@ export default function MemberStatusForm({
       onSubmit={(event) => void submit(event)}
       className="flex flex-col gap-3 rounded-2xl bg-zoop-soft p-5"
     >
-      <p className="text-sm font-bold">{title}</p>
-      <p className="text-[11px] leading-relaxed text-zoop-muted">
-        <strong className="font-inter text-zoop-ink">{member.id}</strong>(
+      <p className="text-body font-bold">{title}</p>
+      <p className="text-caption leading-relaxed text-zoop-muted">
+        <strong className="font-num text-zoop-ink">{member.id}</strong>(
         {member.emailMasked})
         {block
           ? '을 차단해요. 열려 있는 모든 세션이 지금 끝나고, 다시 로그인할 수 없어요.'
           : '의 차단을 풀어요. 이 회원은 다시 로그인할 수 있어요.'}
       </p>
       <div className="flex flex-col gap-1">
-        <label htmlFor={reasonId} className="text-[11px] text-zoop-muted">
+        <label htmlFor={reasonId} className="text-caption text-zoop-muted">
           {block ? '차단 사유' : '해제 사유'}(감사 로그에 남아요)
         </label>
         <textarea
@@ -99,14 +99,14 @@ export default function MemberStatusForm({
           className={TEXTAREA}
         />
       </div>
-      <p className="text-[11px] text-zoop-muted">사유 {reason.length}/500자</p>
+      <p className="text-caption text-zoop-muted">사유 {reason.length}/500자</p>
       {missing && (
-        <p role="alert" className="text-[11px] text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           사유를 1~500자로 입력해 주세요.
         </p>
       )}
       {error && (
-        <p role="alert" className="text-[11px] text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           {title}에 실패했어요. {memberActionErrorMessage(error)}
         </p>
       )}

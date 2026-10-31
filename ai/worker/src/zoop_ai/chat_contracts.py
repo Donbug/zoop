@@ -26,11 +26,14 @@ from pydantic import Field, model_validator
 
 from .contracts import Wire
 
-CHAT_SCHEMA_VERSION = "zoop-ai-chat-2"
+CHAT_SCHEMA_VERSION = "zoop-ai-chat-4"
 ChatStage = Literal["chat-router", "chat-answer", "chat-verification", "chat-agent"]
 QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
-# `zoop_documented` rests on ZOOP's own approved documents (policies), `evidence_grounded` on public evidence.
-Basis = Literal["general_knowledge", "zoop_documented", "evidence_grounded"]
+# `zoop_documented` rests on ZOOP's own approved documents (policies), `evidence_grounded` on public evidence,
+# `web_reported` on what a supplementary web search returned (a snippet, never ZOOP's own verified fact).
+Basis = Literal["general_knowledge", "zoop_documented", "evidence_grounded", "web_reported"]
+# A web hit's id is the application's own (`web-` and a hash of provider and URL), never an evidence id.
+WEB_RESULT_ID = r"^web-[0-9a-f]{32}$"
 
 MAX_REQUIREMENTS = 6
 MAX_SECTIONS = 12
@@ -39,6 +42,19 @@ MAX_QUESTION = 4000
 MAX_TEXT = 12000
 MAX_PATHS = 20
 MAX_PATH_STEPS = 6
+# ZOOP-AIG-001 6.3.3: Luna's accumulated input and the final answer, whose length does not count reasoning. The provider's output
+# cap does count it, so it leaves reasoning a share of its own, provisional until the live spike measures it.
+MAX_INPUT_TOKENS = 24000
+MAX_ANSWER_TOKENS = 2000
+MAX_OUTPUT_TOKENS = 8000
+INPUT_BUDGET_EXCEEDED = "input_budget_exceeded"
+OUTPUT_BUDGET_EXCEEDED = "output_budget_exceeded"
+
+
+def estimated_tokens(text: str) -> int:
+    """A generous estimate before sending, with no tokenizer at hand: about 4 ASCII characters and 1.3 others to a token."""
+    ascii_chars = sum(1 for char in text if ord(char) < 128)
+    return ascii_chars // 4 + (len(text) - ascii_chars) * 3 // 4
 
 
 class ChatGrant(Wire):
@@ -97,11 +113,19 @@ class RouterInput(Wire):
         return self
 
 
+class RouterDependency(Wire):
+    """Run this requirement on companies found by an earlier requirement when its checkpoint matches."""
+    requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
+    cardinality: Literal["exactly", "atLeast", "atMost"]
+    count: int = Field(ge=1, le=5)
+
+
 class RoutedRequirement(Wire):
     requirement_id: str
     types: dict[QueryType, float]
     capabilities: dict[str, float]
     prohibited_advice: float
+    depends_on: RouterDependency | None
 
 
 class RouterAnswer(Wire):
@@ -110,7 +134,7 @@ class RouterAnswer(Wire):
 
 class Quote(Wire):
     """A quoted span the answer may cite. `source_id` selects the grant; the text itself is the minimum span, never the article."""
-    evidence_id: str = Field(pattern=r"^ev-[0-9a-f]{64}$")
+    evidence_id: str = Field(pattern=r"^(ev-[0-9a-f]{64}|web-[0-9a-f]{32})$")
     source_id: str = Field(min_length=1)
     quote: str = Field(min_length=1, max_length=2000)
     article_title: str | None = Field(default=None, max_length=500)
@@ -192,6 +216,7 @@ MAX_APPROVALS = 8
 MAX_MCP_CALLS = 16
 TOOL_NAME = r"^[A-Za-z0-9_]{1,64}$"
 PROVIDER_ID = r"^[A-Za-z0-9_-]{1,128}$"
+REQUIREMENT_ID = r"^[A-Za-z0-9_-]{1,32}$"
 
 
 class AgentRequirement(Wire):
@@ -266,10 +291,13 @@ class AgentInput(Wire):
 
 
 class ApprovalRequest(Wire):
-    """A tool call the model proposes and the provider holds until the application decides (`require_approval=always`)."""
+    """A tool call the model proposes and the provider holds until the application decides (`require_approval=always`).
+    `requirement_ids` are the requirements the model says the call serves, taken out of its `requirementIds` argument and empty
+    when that is missing or malformed: the application decides what they are worth, and `arguments` are the rest."""
     approval_request_id: str = Field(pattern=PROVIDER_ID)
     tool_name: str = Field(pattern=TOOL_NAME)
     arguments: dict[str, Any]
+    requirement_ids: list[Annotated[str, Field(pattern=REQUIREMENT_ID)]] = Field(max_length=MAX_REQUIREMENTS)
 
 
 class McpCallSummary(Wire):
@@ -386,7 +414,53 @@ class ComparisonFact(Wire):
         return self
 
 
-ServerFact = Annotated[PortfolioFact | ComparisonFact, Field(discriminator="kind")]
+class PublicationRule(Wire):
+    rule_id: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,63}@[1-9][0-9]{0,8}$")
+    title: str = Field(min_length=1, max_length=200)
+    summary: str = Field(min_length=1, max_length=1000)
+
+
+class PublicationFact(Wire):
+    """Why an issue is on the map at the request's pinned graph version (Q08): the last review decision's kind, time and
+    path up to the version's review revision, and the rules the version was filtered with. No decider, no decider's note."""
+    kind: Literal["publication_record"]
+    requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
+    issue_id: str = Field(min_length=1, max_length=200)
+    issue_title: str = Field(min_length=1, max_length=300)
+    graph_version: str = Field(min_length=1, max_length=200)
+    review_revision: int = Field(ge=0)
+    rule_revision: int | None = Field(ge=0)
+    decision: Literal["allow", "reject"] | None
+    decision_path: Literal["admin_review", "snapshot_migration", "none"]
+    decided_at: str | None
+    rules: list[PublicationRule] = Field(max_length=10)
+
+    @model_validator(mode="after")
+    def recorded(self):
+        if (self.decision_path == "none") != (self.decision is None) or (self.decision is None) != (self.decided_at is None):
+            raise ValueError("a decision has its path and time, and no decision has neither")
+        if self.decided_at is not None and datetime.fromisoformat(self.decided_at).tzinfo is None:
+            raise ValueError("decidedAt requires timezone")
+        if len({r.rule_id for r in self.rules}) != len(self.rules):
+            raise ValueError("rule ids must be distinct")
+        return self
+
+
+class BriefingSelectionFact(Wire):
+    """Why a published briefing round picked an issue (Q08): its rank and the selection reason the round recorded."""
+    kind: Literal["briefing_selection"]
+    requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
+    issue_id: str = Field(min_length=1, max_length=200)
+    issue_title: str = Field(min_length=1, max_length=300)
+    round_id: str = Field(min_length=1, max_length=256)
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    edition: Literal["morning", "evening"]
+    rank: int = Field(ge=1, le=20)
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+ServerFact = Annotated[PortfolioFact | ComparisonFact | PublicationFact | BriefingSelectionFact,
+                       Field(discriminator="kind")]
 
 
 class VerifySection(Wire):
@@ -423,11 +497,21 @@ class VerificationInput(Wire):
                         fact.to_version != self.request_binding.graph_version_id
                         or fact.as_of != self.request_binding.as_of):
                     raise ValueError("comparison belongs to another version or asOf")
+                if isinstance(fact, PublicationFact) and fact.graph_version != self.request_binding.graph_version_id:
+                    raise ValueError("publication record belongs to another version")
         for section in self.sections:
             if section.basis == "general_knowledge" and section.evidence_ids:
                 raise ValueError("a general section cites nothing")
             if not set(section.evidence_ids) <= known:
                 raise ValueError("a section cites evidence that is not provided")
+            web = [e.startswith("web-") for e in section.evidence_ids]
+            if section.basis == "web_reported" and (not web or not all(web)):
+                raise ValueError("a web section cites web hits only, at least one")
+            if section.basis != "web_reported" and any(web):
+                raise ValueError("only a web section cites web hits")
+        for citation in self.citations:
+            if citation.evidence_id.startswith("web-") != citation.source_id.startswith("web-search:"):
+                raise ValueError("a web hit is quoted under its web provider's grant, and only it")
         return self
 
 
@@ -447,7 +531,7 @@ INPUTS: dict[str, type[Wire]] = {"chat-router": RouterInput, "chat-answer": Answ
 class StageRequest(Wire):
     """What the application asks of one stage. `invocation_id` identifies the attempt's stage: the same id with the same input
     returns the stored outcome and never sends again; the same id with another input is refused."""
-    schema_version: Literal["zoop-ai-chat-2"]
+    schema_version: Literal["zoop-ai-chat-4"]
     invocation_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{8,160}$")
     stage: ChatStage
     mode: Literal["replay", "live"]
@@ -498,7 +582,7 @@ class StageFailure(Wire):
 
 
 class StageResult(Wire):
-    schema_version: Literal["zoop-ai-chat-2"]
+    schema_version: Literal["zoop-ai-chat-4"]
     invocation_id: str
     stage: ChatStage
     status: Literal["succeeded", "failed"]

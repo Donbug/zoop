@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import BottomNav from './BottomNav';
 import ServiceHeader from './ServiceHeader';
 import SkipLink from './SkipLink';
+import './briefing-login-surface.css';
 
 export default function AppLayout() {
   const { pathname } = useLocation();
@@ -9,7 +10,9 @@ export default function AppLayout() {
   // 같은 메뉴 안 이동(/companies/A → /companies/B)까지 다시 만들면 화면 상태와 그래프를 잃는다.
   const section = pathname.split('/')[1] ?? '';
   return (
-    <div className="service-surface">
+    <div
+      className={`service-surface${pathname === '/briefing' ? ' briefing-login-surface' : ''}`}
+    >
       <SkipLink />
       <ServiceHeader navLabel="데스크톱 주 메뉴" />
 

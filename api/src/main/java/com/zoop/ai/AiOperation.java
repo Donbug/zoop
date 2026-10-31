@@ -23,6 +23,8 @@ public enum AiOperation {
     EXPOSURE(false),
     /** Reads one allowlisted handoff's verified status or whole bundle; never changes the AI service or the app. */
     HANDOFF_READ(false),
+    /** Runs the installed S2-1 export for one observation under the current rights; reads only, nothing is cached or written. */
+    OBSERVATION_EXPORT(false),
     /** Starts the AI tick and plan-round for one app slot (#387 ①); idempotent on the round id, so a lost answer is read back. */
     ROUND_RUN(true),
     /** Asks the AI side to freeze the cumulative bundle of one slot (#387 ②); idempotent on the round id. */

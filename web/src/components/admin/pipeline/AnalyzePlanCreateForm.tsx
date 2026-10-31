@@ -153,8 +153,8 @@ export default function AnalyzePlanCreateForm({
       onSubmit={(event) => void submit(event)}
       className="flex flex-col gap-3"
     >
-      <h3 className="text-sm font-bold">분석계획 접수</h3>
-      <p className="text-[11px] leading-relaxed text-zoop-muted">
+      <h3 className="text-body font-bold">분석계획 접수</h3>
+      <p className="text-caption leading-relaxed text-zoop-muted">
         준비된 분석계획의 정확한 참조를 입력해 주세요. 대기열 접수 후 AI 처리를
         진행하며, 기사 수집·검수 승인·공개 반영은 하지 않아요.
       </p>
@@ -178,7 +178,7 @@ export default function AnalyzePlanCreateForm({
         };
         return (
           <div key={field} className="flex flex-col gap-1">
-            <label htmlFor={props.id} className="text-[11px] text-zoop-muted">
+            <label htmlFor={props.id} className="text-caption text-zoop-muted">
               {LABELS[field]}
             </label>
             {field === 'reason' ? (
@@ -205,7 +205,7 @@ export default function AnalyzePlanCreateForm({
             {errors[field] && (
               <p
                 id={`${id}-${field}-error`}
-                className="text-[11px] text-zoop-alert"
+                className="text-caption text-zoop-alert"
               >
                 {errors[field]}
               </p>
@@ -216,7 +216,7 @@ export default function AnalyzePlanCreateForm({
       <div
         role="status"
         aria-live="polite"
-        className="text-[11px] text-zoop-muted"
+        className="text-caption text-zoop-muted"
       >
         {pending ? '분석계획 접수 여부를 확인하고 있어요.' : message}
       </div>

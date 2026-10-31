@@ -3,9 +3,12 @@ package com.zoop.graph.importer;
 import java.time.Clock;
 
 import com.zoop.ai.handoff.HandoffReadClient;
+import com.zoop.ai.observation.ObservationExportClient;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.artifact.storage.ArtifactStoreException;
+import com.zoop.document.importer.IngestionExporters;
 import com.zoop.document.importer.IngestionExportParser;
+import com.zoop.document.importer.IngestionExporter;
 import com.zoop.document.importer.ProcessIngestionExporter;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import org.springframework.beans.factory.ObjectProvider;
@@ -29,7 +32,9 @@ import org.springframework.web.context.WebApplicationContext;
  * <li>{@code zoop.graph.snapshot.source=fixture}: the fixture seeder registers AND ACTIVATES versions at startup, which a staging
  *     run must never do;</li>
  * <li>{@code handoff-source=http} without {@code zoop.ai.handoff-read-client.enabled=true}: the import would have no handoff
- *     source at all.</li>
+ *     source at all;</li>
+ * <li>{@code observation-source=http} without {@code zoop.ai.observation-export-client.enabled=true}: no observation could be
+ *     re-checked, so no import could ever succeed.</li>
  * </ul>
  * The failure happens while beans are created, before a web server would start listening.
  */
@@ -69,12 +74,24 @@ public class GraphHandoffImportConfiguration {
     @Bean
     GraphHandoffRunner graphHandoffRunner(GraphHandoffImportSettings settings, ArtifactFileStore store,
             DocumentRegistryRepository registry, GraphHandoffRepository graph, TransactionOperations transaction, Clock clock,
-            ObjectProvider<HandoffReadClient> handoffReads) {
+            ObjectProvider<HandoffReadClient> handoffReads, ObjectProvider<ObservationExportClient> observationExports) {
         return new GraphHandoffRunner(settings, new GraphHandoffRequestParser(), new GraphHandoffImporter(
-                handoffSource(settings, handoffReads),
-                ProcessIngestionExporter.forPaths(settings.ingestionCli(), settings.ingestionState(),
-                        settings.ingestionSources()),
+                handoffSource(settings, handoffReads), ingestionExporter(settings, observationExports),
                 new IngestionExportParser(), store, registry, graph, transaction, clock));
+    }
+
+    /**
+     * The installed S2-1 CLI, or the observation export client that {@code zoop.ai.observation-export-client} registers.
+     * {@code http} needs the client; {@code cli} ignores one that is enabled, for the same reason as {@link #handoffSource}: the
+     * web application sharing this environment may hold one (its round bridge binds it in a follow-up). See
+     * {@link IngestionExporters}.
+     */
+    static IngestionExporter ingestionExporter(GraphHandoffImportSettings settings,
+            ObjectProvider<ObservationExportClient> observationExports) {
+        return IngestionExporters.forSource(settings.observationSource(),
+                () -> ProcessIngestionExporter.forPaths(settings.ingestionCli(), settings.ingestionState(), settings.ingestionSources()),
+                observationExports, () -> new GraphHandoffImportConfigurationException("observation-source",
+                        "http requires zoop.ai.observation-export-client.enabled=true"));
     }
 
     /**

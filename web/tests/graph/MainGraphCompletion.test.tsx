@@ -1153,9 +1153,17 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
         })
       )[0],
     );
-    await screen.findByRole('heading', { name: '근거 문서' });
-    await screen.findByText('튜토리얼 5/5');
+    // D-GRP-T4/T5: 근거를 읽는 동안 4단계를 유지하고, 닫은 뒤 AI 동작을 노출한다.
+    const evidenceDialog = await screen.findByRole('dialog', {
+      name: '근거 문서',
+    });
+    await within(evidenceDialog).findAllByRole('heading', { level: 3 });
+    expect(screen.getByText('튜토리얼 4/5')).toBeTruthy();
+    expect(screen.queryByText('튜토리얼 5/5')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: '근거 창 닫기' }));
+    await screen.findByText('튜토리얼 5/5');
+    expect(screen.queryByRole('dialog', { name: '근거 문서' })).toBeNull();
+    expect(useGraphUiStore.getState().evidenceTarget).toBeNull();
     expect(screen.getByRole('heading', { name: 'AI에게 질문' })).toBeTruthy();
     expect(
       screen.queryByRole('button', { name: '튜토리얼 건너뛰기' }),

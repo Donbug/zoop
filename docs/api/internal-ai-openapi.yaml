@@ -246,7 +246,7 @@
     `runtime_unavailable`. All carry `Retry-After`; there is exactly one child per request and no automatic retry. A child answer that is not the contract this service
     knows is 500 `runtime_contract_mismatch` or `runtime_binding_mismatch` (not retryable). A 503 or 500 is never an empty bundle.
 
-    **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-2`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
+    **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-4`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
     stage synchronously through the installed `zoop-ai-chat invoke`: `chat-router` (native Jev, typed probabilities per requirement), `chat-answer` (Luna, a strict
     JSON answer by sections), `chat-verification` (native Jev, per-section support and prohibited-advice verdicts) or `chat-agent` (one step of a Luna Responses run
     that calls the ZOOP MCP tools). It is off unless its all-or-nothing server configuration group is set (otherwise 409 `execution_unavailable` after
@@ -268,8 +268,10 @@
 
     **Verification server facts.** The v2 verification input has `requestBinding` (`invocationId`, pinned `graphVersionId`, `asOf`)
     and ordered sections (`sectionId`, `requirementIds`, `basis`, `text`, `evidenceIds`, `serverFacts`). The application alone
-    derives bounded typed `portfolio_scope` and `graph_comparison` facts from successful reads in that request, never from answer
-    text. Facts are scoped to their parent requirement and section, separate from granted article quotes. Membership is current
+    derives bounded typed `portfolio_scope`, `graph_comparison`, `publication_record` and `briefing_selection` facts from
+    successful reads in that request, never from answer text. A publication record is an issue's last review decision (kind,
+    time and path, never the decider or their note) up to the pinned version's review revision and the rules that version was
+    filtered with; a briefing selection is a published round's rank and recorded reason for an issue. Facts are scoped to their parent requirement and section, separate from granted article quotes. Membership is current
     at the read, not historical asOf membership; a truncated list cannot establish completeness or absence. Graph facts name
     the exact baseline, current version, asOf, since, query targets and limits. Missing observations supply no facts. The
     service rejects a binding to another invocation before launching the worker; the worker rejects wrong sections,
@@ -7711,13 +7713,13 @@
                 "reachable":
                   "summary": "The configured endpoint answered its Bearer challenge"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-2"
+                    "schemaVersion": "zoop-ai-chat-4"
                     "mcp": "reachable"
                     "reason": null
                 "unreachable":
                   "summary": "No answer before the content-free probe deadline"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-2"
+                    "schemaVersion": "zoop-ai-chat-4"
                     "mcp": "unreachable"
                     "reason": "mcp_timeout"
         "401":
@@ -7874,7 +7876,7 @@
                 "succeeded":
                   "summary": "Router probabilities"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-2"
+                    "schemaVersion": "zoop-ai-chat-4"
                     "invocationId": "job-00000001:1:chat-router"
                     "stage": "chat-router"
                     "status": "succeeded"
@@ -7892,6 +7894,7 @@
                             "Q08": 0.01
                           "capabilities": {}
                           "prohibitedAdvice": 0.02
+                          "dependsOn": null
                     "failure": null
                     "receipt":
                       "provider": "authored-replay"
@@ -7909,7 +7912,7 @@
                 "notSent":
                   "summary": "A quote without a matching chat grant: nothing was sent"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-2"
+                    "schemaVersion": "zoop-ai-chat-4"
                     "invocationId": "job-00000001:1:chat-answer"
                     "stage": "chat-answer"
                     "status": "failed"
@@ -7922,7 +7925,7 @@
                 "agentHeld":
                   "summary": "chat-agent step held at an approval request"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-2"
+                    "schemaVersion": "zoop-ai-chat-4"
                     "invocationId": "job-00000001:1:chat-agent:1"
                     "stage": "chat-agent"
                     "status": "succeeded"
@@ -7935,6 +7938,8 @@
                           "arguments":
                             "targets":
                               - "KRX:000660"
+                          "requirementIds":
+                            - "r1"
                       "mcpCalls": []
                       "answer": null
                     "failure": null
@@ -8070,7 +8075,7 @@
               "router":
                 "summary": "chat-router replay request (synthetic question)"
                 "value":
-                  "schemaVersion": "zoop-ai-chat-2"
+                  "schemaVersion": "zoop-ai-chat-4"
                   "invocationId": "job-00000001:1:chat-router"
                   "stage": "chat-router"
                   "mode": "replay"
@@ -8085,7 +8090,7 @@
               "agentContinuation":
                 "summary": "chat-agent continuation step with the application's decision (synthetic token)"
                 "value":
-                  "schemaVersion": "zoop-ai-chat-2"
+                  "schemaVersion": "zoop-ai-chat-4"
                   "invocationId": "job-00000001:1:chat-agent:2"
                   "stage": "chat-agent"
                   "mode": "replay"
@@ -9098,14 +9103,22 @@
           "additionalProperties": true
           "type": "object"
           "title": "Arguments"
+        "requirementIds":
+          "items":
+            "type": "string"
+          "type": "array"
+          "title": "Requirementids"
       "additionalProperties": false
       "type": "object"
       "required":
         - "approvalRequestId"
         - "toolName"
         - "arguments"
+        - "requirementIds"
       "title": "ApprovalRequest"
-      "description": "A tool call the model proposed and the provider holds for the application's decision. The service relays it; it never decides."
+      "description": |-
+        A tool call the model proposed and the provider holds for the application's decision. The service relays it; it never decides.
+        `requirementIds` are the requirements the model says the call serves, apart from `arguments`; empty when it named none validly.
     "BApprovalBasis":
       "properties":
         "kind":
@@ -11753,7 +11766,7 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-ai-chat-2"
+          "const": "zoop-ai-chat-4"
           "title": "Schemaversion"
         "mcp":
           "type": "string"
@@ -11845,7 +11858,7 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-ai-chat-2"
+          "const": "zoop-ai-chat-4"
           "title": "Schemaversion"
         "invocationId":
           "type": "string"
@@ -15575,6 +15588,10 @@
         "prohibitedAdvice":
           "type": "number"
           "title": "Prohibitedadvice"
+        "dependsOn":
+          "anyOf":
+            - "$ref": "#/components/schemas/RouterDependency"
+            - "type": "null"
       "additionalProperties": false
       "type": "object"
       "required":
@@ -15582,6 +15599,7 @@
         - "types"
         - "capabilities"
         - "prohibitedAdvice"
+        - "dependsOn"
       "title": "RoutedRequirement"
       "description": "Closed like every stage answer: a key the worker contract does not define is refused, never relayed."
     "RouterAnswer":
@@ -15596,6 +15614,30 @@
       "required":
         - "requirements"
       "title": "RouterAnswer"
+    "RouterDependency":
+      "properties":
+        "requirementId":
+          "type": "string"
+          "title": "Requirementid"
+        "cardinality":
+          "type": "string"
+          "enum":
+            - "exactly"
+            - "atLeast"
+            - "atMost"
+          "title": "Cardinality"
+        "count":
+          "type": "integer"
+          "maximum": 5.0
+          "minimum": 1.0
+          "title": "Count"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "requirementId"
+        - "cardinality"
+        - "count"
+      "title": "RouterDependency"
     "SectionVerdict":
       "properties":
         "support":
@@ -15765,7 +15807,7 @@
       "additionalProperties": false
       "properties":
         "schemaVersion":
-          "const": "zoop-ai-chat-2"
+          "const": "zoop-ai-chat-4"
           "title": "Schemaversion"
           "type": "string"
         "invocationId":
@@ -15789,7 +15831,7 @@
           "type": "string"
         "input":
           "additionalProperties": true
-          "description": "The closed zoop-ai-chat-2 stage input (RouterInput, AnswerInput, VerificationInput or AgentInput)."
+          "description": "The closed zoop-ai-chat-4 stage input (RouterInput, AnswerInput, VerificationInput or AgentInput)."
           "title": "Input"
           "type": "object"
       "required":

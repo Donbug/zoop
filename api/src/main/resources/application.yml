@@ -136,8 +136,7 @@ zoop:
     web:
       # The supplementary web search tool (api/docs/chat-web-search.md). Off by default. No real provider is selected yet:
       # enabled, it needs provider=synthetic (fixture hits under example domains, local and tests only). It is never
-      # planned by the router; it is an MCP tool of the agent path, and the two cannot be on together until web results
-      # can be cited.
+      # planned by the router; it is an MCP tool of the agent path, whose answers cite its hits as web_result.
       enabled: ${ZOOP_CHAT_WEB_ENABLED:false}
       provider: ${ZOOP_CHAT_WEB_PROVIDER:none}
   analysis:
@@ -207,6 +206,17 @@ zoop:
       connect-timeout: ${ZOOP_AI_HANDOFF_READ_CLIENT_CONNECT_TIMEOUT:3s}
       request-timeout: ${ZOOP_AI_HANDOFF_READ_CLIENT_REQUEST_TIMEOUT:60s}
       max-response-bytes: ${ZOOP_AI_HANDOFF_READ_CLIENT_MAX_RESPONSE_BYTES:16777216}
+    observation-export-client:
+      # Observation export route (scope observation.read): POST /internal/v1/observations/export runs the installed
+      # zoop-ai-ingest export --require-store on the AI side for ONE observation and answers the CLI's JSON (document.text
+      # included). Used by the graph handoff import and the document import with observation-source=http. The AI child runs at most 45 s and the
+      # answer is at most 16 MiB, so the request deadline stays above 45 s. One request = one observation; no batch, no job.
+      enabled: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED:false}
+      base-url: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL:}
+      token: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_TOKEN:}
+      connect-timeout: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_CONNECT_TIMEOUT:3s}
+      request-timeout: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_REQUEST_TIMEOUT:50s}
+      max-response-bytes: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_MAX_RESPONSE_BYTES:16777216}
     round-client:
       # Round-run and round-handoff families (scopes round.run, round.read; #387 ①② contract of 2026-10-30): POST/GET
       # /internal/v1/round-runs and /internal/v1/round-handoffs. Used only by the graph round scheduler. Status answers are
@@ -235,6 +245,11 @@ zoop:
     enabled: ${ZOOP_DOCUMENT_IMPORT_ENABLED:false}
     request: ${ZOOP_DOCUMENT_IMPORT_REQUEST:}
     result: ${ZOOP_DOCUMENT_IMPORT_RESULT:}
+    # observation-source: cli (default; the installed zoop-ai-ingest export --require-store, which needs the three
+    # ZOOP_INGESTION_* settings) or http (ai/service POST /internal/v1/observations/export through
+    # zoop.ai.observation-export-client, which must then be enabled; the three ZOOP_INGESTION_* settings must be left unset).
+    # cli ignores an enabled export client (the web application sharing this environment may hold one).
+    observation-source: ${ZOOP_DOCUMENT_IMPORT_OBSERVATION_SOURCE:cli}
     ingestion-cli: ${ZOOP_INGESTION_CLI:}
     ingestion-state-dir: ${ZOOP_INGESTION_STATE_DIR:}
     ingestion-sources: ${ZOOP_INGESTION_SOURCES:}
@@ -276,10 +291,15 @@ zoop:
     # handoff-source: cli (default; the installed zoop-ai-handoff export, which needs handoff-cli, the three handoff/S3/S2 ledger
     # directories and the three operator files) or http (ai/service GET /internal/v1/graph-handoffs/{id}/bundle through
     # zoop.ai.handoff-read-client, which must then be enabled; those seven CLI settings must be left unset). An empty value is
-    # cli; an enabled read client is ignored by cli (the web application's round bridge in the same environment needs it). The
-    # observation check stays the installed zoop-ai-ingest export --require-store in both modes until the AI side offers it over HTTP.
+    # cli; an enabled read client is ignored by cli (the web application's round bridge in the same environment needs it).
+    # observation-source: cli (default; the installed zoop-ai-ingest export --require-store, which needs ingestion-cli) or http
+    # (ai/service POST /internal/v1/observations/export through zoop.ai.observation-export-client, which must then be enabled;
+    # ingestion-cli must be left unset). ingestion-state-dir and ingestion-sources are read by whichever CLI still runs here and
+    # must be left unset when both sources are http. As for the read client, cli ignores an enabled export client (the web
+    # application sharing this environment may hold one).
     enabled: ${ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED:false}
     handoff-source: ${ZOOP_GRAPH_HANDOFF_IMPORT_HANDOFF_SOURCE:cli}
+    observation-source: ${ZOOP_GRAPH_HANDOFF_IMPORT_OBSERVATION_SOURCE:cli}
     request: ${ZOOP_GRAPH_HANDOFF_IMPORT_REQUEST:}
     result: ${ZOOP_GRAPH_HANDOFF_IMPORT_RESULT:}
     handoff-cli: ${ZOOP_HANDOFF_CLI:}

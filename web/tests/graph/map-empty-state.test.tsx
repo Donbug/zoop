@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import MapEmptyState from '@/components/graph/MapEmptyState';
 import { createMockGraph } from '@/mocks/graph/response';
 
@@ -19,6 +20,7 @@ it('D-GRP-01b offers account and alternative filters for no personal holdings', 
       onPersonalFilter={onFilter}
       onMarket={onMarket}
     />,
+    { wrapper: MemoryRouter },
   );
   expect(screen.getByText('보유 종목이 없어요.')).toBeTruthy();
   expect(
@@ -41,7 +43,7 @@ it('names focus companies for no related issues without hiding their nodes', () 
   const name = graph.nodes.find(
     (node) => node.kind === 'company' && node.isFocus,
   )!.label;
-  render(<MapEmptyState graph={graph} />);
+  render(<MapEmptyState graph={graph} />, { wrapper: MemoryRouter });
   expect(screen.getByText('내 종목과 연결된 사건이 아직 없어요.')).toBeTruthy();
   expect(screen.getByText(new RegExp(name))).toBeTruthy();
 });
@@ -53,7 +55,7 @@ it('does not claim a lack of relations when data is partial', () => {
   );
   graph.metadata.emptyReason = 'no_personal_stocks';
   graph.metadata.partial = true;
-  render(<MapEmptyState graph={graph} />);
+  render(<MapEmptyState graph={graph} />, { wrapper: MemoryRouter });
   expect(screen.getByText(/일부 자료가 누락되어/)).toBeTruthy();
   expect(screen.queryByText('보유·관심 종목이 없어요.')).toBeNull();
 });
@@ -62,6 +64,27 @@ it('shows a neutral message for an unknown empty reason', () => {
   const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
   graph.edges = [];
   graph.metadata.emptyReason = 'unknown_from_server';
-  render(<MapEmptyState graph={graph} />);
+  render(<MapEmptyState graph={graph} />, { wrapper: MemoryRouter });
   expect(screen.getByText('현재 지도에 표시된 연결선이 없어요.')).toBeTruthy();
+});
+
+it('B3 moves to my page inside the router without reloading the document', async () => {
+  const graph = createMockGraph(
+    { mode: 'personal', personalFilter: 'all' },
+    'empty',
+  );
+  graph.metadata.emptyReason = 'no_personal_stocks';
+  graph.metadata.personalFilter = 'all';
+  const before = window.location.href;
+  render(
+    <MemoryRouter initialEntries={['/']}>
+      <Routes>
+        <Route path="/" element={<MapEmptyState graph={graph} />} />
+        <Route path="/my" element={<p>마이 화면</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  await userEvent.click(screen.getByRole('link', { name: '관심 종목 고르기' }));
+  expect(screen.getByText('마이 화면')).toBeTruthy();
+  expect(window.location.href).toBe(before);
 });

@@ -140,7 +140,7 @@ export default function CompanyCatalog({
     );
   }
   const heading =
-    'mb-2! block font-mono text-[11px]! font-normal! tracking-[0.12em] text-zoop-muted';
+    'mb-2! block font-mono text-caption! font-normal! tracking-[0.12em] text-zoop-muted';
   const holdingIds = portfolio.data?.connected
     ? portfolio.data.holdings.map((h) => h.companyId)
     : [];
@@ -166,7 +166,7 @@ export default function CompanyCatalog({
       >
         <label
           htmlFor="company-search"
-          className="mb-1.5 block text-[11px] text-zoop-muted"
+          className="mb-1.5 block text-caption text-zoop-muted"
         >
           기업 검색
         </label>
@@ -177,9 +177,9 @@ export default function CompanyCatalog({
             placeholder="종목명"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            className="min-w-0 flex-1 text-[11px]"
+            className="min-w-0 flex-1 text-caption"
           />
-          <button className="shrink-0 bg-zoop-ink! px-2! text-[11px]! text-white">
+          <button className="shrink-0 bg-zoop-ink! px-2! text-caption! text-white">
             검색
           </button>
         </div>

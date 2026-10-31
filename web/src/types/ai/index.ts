@@ -23,8 +23,12 @@ export type ChatJobStatus =
 export type ChatPhase = 'planning' | 'retrieving' | 'writing' | 'verifying';
 export type ChatOutcome =
   'answered' | 'clarification' | 'guidance' | 'insufficient_evidence';
+// web_reported: what a supplementary web search reported, never ZOOP's own verified fact.
 export type ChatBasis =
-  'general_knowledge' | 'zoop_documented' | 'evidence_grounded';
+  | 'general_knowledge'
+  | 'zoop_documented'
+  | 'evidence_grounded'
+  | 'web_reported';
 export type ChatAnswerBasis = ChatBasis | 'mixed' | 'none';
 
 export type ChatPeriod = { start: string; end: string };
@@ -63,8 +67,11 @@ export type ChatAnswerSection = {
 };
 
 export type ChatCitation = {
-  /** company_profile: ZOOP's reviewed company catalog text; docId is the company id. */
-  sourceKind: 'article' | 'zoop_doc' | 'company_profile';
+  /**
+   * company_profile: ZOOP's reviewed company catalog text; docId is the company id.
+   * web_result: a web search hit; publisher is the page's domain and docId the search provider.
+   */
+  sourceKind: 'article' | 'zoop_doc' | 'company_profile' | 'web_result';
   evidenceId: string;
   quote: string;
   articleId: string | null;
@@ -139,6 +146,31 @@ export type ChatNotice = {
   message: string;
 };
 
+// 서버가 답한 요구의 조회 결과로 만든 동작. 눌렀을 때만 실행하며 target은 kind에 해당하는 필드만 값이 있다.
+export type ChatUiAction = {
+  actionId: string;
+  kind:
+    | 'open_company'
+    | 'focus_path'
+    | 'open_briefing'
+    | 'focus_relation'
+    | 'open_evidence'
+    | 'open_watchlist';
+  label: string;
+  requirementIds: string[];
+  target: {
+    companyId: string | null;
+    fromId: string | null;
+    toId: string | null;
+    date: string | null;
+    edition: 'morning' | 'evening' | null;
+    graphVersion: string | null;
+    asOf: string | null;
+    edgeId: string | null;
+    evidenceIds: string[] | null;
+  };
+};
+
 export type ChatResult = {
   outcome: ChatOutcome;
   messageId: string;
@@ -155,6 +187,7 @@ export type ChatResult = {
   limitations: ChatLimitation[];
   answerStatus: ChatAnswerStatus;
   notices: ChatNotice[];
+  uiActions: ChatUiAction[];
 };
 
 export type ChatFailureKind =

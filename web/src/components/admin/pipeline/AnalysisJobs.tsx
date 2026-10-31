@@ -86,10 +86,10 @@ function IngestBaselineLine({ baseline }: { baseline: IngestBaseline }) {
   if (!baseline.at && !baseline.unresolvedFailures) return null;
   return (
     <div className="flex flex-col gap-1">
-      <dl className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
+      <dl className="flex flex-wrap items-center gap-x-6 gap-y-1 text-caption">
         <div className="flex flex-wrap items-center gap-x-2">
-          <dt className="text-[11px] text-zoop-muted">기사 처리 기준 시점</dt>
-          <dd className="font-inter tabular-nums">
+          <dt className="text-caption text-zoop-muted">기사 처리 기준 시점</dt>
+          <dd className="font-num tabular-nums">
             {formatKst(baseline.at)}
             {baseline.outcome &&
               ` · ${ingestOutcomeLabel[baseline.outcome] ?? baseline.outcome}`}
@@ -97,7 +97,7 @@ function IngestBaselineLine({ baseline }: { baseline: IngestBaseline }) {
         </div>
         {!!baseline.unresolvedFailures && (
           <div className="flex items-center gap-x-2">
-            <dt className="text-[11px] text-zoop-muted">다시 처리할 실패</dt>
+            <dt className="text-caption text-zoop-muted">다시 처리할 실패</dt>
             <dd className="tabular-nums">
               {countWith(baseline.unresolvedFailures, '건')}
             </dd>
@@ -130,12 +130,12 @@ function ActiveLine({
       role="status"
       className="flex flex-wrap items-center gap-3 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-wash px-4 py-3"
     >
-      <p className="min-w-0 flex-1 text-xs">
+      <p className="min-w-0 flex-1 text-caption">
         {active
           ? `진행 중인 작업: ${jobName(active)} · ${jobStatusLabel[active.status]}`
           : '실행 중인 작업이 있어요.'}
         {data.lock.locked && data.lock.reason && (
-          <span className="block text-[11px] text-zoop-muted">
+          <span className="block text-caption text-zoop-muted">
             {data.lock.reason}
           </span>
         )}
@@ -197,7 +197,7 @@ function AnalysisJobsSession() {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,460px)]">
       <Section title="작업">
         {jobs.refreshError && (
-          <p role="status" className="text-[11px] text-zoop-muted">
+          <p role="status" className="text-caption text-zoop-muted">
             새로 고치지 못했어요. 이전 결과를 표시해요.
           </p>
         )}
@@ -221,7 +221,7 @@ function AnalysisJobsSession() {
           </>
         )}
         {notice && (
-          <p role="status" className="text-[11px] font-semibold">
+          <p role="status" className="text-caption font-semibold">
             {notice}
           </p>
         )}
@@ -254,7 +254,7 @@ function AnalysisJobsSession() {
                       {jobName(job)}
                     </button>
                     {job.retryOf && (
-                      <span className="ml-2 rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-[11px] text-zoop-muted">
+                      <span className="ml-2 rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-caption text-zoop-muted">
                         재시도
                       </span>
                     )}
@@ -264,25 +264,25 @@ function AnalysisJobsSession() {
                       {jobStatusLabel[job.status]}
                     </span>
                     {job.cancelRequested && isActive(job) && (
-                      <span className="block text-[11px] text-zoop-muted">
+                      <span className="block text-caption text-zoop-muted">
                         취소 요청됨
                       </span>
                     )}
                     {job.kind === 'analyze_plan' && (
-                      <span className="block text-[11px] text-zoop-muted">
+                      <span className="block text-caption text-zoop-muted">
                         {planPhaseLabel[job.planRun.phase]} · 완료 단위{' '}
                         {count(job.planRun.readyUnits)} /{' '}
                         {count(job.planRun.totalUnits)}
                       </span>
                     )}
                     {job.ingest?.newArticles != null && (
-                      <span className="block text-[11px] text-zoop-muted">
+                      <span className="block text-caption text-zoop-muted">
                         신규 기사 {count(job.ingest.newArticles)}건
                       </span>
                     )}
                   </td>
                   <td
-                    className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                    className={`${TD} whitespace-nowrap font-num tabular-nums`}
                   >
                     {formatKst(job.requestedAt)}
                   </td>
@@ -390,14 +390,14 @@ function JobDetail({
   return (
     <article aria-labelledby="job-title" className="flex flex-col gap-4">
       {detail.refreshError && (
-        <p role="status" className="text-[11px] text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}
       <div className="flex items-start gap-2">
-        <h2 id="job-title" className="min-w-0 flex-1 text-sm font-bold">
+        <h2 id="job-title" className="min-w-0 flex-1 text-body font-bold">
           {jobName(job)}
-          <span className="mt-0.5 block font-inter text-[11px] font-normal break-all text-zoop-muted">
+          <span className="mt-0.5 block font-num text-caption font-normal break-all text-zoop-muted">
             {job.id}
           </span>
         </h2>
@@ -422,27 +422,27 @@ function JobDetail({
         </button>
       )}
 
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-xs">
-        <dt className="text-[11px] text-zoop-muted">상태</dt>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-caption">
+        <dt className="text-caption text-zoop-muted">상태</dt>
         <dd className="flex flex-wrap items-center gap-2 font-semibold">
           {jobStatusLabel[job.status]}
           {job.cancelRequested && active && (
-            <span className="text-[11px] font-normal text-zoop-muted">
+            <span className="text-caption font-normal text-zoop-muted">
               취소 요청됨
             </span>
           )}
           {job.recovered && (
-            <span className="rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-[11px] font-normal text-zoop-muted">
+            <span className="rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-caption font-normal text-zoop-muted">
               재시작 복구
             </span>
           )}
         </dd>
-        <dt className="text-[11px] text-zoop-muted">요청</dt>
-        <dd className="font-inter tabular-nums">
+        <dt className="text-caption text-zoop-muted">요청</dt>
+        <dd className="font-num tabular-nums">
           {formatKst(job.requestedAt)} · {job.requestedBy}
         </dd>
-        <dt className="text-[11px] text-zoop-muted">시작·종료</dt>
-        <dd className="font-inter tabular-nums">
+        <dt className="text-caption text-zoop-muted">시작·종료</dt>
+        <dd className="font-num tabular-nums">
           {job.startedAt ? formatKst(job.startedAt) : '시작 전'} ~{' '}
           {job.finishedAt
             ? formatKst(job.finishedAt)
@@ -450,31 +450,31 @@ function JobDetail({
               ? '진행 중'
               : '–'}
         </dd>
-        <dt className="text-[11px] text-zoop-muted">걸린 시간</dt>
+        <dt className="text-caption text-zoop-muted">걸린 시간</dt>
         <dd className="tabular-nums">{formatDuration(job.durationSeconds)}</dd>
         {job.retryOf && (
           <>
-            <dt className="text-[11px] text-zoop-muted">재시도 원본</dt>
+            <dt className="text-caption text-zoop-muted">재시도 원본</dt>
             <dd>
               <button
                 type="button"
                 disabled={pending}
                 onClick={() => onSelect(job.retryOf as string)}
-                className="font-inter break-all underline underline-offset-4 disabled:opacity-60"
+                className="font-num break-all underline underline-offset-4 disabled:opacity-60"
               >
                 {job.retryOf}
               </button>
             </dd>
           </>
         )}
-        <dt className="text-[11px] text-zoop-muted">사유</dt>
+        <dt className="text-caption text-zoop-muted">사유</dt>
         <dd className="break-words">{job.reason}</dd>
       </dl>
 
       {job.error && (
-        <p role="alert" className="text-xs text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           {job.error.message}{' '}
-          <span className="font-inter text-[11px] text-zoop-muted">
+          <span className="font-num text-caption text-zoop-muted">
             ({job.error.code})
           </span>
         </p>
@@ -515,7 +515,7 @@ function JobDetail({
             )}
           </div>
           {closed && !job.retry.allowed && (
-            <p role="status" className="text-[11px] text-zoop-muted">
+            <p role="status" className="text-caption text-zoop-muted">
               {job.kind === 'analyze_plan'
                 ? `이어서 처리할 수 없어요. ${planRetryRefusal[job.retry.code] ?? job.retry.reason}`
                 : `다시 실행할 수 없어요. ${job.retry.reason}`}
@@ -546,13 +546,13 @@ function JobDetail({
 
       {job.kind === 'analyze_plan' && (
         <Section title="분석계획 진행">
-          <div role="status" aria-live="polite" className="text-xs">
+          <div role="status" aria-live="polite" className="text-caption">
             {planPhaseLabel[job.planRun.phase]}
             {job.cancelRequested &&
               active &&
               ' · 취소 요청을 처리 중이며 아직 종료되지 않았어요.'}
           </div>
-          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-xs">
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-caption">
             <dt>planId</dt>
             <dd className="break-all">{job.planRun.planId}</dd>
             <dt>planDigest</dt>
@@ -586,14 +586,14 @@ function JobDetail({
       )}
       {job.ingest && (
         <Section title="기사 처리 결과">
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-xs">
-            <dt className="text-[11px] text-zoop-muted">결과</dt>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-caption">
+            <dt className="text-caption text-zoop-muted">결과</dt>
             <dd>
               {job.ingest.outcome
                 ? (ingestOutcomeLabel[job.ingest.outcome] ?? job.ingest.outcome)
                 : '처리 중'}
             </dd>
-            <dt className="text-[11px] text-zoop-muted">신규 기사</dt>
+            <dt className="text-caption text-zoop-muted">신규 기사</dt>
             <dd className="tabular-nums">
               {job.ingest.newArticles != null ? (
                 <>
@@ -612,8 +612,8 @@ function JobDetail({
                 </span>
               )}
             </dd>
-            <dt className="text-[11px] text-zoop-muted">기준 시점</dt>
-            <dd className="font-inter tabular-nums">
+            <dt className="text-caption text-zoop-muted">기준 시점</dt>
+            <dd className="font-num tabular-nums">
               {formatKst(job.ingest.baselineBefore)} →{' '}
               {formatKst(job.ingest.baselineAfter)}
               {job.ingest.outcome &&
@@ -625,7 +625,7 @@ function JobDetail({
 
       {report && (
         <Section title="실행 보고">
-          <dl className="grid grid-cols-4 gap-x-4 gap-y-3 text-xs">
+          <dl className="grid grid-cols-4 gap-x-4 gap-y-3 text-caption">
             {(
               [
                 ['처리', report.processed],
@@ -638,13 +638,13 @@ function JobDetail({
               ] as const
             ).map(([label, value]) => (
               <div key={label} className="flex flex-col">
-                <dt className="text-[11px] text-zoop-muted">{label}</dt>
+                <dt className="text-caption text-zoop-muted">{label}</dt>
                 <dd className="font-semibold tabular-nums">{count(value)}</dd>
               </div>
             ))}
           </dl>
           {report.errors.length > 0 && (
-            <ul className="flex list-disc flex-col gap-1 pl-5 text-[11px]">
+            <ul className="flex list-disc flex-col gap-1 pl-5 text-caption">
               {report.errors.map((entry, index) => (
                 <li key={index}>{errorLine(entry) || '내용 없는 오류'}</li>
               ))}
@@ -652,10 +652,10 @@ function JobDetail({
           )}
           {report.collectionErrorCount > 0 && (
             <div className="flex flex-col gap-1">
-              <p className="text-[11px] font-semibold text-zoop-muted">
+              <p className="text-caption font-semibold text-zoop-muted">
                 기사를 가져오는 요청 실패 {count(report.collectionErrorCount)}건
               </p>
-              <ul className="flex list-disc flex-col gap-1 pl-5 text-[11px]">
+              <ul className="flex list-disc flex-col gap-1 pl-5 text-caption">
                 {report.collectionErrors.map((entry, index) => (
                   <li key={index}>{errorLine(entry) || '내용 없는 오류'}</li>
                 ))}
@@ -667,27 +667,27 @@ function JobDetail({
 
       {report && (
         <Section title="모델 사용량">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs sm:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-caption sm:grid-cols-4">
             <div className="flex flex-col">
-              <dt className="text-[11px] text-zoop-muted">모델 호출</dt>
+              <dt className="text-caption text-zoop-muted">모델 호출</dt>
               <dd className="font-semibold tabular-nums">
                 {countWith(report.usage.calls, '회')}
               </dd>
             </div>
             <div className="flex flex-col">
-              <dt className="text-[11px] text-zoop-muted">재생 호출</dt>
+              <dt className="text-caption text-zoop-muted">재생 호출</dt>
               <dd className="font-semibold tabular-nums">
                 {countWith(report.usage.replayCalls, '회')}
               </dd>
             </div>
             <div className="flex flex-col">
-              <dt className="text-[11px] text-zoop-muted">입력 토큰</dt>
+              <dt className="text-caption text-zoop-muted">입력 토큰</dt>
               <dd className="font-semibold tabular-nums">
                 {count(report.usage.inputTokens)}
               </dd>
             </div>
             <div className="flex flex-col">
-              <dt className="text-[11px] text-zoop-muted">출력 토큰</dt>
+              <dt className="text-caption text-zoop-muted">출력 토큰</dt>
               <dd className="font-semibold tabular-nums">
                 {count(report.usage.outputTokens)}
               </dd>
@@ -704,7 +704,7 @@ function JobDetail({
       )}
 
       {job.flush && (
-        <p className="text-xs">
+        <p className="text-caption">
           완료한 GraphDB 반영 작업 {count(job.flush.completedProjectionJobs)}건
         </p>
       )}

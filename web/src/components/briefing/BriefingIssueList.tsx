@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { BriefingItem, BriefingResponse } from '@/types/briefing';
 import { issueAnchor } from '@/util/briefingIssueView';
+import { eventTimeText } from '@/util/event-time';
 import BriefingReadingSection from './BriefingReadingSection';
 import BriefingItemDetails from './BriefingItemDetails';
 import {
@@ -17,7 +18,14 @@ import {
   SECTION_TITLE,
 } from './briefingStyles';
 
+/** N-y: 정밀도에 맞춘 KST 표기. 알 수 없으면 기존 문구를 유지한다. */
+function eventTimeLabel(item: BriefingItem) {
+  const time = eventTimeText(item.eventTime, item.timePrecision);
+  return time ? `발생 ${time}` : '발생 시각 미상';
+}
+
 // D-BRF-01·02 핵심 이슈 (FS028·FS030). 서버가 고른 최대 3개만 보여 주고, 부족해도 채우지 않는다.
+
 export default function BriefingIssueList({
   items,
   compact = false,
@@ -48,7 +56,7 @@ export default function BriefingIssueList({
         {graphHref && (
           <Link
             to={graphHref}
-            className={`inline-flex h-7 items-center rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-[11px] font-semibold hover:bg-zoop-wash ${FOCUS_RING}`}
+            className={`inline-flex h-7 items-center rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-caption font-semibold hover:bg-zoop-wash ${FOCUS_RING}`}
           >
             이 회차 전체 관계 그래프
           </Link>
@@ -75,16 +83,12 @@ export default function BriefingIssueList({
                   compact={compact}
                   title={`${item.rank}. ${item.title} · 근거 ${item.evidenceCount}건`}
                 >
-                  <p className={NOTE}>
-                    {item.timePrecision === 'unknown' || !item.eventTime
-                      ? '발생 시각 미상'
-                      : `발생 ${item.eventTime}`}
-                  </p>
-                  <h4 className="text-sm font-bold">
+                  <p className={NOTE}>{eventTimeLabel(item)}</p>
+                  <h4 className="text-body font-bold">
                     {item.rank}. {item.title}
                   </h4>
                   {(item.matchedCompanyIds ?? []).length > 0 && (
-                    <p className="self-start rounded-full border-[0.667px] border-zoop-ink px-2 py-[2px] text-[11px] font-semibold">
+                    <p className="self-start rounded-full border-[0.667px] border-zoop-ink px-2 py-[2px] text-caption font-semibold">
                       내 종목:{' '}
                       {item.companies
                         .filter((company) =>
@@ -95,7 +99,7 @@ export default function BriefingIssueList({
                         (item.matchedCompanyIds ?? []).join(', ')}
                     </p>
                   )}
-                  <p className="text-[11px] text-zoop-muted">
+                  <p className="text-caption text-zoop-muted">
                     {item.companies.length
                       ? item.companies.map((company, index) => (
                           <span key={company.id || index}>

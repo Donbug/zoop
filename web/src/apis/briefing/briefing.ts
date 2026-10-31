@@ -119,3 +119,11 @@ export async function getBriefingRecap(round: BriefingResponse) {
   }
   return recap;
 }
+
+/** FS036: independent selection from the round's whole qualified candidate pool. */
+export function getPersonalizedBriefingIssues(roundId: string) {
+  return call<import('@/types/personalBriefing').PersonalBriefingSelection>(
+    `/api/v1/briefings/${encodeURIComponent(roundId)}/personalized/issues`,
+    'GET',
+  );
+}

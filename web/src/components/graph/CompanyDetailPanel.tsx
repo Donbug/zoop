@@ -9,6 +9,7 @@ import { useCompanyData } from '@/hooks/useCompanyData';
 import type { GraphNode } from '@/types/map/graph';
 import type { WatchSync } from '@/types/map';
 import IssueDocumentSentiments from './IssueDocumentSentiments';
+import { eventTimeText } from '@/util/event-time';
 
 type RelatedCompany = { id: string; name: string; sharedIssueCount: number };
 type Props = {
@@ -160,7 +161,7 @@ export default function CompanyDetailPanel(props: Props) {
           <CompanyLogo
             name={name}
             logoUrl={logoUrl}
-            className="size-14 shrink-0 rounded-full border border-zoop-line bg-zoop-paper text-[18px] font-extrabold"
+            className="size-14 shrink-0 rounded-full border border-zoop-line bg-zoop-paper text-title-sm font-extrabold"
           />
           <div className="min-w-0 flex-1">
             <p className="company-code">
@@ -439,8 +440,9 @@ export default function CompanyDetailPanel(props: Props) {
                     >
                       <b>{issue.title}</b>
                       <span>
-                        {issue.eventTime ?? '시각 미상'} · 근거{' '}
-                        {issue.evidenceCount}건
+                        {eventTimeText(issue.eventTime, issue.timePrecision) ??
+                          '시각 미상'}{' '}
+                        · 근거 {issue.evidenceCount}건
                       </span>
                     </button>
                     <IssueDocumentSentiments

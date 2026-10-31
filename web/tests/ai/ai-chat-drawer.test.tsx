@@ -14,6 +14,7 @@ import AiChatDrawer from '@/components/ai/AiChatDrawer';
 import { contextFromTarget } from '@/hooks/use-chat-conversation';
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import type { ChatJob, ChatResult } from '@/types/ai';
 import type { Session } from '@/types/auth';
 import type { GraphTarget } from '@/types/map';
@@ -80,6 +81,7 @@ function result(patch: Partial<ChatResult> = {}): ChatResult {
     limitations: [],
     answerStatus: 'complete',
     notices: [],
+    uiActions: [],
     ...patch,
   };
 }
@@ -674,6 +676,160 @@ describe('D-AI-02 · job states and stored results', () => {
     ).toBeTruthy();
   });
 
+  it('offers the actions the server made and opens them only on a click', async () => {
+    const target = {
+      companyId: null,
+      fromId: null,
+      toId: null,
+      date: null,
+      edition: null,
+      graphVersion: null,
+      asOf: null,
+      edgeId: null,
+      evidenceIds: null,
+    };
+    const offered = job({
+      result: result({
+        sections: [
+          { basis: 'evidence_grounded', text: '본문', evidenceIds: [] },
+        ],
+        uiActions: [
+          {
+            actionId: 'action-1',
+            kind: 'open_company',
+            label: '기업 상세 · 삼성전자',
+            requirementIds: ['r1'],
+            target: { ...target, companyId: 'KRX:005930' },
+          },
+          {
+            actionId: 'action-2',
+            kind: 'open_briefing',
+            label: '브리핑 열기 · 2026-10-30 퇴근',
+            requirementIds: ['r1'],
+            target: { ...target, date: '2026-10-30', edition: 'evening' },
+          },
+          {
+            actionId: 'action-3',
+            kind: 'focus_path',
+            label: '경로 보기 · 삼성전자 → SK하이닉스',
+            requirementIds: ['r1'],
+            target: {
+              ...target,
+              fromId: 'KRX:005930',
+              toId: 'KRX:000660',
+              graphVersion: 'gv-1',
+            },
+          },
+          {
+            actionId: 'action-5',
+            kind: 'focus_relation',
+            label: '관계 보기 · NVIDIA – SK하이닉스',
+            requirementIds: ['r1'],
+            target: { ...target, edgeId: 'edge-1', graphVersion: 'gv-1' },
+          },
+          {
+            actionId: 'action-6',
+            kind: 'open_watchlist',
+            label: '내 종목 보기',
+            requirementIds: ['r1'],
+            target,
+          },
+          {
+            actionId: 'action-4',
+            kind: 'future_kind' as 'open_company',
+            label: '모르는 동작',
+            requirementIds: ['r1'],
+            target,
+          },
+        ],
+      }),
+    });
+    server.on('GET', CURRENT, () => json(conversation([offered])));
+    const { user, onViewOnMap } = await open();
+
+    expect(
+      (
+        await screen.findByRole('link', { name: '기업 상세 · 삼성전자' })
+      ).getAttribute('href'),
+    ).toBe('/companies/KRX%3A005930');
+    expect(
+      screen
+        .getByRole('link', { name: '브리핑 열기 · 2026-10-30 퇴근' })
+        .getAttribute('href'),
+    ).toBe('/briefing?date=2026-10-30&edition=evening');
+    expect(screen.queryByText('모르는 동작')).toBeNull();
+    expect(onViewOnMap).not.toHaveBeenCalled();
+
+    onViewOnMap.mockReturnValueOnce(false);
+    await user.click(
+      screen.getByRole('button', { name: '경로 보기 · 삼성전자 → SK하이닉스' }),
+    );
+    expect(onViewOnMap).toHaveBeenCalledWith({
+      id: 'KRX:005930,KRX:000660',
+      kind: 'path',
+      graphVersion: 'gv-1',
+      asOf: null,
+    });
+    expect(screen.getByText(/지금 지도에서 열 수 없어요/)).toBeTruthy();
+
+    expect(
+      screen.getByRole('link', { name: '내 종목 보기' }).getAttribute('href'),
+    ).toBe('/my');
+    onViewOnMap.mockReturnValueOnce(true);
+    await user.click(
+      screen.getByRole('button', { name: '관계 보기 · NVIDIA – SK하이닉스' }),
+    );
+    expect(onViewOnMap).toHaveBeenLastCalledWith({
+      id: 'edge-1',
+      kind: 'edge',
+      graphVersion: 'gv-1',
+      asOf: null,
+    });
+  });
+
+  it('opens the articles an answer cited in the evidence window, only on the map', async () => {
+    useGraphUiStore.setState({ evidenceTarget: null });
+    const offered = job({
+      result: result({
+        sections: [
+          { basis: 'evidence_grounded', text: '본문', evidenceIds: [] },
+        ],
+        uiActions: [
+          {
+            actionId: 'action-1',
+            kind: 'open_evidence',
+            label: '근거 보기 · 2건',
+            requirementIds: ['r1'],
+            target: {
+              companyId: null,
+              fromId: null,
+              toId: null,
+              date: null,
+              edition: null,
+              graphVersion: 'gv-1',
+              asOf: null,
+              edgeId: null,
+              evidenceIds: ['ev-1', 'ev-2'],
+            },
+          },
+        ],
+      }),
+    });
+    server.on('GET', CURRENT, () => json(conversation([offered])));
+    const { user } = await open();
+
+    await user.click(
+      await screen.findByRole('button', { name: '근거 보기 · 2건' }),
+    );
+
+    expect(useGraphUiStore.getState().evidenceTarget).toMatchObject({
+      evidenceIds: ['ev-1', 'ev-2'],
+      mapContext: { graphVersion: 'gv-1' },
+    });
+    expect(useAiChatStore.getState().isOpen).toBe(false);
+    useGraphUiStore.setState({ evidenceTarget: null });
+  });
+
   it('shows a company profile citation with its catalog title and publisher and links only a safe homepage', async () => {
     const profile = (evidenceId: string, url: string | null) => ({
       sourceKind: 'company_profile' as const,
@@ -721,6 +877,55 @@ describe('D-AI-02 · job states and stored results', () => {
       'https://www.samsung.com/sec/',
     ]);
     expect(within(card).queryByRole('link', { name: /원문 보기/ })).toBeNull();
+  });
+
+  it('shows what the web reported as its own section, citing the page and its domain as a web result', async () => {
+    const hit = 'web-' + 'a'.repeat(32);
+    const reported = job({
+      question: 'HBM이 뭐야?',
+      result: result({
+        answer: 'HBM은 D램을 쌓은 메모리라고 보도됐어요.',
+        answerBasis: 'web_reported',
+        sections: [
+          {
+            basis: 'web_reported',
+            text: 'HBM은 D램을 쌓은 메모리라고 보도됐어요.',
+            evidenceIds: [hit],
+          },
+        ],
+        citations: [
+          {
+            sourceKind: 'web_result',
+            evidenceId: hit,
+            quote: '[합성 자료] HBM은 D램을 쌓은 메모리다.',
+            articleId: null,
+            articleVersion: null,
+            docId: 'synthetic',
+            docVersion: null,
+            start: 0,
+            end: 22,
+            articleTitle: '[합성] HBM이란',
+            publisher: 'news.example.com',
+            publishedAt: null,
+            url: 'https://news.example.com/hbm',
+          },
+        ],
+      }),
+    });
+    server.on('GET', CURRENT, () => json(conversation([reported])));
+    await open();
+    const card = await screen.findByRole('article', { name: 'HBM이 뭐야?' });
+    expect(
+      within(card).getByRole('region', { name: '웹 검색 보도 구간' }),
+    ).toBeTruthy();
+    expect(
+      within(card).getByText(/웹 검색 결과 · news\.example\.com/),
+    ).toBeTruthy();
+    expect(
+      within(card)
+        .getByRole('link', { name: /웹 페이지 보기/ })
+        .getAttribute('href'),
+    ).toBe('https://news.example.com/hbm');
   });
 
   it('shows a withheld answer as the server sent it, without a basis badge', async () => {

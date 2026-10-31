@@ -160,7 +160,15 @@ public class ChatToolRunner implements AutoCloseable {
      * capability.
      */
     public ChatToolCallReservation reservation(ChatRun run, ChatToolRequest call, String via) {
-        return reservation(binding(call), scope(run), call, via);
+        return reservation(run, call, via, List.of());
+    }
+
+    /**
+     * The same reservation with the requirements the call serves on its record. They are no part of the digest: the same read
+     * for another requirement is the same request, and is read once.
+     */
+    public ChatToolCallReservation reservation(ChatRun run, ChatToolRequest call, String via, List<String> requirementIds) {
+        return reservation(binding(call), scope(run), call, via, requirementIds);
     }
 
     /**
@@ -191,7 +199,7 @@ public class ChatToolRunner implements AutoCloseable {
         if (!run.jobId().equals(kept.jobId()) || !run.memberId().equals(kept.memberId())
                 || run.attemptNo() != kept.attemptNo()) throw invalidKept();
         var meta = StrictJson.parseObject(kept.requestMeta()).keys(
-                Set.of("via", "targets", "limit", "graphVersion", "asOf"), Set.of("evidenceScope", "since"));
+                Set.of("via", "targets", "limit", "graphVersion", "asOf"), Set.of("evidenceScope", "since", "requirementIds"));
         if (!"mcp".equals(meta.string("via"))
                 || !Objects.equals(run.graphVersionId(), meta.stringOrNull("graphVersion"))
                 || !Objects.equals(run.context().asOf() == null ? null : run.context().asOf().toString(),
@@ -480,7 +488,7 @@ public class ChatToolRunner implements AutoCloseable {
 
     /** The allowed request structure {@code chat_tool_calls} keeps, and its digest. */
     private static ChatToolCallReservation reservation(ChatToolRegistry.Binding binding, ChatToolScope scope,
-            ChatToolRequest call, String via) {
+            ChatToolRequest call, String via, List<String> requirementIds) {
         ObjectNode meta = StrictJson.newObject();
         if (via != null) meta.put("via", via);
         var targets = meta.putArray("targets");
@@ -496,8 +504,12 @@ public class ChatToolRunner implements AutoCloseable {
         ObjectNode input = StrictJson.newObject();
         input.put("capabilityId", binding.capability().id());
         input.set("request", meta);
+        String digest = Canonical.digest(input);
+        if (!requirementIds.isEmpty()) {
+            var serves = meta.putArray("requirementIds");
+            requirementIds.forEach(serves::add);
+        }
         return new ChatToolCallReservation(ChatToolRegistry.VERSION, binding.capability().group(),
-                binding.capability().id(), binding.toolId(), ChatToolRegistry.SCHEMA_VERSION, Canonical.digest(input),
-                Canonical.write(meta));
+                binding.capability().id(), binding.toolId(), ChatToolRegistry.SCHEMA_VERSION, digest, Canonical.write(meta));
     }
 }
