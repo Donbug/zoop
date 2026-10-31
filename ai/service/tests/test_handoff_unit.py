@@ -227,6 +227,24 @@ def test_the_model_accepts_exactly_what_it_was_given_and_dumps_it_back_unchanged
     assert json.loads(json.dumps(parsed.wire())) == bundle
 
 
+def test_source_policy_discriminator_keeps_historical_bytes_and_requires_current_country_pin():
+    current = example_bundle()
+    assert Bundle.model_validate(current).wire() == current
+    historical = copy.deepcopy(current)
+    for source in historical["sources"]:
+        source["policies"]["policy"] = "zoop-relation-policy-1"
+        del source["policies"]["countryContext"]
+    assert Bundle.model_validate(historical).wire() == historical
+    for change in (lambda p: p.pop("countryContext"), lambda p: p.update(countryContext="zoop-country-context-2"),
+                   lambda p: p.update(countryContext=None), lambda p: p.update(countryContext=""),
+                   lambda p: p.update(policy="zoop-relation-policy-1"), lambda p: p.update(policy="zoop-relation-policy-3"),
+                   lambda p: p.update(unrecognized="pin")):
+        broken = copy.deepcopy(current)
+        change(broken["sources"][0]["policies"])
+        with pytest.raises(ValidationError):
+            Bundle.model_validate(broken)
+
+
 @pytest.mark.parametrize("name,bundle", SAMPLES, ids=[n for n, _ in SAMPLES])
 def test_a_key_the_producer_did_not_define_is_refused_at_every_level(name, bundle):
     checked = 0

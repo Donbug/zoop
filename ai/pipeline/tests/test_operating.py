@@ -18,7 +18,7 @@ from scripts.operating_smoke import fixture, policy, response, smoke
 from tests.live_support import Fake, PAYLOADS, environment, json_response, openai_reply
 from zoop_ai_pipeline import extraction, live_budget, live_runtime as live
 from zoop_ai_pipeline.live_budget import Budget, BudgetError, NANO
-from zoop_ai_pipeline.live_funding import MODE, STAGES, operating_policy
+from zoop_ai_pipeline.live_funding import MODE, STAGES, capped_set_funding_policy, operating_policy
 from zoop_ai_pipeline.live_runtime import LiveFailure, LiveRuntime
 from zoop_ai_pipeline.operating import Owner
 
@@ -44,7 +44,7 @@ def runtime_session(monkeypatch, tmp_path, handler=None, endpoint=None):
     with budget.owner() as token:
         monkeypatch.setenv(live.OWNER_VAR, token)
         runtime = LiveRuntime.from_env(need_send=True, transport=None if endpoint else fake.transport)
-        budget.admit_set("set-1", {"runtimeIdentity": runtime.binding()["identity"]}, allowances(), token)
+        budget.admit_operating_set("set-1", {"runtimeIdentity": runtime.binding()["identity"]}, allowances(), token)
         yield budget, runtime, fake
 
 
@@ -59,7 +59,7 @@ def test_metered_exceeds_twenty_dollars_and_day_boundary_on_same_reopened_ledger
     budget = Budget.initialize(tmp_path / "budget", funding)
     identity = budget.snapshot()["ledgerId"]
     with budget.owner() as token:
-        budget.admit_set("set-1", {"runtimeIdentity": "binding"}, allowances(3), token)
+        budget.admit_operating_set("set-1", {"runtimeIdentity": "binding"}, allowances(3), token)
         reserve(budget, token, "a", 15 * NANO)
         budget.settle("a", 12_345_678_901)
     clock[0] += 90000
@@ -97,6 +97,37 @@ def test_caps_and_lifecycle_are_discriminated_and_old_cap_contract_stays_enforce
     with pytest.raises(BudgetError, match="live_budget_policy_mismatch"):
         Budget(tmp_path / "new", 100, 10).snapshot()
     assert new.snapshot()["calls"] == 0
+
+
+def test_metered_and_capped_authorities_keep_independent_admission_and_settlement(tmp_path, monkeypatch):
+    monkeypatch.setattr(live_budget, "_now", lambda: "2026-10-28T01:00:00+00:00")
+    metered_policy = policy()
+    metered = Budget.initialize(tmp_path / "metered", metered_policy)
+    capped_policy = capped_set_funding_policy("synthetic-merge", "2026-10-28T00:15:00Z", "2026-10-28T08:30:00Z",
+                                            4 * NANO, 3 * NANO, NANO)
+    capped = Budget(tmp_path / "capped", 4 * NANO, 10, funding=capped_policy,
+                    bucket_caps=capped_policy["bucketMaxNanoUsd"])
+    capped.admit_set("set-1", "a" * 64, {"extract": 1})
+    route = capped_policy["roles"]["shared-openai"]
+    capped.reserve("attempt-1", "extract", route["recipient"], "b" * 64, 100,
+                   account_role="shared-openai", set_id="set-1")
+    capped.settle("attempt-1", 7)
+    with metered.owner() as token:
+        metered.admit_operating_set("set-1", {"runtimeIdentity": "binding"}, allowances(1), token)
+        reserve(metered, token, "attempt-1", 200)
+        metered.settle("attempt-1", 11)
+    capped_snapshot, metered_snapshot = capped.snapshot(), metered.snapshot()
+    assert capped_snapshot["chargedUsd"] == "0.000000007" and capped_snapshot["maxUsd"] == "4.000000000"
+    assert metered_snapshot["chargedUsd"] == "0.000000011" and metered_snapshot["maxUsd"] is None
+    assert capped_snapshot["states"] == metered_snapshot["states"] == {"settled": 1}
+    with pytest.raises(BudgetError, match="live_budget_policy_mismatch"):
+        Budget(tmp_path / "metered", 4 * NANO, 10, funding=capped_policy,
+               bucket_caps=capped_policy["bucketMaxNanoUsd"]).snapshot()
+    with pytest.raises(BudgetError, match="operating_ledger_missing"):
+        Budget(tmp_path / "capped", None, None, policy=metered_policy)
+    with pytest.raises(BudgetError, match="live_budget_policy_mismatch"):
+        Budget(tmp_path / "metered", None, None, policy=metered_policy, funding=capped_policy)
+    assert capped.snapshot() == capped_snapshot and metered.snapshot() == metered_snapshot
 
 
 @pytest.mark.parametrize("change", ["missing", "replacement"])
@@ -196,7 +227,7 @@ def test_pause_resume_history_and_soft_stop_drain_survive_reopen(monkeypatch, tm
     monkeypatch.setattr(live_budget.time, "time", lambda: clock[0])
     budget = Budget.initialize(tmp_path / "budget", policy())
     with budget.owner() as token:
-        budget.admit_set("set-1", {"runtimeIdentity": "binding"}, allowances(), token)
+        budget.admit_operating_set("set-1", {"runtimeIdentity": "binding"}, allowances(), token)
     budget.control("pause", "maintenance")
     reopened = Budget(tmp_path / "budget", None, None, policy=policy())
     with reopened.owner() as token:
@@ -207,7 +238,7 @@ def test_pause_resume_history_and_soft_stop_drain_survive_reopen(monkeypatch, tm
         reopened.settle("a", 1)
         reopened.control("stop", "finite-drain")
         with pytest.raises(BudgetError, match="operating_stopping"):
-            reopened.admit_set("new-set", {"runtimeIdentity": "binding"}, allowances(), token)
+            reopened.admit_operating_set("new-set", {"runtimeIdentity": "binding"}, allowances(), token)
         reserve(reopened, token, "drained")
         reopened.settle("drained", 2)
         clock[0] += 601

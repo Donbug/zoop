@@ -18,7 +18,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .handoff import Handoff, HandoffPaths, Store, open_legacy_history
+from .handoff import Handoff, HandoffPaths, Store, open_legacy_history, require_current_sources
 from .handoff_contracts import MAX_COMMAND, SCHEMA, ExtractionFailure, Manifest, Selector, canonical
 from .handoff_contexts import configured, source_flags
 from .ingestion_contracts import IngestionFailure
@@ -66,6 +66,8 @@ def main() -> int:
         roots = ((paths.relation, paths.extraction, paths.ingestion, *((paths.summaries,) if paths.summaries is not None else ()))
                  if paths and paths.source_contexts is None else ())
         legacy = open_legacy_history(args.state_dir, *roots, handoff_id=request.handoff_id)
+        if legacy is None and args.command == "freeze":
+            require_current_sources(paths, request)
         store = legacy if legacy is not None else Store(args.state_dir, *(paths.roots() if paths else ()), mode=WRITERS.get(args.command, "read"))
         handoff = Handoff(store, paths)
         if args.command == "export":

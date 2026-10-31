@@ -11,11 +11,13 @@ import pytest
 from tests.live_support import DOC_TEXT, VERSION_A, article, article_source, compare_payload, extract_payload, impact_payload, relation_payload, topic_payload
 from zoop_ai_pipeline import live_prompts as prompts
 from zoop_ai_pipeline import extraction_replay as analysis, extraction_topic as topics, relation_rules as rules
-from zoop_ai_pipeline.extraction_contracts import Extraction, PairDecision, ReplyInvalid
+from zoop_ai_pipeline.extraction_contracts import Catalogue, Extraction, PairDecision, ReplyInvalid
 from zoop_ai_pipeline.relation_contracts import RelationResponse
 
 FORBIDDEN_KEYWORDS = {"default", "title", "minLength", "maxLength", "pattern", "format", "minimum", "maximum", "exclusiveMinimum", "const",
                       "minItems", "maxItems", "uniqueItems"}
+CATALOGUE = Catalogue.model_validate({"revision": "authored-live-prompts-1", "companies": [
+    {"companyId": "SYNTH-1", "name": "가상고객", "aliases": [], "ticker": None}]})
 
 
 def schema_nodes(node):
@@ -129,7 +131,7 @@ def test_retained_failure_excerpts_as_synthetic_sources_preserve_every_literal(t
     response["mentions"][0]["evidence"] = [reference]
     before = copy.deepcopy(response)
     expanded = prompts.expand("extract", payload, response)
-    evidence = analysis.parse_extraction(expanded, a).mentions[0].evidence[0]
+    evidence = analysis.parse_extraction(expanded, a, CATALOGUE).mentions[0].evidence[0]
     assert evidence.quote == text and (evidence.start, evidence.end) == (0, len(text)) and evidence.matches(a)
     assert evidence.model_dump() == refs[reference["segmentId"]] and response == before
     if expected_sha:
@@ -137,7 +139,7 @@ def test_retained_failure_excerpts_as_synthetic_sources_preserve_every_literal(t
     corrupted = copy.deepcopy(expanded)
     corrupted["mentions"][0]["evidence"][0]["quote"] = text.replace("***", "").replace("'", "")
     with pytest.raises(ReplyInvalid, match="extraction_reply_invalid"):
-        analysis.parse_extraction(corrupted, a)
+        analysis.parse_extraction(corrupted, a, CATALOGUE)
 
 
 def test_segments_preserve_repeated_text_unicode_whitespace_and_unmapped_boundaries():
@@ -152,7 +154,7 @@ def test_segments_preserve_repeated_text_unicode_whitespace_and_unmapped_boundar
     repeats = [s for s in segments if s["text"] == "반복\n"]
     assert len(repeats) == 2 and repeats[0]["segmentId"] != repeats[1]["segmentId"]
     response["mentions"][0]["evidence"] = [{"segmentId": repeats[1]["segmentId"]}]
-    evidence = analysis.parse_extraction(prompts.expand("extract", payload, response), a).mentions[0].evidence[0]
+    evidence = analysis.parse_extraction(prompts.expand("extract", payload, response), a, CATALOGUE).mentions[0].evidence[0]
     assert evidence.start == text.rindex("반복") and evidence.end == text.rindex("반복") + 3
     for c in refs.values():
         assert c["quote"] == text[c["start"]:c["end"]] and len(c["quote"]) <= 20_000

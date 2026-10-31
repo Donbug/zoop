@@ -69,7 +69,7 @@ def test_fault_pause_overrides_drain_without_reopening_admission(monkeypatch, tm
         budget.control("resume", "usage-reviewed")
         assert budget.snapshot()["control"] == {"state": "stopping", "reason": "usage-reviewed", "drainUntil": before}
         with pytest.raises(BudgetError, match="operating_stopping"):
-            budget.admit_set("other", {"runtimeIdentity": runtime.binding()["identity"]}, {s: 1 for s in STAGES}, runtime._send["owner"])
+            budget.admit_operating_set("other", {"runtimeIdentity": runtime.binding()["identity"]}, {s: 1 for s in STAGES}, runtime._send["owner"])
 
 
 def test_first_bad_verifier_stops_later_candidate_requests(native):

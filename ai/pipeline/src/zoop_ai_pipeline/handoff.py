@@ -535,6 +535,8 @@ def load_source(readers: dict, contexts: Contexts, manifest: Manifest, pin, *, s
     pinned whole review state. The S2 upstream is re-read through its own owner and must be the exact one S3 consumed (its digest equals the pin)."""
     route = contexts.for_pin(pin)
     source, paths = readers[route.context_id], route.paths
+    if strict:
+        source.require_current_analysis(pin.relation.job_id)
     result = gate(source, pin.relation.wire(), pin.upstream.wire())
     if strict and digest(review_state(result)) != pin.review_digest:
         raise ExtractionFailure("review_revision_changed")
@@ -571,6 +573,15 @@ def current(readers: dict, contexts: Contexts, paths: HandoffPaths, manifest: Ma
     loaded = [load_source(readers, contexts, manifest, pin, strict=strict) for pin in sorted(manifest.sources, key=lambda p: p.relation.job_id)]
     single_mode(loaded)
     return loaded
+
+
+def require_current_sources(paths: HandoffPaths, manifest: Manifest) -> None:
+    """Read-only processing eligibility, before a freeze caller opens any writer."""
+    contexts = paths.contexts()
+    with contexts.open(manifest.sources) as readers:
+        for pin in manifest.sources:
+            route = contexts.for_pin(pin)
+            readers[route.context_id].require_current_analysis(pin.relation.job_id)
 
 
 # ---------------------------------------------------------------------------------------------- issue summaries -----------------------

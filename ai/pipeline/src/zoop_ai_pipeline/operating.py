@@ -196,8 +196,7 @@ class Owner:
             engine = extraction.Extractor(store, self.sources(unit), access)
             request, fixtures = ExtractionSubmit.model_validate(unit["extraction"]), extraction.Fixtures(None, None)
             engine.admission(request, fixtures)
-            self.budget.admit_set(unit["setId"], pins, unit["stageAllowances"], token,
-                                  jobs=(unit["extraction"]["jobId"], unit["relationJobId"]), source_context=context)
+            self.budget.admit_operating_set(unit["setId"], pins, unit["stageAllowances"], token, jobs=(unit["extraction"]["jobId"], unit["relationJobId"]), source_context=context)
             engine.freeze(request, fixtures)
             self.pin_native(unit, "s2", store)
 

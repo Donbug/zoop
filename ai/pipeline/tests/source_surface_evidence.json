@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "zoop-source-surface-evidence-1",
+  "observedOn": "2026-10-28",
+  "purpose": "Metadata/DOM excerpts from retained actual public responses. Article prose is not copied into fixtures; tests add explicitly synthetic prose.",
+  "openai": {
+    "url": "https://openai.com/index/mixi/",
+    "successfulCapture": "artifact://14423",
+    "captureSha256": "9514d72c2e3cec2321e26d15a3a039e175e4e4f518cff5db22a5aea42d71f326",
+    "captureHashMeaning": "Reader raw capture including URL/content-type preamble, not an original transport-body hash",
+    "publicationFragment": "<div data-article-hero-copy-region=\"meta\" class=\"mb-8 flex flex-wrap gap-4 justify-center\"><p class=\"text-meta text-primary-100\">August 20, 2025</p></div>",
+    "canonicalFragment": "<link rel=\"canonical\" href=\"https://openai.com/index/mixi/\"/>",
+    "bodyScope": "//main[@id='main']/article//*[@data-toc-content]",
+    "bodyBoundaryObservation": {"matchedScopes": 1, "paragraphs": 22, "keepReadingHeadingsWithinScope": 0, "interestedInLearningCtasWithinScope": 0},
+    "bodyBoundaryEvidence": "artifact://14475",
+    "publicationMetadata": "No article:published_time/datePublished in retained response; visible day is authoritative for this adapter",
+    "nativeRequest": {"userAgent": "ZoopSourceAdapterResearch/1.0", "httpStatus": 403, "rawSha256": "a0610df71c2c6b938be6c60f5c632b82c155716cc250ed9cc6784b2e8ba4006f", "rawBytes": 9723, "retainedPath": "/tmp/zoop-adapter-openai-mixi-20261028.html", "retried": false},
+    "sitemapCapture": "artifact://14414",
+    "sitemapUrl": "https://openai.com/sitemap.xml/page/",
+    "sitemapEntry": "<url><loc>https://openai.com/index/mixi/</loc><lastmod>2026-10-28T00:16:03.770Z</lastmod><xhtml:link rel=\"alternate\" hreflang=\"tr-TR\" href=\"https://openai.com/tr-TR/index/mixi/\"/></url>",
+    "sitemapDateMeaning": "Lastmod is discovery ordering only, demonstrably not this article's August2025 publication"
+  },
+  "anthropic": {
+    "url": "https://www.anthropic.com/news/s1-sec",
+    "nativeRequest": {"userAgent": "ZoopSourceAdapterResearch/1.0", "httpStatus": 200, "rawSha256": "d3604bc52bca5396b8c873fb962f6c3f855de755091b0b073f43cc8593a7d3f7", "rawBytes": 151532, "retainedPath": "/tmp/zoop-adapter-anthropic-s1-sec-20261028.html"},
+    "publicationFragment": "<meta property=\"article:published_time\" content=\"2026-10-26T00:00:00.000Z\"/>",
+    "modifiedFragment": "<meta property=\"article:modified_time\" content=\"2026-10-27T21:40:46.000Z\"/>",
+    "visibleDateFragment": "<time datetime=\"2026-10-26\">Oct 26, 2026</time>",
+    "articleClass": "ArticlePage-module-scss-module__EaEYjq__Article",
+    "headerClass": "ArticleHero-module-scss-module__VYxBBq__Header",
+    "bodyClass": "Body-module-scss-module__PA4F1q__body",
+    "publicationPolicy": "Use the explicitly declared visible day; retain the unmodified raw ISO meta in source bytes. Do not claim midnight was proven to be a CMS sentinel.",
+    "sitemapCapture": "artifact://14413",
+    "sitemapEntry": "<url><loc>https://www.anthropic.com/news/s1-sec</loc><lastmod>2026-10-27T21:40:46.000Z</lastmod></url>"
+  }
+}

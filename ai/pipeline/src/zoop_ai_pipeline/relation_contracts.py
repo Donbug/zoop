@@ -20,7 +20,7 @@ SCHEMA = "zoop-relation-s3"
 LEDGER_VERSION = "zoop-relation-ledger-1"
 CANDIDATE_VERSION = "zoop-relation-candidate-1"
 IMPACT_CANDIDATE_VERSION = "zoop-impact-candidate-1"
-POLICY = "zoop-relation-policy-1"
+POLICY = "zoop-relation-policy-2"  # explicit S2 geography resolution; historical bindings fail closed, never migrate receipts
 REVALIDATION_POLICY = "zoop-relation-revalidation-policy-1"
 IMPACT_POLICY = "zoop-impact-policy-1"
 

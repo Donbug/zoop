@@ -130,14 +130,22 @@ class BUpstream(Bx):
     digest: Hash
 
 
-class BSourcePolicies(Bx):
+class BSourcePolicyVersions(Bx):
     producer: Name
     verifier: Name
     impact_producer: Name
     impact_verifier: Name
-    policy: Name
     revalidation_policy: Name
     impact_policy: Name
+
+
+class BRetainedSourcePolicies(BSourcePolicyVersions):
+    policy: Literal["zoop-relation-policy-1"]
+
+
+class BSourcePolicies(BSourcePolicyVersions):
+    policy: Literal["zoop-relation-policy-2"]
+    country_context: Literal["zoop-country-context-1"]
 
 
 class BEligibility(Bx):
@@ -201,7 +209,7 @@ class BSource(Bx):
     upstream: BUpstream
     review_digest: Hash
     provenance: BSourceProvenance
-    policies: BSourcePolicies
+    policies: Annotated[Union[BRetainedSourcePolicies, BSourcePolicies], Field(discriminator="policy")]
     review_used: Annotated[list[BReviewUse], Field(max_length=MAX_RELATIONS)]
     audit: BAudit
 

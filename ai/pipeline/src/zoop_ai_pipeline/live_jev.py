@@ -97,12 +97,14 @@ CLAIM_TEMPLATES = {
     "connection": ("Read the quotes {labels} in `state.quotes` together as one passage. Do they connect `state.relation.subject` to "
                    "`state.relation.object` through the chain of steps in `state.relation.path`, as an indirect relationship and not a "
                    "direct one?"),
-    "scope": ("Read the quotes {labels} in `state.quotes` together. Do they support the relationship for each non-null "
-              "`state.relation.businessScope` and `state.relation.productScope` value, for these entities? A null field is "
-              "unspecified and makes no claim of unrestricted applicability. Assess only stated scope values; do not broaden "
-              "a narrower source restriction or require the quotes to prove that the listed scopes exhaust every possible "
-              "restriction. Choose insufficient when a stated scope is not established, and contradicted when the quotes "
-              "conflict with it."),
+    "scope": ("Read the quotes {labels} in `state.quotes` together as one passage. Do they state or directly imply every non-null "
+              "scope fact in `state.relation.businessScope` (business) and `state.relation.productScope` (product), for this same "
+              "relationship, subject, object, type and direction? A null scope is unknown: ignore that field, without asserting "
+              "unrestricted or whole-business coverage. A non-null scope identifies a business or product where the relationship "
+              "holds; do not broaden a narrower source restriction. It does not assert an exclusive boundary unless the supplied value explicitly claims exclusivity. Require "
+              "quote support for every non-null scope fact, including any explicitly claimed exclusivity. Choose insufficient "
+              "when any supplied fact is not established, or contradicted when the quotes conflict with it. Merely operating in "
+              "the same business or mentioning the same product does not establish this relationship."),
     "validity": ("Read the quotes {labels} in `state.quotes` together as one passage. Do they state that the relationship holds from "
                  "`state.relation.validity.from` until `state.relation.validity.until`? A null bound is not stated; compare only the "
                  "bounds that are not null."),

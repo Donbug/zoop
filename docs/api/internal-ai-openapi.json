@@ -8460,9 +8460,9 @@
                       },
                       "verification": {
                         "manifestDigest": "24b3aa2eff4080115c8ac709d9b1e89915b79662635f30b3cd852012777386e2",
-                        "bundleDigest": "f4a906464286298d4c7553451eedc18ef2fde731521e979c56e01d914eabdf59",
+                        "bundleDigest": "2b3ffa0fcdbd0b91cbbb65ed64d2692f8ab31618aac43b42fcfeacbe3acffce2",
                         "contentDigest": "332f1be0ceb7246ac3af514b8f34dcb3d3f5fbb379ac9f437359292b7b761b01",
-                        "bundleBytes": 12799,
+                        "bundleBytes": 12857,
                         "counts": {
                           "companies": 1,
                           "pathCompanies": 0,
@@ -8872,9 +8872,9 @@
                       },
                       "verification": {
                         "manifestDigest": "24b3aa2eff4080115c8ac709d9b1e89915b79662635f30b3cd852012777386e2",
-                        "bundleDigest": "f4a906464286298d4c7553451eedc18ef2fde731521e979c56e01d914eabdf59",
+                        "bundleDigest": "2b3ffa0fcdbd0b91cbbb65ed64d2692f8ab31618aac43b42fcfeacbe3acffce2",
                         "contentDigest": "332f1be0ceb7246ac3af514b8f34dcb3d3f5fbb379ac9f437359292b7b761b01",
-                        "bundleBytes": 12799,
+                        "bundleBytes": 12857,
                         "counts": {
                           "companies": 1,
                           "pathCompanies": 0,
@@ -8971,9 +8971,10 @@
                               "verifier": "zoop-relation-verifier-1",
                               "impactProducer": "zoop-impact-producer-1",
                               "impactVerifier": "zoop-impact-verifier-1",
-                              "policy": "zoop-relation-policy-1",
-                              "revalidationPolicy": "zoop-revalidation-1",
-                              "impactPolicy": "zoop-impact-policy-1"
+                              "revalidationPolicy": "zoop-relation-revalidation-policy-1",
+                              "impactPolicy": "zoop-impact-policy-1",
+                              "policy": "zoop-relation-policy-2",
+                              "countryContext": "zoop-country-context-1"
                             },
                             "reviewUsed": [
                               {
@@ -9433,9 +9434,9 @@
                       },
                       "verification": {
                         "manifestDigest": "24b3aa2eff4080115c8ac709d9b1e89915b79662635f30b3cd852012777386e2",
-                        "bundleDigest": "a06506fba4f2b3f6dcbe5c717b2450f585fa6a5dad7e7b4bda9dc6119460710e",
+                        "bundleDigest": "d5c5a65535a266af063fe8988f279313ec78d6a11f1e8379441ea814db7e8d79",
                         "contentDigest": "6decaec3b79c33bf679cb5d4be4b33a71228028444d2226b6df67e3429ef5e18",
-                        "bundleBytes": 11074,
+                        "bundleBytes": 11132,
                         "counts": {
                           "companies": 1,
                           "pathCompanies": 0,
@@ -9532,9 +9533,10 @@
                               "verifier": "zoop-relation-verifier-1",
                               "impactProducer": "zoop-impact-producer-1",
                               "impactVerifier": "zoop-impact-verifier-1",
-                              "policy": "zoop-relation-policy-1",
-                              "revalidationPolicy": "zoop-revalidation-1",
-                              "impactPolicy": "zoop-impact-policy-1"
+                              "revalidationPolicy": "zoop-relation-revalidation-policy-1",
+                              "impactPolicy": "zoop-impact-policy-1",
+                              "policy": "zoop-relation-policy-2",
+                              "countryContext": "zoop-country-context-1"
                             },
                             "reviewUsed": [
                               {
@@ -14915,6 +14917,63 @@
         ],
         "title": "BRelationCounts"
       },
+      "BRetainedSourcePolicies": {
+        "properties": {
+          "producer": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Producer"
+          },
+          "verifier": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Verifier"
+          },
+          "impactProducer": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Impactproducer"
+          },
+          "impactVerifier": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Impactverifier"
+          },
+          "revalidationPolicy": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Revalidationpolicy"
+          },
+          "impactPolicy": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Impactpolicy"
+          },
+          "policy": {
+            "type": "string",
+            "const": "zoop-relation-policy-1",
+            "title": "Policy"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "producer",
+          "verifier",
+          "impactProducer",
+          "impactVerifier",
+          "revalidationPolicy",
+          "impactPolicy",
+          "policy"
+        ],
+        "title": "BRetainedSourcePolicies"
+      },
       "BReviewUse": {
         "properties": {
           "relationCandidateId": {
@@ -15028,7 +15087,22 @@
             "$ref": "#/components/schemas/BSourceProvenance"
           },
           "policies": {
-            "$ref": "#/components/schemas/BSourcePolicies"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BRetainedSourcePolicies"
+              },
+              {
+                "$ref": "#/components/schemas/BSourcePolicies"
+              }
+            ],
+            "title": "Policies",
+            "discriminator": {
+              "propertyName": "policy",
+              "mapping": {
+                "zoop-relation-policy-1": "#/components/schemas/BRetainedSourcePolicies",
+                "zoop-relation-policy-2": "#/components/schemas/BSourcePolicies"
+              }
+            }
           },
           "reviewUsed": {
             "items": {
@@ -15154,12 +15228,6 @@
             "minLength": 1,
             "title": "Impactverifier"
           },
-          "policy": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Policy"
-          },
           "revalidationPolicy": {
             "type": "string",
             "maxLength": 200,
@@ -15171,6 +15239,16 @@
             "maxLength": 200,
             "minLength": 1,
             "title": "Impactpolicy"
+          },
+          "policy": {
+            "type": "string",
+            "const": "zoop-relation-policy-2",
+            "title": "Policy"
+          },
+          "countryContext": {
+            "type": "string",
+            "const": "zoop-country-context-1",
+            "title": "Countrycontext"
           }
         },
         "additionalProperties": false,
@@ -15180,9 +15258,10 @@
           "verifier",
           "impactProducer",
           "impactVerifier",
-          "policy",
           "revalidationPolicy",
-          "impactPolicy"
+          "impactPolicy",
+          "policy",
+          "countryContext"
         ],
         "title": "BSourcePolicies"
       },
