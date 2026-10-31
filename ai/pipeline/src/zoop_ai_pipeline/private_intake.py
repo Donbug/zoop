@@ -22,6 +22,7 @@ from pydantic import Field, model_serializer, model_validator
 
 from .collection import Fetcher, Rules, parse_robots
 from .collection_contracts import Policy
+from .collector_control import NO_CONTROL
 from .ingestion_contracts import MAX_RAW, IngestionFailure, Wire, byte_hash, canonical, digest, now, reserved_state_roots
 from .ingestion_parsers import prepare, profile
 from .ingestion_url import canonical_url
@@ -394,8 +395,8 @@ class _QueueAttempts:
 
 class State:
     """Descriptor-relative owned namespace; an immutable plan precedes every mutable snapshot."""
-    def __init__(self, config, command):
-        self.config, self.fd, self.lock = config, None, None
+    def __init__(self, config, command, control=NO_CONTROL):
+        self.config, self.fd, self.lock, self.control = config, None, None, control
         self.queue = None
         root = Path(config.state_dir)
         for reserved in [Path(__file__).resolve().parents[4], *reserved_state_roots()]:
@@ -939,6 +940,9 @@ def _attempt(state, kind, key):
 def _budget(state, fetcher):
     if state.data["stopCode"] in HARD_STOPS:
         return True
+    if state.control.boundary():
+        state.data["stopCode"] = state.data["stopCode"] or "admission_stopped"
+        return True
     if fetcher.requests >= fetcher.policy.max_requests:
         state.data["stopCode"] = "request_budget"
     elif fetcher.downloaded + _provider_bytes(state) >= fetcher.policy.max_total_bytes:
@@ -1331,10 +1335,10 @@ def retained_items(config):
         state.close()
 
 
-def run(config, command="run"):
+def run(config, command="run", control=NO_CONTROL):
     if command not in {"run", "resume", "status"}:
         raise IngestionFailure("private_command_invalid")
-    state = State(config, command)
+    state = State(config, command, control)
     try:
         if command == "status":
             return summary(config, state)

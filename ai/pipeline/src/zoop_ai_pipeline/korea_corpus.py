@@ -16,6 +16,7 @@ from pydantic import Field, model_validator
 
 from .collection import Fetched, Fetcher, collect
 from .collection_contracts import Policy, Request
+from .collector_control import NO_CONTROL
 from .ingestion import Ingestor, Store
 from .ingestion_contracts import Authority, Export, Grant, IngestionFailure, Run, Wire, byte_hash, canonical, digest, now, read_file, reserved_state_roots
 from .korea_portal import BODY_XPATH, listing_url, parse_listing, validate_article
@@ -422,7 +423,7 @@ def status(config):
     return package(config, data)
 
 
-def run(config):
+def run(config, control=NO_CONTROL):
     evidence = load_evidence(config.rights_evidence)
     excluded = exclusions(config)
     binding = {"config": config.wire(), "rightsSha256": byte_hash(evidence), "gateVersion": "korea-portal-static-3"}
@@ -464,9 +465,13 @@ def run(config):
                 record.update(outcome="unknown", reason="interrupted-attempt-no-automatic-refetch")
             state.save()
         # Round-robin pages and items keep channel caps independent of portal category volume.
-        while not data["reason"]:
+        stopped = False
+        while not data["reason"] and not stopped:
             progress = False
             for channel in config.channels:
+                if control.boundary():
+                    stopped = True
+                    break
                 name, info = channel.name, data["channels"][channel.name]
                 successes = sum(r["outcome"] == "exported" and r["candidate"]["channel"] == name for r in data["items"].values())
                 if successes >= channel.max_documents:
@@ -521,6 +526,9 @@ def run(config):
                         progress = True
                         pending = [r for r in data["items"].values() if r["outcome"] == "pending" and r["candidate"]["channel"] == name]
                 for record in pending:
+                    if control.boundary():
+                        stopped = True
+                        break
                     successes = sum(r["outcome"] == "exported" and r["candidate"]["channel"] == name for r in data["items"].values())
                     total = sum(r["outcome"] == "exported" for r in data["items"].values())
                     if total >= config.max_documents:

@@ -1,0 +1,10 @@
+.venv
+.pytest_cache
+.python-version
+.env
+.env.*
+var
+tests
+scripts
+**/__pycache__
+**/node_modules
