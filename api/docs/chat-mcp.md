@@ -130,6 +130,14 @@ agent 단계가 하나라도 시작된 뒤의 `mcp_unreachable`는 **같은 run�
 
 **fan-out.** 대상이 5개(한 호출의 `targets` 상한)를 넘는 요구가 있는 계획은 agent 경로를 타지 않고 direct 경로에서 서버가 5개씩 나눠 읽는다. route 요약에 `path=agent`, `agentSteps`, `approvedCalls`, `deniedCalls`를 남긴다.
 
+## MCP와 direct의 동등성
+
+같은 질문은 어느 경로로 읽어도 같은 자료를 읽어야 한다. `ChatMcpDirectParityTest`가 실제 읽기 도구와 합성 그래프로 도구별 결과(항목, 근거, 버전, 경로, 잘림)를 비교한다. MCP 인자는 대상과 개수뿐이라, 요구의 문구나 대상의 출처에 달린 읽기는 agent로 보내지 않고 direct로 둔다(`OrchestratedChatEngine.agentReadsLikeDirect`).
+
+- 질문에 적힌 기간이 있는 `graph.version.diff`
+- 기간이 있는 `document.search`
+- 회원이 근거를 좁혀 선택했는데 요구가 자기 대상을 지목한 읽기
+
 ## 5. 켜기 전에 남은 조건
 
 아래가 끝나기 전에는 로컬 합성 시험 밖에서 `ZOOP_CHAT_MCP_ENABLED`·`ZOOP_CHAT_AGENT_ENABLED`를 켜지 않는다.

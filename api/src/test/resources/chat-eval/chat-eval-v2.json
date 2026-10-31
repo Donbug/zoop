@@ -1,5 +1,5 @@
 {
-  "setVersion": "chat-eval-v1",
+  "setVersion": "chat-eval-v2",
   "description": "챗봇 고정 평가 세트. 질문 문장은 실제 요구 분해·기업 이름 해석을 거치고, 모델 세 단계(라우터·생성·검증)만 대본 응답으로 바꾼다. 도구는 합성 fixture 그래프(fixture-2026-10-08)를 읽는다. 대본 응답이므로 흐름 회귀만 확인하며 답변 품질이나 임계값을 재지 않는다. 형식과 실행 방법: docs/development/ai-chatbot-eval-set.md",
   "catalog": [
     {"id": "KRX:005930", "name": "삼성전자", "ticker": "005930", "aliases": ["삼성"]},
@@ -276,7 +276,8 @@
         "tools": ["graph.path.read"],
         "outcome": "answered",
         "citationKinds": ["article"],
-        "graphTargets": ["NASDAQ:NVDA", "KRX:000660"]
+        "graphTargets": ["NASDAQ:NVDA", "KRX:000660"],
+        "uiActions": ["focus_path", "focus_relation", "focus_relation", "open_company", "open_company", "open_evidence"]
       }
     },
     {
@@ -720,6 +721,186 @@
         "heldRequirements": ["r2"],
         "appliedCompanies": ["KRX:000660"],
         "limitations": [{"kind": "evidence_insufficient", "label": "삼성전자는 어떤 회사야", "cause": "evidence_held"}]
+      }
+    },
+    {
+      "id": "compound-concept-fact-and-path",
+      "group": "compound",
+      "question": "HBM이 뭐고 NVIDIA와 SK하이닉스는 어떻게 연결돼 있어?",
+      "script": {
+        "router": {"r1": {"types": {"Q02": 0.9, "Q03": 0.8, "Q04": 0.9}, "capabilities": {"graph.path.read": 0.9, "company.read": 0.8}}},
+        "answer": {"sections": [
+          {"basis": "general_knowledge", "text": "HBM은 메모리 칩을 수직으로 쌓아 대역폭을 높인 메모리입니다.", "requirementIds": ["r1-c"], "evidenceIds": []},
+          {"basis": "evidence_grounded", "text": "두 기업은 차세대 GPU용 HBM 공급 계약 사건으로 연결돼 있습니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}
+        ]}
+      },
+      "expect": {
+        "planned": ["r1:tools", "r1-c:general"],
+        "stages": ["router", "answer", "verify"],
+        "outcome": "answered",
+        "answerStatus": "complete",
+        "coverage": ["r1:answered", "r1-c:answered"]
+      }
+    },
+    {
+      "id": "compound-four-types",
+      "group": "compound",
+      "question": "HBM이 뭐야? SK하이닉스는 어떤 회사야? NVIDIA와 SK하이닉스는 어떻게 연결돼 있어? 오늘 출근 브리핑 보여줘",
+      "script": {
+        "router": {
+          "r1": {"types": {"Q02": 0.9}, "capabilities": {}},
+          "r2": {"types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}},
+          "r3": {"types": {"Q04": 0.9}, "capabilities": {}},
+          "r4": {"types": {"Q06": 0.9}, "capabilities": {"briefing.read": 0.9}}
+        },
+        "answer": {"sections": [
+          {"basis": "general_knowledge", "text": "HBM은 메모리 칩을 수직으로 쌓아 대역폭을 높인 메모리입니다.", "requirementIds": ["r1"], "evidenceIds": []},
+          {"basis": "evidence_grounded", "text": "SK하이닉스는 메모리 반도체를 만듭니다.", "requirementIds": ["r2"], "evidenceIds": ["$branch:1"]},
+          {"basis": "evidence_grounded", "text": "두 기업은 차세대 GPU용 HBM 공급 계약 사건으로 연결돼 있습니다.", "requirementIds": ["r3"], "evidenceIds": ["$branch"]},
+          {"basis": "evidence_grounded", "text": "오늘 출근 브리핑 1위는 차세대 GPU용 HBM 공급 계약입니다.", "requirementIds": ["r4"], "evidenceIds": ["$branch:1"]}
+        ]}
+      },
+      "expect": {
+        "stages": ["router", "answer", "verify"],
+        "tools": ["briefing.read", "company.read", "graph.path.read"],
+        "outcome": "answered",
+        "answerStatus": "complete",
+        "limitations": [],
+        "coverage": ["r1:answered", "r2:answered", "r3:answered", "r4:answered"]
+      }
+    },
+    {
+      "id": "compound-rule-and-fact",
+      "group": "compound",
+      "question": "탈퇴하면 질문 기록은 어떻게 돼? SK하이닉스는 어떤 회사야?",
+      "script": {
+        "router": {
+          "r1": {"types": {"Q01": 0.9}, "capabilities": {"zoopPolicy.read": 0.9}},
+          "r2": {"types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}}
+        },
+        "answer": {"sections": [
+          {"basis": "zoop_documented", "text": "탈퇴하면 개인정보 처리방침이 정한 기간이 지난 뒤 질문 기록을 지웁니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch:2"]},
+          {"basis": "evidence_grounded", "text": "SK하이닉스는 메모리 반도체를 만듭니다.", "requirementIds": ["r2"], "evidenceIds": ["$branch:1"]}
+        ]}
+      },
+      "expect": {
+        "tools": ["company.read", "zoopPolicy.read"],
+        "outcome": "answered",
+        "answerStatus": "complete",
+        "coverage": ["r1:answered", "r2:answered"]
+      }
+    },
+    {
+      "id": "failure-one-read-of-a-requirement",
+      "group": "failure",
+      "question": "SK하이닉스는 어떤 회사야?",
+      "unavailableTools": ["issue.read"],
+      "script": {
+        "router": {"r1": {"types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9, "issue.read": 0.9}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 메모리 반도체를 만듭니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch:1"]}]}
+      },
+      "expect": {
+        "tools": ["company.read", "issue.read"],
+        "outcome": "answered",
+        "answerStatus": "complete",
+        "limitations": [],
+        "notices": ["tool_unavailable"],
+        "coverage": ["r1:answered"]
+      }
+    },
+    {
+      "id": "failure-one-requirement-of-two",
+      "group": "failure",
+      "question": "SK하이닉스는 어떤 회사야? 삼성전자 사건은 뭐가 있어?",
+      "unavailableTools": ["issue.read"],
+      "script": {
+        "router": {
+          "r1": {"types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}},
+          "r2": {"types": {"Q03": 0.9}, "capabilities": {"issue.read": 0.9}}
+        },
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 메모리 반도체를 만듭니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch:1"]}], "insufficientRequirementIds": ["r2"]}
+      },
+      "expect": {
+        "outcome": "answered",
+        "answerStatus": "partial",
+        "limitations": [{"kind": "tool_unavailable"}],
+        "notices": [],
+        "coverage": ["r1:answered", "r2:limited"]
+      }
+    },
+    {
+      "id": "failure-every-read-down",
+      "group": "failure",
+      "question": "SK하이닉스는 어떤 회사야?",
+      "unavailableTools": ["company.read"],
+      "script": {
+        "router": {"r1": {"types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}}}
+      },
+      "expect": {
+        "stages": ["router"],
+        "outcome": "failed",
+        "failure": {"kind": "transient", "reason": null, "rerunnable": true}
+      }
+    },
+    {
+      "id": "q07-dependent-under-its-condition",
+      "group": "Q07",
+      "question": "내 종목을 찾아줘? 정확히 두 곳이면 그 회사들을 설명해줘",
+      "memberScope": [{"id": "KRX:000660", "name": "SK하이닉스", "held": true}],
+      "script": {
+        "router": {
+          "r1": {"types": {"Q07": 0.9}, "capabilities": {}},
+          "r2": {"types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "dependsOn": {"requirementId": "r1", "cardinality": "exactly", "count": 2}}
+        },
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "내 종목에는 SK하이닉스가 있습니다.", "requirementIds": ["r1"], "evidenceIds": []}]}
+      },
+      "expect": {
+        "tools": ["portfolio.scope.read"],
+        "outcome": "answered",
+        "answerStatus": "partial",
+        "limitations": [{"kind": "precondition_unmet"}],
+        "uiActions": ["open_watchlist"],
+        "coverage": ["r1:answered", "r2:limited"]
+      }
+    },
+    {
+      "id": "q07-dependent-over-its-condition",
+      "group": "Q07",
+      "question": "내 종목을 찾아줘? 정확히 두 곳이면 그 회사들을 설명해줘",
+      "memberScope": [
+        {"id": "KRX:000660", "name": "SK하이닉스", "held": true},
+        {"id": "KRX:005930", "name": "삼성전자", "held": true},
+        {"id": "NASDAQ:NVDA", "name": "NVIDIA", "watched": true}
+      ],
+      "script": {
+        "router": {
+          "r1": {"types": {"Q07": 0.9}, "capabilities": {}},
+          "r2": {"types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "dependsOn": {"requirementId": "r1", "cardinality": "exactly", "count": 2}}
+        }
+      },
+      "expect": {
+        "stages": ["router"],
+        "tools": ["portfolio.scope.read"],
+        "outcome": "clarification",
+        "reason": "checkpoint_excess",
+        "coverage": ["r1:clarify", "r2:clarify"]
+      }
+    },
+    {
+      "id": "q07-dependent-none-found",
+      "group": "Q07",
+      "question": "내 종목을 찾아줘? 정확히 두 곳이면 그 회사들을 설명해줘",
+      "script": {
+        "router": {
+          "r1": {"types": {"Q07": 0.9}, "capabilities": {}},
+          "r2": {"types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "dependsOn": {"requirementId": "r1", "cardinality": "exactly", "count": 2}}
+        },
+        "answer": {"sections": [], "insufficientRequirementIds": ["r1"]}
+      },
+      "expect": {
+        "tools": ["portfolio.scope.read"],
+        "outcome": "insufficient_evidence",
+        "coverage": ["r1:limited", "r2:limited"]
       }
     },
     {

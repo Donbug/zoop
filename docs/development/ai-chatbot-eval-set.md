@@ -1,6 +1,6 @@
 # ZOOP AI 챗봇 고정 평가 세트
 
-기준일: 2026년 10월 28일 / 실행 세트 버전: `chat-eval-v1` / 다음 목표: `chat-eval-v2`
+기준일: 2026년 10월 31일 / 실행 세트 버전: `chat-eval-v2`
 
 관련 문서:
 
@@ -23,17 +23,18 @@
 
 ## 2. 구성
 
-- 세트: `api/src/test/resources/chat-eval/chat-eval-v1.json`
+- 세트: `api/src/test/resources/chat-eval/chat-eval-v2.json`
 - 실행기: `api/src/test/java/com/zoop/chat/model/ChatEvalSetTest.java` (사례마다 JUnit 동적 시험 하나)
-- 결과: `api/build/reports/chat-eval/chat-eval-v1.json`(사례별 관측값), `chat-eval-v1.md`(요약 표)
+- 결과: `api/build/reports/chat-eval/chat-eval-v2.json`(사례별 관측값), `chat-eval-v2.md`(요약 표)
   - 실행이나 관측 중 예외로 끝난 사례도 실패로 보고한다. `observed.outcome=error`이고, `error`에 던져진 예외, `observed.stages`에 도달한 단계를 남긴 뒤 예외를 다시 던진다. 예: 대본에 없는 생성 단계가 호출된 경우.
   - 요약의 `setCases`는 세트 전체 사례 수, `cases`는 보고된 사례 수, `errors`는 예외로 끝난 사례 수다. 세트에는 있는데 보고되지 않은 사례 ID는 `notReported`에 적고 표 위에 따로 표시한다. 필터로 일부만 돌렸거나 시작하지 못한 사례이며 통과로 세지 않는다.
 
-실행 경로는 운영과 같다. 질문 → `ChatModelStages`(요구 분해·이름 해석, 모델 단계 wire) → `OrchestratedChatEngine`(계획·조회·검사·결과) → 실제 읽기 도구(`company.read`, `issue.read`, `evidence.resolve`, `graph.path.read`, `zoopPolicy.read`, `briefing.read`, `selectionRule.read`). 다른 점은 세 가지뿐이다.
+실행 경로는 운영과 같다. 질문 → `ChatModelStages`(요구 분해·이름 해석, 모델 단계 wire) → `OrchestratedChatEngine`(계획·조회·검사·결과) → 실제 읽기 도구(`company.read`, `issue.read`, `evidence.resolve`, `graph.path.read`, `zoopPolicy.read`, `briefing.read`, `briefing.evidence`, `selectionRule.read`, `graph.version.diff`, `portfolio.scope.read`, `document.search`). 다른 점은 네 가지뿐이다.
 
 1. AI 서비스 대신 대본 클라이언트가 라우터·생성·검증 단계에 답한다.
 2. 그래프는 합성 fixture `fixture-2026-10-08`(기업 7개, 사건 4개)을 고정 버전으로 읽는다. 모든 근거는 읽을 수 있다.
-3. 카탈로그 이름, 기업 개요 2건, 약관·개인정보 처리방침 각 2구간, 발행 브리핑 회차(`briefings`), 사건의 공개 기록(`publications`)은 세트 파일의 합성 값이다. 카탈로그에는 그래프에 없는 기업(한미약품, 카카오)과 같은 별칭을 가진 두 기업(`한미`)을 일부러 넣었다. 세트에 없는 회차는 `not_ready`, 공개 기록이 없는 사건은 결정 기록 없음으로 읽는다.
+3. 도구 호출의 시간 한도를 넉넉히 둔다. 느린 PC에서 조회가 3초를 넘겨 사례가 흔들리지 않게 하려는 것이며, 시간 한도 자체는 `ChatToolRunner` 시험이 확인한다.
+4. 카탈로그 이름, 기업 개요 2건, 약관·개인정보 처리방침 각 2구간, 발행 브리핑 회차(`briefings`), 사건의 공개 기록(`publications`), 기업 문서(`documents`)는 세트 파일의 합성 값이다. 카탈로그에는 그래프에 없는 기업(한미약품, 카카오)과 같은 별칭을 가진 두 기업(`한미`)을 일부러 넣었다. 세트에 없는 회차는 `not_ready`, 공개 기록이 없는 사건은 결정 기록 없음으로 읽는다.
 
 ## 3. 사례 형식
 
@@ -58,6 +59,7 @@
 - `group`: `Q01`~`Q08`, `compound`, `advice`, `attack`, `clarification`, `failure`.
 - `selection`, `graphVersion`: 생략하면 선택 없음과 `fixture-2026-10-08`. `graphVersion: null`은 고정된 공개 그래프가 없는 질문이고, 없는 버전 이름은 읽을 수 없는 그래프다.
 - `memberScope`: Q07에서 회원의 보유·관심 종목 `[{id, name, held, watched}]`. 생략하면 없음이다. 실제 회원 데이터 대신 `portfolio.scope.read`가 이 목록을 읽는다.
+- `unavailableTools`: 이 사례에서 자료를 읽을 수 없는 capability 목록. 그 도구는 일시 불가로 실패한다.
 - `script.router`: 분해된 요구 ID(`r1`, `r2`…)마다 라우터 답. `{"fail": "unknown" | "sent" | "refused"}`는 단계 실패다. 라우터가 호출되지 않는 사례(요구 7개 이상, 공유 이름)는 `script`를 비운다.
 - `script.answer`의 `evidenceIds`에서 `$branch`는 그 구간의 첫 요구에 실제로 보낸 인용 전부, `$branch:N`은 앞에서 N개다. 그 밖의 값은 그대로 보낸다(지어낸 근거 ID 공격).
 - `script.verify`를 생략하면 모든 구간이 통과한다(일반 구간은 `support: null`).
@@ -80,7 +82,19 @@
 | `limitations` | `{kind, label, cause}` 목록. `cause`(`evidence_held`, `nothing_found`)는 문구에 원인이 드러나는지 본다 |
 | `planned` | 계획된 요구와 방식(`r1:tools`, `r1-c:general` 등). 개념 하위 요구 유무를 여기서 본다 |
 | `droppedGeneral`, `heldRequirements` | 1층 검사로 뺀 개념 구간, 의미 검증이 보류한 요구 |
+| `notices`, `uiActions` | 결과의 notice code, 화면 동작 kind(순서대로) |
+| `coverage` | 서버가 정한 요구별 결말(`r1:answered`, `r2:limited`, `r1:clarify`). 어떤 사례든 `pending`이 남으면 실패다 |
 | `appliedCompanies`, `appliedIssues`, `appliedPeriod`, `questionOverrodeContext`, `graphTargets`, `choices` | 결과의 `applied`, 지도 대상, 확인 질문 선택지 ID |
+
+### agent 경로 세트
+
+`api/src/test/resources/chat-eval/chat-eval-agent-v1.json`, 실행기는 `ChatAgentEvalTest`다. 13개 사례가 있고, 질문 대신 요구를 사례에 직접 적으며 라우터와 생성 단계는 쓰지 않는다. 생성 단계가 불리면 사례가 실패하므로 agent 경로를 벗어난 계획도 잡힌다.
+
+- `requirements`: 라우터가 낼 요구 `{id, label, types, capabilities, targets}`.
+- `agent`: Luna의 단계 목록. `{"calls": [{id, tool, targets, requirementIds}]}`는 승인 요청이고, `{"answer": {...}}`는 최종 답이다. 승인된 호출은 다음 단계 전에 실제 `/mcp` 처리기로 실행된다.
+- 답의 `evidenceIds`에서 `$reads`는 그 구간의 첫 요구가 읽은 근거, `$web`은 그 요구의 검색 결과, `$reads:r2`는 다른 요구의 근거다(인용 공격 사례).
+- `unavailableTools`: `chat-eval-v2`와 같다.
+- `expect`: `path`, `decisions`(`c1:approved`처럼 라운드 순서대로), `tools`, `outcome`, `failure`, `answerBasis`, `answerStatus`, `citationKinds`, `limitations`, `notices`, `coverage`, `uiActions`. 모르는 키는 실패한다.
 
 ## 4. 실행
 
@@ -96,9 +110,9 @@ export JAVA_HOME=<JDK 21>
 - 근거 부족: 도구를 호출한 사례 중 outcome이 `insufficient_evidence`이거나 `evidence_insufficient` 제한이 붙은 사례
 - 개념 하위 요구 제외: 개념 하위 요구(`-c`)가 계획된 사례 중 `droppedGeneral`이 있는 사례
 
-## 5. v1 사례와 드러난 공백
+## 5. 사례와 드러난 공백
 
-51개 사례: Q01 2, Q02 2, Q03 9, Q04 2, Q05 3, Q06 3, Q07 9, Q08 2, 복합 7, 투자 판단 4, 공격 3, 확인 질문 1, 장애 4. 2026-10-30 기준 모두 통과한다(대본 실행).
+60개 사례: Q01 2, Q02 2, Q03 9, Q04 2, Q05 3, Q06 3, Q07 12, Q08 2, 복합 10, 투자 판단 4, 공격 3, 확인 질문 1, 장애 7. 2026-10-31 기준 모두 통과한다(대본 실행).
 
 세트를 만들며 확인한 현재 공백(`gap` 표시 사례):
 
@@ -115,49 +129,55 @@ Q07에서 질문이 기업을 지목하는 경우(구현 계획 결정 (11))는 
 
 세트에 넣지 못한 것:
 
-- **체크포인트·의존 단계의 나머지**: 라우터 wire(`zoop-ai-chat-3`)가 `dependsOn`을 전달한다(2026-10-30). 세트에는 `q07-dependent-company-details`(`exactly(2)` 충족)만 있고, 0개·미달·초과 분기는 아직 `OrchestratedChatEngineTest`의 결정 대본으로만 확인된다. 실제 Jev가 의존 관계를 얼마나 맞히는지는 재지 않았다.
+- **실제 Jev의 의존 판단**: 체크포인트의 충족·미달·초과·0개는 `q07-dependent-*`가 고정한다(`dependsOn`은 대본 값). 실제 Jev가 의존 관계를 얼마나 맞히는지는 재지 않았다.
+- **agent·MCP 경로**: 실행기가 direct 경로만 돈다. 해당 항목은 6장 표의 JUnit 시험이 확인한다.
 - **확인 질문의 답(깊이 1·2)**, **선택 근거로 좁힌 질문(`evidencePool`)**, **시간 한도(`deadline_guard`)**: 실행기가 단일 턴·고정 시간만 다룬다. 필요하면 사례 형식에 `turns`와 남은 시간을 더한다.
 
 ## 6. 다음 단계
 
-### 2026-10-28 v0.11 수용 사례 (chat-eval-v2 추가 예정)
+### v0.11 수용 사례의 확인 위치 (2026-10-31)
 
-현재 `chat-eval-v1` 실행 증거와 구분한다. 아래는 구현 후 고정 fixture·기대 호출·결과를 추가할 항목이며 이번 개정으로 테스트가 추가되거나 통과한 것은 아니다.
+`chat-eval-v2`는 direct 경로의 대본 실행이다. agent 경로는 별도 세트 `chat-eval-agent-v1`(`ChatAgentEvalTest`)이 돈다. 그 세트는 Luna만 대본으로 바꾸고 실제 엔진, 승인 gate, MCP 도구, 원장, 합성 웹 공급자를 거치며, 요구 분해·라우터는 거치지 않는다(요구를 사례에 직접 적는다). 아래는 합성 대본·fake로 확인한 흐름이며 실제 모델·데이터 결과가 아니다.
 
-| 사례 | 기대 결과 |
-| --- | --- |
-| Q02 단독 안정적 개념 | 웹 보조 최대 1회, 성공 시 web_reported; 0건·장애면 제한된 일반 지식과 notice, 불필요한 Q03/Q04 없음 |
-| Q02+Q03+Q04 복합 요구 | 필요한 조회 조합·중복 제거, 명시 요구 누락 없음, 최종 생성 1회 |
-| 네 유형 이상 필수 요구 | top-3로 자르지 않음, 예산 초과 시 clarification |
-| Q01 단독 / Q01+Q03 | Q01 검색·웹 근거 차용 없음, 복합 질문의 Q03에만 필요 검색 |
-| Q02~Q08 각각 검색 필요/불필요 쌍 | 필요한 경우만 검색, 내부 0건이 아니어도 외부 보완 가능 |
-| 웹에만 있고 내부 그래프에 없는 관계 | 외부 보도와 내부 경로 구분, 간선·포커스 대상 생성 금지 |
-| Q05/Q06/Q08 외부 정보 불일치 | 실제 차이·발행 회차·기록된 선정 이유를 웹으로 덮지 않음 |
-| Q07 보조 검색 | 본인 범위 먼저 확인, 원문·식별자·수량·전체 포트폴리오 전송 없음 |
-| 다음 턴 Q04→Q02 / 그 회사·최신 | 재분류, 검증된 문맥 승계, 명시 조건 우선·모호성 확인 |
-| polling·재열람 | 새 분류·검색·모델 호출·UI 동작 실행 없음 |
-| Q03~Q08 내부 근거 충분/부족 쌍 | 충분하면 웹 0회, 부족·최신성·출처 요청이면 마지막 라운드에서만 웹 |
-| 검색 0건 / timeout / unavailable | 전체 답변 유지, web_unavailable notice와 실제 미충족 limitation 분리 |
-| 배치 검색·재시도·기한 초과 | 총 8·내부 6·웹 2, job 45초, Luna 잔여 기한·마지막 10초 작성 예약 준수 |
-| 동일 logical call 동시·순차 중복 | single-flight 1회, 성공 0건 포함 요청 cache hit, 권한·grant 재검사 |
-| cache key의 scope·version·asOf 차이 | 서로 합치지 않음, job 종료 뒤 재사용 없음 |
-| MCP/direct 동일 fixture | 같은 Tool Service의 결과·권한·버전·evidence 정규화 동등 |
-| Responses 시작 전 preflight 실패·circuit open | MCP 미노출, 처음부터 direct adapter·BranchContext 경로, 같은 예산·grant |
-| Responses 실행 중 MCP transport 실패 | direct 결과 끼워 넣기 0회, 성공 결과 유지·notice/limitation, 다음 job circuit 반영 |
-| 인증·권한·grant·스키마 거부 | direct 우회 0회, 거부 원인 유지 |
-| MCP 결과 수신 여부 불명 | 자동·수동 중복 호출 0회, response_unknown/reconciliation |
-| 최근 5회 중 연결 3회 실패 | 30초 circuit open, half-open probe 1회; 인증·DB 오류는 집계 제외 |
-| mcp_approval_request 1·3라운드 | ai/service 독자 승인 0회, Java의 예산·요구·scope·grant 결정만 continuation에 사용 |
-| approval 거부 | 위조 MCP/function 결과·direct 대체 메시지 0회, 다른 정상 근거 또는 limitation/guidance |
-| Q07 portfolio scope | portfolio.scope.read MCP catalog 미등록, 전체 목록·수량·보유 표시 모델 전송 0건, 일치 공개 결과 최대 5개 |
-| /mcp 외부 경계 | 64 KiB request·256 KiB call result·1 MiB job·분당 30·동시 4 위반 거부 |
-| 도구 1·4·8회 latency | server-only client, 합성 Responses replay, 승인된 소량 live를 분리 기록; terminal DB commit까지 45초 |
-| 인용 위조·snippet 미지지·프롬프트 주입 | 출처·요구 매핑 및 의미 검사, 외부 지시 무시 |
-| MCP 미등록 도구·위조 subject·스키마 변경 | 차단, allowlist 자동 확장 없음 |
-| Luna allowed_tools·연속 호출 | 허용 도구만 선택, 새 정보 이득 없는 반복 거부, 명시 요구별 서버 coverage |
-| 부분 결과 | answerStatus complete/partial/guidance, notices와 limitations 중복 없음 |
-| UI 대상 철회·버전 변경·외부 보도 ID 위조 | 클릭 시 재검사·안내, 임의 경로 실행 없음 |
-| snapshot 만료·grant 부재 | 재현 불가 구간 가림·모델 전송 차단, 거짓 최신성 표시 없음 |
+- **세트**: `chat-eval-v2` 사례. `agent-*`는 `chat-eval-agent-v1` 사례
+- **단위**: JUnit 시험(세트에는 없음)
+- **일부**: 항목의 일부만 확인
+- **없음**: 확인하는 시험이 없음. 구현이 없는 경우 함께 적음
+
+| 사례 | 기대 결과 | 확인 위치 |
+| --- | --- | --- |
+| Q02 단독 안정적 개념 | 웹 보조 최대 1회, 성공 시 web_reported; 0건·장애면 제한된 일반 지식과 notice, 불필요한 Q03/Q04 없음 | 세트: `agent-concept-web-reported`, `agent-concept-no-web-results`, `agent-concept-web-down` |
+| Q02+Q03+Q04 복합 요구 | 필요한 조회 조합·중복 제거, 명시 요구 누락 없음, 최종 생성 1회 | 세트: `compound-concept-fact-and-path` |
+| 네 유형 이상 필수 요구 | top-3로 자르지 않음, 예산 초과 시 clarification | 세트: `compound-four-types`, `compound-too-many-requirements` |
+| Q01 단독 / Q01+Q03 | Q01 검색·웹 근거 차용 없음, 복합 질문의 Q03에만 필요 검색 | 세트: `compound-rule-and-fact`, `agent-rule-and-fact-web`, `agent-rule-never-searches` |
+| Q02~Q08 각각 검색 필요/불필요 쌍 | 필요한 경우만 검색, 내부 0건이 아니어도 외부 보완 가능 | 일부: `agent-fact-enough-no-web`, `agent-fact-gap-then-web`. "내부 0건이 아니어도" 판단은 구현이 없음 |
+| 웹에만 있고 내부 그래프에 없는 관계 | 외부 보도와 내부 경로 구분, 간선·포커스 대상 생성 금지 | 일부: 웹 구간 인용 분리는 `ChatAgentPathEngineTest`. 대상 생성 금지 시나리오는 없음 |
+| Q05/Q06/Q08 외부 정보 불일치 | 실제 차이·발행 회차·기록된 선정 이유를 웹으로 덮지 않음 | 없음. Q06·Q08은 agent 경로가 아니라 지금은 웹을 쓰지 않음 |
+| Q07 보조 검색 | 본인 범위 먼저 확인, 원문·식별자·수량·전체 포트폴리오 전송 없음 | 없음. Q07은 direct 경로라 지금은 웹을 쓰지 않음 |
+| 다음 턴 Q04→Q02 / 그 회사·최신 | 재분류, 검증된 문맥 승계, 명시 조건 우선·모호성 확인 | 일부: `ChatPlannerTest`의 턴 문맥 시험. 세트는 단일 턴만 다룸 |
+| polling·재열람 | 새 분류·검색·모델 호출·UI 동작 실행 없음 | 일부: `ChatResponseGuardTest`의 재열람 검사 |
+| Q03~Q08 내부 근거 충분/부족 쌍 | 충분하면 웹 0회, 부족·최신성·출처 요청이면 마지막 라운드에서만 웹 | 일부: `ChatMcpAgentTest.aWebSearchIsApprovedOnlyAfterAnInternalReadLeftSomethingUnmetAndOnlyForAQueryThatMayLeave`, `anotherRequirementsGapOpensNoSearch`. 최신성·출처 요청 판단은 없음 |
+| 검색 0건 / timeout / unavailable | 전체 답변 유지, web_unavailable notice와 실제 미충족 limitation 분리 | 세트: `agent-concept-web-down`, `agent-concept-no-web-results` |
+| 배치 검색·재시도·기한 초과 | 총 8·내부 6·웹 2, job 45초, Luna 잔여 기한·마지막 10초 작성 예약 준수 | 단위: `ChatMcpAgentTest.sixInternalAndTwoWebCallsInThreeRoundsFitWhenAnInternalReadCameBackEmpty`, `ChatAgentPathEngineTest.anAgentStepThatCannotGetTheTimeAnAnswerNeedsEndsAsDeadlineGuard` |
+| 동일 logical call 동시·순차 중복 | single-flight 1회, 성공 0건 포함 요청 cache hit, 권한·grant 재검사 | 단위: `ChatMcpEndpointTest.aRepeatOfACallReusesWhatTheFirstReadAndStillCountsAsACall`, `identicalRequestsArrivingTogetherAreReadOnce`, `aReuseIsCheckedAgainstTheSendGrantsAsTheyAreNow` |
+| cache key의 scope·version·asOf 차이 | 서로 합치지 않음, job 종료 뒤 재사용 없음 | 일부: 재사용은 시도 범위의 원장에서만 찾음. 키 차이를 직접 겨냥한 시험은 없음 |
+| MCP/direct 동일 fixture | 같은 Tool Service의 결과·권한·버전·evidence 정규화 동등 | 단위: `ChatMcpDirectParityTest`, `ChatAgentPathEngineTest.aPeriodInTheQuestionStaysOnTheDirectPathWhereItIsRead`. 합성 그래프에서만 비교 |
+| Responses 시작 전 preflight 실패·circuit open | MCP 미노출, 처음부터 direct adapter·BranchContext 경로, 같은 예산·grant | 단위: `ChatAgentPathEngineTest.anUnavailablePreflightStartsDirectBeforeAnyAgentStep` |
+| Responses 실행 중 MCP transport 실패 | direct 결과 끼워 넣기 0회, 성공 결과 유지·notice/limitation, 다음 job circuit 반영 | 일부: 개별 호출 실패는 `agent-read-fails-in-part`. Luna 단계 자체가 실패하면 답변 후보가 없어 실패로 끝남 |
+| 인증·권한·grant·스키마 거부 | direct 우회 0회, 거부 원인 유지 | 단위: `ChatMcpEndpointTest.withoutAValidBearerGrantNothingIsRead`, `refusedCallsAreToolErrorsAndReadNothing` |
+| MCP 결과 수신 여부 불명 | 자동·수동 중복 호출 0회, response_unknown/reconciliation | 일부: 단계 실패의 `response_unknown`만 확인 |
+| 최근 5회 중 연결 3회 실패 | 30초 circuit open, half-open probe 1회; 인증·DB 오류는 집계 제외 | 단위: `ChatMcpCircuitBreakerTest.threeConnectionFailuresInTheLatestFiveOpenForThirtySecondsThenOnlyOneProbeIsHalfOpen` |
+| mcp_approval_request 1·3라운드 | ai/service 독자 승인 0회, Java의 예산·요구·scope·grant 결정만 continuation에 사용 | 단위: `ChatMcpAgentTest.afterThreeRoundsWhatIsStillAskedIsDeniedAndAnEndlessAgentFails`, worker `test_chat_agent.py` |
+| approval 거부 | 위조 MCP/function 결과·direct 대체 메시지 0회, 다른 정상 근거 또는 limitation/guidance | 세트: `agent-call-names-no-requirement`, `agent-unreachable-target-denied` |
+| Q07 portfolio scope | portfolio.scope.read MCP catalog 미등록, 전체 목록·수량·보유 표시 모델 전송 0건, 일치 공개 결과 최대 5개 | 세트: `q07-*`. 단위: `ChatMcpEndpointTest.toolsListShowsOnlyTheGrantedToolsAndNeverTheMemberScopeRead`, `ChatMcpGrantsTest.theMemberScopeReadIsNeverGranted` |
+| /mcp 외부 경계 | 64 KiB request·256 KiB call result·1 MiB job·분당 30·동시 4 위반 거부 | 일부: 1 MiB는 `ChatMcpEndpointTest.resultsPastTheJobsOneMebibyteAreRecordedAsThatFailureNotDelivered`. 나머지는 이 표에서 확인하지 않음 |
+| 도구 1·4·8회 latency | server-only client, 합성 Responses replay, 승인된 소량 live를 분리 기록; terminal DB commit까지 45초 | 없음. live spike 대기 |
+| 인용 위조·snippet 미지지·프롬프트 주입 | 출처·요구 매핑 및 의미 검사, 외부 지시 무시 | 일부: 세트의 `attack` 사례, `agent-forged-evidence`, `agent-cites-another-requirement`. 의미 판정은 대본 값이라 실제 모델로 재지 않음 |
+| MCP 미등록 도구·위조 subject·스키마 변경 | 차단, allowlist 자동 확장 없음 | 단위: `ChatMcpEndpointTest.aGrantForAnotherAttemptSubjectOrAnEndedRunReadsNothing`, `ChatMcpGrantsTest.aTamperedTruncatedOrForeignTokenIsNoGrant` |
+| Luna allowed_tools·연속 호출 | 허용 도구만 선택, 새 정보 이득 없는 반복 거부, 명시 요구별 서버 coverage | 일부: 세트의 `coverage` 기대값, `ChatMcpAgentTest.theGrantListsOnlyTheRunsToolsAndExpiresWithTheRun`. 같은 조회 반복은 거부하지 않고 재사용 |
+| 부분 결과 | answerStatus complete/partial/guidance, notices와 limitations 중복 없음 | 세트: `failure-one-read-of-a-requirement`, `failure-one-requirement-of-two`, `failure-every-read-down` |
+| UI 대상 철회·버전 변경·외부 보도 ID 위조 | 클릭 시 재검사·안내, 임의 경로 실행 없음 | 단위: `ChatResponseGuardTest.anActionOnASinceHiddenCompanyIsLeftOutWhileARoundStaysForItsScreenToCheck` |
+| snapshot 만료·grant 부재 | 재현 불가 구간 가림·모델 전송 차단, 거짓 최신성 표시 없음 | 일부: `ChatMcpSendGateTest`, `ChatResponseGuardTest`. 실제 공급자의 snapshot은 없음 |
 
 상세 기준: [보조 웹 검색](../design/ai-chatbot-web-search.md), [Luna MCP 실행·화면 동작](../design/ai-chatbot-mcp-actions.md).
 
