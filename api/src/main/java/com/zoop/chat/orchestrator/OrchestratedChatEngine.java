@@ -445,7 +445,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 notices(directStart, agentNotices, readInPart.stream().filter(id -> explicit(decision, id))
                         .map(id -> byId.get(id).label()).toList()), overrode(run, confirmed, answered),
                 writtenPeriod(run, confirmed, answered),
-                ChatUiActions.of(branches, answered, targets, run.graphVersionId(), run.context().asOf()), clock.instant());
+                ChatUiActions.of(branches, answered, targets, ChatUiActions.citedArticles(kept, keptCitations),
+                        run.graphVersionId(), run.context().asOf()), clock.instant());
         route.put("outcome", "answered").set("coverage", coverage.json());
         return new ChatEngineOutcome.Completed(result, route);
     }
