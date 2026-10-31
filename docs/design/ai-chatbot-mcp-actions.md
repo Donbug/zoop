@@ -130,7 +130,7 @@ MCP endpoint와 direct adapter는 같은 Tool Service·스키마·scope·버전�
 | 상황 | 초기 처리 |
 | --- | --- |
 | Responses 시작 전 health preflight 실패 / circuit open | MCP를 노출하지 않고 Java의 기존 계획·direct adapter로 조회한 뒤, 정규화된 BranchContext를 Luna 생성 입력으로 전달 |
-| Responses 실행 중 MCP 연결·transport 실패 | 같은 실행에서 direct 전환하지 않음. 성공한 결과는 유지하고 `tool_unavailable` notice와 실제 미충족 limitation으로 종료. circuit 통계는 다음 job에 반영 |
+| Responses 실행 중 MCP 연결·transport 실패 | 같은 실행에서 direct 전환하지 않음. 개별 호출 실패는 Luna가 나머지로 답하고 서버가 `tool_unavailable` notice와 실제 미충족 limitation으로 표시. Luna 단계 자체가 실패하면 답변 후보가 없으므로 그 run은 실패로 끝난다(2026-10-31 결정: 공급자의 처리 범위를 모르는 상태에서 다른 경로로 답을 만들지 않는다). circuit 통계는 다음 job에 반영 |
 | 인증·권한·grant 거부 / invalid schema | direct 우회 금지, 자료 차단·원인 유지 |
 | DB·공개 snapshot 장애 | direct도 같은 원천이므로 우회 금지. 독립된 정상 근거만 사용하거나 고정 안내 |
 | 웹 실패 | 다른 공급자·direct 경로로 자동 재검색하지 않음. `web_unavailable` 후 답변 지속 |
@@ -151,7 +151,7 @@ Circuit breaker 초기값은 endpoint별 최근 5회 **연결** 시도 중 3회 
 
 답할 근거가 전혀 없으면 guidance 또는 조회 성공 시 insufficient_evidence의 고정 안내다. Q02 웹 실패는 general_knowledge로 개념 설명 가능하지만 최신 기업 사실·수치·전망을 만들어내지 않는다. 모델 결과 불명/검증 실패 등 failed job에는 기존 ChatFailure 기반 고정 안내를 표시한다. cancelled·미인증·저장/전달 시스템 장애는 completed로 가장하지 않는다. 안전 안내 자체에 다시 모델 검증을 호출할 필요는 없다.
 
-answerStatus·notices는 DTO·저장·OpenAPI·웹 타입·재열람 guard에 함께 들어갔다(저장 migration 없음: 결과 jsonb에 담긴다). direct 경로에서 일부 요구의 조회만 시간 초과·자료 일시 불가로 실패하면 그 요구(와 그것에 기대는 요구)는 `tool_unavailable` limitation이 되고 나머지 요구는 답해 partial이다(2026-10-30). 한 요구의 조회 중 일부만 실패하고 항목을 읽은 조회가 있으면 그 결과로 계속해, 답하면 `tool_unavailable` notice(요구 표현 포함, complete 유지), 못 답하면 `tool_unavailable` limitation이다(2026-10-31). 다른 요구가 기대는 요구는 일부 결과로 다음 단계를 계획하지 않도록 전체를 답하지 않는다. agent 경로도 같다: 승인됐지만 결과가 없는 내부 호출의 요구에 같은 규칙을 쓴다. 답한 요구가 하나도 남지 않거나 어댑터 오류(버그)면 지금처럼 failed다. Luna 단계 자체가 실패하면 답변 후보가 없어 위 표와 달리 notice 없이 실패로 끝난다.
+answerStatus·notices는 DTO·저장·OpenAPI·웹 타입·재열람 guard에 함께 들어갔다(저장 migration 없음: 결과 jsonb에 담긴다). direct 경로에서 일부 요구의 조회만 시간 초과·자료 일시 불가로 실패하면 그 요구(와 그것에 기대는 요구)는 `tool_unavailable` limitation이 되고 나머지 요구는 답해 partial이다(2026-10-30). 한 요구의 조회 중 일부만 실패하고 항목을 읽은 조회가 있으면 그 결과로 계속해, 답하면 `tool_unavailable` notice(요구 표현 포함, complete 유지), 못 답하면 `tool_unavailable` limitation이다(2026-10-31). 다른 요구가 기대는 요구는 일부 결과로 다음 단계를 계획하지 않도록 전체를 답하지 않는다. agent 경로도 같다: 승인됐지만 결과가 없는 내부 호출의 요구에 같은 규칙을 쓴다. 답한 요구가 하나도 남지 않거나 어댑터 오류(버그)면 지금처럼 failed다. Luna 단계 자체가 실패하면 위 표대로 실패로 끝난다.
 
 ## 4. 유형별 도구와 UI 동작
 

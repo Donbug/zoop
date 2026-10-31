@@ -8,11 +8,11 @@
 
 1. `/mcp`를 인터넷 전체가 아니라 승인된 HTTPS ingress로 노출하고 `zoop-ai-chat probe-mcp`가 endpoint의 `401 Bearer` challenge를 확인하는지 본다.
 2. `chat-agent` 목적과 실제 recipient를 가진 model-send grant, `zoop-graph` source, 별도 MCP HMAC 키를 격리 환경에 등록한다. 8-call 시나리오에는 `ZOOP_CHAT_WEB_ENABLED=true`, `ZOOP_CHAT_WEB_PROVIDER=synthetic`과 `web-search:<공급자>` source grant도 필요하다. 키·grant·질문·답변·URL은 spike evidence에 쓰지 않는다.
-3. 합성 기업·근거만 사용해 아래 네 시나리오를 각 5회 실행한다. 같은 실행을 자동 재전송하지 않으며 provider outcome이 unknown이면 그 run은 실패 증거로 남긴다.
+3. 승인된 대상 데이터로 아래 네 시나리오를 각 5회 실행한다(아래 "실행"). 같은 실행을 자동 재전송하지 않으며 provider outcome이 unknown이면 그 run은 실패 증거로 남긴다.
 4. job의 `running` 시각부터 terminal DB commit 시각, 실제 tool/approval/provider 호출 수, provider usage와 추정 비용을 원장에서 추출해 `zoop-chat-live-spike-1` JSON을 만든다(아래 "Evidence 추출").
 5. 보고서 gate를 실행한다. 모든 시나리오가 성공하고 각 job이 45초, 입력 24k, 최종 답변 2k(reasoning 제외)를 지켜야 한다.
 
-질문은 [`scripts/chat_live_spike_scenarios.json`](../../scripts/chat_live_spike_scenarios.json)에 고정했다. 격리 환경은 합성 그래프 `fixture-2026-10-08`과 합성 웹 공급자를 쓰고, 8-call이 쓰는 카카오는 카탈로그에만 넣는다(그래프에 없어 내부 조회가 비어야 웹이 승인된다). 실행기는 없다. 운영자가 질문을 합성 회원으로 보내고 job ID를 manifest에 적는다.
+질문은 [`scripts/chat_live_spike_scenarios.json`](../../scripts/chat_live_spike_scenarios.json)에 고정했다. 합성 그래프 `fixture-2026-10-08`이나 승인된 실제 데이터로 실행할 수 있고 웹은 합성 공급자를 쓴다. 8-call이 쓰는 카카오는 카탈로그에만 있어야 한다(그래프에 없어 내부 조회가 비어야 웹이 승인된다). 실제 데이터에서 이 전제가 깨지면 preflight가 알리고, 시나리오의 기업을 바꿔야 한다. 바꾼 뒤에는 `ChatLiveSpikeScenariosTest`를 돌린다.
 
 필수 시나리오는 `tools-1-rounds-1`, `tools-4-rounds-1`, `tools-4-rounds-3`, `tools-8-rounds-3`이다. 8-call은 내부 6회와 웹 2회로 채운다. 예산과 웹 도구는 구현됐지만(2026-10-30) 이 시나리오를 실행해 확인하지는 않았다. 웹 검색은 개념만 있는 run이 아니면 앞 라운드의 승인된 내부 조회가 0건이거나 잘렸을 때만 승인되므로, 합성 대상과 질문을 그 조건에 맞춰야 한다. 호출 수는 Luna가 고르므로 정확히 8회가 된다는 보장이 없고, 완료 run은 시나리오와 정확히 같아야 한다. 실제 웹 공급자가 없어 합성 공급자로만 측정하며, 공급자가 정해지면 지연을 다시 잰다. 6회를 8회로 기록하지 않으며, 이 시나리오가 통과하거나 별도 정책 revision이 승인되기 전까지 live gate는 닫힌 상태가 맞다.
 
@@ -22,6 +22,27 @@ python scripts/chat_live_spike_report.py /secure/operator/chat-live-spike.json \
 ```
 
 기본 최소 표본은 시나리오당 5회다. 성공은 exit 0과 `gate: passed`, 미달은 exit 2와 구체적인 `failures`, 형식 오류는 exit 64와 `gate: invalid`다. p50/p95는 작은 표본에서도 관측값을 만들지 않는 nearest-rank 방식이다.
+
+## 실행
+
+`scripts/chat_live_spike_run.py`가 환경을 점검하고 질문을 보낸다. 자격 증명은 환경 변수 `ZOOP_SPIKE_EMAIL`, `ZOOP_SPIKE_PASSWORD`로만 받고, 질문·답변·토큰을 출력하지 않는다. 회원은 초기 설정을 마쳐야 한다.
+
+```sh
+# 모델을 부르지 않는다. 그래프의 기업 전제, /mcp의 401 Bearer, 회원 로그인을 확인한다.
+python scripts/chat_live_spike_run.py --base-url "$API" --origin "$WEB_ORIGIN" preflight --mcp-url "$API/mcp"
+
+# 유료 호출이다. 승인 뒤에만 실행한다.
+python scripts/chat_live_spike_run.py --base-url "$API" --origin "$WEB_ORIGIN" run \
+  --base-manifest /secure/operator/chat-live-spike-base.json \
+  --manifest /secure/operator/chat-live-spike-manifest.json \
+  --max-runs 20 --i-approved-paid-calls
+```
+
+- `--base-manifest`는 `schemaVersion`, `candidateCommit`, `approvedBy`, `approvalRef`, `environment`, `policyVersion`, `pricing`만 담는다. `runs`는 실행기가 job마다 저장한다.
+- `--max-runs`는 승인한 전체 상한이고 manifest에 이미 있는 run도 센다. 먼저 `--scenario tools-1-rounds-1 --repeat 1`처럼 한 건만 돌려 경로를 확인할 수 있다.
+- 같은 manifest로 다시 실행하면 모자란 만큼만 보낸다. 실패한 job은 run으로 남고 다시 보내지 않는다.
+- exit 0은 완료, 2는 점검 실패나 상한 도달, 3은 접수 여부가 불명이라 중단한 경우다. 3이면 원장을 먼저 확인하고 그대로 다시 실행하지 않는다.
+- 기본 대기는 job당 120초다.
 
 ## 시나리오 재현성
 
