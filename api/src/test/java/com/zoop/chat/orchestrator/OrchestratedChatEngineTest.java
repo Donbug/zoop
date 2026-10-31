@@ -522,6 +522,84 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
+    void aRequirementAnsweredOnTheRestOfItsReadsSaysOneFailedWithoutBeingPartial() {
+        // D-AI-02: tool_unavailable as a notice, beside an answer that stands on what was read.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9, "issue.read", 0.9), List.of(HYNIX)));
+        tools.put(ChatCapability.ISSUE_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))),
+                List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        ChatResult result = outcome.result();
+        assertEquals("complete", result.answerStatus());
+        assertTrue(result.limitations().isEmpty());
+        assertEquals(List.of("tool_unavailable"), result.notices().stream().map(n -> n.code()).toList());
+        assertEquals(List.of("요구 r1"), result.notices().getFirst().labels());
+        assertEquals("r1", outcome.routeSummary().path("partialFaults").get(0).asString());
+        assertEquals("answered", outcome.routeSummary().path("coverage").get(0).path("status").asString());
+    }
+
+    @Test
+    void aRequirementLeftUnansweredWithAReadMissingIsTheFaultNeverMissingEvidence() {
+        decision = ChatPlannerTest.decision(
+                req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9, "issue.read", 0.9), List.of(HYNIX)),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)));
+        tools.put(ChatCapability.ISSUE_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r2"), evidence(HYNIX))),
+                List.of("r1"), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        assertEquals(List.of("tool_unavailable"), outcome.result().limitations().stream().map(l -> l.kind()).toList());
+        assertTrue(outcome.result().notices().isEmpty());
+        assertEquals("tool_unavailable", outcome.routeSummary().path("coverage").get(0).path("reason").asString());
+    }
+
+    @Test
+    void readsThatReturnedNothingBesideAFaultAnswerNothing() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9, "issue.read", 0.9), List.of(HYNIX)));
+        tools.put(ChatCapability.ISSUE_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(), List.of(),
+                List.of(), false, false));
+
+        assertFailed("transient", null, true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertTrue(generated.isEmpty(), "an empty read beside a fault is not 'nothing found'");
+    }
+
+    @Test
+    void aSourceOfAnotherRequirementIsNotReadInPart() {
+        // The next stage would be planned on part of what the source finds.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("issue.read", 0.9, "company.read", 0.9), List.of("iss-1")),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9)).dependingOn(new Dependency("r1", "exactly", 1)));
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        var control = new Control(Duration.ofSeconds(60));
+
+        assertFailed("transient", null, true, engine().answer(run(), control));
+        assertEquals(2, control.reserved.size(), "the dependent stage never ran");
+        assertTrue(generated.isEmpty());
+    }
+
+    @Test
+    void anAnswerHeldWithAReadMissingIsAFailureToRerun() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9, "issue.read", 0.9), List.of(HYNIX)));
+        tools.put(ChatCapability.ISSUE_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))),
+                List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("hold", "no")));
+
+        assertFailed("transient", null, true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+    }
+
+    @Test
     void anAdapterFaultInOneRequirementStillEndsTheRun() {
         decision = ChatPlannerTest.decision(
                 req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)),

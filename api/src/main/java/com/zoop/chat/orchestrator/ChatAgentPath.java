@@ -51,14 +51,16 @@ public interface ChatAgentPath {
      * The final answer, the results of the calls that ran (as the model received them), the requirements each was approved
      * for ({@code served}, by tool call id), and what the run decided: steps, approved and denied calls. {@code notices} are
      * the codes of web faults the answer went on without (web search design 4: {@code web_unavailable},
-     * {@code web_no_results}, {@code web_budget_exhausted}).
+     * {@code web_no_results}, {@code web_budget_exhausted}). {@code faulted} holds the requirements an approved internal call
+     * left without its result.
      */
     record Outcome(ChatGeneratedAnswer answer, List<ChatToolResult> results, Map<String, List<String>> served, int steps,
-            int approved, int denied, List<String> notices) {
+            int approved, int denied, List<String> notices, Set<String> faulted) {
         public Outcome {
             results = List.copyOf(results);
             served = Map.copyOf(served);
             notices = List.copyOf(notices);
+            faulted = Set.copyOf(faulted);
         }
 
         /** The results of the calls approved for this requirement. */

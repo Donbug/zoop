@@ -58,8 +58,9 @@ import tools.jackson.databind.node.ObjectNode;
  * that runs out ends as {@code response_unknown}. The executor refuses a completion past the run deadline.</li>
  * <li>A model failure is {@code transient}: {@code provider_error} (rerunnable) when nothing was processed or the answer was
  * malformed, {@code response_unknown} (never rerun) when the provider may have processed it.</li>
- * <li>A tool failure ends the run before any count is evaluated: {@code tool_timeout} and unavailable data are transient,
- * an adapter fault is internal. None of them becomes a limitation or "nothing found".</li>
+ * <li>A tool failure leaving nothing answered ends the run before any count is evaluated: {@code tool_timeout} and unavailable
+ * data are transient, an adapter fault is internal. None of them becomes "nothing found". A requirement answered on the rest
+ * of its reads says so in a {@code tool_unavailable} notice; one left unanswered is that limitation.</li>
  * <li>A failed deterministic check, a contradicted claim or prohibited advice is {@code validation_failed}; nothing is
  * regenerated. A section held by the verifier drops the requirements it answers as {@code evidence_insufficient}.</li>
  * <li>Each requirement's end is the server's own record ({@link ChatRequirementCoverage}, in the route summary): an answer
@@ -261,7 +262,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 List<ChatToolResult> web = ran.resultsOf(p.id()).stream().filter(r -> !r.webResults().isEmpty()).toList();
                 if (!web.isEmpty()) results.put(p.id(), web);
             });
-            retrieved = new ChatRetrieval.Outcome(results, Map.of(), Set.of(), null, null);
+            retrieved = new ChatRetrieval.Outcome(results, Map.of(), Set.of(), null, null, Set.of(), Map.of(), null, ran.faulted());
             coverage.read(confirmed, results);
             agentAnswer = ran.answer();
             agentNotices = ran.notices();
@@ -373,6 +374,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         // A requirement still answered by a kept section of its own is answered; a joining section goes with any held part.
         insufficient.removeIf(id -> kept.stream().anyMatch(s -> s.requirementIds().contains(id)));
         if (kept.isEmpty() && retrieved.faulted() != null) throw new Stop(toolFailure(retrieved.faulted()));
+        if (kept.isEmpty() && !retrieved.partial().isEmpty()) throw new Stop(new ChatEngineOutcome.Failed("transient", null, true));
         if (kept.isEmpty()) {
             // The most specific cause the server knows: a limit it hit, then a verdict, then a lookup that found nothing.
             List<String> unanswered = insufficient.stream().filter(id -> byId.get(id).parent() == null).toList();
@@ -394,6 +396,14 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         }
         kept.forEach(s -> s.requirementIds().forEach(coverage::answered));
         for (String id : insufficient) {
+            if (retrieved.partial().contains(id)) {
+                // Unanswered with a read missing: the fault, never "no evidence".
+                coverage.limited(id, ChatRetrieval.TOOL_UNAVAILABLE);
+                if (explicit(decision, id)) {
+                    limitations.add(ChatResults.limitation(ChatRetrieval.TOOL_UNAVAILABLE, byId.get(id).label()));
+                }
+                continue;
+            }
             InsufficientCause cause = held.contains(id) ? EVIDENCE_HELD
                     : retrieved.noneFound().contains(id) ? NOTHING_FOUND : EVIDENCE_INSUFFICIENT;
             coverage.limited(id, cause.code());
@@ -421,6 +431,10 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
 
         Set<String> answered = new HashSet<>();
         kept.forEach(s -> answered.addAll(s.requirementIds()));
+        Set<String> partialFaults = retrieved.partial();
+        List<String> readInPart = confirmed.requirements().stream().map(Planned::id)
+                .filter(id -> partialFaults.contains(id) && answered.contains(id)).toList();
+        if (!partialFaults.isEmpty()) route.putArray("partialFaults").addAll(strings(partialFaults));
         // A map target stays only while a requirement whose tools returned it is still answered.
         Set<String> reachable = new HashSet<>();
         branches.stream().filter(b -> answered.contains(b.requirementId()))
@@ -428,7 +442,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         var targets = passed.graphTargets().stream().filter(g -> reachable.contains(g.id())).toList();
         ChatResult result = ChatResults.answered(run, kept, keptCitations, targets,
                 items(retrieved, answered, "company"), items(retrieved, answered, "issue"), limitations, partial,
-                notices(directStart, agentNotices), overrode(run, confirmed, answered),
+                notices(directStart, agentNotices, readInPart.stream().filter(id -> explicit(decision, id))
+                        .map(id -> byId.get(id).label()).toList()), overrode(run, confirmed, answered),
                 writtenPeriod(run, confirmed, answered),
                 ChatUiActions.of(branches, answered, targets, run.graphVersionId(), run.context().asOf()), clock.instant());
         route.put("outcome", "answered").set("coverage", coverage.json());
@@ -597,11 +612,12 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 hit.url());
     }
 
-    /** What the answer went on without: a direct start, and the web faults of an agent run. */
-    private static List<ChatNotice> notices(boolean directStart, List<String> agentNotices) {
+    /** What the answer went on without: a direct start, the web faults of an agent run, and reads of answered requirements. */
+    private static List<ChatNotice> notices(boolean directStart, List<String> agentNotices, List<String> readInPart) {
         List<ChatNotice> notices = new ArrayList<>();
         if (directStart) notices.add(ChatResults.notice("mcp_direct_start"));
         agentNotices.forEach(code -> notices.add(ChatResults.notice(code)));
+        if (!readInPart.isEmpty()) notices.add(ChatResults.notice(ChatRetrieval.TOOL_UNAVAILABLE, readInPart));
         return notices;
     }
 
