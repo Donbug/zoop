@@ -211,6 +211,21 @@ class ChatAgentPathEngineTest {
         assertEquals(List.of(List.of(ChatCapability.COMPANY_READ)), agent.allowed);
     }
 
+    @Test
+    void aServiceRulePartClosesTheWebForItselfNotForTheFactBesideIt() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q01, 0.9), Map.of("zoopPolicy.read", 0.9)),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.ZOOP_POLICY_READ, ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH));
+        agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of(),
+                List.of());
+        agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
+
+        engine(agent).answer(run(), new Control(Duration.ofSeconds(60)));
+
+        assertTrue(agent.allowed.getFirst().contains(ChatCapability.WEB_SEARCH));
+        assertEquals(List.of(false, true), agent.requirements.getFirst().stream().map(ChatModels.AgentRequirement::web).toList());
+    }
+
     private static final String HIT = "web-" + "a".repeat(32);
 
     private static ChatToolResult webResult() {
@@ -495,7 +510,13 @@ class ChatAgentPathEngineTest {
                 return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
             }
         };
-        var registry = new ChatToolRegistry(List.of(company, issue));
+        ChatTool policy = new ChatTool() {
+            public ChatCapability capability() { return ChatCapability.ZOOP_POLICY_READ; }
+            public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
+                return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
+            }
+        };
+        var registry = new ChatToolRegistry(List.of(company, issue, policy));
         var runner = new ChatToolRunner(registry);
         runners.add(runner);
         ChatModels.Router router = (run, bound) -> {

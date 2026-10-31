@@ -254,7 +254,7 @@ public final class ChatModels {
     }
 
     /** A requirement the agent answers, with the ids the server already resolved for it. */
-    public record AgentRequirement(String id, String label, boolean general, List<String> targets) {
+    public record AgentRequirement(String id, String label, boolean general, List<String> targets, boolean web) {
         public AgentRequirement {
             targets = List.copyOf(targets);
         }

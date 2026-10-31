@@ -129,7 +129,7 @@ class ChatModelStagesTest {
     @Test
     void anAgentStepSendsTheGrantAndToolsButNoServerUrlAndReadsBothOutcomes() {
         var requirement = new com.zoop.chat.orchestrator.ChatModels.AgentRequirement("r1", "SK하이닉스 최근 사건", false,
-                List.of("KRX:000660"));
+                List.of("KRX:000660"), true);
         answer = call -> succeeded(call, """
                 {"responseId":"resp_1","status":"approval_required","mcpCalls":[],"answer":null,
                  "approvalRequests":[{"approvalRequestId":"mcpr_1","toolName":"company_read","arguments":{"targets":["KRX:000660"],"limit":null},"requirementIds":["r1"]}]}""");

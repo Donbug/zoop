@@ -137,7 +137,7 @@ agent 단계가 하나라도 시작된 뒤의 `mcp_unreachable`는 **같은 run�
 1. ~~**model-send grant 검사.**~~ 구현(3장 "모델 전송 gate"). 켜기 전에 운영자가 레지스트리에 `chat-agent` 목적·agent 수신자 grant와 `zoop-graph` source를 등록하고, OpenAI 보유 조건을 거버넌스 10장에 기록해야 한다.
 2. **예산**(단계 2): job 단위 호출 상한 6회(내부 몫, 웹 2회는 따로 센다. rerun은 남은 호출만 쓰고, 계획에 모자라면 `budget_exceeded`로 재실행 불가), agent 라운드당 승인 4건(동시 4개), fan-out 5, agent run 45초(검증·저장까지)·Luna 35초는 구현했다. 요청 캐시·single-flight(인스턴스 안)·재사용 시 gate 재검사·job당 결과 1 MiB도 구현했다(3장). 도구별 시간은 일반 읽기 3초·그래프 계산(`zoop-graph-read`: `graph.path.read`·`graph.version.diff`) 5초로 구현했다(단계 10초와 run 기한으로 줄어듦). 웹 검색 도구의 호출당 7초, job당 웹 2회(내부 6회와 별도), 회원 하루 20회·프로젝트 하루 500회 원자 예약도 구현했다([챗봇 보조 웹 검색 도구](chat-web-search.md)). 남은 것: direct 경로 45초(단계 한도 실측 후), 인스턴스를 넘는 single-flight(필요하면). rate limit은 인스턴스별이다.
 3. ~~**preflight·circuit breaker.**~~ 구현. AI runtime의 무과금 health probe와 Java의 5회/3실패·30초·단일 half-open probe, 시작 전 direct 선택, 실행 중 무대체를 적용했다.
-4. ~~**승인 요청의 요구 매핑.**~~ 구현(`zoop-ai-chat-4`, 4장 흐름 2·4). 웹 검색 gate는 아직 run 단위다([챗봇 보조 웹 검색 도구](chat-web-search.md) 1장).
+4. ~~**승인 요청의 요구 매핑.**~~ 구현(`zoop-ai-chat-4`, 4장 흐름 2·4). 웹 검색 gate도 요구별이다([챗봇 보조 웹 검색 도구](chat-web-search.md) 5장).
 5. **네트워크·운영**: HTTPS 인바운드 노출 범위, 공급자 출발지 제한 여부(IP allowlist만으로 인증하지 않음), 승인된 소량 live latency spike(실제 Responses·MCP 응답 형태 확인 포함). Spike의 승인·합성 데이터·무내용 증거·통과 gate는 [챗봇 MCP live latency spike](../../docs/development/chat-live-spike.md)에 고정했다. HTTPS·출발지 제한 선택, model-send grant, `store=true` 보유 조건·외부 처리 고지, 키 회전, 사고·증거 보존 책임은 [운영 readiness gate](../../docs/development/chat-operations-readiness.md)가 같은 후보 commit의 통과한 spike와 함께 검사한다. 이 검사는 배포나 플래그 변경을 하지 않는다. 총 8회 시나리오(내부 6 + 웹 2)는 상한으로는 가능하지만 실행해 확인하지 않았고, 실제 웹 공급자가 없어 합성 공급자로만 측정할 수 있다(조건은 spike 문서). 그 시나리오가 통과하기 전에는 gate를 통과로 기록하지 않는다.
 
 ## 6. 시험
