@@ -283,14 +283,12 @@ describe('A-ADM-02 이용 통계 (FS065)', () => {
     ).toBeTruthy();
     expect(within(usage).getByText('40.5%')).toBeTruthy();
     expect(within(usage).getByText('15 / 37노출')).toBeTruthy();
-    expect(
-      within(usage).queryByText('3 / 3명 (분모 5 미만이라 비율 숨김)'),
-    ).toBeNull();
     expect(within(usage).queryByText('온보딩 완료율')).toBeNull();
     expect(within(usage).queryByText('표본 부족')).toBeNull();
 
     const interest = screen.getByRole('table', { name: '브리핑 관심도 지표' });
     expect(within(interest).getByText('브리핑 조회율')).toBeTruthy();
+    expect(within(interest).getByText('0 / 4명 (표본 부족)')).toBeTruthy();
     expect(screen.getByText('이 묶음에 제공하는 지표가 없어요.')).toBeTruthy();
     expect(
       screen.getByText('이 기간에 브리핑을 조회하거나 평가한 기록이 없어요.'),

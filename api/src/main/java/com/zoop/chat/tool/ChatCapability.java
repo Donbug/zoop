@@ -15,7 +15,7 @@ public enum ChatCapability {
     SCREEN_SPEC_READ("screenSpec.read", "zoop-help-read", "ZOOP 화면 설명 읽기"),
     ZOOP_POLICY_READ("zoopPolicy.read", "zoop-help-read", "ZOOP 서비스 이용약관과 개인정보 처리방침 읽기"),
     COMPANY_READ("company.read", "zoop-core-read", "기업과 그 기업의 승인된 관계, 관계를 뒷받침하는 근거 읽기"),
-    DOCUMENT_SEARCH("document.search", "zoop-core-read", "기업 뉴스·공시 문서 검색"),
+    DOCUMENT_SEARCH("document.search", "zoop-core-read", "기업의 최근 뉴스·공시 문서 읽기"),
     ISSUE_READ("issue.read", "zoop-core-read", "사건(이슈)과 관련 기업, 사건 근거 읽기"),
     EVIDENCE_RESOLVE("evidence.resolve", "zoop-core-read", "근거 문서의 인용 구간 확인"),
     PERIOD_COMPARE("period.compare", "zoop-core-read", "두 기간의 변화 비교"),
@@ -24,7 +24,16 @@ public enum ChatCapability {
     GRAPH_VERSION_DIFF("graph.version.diff", "zoop-graph-read", "그래프 버전 사이의 차이 계산"),
     BRIEFING_READ("briefing.read", "zoop-briefing-read", "발행된 출근·퇴근 브리핑 읽기"),
     BRIEFING_EVIDENCE("briefing.evidence", "zoop-briefing-read", "브리핑 항목의 근거 읽기"),
-    PORTFOLIO_SCOPE_READ("portfolio.scope.read", "zoop-member-scope-read", "회원 본인의 보유·관심 종목 범위 확인");
+    PORTFOLIO_SCOPE_READ("portfolio.scope.read", "zoop-member-scope-read", "회원 본인의 보유·관심 종목 범위 확인"),
+    /**
+     * The supplementary public web search (web search design): one server-checked query per call, counted apart from the
+     * internal reads. Never planned by the router ({@link ChatToolRegistry#bound}); on the agent path Luna may ask for it
+     * and the server decides each call.
+     */
+    WEB_SEARCH("web.search", ChatCapability.WEB_GROUP, "공개 웹 검색(보조 근거)");
+
+    /** The registry group of the web search, whose calls have their own budget and time limit. */
+    public static final String WEB_GROUP = "web-search";
 
     private final String id;
     private final String group;
@@ -47,6 +56,11 @@ public enum ChatCapability {
 
     public String group() {
         return group;
+    }
+
+    /** Whether it searches the public web rather than reading ZOOP's own data. */
+    public boolean web() {
+        return WEB_GROUP.equals(group);
     }
 
     /** Whether its reads need the run's pinned public graph; ZOOP's own documents do not. */
@@ -76,6 +90,7 @@ public enum ChatCapability {
         return switch (this) {
             case GRAPH_VERSION_DIFF -> List.of(WHOLE_GRAPH);
             case PORTFOLIO_SCOPE_READ -> List.of(MEMBER_SELF);
+            case BRIEFING_READ, BRIEFING_EVIDENCE -> List.of(ChatBriefingRound.LATEST);
             default -> List.of();
         };
     }

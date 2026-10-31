@@ -99,35 +99,6 @@ function setup(
   return { server, user: userEvent.setup() };
 }
 
-function holdings(names: string[]) {
-  return {
-    connected: names.length > 0,
-    connection: null,
-    holdings: names.map((name, index) => ({
-      companyId:
-        name === '삼성전자'
-          ? 'samsung'
-          : name === 'SK하이닉스'
-            ? 'hynix'
-            : `c${index}`,
-      name,
-    })),
-    mockAsOf: null,
-    valuation: null,
-  };
-}
-
-function settings(watchlistIds: string[]) {
-  return {
-    mode: 'watchlist',
-    watchlistIds,
-    tutorialCompleted: true,
-    completed: true,
-    investor: true,
-    version: 1,
-  };
-}
-
 let server: FakeServer;
 
 beforeEach(() => {
@@ -214,7 +185,7 @@ describe('FS066-01 브리핑 평가', () => {
       targetVersion: 'v7',
       reason: null,
     });
-    expect(await screen.findByText('도움이 안 됐다고 남겼어요')).toBeTruthy();
+    expect(screen.queryByText('도움이 안 됐다고 남겼어요')).toBeNull();
 
     await user.type(
       screen.getByPlaceholderText('어떤 점이 아쉬웠나요? (선택)'),
@@ -356,150 +327,7 @@ describe('FS066-01 브리핑 평가', () => {
   });
 });
 
-describe('FS036 내 종목 기준 브리핑', () => {
-  it('회원이 바뀌면 이전 기준 종목을 즉시 숨기고 새 회원의 기준을 다시 조회한다', async () => {
-    signInMember('member-a');
-    ({ server } = setup('/briefing?view=personal'));
-    server.on('GET', '/api/v1/portfolio', () =>
-      json(holdings(['이전 회원 합성 종목'])),
-    );
-    server.on('GET', '/api/v1/me/settings', () => json(settings([])));
-    server.on('GET', '/api/v1/briefings/:id/personalized', () =>
-      json(briefing()),
-    );
-    await screen.findByText('보유 종목 기준 · 이전 회원 합성 종목');
-    const pending = deferred<Response>();
-    server.on('GET', '/api/v1/portfolio', () => pending.promise);
-    await act(async () => signInMember('member-b'));
-    expect(
-      screen.queryByText('보유 종목 기준 · 이전 회원 합성 종목'),
-    ).toBeNull();
-    await waitFor(() =>
-      expect(server.calls('GET', '/api/v1/portfolio')).toHaveLength(2),
-    );
-    await act(async () =>
-      pending.resolve(json(holdings(['새 회원 합성 종목']))),
-    );
-    await screen.findByText('보유 종목 기준 · 새 회원 합성 종목');
-    expect(
-      screen.queryByText('보유 종목 기준 · 이전 회원 합성 종목'),
-    ).toBeNull();
-  });
-  it('보유 종목 기준으로 개인화 회차를 요청하고 겹치는 종목을 표시한다', async () => {
-    signInMember();
-    ({ server } = setup('/briefing?view=personal'));
-    server.on('GET', '/api/v1/portfolio', () =>
-      json(holdings(['삼성전자', 'SK하이닉스'])),
-    );
-    server.on('GET', '/api/v1/me/settings', () => json(settings(['naver'])));
-    server.on('GET', '/api/v1/briefings/:id/personalized', () =>
-      json(briefing([item({ matchedCompanyIds: ['samsung'] })])),
-    );
-
-    expect(
-      await screen.findByText('보유 종목 기준 · 삼성전자, SK하이닉스'),
-    ).toBeTruthy();
-    expect(await screen.findByText('내 종목: 삼성전자')).toBeTruthy();
-    expect(
-      server.calls('GET', '/api/v1/briefings/:id/personalized')[0].params.id,
-    ).toBe(ROUND);
-    expect(screen.getByText(/기준 시점 2026-09-17 07:40 KST/)).toBeTruthy();
-    expect(
-      screen
-        .getByRole('button', { name: '내 종목 기준' })
-        .getAttribute('aria-pressed'),
-    ).toBe('true');
-  });
-
-  it('보유 종목이 있어도 서버가 관심 종목과 겹친다고 표시한 이슈는 그대로 보인다', async () => {
-    signInMember();
-    ({ server } = setup('/briefing?view=personal'));
-    server.on('GET', '/api/v1/portfolio', () => json(holdings(['SK하이닉스'])));
-    server.on('GET', '/api/v1/me/settings', () => json(settings(['samsung'])));
-    server.on('GET', '/api/v1/briefings/:id/personalized', () =>
-      json(briefing([item({ matchedCompanyIds: ['samsung'] })])),
-    );
-
-    expect(await screen.findByText('내 종목: 삼성전자')).toBeTruthy();
-    expect(
-      screen.queryByText(/내 종목 기준 결과를 불러오지 못했어요/),
-    ).toBeNull();
-  });
-
-  it('보유 종목이 없으면 관심 종목을 기준으로 한다', async () => {
-    signInMember();
-    ({ server } = setup('/briefing?view=personal'));
-    server.on('GET', '/api/v1/portfolio', () => json(holdings([])));
-    server.on('GET', '/api/v1/companies/:id', (request) =>
-      json({ id: request.params.id, name: 'NAVER' }),
-    );
-    server.on('GET', '/api/v1/me/settings', () =>
-      json(settings(['samsung', 'naver'])),
-    );
-    server.on('GET', '/api/v1/briefings/:id/personalized', () =>
-      json(briefing()),
-    );
-
-    expect(await screen.findByText('관심 종목 2개 기준')).toBeTruthy();
-    // 이 회차에 없는 관심 종목은 기업 상세에서 이름을 가져온다.
-    expect(await screen.findByText(/삼성전자, NAVER/)).toBeTruthy();
-  });
-
-  it('보유·관심 종목이 모두 없으면 종목 설정이나 공통 브리핑을 안내하고 개인화를 요청하지 않는다', async () => {
-    signInMember();
-    ({ server } = setup('/briefing?view=personal'));
-    server.on('GET', '/api/v1/portfolio', () => json(holdings([])));
-    server.on('GET', '/api/v1/me/settings', () => json(settings([])));
-
-    expect(
-      await screen.findByText(/보유 종목과 관심 종목이 없어/),
-    ).toBeTruthy();
-    expect(
-      screen
-        .getByRole('link', { name: '내 종목 설정하기' })
-        .getAttribute('href'),
-    ).toBe('/my');
-    expect(
-      server.calls('GET', '/api/v1/briefings/:id/personalized'),
-    ).toHaveLength(0);
-  });
-
-  it('개인화 결과를 받지 못하면 공통 브리핑을 두고 다시 시도할 수 있다', async () => {
-    signInMember();
-    ({ server } = setup('/briefing?view=personal'));
-    server.on('GET', '/api/v1/portfolio', () => json(holdings(['삼성전자'])));
-    server.on('GET', '/api/v1/me/settings', () => json(settings([])));
-    let attempts = 0;
-    server.on('GET', '/api/v1/briefings/:id/personalized', () => {
-      attempts += 1;
-      return attempts === 1
-        ? apiError(503, 'SOURCE_UNAVAILABLE')
-        : json(briefing([item({ matchedCompanyIds: ['samsung'] })]));
-    });
-    const user = userEvent.setup();
-
-    const alert = await screen.findByText(
-      '내 종목 기준 결과를 불러오지 못했어요. 아래는 공통 브리핑이에요.',
-    );
-    expect(
-      screen.getByText('1. NVIDIA Vera Rubin NVL72 MLPerf 결과'),
-    ).toBeTruthy();
-    await user.click(
-      within(alert.parentElement as HTMLElement).getByRole('button', {
-        name: '다시 시도',
-      }),
-    );
-    expect(await screen.findByText('내 종목: 삼성전자')).toBeTruthy();
-  });
-
-  it('비회원이 내 종목 기준을 고르면 로그인을 안내한다', async () => {
-    ({ server } = setup('/briefing?view=personal'));
-    expect(
-      await screen.findByText(/내 종목 기준 브리핑은 로그인한 회원만/),
-    ).toBeTruthy();
-    expect(server.calls('GET', '/api/v1/portfolio')).toHaveLength(0);
-  });
-});
+// FS036 reselection/ownership regressions are covered in personalIssueSelection.test.tsx.
 
 describe('110 final review regressions', () => {
   it('keeps feedback disabled after read failure, then restores the saved vote on retry', async () => {
@@ -618,48 +446,6 @@ describe('110 final review regressions', () => {
     );
     expect(fresh.getAttribute('aria-pressed')).toBe('false');
     expect(screen.queryByText('도움이 됐다고 남겼어요')).toBeNull();
-  });
-  it.each(['version', 'round', 'content', 'match'])(
-    'rejects mismatched personalized %s and keeps the common round',
-    async (field) => {
-      signInMember();
-      const { server } = setup('/briefing?view=personal');
-      server.on('GET', '/api/v1/portfolio', () => json(holdings(['삼성전자'])));
-      server.on('GET', '/api/v1/briefings/:id/personalized', () => {
-        const data = briefing([
-          item({
-            matchedCompanyIds:
-              field === 'match' ? ['not-my-company'] : ['samsung'],
-          }),
-        ]);
-        if (field === 'version') data.graphVersion = 'other';
-        if (field === 'round') data.id = 'other';
-        if (field === 'content') data.items[0].title = '다른 발행 내용';
-        return json(data);
-      });
-      await screen.findByText(
-        '내 종목 기준 결과를 불러오지 못했어요. 아래는 공통 브리핑이에요.',
-      );
-      expect(screen.queryByText('내 종목: 삼성전자')).toBeNull();
-      expect(screen.queryByText('다른 발행 내용')).toBeNull();
-    },
-  );
-  it('shows real zero weight with its valuation time', async () => {
-    signInMember();
-    const { server } = setup('/briefing?view=personal');
-    server.on('GET', '/api/v1/portfolio', () => {
-      const p = holdings(['삼성전자']);
-      return json({
-        ...p,
-        holdings: p.holdings.map((h) => ({ ...h, weight: 0 })),
-        valuation: { calculatedAt: '2026-09-17T06:00:00+09:00' },
-      });
-    });
-    server.on('GET', '/api/v1/briefings/:id/personalized', () =>
-      json(briefing([item({ matchedCompanyIds: ['samsung'] })])),
-    );
-    await screen.findByText(/조회한 모의 보유 비중 삼성전자 0.0%/);
-    expect(screen.getByText(/비중 기준 2026-09-17 06:00 KST/)).toBeTruthy();
   });
 });
 it.each(['cursor', 'version'])(

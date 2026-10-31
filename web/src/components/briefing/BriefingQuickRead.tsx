@@ -45,7 +45,7 @@ export default function BriefingQuickRead({
       <p className={NOTE}>핵심 먼저 읽기 · 발행 시 저장한 문장</p>
       <h3
         id="briefing-quick-title"
-        className="mt-2 mb-3 text-xl leading-snug font-bold tracking-tight"
+        className="mt-2 mb-3 text-title leading-snug font-bold tracking-tight"
       >
         {result.edition === 'morning' ? '오늘의 전망' : '다음 거래일의 전망'}
         {forecast?.direction && (
@@ -80,7 +80,7 @@ export default function BriefingQuickRead({
           {change && (
             <details className="mt-4 rounded-panel border border-panel-line bg-zoop-wash p-3">
               <summary
-                className={`min-h-11 cursor-pointer content-center text-sm font-semibold ${FOCUS_RING}`}
+                className={`min-h-11 cursor-pointer content-center text-body font-semibold ${FOCUS_RING}`}
               >
                 {result.edition === 'morning'
                   ? '이전 전망 대비 변화'

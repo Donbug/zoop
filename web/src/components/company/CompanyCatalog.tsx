@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { useCompanyResource, type Resource } from '@/hooks/useCompanyResource';
-import { useAsyncData } from '@/hooks/useAsyncData';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuthStore, selectMemberId } from '@/stores/useAuthStore';
-import { getSettings } from '@/apis/settings/settings';
 import type { GraphResponse } from '@/types/map/graph';
 import CompanyCatalogRow, { type CatalogCompany } from './CompanyCatalogRow';
 
@@ -12,7 +11,9 @@ export default function CompanyCatalog({
   graph: graphResource,
   currentCompany,
   portfolio,
+  settings: sharedSettings,
 }: {
+  settings?: ReturnType<typeof useCompanySettings>;
   graph?: Resource<GraphResponse>;
   currentCompany?: CatalogCompany | null;
   portfolio: {
@@ -39,12 +40,8 @@ export default function CompanyCatalog({
     '',
     false,
   );
-  const settings = useAsyncData(
-    useCallback(
-      () => (member ? getSettings() : Promise.resolve(null)),
-      [member],
-    ),
-  );
+  const ownSettings = useCompanySettings(!sharedSettings);
+  const settings = sharedSettings ?? ownSettings;
   const recentKey = `zoop.company.recent:${owner}`;
   const recent = useMemo(() => {
     let saved: unknown = [];
@@ -143,7 +140,7 @@ export default function CompanyCatalog({
     );
   }
   const heading =
-    'mb-2! block font-mono text-[11px]! font-normal! tracking-[0.12em] text-zoop-muted';
+    'mb-2! block font-mono text-caption! font-normal! tracking-[0.12em] text-zoop-muted';
   const holdingIds = portfolio.data?.connected
     ? portfolio.data.holdings.map((h) => h.companyId)
     : [];
@@ -169,7 +166,7 @@ export default function CompanyCatalog({
       >
         <label
           htmlFor="company-search"
-          className="mb-1.5 block text-[11px] text-zoop-muted"
+          className="mb-1.5 block text-caption text-zoop-muted"
         >
           기업 검색
         </label>
@@ -180,9 +177,9 @@ export default function CompanyCatalog({
             placeholder="종목명"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            className="min-w-0 flex-1 text-[11px]"
+            className="min-w-0 flex-1 text-caption"
           />
-          <button className="shrink-0 bg-zoop-ink! px-2! text-[11px]! text-white">
+          <button className="shrink-0 bg-zoop-ink! px-2! text-caption! text-white">
             검색
           </button>
         </div>

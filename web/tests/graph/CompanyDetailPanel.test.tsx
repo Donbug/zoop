@@ -64,7 +64,6 @@ function renderPanel(token: string | null = null) {
         onClose={vi.fn()}
         onSelectIssue={vi.fn()}
         onFocus={vi.fn()}
-        onConnections={vi.fn()}
         onAskAi={vi.fn()}
       />
     </MemoryRouter>,
@@ -105,6 +104,73 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     });
     renderPanel();
     expect(screen.queryByText('기업명 더 보기')).toBeNull();
+  });
+
+  it('D-GRP-03 선택한 기업을 보유하지 않으면 가상 계좌 보유 영역을 숨긴다', () => {
+    renderPanel('member-token');
+    expect(
+      screen.queryByRole('heading', { name: '가상 계좌 보유' }),
+    ).toBeNull();
+  });
+
+  it('D-GRP-03 선택한 기업을 보유하면 가상 계좌 보유 영역을 표시한다', () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      data: {
+        ...state.data,
+        holding: {
+          companyId: company.id,
+          name: company.name,
+          ticker: company.ticker,
+          quantity: 20,
+          avgPrice: 60000,
+          avgPriceCurrency: 'KRW',
+          marketValue: 1200000,
+          weight: 0.5,
+        },
+      },
+    });
+    renderPanel('member-token');
+    expect(
+      screen.getByRole('heading', { name: '가상 계좌 보유' }),
+    ).toBeTruthy();
+    expect(screen.getByText('20주')).toBeTruthy();
+  });
+
+  it('D-GRP-03 다른 종목만 보유 중이면 선택 기업의 보유 영역을 숨긴다', () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      data: { ...state.data, holding: null },
+    });
+    renderPanel('member-token');
+    expect(
+      screen.queryByRole('heading', { name: '가상 계좌 보유' }),
+    ).toBeNull();
+    expect(
+      screen.queryByText('이 기업의 모의 보유 내역이 없습니다.'),
+    ).toBeNull();
+  });
+
+  it('D-GRP-03 보유 비중을 계산할 수 없으면 대시로 표시한다', () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      data: {
+        ...state.data,
+        holding: {
+          companyId: company.id,
+          name: company.name,
+          ticker: company.ticker,
+          quantity: 20,
+          avgPrice: 60000,
+          avgPriceCurrency: 'KRW',
+          marketValue: null,
+          weight: null,
+        },
+      },
+    });
+    renderPanel('member-token');
+    expect(screen.getByText('-', { selector: 'b' })).toBeTruthy();
+    expect(screen.queryByText('통화 혼합으로 계산 안 함')).toBeNull();
   });
 
   it('튜토리얼 잠금 중에도 실제 SectionError 재시도가 작동한다', async () => {
@@ -176,7 +242,6 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
                 onClose={vi.fn()}
                 onSelectIssue={vi.fn()}
                 onFocus={vi.fn()}
-                onConnections={vi.fn()}
                 onAskAi={vi.fn()}
               />
             }
@@ -236,7 +301,6 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
           onClose={vi.fn()}
           onSelectIssue={vi.fn()}
           onFocus={vi.fn()}
-          onConnections={vi.fn()}
           onAskAi={vi.fn()}
         />
       </MemoryRouter>
@@ -267,5 +331,51 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     expect(
       screen.getByRole('button', { name: '재시도' }).hasAttribute('disabled'),
     ).toBe(false);
+  });
+
+  it('D-GRP-03 N-e 직접 이슈의 정확한 시각은 KST로, 날짜만 있는 값은 그대로 보인다', () => {
+    const [first, second] = company.directIssues;
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      data: {
+        ...state.data,
+        company: {
+          ...company,
+          directIssues: [
+            { ...first, eventTime: '2026-10-08T00:30:00Z' },
+            { ...second, eventTime: '2026-10-07' },
+          ],
+        },
+      },
+    });
+    renderPanel();
+    expect(screen.getByText(/2026-10-08 09:30 KST · 근거/)).toBeTruthy();
+    expect(screen.getByText(/^2026-10-07 · 근거/)).toBeTruthy();
+    expect(screen.queryByText(/2026-10-08T00:30:00Z/)).toBeNull();
+  });
+
+  it('D-GRP-03 N-e 직접 이슈 시각은 받은 정밀도까지만 보인다', () => {
+    const [first, second] = company.directIssues;
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      data: {
+        ...state.data,
+        company: {
+          ...company,
+          directIssues: [
+            {
+              ...first,
+              eventTime: '2026-01-01T00:00:00+09:00',
+              timePrecision: 'year',
+            },
+            { ...second, eventTime: null, timePrecision: 'unknown' },
+          ],
+        },
+      },
+    });
+    renderPanel();
+    expect(screen.getByText(/^2026 · 근거/)).toBeTruthy();
+    expect(screen.queryByText(/00:00 KST/)).toBeNull();
+    expect(screen.getByText(/^시각 미상 · 근거/)).toBeTruthy();
   });
 });

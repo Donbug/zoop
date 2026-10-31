@@ -55,11 +55,12 @@ export function useCompanyData(
           asOf,
         }),
         holding: token
-          ? getPortfolio().then(
-              (portfolio) =>
-                portfolio.holdings.find(
-                  (item) => item.companyId === companyId,
-                ) ?? null,
+          ? getPortfolio().then((portfolio) =>
+              portfolio.connected
+                ? (portfolio.holdings.find(
+                    (item) => item.companyId === companyId,
+                  ) ?? null)
+                : null,
             )
           : Promise.resolve(null),
       };
@@ -70,8 +71,9 @@ export function useCompanyData(
       const errors: CompanyDataState['errors'] = {};
       results.forEach((result, index) => {
         const key = keys[index];
-        if (result.status === 'fulfilled') data[key] = result.value as never;
-        else
+        if (result.status === 'fulfilled') {
+          data[key] = result.value as never;
+        } else
           errors[key] =
             result.reason instanceof Error
               ? result.reason.message

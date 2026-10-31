@@ -80,7 +80,7 @@ export default function CompanyInfoTab({
           {!fields.some(([key]) => provided(company[key])) && !href && (
             <p role="status">확인된 기업 기준정보가 없습니다.</p>
           )}
-          <dl className="grid grid-cols-2 gap-x-4 text-xs max-sm:grid-cols-1">
+          <dl className="grid grid-cols-2 gap-x-4 text-caption max-sm:grid-cols-1">
             {fields.map(([key, label]) => (
               <div key={key} className="min-w-0 border-b border-zoop-line py-4">
                 <dt className="text-zoop-muted">{label}</dt>

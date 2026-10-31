@@ -25,7 +25,7 @@ def test_an_unauthenticated_refusal_with_a_bearer_challenge_is_the_zoop_endpoint
         seen.append(request)
         return httpx.Response(401, headers={"WWW-Authenticate": "Bearer"})
 
-    assert chat_probe.probe(ENV, transport(handle)) == {"schemaVersion": "zoop-ai-chat-1", "mcp": "reachable"}
+    assert chat_probe.probe(ENV, transport(handle)) == {"schemaVersion": "zoop-ai-chat-4", "mcp": "reachable"}
     request = seen[0]
     assert str(request.url) == URL and request.method == "POST"
     assert "authorization" not in request.headers, "the probe carries no grant"
@@ -38,12 +38,17 @@ def test_an_unauthenticated_refusal_with_a_bearer_challenge_is_the_zoop_endpoint
     (httpx.Response(401), "mcp_status_unexpected"),
     (httpx.Response(401, headers={"WWW-Authenticate": "Bearerish"}), "mcp_status_unexpected"),
     (httpx.Response(404), "mcp_status_unexpected"),
-    (httpx.Response(502), "mcp_status_unexpected"),
+    # A gateway in front answering for a backend it could not reach is a connection failure, not the endpoint answering.
+    (httpx.Response(502), "mcp_unavailable"),
+    (httpx.Response(503), "mcp_unavailable"),
+    (httpx.Response(504), "mcp_unavailable"),
+    (httpx.Response(500), "mcp_status_unexpected"),
+    (httpx.Response(403), "mcp_status_unexpected"),
     (httpx.Response(302, headers={"Location": "https://elsewhere.example/mcp"}), "mcp_status_unexpected"),
 ])
 def test_anything_but_the_endpoints_own_refusal_is_unreachable(response, reason):
     result = chat_probe.probe(ENV, transport(lambda request: response))
-    assert result == {"schemaVersion": "zoop-ai-chat-1", "mcp": "unreachable", "reason": reason}
+    assert result == {"schemaVersion": "zoop-ai-chat-4", "mcp": "unreachable", "reason": reason}
 
 
 @pytest.mark.parametrize("error,reason", [
@@ -70,11 +75,11 @@ def test_a_missing_or_invalid_url_is_the_operators_configuration_not_the_servers
 
 
 def test_the_cli_exits_by_outcome(monkeypatch, capsys):
-    monkeypatch.setattr(chat_probe, "probe", lambda: {"schemaVersion": "zoop-ai-chat-1", "mcp": "reachable"})
+    monkeypatch.setattr(chat_probe, "probe", lambda: {"schemaVersion": "zoop-ai-chat-4", "mcp": "reachable"})
     assert chat_cli.main(["probe-mcp"]) == 0
     assert json.loads(capsys.readouterr().out)["mcp"] == "reachable"
 
-    monkeypatch.setattr(chat_probe, "probe", lambda: {"schemaVersion": "zoop-ai-chat-1", "mcp": "unreachable",
+    monkeypatch.setattr(chat_probe, "probe", lambda: {"schemaVersion": "zoop-ai-chat-4", "mcp": "unreachable",
                                                       "reason": "mcp_timeout"})
     assert chat_cli.main(["probe-mcp"]) == 2
     assert json.loads(capsys.readouterr().out)["reason"] == "mcp_timeout"

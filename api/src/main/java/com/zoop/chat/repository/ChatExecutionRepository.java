@@ -40,6 +40,14 @@ public interface ChatExecutionRepository {
     /** Records that the run is about to call a model (after {@link #lockOwned} in the same transaction). */
     void recordModelCall(String jobId, int runs, String attempts, Instant at);
 
+    /** Keeps an attempt's verified result under the run's fence, before it is stored on the job. */
+    boolean keepVerified(String jobId, String ownerToken, int attemptNo, String result, String routeSummary, Instant at);
+
+    Optional<ChatRecoveryResult> verifiedResult(String jobId, int attemptNo);
+
+    /** Forgets the job's kept results: it ended, and they will not be saved again. */
+    void dropVerified(String jobId);
+
     boolean complete(String jobId, String ownerToken, Instant at, String outcome, String messageId, String result,
             String resultSchemaVersion, String routeSummary, String routeSchemaVersion, String attempts);
 
@@ -64,9 +72,18 @@ public interface ChatExecutionRepository {
 
     /**
      * The job's tool calls that count against its budget: every call this attempt reserved, and those of its earlier
-     * attempts that were made (all but {@code cancelled}, a reservation that never ran).
+     * attempts that were made (all but {@code cancelled}, a reservation that never ran). {@code web} counts the web
+     * searches ({@code registry_group = web-search}) instead of the internal reads; every web reservation counts even when
+     * it never started, as its job and daily quota were already taken. The two budgets are apart.
      */
-    int countJobToolCalls(String jobId, int attemptNo);
+    int countJobToolCalls(String jobId, int attemptNo, boolean web);
+
+    /**
+     * Takes {@code calls} web searches from the KST day's quotas of the project and of {@code memberId}, both or neither
+     * (inside the transaction that reserves them). Returns null when taken, else the quota that had too few left:
+     * {@code project} or {@code member}. Nothing is taken then.
+     */
+    String takeWebSearchQuota(String memberId, java.time.LocalDate day, int calls, int memberCap, int projectCap);
 
     /** Stores reserved tool calls (after {@link #lockOwned} in the same transaction). */
     void reserveToolCalls(List<NewChatToolCall> calls, Instant at);

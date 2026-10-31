@@ -133,9 +133,36 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
         job.row = with(job.row, job.row.status(), job.row.phase(), runs, attempts, at, null);
     }
 
+    /** Kept verified results by {@code jobId/attemptNo}. */
+    final Map<String, com.zoop.chat.repository.ChatRecoveryResult> kept = new LinkedHashMap<>();
+    /** How many more completions fail as a lost database connection. */
+    int failingCompletes;
+    boolean refuseKeeping;
+
+    @Override
+    public boolean keepVerified(String jobId, String ownerToken, int attemptNo, String result, String routeSummary, Instant at) {
+        if (refuseKeeping) throw new org.springframework.dao.DataAccessResourceFailureException("connection lost");
+        if (!owned(jobs.get(jobId), ownerToken, at)) return false;
+        return kept.putIfAbsent(jobId + "/" + attemptNo, new com.zoop.chat.repository.ChatRecoveryResult(result, routeSummary)) == null;
+    }
+
+    @Override
+    public Optional<com.zoop.chat.repository.ChatRecoveryResult> verifiedResult(String jobId, int attemptNo) {
+        return Optional.ofNullable(kept.get(jobId + "/" + attemptNo));
+    }
+
+    @Override
+    public void dropVerified(String jobId) {
+        kept.keySet().removeIf(key -> key.startsWith(jobId + "/"));
+    }
+
     @Override
     public boolean complete(String jobId, String ownerToken, Instant at, String outcome, String messageId, String result,
             String resultSchemaVersion, String routeSummary, String routeSchemaVersion, String attempts) {
+        if (failingCompletes > 0) {
+            failingCompletes--;
+            throw new org.springframework.dao.DataAccessResourceFailureException("connection lost");
+        }
         Job job = jobs.get(jobId);
         if (!owned(job, ownerToken, at)) return false;
         job.row = withOutcome(with(job.row, "completed", null, job.row.runs(), attempts, at, at), outcome, result, null);
@@ -197,9 +224,25 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
     }
 
     @Override
-    public synchronized int countJobToolCalls(String jobId, int attemptNo) {
+    public synchronized int countJobToolCalls(String jobId, int attemptNo, boolean web) {
         return (int) toolCalls.stream().filter(c -> c.row.jobId().equals(jobId)
-                && (c.row.attemptNo() == attemptNo || !"cancelled".equals(c.status))).count();
+                && (web || c.row.attemptNo() == attemptNo || !"cancelled".equals(c.status))
+                && "web-search".equals(c.row.registryGroup()) == web).count();
+    }
+
+    /** Web searches taken per KST day and subject ("project" or "member:<id>"). */
+    final Map<String, Integer> webQuotas = new java.util.HashMap<>();
+
+    @Override
+    public synchronized String takeWebSearchQuota(String memberId, java.time.LocalDate day, int calls, int memberCap,
+            int projectCap) {
+        String project = day + "/project";
+        String member = day + "/member:" + memberId;
+        if (webQuotas.getOrDefault(project, 0) + calls > projectCap) return "project";
+        if (webQuotas.getOrDefault(member, 0) + calls > memberCap) return "member";
+        webQuotas.merge(project, calls, Integer::sum);
+        webQuotas.merge(member, calls, Integer::sum);
+        return null;
     }
 
     @Override
@@ -258,9 +301,14 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
         return toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.row.attemptNo() == attemptNo
                         && "succeeded".equals(c.status) && c.end != null && c.end.result() != null)
                 .sorted(Comparator.comparingInt(c -> c.row.callIndex()))
-                .map(c -> new com.zoop.chat.repository.ChatKeptToolResult(c.row.toolCallId(), c.row.capabilityId(),
-                        c.end.result()))
+                .map(this::kept)
                 .toList();
+    }
+
+    private com.zoop.chat.repository.ChatKeptToolResult kept(ToolCall c) {
+        return new com.zoop.chat.repository.ChatKeptToolResult(c.row.jobId(), jobs.get(c.row.jobId()).row.memberId(),
+                c.row.attemptNo(), c.row.toolCallId(), c.row.capabilityId(), c.row.requestMeta(), c.row.inputDigest(),
+                c.end.result());
     }
 
     @Override
@@ -270,8 +318,7 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
                         && c.row.capabilityId().equals(capabilityId) && c.row.inputDigest().equals(inputDigest)
                         && "succeeded".equals(c.status) && c.end != null && c.end.result() != null)
                 .min(Comparator.comparingInt(c -> c.row.callIndex()))
-                .map(c -> new com.zoop.chat.repository.ChatKeptToolResult(c.row.toolCallId(), c.row.capabilityId(),
-                        c.end.result()));
+                .map(this::kept);
     }
 
     @Override
@@ -326,7 +373,10 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
             String afterId, int limit) { throw new UnsupportedOperationException(); }
     @Override public boolean deleteSession(String sessionId) { throw new UnsupportedOperationException(); }
     @Override public int countJobs(String sessionId) { throw new UnsupportedOperationException(); }
-    @Override public List<ChatJobRow> jobs(String sessionId) { throw new UnsupportedOperationException(); }
+    @Override public List<ChatJobRow> jobs(String sessionId) {
+        return jobs.values().stream().map(job -> job.row)
+                .filter(row -> row.sessionId().equals(sessionId) && row.result() != null).toList();
+    }
     @Override public Optional<ChatJobRow> activeJob(String sessionId) { throw new UnsupportedOperationException(); }
     @Override public int nextSeq(String sessionId) { throw new UnsupportedOperationException(); }
     @Override public boolean insertJob(NewChatJob job) { throw new UnsupportedOperationException(); }

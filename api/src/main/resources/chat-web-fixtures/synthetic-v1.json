@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "zoop-chat-web-fixture-1",
+  "description": "Synthetic web search hits for local and test runs only. Every page is under a reserved example domain and none is a real source.",
+  "queries": {
+    "HBM": [
+      {
+        "url": "https://news.example.com/synthetic/hbm-explained",
+        "title": "[합성] HBM이란 무엇인가",
+        "snippet": "[합성 자료] HBM(High Bandwidth Memory)은 여러 개의 D램을 수직으로 쌓아 데이터 전송 폭을 넓힌 메모리다.",
+        "publishedAt": "2026-10-01T00:00:00Z"
+      },
+      {
+        "url": "https://wiki.example.org/synthetic/HBM",
+        "title": "[합성] HBM 개요",
+        "snippet": "[합성 자료] 고대역폭 메모리는 GPU·AI 가속기에 주로 쓰인다.",
+        "publishedAt": null
+      }
+    ],
+    "EUV 수출 규제": [
+      {
+        "url": "https://news.example.com/synthetic/euv-export",
+        "title": "[합성] EUV 장비 수출 규제 동향",
+        "snippet": "[합성 자료] 노광 장비 수출 규제 범위가 논의되고 있다는 합성 기사 요약.",
+        "publishedAt": "2026-10-20T00:00:00Z"
+      }
+    ]
+  },
+  "unavailable": ["장애 시험"]
+}

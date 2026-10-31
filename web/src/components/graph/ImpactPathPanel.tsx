@@ -130,7 +130,7 @@ export default function ImpactPathPanel({
       </header>
       <div className={ui.scroll} aria-busy={loading}>
         {impact?.metadata.partial && (
-          <p className="px-4 py-2 text-[11px] text-zoop-alert" role="status">
+          <p className="px-4 py-2 text-caption text-zoop-alert" role="status">
             현재 공개 권한을 확인할 수 있는 근거만 표시합니다.
           </p>
         )}
@@ -206,7 +206,7 @@ export default function ImpactPathPanel({
                             {node?.label ?? step.id}
                           </strong>
                           <button
-                            className="mt-1 text-[11px] font-semibold underline disabled:text-panel-muted"
+                            className="mt-1 text-caption font-semibold underline disabled:text-panel-muted"
                             disabled={stepEvidence.length === 0}
                             data-tutorial-action={
                               tutorialEvidence ? 'evidence' : undefined

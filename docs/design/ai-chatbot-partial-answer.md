@@ -56,11 +56,11 @@
   - 배경: `<원 라벨> — 일반 배경(특정 기업·사건의 사실 제외)`
   - 워커 계약 `Branch.label`은 4,000자(code point) 이하다. 접미사를 붙여 넘치면 원래 라벨이 아니라 **하위 요구 라벨의 앞부분만** code point 단위로 잘라 접미사 자리를 만든다(`ChatPlan.Planned.MAX_LABEL`). 원래 요구는 그대로 둔다.
 - 공개 `ChatResult.sections`에는 요구 ID가 나가지 않는다(`ChatResults.answered`). 그래서 **공개 OpenAPI는 바뀌지 않는다.** limitation 종류도 기존 것만 쓴다.
-- 워커 계약 `zoop-ai-chat-1`도 바뀌지 않는다. 하위 요구는 기존 `general=true` branch로 간다.
+- 워커 단계 계약은 `zoop-ai-chat-4`다. 하위 요구는 `general=true` branch로 가고 검증에는 `sectionId`·`requirementIds`를 보낸다. 서버 조회 사실은 같은 요구의 근거 구간에만 붙이며 일반 지식 구간에는 붙이지 않는다.
 - route 요약(`chat_jobs.route`)의 요구 항목에 `origin`(`router` / `concept` / `background`)과 `parent`를 남겨 감사할 수 있게 한다.
 - 상한:
   - 하위 요구는 원래 요구마다 최대 1개다. 명시 요구 상한 6개(`MAX_REQUIREMENTS`)에는 세지 않는다.
-  - 생성 단계는 branch를 최대 6개 받는다(워커 계약 `zoop-ai-chat-1`의 `branches` 상한, `ChatPlanner.MAX_BRANCHES`). 그래서 limitation이 아닌 라우터 요구와 하위 요구를 합쳐 6개가 될 때까지만, 앞 요구부터 하위 요구를 만든다. 남는 자리가 없으면 만들지 않는다. 2부의 배경 하위 요구는 개념 하위 요구 뒤에 같은 자리를 나눠 쓴다.
+  - 생성 단계는 branch를 최대 6개 받는다(워커 계약 `zoop-ai-chat-4`의 `branches` 상한, `ChatPlanner.MAX_BRANCHES`). 그래서 limitation이 아닌 라우터 요구와 하위 요구를 합쳐 6개가 될 때까지만, 앞 요구부터 하위 요구를 만든다. 남는 자리가 없으면 만들지 않는다. 2부의 배경 하위 요구는 개념 하위 요구 뒤에 같은 자리를 나눠 쓴다.
 
 ### 3.1 하위 요구 구간의 추가 검사
 

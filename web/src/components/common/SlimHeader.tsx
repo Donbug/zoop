@@ -16,13 +16,13 @@ export default function SlimHeader({
         aria-label="ZOOP"
         className="flex items-center gap-1.5 no-underline focus-visible:outline-2 focus-visible:outline-offset-2"
       >
-        <strong className="font-inter text-base font-extrabold">ZOOP</strong>
+        <strong className="font-heading text-lead font-extrabold">ZOOP</strong>
       </Link>
       <div
         aria-label="화면 도구"
         className="flex items-center gap-2 text-zoop-muted"
       >
-        <span className="grid size-8 place-items-center" aria-hidden="true">
+        {/* <span className="grid size-8 place-items-center" aria-hidden="true">
           <img
             src="/graph-assets/slim-archive.svg"
             width="16"
@@ -30,7 +30,7 @@ export default function SlimHeader({
             alt=""
             data-icon
           />
-        </span>
+        </span> */}
         {themeSwitch ? (
           <button
             type="button"
