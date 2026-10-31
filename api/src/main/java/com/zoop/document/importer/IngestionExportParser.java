@@ -50,7 +50,7 @@ public final class IngestionExportParser {
     private static final Set<String> COLLECTED_KEYS = Set.of("provenance", "collection");
     /**
      * The operator-declared publishing outlet; the ledger omits the key when none was declared, so every older export (which never has
-     * it) stays valid and unchanged. It is the only optional observation key that is not a collection fact.
+     * it) stays valid and unchanged. Language is independently optional and does not change app metadata or public responses.
      */
     private static final String PUBLISHER = "publisher";
     /**

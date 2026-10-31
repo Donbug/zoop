@@ -1,0 +1,11 @@
+{
+  "name": "zoop-retained-html-extractor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {"node": ">=22"},
+  "dependencies": {
+    "defuddle": "0.19.6",
+    "linkedom": "0.18.14"
+  }
+}

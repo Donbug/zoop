@@ -731,6 +731,29 @@ def mutated(bundle: dict, change) -> dict:
     return copy
 
 
+def test_source_policy_shapes_preserve_history_and_require_current_country_pin(valid_bundle):
+    current = copy.deepcopy(valid_bundle)
+    assert all(source["policies"]["policy"] == "zoop-relation-policy-2"
+               and source["policies"]["countryContext"] == "zoop-country-context-1" for source in current["sources"])
+    validate_bundle(current)
+    historical = copy.deepcopy(current)
+    for source in historical["sources"]:
+        source["policies"]["policy"] = "zoop-relation-policy-1"
+        del source["policies"]["countryContext"]
+    before = json_bytes(historical)
+    validate_bundle(historical)
+    assert json_bytes(historical) == before
+    for change in (lambda p: p.pop("countryContext"), lambda p: p.update(countryContext="zoop-country-context-2"),
+                   lambda p: p.update(countryContext=None), lambda p: p.update(countryContext=""),
+                   lambda p: p.update(policy="zoop-relation-policy-1"), lambda p: p.update(policy="zoop-relation-policy-3"),
+                   lambda p: p.update(unrecognized="pin")):
+        broken = copy.deepcopy(current)
+        change(broken["sources"][0]["policies"])
+        with pytest.raises(ExtractionFailure) as caught:
+            validate_bundle(broken)
+        assert caught.value.code == "handoff_bundle_invalid"
+
+
 def test_the_valid_bundle_validates_and_every_listed_corruption_is_refused(valid_bundle):
     validate_bundle(valid_bundle)
     cases = {

@@ -15,7 +15,7 @@ from . import ingestion_parsers as parsers
 from .ingestion_contracts import (SCHEMA, reserved_state_roots, MAX_INPUT, Authority, Export, IngestionFailure, Inspect, Item,
     Manifest, Receipt, Registry, Run, byte_hash, canonical, digest, now, read_file, timestamp)
 
-PROVENANCE = {"authored-files": "authored_control", "collected-http": "collected_http"}
+PROVENANCE = {"authored-files": "authored_control", "collected-http": "collected_http", "retained-private": "retained_private"}
 
 _SQL = """
 CREATE TABLE IF NOT EXISTS blobs(hash TEXT PRIMARY KEY, data BLOB NOT NULL);
@@ -166,6 +166,21 @@ class Ingestor:
         row = self.store.one("SELECT * FROM rounds WHERE id=? AND source=?", (rid, source))
         if row is None:
             raise IngestionFailure("round_not_found")
+        if self.authority.public:
+            # The import origin is immutable ledger evidence, not a property of
+            # the registry supplied by this reader. Current public grant revisions
+            # remain valid for genuinely public rounds.
+            evidence = self.store.one("SELECT data FROM blobs WHERE hash=?", (row["registry_hash"],))
+            if evidence is None or byte_hash(evidence["data"]) != row["registry_hash"]:
+                raise IngestionFailure("ingestion_state_invalid")
+            try:
+                schema = json.loads(evidence["data"])["schemaVersion"]
+            except (ValueError, TypeError, KeyError) as exc:
+                raise IngestionFailure("ingestion_state_invalid") from exc
+            if schema in {"zoop-private-processing-1", "zoop-private-execution-1"}:
+                raise IngestionFailure("private_processing_not_public")
+            if schema != SCHEMA:
+                raise IngestionFailure("ingestion_state_invalid")
         return row
 
     def _authorize(self, row, operations=("read", "store")):
@@ -263,6 +278,8 @@ class Ingestor:
                 if (item.collection is not None) != (source.adapter == "collected-http"):
                     # Collected records need a recorded acquisition; authored fixtures can never claim one.
                     raise IngestionFailure("collection_provenance_conflict")
+                if (item.private is not None) != (source.adapter == "retained-private"):
+                    raise IngestionFailure("retained_provenance_conflict")
                 if item.candidate_id in candidate_ids:
                     raise IngestionFailure("candidate_identity_duplicate")
                 candidate_ids.add(item.candidate_id)
@@ -309,15 +326,21 @@ class Ingestor:
             if ref is None:
                 raise IngestionFailure("document_response_missing")
             self._authorize(row)
+            self.authority.admit(row["source"], scope.scope_id, item, ref.sha256)
             # Reuse only document bytes already durably acquired in this exact
             # authorized source/round slice, never an unrelated global BLOB.
             saved = self.store.one("""SELECT b.data FROM candidates c JOIN raw_versions r ON r.id=c.raw_version
                 JOIN blobs b ON b.hash=r.raw_hash WHERE c.round=? AND c.source=? AND r.raw_hash=? LIMIT 1""",
                 (row["id"], row["source"], ref.sha256))
             receipt = self._receipt(row, source, item, ref, url) if item.collection is not None else None
-            raw = saved["data"] if saved is not None else self.authority.fixture(source, ref)
+            if item.private is not None:
+                from .private_retained import retained_input
+                raw, receipt = retained_input(source, scope, item, ref)
+            else:
+                raw = saved["data"] if saved is not None else self.authority.fixture(source, ref)
             if byte_hash(raw) != ref.sha256:
                 raise IngestionFailure("saved_response_hash_mismatch")
+            self.authority.admit(row["source"], scope.scope_id, item, ref.sha256)
             self._authorize(row)
             with self.store.transaction(lambda: self._authorize(row)):
                 document, ambiguity = self._identity(row["source"], item.supplier_document_id, url, key)
@@ -329,6 +352,7 @@ class Ingestor:
                 self.db.execute("INSERT OR IGNORE INTO raw_versions VALUES(?,?,?,?)", (raw_version, document, raw_hash, canonical(item.metadata())))
                 self.db.execute("UPDATE candidates SET document=?,raw_version=?,ambiguity=?,new_raw=? WHERE round=? AND source=? AND page=? AND ordinal=?", (document, raw_version, ambiguity, int(new_raw), *key))
         raw_record = self.store.one("SELECT * FROM raw_versions WHERE id=?", (raw_version,))
+        self.authority.admit(row["source"], scope.scope_id, item, raw_record["raw_hash"])
         if json.loads(row["parser"]) != parsers.profile(scope.article_xpath):
             raise IngestionFailure("parser_profile_changed")
         preparation_key = digest([raw_version, json.loads(row["parser"]), json.loads(row["request"])["cleanerVersion"]])
@@ -343,7 +367,10 @@ class Ingestor:
             current = self.store.one("SELECT ambiguity FROM candidates WHERE round=? AND source=? AND page=? AND ordinal=?", key)
             if not item.supplier_document_id and current["ambiguity"] == "source_identity_ambiguous":
                 raise IngestionFailure("source_identity_ambiguous")
-            parsed = parsers.prepare(raw, item.media_type, scope.article_xpath)
+            if item.private is not None and item.private.record_schema == "zoop-official-source-record-1":
+                parsed = parsers.prepare(raw, item.media_type, scope.article_xpath, retained_schema=item.private.record_schema)
+            else:
+                parsed = parsers.prepare(raw, item.media_type, scope.article_xpath)
         except IngestionFailure as exc:
             self._authorize(row)
             held_content = None
@@ -466,6 +493,7 @@ class Ingestor:
 
     def inspect(self, request: Inspect):
         row = self._round(request.round_id, request.source_id)
+        self._authorize(row, ("read",))
         result = self.result(request.round_id, request.source_id, request.offset, request.limit)
         if not request.document_id:
             return result
@@ -501,6 +529,20 @@ class Ingestor:
         if version is None:
             raise IngestionFailure("document_version_not_in_round")
         content = json.loads(version["content"])
+        if not self.authority.public:
+            candidates = self.db.execute("SELECT * FROM candidates WHERE round=? AND source=? AND document=? AND version=? ORDER BY page,ordinal",
+                                        (round_id, source_id, document_id, document_version)).fetchall()
+            # A document can occur more than once; an inspect resolves an authorized exact member,
+            # while export below additionally checks the requested page/ordinal.
+            failure = None
+            for candidate in candidates:
+                try:
+                    self.authority.member(row, candidate, content)
+                    break
+                except IngestionFailure as exc:
+                    failure = exc
+            else:
+                raise failure or IngestionFailure("private_processing_member_unknown")
         selector = json.loads(row["config"])["scope"]["articleXPath"]
         if "articleXPath" not in content["parserProfile"] or content["parserProfile"]["articleXPath"] != selector or content["parserProfile"] != json.loads(row["parser"]):
             raise IngestionFailure("preparation_profile_unbound")
@@ -519,6 +561,8 @@ class Ingestor:
         By default a consumer needs read and quote-display. A consumer that PERSISTS the exported text (the app document import)
         must pass `require_store`, which additionally requires the current grant to allow `store`; the check runs against the
         current registry on this call like every other right, so no consumer has to parse or trust the registry itself."""
+        if require_store and not self.authority.public:
+            raise IngestionFailure("private_processing_not_public")
         row = self._round(request.round_id, request.source_id)
         operations = ("read", "store", "quote-display") if require_store else ("read", "quote-display")
         candidate = self.store.one("SELECT * FROM candidates WHERE round=? AND source=? AND page=? AND ordinal=?", (request.round_id, request.source_id, request.page, request.ordinal))
@@ -528,17 +572,21 @@ class Ingestor:
         if content["rawVersion"] != request.raw_version:
             raise IngestionFailure("observation_not_found")
         item = Item.model_validate_json(candidate["data"])
+        self.authority.member(row, candidate, content)
         page = self.store.one("SELECT page_id,observed_at FROM pages WHERE round=? AND source=? AND ordinal=?", (request.round_id, request.source_id, request.page))
-        grant = source.grant
         result = {"schemaVersion": SCHEMA, "observation": {"roundId": request.round_id, "sourceId": request.source_id, "page": request.page,
             "ordinal": request.ordinal, "pageId": page["page_id"], "observedAt": page["observed_at"], "documentId": request.document_id,
             "rawVersion": request.raw_version, "documentVersion": request.document_version,
             "url": parsers.normalize_url(item.url, source.allowed_hosts), "title": item.title, "publishedAt": item.published_at,
             "modifiedAt": item.modified_at, "sourceRevision": item.source_revision, "mediaType": item.media_type},
-            "grant": {"grantId": grant.grant_id, "revision": grant.revision}, "document": projection, "locatorMetadata": metadata}
+            "grant": self.authority.reference(source, row, candidate), "document": projection, "locatorMetadata": metadata}
         if item.publisher is not None:
             # Only a declared outlet is exported: absence means unspecified, never null, so an unspecified export keeps its exact earlier keys.
             result["observation"]["publisher"] = item.publisher
+        if item.language is not None:
+            result["observation"]["language"] = item.language
+        if item.private is not None:
+            result["observation"].update(provenance=PROVENANCE["retained-private"], retained=item.private.wire())
         if item.collection is not None:
             # Collected observations alone add provenance + acquisition facts. An authored export keeps exactly the keys the closed
             # application importer (IngestionExportParser) accepts, so its absence of these keys means "authored control".

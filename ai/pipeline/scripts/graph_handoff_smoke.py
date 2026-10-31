@@ -42,6 +42,7 @@ sys.path[:0] = [str(PIPELINE)]
 from scripts.ingestion_smoke import json_bytes, ownership_env  # noqa: E402
 from scripts.extraction_smoke import page  # noqa: E402
 from scripts.relation_smoke import RelKit, SUP, INV, co, converge, ev, find, impact_item, impact_verifier_reply, proposal, tree, world_cite  # noqa: E402
+from zoop_ai_pipeline.extraction_contracts import Catalogue  # noqa: E402
 from zoop_ai_pipeline.graph_projection import review_state  # noqa: E402
 from zoop_ai_pipeline.handoff_contracts import POLICY, app_evidence_id, content_digest  # noqa: E402
 from zoop_ai_pipeline.issue_summary import producer_payload, verifier_payload  # noqa: E402
@@ -68,6 +69,21 @@ SUPPLIER = {"company_id": "SYNTH-3", "name": "합성부품", "role": "supplier"}
 PARTNER = {"company_id": "SYNTH-2", "name": "합성협력", "role": "partner"}        # mapped to co:synth-2, which no public decision carries
 STRANGER = {"company_id": "SYNTH-9", "name": "미등록 법인", "role": "observer"}   # no canonical entry in any upstream
 UNKNOWN = {"company_id": None, "name": "미상 거래처", "role": "counterparty"}      # a name without any company id
+
+
+class HandoffKit(RelKit):
+    """These source masters are known even when their canonical/public mapping is absent; other relation fixtures stay unchanged."""
+
+    @staticmethod
+    def catalogue() -> Catalogue:
+        value = RelKit.catalogue().wire()
+        value["revision"] = "catalogue-handoff-1"
+        next(company for company in value["companies"] if company["companyId"] == "SYNTH-2")["aliases"].append("합성협력")
+        value["companies"].append({"companyId": "SYNTH-9", "name": "미등록 법인", "aliases": [], "ticker": None})
+        return Catalogue.model_validate(value)
+
+    def submit(self, job: str, incoming: dict, events: list[dict] | None = None, **options) -> dict:
+        return {**super().submit(job, incoming, events, **options), "catalogue": self.catalogue().wire()}
 
 
 def korean_date(day: str) -> str:
@@ -156,7 +172,7 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
     target of rel-a's impact, finds rel-b's `event-a` target insufficient, and the factory impact cites a document outside the relation); default none: every impact stage is complete
     with no candidate (`not-proposed`).
     uncited_source: document a2 is ingested under its OWN source id and grant (`UNCITED_SOURCE`), so revoking that grant alone removes one article of the supply issue's summary basis."""
-    kit = RelKit(root)
+    kit = HandoffKit(root)
     valid_text = validity_sentence(valid_from, valid_until) if dated else None
     docs = [{"supplier": "supplier-a", "html": page(SUP, INV, EVT_A, GEO_A, *((CHAIN,) if chain else ())), "publisher": PUBLISHERS["a"]},
             {"supplier": "supplier-a2", "html": page(EVT_A2)},

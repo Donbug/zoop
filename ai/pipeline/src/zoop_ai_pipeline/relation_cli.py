@@ -14,10 +14,11 @@ from pydantic import ValidationError
 
 from .extraction import Sources
 from .extraction_contracts import MAX_REPLAY
-from .ingestion_contracts import Authority, IngestionFailure, read_file
+from .ingestion_contracts import IngestionFailure, read_file
 from .live_runtime import LiveFailure, LiveRuntime
 from .relation import Engine, Fixtures, Store
 from .relation_contracts import MAX_COMMAND, SCHEMA, ExtractionFailure, Review, Selector, Submit, canonical, digest
+from .private_processing import runtime_factory, select_authority
 
 
 def main() -> int:
@@ -26,18 +27,22 @@ def main() -> int:
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--extraction-state-dir", type=Path)
     parser.add_argument("--ingestion-state-dir", type=Path)
-    parser.add_argument("--sources", type=Path)
+    authority_options = parser.add_mutually_exclusive_group()
+    authority_options.add_argument("--sources", type=Path)
+    authority_options.add_argument("--private-processing", type=Path)
     parser.add_argument("--replay", type=Path, help="authored producer fixture (relation/impact stages; replay jobs only)")
     parser.add_argument("--verifier-replay", type=Path, help="independent authored verifier fixture (verify-relation/verify-impact stages; replay jobs only)")
     parser.add_argument("--initial-only", action="store_true", help="resume only if this job has not taken its first dispatch (initial_dispatch_taken otherwise)")
     args = parser.parse_args()
     if args.initial_only and args.command != "resume":
         parser.error("--initial-only is only valid with resume")
-    if args.command != "live-binding" and not all((args.state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources)):
-        parser.error("--state-dir, --extraction-state-dir, --ingestion-state-dir and --sources are required")
+    if args.command != "live-binding" and not all((args.state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources or args.private_processing)):
+        parser.error("--state-dir, --extraction-state-dir, --ingestion-state-dir and one source authority are required")
     store = None
     try:
         if args.command == "live-binding":
+            if args.private_processing is not None:
+                raise IngestionFailure("private_processing_not_public")
             # Offline and keyless: the exact non-secret runtime configuration a live job would freeze.
             binding = LiveRuntime.from_env(need_send=False).binding()
             print(canonical({"schemaVersion": SCHEMA, "binding": binding, "bindingDigest": digest(binding)}))
@@ -52,9 +57,9 @@ def main() -> int:
             raise ExtractionFailure("fixture_not_allowed")
         fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None,
                             read_file(args.verifier_replay, MAX_REPLAY) if args.verifier_replay else None)
-        authority = Authority(args.sources)
+        authority = select_authority(args.sources, args.private_processing)
         store = Store(args.state_dir, args.extraction_state_dir, args.ingestion_state_dir)
-        factory = (lambda need_send: LiveRuntime.from_env(need_send=need_send)) if args.command in {"run", "submit", "resume"} else None
+        factory = runtime_factory(authority) if args.command in {"run", "submit", "resume"} else None
         engine = Engine(store, Sources(args.ingestion_state_dir, authority), args.extraction_state_dir, args.ingestion_state_dir, factory)
         if args.command == "run":
             result = engine.run(request, fixtures)
