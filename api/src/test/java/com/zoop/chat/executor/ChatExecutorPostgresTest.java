@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
 import com.zoop.chat.dto.ChatJobRequest;
 import com.zoop.chat.repository.ChatExecutionRepository;
+import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatRepository;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.service.ChatService;
@@ -121,6 +122,21 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void aKeptResultIsOnePerAttemptAndGoesWhenTheResultIsStored() {
+        engine.script((run, control) -> ScriptedChatEngine.generalAnswer("보관한 답"));
+        String jobId = submit("HBM이 뭐야?");
+        var claim = executor.claimNext().orElseThrow();
+        assertTrue(runs.keepVerified(jobId, claim.ownerToken(), 1, "{\"outcome\":\"answered\"}", "{\"path\":\"direct\"}", Instant.now()));
+        assertFalse(runs.keepVerified(jobId, "someone-else", 2, "{}", null, Instant.now()), "the run's fence applies");
+        assertEquals("{\"path\": \"direct\"}", runs.verifiedResult(jobId, 1).orElseThrow().routeSummary());
+
+        executor.execute(claim);
+
+        assertEquals("completed", service.getJob(member, jobId).status());
+        assertTrue(runs.verifiedResult(jobId, 1).isEmpty());
+    }
+
+    @Test
     void aQueuedQuestionRunsToAStoredResultTheMemberCanRead() {
         engine.script((run, control) -> {
             control.beforeModelCall();
@@ -142,6 +158,10 @@ class ChatExecutorPostgresTest {
         assertEquals("chat-result/v1", jdbc.queryForObject("SELECT result_schema_version FROM chat_jobs WHERE id = ?",
                 String.class, jobId));
         assertFalse(executor.runOnce());
+
+        var row = chats.findJob(jobId).orElseThrow();
+        assertEquals(List.of(jobId), chats.answersBefore(row.sessionId(), row.seq() + 1, 2).stream().map(ChatJobRow::id).toList());
+        assertTrue(chats.answersBefore(row.sessionId(), row.seq(), 2).isEmpty());
     }
 
     @Test
@@ -152,16 +172,17 @@ class ChatExecutorPostgresTest {
         String id = recorder.start(jobId, 2, "chat-router", "replay");
         assertEquals("running", jdbc.queryForObject("SELECT status FROM ai_executions WHERE id = ?", String.class, id));
         recorder.finish(id, "succeeded", "sent", new com.zoop.ai.chat.ChatStageReply.Receipt("typesafe", "systemone-v1", "jev",
-                "chat-router-1", "replay", 12L, null, Instant.now(), Instant.now()), null);
+                "chat-router-1", "replay", 12L, null, 5L, Instant.now(), Instant.now()), null);
         recorder.finish(id, "failed", "not_sent", null, "late");
         var row = jdbc.queryForMap("SELECT feature, execution_mode, status, chat_job_id, stage, model, input_tokens, "
-                + "output_tokens, error_code, finished_at, attempt_no, provider_send_state, provider_revision, "
+                + "output_tokens, reasoning_tokens, error_code, finished_at, attempt_no, provider_send_state, provider_revision, "
                 + "receipt_execution_mode, provider_sent_at, provider_received_at FROM ai_executions WHERE id = ?", id);
         assertEquals("chatbot", row.get("feature"));
         assertEquals("replay", row.get("execution_mode"));
         assertEquals("succeeded", row.get("status"), "an ended execution is not rewritten");
         assertEquals(jobId, row.get("chat_job_id"));
         assertEquals("chat-router", row.get("stage"));
+        assertEquals(5L, ((Number) row.get("reasoning_tokens")).longValue());
         assertEquals(2, ((Number) row.get("attempt_no")).intValue());
         assertEquals("sent", row.get("provider_send_state"));
         assertEquals("systemone-v1", row.get("provider_revision"));

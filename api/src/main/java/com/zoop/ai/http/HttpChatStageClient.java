@@ -23,12 +23,12 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * {@link ChatStageClient} over the shared {@link AiHttpTransport}. The answer must be a {@code zoop-ai-chat-2} result for the
+ * {@link ChatStageClient} over the shared {@link AiHttpTransport}. The answer must be a {@code zoop-ai-chat-4} result for the
  * same invocation and stage; anything else is a {@code RESPONSE_MALFORMED} transport failure, which for this mutating operation
  * means the stage may have sent a request. Error envelopes are the S1 family's ({@code zoop-ai-internal-1}).
  */
 public final class HttpChatStageClient implements ChatStageClient, AutoCloseable {
-    static final String SCHEMA = "zoop-ai-chat-2";
+    static final String SCHEMA = "zoop-ai-chat-4";
     private static final String PATH = "/internal/v1/chat-stages/";
     private static final String MCP_HEALTH_PATH = "/internal/v1/chat-mcp-health";
     private static final Pattern FAILURE_CODE = Pattern.compile("[a-z0-9_]{1,64}");
@@ -109,7 +109,8 @@ public final class HttpChatStageClient implements ChatStageClient, AutoCloseable
         Obj usage = r.object("usage");
         return new ChatStageReply.Receipt(r.string("provider", NAME), r.string("providerRevision", NAME),
                 r.string("model", NAME), r.string("promptVersion", NAME), r.string("executionMode", NAME),
-                usage.optCount("inputTokens"), usage.optCount("outputTokens"), instant(r.string("sentAt", NAME)),
+                usage.optCount("inputTokens"), usage.optCount("outputTokens"), usage.optCount("reasoningTokens"),
+                instant(r.string("sentAt", NAME)),
                 r.optString("receivedAt", NAME).map(HttpChatStageClient::instant).orElse(null));
     }
 

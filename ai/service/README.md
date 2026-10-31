@@ -327,7 +327,7 @@ ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli recover \
 
 ## 챗봇 모델 단계 (`/internal/v1/chat-stages/{stage}`)
 
-챗봇 오케스트레이터가 모델 단계 하나(`chat-router` 네이티브 Jev, `chat-answer` Luna, `chat-verification` 네이티브 Jev, `chat-agent` Luna Responses + ZOOP MCP 한 단계)를 **동기**로 실행하는 다섯 번째 가족이다. scope는 `chat.invoke`이며 설치된 `zoop-ai-chat invoke`만 고정 argv로 실행한다(단계 계약 `zoop-ai-chat-2`, 규칙은 [AI 런타임 준비 §11](../../docs/development/ai-runtime-setup.md)). 검증의 `requestBinding.invocationId`가 호출 ID와 다르면 child 실행 전에 거절한다. worker는 구간·요구·버전에 결속된 서버 조회 사실을 검증하며 출처 grant v1 계약은 그대로 유지한다. 아래 그룹이 없으면 인증 뒤 409 `execution_unavailable`이다.
+챗봇 오케스트레이터가 모델 단계 하나(`chat-router` 네이티브 Jev, `chat-answer` Luna, `chat-verification` 네이티브 Jev, `chat-agent` Luna Responses + ZOOP MCP 한 단계)를 **동기**로 실행하는 다섯 번째 가족이다. scope는 `chat.invoke`이며 설치된 `zoop-ai-chat invoke`만 고정 argv로 실행한다(단계 계약 `zoop-ai-chat-4`, 규칙은 [AI 런타임 준비 §11](../../docs/development/ai-runtime-setup.md)). 검증의 `requestBinding.invocationId`가 호출 ID와 다르면 child 실행 전에 거절한다. worker는 구간·요구·버전에 결속된 서버 조회 사실을 검증하며 출처 grant v1 계약은 그대로 유지한다. 아래 그룹이 없으면 인증 뒤 409 `execution_unavailable`이다.
 
 | 변수 | 규칙 |
 |---|---|

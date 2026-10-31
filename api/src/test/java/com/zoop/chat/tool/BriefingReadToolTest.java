@@ -53,7 +53,10 @@ class BriefingReadToolTest {
                 List.of("briefing:2026-10-30:morning"), 20));
 
         assertEquals(List.of("2026-10-30/morning"), asked);
-        assertEquals("briefing:br-1", output.dataVersion());
+        assertEquals("briefing:2026-10-30:morning:br-1", output.dataVersion());
+        assertEquals(new ChatBriefingRound(java.time.LocalDate.parse("2026-10-30"), "morning"),
+                ChatBriefingRound.ofDataVersion(output.dataVersion()).orElseThrow());
+        assertTrue(ChatBriefingRound.ofDataVersion("briefing:none").isEmpty());
         assertEquals(List.of("iss-1", "iss-2"), output.items().stream().map(ChatToolItem::id).toList());
         var first = output.items().getFirst();
         assertEquals("briefing_item", first.kind());

@@ -13,7 +13,7 @@ import httpx
 import pytest
 
 from zoop_ai import chat_cli, chat_jev, chat_luna, chat_runtime
-from zoop_ai.chat_contracts import ChatGrantRegistry, Receipt, RouterInput, StageRequest, VerificationInput
+from zoop_ai.chat_contracts import ChatGrantRegistry, Receipt, RouterInput, StageRequest, VerificationInput, estimated_tokens
 from zoop_ai.chat_runtime import ChatLedger, LiveSender, ReplaySender, invoke, request_identity, stage_config
 from zoop_ai.provider import ProviderError
 
@@ -49,7 +49,7 @@ def verification_input(invocation: str = "job-1:a1:stage") -> dict[str, Any]:
 
 
 def request(stage: str, payload: dict[str, Any], *, mode: str = "live", invocation: str = "job-1:a1:stage") -> StageRequest:
-    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-2", "invocationId": invocation, "stage": stage,
+    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-4", "invocationId": invocation, "stage": stage,
                                         "mode": mode, "input": payload})
 
 
@@ -72,6 +72,20 @@ def choice(name: str, p: float = 0.97, confidence: float = 0.93) -> dict[str, An
     return {"type": "choice", "choice": name, "probabilities": probabilities, "confidence": confidence}
 
 
+def categorical_choice(name: str, names: list[str], p: float = 0.97, confidence: float = 0.93) -> dict[str, Any]:
+    rest = (1 - p) / (len(names) - 1)
+    probabilities = {candidate: (p if candidate == name else rest) for candidate in names}
+    return {"type": "choice", "choice": name, "probabilities": probabilities, "confidence": confidence}
+
+
+def scripted_answer(question: dict[str, Any], p: float = 0.9) -> dict[str, Any]:
+    if question["type"] == "noul":
+        return noul(p)
+    names = list(question["criteria"])
+    winner = "none" if "none" in names else "supported" if "supported" in names else names[0]
+    return categorical_choice(winner, names)
+
+
 class Endpoint:
     """Records what reached the fake provider and answers with `respond(path, body)`."""
 
@@ -89,7 +103,8 @@ class Endpoint:
 
 def jev_all(p: float = 0.9, model: str = chat_jev.MODEL):
     def respond(path, body):
-        return httpx.Response(200, json={"model": model, "answers": {k: noul(p) for k in body["questions"]},
+        return httpx.Response(200, json={"model": model, "answers": {k: scripted_answer(q, p)
+                                                                        for k, q in body["questions"].items()},
                                          "usage": {"input_tokens": 40, "output_tokens": 3}})
     return respond
 
@@ -102,11 +117,13 @@ def run(req: StageRequest, tmp: Path, endpoint: Endpoint | None = None, *, env=N
 
 # ---- Jev router and verification policy -------------------------------------------------------------------------------------
 
-def test_router_request_carries_texts_only_and_one_noul_per_type_capability_and_advice():
+def test_router_request_carries_texts_and_dependency_choices_without_application_ids():
     body = chat_jev.build_router_request(RouterInput.model_validate(router_input()), chat_jev.MODEL)
     assert body["model"] == chat_jev.MODEL
-    assert len(body["questions"]) == 2 * (8 + 1 + 1)
-    assert all(q["type"] == "noul" for q in body["questions"].values())
+    assert len(body["questions"]) == 2 * (8 + 1 + 1) + 3
+    assert {key for key, q in body["questions"].items() if q["type"] == "choice"} == {
+        "r1-dependency-source", "r1-dependency-cardinality", "r1-dependency-count"}
+    assert set(body["questions"]["r1-dependency-source"]["criteria"]) == {"none", "r0"}
     assert body["state"]["requirements"] == [{"key": "r0", "text": "HBM이 뭐야"}, {"key": "r1", "text": "SK하이닉스 최근 뉴스"}]
     assert "requirementId" not in json.dumps(body["state"]) and "company.read" not in json.dumps(body)
 
@@ -114,7 +131,7 @@ def test_router_request_carries_texts_only_and_one_noul_per_type_capability_and_
 def test_router_answer_keeps_probabilities_and_refuses_a_partial_or_foreign_answer():
     payload = RouterInput.model_validate(router_input())
     questions = chat_jev.build_router_request(payload, chat_jev.MODEL)["questions"]
-    answers = {k: noul(0.05) for k in questions}
+    answers = {k: scripted_answer(question, 0.05) for k, question in questions.items()}
     answers["r0-q02"] = noul(0.93)
     answers["r1-cap0"] = noul(0.81)
     answers["r1-advice"] = noul(0.4)
@@ -122,11 +139,28 @@ def test_router_answer_keeps_probabilities_and_refuses_a_partial_or_foreign_answ
     first, second = routed.requirements
     assert first.requirement_id == "r1" and first.types["Q02"] == 0.93 and first.types["Q03"] == 0.05
     assert second.capabilities == {"company.read": 0.81} and second.prohibited_advice == 0.4
+    assert second.depends_on is None
     with pytest.raises(ValueError, match="native_answers_invalid"):
         chat_jev.interpret_router({"model": chat_jev.MODEL, "answers": dict(list(answers.items())[1:])}, payload,
                                   chat_jev.MODEL)
     with pytest.raises(ValueError, match="native_model_mismatch"):
         chat_jev.interpret_router({"model": "jev-latest", "answers": answers}, payload, chat_jev.MODEL)
+
+
+def test_router_emits_only_a_confident_dependency_on_an_earlier_requirement():
+    payload = RouterInput.model_validate(router_input())
+    questions = chat_jev.build_router_request(payload, chat_jev.MODEL)["questions"]
+    answers = {key: scripted_answer(question, 0.05) for key, question in questions.items()}
+    answers["r1-dependency-source"] = categorical_choice("r0", ["none", "r0"])
+    answers["r1-dependency-cardinality"] = categorical_choice("exactly", ["exactly", "atLeast", "atMost"])
+    answers["r1-dependency-count"] = categorical_choice("count2", [f"count{count}" for count in range(1, 6)])
+    routed = chat_jev.interpret_router({"model": chat_jev.MODEL, "answers": answers}, payload, chat_jev.MODEL)
+    assert routed.requirements[1].depends_on.wire() == {
+        "requirementId": "r1", "cardinality": "exactly", "count": 2}
+
+    answers["r1-dependency-source"] = categorical_choice("r0", ["none", "r0"], p=0.6)
+    assert chat_jev.interpret_router({"model": chat_jev.MODEL, "answers": answers}, payload,
+                                     chat_jev.MODEL).requirements[1].depends_on is None
 
 
 def test_verification_policy_holds_whatever_is_uncertain():
@@ -427,6 +461,47 @@ def test_the_answer_request_is_strict_json_with_the_chat_prompt_and_its_answer_i
         assert bad.receipt is not None, "a received answer keeps its receipt"
 
 
+def sized(content: Any, *, output: int, reasoning: int, finish: str = "stop"):
+    def respond(path, body):
+        return httpx.Response(200, json={"model": "gpt-6-luna", "choices": [{"finish_reason": finish,
+                                                                             "message": {"content": json.dumps(content)}}],
+                                         "usage": {"prompt_tokens": 100, "completion_tokens": output,
+                                                   "completion_tokens_details": {"reasoning_tokens": reasoning}}})
+    return respond
+
+
+GOOD_ANSWER = {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 HBM을 공급한다.", "requirementIds": ["r2"],
+                             "evidenceIds": [EV1]}], "insufficientRequirementIds": [], "graphTargetIds": []}
+
+
+def test_an_answer_is_limited_to_2k_tokens_without_its_reasoning_and_cut_answers_fail_alike(tmp_path):
+    recipient = f"openai-compatible:{stage_config('chat-answer', 'live', LIVE).provider_revision}"
+    endpoint = Endpoint(sized(GOOD_ANSWER, output=7000, reasoning=5000))
+    fits = run(request("chat-answer", answer_input()), tmp_path, endpoint, registry=grants(recipient))
+    assert fits.status == "succeeded", fits
+    assert endpoint.calls[0][1]["max_completion_tokens"] == 8000
+
+    for i, response in enumerate([sized(GOOD_ANSWER, output=7000, reasoning=4999),
+                                  sized(GOOD_ANSWER, output=8000, reasoning=7000, finish="length")]):
+        over = run(request("chat-answer", answer_input(), invocation=f"job-1:a1:long-{i}"), tmp_path, Endpoint(response),
+                   registry=grants(recipient))
+        assert over.failure.code == "output_budget_exceeded" and over.failure.sent and not over.failure.unknown
+        assert over.receipt is not None
+
+
+def test_a_direct_answer_over_its_input_limit_is_refused_before_anything_is_sent(tmp_path, monkeypatch):
+    recipient = f"openai-compatible:{stage_config('chat-answer', 'live', LIVE).provider_revision}"
+    monkeypatch.setattr(chat_runtime, "MAX_INPUT_TOKENS", chat_luna.input_tokens(request("chat-answer", answer_input()).parsed()) - 1)
+    endpoint = Endpoint(sized(GOOD_ANSWER, output=10, reasoning=0))
+    refused = run(request("chat-answer", answer_input()), tmp_path, endpoint, registry=grants(recipient))
+    assert refused.failure.code == "input_budget_exceeded" and not refused.failure.sent
+    assert endpoint.calls == []
+
+
+def test_token_estimates_count_korean_higher_than_latin_text():
+    assert estimated_tokens("a" * 400) == 100 and estimated_tokens("가" * 400) == 300
+
+
 # ---- ledger: idempotency, unknown fate, budget ---------------------------------------------------------------------------
 
 def test_an_invocation_is_sent_once_and_another_input_under_its_id_is_refused(tmp_path):
@@ -585,7 +660,7 @@ def test_the_live_ceiling_is_shared_by_all_chat_stages(tmp_path):
 def replay_file(tmp: Path, req: StageRequest, response: Any) -> Path:
     path = tmp / "replay.json"
     entry = {"stage": req.stage, "inputDigest": request_identity(req, stage_config(req.stage, "replay")), "response": response}
-    path.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-2", "recordingKind": "authored-test", "responses": [entry]}),
+    path.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-4", "recordingKind": "authored-test", "responses": [entry]}),
                     encoding="utf-8")
     return path
 
@@ -593,7 +668,8 @@ def replay_file(tmp: Path, req: StageRequest, response: Any) -> Path:
 def test_replay_answers_by_exact_identity_and_a_mismatch_sends_nothing(tmp_path):
     req = request("chat-router", router_input(), mode="replay")
     questions = chat_jev.build_router_request(req.parsed(), "authored-synthetic-chat-router")["questions"]
-    path = replay_file(tmp_path, req, {"model": "authored-synthetic-chat-router", "answers": {k: noul(0.5) for k in questions}})
+    path = replay_file(tmp_path, req, {"model": "authored-synthetic-chat-router",
+                                      "answers": {k: scripted_answer(q, 0.5) for k, q in questions.items()}})
     result = invoke(req, state_dir=tmp_path, registry=None, sender=ReplaySender(path), env={})
     assert result.status == "succeeded" and result.receipt.execution_mode == "replay"
     other = request("chat-router", {**router_input(), "turns": [{"text": "다른"}]}, mode="replay", invocation="job-2:a1:r")
@@ -604,7 +680,8 @@ def test_replay_answers_by_exact_identity_and_a_mismatch_sends_nothing(tmp_path)
 def test_cli_prints_the_result_and_exits_by_outcome(tmp_path, monkeypatch, capsys):
     req = request("chat-router", router_input(), mode="replay")
     questions = chat_jev.build_router_request(req.parsed(), "authored-synthetic-chat-router")["questions"]
-    path = replay_file(tmp_path, req, {"model": "authored-synthetic-chat-router", "answers": {k: noul(0.5) for k in questions}})
+    path = replay_file(tmp_path, req, {"model": "authored-synthetic-chat-router",
+                                      "answers": {k: scripted_answer(q, 0.5) for k, q in questions.items()}})
     state = tmp_path / "state"
     state.mkdir()
     monkeypatch.setattr("sys.stdin", io.StringIO(req.model_dump_json(by_alias=True)))
@@ -612,7 +689,7 @@ def test_cli_prints_the_result_and_exits_by_outcome(tmp_path, monkeypatch, capsy
     printed = json.loads(capsys.readouterr().out)
     assert printed["status"] == "succeeded" and printed["invocationId"] == req.invocation_id
 
-    monkeypatch.setattr("sys.stdin", io.StringIO('{"schemaVersion":"zoop-ai-chat-2"}'))
+    monkeypatch.setattr("sys.stdin", io.StringIO('{"schemaVersion":"zoop-ai-chat-4"}'))
     assert chat_cli.main(["invoke", "--state-dir", str(state)]) == 64
     assert json.loads(capsys.readouterr().out) == {"error": "request_invalid"}
 
@@ -646,7 +723,7 @@ def test_path_pairs_keep_their_status_and_steps_name_only_quoted_evidence():
 
 def test_the_answer_prompt_explains_paths_and_its_version_moved():
     assert "status=cut" in chat_luna.PROMPT and "evidenceIds" in chat_luna.PROMPT
-    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-10-26-1-")
+    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-10-30-1-")
 
 
 def test_the_answer_prompt_and_schema_know_zoop_document_sections():

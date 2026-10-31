@@ -4982,6 +4982,252 @@ paths:
           differences:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
         teamQuestions: []
+  "/api/v1/admin/pipeline/rounds":
+    get:
+      tags:
+        - "admin-pipeline"
+      summary: "그래프 정기 회차 목록 조회"
+      description: "그래프 정기 회차(#55) 목록. 최신 슬롯부터, stage 필터, 불투명 커서. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      operationId: "listGraphRounds"
+      parameters:
+        -
+          name: "stage"
+          in: "query"
+          required: false
+          schema:
+            anyOf:
+              -
+                "$ref": "#/components/schemas/GraphRoundStage"
+              -
+                type: "null"
+        -
+          "$ref": "#/components/parameters/RequestId"
+        -
+          "$ref": "#/components/parameters/Cursor"
+        -
+          "$ref": "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: "정상 응답"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/GraphRoundList"
+          headers:
+            X-Request-ID:
+              description: "실제 사용한 전송별 요청 ID"
+              schema:
+                type: "string"
+        "401":
+          "$ref": "#/components/responses/Error401"
+        "403":
+          "$ref": "#/components/responses/Error403"
+        "422":
+          "$ref": "#/components/responses/Error422"
+        "500":
+          "$ref": "#/components/responses/Error500"
+        "503":
+          "$ref": "#/components/responses/Error503"
+      security:
+        -
+          adminSession: []
+      x-zoop:
+        fsIds: ["FS058", "FS059", "FS063", "FS067-01"]
+        nfsIds: ["NFS001", "NFS002", "NFS004", "NFS008", "NFS012"]
+        screenIds: ["A-ADM-03"]
+        wbsIds: ["6.1.2", "6.11.1", "6.10.6", "6.10.16", "6.5.4", "6.5.5", "6.5.6"]
+        priority: "P1"
+        authority: "관리자(작업별 권한)"
+        errorCodes: ["INVALID_REQUEST", "INVALID_CURSOR", "SOURCE_UNAVAILABLE", "INTERNAL_ERROR", "AUTH_REQUIRED", "MEMBER_REQUIRED", "ACCESS_DENIED"]
+        prototype:
+          method: null
+          path: null
+          operationId: null
+          differences:
+            - "직접 대응 BFF 작업 없음. 정기 회차는 정식 API(#55)에서 처음 생긴다."
+        teamQuestions:
+          - "회차 단위 보기의 FE 구성(단계 진행 바·실패 사유·변경 없음 표시)은 화면 계획과 함께 검증한다."
+    post:
+      tags:
+        - "admin-pipeline"
+      summary: "그래프 정기 회차 수동 시작"
+      description: "지금 또는 지정 슬롯의 회차를 관리자가 시작한다(started_by=admin:<id>). 자동 회차와 같은 단계를 밟는다. 스케줄러와 함께 구현되며 그 전에는 404. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      operationId: "startGraphRound"
+      parameters:
+        -
+          "$ref": "#/components/parameters/RequestId"
+        -
+          "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/GraphRoundStartRequest"
+      responses:
+        "202":
+          description: "회차 행이 만들어졌고 스케줄러가 진행한다"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/GraphRoundOut"
+          headers:
+            X-Request-ID:
+              description: "실제 사용한 전송별 요청 ID"
+              schema:
+                type: "string"
+        "401":
+          "$ref": "#/components/responses/Error401"
+        "403":
+          "$ref": "#/components/responses/Error403"
+        "404":
+          "$ref": "#/components/responses/Error404"
+        "409":
+          "$ref": "#/components/responses/Error409"
+        "422":
+          "$ref": "#/components/responses/Error422"
+        "500":
+          "$ref": "#/components/responses/Error500"
+        "503":
+          "$ref": "#/components/responses/Error503"
+      security:
+        -
+          adminSession: []
+      x-zoop:
+        fsIds: ["FS058", "FS059", "FS063", "FS067-01"]
+        nfsIds: ["NFS001", "NFS002", "NFS004", "NFS008", "NFS012"]
+        screenIds: ["A-ADM-03"]
+        wbsIds: ["6.1.2", "6.11.1", "6.10.6", "6.10.16", "6.5.4", "6.5.5", "6.5.6"]
+        priority: "P2"
+        authority: "관리자(작업별 권한)"
+        errorCodes: ["INVALID_REQUEST", "RESOURCE_NOT_FOUND", "REVISION_CONFLICT", "IDEMPOTENCY_CONFLICT", "SOURCE_UNAVAILABLE", "INTERNAL_ERROR", "AUTH_REQUIRED", "MEMBER_REQUIRED", "ACCESS_DENIED"]
+        prototype:
+          method: null
+          path: null
+          operationId: null
+          differences:
+            - "직접 대응 BFF 작업 없음. 스케줄러(PR-R2)와 함께 구현한다."
+        teamQuestions:
+          - "수동 시작이 같은 슬롯의 자동 회차와 겹칠 때의 규칙(같은 슬롯은 한 행)을 FE 문구와 함께 확정한다."
+  "/api/v1/admin/pipeline/rounds/{roundId}":
+    get:
+      tags:
+        - "admin-pipeline"
+      summary: "그래프 정기 회차 상세·이력 조회"
+      description: "회차 행 전체와 이벤트 타임라인(코드·요청 ID·시각·detail). 경로·본문·비밀은 없다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      operationId: "getGraphRound"
+      parameters:
+        -
+          name: "roundId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+            pattern: "^round-[0-9]{8}T[0-9]{4}$"
+        -
+          "$ref": "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: "정상 응답"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/GraphRoundDetail"
+          headers:
+            X-Request-ID:
+              description: "실제 사용한 전송별 요청 ID"
+              schema:
+                type: "string"
+        "401":
+          "$ref": "#/components/responses/Error401"
+        "403":
+          "$ref": "#/components/responses/Error403"
+        "404":
+          "$ref": "#/components/responses/Error404"
+        "500":
+          "$ref": "#/components/responses/Error500"
+        "503":
+          "$ref": "#/components/responses/Error503"
+      security:
+        -
+          adminSession: []
+      x-zoop:
+        fsIds: ["FS058", "FS059", "FS063", "FS067-01"]
+        nfsIds: ["NFS001", "NFS002", "NFS004", "NFS008", "NFS012"]
+        screenIds: ["A-ADM-03"]
+        wbsIds: ["6.1.2", "6.11.1", "6.10.6", "6.10.16", "6.5.4", "6.5.5", "6.5.6"]
+        priority: "P1"
+        authority: "관리자(작업별 권한)"
+        errorCodes: ["RESOURCE_NOT_FOUND", "SOURCE_UNAVAILABLE", "INTERNAL_ERROR", "AUTH_REQUIRED", "MEMBER_REQUIRED", "ACCESS_DENIED"]
+        prototype:
+          method: null
+          path: null
+          operationId: null
+          differences:
+            - "직접 대응 BFF 작업 없음."
+        teamQuestions: []
+  "/api/v1/admin/pipeline/rounds/{roundId}/retry":
+    post:
+      tags:
+        - "admin-pipeline"
+      summary: "실패한 그래프 정기 회차 재시도"
+      description: "failed 또는 대기 초과 회차를 같은 roundId로 멈춘 단계부터 다시 시도한다(이벤트 retried에 관리자 id, 감사 기록; started_by는 바꾸지 않음). 스케줄러와 함께 구현되며 그 전에는 404. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      operationId: "retryGraphRound"
+      parameters:
+        -
+          name: "roundId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+            pattern: "^round-[0-9]{8}T[0-9]{4}$"
+        -
+          "$ref": "#/components/parameters/RequestId"
+        -
+          "$ref": "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: "재시도가 접수됐다"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/GraphRoundOut"
+          headers:
+            X-Request-ID:
+              description: "실제 사용한 전송별 요청 ID"
+              schema:
+                type: "string"
+        "401":
+          "$ref": "#/components/responses/Error401"
+        "403":
+          "$ref": "#/components/responses/Error403"
+        "404":
+          "$ref": "#/components/responses/Error404"
+        "409":
+          "$ref": "#/components/responses/Error409"
+        "500":
+          "$ref": "#/components/responses/Error500"
+        "503":
+          "$ref": "#/components/responses/Error503"
+      security:
+        -
+          adminSession: []
+      x-zoop:
+        fsIds: ["FS058", "FS059", "FS063", "FS067-01"]
+        nfsIds: ["NFS001", "NFS002", "NFS004", "NFS008", "NFS012"]
+        screenIds: ["A-ADM-03"]
+        wbsIds: ["6.1.2", "6.11.1", "6.10.6", "6.10.16", "6.5.4", "6.5.5", "6.5.6"]
+        priority: "P2"
+        authority: "관리자(작업별 권한)"
+        errorCodes: ["RESOURCE_NOT_FOUND", "JOB_NOT_RETRYABLE", "IDEMPOTENCY_CONFLICT", "SOURCE_UNAVAILABLE", "INTERNAL_ERROR", "AUTH_REQUIRED", "MEMBER_REQUIRED", "ACCESS_DENIED"]
+        prototype:
+          method: null
+          path: null
+          operationId: null
+          differences:
+            - "직접 대응 BFF 작업 없음. 스케줄러(PR-R2)와 함께 구현한다."
+        teamQuestions:
+          - "analyze_plan job의 retry가 job당 1회인 제약 위에서 회차 retry의 의미(단계 재개 vs plan 재접수)를 확정한다."
   "/api/v1/admin/pipeline/candidates":
     get:
       tags:
@@ -12261,7 +12507,7 @@ components:
             - "web_not_configured"
             - "tool_unavailable"
             - "tool_budget_exhausted"
-          description: "mcp_direct_start: 도구 연결(MCP) 사전 확인이 실패해 서버가 정한 기본 조회 경로로 처음부터 답함(답변 검증은 같음). web_*: 보조 웹 검색이 실패·0건·예산 소진·미설정이라 쓰지 못함. tool_*: 내부 조회 하나가 실패하거나 호출 예산이 모자랐으나 다른 근거로 해당 요구를 답함. 지금 서버가 만드는 값은 mcp_direct_start뿐이며 나머지는 웹 검색 도구·도구 장애 부분 답변과 함께 생긴다. 클라이언트는 모르는 code도 message로 표시한다."
+          description: "mcp_direct_start: 도구 연결(MCP) 사전 확인이 실패해 서버가 정한 기본 조회 경로로 처음부터 답함(답변 검증은 같음). web_*: 보조 웹 검색이 실패·0건·예산 소진·미설정이라 쓰지 못함. tool_*: 내부 조회 하나가 실패하거나 호출 예산이 모자랐으나 다른 근거로 해당 요구를 답함. web_not_configured와 tool_budget_exhausted는 아직 서버가 만들지 않는다. 클라이언트는 모르는 code도 message로 표시한다."
         labels:
           items:
             type: "string"
@@ -12380,6 +12626,12 @@ components:
           type: "array"
           maxItems: 8
           description: "답변을 막지 않은 장애·우회. 이 필드 이전에 저장된 결과는 빈 배열이다."
+        uiActions:
+          items:
+            "$ref": "#/components/schemas/ChatUiAction"
+          type: "array"
+          maxItems: 6
+          description: "답변에서 회원이 눌러 열 수 있는 화면. 서버가 답한 요구의 실제 조회 결과로만 만들며 모델이 제안하지 않는다. 눌렀을 때만 실행하고, polling·재열람으로 실행하지 않는다. 돌려줄 때 지금 볼 수 없는 기업이 들어간 항목은 뺀다. 이 필드 이전에 저장된 결과는 빈 배열이다."
         metadata:
           "$ref": "#/components/schemas/Metadata"
       type: "object"
@@ -12399,7 +12651,127 @@ components:
         - "limitations"
         - "answerStatus"
         - "notices"
+        - "uiActions"
         - "metadata"
+    ChatUiAction:
+      properties:
+        actionId:
+          type: "string"
+          description: "이 결과 안에서만 유일한 서버 발급 ID"
+        kind:
+          type: "string"
+          enum:
+            - "open_company"
+            - "focus_path"
+            - "open_briefing"
+            - "focus_relation"
+            - "open_evidence"
+            - "open_watchlist"
+          description: "open_company: 기업 상세. focus_path: 지도에서 두 기업 사이 경로. open_briefing: 해당 회차 브리핑. focus_relation: 지도에서 답변이 인용한 경로 단계의 관계. open_evidence: 요구가 인용한 기사를 근거 창에서 함께 연다. open_watchlist: 회원 본인의 내 종목 화면. 클라이언트는 모르는 kind를 표시하지 않는다."
+        label:
+          type: "string"
+          maxLength: 300
+          description: "서버가 조회 결과의 이름으로 만든 표시 문구"
+        requirementIds:
+          items:
+            type: "string"
+          type: "array"
+          maxItems: 6
+          description: "이 동작을 낳은 답한 요구"
+        target:
+          "$ref": "#/components/schemas/ChatUiActionTarget"
+      type: "object"
+      required:
+        - "actionId"
+        - "kind"
+        - "label"
+        - "requirementIds"
+        - "target"
+    ChatUiActionTarget:
+      properties:
+        companyId:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "open_company"
+        fromId:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "focus_path 시작 기업"
+        toId:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "focus_path 끝 기업"
+        date:
+          anyOf:
+            -
+              type: "string"
+              pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+            -
+              type: "null"
+          description: "open_briefing 회차의 KST 날짜"
+        edition:
+          anyOf:
+            -
+              type: "string"
+              enum:
+                - "morning"
+                - "evening"
+            -
+              type: "null"
+          description: "open_briefing 회차"
+        graphVersion:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "focus_path·focus_relation·open_evidence: 읽은 그래프 버전. 지도 동작은 지금 지도가 다른 스냅샷이면 열지 않고 안내한다."
+        asOf:
+          anyOf:
+            -
+              type: "string"
+              format: "date-time"
+            -
+              type: "null"
+          description: "focus_path·focus_relation·open_evidence: 질문에 고정된 기준 시각"
+        edgeId:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "focus_relation 관계"
+        evidenceIds:
+          anyOf:
+            -
+              type: "array"
+              items:
+                type: "string"
+              maxItems: 20
+            -
+              type: "null"
+          description: "open_evidence 근거"
+      type: "object"
+      required:
+        - "companyId"
+        - "fromId"
+        - "toId"
+        - "date"
+        - "edition"
+        - "graphVersion"
+        - "asOf"
+        - "edgeId"
+        - "evidenceIds"
+      description: "kind에 해당하는 필드만 값이 있다."
     ChatSessionResponse:
       properties:
         id:
@@ -16477,6 +16849,8 @@ components:
           items:
             "$ref": "#/components/schemas/PastRun"
           type: "array"
+        rounds:
+          "$ref": "#/components/schemas/GraphRoundsSection"
       type: "object"
       required:
         - "asOf"
@@ -16489,6 +16863,156 @@ components:
         - "publication"
         - "jobs"
         - "runs"
+    GraphRoundStage:
+      type: "string"
+      enum: ["scheduled", "run_requested", "plan_ready", "analysis_queued", "analysis_done", "freeze_requested", "handoff_ready", "imported", "skipped", "failed"]
+    GraphRoundsSection:
+      type: "object"
+      properties:
+        enabled:
+          type: "boolean"
+        nextSlotAt:
+          type: [string, "null"]
+          format: "date-time"
+        lastTickAt:
+          type: [string, "null"]
+          format: "date-time"
+        openRounds:
+          type: "integer"
+        recent:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/GraphRoundOut"
+      required: ["enabled", "openRounds", "recent"]
+    GraphRoundList:
+      type: "object"
+      properties:
+        items:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/GraphRoundOut"
+        nextCursor:
+          type: [string, "null"]
+      required: ["items"]
+    GraphRoundDetail:
+      type: "object"
+      properties:
+        round:
+          "$ref": "#/components/schemas/GraphRoundOut"
+        events:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/GraphRoundEventOut"
+      required: ["round", "events"]
+    GraphRoundOut:
+      type: "object"
+      description: "회차 한 행. 코드·id·digest만 있고 경로·본문·비밀은 없다. failureCode는 failed일 때만, activatedVersionId는 활성화 뒤 사후 기록."
+      properties:
+        roundId:
+          type: "string"
+          pattern: "^round-[0-9]{8}T[0-9]{4}$"
+        slotAt:
+          type: "string"
+          format: "date-time"
+        stage:
+          "$ref": "#/components/schemas/GraphRoundStage"
+        startedBy:
+          type: "string"
+          description: "system:scheduler 또는 admin:<id>"
+        attempts:
+          type: "integer"
+        nextAttemptAt:
+          type: [string, "null"]
+          format: "date-time"
+        plan:
+          anyOf:
+            -
+              "$ref": "#/components/schemas/GraphRoundPlan"
+            -
+              type: "null"
+        analysisJobId:
+          type: [string, "null"]
+        handoff:
+          anyOf:
+            -
+              "$ref": "#/components/schemas/GraphRoundHandoff"
+            -
+              type: "null"
+        graphVersionId:
+          type: [string, "null"]
+        activatedVersionId:
+          type: [string, "null"]
+        activationNote:
+          type: [string, "null"]
+        failureCode:
+          type: [string, "null"]
+        lease:
+          anyOf:
+            -
+              "$ref": "#/components/schemas/GraphRoundLease"
+            -
+              type: "null"
+        createdAt:
+          type: "string"
+          format: "date-time"
+        updatedAt:
+          type: "string"
+          format: "date-time"
+      required: ["roundId", "slotAt", "stage", "startedBy", "attempts", "createdAt", "updatedAt"]
+    GraphRoundPlan:
+      type: "object"
+      properties:
+        planId:
+          type: [string, "null"]
+        planDigest:
+          type: [string, "null"]
+    GraphRoundHandoff:
+      type: "object"
+      properties:
+        handoffId:
+          type: [string, "null"]
+        manifestDigest:
+          type: [string, "null"]
+        bundleDigest:
+          type: [string, "null"]
+    GraphRoundLease:
+      type: "object"
+      properties:
+        owner:
+          type: "string"
+        until:
+          type: "string"
+          format: "date-time"
+      required: ["owner", "until"]
+    GraphRoundEventOut:
+      type: "object"
+      properties:
+        id:
+          type: "integer"
+          format: "int64"
+        at:
+          type: "string"
+          format: "date-time"
+        stage:
+          "$ref": "#/components/schemas/GraphRoundStage"
+        outcome:
+          type: "string"
+          enum: ["advanced", "waiting", "failed", "retried", "skipped"]
+        code:
+          type: [string, "null"]
+        requestId:
+          type: [string, "null"]
+        detail:
+          type: [object, "null"]
+          description: "외부 응답의 코드·digest만. 경로·본문·비밀 없음"
+      required: ["id", "at", "stage", "outcome"]
+    GraphRoundStartRequest:
+      type: "object"
+      properties:
+        slotAt:
+          type: [string, "null"]
+          format: "date-time"
+          description: "생략하면 지금. 같은 슬롯의 행이 이미 있으면 409"
     OverviewFeedback:
       properties:
         up:

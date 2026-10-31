@@ -40,6 +40,14 @@ public interface ChatExecutionRepository {
     /** Records that the run is about to call a model (after {@link #lockOwned} in the same transaction). */
     void recordModelCall(String jobId, int runs, String attempts, Instant at);
 
+    /** Keeps an attempt's verified result under the run's fence, before it is stored on the job. */
+    boolean keepVerified(String jobId, String ownerToken, int attemptNo, String result, String routeSummary, Instant at);
+
+    Optional<ChatRecoveryResult> verifiedResult(String jobId, int attemptNo);
+
+    /** Forgets the job's kept results: it ended, and they will not be saved again. */
+    void dropVerified(String jobId);
+
     boolean complete(String jobId, String ownerToken, Instant at, String outcome, String messageId, String result,
             String resultSchemaVersion, String routeSummary, String routeSchemaVersion, String attempts);
 

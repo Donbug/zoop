@@ -39,8 +39,8 @@ const STAGES = [
   ['publish', '발행'],
 ] as const;
 
-const DD = 'text-xs';
-const DT = 'text-[11px] text-zoop-muted';
+const DD = 'text-caption';
+const DT = 'text-caption text-zoop-muted';
 
 function RoundDetailView({
   round,
@@ -71,14 +71,14 @@ function RoundDetailView({
           </ul>
         </dd>
         <dt className={DT}>데이터 범위</dt>
-        <dd className={`${DD} font-inter tabular-nums`}>
+        <dd className={`${DD} font-num tabular-nums`}>
           {round.dataWindow.openStart
             ? '처음부터'
             : formatKst(round.dataWindow.start)}{' '}
           ~ {formatKst(round.dataWindow.end)}
         </dd>
         <dt className={DT}>발행</dt>
-        <dd className={`${DD} font-inter tabular-nums`}>
+        <dd className={`${DD} font-num tabular-nums`}>
           {round.publishedAt ? formatKst(round.publishedAt) : '–'}
           {round.graphVersion && (
             <span className="ml-2 text-zoop-muted">
@@ -90,14 +90,14 @@ function RoundDetailView({
         <dd className={`${DD} tabular-nums`}>{count(round.attempts)}회</dd>
       </dl>
       {round.failureReason && (
-        <p className="rounded-2xl bg-zoop-soft px-4 py-3 text-xs text-zoop-alert">
+        <p className="rounded-2xl bg-zoop-soft px-4 py-3 text-caption text-zoop-alert">
           실패 사유: {round.failureReason}
         </p>
       )}
       {round.suspension && (
-        <p className="rounded-2xl bg-zoop-soft px-4 py-3 text-xs">
+        <p className="rounded-2xl bg-zoop-soft px-4 py-3 text-caption">
           제공 중단: {round.suspension.reason}{' '}
-          <span className="text-[11px] text-zoop-muted">
+          <span className="text-caption text-zoop-muted">
             ({formatKst(round.suspension.at)} · {round.suspension.adminEmail})
           </span>
         </p>
@@ -139,7 +139,7 @@ function RoundDetailView({
           </button>
         )}
         {!round.reprocessable && round.blockedReason && (
-          <p className="w-full text-[11px] text-zoop-muted">
+          <p className="w-full text-caption text-zoop-muted">
             재처리할 수 없어요: {round.blockedReason}
           </p>
         )}
@@ -154,7 +154,7 @@ function RoundDetailView({
               aria-label="발행 원문"
               className="flex min-w-0 flex-col gap-2"
             >
-              <h3 className="text-xs font-bold">발행 원문</h3>
+              <h3 className="text-caption font-bold">발행 원문</h3>
               {items.length === 0 ? (
                 <Empty>담긴 핵심 이슈가 없어요.</Empty>
               ) : (
@@ -164,13 +164,13 @@ function RoundDetailView({
                       key={item.eventId}
                       className="flex flex-col gap-1 border-b-[0.667px] border-zoop-line py-2"
                     >
-                      <p className="text-xs font-semibold">
+                      <p className="text-caption font-semibold">
                         <span className="text-zoop-muted tabular-nums">
                           {item.rank}.{' '}
                         </span>
                         {item.title}
                       </p>
-                      <p className="text-[11px] text-zoop-muted">
+                      <p className="text-caption text-zoop-muted">
                         {item.reason}
                       </p>
                     </li>
@@ -179,7 +179,7 @@ function RoundDetailView({
               )}
             </section>
             <section aria-label="정정" className="flex min-w-0 flex-col gap-2">
-              <h3 className="text-xs font-bold">
+              <h3 className="text-caption font-bold">
                 정정 {count(round.corrections.length)}
               </h3>
               {round.corrections.length === 0 ? (
@@ -192,12 +192,14 @@ function RoundDetailView({
                       className="flex flex-col gap-1 border-b-[0.667px] border-zoop-line py-2"
                     >
                       {correction.original && (
-                        <p className="text-[11px] text-zoop-faint line-through">
+                        <p className="text-caption text-zoop-faint line-through">
                           원문: {correction.original}
                         </p>
                       )}
-                      <p className="text-xs">정정: {correction.corrected}</p>
-                      <p className="text-[11px] text-zoop-muted">
+                      <p className="text-caption">
+                        정정: {correction.corrected}
+                      </p>
+                      <p className="text-caption text-zoop-muted">
                         사유 {correction.reason} ·{' '}
                         {formatKst(correction.createdAt)} ·{' '}
                         {correction.adminEmail}
@@ -230,7 +232,7 @@ function RoundDetailView({
                 <tr key={attempt.n}>
                   <td className={`${TD} tabular-nums`}>{attempt.n}</td>
                   <td
-                    className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                    className={`${TD} whitespace-nowrap font-num tabular-nums`}
                   >
                     {formatKst(attempt.startedAt)}
                   </td>
@@ -281,12 +283,12 @@ function RoundPanel({
   return (
     <article aria-label="회차 상세" className="flex min-w-0 flex-col gap-4">
       {detail.refreshError && (
-        <p role="status" className="text-[11px] text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}
       <div className="flex items-start gap-2">
-        <h2 className="flex-1 text-sm font-bold tabular-nums">
+        <h2 className="flex-1 text-body font-bold tabular-nums">
           {round
             ? `${round.date} ${editionLabel[round.edition]} 브리핑`
             : '회차 상세'}
@@ -294,13 +296,13 @@ function RoundPanel({
         <button
           type="button"
           onClick={onClose}
-          className={`text-[11px] text-zoop-muted hover:text-zoop-ink ${FOCUS_RING}`}
+          className={`text-caption text-zoop-muted hover:text-zoop-ink ${FOCUS_RING}`}
         >
           닫기
         </button>
       </div>
       {done && (
-        <p role="status" className="text-[11px] font-semibold">
+        <p role="status" className="text-caption font-semibold">
           {done}
         </p>
       )}
@@ -372,7 +374,7 @@ export default function BriefingOperations() {
         }
       />
       {rounds.refreshError && (
-        <p role="status" className="text-[11px] text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}
@@ -430,7 +432,7 @@ export default function BriefingOperations() {
                         )}
                       </td>
                       <td
-                        className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                        className={`${TD} whitespace-nowrap font-num tabular-nums`}
                       >
                         {formatKst(round.dataWindow.end)}
                       </td>
@@ -469,7 +471,7 @@ export default function BriefingOperations() {
             />
           ) : (
             <div className="flex flex-col gap-1">
-              <p className="text-sm font-bold">회차를 골라 주세요</p>
+              <p className="text-body font-bold">회차를 골라 주세요</p>
               <Note>발행 원문과 정정, 처리 기록을 보여 줘요.</Note>
             </div>
           )}

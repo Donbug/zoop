@@ -153,7 +153,7 @@ ai/service/.venv/bin/python ai/service/scripts/online_admission_actual_smoke.py 
 
 ## 챗봇 모델 단계 클라이언트
 
-`com.zoop.ai.chat.ChatStageClient`(`HttpChatStageClient`)는 `POST /internal/v1/chat-stages/{stage}`(계약 `zoop-ai-chat-2`)로 챗봇 모델 단계 하나를 동기로 실행합니다. 단계는 `chat-router`(Jev), `chat-answer`(Luna), `chat-verification`(Jev), `chat-agent`(Luna Responses 승인 루프의 한 단계)입니다. 같은 전송 계층(`AiHttpTransport`: 재시도·redirect·proxy 없음, 응답 크기·마감 제한, `X-Request-ID` 대조)을 쓰고 오류 봉투는 S1(`zoop-ai-internal-1`)입니다. `Idempotency-Key`는 `invocationId`(`<chatJobId>.<attemptNo>.<router|answer|verify|agent-n>`)입니다. 같은 시도의 같은 단계는 AI 쪽에서 두 번 보내지지 않고, 재실행(rerun)은 새 시도 번호로 새 invocation이 됩니다.
+`com.zoop.ai.chat.ChatStageClient`(`HttpChatStageClient`)는 `POST /internal/v1/chat-stages/{stage}`(계약 `zoop-ai-chat-4`)로 챗봇 모델 단계 하나를 동기로 실행합니다. 단계는 `chat-router`(Jev), `chat-answer`(Luna), `chat-verification`(Jev), `chat-agent`(Luna Responses 승인 루프의 한 단계)입니다. 같은 전송 계층(`AiHttpTransport`: 재시도·redirect·proxy 없음, 응답 크기·마감 제한, `X-Request-ID` 대조)을 쓰고 오류 봉투는 S1(`zoop-ai-internal-1`)입니다. `Idempotency-Key`는 `invocationId`(`<chatJobId>.<attemptNo>.<router|answer|verify|agent-n>`)입니다. 같은 시도의 같은 단계는 AI 쪽에서 두 번 보내지지 않고, 재실행(rerun)은 새 시도 번호로 새 invocation이 됩니다.
 
 `com.zoop.chat.model.ChatModelStages`가 오케스트레이터의 네 포트(`ChatModels.Router/Generator/Verifier/Agent`)를 구현합니다.
 

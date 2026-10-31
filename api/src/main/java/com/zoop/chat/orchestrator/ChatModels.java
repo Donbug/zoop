@@ -254,7 +254,7 @@ public final class ChatModels {
     }
 
     /** A requirement the agent answers, with the ids the server already resolved for it. */
-    public record AgentRequirement(String id, String label, boolean general, List<String> targets) {
+    public record AgentRequirement(String id, String label, boolean general, List<String> targets, boolean web) {
         public AgentRequirement {
             targets = List.copyOf(targets);
         }
@@ -282,16 +282,34 @@ public final class ChatModels {
         }
     }
 
-    /** A tool call Luna proposed, held by the provider until the server decides. */
-    public record ApprovalRequest(String id, String toolName, Map<String, Object> arguments) {
+    /**
+     * A tool call Luna proposed, held by the provider until the server decides. {@code requirementIds} are the requirements
+     * Luna says it serves, apart from the arguments; none when it named none validly.
+     */
+    public record ApprovalRequest(String id, String toolName, Map<String, Object> arguments, List<String> requirementIds) {
         public ApprovalRequest {
             // A model may write an explicit null; the server's argument check refuses it, so it is kept as written.
             arguments = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(arguments));
+            requirementIds = List.copyOf(requirementIds);
         }
     }
 
-    /** One step's outcome: held at {@code approvals} (no answer), or the final {@code answer} (no approvals). */
-    public record AgentStep(String responseId, List<ApprovalRequest> approvals, ChatGeneratedAnswer answer) {
+    /** Luna's accumulated input of one run (ZOOP-AIG-001 6.3.3). */
+    public static final long MAX_INPUT_TOKENS = 24_000;
+    /** A failure code of the answer stages: the input is over its limit, nothing more is sent for this run. */
+    public static final String INPUT_BUDGET_EXCEEDED = "input_budget_exceeded";
+    /** A failure code of the answer stages: the answer passed its length or was cut at the output cap. */
+    public static final String OUTPUT_BUDGET_EXCEEDED = "output_budget_exceeded";
+
+    /**
+     * One step's outcome: held at {@code approvals} (no answer), or the final {@code answer} (no approvals). {@code inputTokens}
+     * is what the provider reported for the step, null when it reported none.
+     */
+    public record AgentStep(String responseId, List<ApprovalRequest> approvals, ChatGeneratedAnswer answer, Long inputTokens) {
+        public AgentStep(String responseId, List<ApprovalRequest> approvals, ChatGeneratedAnswer answer) {
+            this(responseId, approvals, answer, null);
+        }
+
         public AgentStep {
             approvals = List.copyOf(approvals);
             if (approvals.isEmpty() == (answer == null)) {

@@ -141,7 +141,41 @@ public final class GraphHandoffImporter {
     private record Checked(VerifiedHandoff handoff, List<ObservationFacts> facts, Map<String, ObservationFacts> byArticle) {
     }
 
+    /**
+     * A caller's own record of the version, written inside the import transaction right before it commits (for a new version
+     * and for {@code unchanged} alike), so that the version and the caller's claim on it commit or roll back together. The
+     * round bridge links the round row to the version here. It may refuse with {@link RecordRefused}: the import is then rolled
+     * back, its files removed, and {@link #run(GraphHandoffRequest, VersionRecorder)} rethrows it.
+     */
+    @FunctionalInterface
+    public interface VersionRecorder {
+        void record(GraphHandoffResult.Staged staged);
+    }
+
+    /** Thrown by a {@link VersionRecorder} to roll the import back; carries no text. */
+    public static final class RecordRefused extends RuntimeException {
+        public RecordRefused() {
+            super("record refused", null, false, false);
+        }
+    }
+
+    private static final VersionRecorder NO_RECORD = staged -> {
+    };
+
+    /** The id of the version an import of {@code handoffId} registers ({@code gv-} + SHA-256 of the handoff id). */
+    public static String versionId(String handoffId) {
+        return HandoffSnapshotWriter.versionId(handoffId);
+    }
+
     public GraphHandoffResult run(GraphHandoffRequest request) {
+        return run(request, NO_RECORD);
+    }
+
+    /**
+     * The import with the caller's {@link VersionRecorder} inside its transaction. Never throws for the import's own failures
+     * (they come back in the result); a {@link RecordRefused} from the recorder is rethrown after the rollback.
+     */
+    public GraphHandoffResult run(GraphHandoffRequest request, VersionRecorder recorder) {
         ArtifactFileStore.Session session;
         try {
             session = store.open();
@@ -151,10 +185,13 @@ public final class GraphHandoffImporter {
                     ? GraphHandoffFailure.IMPORT_BUSY : GraphHandoffFailure.ARTIFACT_STORE_UNAVAILABLE));
         }
         try (session) {
-            return GraphHandoffResult.succeeded(stage(session, request));
+            return GraphHandoffResult.succeeded(stage(session, request, recorder));
         } catch (GraphHandoffException failure) {
             log.warn("graph handoff import failed: {}", failure.failure().code());
             return GraphHandoffResult.failed(failure);
+        } catch (RecordRefused refused) {
+            log.warn("graph handoff import rolled back: the caller refused to record the version");
+            throw refused;
         } catch (RuntimeException unexpected) {
             // State is unknown: keep any file (recoverable) and report without the exception's text.
             log.error("graph handoff import failed unexpectedly: {}", unexpected.getClass().getName());
@@ -162,14 +199,15 @@ public final class GraphHandoffImporter {
         }
     }
 
-    private Staged stage(ArtifactFileStore.Session session, GraphHandoffRequest request) {
+    private Staged stage(ArtifactFileStore.Session session, GraphHandoffRequest request, VersionRecorder recorder) {
         Checked checked = check(request);
         String versionId = HandoffSnapshotWriter.versionId(request.handoffId());
         byte[] receiptBytes = receiptBytes(checked.handoff());
         List<ArtifactFileStore.StoredFile> created = new ArrayList<>();
         try {
-            return transaction.execute(status -> write(session, request, checked, versionId, receiptBytes, created));
-        } catch (GraphHandoffException rolledBack) {
+            return transaction.execute(status -> write(session, request, checked, versionId, receiptBytes, created, recorder));
+        } catch (GraphHandoffException | RecordRefused rolledBack) {
+            // Known rollback (the exception left the transaction): the files this run created are removed again.
             for (ArtifactFileStore.StoredFile file : created) {
                 if (session.discard(file)) {
                     log.info("graph handoff import removed a file it had created");
@@ -215,9 +253,12 @@ public final class GraphHandoffImporter {
     // ---------------------------------------------------------------------------------------------- the transaction ------
 
     private Staged write(ArtifactFileStore.Session session, GraphHandoffRequest request, Checked checked, String versionId,
-            byte[] receiptBytes, List<ArtifactFileStore.StoredFile> created) {
+            byte[] receiptBytes, List<ArtifactFileStore.StoredFile> created, VersionRecorder recorder) {
         try {
-            return writeChecked(session, request, checked, versionId, receiptBytes, created);
+            Staged staged = writeChecked(session, request, checked, versionId, receiptBytes, created);
+            // The caller's record, last in the transaction: a new version and an unchanged one alike.
+            recorder.record(staged);
+            return staged;
         } catch (DataAccessException failure) {
             // Known rollback: the statement failed inside this transaction (a commit failure is caught by the caller).
             log.error("graph handoff import database failure: {}", failure.getClass().getSimpleName());

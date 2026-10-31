@@ -1,6 +1,6 @@
 # AI 챗봇 Luna MCP 실행·복합 질의·화면 동작 계약
 
-기준일: 2026-10-28 / 상태: 2026-10-28 팀 결정 · 구현 예정 · 출시 검증 별도
+기준일: 2026-10-28 / 상태: 2026-10-28 팀 결정 · 구현 현황은 [챗봇 MCP 엔드포인트](../../api/docs/chat-mcp.md) · 출시 검증 별도
 
 상위 정책: [AI 거버넌스 v0.11](../ZOOP_AI_거버넌스_정책.md) / [설계 요약](ai-chatbot-design-summary.md) / [보조 웹 검색](ai-chatbot-web-search.md)
 
@@ -22,8 +22,8 @@ MCP 도입 목적은 **Luna가 조회 결과를 보고 다음 도구·인자를 
 ## 2. 턴별 분류와 문맥
 
 - 새 질문/job마다 요구와 Q 유형을 다시 분류한다. 세션에 분류를 고정하지 않는다.
-- 기존 구현은 확인 질문 사슬만 모델 입력에 포함한다. 일반 이전 턴 문맥 승계는 별도 미구현 기능이다. 도입 시 같은 대화의 직전 완료 2턴에서 서버가 검증한 대상 ID·기간·선택 정보만 후보로 전달한다. 답변 본문·원문·숨겨진 추론은 승계하지 않고 현재 권한을 재확인한다.
-- 명시된 새 대상·기간이 우선이다. ‘그 회사’ 후보가 여럿이면 clarification한다.
+- 모델 입력에는 지금처럼 확인 질문 사슬만 넣는다. 이전 턴 문맥 승계는 서버 계획 단계에서 한다(2026-10-30 구현). 같은 대화의 직전 답변 2턴(`answered`·`insufficient_evidence`, 이어지는 질문의 사슬 시작 전)에서 저장된 `applied`의 기업·사건 ID와 질문·선택 기간만 후보로 쓴다. 답변 본문·원문·숨겨진 추론은 승계하지 않고, 대상은 이번 job의 고정 그래프에서 다시 확인해 보이는 것만 남긴다(확인 불가면 후보 없음).
+- 명시된 새 대상·기간이 우선이고, 그다음 화면 선택, 그다음 이전 턴 후보다. ‘그 회사’ 후보가 여럿이면 후보를 선택지로 clarification한다. 지목 없는 조회는 후보가 하나면 그 대상을 읽고, 지도 전체를 볼 수 있는 조회는 ‘그 회사’처럼 가리킬 때만 후보를 쓴다. 승계한 기간은 비교 조회에만 쓰며 `applied.period.basis=context`로 표시한다.
 - job 안의 graphVersion·asOf·선택 evidence 범위는 고정한다. 기술 재시도와 resolves 확인 답은 기존 고정 문맥을 승계한다. 독립된 ‘최신’ 새 질문에서만 새 시점을 정한다.
 - polling·재열람·저장 복구는 새 분류·도구 호출을 만들지 않는다. 이전 답변은 새로운 사실의 근거가 아니다.
 
@@ -87,6 +87,8 @@ MCP 자격 증명은 OpenAI 모델 API 키와 별개다. job·실행 세대·sub
 
 모델 측 요청 1건에도 여러 추론·도구 왕복이 있을 수 있다. 모델/도구 토큰·continuation·reasoning 사용량을 실제 영수증으로 합산하고, 서버가 예약하는 모델 출력 비용은 reasoning도 포함한다. 2,000은 최종 답변 길이 상한이며 reasoning 비용까지 그 안이라고 가정하지 않는다. 모델이 초과 호출을 시도하면 gate가 거부하고 실행기가 신규 실행을 종료한다.
 
+토큰 상한 구현(2026-10-30): 공급자 출력 상한은 reasoning을 포함하므로 Luna 요청에 8,000(답변 2,000 + reasoning 몫 6,000, spike 뒤 재조정)을 보내고, 받은 뒤 출력에서 reasoning을 뺀 값이 2,000을 넘거나 출력 상한에서 잘린 답은 버려 `budget_exceeded/output_limit`으로 끝낸다. direct 답변은 입력 전체를 한 번에 보내므로 추정치(토크나이저 없이 ASCII 4자·그 외 1.3자당 1토큰)가 24,000을 넘으면 보내지 않고 `budget_exceeded/context_too_large`다. agent는 입력이 공급자 쪽에서 늘어나므로 Java가 단계별 보고값을 합산한다. 다음 단계 입력은 직전 단계 이상이므로, 합계 + 직전 입력이 24,000을 넘으면 더 보내지 않고 `context_too_large`, 합계 + 직전 입력 2배가 넘으면 새 도구를 거부해 다음 단계가 답을 쓴다. 한 단계의 도구 결과로 입력이 크게 늘면 사후에야 알 수 있어 그 단계의 초과는 막지 못하고, 공급자가 사용량을 보고하지 않으면 합산하지 않는다.
+
 ### 3.3 요청 단위 캐시와 중복 억제
 
 캐시 키는 `jobId + executionGeneration + logicalToolId + schema/policyRevision + canonicalArguments + subject/scopeDigest + graphVersion + asOf`다. 기본 인자·기간·집합 순서를 정규화하되 의미 있는 순서·페이지 cursor·선택 evidence 범위는 보존한다. requirementId만 다른 동일 조회는 한 결과에 요구 매핑을 합친다. 서로 다른 회원·작업·버전의 캐시는 공유하지 않는다.
@@ -149,7 +151,7 @@ Circuit breaker 초기값은 endpoint별 최근 5회 **연결** 시도 중 3회 
 
 답할 근거가 전혀 없으면 guidance 또는 조회 성공 시 insufficient_evidence의 고정 안내다. Q02 웹 실패는 general_knowledge로 개념 설명 가능하지만 최신 기업 사실·수치·전망을 만들어내지 않는다. 모델 결과 불명/검증 실패 등 failed job에는 기존 ChatFailure 기반 고정 안내를 표시한다. cancelled·미인증·저장/전달 시스템 장애는 completed로 가장하지 않는다. 안전 안내 자체에 다시 모델 검증을 호출할 필요는 없다.
 
-answerStatus·notices는 DTO·저장·OpenAPI·웹 타입·재열람 guard에 함께 들어갔다(저장 migration 없음: 결과 jsonb에 담긴다). direct 경로에서 일부 요구의 조회만 시간 초과·자료 일시 불가로 실패하면 그 요구(와 그것에 기대는 요구)는 `tool_unavailable` limitation이 되고 나머지 요구는 답해 partial이다(2026-10-30). 한 요구의 조회 중 하나라도 실패하면 그 요구 전체를 답하지 않는다(일부 조회로 답한 요구의 `tool_unavailable` notice는 아직 만들지 않는다). 답한 요구가 하나도 남지 않거나 어댑터 오류(버그)면 지금처럼 failed다. agent 경로 실행 중 장애는 위 표대로 별도다.
+answerStatus·notices는 DTO·저장·OpenAPI·웹 타입·재열람 guard에 함께 들어갔다(저장 migration 없음: 결과 jsonb에 담긴다). direct 경로에서 일부 요구의 조회만 시간 초과·자료 일시 불가로 실패하면 그 요구(와 그것에 기대는 요구)는 `tool_unavailable` limitation이 되고 나머지 요구는 답해 partial이다(2026-10-30). 한 요구의 조회 중 일부만 실패하고 항목을 읽은 조회가 있으면 그 결과로 계속해, 답하면 `tool_unavailable` notice(요구 표현 포함, complete 유지), 못 답하면 `tool_unavailable` limitation이다(2026-10-31). 다른 요구가 기대는 요구는 일부 결과로 다음 단계를 계획하지 않도록 전체를 답하지 않는다. agent 경로도 같다: 승인됐지만 결과가 없는 내부 호출의 요구에 같은 규칙을 쓴다. 답한 요구가 하나도 남지 않거나 어댑터 오류(버그)면 지금처럼 failed다. Luna 단계 자체가 실패하면 답변 후보가 없어 위 표와 달리 notice 없이 실패로 끝난다.
 
 ## 4. 유형별 도구와 UI 동작
 
@@ -174,6 +176,8 @@ UI 동작은 DB 읽기 도구와 분리한다. 조회 결과의 유효한 ID를 
 
 각 제안은 서버 발급 actionId, 허용 kind, label, requirementIds, typed target, 필요 시 graphVersion/asOf를 가진다. 초기 kind는 `open_company`, `focus_relation`, `focus_path`, `open_evidence`, `open_briefing`, `open_watchlist`로 제한한다. 실제 필드·enum은 구현 PR에서 DTO·OpenAPI·클라이언트와 함께 확정한다. Q01 도움말 및 Q05 비교 화면은 실제 지원 route가 확인된 경우만 확장한다.
 
+구현(2026-10-30): `open_company`(답변의 `graphTargets`에 있는 기업), `focus_path`(`found`로 읽은 경로, 답변과 같은 스냅샷의 지도에서만), `open_briefing`(실제로 읽은 회차)만 OpenAPI `ChatUiAction`으로 제공한다. 답한 요구의 조회 결과에서 서버가 답변당 최대 6개를 만들며 모델은 제안하지 않는다. 돌려줄 때 지금 볼 수 없는 기업이 든 항목은 빼고, 답변을 가리면 모두 뺀다. 2026-10-31에 나머지를 더했다. `focus_relation`은 여러 단계 경로에서 답변이 인용한 단계의 관계(한 단계 경로는 `focus_path`와 같아 제외), `open_evidence`는 요구가 인용한 기사를 근거 창에서 함께 여는 동작(요구당 하나, 지도 화면에서만), `open_watchlist`는 회원 범위를 읽어 항목이 있었던 답변의 내 종목 화면이다.
+
 - 대상 ID가 도구 결과에 존재하고 공개·권한·버전 검사를 통과해야 동작을 만든다. 외부 보도만으로 내부 관계 ID를 만들지 않는다.
 - 클릭 후 대상 화면의 기존 API·권한·404 처리로 현재 공개 상태·권한을 다시 확인한다. 버튼 확인 전용 API는 추가하지 않으며 경로 포커스에 기존 API로 부족한 버전 확인은 구현 PR에서 계약화한다. 삭제·철회·버전 불일치는 ‘현재 열 수 없음’으로 안내하고 다른 간선으로 치환하지 않는다.
 - polling·복구·재열람으로 동작을 재실행하지 않는다. 외부 출처는 서버가 검증한 http(s) URL만 사용한다.
@@ -185,4 +189,4 @@ UI 동작은 DB 읽기 도구와 분리한다. 조회 결과의 유효한 ID를 
 
 동시 변경 대상은 planner capability·실행 봉투, Responses MCP 연결·서버 바인딩·승인 continuation, ChatResult·answerStatus/notices·citation/basis·UI action 계약, 감사 기록, 응답 검사·재열람 guard, 생성 명세·클라이언트, 화면·테스트다. 공개 job 접수·polling·resolves 수명주기는 유지한다. 미구현 계약을 OpenAPI 출력에만 먼저 추가하지 않는다.
 
-평가는 [고정 평가 세트의 다음 버전 항목](../development/ai-chatbot-eval-set.md)을 따른다. 독립 Luna coverage-verifier 계획은 3.1절로 대체한다. Responses MCP 실행·Java 승인 continuation·cache·direct 시작 경로·부분 응답은 모두 구현 예정이다. 공식 API 근거: [Luna 모델](https://developers.openai.com/api/docs/models/gpt-6-luna), [Responses MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)(2026-10-28 확인). 기존 Figma 보드는 이전 설계일 수 있으며 구현 전에 별도로 동기화한다.
+평가는 [고정 평가 세트의 다음 버전 항목](../development/ai-chatbot-eval-set.md)을 따른다. 독립 Luna coverage-verifier 계획은 3.1절로 대체한다. Responses MCP 실행·Java 승인 continuation·cache·direct 시작 경로·부분 응답은 구현됐고(2026-10-30, 기능 플래그 기본 꺼짐, 합성 replay로만 확인) live 확인이 남았다. 공식 API 근거: [Luna 모델](https://developers.openai.com/api/docs/models/gpt-6-luna), [Responses MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)(2026-10-28 확인). 기존 Figma 보드는 이전 설계일 수 있으며 구현 전에 별도로 동기화한다.

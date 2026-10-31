@@ -14,7 +14,7 @@ export function PageHeader({
 }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-xl font-[750] tracking-[-0.035em]">{title}</h1>
+      <h1 className="text-title font-[750] tracking-[-0.035em]">{title}</h1>
       {actions && <div className="flex items-center gap-3">{actions}</div>}
     </header>
   );
@@ -22,7 +22,7 @@ export function PageHeader({
 
 export function Loading({ children }: { children: ReactNode }) {
   return (
-    <p role="status" className="text-xs text-zoop-muted">
+    <p role="status" className="text-caption text-zoop-muted">
       {children}
     </p>
   );
@@ -43,8 +43,8 @@ export function ErrorBox({
       className="flex flex-wrap items-center gap-3 rounded-2xl bg-zoop-soft px-4 py-3"
     >
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold">{title}</p>
-        <p className="mt-0.5 text-[11px] text-zoop-muted">
+        <p className="text-caption font-semibold">{title}</p>
+        <p className="mt-0.5 text-caption text-zoop-muted">
           {adminErrorMessage(error)}
         </p>
       </div>
@@ -59,7 +59,7 @@ export function ErrorBox({
 
 export function Empty({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-2xl bg-zoop-soft px-4 py-4 text-[11px] text-zoop-muted">
+    <p className="rounded-2xl bg-zoop-soft px-4 py-4 text-caption text-zoop-muted">
       {children}
     </p>
   );
@@ -68,7 +68,7 @@ export function Empty({ children }: { children: ReactNode }) {
 /** 표 위 보조 설명(집계 시각·기준 등) */
 export function Note({ children }: { children: ReactNode }) {
   return (
-    <p className="text-[11px] leading-relaxed text-zoop-muted">{children}</p>
+    <p className="text-caption leading-relaxed text-zoop-muted">{children}</p>
   );
 }
 
@@ -83,12 +83,12 @@ export function Metric({
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <dt className="text-[11px] text-zoop-muted">{label}</dt>
-      <dd className="text-xl font-[750] tracking-[-0.03em] tabular-nums">
+      <dt className="text-caption text-zoop-muted">{label}</dt>
+      <dd className="text-title font-[750] tracking-[-0.03em] tabular-nums">
         {value}
       </dd>
       {detail && (
-        <dd className="text-[11px] leading-relaxed text-zoop-faint tabular-nums">
+        <dd className="text-caption leading-relaxed text-zoop-faint tabular-nums">
           {detail}
         </dd>
       )}
@@ -109,14 +109,14 @@ export function Section({
   return (
     <section className="flex min-w-0 flex-col gap-2" aria-label={title}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-bold">{title}</h2>
+        <h2 className="text-body font-bold">{title}</h2>
         {link && (
           <div className="flex items-center gap-3">
             {link.map((item) => (
               <Link
                 key={item.to}
                 to={item.to}
-                className={`text-[11px] text-zoop-muted hover:text-zoop-ink ${FOCUS_RING}`}
+                className={`text-caption text-zoop-muted hover:text-zoop-ink ${FOCUS_RING}`}
               >
                 {item.label} →
               </Link>
@@ -171,7 +171,7 @@ export function Segmented<T extends string>({
           type="button"
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}
-          className={`min-h-8 rounded-full px-4 text-xs text-zoop-muted transition-colors aria-pressed:bg-zoop-ink aria-pressed:font-semibold aria-pressed:text-zoop-paper ${FOCUS_RING}`}
+          className={`min-h-8 rounded-full px-4 text-caption text-zoop-muted transition-colors aria-pressed:bg-zoop-ink aria-pressed:font-semibold aria-pressed:text-zoop-paper ${FOCUS_RING}`}
         >
           {option.label}
         </button>
@@ -208,7 +208,7 @@ export function Tabs<T extends string>({
             role="tab"
             aria-selected={option.value === value}
             onClick={() => onChange(option.value)}
-            className={`-mb-px inline-flex min-h-11 flex-1 shrink-0 items-center justify-center gap-1.5 border-b-2 border-transparent px-4 text-sm text-zoop-muted transition-colors hover:text-zoop-ink aria-selected:border-zoop-ink aria-selected:font-bold aria-selected:text-zoop-ink ${FOCUS_RING}`}
+            className={`-mb-px inline-flex min-h-11 flex-1 shrink-0 items-center justify-center gap-1.5 border-b-2 border-transparent px-4 text-body text-zoop-muted transition-colors hover:text-zoop-ink aria-selected:border-zoop-ink aria-selected:font-bold aria-selected:text-zoop-ink ${FOCUS_RING}`}
           >
             {option.icon}
             {option.label}
@@ -229,7 +229,7 @@ export function Tabs<T extends string>({
           role="tab"
           aria-selected={option.value === value}
           onClick={() => onChange(option.value)}
-          className={`min-h-9 shrink-0 rounded-full px-4 text-xs text-zoop-muted transition-colors aria-selected:bg-zoop-ink aria-selected:font-bold aria-selected:text-zoop-paper ${FOCUS_RING}`}
+          className={`min-h-9 shrink-0 rounded-full px-4 text-caption text-zoop-muted transition-colors aria-selected:bg-zoop-ink aria-selected:font-bold aria-selected:text-zoop-paper ${FOCUS_RING}`}
         >
           {option.label}
         </button>
@@ -258,7 +258,7 @@ export function MoreButton({
         {loading ? '불러오고 있어요' : '더 보기'}
       </button>
       {error && (
-        <p role="alert" className="text-[11px] text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           다음 목록을 불러오지 못했어요. {adminErrorMessage(error)}
         </p>
       )}

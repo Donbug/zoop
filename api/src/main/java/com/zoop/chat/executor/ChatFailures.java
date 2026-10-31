@@ -20,7 +20,9 @@ final class ChatFailures {
 
     static ChatFailure of(String kind, String reason, boolean rerunnable, int runs) {
         boolean rerun = "transient".equals(kind) && rerunnable && !"response_unknown".equals(reason) && runs < MAX_RUNS;
-        return new ChatFailure(kind, reason, message(kind, reason, rerun), rerun ? "rerun" : null);
+        // A kept verified result is saved again without any model call, so the run limit does not apply.
+        String retry = "save_failed".equals(kind) ? "save_only" : rerun ? "rerun" : null;
+        return new ChatFailure(kind, reason, message(kind, reason, rerun), retry);
     }
 
     private static String message(String kind, String reason, boolean rerun) {
@@ -36,6 +38,7 @@ final class ChatFailures {
                     : "질문 범위가 너무 넓어 처리하지 못했어요. 대상이나 기간을 줄여 새 질문으로 보내 주세요.";
             case "validation_failed" -> "답변이 검증을 통과하지 못해 보여드리지 않아요. 질문을 고쳐 새 질문으로 보내 주세요.";
             case "permission_denied" -> "이 질문을 처리할 권한을 확인하지 못했어요. 로그인 상태를 확인해 주세요.";
+            case "save_failed" -> "답변은 준비됐지만 저장하지 못했어요. 저장을 다시 시도해 주세요.";
             case "result_lost" -> "검증한 결과를 보관하지 못해 복구할 수 없어요. 질문을 새 질문으로 다시 보내 주세요.";
             default -> "답변을 만드는 중 예상하지 못한 오류가 났어요. 질문을 새 질문으로 다시 보내 주세요.";
         };

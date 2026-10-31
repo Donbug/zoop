@@ -26,7 +26,7 @@ from pydantic import Field, model_validator
 
 from .contracts import Wire
 
-CHAT_SCHEMA_VERSION = "zoop-ai-chat-2"
+CHAT_SCHEMA_VERSION = "zoop-ai-chat-4"
 ChatStage = Literal["chat-router", "chat-answer", "chat-verification", "chat-agent"]
 QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
 # `zoop_documented` rests on ZOOP's own approved documents (policies), `evidence_grounded` on public evidence,
@@ -42,6 +42,19 @@ MAX_QUESTION = 4000
 MAX_TEXT = 12000
 MAX_PATHS = 20
 MAX_PATH_STEPS = 6
+# ZOOP-AIG-001 6.3.3: Luna's accumulated input and the final answer, whose length does not count reasoning. The provider's output
+# cap does count it, so it leaves reasoning a share of its own, provisional until the live spike measures it.
+MAX_INPUT_TOKENS = 24000
+MAX_ANSWER_TOKENS = 2000
+MAX_OUTPUT_TOKENS = 8000
+INPUT_BUDGET_EXCEEDED = "input_budget_exceeded"
+OUTPUT_BUDGET_EXCEEDED = "output_budget_exceeded"
+
+
+def estimated_tokens(text: str) -> int:
+    """A generous estimate before sending, with no tokenizer at hand: about 4 ASCII characters and 1.3 others to a token."""
+    ascii_chars = sum(1 for char in text if ord(char) < 128)
+    return ascii_chars // 4 + (len(text) - ascii_chars) * 3 // 4
 
 
 class ChatGrant(Wire):
@@ -100,11 +113,19 @@ class RouterInput(Wire):
         return self
 
 
+class RouterDependency(Wire):
+    """Run this requirement on companies found by an earlier requirement when its checkpoint matches."""
+    requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
+    cardinality: Literal["exactly", "atLeast", "atMost"]
+    count: int = Field(ge=1, le=5)
+
+
 class RoutedRequirement(Wire):
     requirement_id: str
     types: dict[QueryType, float]
     capabilities: dict[str, float]
     prohibited_advice: float
+    depends_on: RouterDependency | None
 
 
 class RouterAnswer(Wire):
@@ -195,6 +216,7 @@ MAX_APPROVALS = 8
 MAX_MCP_CALLS = 16
 TOOL_NAME = r"^[A-Za-z0-9_]{1,64}$"
 PROVIDER_ID = r"^[A-Za-z0-9_-]{1,128}$"
+REQUIREMENT_ID = r"^[A-Za-z0-9_-]{1,32}$"
 
 
 class AgentRequirement(Wire):
@@ -269,10 +291,13 @@ class AgentInput(Wire):
 
 
 class ApprovalRequest(Wire):
-    """A tool call the model proposes and the provider holds until the application decides (`require_approval=always`)."""
+    """A tool call the model proposes and the provider holds until the application decides (`require_approval=always`).
+    `requirement_ids` are the requirements the model says the call serves, taken out of its `requirementIds` argument and empty
+    when that is missing or malformed: the application decides what they are worth, and `arguments` are the rest."""
     approval_request_id: str = Field(pattern=PROVIDER_ID)
     tool_name: str = Field(pattern=TOOL_NAME)
     arguments: dict[str, Any]
+    requirement_ids: list[Annotated[str, Field(pattern=REQUIREMENT_ID)]] = Field(max_length=MAX_REQUIREMENTS)
 
 
 class McpCallSummary(Wire):
@@ -506,7 +531,7 @@ INPUTS: dict[str, type[Wire]] = {"chat-router": RouterInput, "chat-answer": Answ
 class StageRequest(Wire):
     """What the application asks of one stage. `invocation_id` identifies the attempt's stage: the same id with the same input
     returns the stored outcome and never sends again; the same id with another input is refused."""
-    schema_version: Literal["zoop-ai-chat-2"]
+    schema_version: Literal["zoop-ai-chat-4"]
     invocation_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{8,160}$")
     stage: ChatStage
     mode: Literal["replay", "live"]
@@ -557,7 +582,7 @@ class StageFailure(Wire):
 
 
 class StageResult(Wire):
-    schema_version: Literal["zoop-ai-chat-2"]
+    schema_version: Literal["zoop-ai-chat-4"]
     invocation_id: str
     stage: ChatStage
     status: Literal["succeeded", "failed"]

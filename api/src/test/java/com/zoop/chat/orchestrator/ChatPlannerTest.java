@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.zoop.chat.dto.ChatAppliedItem;
+import com.zoop.chat.dto.ChatChoice;
 import com.zoop.chat.dto.ChatFrozenContext;
 import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.orchestrator.ChatPlan.Mode;
@@ -445,6 +447,101 @@ class ChatPlannerTest {
                 Map.of(ChatQueryType.Q01, 0.9), Map.of("help.search", 0.9))), bound));
     }
 
+    private static final ChatAppliedItem SAMSUNG = new ChatAppliedItem("KRX:005930", "삼성전자");
+    private static final ChatAppliedItem HYNIX = new ChatAppliedItem("KRX:000660", "SK하이닉스");
+    private static final ChatAppliedItem ISSUE = new ChatAppliedItem("iss-1", "HBM 공급 계약");
+
+    private static ChatRun after(ChatAppliedItem... companies) {
+        return run(0, "v1").withPrior(new ChatRun.Prior(List.of(companies), List.of(ISSUE), null));
+    }
+
+    private static Req asking(String label, Map<ChatQueryType, Double> types, Map<String, Double> capabilities) {
+        return new Req(new Requirement("r1", label, true, types, capabilities, List.of(), 0.0, null));
+    }
+
+    @Test
+    void aLookupThatNamesNothingReadsTheOneCompanyTheLastAnswerApplied() {
+        var read = run(planner.plan(after(SAMSUNG), decision(req("r1", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9))), BOUND)).requirements().getFirst();
+        assertEquals(List.of("KRX:005930"), read.targets());
+    }
+
+    @Test
+    void wordsPointingAtAnEventReadTheLastAnswersIssueNotItsCompany() {
+        var read = run(planner.plan(after(SAMSUNG), decision(asking("그 사건 더 알려줘", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("issue.read", 0.9))), BOUND)).requirements().getFirst();
+        assertEquals(List.of("iss-1"), read.targets());
+    }
+
+    @Test
+    void severalCarriedCompaniesAreAskedAndAPickLeavesThatOne() {
+        var question = asking("그 회사 최근 소식은", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9));
+        var stop = assertInstanceOf(ChatPlan.Stop.class, planner.plan(after(SAMSUNG, HYNIX), decision(question), BOUND));
+        assertEquals("clarification", stop.outcome());
+        assertEquals("ambiguous", stop.reason());
+        assertEquals(List.of(new ChatChoice("KRX:005930", "삼성전자", "company"), new ChatChoice("KRX:000660", "SK하이닉스", "company")),
+                stop.choices());
+
+        var base = after(SAMSUNG, HYNIX);
+        var reply = new ChatRun(base.jobId(), base.sessionId(), base.memberId(), 1, "run", List.of(
+                new ChatRun.Turn("job-0", "그 회사 최근 소식은", null, null),
+                new ChatRun.Turn("job-1", "SK하이닉스", "KRX:000660", "SK하이닉스")), base.context(), base.selection(),
+                base.graphVersionId(), 1, base.askedAt(), base.deadline(), base.prior());
+        assertEquals(List.of("KRX:000660"), run(planner.plan(reply, decision(question), BOUND)).requirements().getFirst().targets());
+    }
+
+    @Test
+    void aNamedTargetAndTheSelectionComeBeforeWhatTheLastAnswerApplied() {
+        var named = run(planner.plan(after(SAMSUNG), decision(req("r1", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of("KRX:000660"))), BOUND)).requirements().getFirst();
+        assertEquals(List.of("KRX:000660"), named.targets());
+
+        var selected = run(0, "v1", List.of("KRX:035720")).withPrior(after(SAMSUNG).prior());
+        var read = run(planner.plan(selected, decision(asking("그 회사 소식", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9))), BOUND)).requirements().getFirst();
+        assertEquals(List.of("KRX:035720"), read.targets());
+        assertEquals(ChatPlan.TargetSource.CONTEXT, read.targetSource());
+    }
+
+    @Test
+    void aMapChangeQuestionStaysOnTheWholeMapUnlessItPointsAtTheCompany() {
+        var bound = Set.of("graph.version.diff", "company.read");
+        var whole = run(planner.plan(after(SAMSUNG), decision(asking("지도에서 뭐가 바뀌었어", Map.of(ChatQueryType.Q05, 0.9), Map.of())),
+                bound)).requirements().getFirst();
+        assertEquals(ChatPlan.TargetSource.SERVER, whole.targetSource());
+
+        var pointed = run(planner.plan(after(SAMSUNG), decision(asking("그 회사는 뭐가 바뀌었어", Map.of(ChatQueryType.Q05, 0.9), Map.of())),
+                bound)).requirements().getFirst();
+        assertEquals(List.of("KRX:005930"), pointed.targets());
+    }
+
+    @Test
+    void aParticleBeforeANounIsNotAPointerAndZoopDocumentsTakeNoCandidates() {
+        var particle = planner.plan(run(0, "v1").withPrior(new ChatRun.Prior(List.of(SAMSUNG, HYNIX), List.of(), null)),
+                decision(asking("카카오가 기업을 인수했어", Map.of(ChatQueryType.Q05, 0.9), Map.of())),
+                Set.of("graph.version.diff"));
+        assertEquals(ChatPlan.TargetSource.SERVER, run(particle).requirements().getFirst().targetSource());
+
+        var policy = planner.plan(after(SAMSUNG, HYNIX), decision(asking("이 회사 탈퇴는 어떻게 해", Map.of(ChatQueryType.Q01, 0.9),
+                Map.of("zoopPolicy.read", 0.9))), Set.of("zoopPolicy.read"));
+        assertEquals(ChatPlan.TargetSource.SERVER, run(policy).requirements().getFirst().targetSource());
+    }
+
+    @Test
+    void aComparisonUsesItsOwnWordsThenTheSelectionThenThePeriodTheLastAnswersUsed() {
+        var carried = run(0, "v1").withPrior(new ChatRun.Prior(List.of(), List.of(),
+                new com.zoop.chat.dto.ChatPeriod("2026-10-12", "2026-10-18")));
+        assertEquals("2026-10-12", ChatRetrieval.period(carried, planned("뭐가 바뀌었어")).orElseThrow().start().toString());
+        assertNull(ChatRetrieval.period(carried, planned("뭐가 바뀌었어")).orElseThrow().expression());
+        assertEquals("오늘", ChatRetrieval.period(carried, planned("오늘 뭐가 바뀌었어")).orElseThrow().expression());
+    }
+
+    @Test
+    void withoutAnyCandidateALookupStillAsksWhichTarget() {
+        assertStop("clarification", "ambiguous_target", planner.plan(run(0, "v1"), decision(asking("그 회사 소식",
+                Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9))), BOUND));
+    }
+
     // ---- fixtures -------------------------------------------------------------------------------------------------------
 
     static ChatPlan.Run run(ChatPlan plan) {
@@ -455,6 +552,18 @@ class ChatPlannerTest {
         var stop = assertInstanceOf(ChatPlan.Stop.class, plan, plan.toString());
         assertEquals(outcome, stop.outcome());
         assertEquals(reason, stop.reason());
+    }
+
+    @Test
+    void anIssueABriefingQuestionNamesReadsItsEvidenceAndARoundAloneDoesNot() {
+        Set<String> bound = Set.of("briefing.read", "briefing.evidence");
+        var named = run(new ChatPlanner().plan(run(0, "v1"), decision(req("r1", Map.of(ChatQueryType.Q06, 0.9),
+                Map.of("briefing.read", 0.9), List.of("iss-1"))), bound)).requirements().getFirst();
+        assertEquals(List.of(ChatCapability.BRIEFING_EVIDENCE, ChatCapability.BRIEFING_READ), named.capabilities());
+
+        var round = run(new ChatPlanner().plan(run(0, "v1"), decision(req("r1", Map.of(ChatQueryType.Q06, 0.9),
+                Map.of("briefing.read", 0.9))), bound)).requirements().getFirst();
+        assertEquals(List.of(ChatCapability.BRIEFING_READ), round.capabilities());
     }
 
     static Req req(String id, Map<ChatQueryType, Double> types, Map<String, Double> capabilities) {

@@ -15,7 +15,7 @@ public enum ChatCapability {
     SCREEN_SPEC_READ("screenSpec.read", "zoop-help-read", "ZOOP 화면 설명 읽기"),
     ZOOP_POLICY_READ("zoopPolicy.read", "zoop-help-read", "ZOOP 서비스 이용약관과 개인정보 처리방침 읽기"),
     COMPANY_READ("company.read", "zoop-core-read", "기업과 그 기업의 승인된 관계, 관계를 뒷받침하는 근거 읽기"),
-    DOCUMENT_SEARCH("document.search", "zoop-core-read", "기업 뉴스·공시 문서 검색"),
+    DOCUMENT_SEARCH("document.search", "zoop-core-read", "기업의 최근 뉴스·공시 문서 읽기"),
     ISSUE_READ("issue.read", "zoop-core-read", "사건(이슈)과 관련 기업, 사건 근거 읽기"),
     EVIDENCE_RESOLVE("evidence.resolve", "zoop-core-read", "근거 문서의 인용 구간 확인"),
     PERIOD_COMPARE("period.compare", "zoop-core-read", "두 기간의 변화 비교"),
@@ -90,7 +90,7 @@ public enum ChatCapability {
         return switch (this) {
             case GRAPH_VERSION_DIFF -> List.of(WHOLE_GRAPH);
             case PORTFOLIO_SCOPE_READ -> List.of(MEMBER_SELF);
-            case BRIEFING_READ -> List.of(ChatBriefingRound.LATEST);
+            case BRIEFING_READ, BRIEFING_EVIDENCE -> List.of(ChatBriefingRound.LATEST);
             default -> List.of();
         };
     }
