@@ -4747,7 +4747,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| code | 필수 | string {mcp_direct_start, web_unavailable, web_no_results, web_budget_exhausted, web_not_configured, tool_unavailable, tool_budget_exhausted} | mcp_direct_start: 도구 연결(MCP) 사전 확인이 실패해 서버가 정한 기본 조회 경로로 처음부터 답함(답변 검증은 같음). web_*: 보조 웹 검색이 실패·0건·예산 소진·미설정이라 쓰지 못함. tool_*: 내부 조회 하나가 실패하거나 호출 예산이 모자랐으나 다른 근거로 해당 요구를 답함. 지금 서버가 만드는 값은 mcp_direct_start뿐이며 나머지는 웹 검색 도구·도구 장애 부분 답변과 함께 생긴다. 클라이언트는 모르는 code도 message로 표시한다. |
+| code | 필수 | string {mcp_direct_start, web_unavailable, web_no_results, web_budget_exhausted, web_not_configured, tool_unavailable, tool_budget_exhausted} | mcp_direct_start: 도구 연결(MCP) 사전 확인이 실패해 서버가 정한 기본 조회 경로로 처음부터 답함(답변 검증은 같음). web_*: 보조 웹 검색이 실패·0건·예산 소진·미설정이라 쓰지 못함. tool_*: 내부 조회 하나가 실패하거나 호출 예산이 모자랐으나 다른 근거로 해당 요구를 답함. web_not_configured와 tool_budget_exhausted는 아직 서버가 만들지 않는다. 클라이언트는 모르는 code도 message로 표시한다. |
 | labels | 필수 | string[] | 알림이 해당하는 요구를 회원 질문의 표현으로 나타낸 문구. 실행 전체에 해당하면 빈 배열이다. |
 | message | 필수 | string | code별 서버 템플릿으로 만든 안내 문장 |
 
@@ -4797,7 +4797,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | actionId | 필수 | string | 이 결과 안에서만 유일한 서버 발급 ID |
-| kind | 필수 | string {open_company, focus_path, open_briefing} | open_company: 기업 상세. focus_path: 지도에서 두 기업 사이 경로. open_briefing: 해당 회차 브리핑. 클라이언트는 모르는 kind를 표시하지 않는다. |
+| kind | 필수 | string {open_company, focus_path, open_briefing, focus_relation, open_evidence, open_watchlist} | open_company: 기업 상세. focus_path: 지도에서 두 기업 사이 경로. open_briefing: 해당 회차 브리핑. focus_relation: 지도에서 답변이 인용한 경로 단계의 관계. open_evidence: 요구가 인용한 기사를 근거 창에서 함께 연다. open_watchlist: 회원 본인의 내 종목 화면. 클라이언트는 모르는 kind를 표시하지 않는다. |
 | label | 필수 | string | 서버가 조회 결과의 이름으로 만든 표시 문구 |
 | requirementIds | 필수 | string[] | 이 동작을 낳은 답한 요구 |
 | target | 필수 | [ChatUiActionTarget](#schema-chatuiactiontarget) |  |
@@ -4815,8 +4815,10 @@ kind에 해당하는 필드만 값이 있다.
 | toId | 필수 | string / null | focus_path 끝 기업 |
 | date | 필수 | string / null | open_briefing 회차의 KST 날짜 |
 | edition | 필수 | string {morning, evening} / null | open_briefing 회차 |
-| graphVersion | 필수 | string / null | focus_path: 경로를 읽은 그래프 버전. 지금 지도가 다른 스냅샷이면 열지 않고 안내한다. |
-| asOf | 필수 | string (date-time) / null | focus_path: 질문에 고정된 기준 시각 |
+| graphVersion | 필수 | string / null | focus_path·focus_relation·open_evidence: 읽은 그래프 버전. 지도 동작은 지금 지도가 다른 스냅샷이면 열지 않고 안내한다. |
+| asOf | 필수 | string (date-time) / null | focus_path·focus_relation·open_evidence: 질문에 고정된 기준 시각 |
+| edgeId | 필수 | string / null | focus_relation 관계 |
+| evidenceIds | 필수 | string[] / null | open_evidence 근거 |
 
 <a id="schema-chatsessionresponse"></a>
 
