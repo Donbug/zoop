@@ -26,7 +26,7 @@ from pydantic import Field, model_validator
 
 from .contracts import Wire
 
-CHAT_SCHEMA_VERSION = "zoop-ai-chat-3"
+CHAT_SCHEMA_VERSION = "zoop-ai-chat-4"
 ChatStage = Literal["chat-router", "chat-answer", "chat-verification", "chat-agent"]
 QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
 # `zoop_documented` rests on ZOOP's own approved documents (policies), `evidence_grounded` on public evidence,
@@ -216,6 +216,7 @@ MAX_APPROVALS = 8
 MAX_MCP_CALLS = 16
 TOOL_NAME = r"^[A-Za-z0-9_]{1,64}$"
 PROVIDER_ID = r"^[A-Za-z0-9_-]{1,128}$"
+REQUIREMENT_ID = r"^[A-Za-z0-9_-]{1,32}$"
 
 
 class AgentRequirement(Wire):
@@ -290,10 +291,13 @@ class AgentInput(Wire):
 
 
 class ApprovalRequest(Wire):
-    """A tool call the model proposes and the provider holds until the application decides (`require_approval=always`)."""
+    """A tool call the model proposes and the provider holds until the application decides (`require_approval=always`).
+    `requirement_ids` are the requirements the model says the call serves, taken out of its `requirementIds` argument and empty
+    when that is missing or malformed: the application decides what they are worth, and `arguments` are the rest."""
     approval_request_id: str = Field(pattern=PROVIDER_ID)
     tool_name: str = Field(pattern=TOOL_NAME)
     arguments: dict[str, Any]
+    requirement_ids: list[Annotated[str, Field(pattern=REQUIREMENT_ID)]] = Field(max_length=MAX_REQUIREMENTS)
 
 
 class McpCallSummary(Wire):
@@ -527,7 +531,7 @@ INPUTS: dict[str, type[Wire]] = {"chat-router": RouterInput, "chat-answer": Answ
 class StageRequest(Wire):
     """What the application asks of one stage. `invocation_id` identifies the attempt's stage: the same id with the same input
     returns the stored outcome and never sends again; the same id with another input is refused."""
-    schema_version: Literal["zoop-ai-chat-3"]
+    schema_version: Literal["zoop-ai-chat-4"]
     invocation_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{8,160}$")
     stage: ChatStage
     mode: Literal["replay", "live"]
@@ -578,7 +582,7 @@ class StageFailure(Wire):
 
 
 class StageResult(Wire):
-    schema_version: Literal["zoop-ai-chat-3"]
+    schema_version: Literal["zoop-ai-chat-4"]
     invocation_id: str
     stage: ChatStage
     status: Literal["succeeded", "failed"]
