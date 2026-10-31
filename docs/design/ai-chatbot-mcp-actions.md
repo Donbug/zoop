@@ -151,7 +151,7 @@ Circuit breaker 초기값은 endpoint별 최근 5회 **연결** 시도 중 3회 
 
 답할 근거가 전혀 없으면 guidance 또는 조회 성공 시 insufficient_evidence의 고정 안내다. Q02 웹 실패는 general_knowledge로 개념 설명 가능하지만 최신 기업 사실·수치·전망을 만들어내지 않는다. 모델 결과 불명/검증 실패 등 failed job에는 기존 ChatFailure 기반 고정 안내를 표시한다. cancelled·미인증·저장/전달 시스템 장애는 completed로 가장하지 않는다. 안전 안내 자체에 다시 모델 검증을 호출할 필요는 없다.
 
-answerStatus·notices는 DTO·저장·OpenAPI·웹 타입·재열람 guard에 함께 들어갔다(저장 migration 없음: 결과 jsonb에 담긴다). direct 경로에서 일부 요구의 조회만 시간 초과·자료 일시 불가로 실패하면 그 요구(와 그것에 기대는 요구)는 `tool_unavailable` limitation이 되고 나머지 요구는 답해 partial이다(2026-10-30). 한 요구의 조회 중 하나라도 실패하면 그 요구 전체를 답하지 않는다(일부 조회로 답한 요구의 `tool_unavailable` notice는 아직 만들지 않는다). 답한 요구가 하나도 남지 않거나 어댑터 오류(버그)면 지금처럼 failed다. agent 경로 실행 중 장애는 위 표대로 별도다.
+answerStatus·notices는 DTO·저장·OpenAPI·웹 타입·재열람 guard에 함께 들어갔다(저장 migration 없음: 결과 jsonb에 담긴다). direct 경로에서 일부 요구의 조회만 시간 초과·자료 일시 불가로 실패하면 그 요구(와 그것에 기대는 요구)는 `tool_unavailable` limitation이 되고 나머지 요구는 답해 partial이다(2026-10-30). 한 요구의 조회 중 일부만 실패하고 항목을 읽은 조회가 있으면 그 결과로 계속해, 답하면 `tool_unavailable` notice(요구 표현 포함, complete 유지), 못 답하면 `tool_unavailable` limitation이다(2026-10-31). 다른 요구가 기대는 요구는 일부 결과로 다음 단계를 계획하지 않도록 전체를 답하지 않는다. agent 경로도 같다: 승인됐지만 결과가 없는 내부 호출의 요구에 같은 규칙을 쓴다. 답한 요구가 하나도 남지 않거나 어댑터 오류(버그)면 지금처럼 failed다. Luna 단계 자체가 실패하면 답변 후보가 없어 위 표와 달리 notice 없이 실패로 끝난다.
 
 ## 4. 유형별 도구와 UI 동작
 
