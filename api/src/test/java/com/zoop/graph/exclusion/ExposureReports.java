@@ -138,7 +138,13 @@ final class ExposureReports {
 
     /** A lift decided on exclusion revision {@code expectedRevision}. */
     static byte[] lift(String versionId, long expectedRevision, String... issueIds) {
+        return lift(versionId, expectedRevision, null, issueIds);
+    }
+
+    /** {@code laterVersions} null: the key is left out (the default, the named version only). */
+    static byte[] lift(String versionId, long expectedRevision, Boolean laterVersions, String... issueIds) {
         ObjectNode request = StrictJson.newObject();
+        if (laterVersions != null) request.put("laterVersions", laterVersions.booleanValue());
         request.put("schemaVersion", "zoop-disclosure-exclusion-1");
         request.put("requestId", requestId());
         request.put("action", "lift");

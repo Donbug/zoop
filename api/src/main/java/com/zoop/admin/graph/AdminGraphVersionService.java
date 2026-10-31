@@ -23,6 +23,7 @@ import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
 import com.zoop.document.evidence.graph.GraphEvidence;
 import com.zoop.document.evidence.service.EvidenceService;
+import com.zoop.graph.exclusion.DisclosureExclusionCarry;
 import com.zoop.graph.read.DisclosureExclusionReader;
 import com.zoop.graph.read.GraphEvidenceSnapshotReader;
 import com.zoop.graph.read.GraphSnapshotFilter;
@@ -60,6 +61,7 @@ public class AdminGraphVersionService {
     private final JdbcGraphVersionRepository versions;
     private final GraphSnapshotStore snapshots;
     private final DisclosureExclusionReader exclusions;
+    private final DisclosureExclusionCarry carry;
     private final EvidenceService evidence;
     private final AdminAuditRepository audit;
     private final ObjectMapper mapper;
@@ -68,14 +70,15 @@ public class AdminGraphVersionService {
     private final String snapshotSource;
 
     public AdminGraphVersionService(JdbcAdminGraphVersionRepository repository, JdbcGraphVersionRepository versions,
-            GraphSnapshotStore snapshots, DisclosureExclusionReader exclusions, EvidenceService evidence,
-            AdminAuditRepository audit, ObjectMapper mapper, Clock clock,
+            GraphSnapshotStore snapshots, DisclosureExclusionReader exclusions, DisclosureExclusionCarry carry,
+            EvidenceService evidence, AdminAuditRepository audit, ObjectMapper mapper, Clock clock,
             @Value("${zoop.graph.activation.allow-without-exclusion-store:false}") boolean allowWithoutExclusionStore,
             @Value("${zoop.graph.snapshot.source:none}") String snapshotSource) {
         this.repository = repository;
         this.versions = versions;
         this.snapshots = snapshots;
         this.exclusions = exclusions;
+        this.carry = carry;
         this.evidence = evidence;
         this.audit = audit;
         this.mapper = mapper;
@@ -153,7 +156,7 @@ public class AdminGraphVersionService {
             refuseFixtureOutsideFixtureSource(version, requestId);
             PublicGraphSnapshot snapshot = snapshots.load(version);
             var activation = versions.activateByAdmin(versionId, expected, admin.adminId(), admin.email(), reason,
-                    () -> publishableNow(version, snapshot, requestId));
+                    () -> publishableNow(version, snapshot, "admin:" + admin.adminId(), requestId));
             audit.recordGraphActivation(admin.adminId(), admin.email(), versionId, activation.previousVersionId(),
                     activation.pointerChanged(), reason, requestId, activation.activatedAt());
             ActivateResponse result = new ActivateResponse(versionId, activation.previousVersionId(),
@@ -186,7 +189,7 @@ public class AdminGraphVersionService {
             String expected = versions.active().map(GraphVersionRecord::id).orElse(null);
             PublicGraphSnapshot snapshot = snapshots.load(candidate);
             return versions.activateBySystem(candidate.id(), expected, since, AUTO_REASON,
-                    () -> publishableNow(candidate, snapshot, requestId));
+                    () -> publishableNow(candidate, snapshot, "system", requestId));
         } catch (DataAccessException exception) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
         }
@@ -209,15 +212,30 @@ public class AdminGraphVersionService {
      * Runs under the publication lock, before the pointer moves (graph read contract section 0: current rights, exclusions and
      * read readiness right before the switch). Fixtures carry no rights and no stored evidence (and were already refused
      * outside the fixture source), so only imported versions get the rights checks.
-     * Without an exclusion store "nothing excluded" is unknown: refused unless the operator opted in. Returns the last check,
+     * Without an exclusion store "nothing excluded" is unknown: refused unless the operator opted in. With one, the exclusions
+     * of the version public until now are first carried to this version (#55 A-14, {@link DisclosureExclusionCarry}), so the
+     * overlay read next already holds them and a refusal below rolls them back. Returns the last check,
      * which the repository runs at the activation time: grant pins are judged at the moment the version becomes public.
      */
-    private Consumer<Instant> publishableNow(GraphVersionRecord version, PublicGraphSnapshot snapshot, String requestId) {
+    private Consumer<Instant> publishableNow(GraphVersionRecord version, PublicGraphSnapshot snapshot, String activatedBy,
+            String requestId) {
         if (!IMPORTED.equals(version.kind())) return at -> { };
-        if (!exclusions.authoritative() && !allowWithoutExclusionStore) {
-            log.info("Graph activation refused (graphVersion={}, reason=exclusion_store_unavailable, requestId={})",
-                    version.id(), requestId);
-            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        if (!exclusions.authoritative()) {
+            if (!allowWithoutExclusionStore) {
+                log.info("Graph activation refused (graphVersion={}, reason=exclusion_store_unavailable, requestId={})",
+                        version.id(), requestId);
+                throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            }
+        } else {
+            // The version public until now; when that is a synthetic fixture (a dev rollback), the imported version public
+            // before it, so the chain of exclusions is not cut by a fixture in between.
+            String base = versions.active().filter(active -> IMPORTED.equals(active.kind())).map(GraphVersionRecord::id)
+                    .or(versions::lastActivatedImported).orElse(null);
+            int carried = carry.carry(base, version.id(), activatedBy);
+            if (carried > 0) {
+                log.info("Graph activation carried {} exclusion targets (graphVersion={}, from={}, requestId={})", carried,
+                        version.id(), base, requestId);
+            }
         }
         PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot, null, exclusions.current(version.id()));
         Instant at = clock.instant();

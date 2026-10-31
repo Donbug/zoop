@@ -1,9 +1,11 @@
 package com.zoop.graph.exclusion;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -180,6 +182,15 @@ class ExclusionRequestParserTest {
         assertEquals(4, lift.expectedRevision());
         assertEquals(2, lift.targets().size());
         assertEquals("정정 확인 후 해제", lift.reason());
+        assertFalse(lift.laterVersions(), "left out: the named version only");
+        assertTrue(assertInstanceOf(Lift.class, parser.parse(ExposureReports.lift("gv-test", 4, true, "issue-a"))).laterVersions());
+        assertFalse(assertInstanceOf(Lift.class, parser.parse(ExposureReports.lift("gv-test", 4, false, "issue-a"))).laterVersions());
+        assertNotEquals(lift.requestSha256(), parser.parse(ExposureReports.lift("gv-test", 4, true, "issue-a", "issue-b"))
+                .requestSha256(), "the flag is part of the request the id is bound to");
+        ObjectNode notABoolean = (ObjectNode) StrictJson.parseObject(ExposureReports.lift("gv-test", 0, "issue-a")).node();
+        notABoolean.put("laterVersions", "yes");
+        assertEquals(ExclusionFailure.REQUEST_INVALID,
+                assertThrows(ExclusionException.class, () -> parser.parse(StrictJson.write(notABoolean))).failure());
 
         for (byte[] invalid : List.of(ExposureReports.lift("gv-test", 0), ExposureReports.lift("gv-test", 0, "issue-a", "issue-a"),
                 ExposureReports.utf8("{\"schemaVersion\":\"zoop-disclosure-exclusion-1\",\"requestId\":\"cmd\","

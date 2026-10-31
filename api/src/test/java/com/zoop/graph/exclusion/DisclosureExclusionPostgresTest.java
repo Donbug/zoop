@@ -2,6 +2,7 @@ package com.zoop.graph.exclusion;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,6 +26,7 @@ import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.common.json.StrictJson;
 import com.zoop.document.repository.ArtifactRow;
 import com.zoop.document.repository.DocumentRegistryRepository;
+import com.zoop.graph.exclusion.ExclusionResult.VersionChange;
 import com.zoop.graph.read.DisclosureExclusions;
 import com.zoop.graph.read.JdbcDisclosureExclusionReader;
 import com.zoop.graph.version.JdbcGraphVersionRepository;
@@ -163,6 +165,16 @@ class DisclosureExclusionPostgresTest {
 
     private ExclusionResult run(byte[] request) {
         return service.run(parser.parse(request));
+    }
+
+    /** What an activation does under the publication lock in its transaction: carry {@code base}'s exclusions to {@code target}. */
+    private int carry(String base, String target) {
+        JdbcDisclosureExclusionRepository repository = new JdbcDisclosureExclusionRepository(
+                context.getBean(NamedParameterJdbcTemplate.class));
+        return new TransactionTemplate(context.getBean(PlatformTransactionManager.class)).execute(status -> {
+            repository.lockPublication();
+            return new DisclosureExclusionCarry(repository).carry(base, target, "system");
+        });
     }
 
     private long revision() {
@@ -371,7 +383,7 @@ class DisclosureExclusionPostgresTest {
                 .getBeanProvider(HandoffExposureClient.class);
 
         new DisclosureExclusionConfiguration().disclosureExclusionRunner(properties, context,
-                context.getBean(NamedParameterJdbcTemplate.class), registry,
+                new JdbcDisclosureExclusionRepository(context.getBean(NamedParameterJdbcTemplate.class)), registry,
                 new TransactionTemplate(context.getBean(PlatformTransactionManager.class)), exposure).run(null);
 
         assertEquals("applied", StrictJson.parseObject(Files.readAllBytes(resultFile)).string("outcome"));
@@ -440,6 +452,103 @@ class DisclosureExclusionPostgresTest {
         assertEquals(ExclusionResult.APPLIED, run(ExposureReports.exclude(ExposureReports.report(
                 ExposureReports.handoff(HANDOFF_1, List.of("issue-a"), List.of(), false)))).outcome());
         assertEquals(Set.of("issue-a", "issue-b"), reader.current(v1).issueIds());
+    }
+
+    /** What an activation appends (#55 A-14): the public version's unlifted targets, once, as a carried change on the new version. */
+    @Test
+    void aCarryAppendsThePublicVersionsUnliftedTargetsOnceAndNothingWhenThereIsNothingNew() {
+        run(ExposureReports.exclude(ExposureReports.report(
+                ExposureReports.handoff(HANDOFF_1, List.of("issue-a", "issue-b"), List.of("edge-a"), true))));
+        run(ExposureReports.lift(v1, revision(), "issue-b"));
+        long before = revision();
+
+        assertEquals(4, carry(v1, v2), "issue-a, edge-a, the evidence and the article; not the lifted issue-b");
+
+        assertEquals(before + 1, revision());
+        DisclosureExclusions carried = reader.current(v2);
+        assertEquals(Set.of("issue-a"), carried.issueIds());
+        assertEquals(Set.of("edge-a"), carried.relationIds());
+        assertEquals(Set.of(ExposureReports.EVIDENCE), carried.evidenceIds());
+        assertEquals(Set.of(new DisclosureExclusions.ArticleTarget(ExposureReports.ARTICLE, ExposureReports.ARTICLE_VERSION)),
+                carried.articleTargets());
+        assertEquals(Set.of("issue-a"), reader.current(v1).issueIds(), "the base version is untouched");
+        var change = jdbc.queryForMap("SELECT action, cause, report_sha256, base_version_id, operator, reason "
+                + "FROM disclosure_exclusion_changes WHERE revision = ?", before + 1);
+        assertEquals("exclude", change.get("action"));
+        assertEquals(DisclosureExclusionCarry.CAUSE, change.get("cause"));
+        assertNull(change.get("report_sha256"));
+        assertEquals(v1, change.get("base_version_id"));
+        assertEquals("system", change.get("operator"));
+        assertEquals("carried from " + v1 + " at activation by system", change.get("reason"));
+
+        assertEquals(0, carry(v1, v2), "everything is already excluded there");
+        assertEquals(0, carry(v2, v2), "a re-activation of the public version");
+        assertEquals(0, carry(null, v2), "a first activation has no public version");
+        assertEquals(before + 1, revision(), "nothing appended for nothing");
+
+        // A lift the operator made on the new version itself (its corrected content, released while the version waited) stands:
+        // the carry does not re-exclude over that decision. The base version keeps its own exclusion.
+        run(ExposureReports.lift(v2, revision(), "issue-a"));
+        assertEquals(0, carry(v1, v2));
+        assertEquals(Set.of(), reader.current(v2).issueIds());
+        assertEquals(Set.of("issue-a"), reader.current(v1).issueIds());
+
+        // The schema keeps a carried change apart from an operator exclude: no report hash, a base version.
+        assertThrows(DataAccessException.class, () -> jdbc.update("INSERT INTO disclosure_exclusion_changes "
+                + "(revision, action, cause, report_sha256, reason, operator, changed_at) VALUES (?, 'exclude', 'carried', NULL, "
+                + "'x', 'system', now())", revision() + 1), "a carried change without its base version");
+        assertThrows(DataAccessException.class, () -> jdbc.update("INSERT INTO disclosure_exclusion_changes "
+                + "(revision, action, cause, report_sha256, base_version_id, reason, operator, changed_at) VALUES (?, 'exclude', "
+                + "'source-change', ?, ?, 'x', 'system', now())", revision() + 1, "9".repeat(64), v1),
+                "an operator exclude never names a base version");
+    }
+
+    @Test
+    void aLiftCoversTheLaterImportedVersionsOnlyWhenAskedAndTheStaleCheckSpansThem() {
+        run(ExposureReports.exclude(ExposureReports.report(
+                ExposureReports.handoff(HANDOFF_1, List.of("issue-a"), List.of(), false),
+                ExposureReports.handoff(HANDOFF_2, List.of("issue-a"), List.of(), false))));
+
+        ExclusionResult one = run(ExposureReports.lift(v1, revision(), "issue-a"));
+        assertEquals(ExclusionResult.APPLIED, one.outcome());
+        assertEquals(List.of(v1), one.versions().stream().map(VersionChange::graphVersionId).toList(), "by default the named version");
+        assertEquals(Set.of("issue-a"), reader.current(v2).issueIds());
+
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_1, List.of("issue-a"), List.of(), false))));
+        ExclusionResult both = run(ExposureReports.lift(v1, revision(), true, "issue-a", "issue-never"));
+        assertEquals(ExclusionResult.APPLIED, both.outcome());
+        assertEquals(List.of(v1, v2), both.versions().stream().map(VersionChange::graphVersionId).toList(),
+                "v2 was imported after v1: lifted there too");
+        assertEquals(Map.of("issue", 1), both.versions().get(1).changed());
+        assertEquals(Map.of("issue", 1), both.versions().get(1).unchanged());
+        assertEquals(Set.of(), reader.current(v1).issueIds());
+        assertEquals(Set.of(), reader.current(v2).issueIds());
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM disclosure_exclusion_targets WHERE revision = ?", Integer.class,
+                both.revision()), "one change, a target row per version");
+
+        // An operator change of the target in a later version after the decision makes a lift over later versions stale, and
+        // only that lift: the named version alone can still be lifted.
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_1, List.of("issue-a"), List.of(), false))));
+        long seen = revision();
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_2, List.of("issue-a"), List.of(), false))));
+        assertEquals(ExclusionFailure.REVISION_STALE, run(ExposureReports.lift(v1, seen, true, "issue-a")).failure().failure());
+        assertEquals(Set.of("issue-a"), reader.current(v1).issueIds(), "nothing written");
+        assertEquals(ExclusionResult.APPLIED, run(ExposureReports.lift(v1, seen, false, "issue-a")).outcome());
+        assertEquals(Set.of("issue-a"), reader.current(v2).issueIds(), "the later version keeps its own exclusion");
+
+        // A carry from the named version to a later one after the decision is not a change the operator did not see: it copied
+        // the decision the lift is about. The round in between does not make the lift stale.
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_1, List.of("issue-c"), List.of(), false))));
+        long decided = revision();
+        assertEquals(1, carry(v1, v2), "issue-c reaches v2 by the carry alone");
+        ExclusionResult acrossTheCarry = run(ExposureReports.lift(v1, decided, true, "issue-c"));
+        assertEquals(ExclusionResult.APPLIED, acrossTheCarry.outcome(), () -> String.valueOf(acrossTheCarry.failure()));
+        assertEquals(List.of(v1, v2), acrossTheCarry.versions().stream().map(VersionChange::graphVersionId).toList());
+        assertEquals(Map.of("issue", 1), acrossTheCarry.versions().get(1).changed());
+        assertFalse(reader.current(v2).issueIds().contains("issue-c"));
+        // The last imported version has nothing after it.
+        ExclusionResult last = run(ExposureReports.lift(v2, revision(), true, "issue-a"));
+        assertEquals(List.of(v2), last.versions().stream().map(VersionChange::graphVersionId).toList());
     }
 
     @Test
