@@ -1,4 +1,4 @@
-"""Credential-filtered installed ingestion export under a pinned exact route."""
+"""Credential-filtered installed ingestion export under a pinned exact route, always requiring store rights."""
 from __future__ import annotations
 
 import json

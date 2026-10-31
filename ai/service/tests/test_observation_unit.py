@@ -103,7 +103,7 @@ def environment(tmp_path):
     ingestion = tmp_path / "ingestion"
     ingestion.mkdir()
     sources = tmp_path / "sources.json"
-    sources.write_text('{}')
+    sources.write_text('{}')  # configuration only checks file accessibility; native CLI validates the registry on every read
     return ws, ws.env(ZOOP_AI_SERVICE_INGESTION_COMMAND=str(ws.env()["ZOOP_AI_SERVICE_WORKER_COMMAND"]),
                       ZOOP_AI_INGESTION_STATE_DIR=str(ingestion), ZOOP_AI_SERVICE_SOURCES=str(sources),
                       ZOOP_STATE_DIR=str(tmp_path / "app"))

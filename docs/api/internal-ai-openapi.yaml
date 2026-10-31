@@ -7861,7 +7861,7 @@
           "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
       "responses":
         "200":
-          "description": "Successful Response"
+          "description": "Exact native CLI export JSON, including authorized document.text and optional native provenance; no wrapper or omitted fields."
           "content":
             "application/json":
               "schema":
@@ -7872,7 +7872,7 @@
                 "type": "string"
                 "const": "no-store"
         "401":
-          "description": "authentication_required."
+          "description": "authentication_required: missing, malformed or unknown bearer token."
           "content":
             "application/json":
               "schema":
@@ -7945,7 +7945,7 @@
                 "type": "string"
                 "const": "no-store"
         "409":
-          "description": "registry_changed, scope_configuration_conflict or preparation_profile_unbound."
+          "description": "registry_changed, scope_configuration_conflict or preparation_profile_unbound; never recover automatically."
           "content":
             "application/json":
               "schema":
@@ -7956,7 +7956,7 @@
                 "type": "string"
                 "const": "no-store"
         "413":
-          "description": "request_too_large: body exceeds 2,000,000 bytes."
+          "description": "request_too_large: declared or streamed body exceeds 2,000,000 bytes."
           "content":
             "application/json":
               "schema":
@@ -8001,7 +8001,7 @@
                 "type": "string"
                 "const": "no-store"
         "500":
-          "description": "runtime_contract_mismatch, runtime_binding_mismatch or internal_error."
+          "description": "runtime_contract_mismatch, runtime_binding_mismatch or internal_error; no content is returned."
           "content":
             "application/json":
               "schema":
@@ -8012,7 +8012,7 @@
                 "type": "string"
                 "const": "no-store"
         "503":
-          "description": "execution_unavailable, runtime_busy, service_busy, runtime_unavailable or service_configuration_invalid."
+          "description": "execution_unavailable (group disabled), runtime_busy, service_busy, runtime_unavailable or service_configuration_invalid."
           "content":
             "application/json":
               "schema":
@@ -8031,7 +8031,7 @@
                     "status": null
           "headers":
             "Retry-After":
-              "description": "Seconds before retrying with the same key and body."
+              "description": "Seconds before another explicit read; the service never retries automatically."
               "schema":
                 "type": "integer"
             "Cache-Control":
@@ -8047,7 +8047,7 @@
           "application/json":
             "schema":
               "$ref": "#/components/schemas/ObservationExportRequest"
-      "description": "Requires observation.read. One complete seven-field native selector plus schemaVersion zoop-ingestion-s2-1. Every request runs installed zoop-ai-ingest export --require-store with credential-filtered environment and server-owned paths. Current read/store/quote-display rights, frozen source configuration, selector, text and locator hashes are checked. Single-context mode reads its configured registry; multicontext mode resolves only an exact selector in the pinned handoff inventory, checked before and after export. Unknown routes are 404; changed or invalid inventory fails closed. Scope covers the configured inventory, not per-observation ownership. No query parameters or caller-supplied paths. One synchronous 200 includes document.text and preserves native optional fields. Child deadline 45 seconds, at most two exports, input limit 2,000,000 bytes and response limit 16 MiB. Repeated requests recheck rights; delivered text cannot be recalled atomically."
+      "description": "Requires observation.read, explicitly granted to operator-selected internal importer principals. This scope permits exact reads across the server's configured registry or inventory; it is not per-observation ownership. One complete seven-field native selector plus required schemaVersion zoop-ingestion-s2-1; unknown fields are refused. Every request runs installed zoop-ai-ingest export --require-store with a credential-filtered environment and server-owned paths. The native CLI checks current read, store and quote-display grants and frozen source configuration. The service additionally validates selector identity, text sourceHash, document version and locator hashes before returning the unchanged native JSON. Single-context mode reads its configured registry; multicontext mode resolves only an exact selector in the pinned handoff inventory, checked before and after export. Unknown routes are 404; changed or invalid inventory fails closed. One request returns one observation synchronously with 200; batch and asynchronous (202) delivery are open design items of issue #407. Authorized document.text is intentionally present only in a 200 response. No status route, cache, job, ingestion write, retry or recovery. No query parameters, client paths/CLI arguments, observationId or requireStore option. Idempotency-Key is not required and conveys no authority; a repeated request rechecks current rights rather than replaying a cached result. Input limit 2,000,000 bytes; stdout/response limit 16 MiB; 45-second child deadline; at most two concurrent exports. Ingestion writer contention is 503 runtime_busy with runtimeCode ingestion_busy. Disabled configuration is 503 execution_unavailable after authentication. Error codes contain no text, path, key or raw diagnostics. All responses use Cache-Control: no-store. This read does not grant model-send, publication, activation or perpetual rights. Rights checks and HTTP delivery are separate observations, not atomic revocation or recall of already delivered text."
   "/internal/v1/chat-stages/{stage}":
     "post":
       "tags":
@@ -16668,6 +16668,6 @@
   - "name": "plan-admissions"
     "description": "Bounded exact plan admission and immutable reference reads; no dispatch."
   - "name": "observations"
-    "description": "Synchronous native observation export under current read/store/quote-display rights."
+    "description": "Synchronous native ingestion export with current read/store/quote-display rights; no ingestion writes or model permission."
   - "name": "plan-admission-policy"
     "description": "Separate operator-only policy CAS control; never application authority."

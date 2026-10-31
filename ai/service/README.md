@@ -6,6 +6,8 @@
 
 > **경계.** 이 서비스는 pipeline의 비공개 Neo4j 버전 projection(`zoop-ai-graph`, FS080 일부)을 **읽기 전용 두 라우트**(`/internal/v1/graph-versions`, 아래 별도 절)로만 감싸고, 별개로 AI handoff bundle의 **읽기 전용 두 라우트**(`/internal/v1/graph-handoffs`, 아래 절)를 제공합니다. 버전 생성(`init`·`freeze`·`project`·`recover`)·게시·활성화·FS081 철회·목록·호출자 Cypher는 없고, Neo4j write 자격과 쓰기 명령은 pipeline 운영자 프로세스만 갖습니다. 공개 API·Spring 클라이언트·활성 포인터는 없습니다([pipeline README](../pipeline/README.md), [AI 실행 계약](../../docs/design/ai-system.md), [백엔드 인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)).
 
+> **관측 export(#387의 세 번째 작업만).** `POST /internal/v1/observations/export`는 설치된 `zoop-ai-ingest export --require-store`를 동기 호출합니다. 현재 권한이 허용하는 문서 본문을 200 응답에 포함하며, 수집 실행·회차 job·freeze·스케줄러는 추가하지 않습니다. 설정과 운영 경계는 아래 「관측 export」 절을 따릅니다.
+
 ```bash
 make service-install           # uv sync --project ai/service --frozen --group dev (공개 의존성만, 토큰 없음)
 make service-test              # 실제 uvicorn + 설치된 zoop-ai + authored replay (4-worker 병렬, 느린 테스트 30개 시간 출력)
@@ -50,20 +52,38 @@ ai/service/.venv/bin/python -m zoop_ai_service.main   # 또는 zoop-ai-service (
 
 잘못된 설정은 종료 코드 78과 `{"error":"service_config_invalid","field":"<VAR>","reason":"<code>"}`만 출력합니다(값 출력 없음). child 환경은 `PATH=/usr/bin:/bin`, `LANG=C.UTF-8`, `PYTHON*` 몇 개와 위 통과 값뿐입니다. 요청이 경로·명령·환경·provider URL·모델·fixture·grant registry를 고를 수는 없습니다.
 
-### 관측 export와 앱 수입용 읽기 profile
+### 관측 export와 앱 수입용 읽기 profile(선택, 기본 꺼짐)
 
-`POST /internal/v1/observations/export`는 `observation.read` scope로 관측 한 건을 동기 조회합니다. 요청은 `schemaVersion: zoop-ingestion-s2-1`과 `roundId`, `sourceId`, `page`, `ordinal`, `documentId`, `rawVersion`, `documentVersion`만 받습니다. 매 요청에서 설치된 `zoop-ai-ingest export --require-store`가 현재 `read`·`store`·`quote-display` 권한을 검사합니다. 응답은 본문과 native provenance를 포함한 export JSON이며, 서비스가 selector·본문·document version·locator hash를 검증합니다. 요청 상한은 2,000,000바이트, 응답은 16 MiB, child deadline은 45초, 동시 export는 2건입니다.
+`POST /internal/v1/observations/export`는 `observation.read` scope로 관측 한 건을 동기 조회합니다. 이 scope는 운영자가 지정한 내부 문서 수입 principal에 명시적으로 부여하며, 기존 principal에 자동으로 추가하지 않습니다. **서버가 설정한 ingestion 저장소 또는 inventory 전체의 정확한 관측 조회 권한**이며 관측별 소유권은 아닙니다. 같은 scope를 명시적으로 받은 principal은 동일한 현재 source 권리 검사를 거쳐 조회할 수 있습니다. Scope가 없는 인증된 principal은 403, 알 수 없는 토큰은 401입니다.
 
 | 설정 | profile 조건 |
 |---|---|
 | `ZOOP_AI_SERVICE_INGESTION_COMMAND` | 그룹을 켜는 설치 CLI의 절대 경로입니다. 이미지 경로는 `/opt/zoop/pipeline/.venv/bin/zoop-ai-ingest`입니다. |
-| `ZOOP_AI_INGESTION_STATE_DIR`, `ZOOP_AI_SERVICE_SOURCES` | 단일 context에서만 지정합니다. 함께 켠 실행·handoff 그룹과 같은 원장·현재 registry를 사용합니다. |
+| `ZOOP_AI_INGESTION_STATE_DIR`, `ZOOP_AI_SERVICE_SOURCES` | 단일 context에서 기존 ingestion 저장소와 현재 운영자 registry를 지정합니다. 함께 켠 실행·graph·handoff 그룹과 같은 원장·현재 registry를 사용하며, CLI가 registry를 요청마다 다시 읽습니다. |
 | `ZOOP_AI_SERVICE_OBSERVATION_SOURCE_CONTEXTS`, `ZOOP_AI_SERVICE_OBSERVATION_SOURCE_CONTEXTS_SHA256` | 여러 context에서 단일 설정을 대신합니다. 기존 `zoop-handoff-source-contexts-1` inventory의 정확한 파일과 SHA-256을 지정합니다. handoff 그룹이 켜져 있으면 `ZOOP_AI_SERVICE_HANDOFF_SOURCE_CONTEXTS` 쌍과 파일·SHA가 모두 같아야 합니다. |
 | `ZOOP_STATE_DIR` | native 상태 소유권 검사의 앱 경로입니다. service·worker·native 원장과 겹치면 시작을 거절합니다. |
 
-여러 context에서는 전체 7-field selector에 정확히 대응하는 원장 하나만 읽습니다. 다른 원장을 검색해 대신 제공하지 않습니다. 중복 route는 시작 때 거절하고, 파일 hash를 export 전후에 다시 확인합니다. 현재 registry 내용은 inventory hash에 고정하지 않으므로 권리 철회는 다음 조회부터 적용됩니다. 알 수 없는 selector는 404, 권리 부족은 403 `source_unauthorized`, registry·source 설정 변경은 409, inventory 변경·native 저장소 문제는 503 `service_configuration_invalid`입니다. scope가 없으면 403, 인증 실패는 401, 그룹이 꺼져 있으면 인증 후 503입니다. 모든 응답은 `Cache-Control: no-store`입니다.
+기존 서비스 필수 설정도 필요합니다. 그룹을 설정하지 않으면 인증 후 503 `execution_unavailable`이며, 그룹 설정이 불완전하면 시작을 거절합니다. 관측 export가 공유 ingestion·sources 설정을 사용하더라도 S2·S3 실행 그룹은 별도로 설정해야 합니다.
 
-앱 수입 전용 principal에는 `handoff.read`와 `observation.read`를 명시적으로 부여합니다. 이 scope는 설정된 inventory 전체의 정확한 관측 조회 권한이며 관측별 소유권은 아닙니다. 기존 online admission profile은 principal·scope를 고정하므로 그 binding을 바꾸지 말고 별도 읽기 profile과 service state를 사용합니다. 기존 회차·예산·영수증은 유지합니다. 읽기 child는 필터링된 환경만 받고 provider 자격 증명이나 앱 DB 자격 증명을 받지 않습니다.
+요청은 닫힌 native selector입니다. `schemaVersion`은 필수이며 값은 `zoop-ingestion-s2-1`입니다. 나머지 필드는 정확히 `roundId`, `sourceId`, `page`, `ordinal`, `documentId`, `rawVersion`, `documentVersion`입니다. `observationId`, 클라이언트 경로·CLI 인자·registry·`requireStore` 옵션과 query parameter는 받지 않습니다. `Idempotency-Key`는 필요하지 않고 권한이나 캐시 신원을 만들지 않습니다.
+
+서버는 매 요청에서 설치된 `zoop-ai-ingest export --require-store`만 실행합니다. CLI가 현재 `read`·`store`·`quote-display`, 고정된 source 설정과 관측 버전을 검사하며, 서비스는 응답의 selector 일치, 본문의 `sourceHash`, document version과 locator hash를 검증합니다. 성공 응답은 **CLI의 정확한 JSON**이며 `document.text`, locator와 선택적 publisher·language·collection 필드를 보존합니다. `language`는 native가 선언한 2~35자 문자열만 받고, 미지정 필드는 추가하지 않습니다. 별도 wrapper나 상태 조회 경로는 없습니다. 한 요청은 관측 하나를 동기 200으로 돌려주며, 묶음 조회와 비동기(202) 전달은 #407에서 정할 열린 항목입니다. 요청은 2,000,000바이트, stdout·응답은 16 MiB, child 실행은 45초, 동시 export는 2개로 제한합니다. 모든 응답에 `Cache-Control: no-store`가 붙습니다.
+
+여러 context에서는 전체 7-field selector에 정확히 대응하는 원장 하나만 읽습니다. 다른 원장을 검색해 대신 제공하지 않습니다. 중복 route는 시작 때 거절하고, 파일 hash를 export 전후에 다시 확인합니다. 현재 registry 내용은 inventory hash에 고정하지 않으므로 권리 철회는 다음 조회부터 적용됩니다.
+
+| 결과 | HTTP |
+|---|---|
+| 허용된 native export | 200 |
+| `source_unauthorized` | 403 |
+| `round_not_found`, `observation_not_found`, `document_version_not_in_round`, 알 수 없는 inventory selector | 404 |
+| `registry_changed`, `scope_configuration_conflict`, `preparation_profile_unbound` | 409 |
+| writer lock의 `ingestion_busy` | 503 `runtime_busy`, `runtimeCode=ingestion_busy`, `Retry-After: 2` |
+| inventory 변경·hot WAL·손상된 설정 등 native 상태 거부 | 503 `service_configuration_invalid`와 안전한 `runtimeCode` |
+| stdout 계약·본문 hash·응답 신원 불일치 | 500 `runtime_contract_mismatch` 또는 `runtime_binding_mismatch` |
+
+오류와 로그에는 본문·운영자 경로·키·raw stderr를 넣지 않습니다. 요청마다 권리를 새로 확인하며, 캐시·ingestion 쓰기·자동 재시도·복구·job 등록은 하지 않습니다. 권리 검사와 HTTP 전달은 별개 시점이므로 이미 전달한 본문을 회수하거나 원자적 철회를 보장하지 않습니다. 이 조회는 모델 송신·grant 발급·게시·활성화를 허가하지 않습니다. 읽기 child는 필터링된 환경만 받고 provider 자격 증명이나 앱 DB 자격 증명을 받지 않습니다.
+
+앱 수입 전용 principal에는 `handoff.read`와 `observation.read`를 명시적으로 부여합니다. **기존 온라인 profile에 scope만 추가해 재시작하면 안 됩니다.** Plan authority binding은 모든 principal 이름과 scope를 고정하므로 `observation.read` 추가도 기존 binding을 바꾸며 시작이 거부됩니다. 기존 profile·binding·회차·예산·quota·영수증을 보존한 별도 읽기 profile과 service state를 사용합니다. 기존 profile을 바꾸려면 별도 승인된 migration 절차가 필요하며, 새 profile은 기존 실행 예산이나 admission 한도를 초기화하는 수단이 아닙니다.
 
 ECS의 AI service TaskDefinition에는 위 경로와 기존 필수 `ZOOP_AI_SERVICE_PRINCIPALS`, `ZOOP_AI_SERVICE_STATE_DIR`, `ZOOP_AI_WORKER_STATE_DIR`, `ZOOP_AI_SERVICE_WORKER_COMMAND`, `ZOOP_AI_SERVICE_GRANTS`, port·bind 설정을 제공합니다. source mount와 현재 registry는 AI task가 읽고, API importer task에는 HTTP client 설정과 실제 대상 DB·artifact root만 제공합니다. 서비스 진입점은 이미지의 `zoop-ai-service`이며 native pipeline도 동일 이미지에 설치됩니다. 외부 client base URL은 승인된 HTTPS 주소여야 합니다. 이 설정 예시는 endpoint·token을 발급하거나 ingress를 배포하지 않습니다.
 
@@ -71,7 +91,9 @@ ECS의 AI service TaskDefinition에는 위 경로와 기존 필수 `ZOOP_AI_SERV
 
 배치 위치를 바꿀 때는 source-context의 운영 경로와 authority-set의 바깥 `sources` 경로를 대상 위치로 옮기고 inventory SHA-256을 다시 고정합니다. registry 내부의 `inputRoot` 문자열은 과거 ingestion 설정의 고정 identity이므로 원래 값 그대로 보존합니다. 현재 권한 leaf는 AI와 API가 같은 canonical 파일을 읽도록 공유하고, 애플리케이션의 읽기 전용 mount와 별개로 운영자가 갱신합니다. API의 control 접근 권한은 [API mount 지침](../../api/README.md#여러-원장-읽기와-현재-권한)을 따릅니다.
 
-합성 종단 시나리오는 `api/scripts/http_native_delivery_smoke.py`입니다. 두 native context의 실제 HTTP 인증·selector·misroute·권리 철회, Java/PostgreSQL 문서 등록, target bindings, 최종 commit 직전 권리 재확인, native-8 수입과 공개 graph·본문 근거를 검사합니다. 실행 전제와 명령은 [HTTP 수입 안내](../../api/docs/GRAPH_READ_HANDOFF.md#http로-문서와-native-handoff-수입)를 따릅니다.
+단일 context의 오프라인 실제 HTTP→CLI smoke는 `ai/service/.venv/bin/python ai/service/scripts/observation_export_smoke.py`입니다. 합성 HTML로 만든 native 저장소만 사용하며 네트워크는 loopback으로 제한하고 `.env` 읽기를 거부합니다. 설치된 pipeline 환경이 필요하며 의존성을 자동으로 설치하지 않습니다.
+
+여러 context의 합성 종단 시나리오는 `api/scripts/http_native_delivery_smoke.py`입니다. 두 native context의 실제 HTTP 인증·selector·misroute·권리 철회, Java/PostgreSQL 문서 등록, target bindings, 최종 commit 직전 권리 재확인, native-8 수입과 공개 graph·본문 근거를 검사합니다. 실행 전제와 명령은 [HTTP 수입 안내](../../api/docs/GRAPH_READ_HANDOFF.md#http로-문서와-native-handoff-수입)를 따릅니다.
 
 ### 온라인 plan admission(선택, 기본 꺼짐)
 

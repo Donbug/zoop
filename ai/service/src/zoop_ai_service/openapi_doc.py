@@ -513,7 +513,7 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
                     {"name": "graph-handoffs", "description": "Read-only, nonpublic AI handoff status and whole-bundle delivery over operator-pinned handoffs, through the installed zoop-ai-handoff export command (no write, no model, no network)."},
                     {"name": "chat-stages", "description": "One chatbot model stage (router, answer or verification) per request, synchronously, through the installed zoop-ai-chat runtime (replay, or live behind the chat gate)."},
                     {"name": "plan-admissions", "description": "Bounded exact plan admission and immutable reference reads; no dispatch."},
-                    {"name": "observations", "description": "Synchronous native observation export under current read/store/quote-display rights."},
+                    {"name": "observations", "description": "Synchronous native ingestion export with current read/store/quote-display rights; no ingestion writes or model permission."},
                     {"name": "plan-admission-policy", "description": "Separate operator-only policy CAS control; never application authority."}]
     components = spec["components"]
     components["securitySchemes"] = {"bearerAuth": {"type": "http", "scheme": "bearer",
@@ -609,14 +609,24 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     export["requestBody"] = {"required": True, "content": {"application/json": {
         "schema": {"$ref": "#/components/schemas/ObservationExportRequest"}}}}
     export["description"] = (
-        "Requires observation.read. One complete seven-field native selector plus schemaVersion zoop-ingestion-s2-1. "
-        "Every request runs installed zoop-ai-ingest export --require-store with credential-filtered environment and server-owned paths. "
-        "Current read/store/quote-display rights, frozen source configuration, selector, text and locator hashes are checked. "
+        "Requires observation.read, explicitly granted to operator-selected internal importer principals. This scope permits exact reads across the server's "
+        "configured registry or inventory; it is not per-observation ownership. One complete seven-field native selector plus required schemaVersion "
+        "zoop-ingestion-s2-1; unknown fields are refused. "
+        "Every request runs installed zoop-ai-ingest export --require-store with a credential-filtered environment and server-owned paths. "
+        "The native CLI checks current read, store and quote-display grants and frozen source configuration. "
+        "The service additionally validates selector identity, text sourceHash, document version and locator hashes before returning the unchanged native JSON. "
         "Single-context mode reads its configured registry; multicontext mode resolves only an exact selector in the pinned handoff inventory, "
         "checked before and after export. Unknown routes are 404; changed or invalid inventory fails closed. "
-        "Scope covers the configured inventory, not per-observation ownership. No query parameters or caller-supplied paths. "
-        "One synchronous 200 includes document.text and preserves native optional fields. Child deadline 45 seconds, at most two exports, "
-        "input limit 2,000,000 bytes and response limit 16 MiB. Repeated requests recheck rights; delivered text cannot be recalled atomically.")
+        "One request returns one observation synchronously with 200; batch and asynchronous (202) delivery are open design items of issue #407. "
+        "Authorized document.text is intentionally present only in a 200 response. No status route, cache, job, ingestion write, retry or recovery. "
+        "No query parameters, client paths/CLI arguments, observationId or requireStore option. Idempotency-Key is not required and conveys no authority; "
+        "a repeated request rechecks current rights rather than replaying a cached result. Input limit 2,000,000 bytes; stdout/response limit 16 MiB; "
+        "45-second child deadline; at most two concurrent exports. Ingestion writer contention is 503 runtime_busy with runtimeCode ingestion_busy. "
+        "Disabled configuration is 503 execution_unavailable after authentication. Error codes contain no text, path, key or raw diagnostics. "
+        "All responses use Cache-Control: no-store. This read does not grant model-send, publication, activation or perpetual rights. "
+        "Rights checks and HTTP delivery are separate observations, not atomic revocation or recall of already delivered text.")
+    export["responses"]["200"]["description"] = "Exact native CLI export JSON, including authorized document.text and optional native provenance; no wrapper or omitted fields."
     for response in export["responses"].values():
         response.setdefault("headers", {})["Cache-Control"] = {"schema": {"type": "string", "const": "no-store"}}
+    export["responses"]["503"]["headers"]["Retry-After"]["description"] = "Seconds before another explicit read; the service never retries automatically."
     return spec

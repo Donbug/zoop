@@ -399,19 +399,18 @@ PLAN_ERRORS = {
 }
 
 
-
 OBSERVATION_ERRORS = {
     code: {"model": ErrorEnvelope, "description": description}
     for code, description in {
-        401: "authentication_required.",
+        401: "authentication_required: missing, malformed or unknown bearer token.",
         403: "scope_denied or source_unauthorized: current read/store/quote-display rights are required.",
         404: "round_not_found, observation_not_found or document_version_not_in_round.",
-        409: "registry_changed, scope_configuration_conflict or preparation_profile_unbound.",
-        413: "request_too_large: body exceeds 2,000,000 bytes.",
+        409: "registry_changed, scope_configuration_conflict or preparation_profile_unbound; never recover automatically.",
+        413: "request_too_large: declared or streamed body exceeds 2,000,000 bytes.",
         415: "unsupported_media_type: requires application/json with UTF-8.",
         422: "invalid_request: exact closed native selector; no query parameters.",
-        500: "runtime_contract_mismatch, runtime_binding_mismatch or internal_error.",
-        503: "execution_unavailable, runtime_busy, service_busy, runtime_unavailable or service_configuration_invalid.",
+        500: "runtime_contract_mismatch, runtime_binding_mismatch or internal_error; no content is returned.",
+        503: "execution_unavailable (group disabled), runtime_busy, service_busy, runtime_unavailable or service_configuration_invalid.",
     }.items()
 }
 

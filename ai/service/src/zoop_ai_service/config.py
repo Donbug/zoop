@@ -780,7 +780,7 @@ def load(environ: Mapping[str, str]) -> ServiceConfig:
         if key in environ:
             child[key] = environ[key]
     extraction_enabled = any(name in environ for name in (*EXTRACTION_OWN, EXTRACTION_TOPIC))
-    # Shared ingestion settings belong to observation reads unless an execution group explicitly claims them.
+    # Shared settings alone retain the legacy S3 incomplete-group refusal unless S2 or observation export claims them.
     relation_enabled = any(name in environ for name in RELATION_OWN) or (
         not extraction_enabled and OBSERVATION_COMMAND not in environ and any(name in environ for name in SHARED_VARS))
     relation = _relation(environ, principals, state_dir, worker_state, relation_enabled)

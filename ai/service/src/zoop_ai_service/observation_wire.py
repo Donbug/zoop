@@ -1,4 +1,8 @@
-"""Closed native ingestion export wire with exact selector and content-hash checks."""
+"""Closed native ingestion export wire, independent of the installed pipeline package.
+
+The service checks the exact selector and native content hashes, then returns the original
+JSON, retaining absent optional fields. Rights remain the installed CLI's responsibility.
+"""
 from __future__ import annotations
 
 import hashlib

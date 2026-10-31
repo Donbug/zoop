@@ -40,6 +40,7 @@ class ObservationReads:
                     raise ObservationError(404, code)
                 if code in {"registry_changed", "scope_configuration_conflict", "preparation_profile_unbound"}:
                     raise ObservationError(409, code)
+                # CLI codes have already been reduced to a bounded machine code; never relay its diagnostics.
                 raise ObservationError(503, "service_configuration_invalid", runtime_code=code, retry_after=30)
             if outcome.kind == "contract":
                 raise ObservationError(500, "runtime_contract_mismatch")
