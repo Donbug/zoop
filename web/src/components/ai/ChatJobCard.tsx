@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import { PHASES } from '@/components/ai/chat-phases';
 import {
@@ -7,6 +7,7 @@ import {
   safeArticleUrl,
 } from '@/components/graph/event-format';
 import { useAiChatStore } from '@/stores/useAiChatStore';
+import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import type {
   ChatAnswerBasis,
   ChatBasis,
@@ -427,6 +428,7 @@ function UiActions({
 }) {
   const [unavailable, setUnavailable] = useState(false);
   const close = useAiChatStore((state) => state.close);
+  const location = useLocation();
   return (
     <div>
       <div className={ui.textActions}>
@@ -456,6 +458,68 @@ function UiActions({
               >
                 {action.label}
               </Link>
+            );
+          }
+          if (action.kind === 'open_watchlist') {
+            return (
+              <Link key={action.actionId} to="/my" onClick={close}>
+                {action.label}
+              </Link>
+            );
+          }
+          // D-GRP-05 근거 창은 지도에만 있다. 서버 동작의 근거 ID로 열고, 창이 지금 볼 수 있는지 다시 확인한다.
+          if (
+            action.kind === 'open_evidence' &&
+            target.evidenceIds?.length &&
+            onViewOnMap
+          ) {
+            const { evidenceIds } = target;
+            return (
+              <button
+                key={action.actionId}
+                type="button"
+                onClick={() => {
+                  close();
+                  useGraphUiStore.getState().openEvidence({
+                    kind: 'path',
+                    id: `answer:${evidenceIds.join(',')}`,
+                    label: action.label,
+                    evidenceIds,
+                    mapContext: {
+                      url: `${location.pathname}${location.search}`,
+                      graphVersion: target.graphVersion ?? undefined,
+                      asOf: target.asOf ?? undefined,
+                    },
+                  });
+                }}
+              >
+                {action.label}
+              </button>
+            );
+          }
+          if (
+            action.kind === 'focus_relation' &&
+            target.edgeId &&
+            onViewOnMap
+          ) {
+            const edgeId = target.edgeId;
+            return (
+              <button
+                key={action.actionId}
+                type="button"
+                onClick={() =>
+                  setUnavailable(
+                    !onViewOnMap({
+                      id: edgeId,
+                      kind: 'edge',
+                      graphVersion: target.graphVersion,
+                      asOf: target.asOf,
+                    }),
+                  )
+                }
+              >
+                {action.label}
+              </button>
             );
           }
           if (
@@ -488,7 +552,7 @@ function UiActions({
       </div>
       {unavailable && (
         <p className={ui.muted} role="status">
-          이 경로는 답변을 만든 그래프 기준이라 지금 지도에서 열 수 없어요.
+          이 항목은 답변을 만든 그래프 기준이라 지금 지도에서 열 수 없어요.
         </p>
       )}
     </div>

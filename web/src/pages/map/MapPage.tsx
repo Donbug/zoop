@@ -723,6 +723,7 @@ function MapWorkspace({
    * D-AI-02 "지도에서 보기": 답변을 만든 스냅샷(그래프 버전과 질문에 명시된 기준 시각)으로 연다.
    * - 지금 지도가 같은 버전·같은 기준 시각이고 대상 노드가 있으면 그 자리에서 초점을 맞춘다.
    * - 아니면 기업 대상이고 명시된 시각이 있을 때만 그 버전·시각의 기업 지도로 이동하며, 이전 사건·영향·회차 선택은 지운다.
+   * - 관계는 같은 스냅샷의 지도에 그 연결선이 있을 때만 선택한다(D-GRP-04).
    * - 그 밖(사건·관계, 시각 없이 버전만 고정된 답변)은 지금 지도가 그 스냅샷을 열 수 없으므로 false: 시각을 지어내지 않는다.
    */
   function viewAnswerTarget(target: AnswerMapTarget) {
@@ -738,6 +739,19 @@ function MapWorkspace({
       )
         return false;
       updateQuery({ path: target.id, focus: null, hops: null, select: null });
+      return true;
+    }
+    if (target.kind === 'edge') {
+      if (!sameSnapshot || !data?.edges.some((edge) => edge.id === target.id))
+        return false;
+      updateQuery({
+        select: `edge:${target.id}`,
+        id: null,
+        impact: null,
+        path: null,
+        focus: null,
+        hops: null,
+      });
       return true;
     }
     if (sameSnapshot) {
