@@ -22,6 +22,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import {
   bucketKey,
   impactEdges,
+  money,
   requestTime,
   timeRange,
 } from '@/components/company/detail-model';
@@ -331,6 +332,40 @@ function open(query = '') {
 }
 const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
 
+test('D-COM-01 48 normalizes a missing tab and announces the prototype notice', async () => {
+  open(`${pinned}&tab=gone&depth=2`);
+  await screen.findByText('요청한 탭이 없어 사건 탭을 보여 드려요');
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).not.toContain('tab=gone'),
+  );
+  expect(screen.getByTestId('address').textContent).toContain('depth=2');
+});
+
+test('D-COM-01 48 clears a missing event without changing pinned graph time', async () => {
+  server.on('GET', '/api/v1/events/:id', () =>
+    apiError(404, 'RESOURCE_NOT_FOUND'),
+  );
+  open(`${pinned}&event=gone&graphAsOf=${encodeURIComponent(old)}`);
+  await screen.findByText('선택했던 사건을 지금은 볼 수 없어 선택을 풀었어요');
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).not.toContain(
+      'event=gone',
+    ),
+  );
+  const address = screen.getByTestId('address').textContent!;
+  expect(address).not.toContain('event=gone');
+  expect(
+    new URL(address, 'http://localhost').searchParams.get('graphAsOf'),
+  ).toBe(old);
+});
+
+test('D-COM-01 48 does not clear an event when the list fails', async () => {
+  server.on('GET', '/api/v1/events', () => apiError(503, 'SOURCE_UNAVAILABLE'));
+  open(`${pinned}&event=issue-a`);
+  await screen.findByText(/타임라인 조회 실패/);
+  expect(screen.getByTestId('address').textContent).toContain('event=issue-a');
+});
+
 test.each(['events', 'documents', 'info'])(
   'D-COM-01 F4 keeps one main and the skip-link target on the %s tab',
   async (tab) => {
@@ -484,7 +519,9 @@ test('D-COM-06: catalog company switch clears the prior company event graph time
     }),
   );
   open(`${pinned}&graphAsOf=${encodeURIComponent(old)}`);
-  const catalog = screen.getByRole('complementary', { name: '기업 선택' });
+  const catalog = await screen.findByRole('complementary', {
+    name: '기업 선택',
+  });
   await userEvent.type(
     within(catalog).getByRole('textbox', { name: '기업명·종목 코드' }),
     'OTHER',
@@ -752,7 +789,12 @@ test('connected member displays mock holding without replacing null values', asy
   );
   open(pinned);
   await screen.findByText('20주');
-  expect(screen.getByText('계산 불가')).toBeTruthy();
+  expect(screen.getByText('-', { selector: 'dd' })).toBeTruthy();
+  // D-COM-01 N-x: same currency format as the price; null stays '미제공'.
+  expect(screen.getByText('100원', { selector: 'dd' })).toBeTruthy();
+  expect(screen.getByText('시세 미제공', { selector: 'dd' })).toBeTruthy();
+  expect(screen.getByText('100원 ~ 130원', { selector: 'dd' })).toBeTruthy();
+  expect(screen.getByText('미제공 ~ 미제공', { selector: 'dd' })).toBeTruthy();
   const region = screen.getByRole('region', { name: '가상 계좌 보유' });
   expect(within(region).getAllByText(/모의/).length).toBeGreaterThan(0);
   // D-COM-01 / F6: private valuation timestamps retain the original machine values.
@@ -768,6 +810,45 @@ test('connected member displays mock holding without replacing null values', asy
   ).toBe(true);
   await act(async () => useAuthStore.getState().clearSession());
   expect(screen.queryByText('20주')).toBeNull();
+});
+test('D-COM-01 company detail hides holdings when the portfolio only holds other companies', async () => {
+  useAuthStore.getState().setSession({
+    authenticated: true,
+    kind: 'member',
+    user: {
+      id: 'synthetic-member',
+      email: 'synthetic@example.test',
+      displayName: '가상',
+    },
+    setup: { completed: true, tutorialCompleted: false },
+    csrfToken: 'synthetic',
+    expiresAt: null,
+  });
+  server.on('GET', '/api/v1/portfolio', () =>
+    json({
+      connected: true,
+      holdings: [
+        {
+          companyId: 'KRX:OTHER',
+          quantity: 20,
+          avgPrice: 100,
+          avgPriceCurrency: 'KRW',
+          marketValue: 2000,
+          weight: 1,
+          quote: { status: 'available', currency: 'KRW' },
+        },
+      ],
+      mockAsOf: old,
+      valuation: null,
+      metadata,
+    }),
+  );
+  open(pinned);
+  await waitFor(() =>
+    expect(server.calls('GET', '/api/v1/portfolio').length).toBeGreaterThan(0),
+  );
+  expect(screen.queryByRole('region', { name: '가상 계좌 보유' })).toBeNull();
+  expect(screen.queryByText('이 기업의 모의 보유 종목이 없어요.')).toBeNull();
 });
 test('switching member hides previous holdings while next response is pending', async () => {
   const session = (id: string) => ({
@@ -815,7 +896,7 @@ test('switching member hides previous holdings while next response is pending', 
       }),
     ),
   );
-  await screen.findByText('연결된 가상 계좌가 없어요.');
+  expect(screen.queryByRole('region', { name: '가상 계좌 보유' })).toBeNull();
 });
 test('event map link opens the event-time map; round trip restores period, time, tab, event and bucket exactly', async () => {
   const query = `${pinned}&period=1m&tab=events&event=issue-a&bucket=2026-10-05`;
@@ -2292,7 +2373,7 @@ test.each([
     );
     const indicator = await region.findByText(label, { exact: true });
     expect(indicator.classList.contains(color)).toBe(true);
-    expect(indicator.classList.contains('text-[11px]')).toBe(false);
+    expect(indicator.classList.contains('text-caption')).toBe(false);
     expect(indicator.classList.contains('mt-0.5')).toBe(false);
   },
 );
@@ -2331,3 +2412,48 @@ test.each([
     );
   },
 );
+
+test('D-COM-01 N-x formats an available holding value and keeps an unknown buy currency', async () => {
+  useAuthStore.getState().setSession({
+    authenticated: true,
+    kind: 'member',
+    user: {
+      id: 'synthetic-member',
+      email: 'synthetic@example.test',
+      displayName: '가상',
+    },
+    setup: { completed: true, tutorialCompleted: false },
+    csrfToken: 'synthetic',
+    expiresAt: null,
+  });
+  server.on('GET', '/api/v1/portfolio', () =>
+    json({
+      connected: true,
+      holdings: [
+        {
+          companyId: id,
+          quantity: 20,
+          avgPrice: 1500,
+          avgPriceCurrency: null,
+          marketValue: 2400,
+          weight: 1,
+          quote: { status: 'available', currency: 'KRW' },
+        },
+      ],
+      mockAsOf: old,
+      valuation: null,
+      metadata,
+    }),
+  );
+  open(pinned);
+  await screen.findByText('20주');
+  expect(screen.getByText('2,400원', { selector: 'dd' })).toBeTruthy();
+  expect(screen.getByText('1,500 통화 미상', { selector: 'dd' })).toBeTruthy();
+});
+
+test('D-COM-01 N-x keeps fractional won and formats other currencies like the price', () => {
+  expect(money(71234.56, 'KRW')).toBe('71,234.56원');
+  expect(money(71000, 'KRW')).toBe('71,000원');
+  expect(money(12.5, 'USD')).toBe('$12.50');
+  expect(money(null, 'KRW')).toBe('미제공');
+});

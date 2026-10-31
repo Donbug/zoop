@@ -24,7 +24,7 @@ export default function SessionStatus() {
         </div>
       ) : (
         <>
-          <p className="text-xs text-zoop-muted">
+          <p className="text-caption text-zoop-muted">
             로그인한 계정으로 계속할 수 있어요.
           </p>
           <button

@@ -19,6 +19,12 @@ import com.zoop.graph.importer.HandoffFixtures.Built;
 import com.zoop.graph.importer.HandoffFixtures.FakeHandoff;
 import com.zoop.graph.importer.HandoffFixtures.FakeIngestion;
 import com.zoop.graph.read.GraphQueryService;
+import com.zoop.graph.round.GraphRound;
+import com.zoop.graph.round.GraphRoundEvent;
+import com.zoop.graph.round.GraphRoundImportBridge;
+import com.zoop.graph.round.GraphRoundPatch;
+import com.zoop.graph.round.GraphRoundStage;
+import com.zoop.graph.round.JdbcGraphRoundRepository;
 import com.zoop.graph.snapshot.ArtifactGraphSnapshotStore;
 import com.zoop.graph.snapshot.FixtureGraphVersionSeeder;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
@@ -29,9 +35,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -65,6 +73,7 @@ class GraphHandoffImportPostgresIntegrationTest {
     private static JdbcGraphHandoffRepository graph;
     private static TransactionTemplate transaction;
     private static FixtureGraphVersionSeeder seeder;
+    private static JdbcGraphRoundRepository rounds;
 
     @TempDir
     Path temp;
@@ -95,6 +104,7 @@ class GraphHandoffImportPostgresIntegrationTest {
         graph = context.getBean(JdbcGraphHandoffRepository.class);
         transaction = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
         seeder = context.getBean(FixtureGraphVersionSeeder.class);
+        rounds = context.getBean(JdbcGraphRoundRepository.class);
     }
 
     @AfterAll
@@ -105,13 +115,15 @@ class GraphHandoffImportPostgresIntegrationTest {
 
     /** Removes everything this test creates, children first; the fixture versions are re-seeded by every test. */
     private static void clean() {
+        // Round rows reference versions (SET NULL on delete) and are guarded against DELETE: TRUNCATE first.
+        jdbc.execute("TRUNCATE graph_round_events, graph_rounds");
         jdbc.update("DELETE FROM graph_activations");
         jdbc.update("DELETE FROM graph_versions");
         jdbc.update("DELETE FROM evidence WHERE article_id = ?", HandoffFixtures.ARTICLE_ID);
         jdbc.update("DELETE FROM article_versions WHERE article_id = ?", HandoffFixtures.ARTICLE_ID);
         jdbc.update("DELETE FROM articles WHERE id = ?", HandoffFixtures.ARTICLE_ID);
-        jdbc.update("DELETE FROM artifacts WHERE id = ? OR id = 'exact-pg-test' OR id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'",
-                "text-" + HandoffFixtures.ARTICLE_VERSION);
+        jdbc.update("DELETE FROM artifacts WHERE id = ? OR id = 'exact-pg-test' OR id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"
+                + " OR id LIKE 'artifact-bundle-gv-%'", "text-" + HandoffFixtures.ARTICLE_VERSION);
         jdbc.update("DELETE FROM artifacts WHERE kind = 'graph_snapshot' AND id LIKE 'artifact-fixture-%'");
         jdbc.update("DELETE FROM companies WHERE id LIKE 'SYNTH:%'");
         jdbc.update("DELETE FROM companies WHERE id = ?", HandoffFixtures.ISSUE);
@@ -370,7 +382,8 @@ class GraphHandoffImportPostgresIntegrationTest {
         // The first spans had been inserted and the artifacts registered inside the transaction; none of it survived.
         assertEquals(1, count("SELECT count(*) FROM evidence WHERE article_id = ?", HandoffFixtures.ARTICLE_ID));
         assertEquals(0, count("SELECT count(*) FROM graph_versions WHERE id LIKE 'gv-%'"));
-        assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"));
+        assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"
+                + " OR id LIKE 'artifact-bundle-gv-%'"));
         assertEquals(filesBefore, files());
         assertFalse(Files.exists(root.resolve("graph_snapshot").resolve(built.versionId() + ".json")));
         assertEquals(active, activeVersion());
@@ -389,7 +402,8 @@ class GraphHandoffImportPostgresIntegrationTest {
         assertEquals(GraphHandoffFailure.INGESTION_EXPORT_FAILED, result.failure().failure());
         assertEquals(0, count("SELECT count(*) FROM evidence WHERE article_id = ?", HandoffFixtures.ARTICLE_ID));
         assertEquals(0, count("SELECT count(*) FROM graph_versions WHERE id LIKE 'gv-%'"));
-        assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"));
+        assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"
+                + " OR id LIKE 'artifact-bundle-gv-%'"));
         assertEquals(filesBefore, files());
         assertEquals(history, activationFingerprint());
     }
@@ -503,7 +517,8 @@ class GraphHandoffImportPostgresIntegrationTest {
                     "SELECT coalesce(quote_verified::text, 'null') || '|' || coalesce(verification_artifact_id, 'null') FROM evidence WHERE id = ?",
                     String.class, id), "the stored row must not be repaired");
             assertEquals(0, count("SELECT count(*) FROM graph_versions WHERE id LIKE 'gv-%'"), before);
-            assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"),
+            assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"
+                    + " OR id LIKE 'artifact-bundle-gv-%'"),
                     before);
             assertEquals(filesBefore, files(), before);
         }
@@ -724,5 +739,178 @@ class GraphHandoffImportPostgresIntegrationTest {
             }
             assertEquals(com.zoop.graph.rules.PublicationRuleEvaluator.RULE_ID.matcher(id).matches(), accepted, id);
         }
+    }
+
+    // ------------------------------------------------------------------------------------------ composition (#55, PR-1) ----
+
+    @Test
+    void theCompositionRowAndTheBundleProjectionAreWrittenOnceWithTheVersionAndLeaveOnlyWithIt() throws Exception {
+        GraphHandoffResult result = importer.run(built.request());
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        String versionId = built.versionId();
+
+        Map<String, Object> source = jdbc.queryForMap(
+                "SELECT ordinal, handoff_id, receipt_artifact_id, bundle_snapshot_artifact_id FROM graph_version_sources "
+                        + "WHERE graph_version_id = ?", versionId);
+        assertEquals(0, ((Number) source.get("ordinal")).intValue());
+        assertEquals(HandoffFixtures.HANDOFF_ID, source.get("handoff_id"));
+        assertEquals("artifact-receipt-" + versionId, source.get("receipt_artifact_id"));
+        // No rule hid anything, so the rule-free projection is the stored snapshot itself; no second artifact or file exists.
+        assertEquals("artifact-" + versionId, source.get("bundle_snapshot_artifact_id"));
+        assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id = ?", "artifact-bundle-" + versionId));
+        assertEquals(0, count("SELECT count(*) FROM artifacts WHERE kind = 'graph_bundle_snapshot'"));
+
+        // Written once: neither an UPDATE nor a DELETE of the row itself is allowed.
+        for (String statement : List.of("UPDATE graph_version_sources SET ordinal = 7 WHERE graph_version_id = ?",
+                "DELETE FROM graph_version_sources WHERE graph_version_id = ?")) {
+            assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(statement, versionId), statement);
+        }
+        assertEquals(1, count("SELECT count(*) FROM graph_version_sources WHERE graph_version_id = ?", versionId));
+        // The row belongs to its version: it goes with it and with nothing else (rolled back here, the version stays).
+        transaction.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            jdbc.update("DELETE FROM graph_versions WHERE id = ?", versionId);
+            assertEquals(0, count("SELECT count(*) FROM graph_version_sources WHERE graph_version_id = ?", versionId));
+        });
+        assertEquals(1, count("SELECT count(*) FROM graph_version_sources WHERE graph_version_id = ?", versionId));
+        // The receipt the row points at cannot vanish under it.
+        assertThrows(org.springframework.dao.DataAccessException.class,
+                () -> jdbc.update("DELETE FROM artifacts WHERE id = ?", "artifact-receipt-" + versionId));
+    }
+
+    @Test
+    void theMigrationBackfillsOneSourceRowPerImportedVersionWithoutAProjection() {
+        String url = System.getenv("ZOOP_COMPANY_TEST_DB_URL");
+        String password = System.getenv().getOrDefault("ZOOP_COMPANY_TEST_DB_PASSWORD", "");
+        String schema = "sources_upgrade_" + java.util.UUID.randomUUID().toString().replace("-", "");
+        String upgradeUrl = url + "?currentSchema=" + schema + ",public";
+        try {
+            // Everything before the composition migration, then what an earlier import and the fixture seeder would have left.
+            org.flywaydb.core.Flyway.configure().dataSource(upgradeUrl, "company_test", password).schemas(schema)
+                    .defaultSchema(schema).target("20261028140000").load().migrate();
+            String imported = "gv-" + "1".repeat(64);
+            String fixture = "fixture-upgrade";
+            String at = "2026-10-20T00:00:00Z";
+            for (String[] artifact : new String[][] {
+                    {"artifact-" + imported, "graph_snapshot", "artifact-root:graph_snapshot/" + imported + ".json"},
+                    {"artifact-receipt-" + imported, "verification_receipt", "artifact-root:verification_receipt/" + imported + ".json"},
+                    {"artifact-" + fixture, "graph_snapshot", "classpath:graph-fixtures/" + fixture + ".json"}}) {
+                jdbc.update("INSERT INTO " + schema + ".artifacts (id, kind, storage_uri, sha256, bytes, media_type, created_at) "
+                        + "VALUES (?, ?, ?, ?, 1, 'application/json', ?::timestamptz)", artifact[0], artifact[1], artifact[2],
+                        "a".repeat(64), at);
+            }
+            jdbc.update("INSERT INTO " + schema + ".graph_versions (id, sequence, kind, created_at, created_by, source_label, "
+                    + "issue_count, relation_count, article_count, snapshot_artifact_id, review_revision) VALUES "
+                    + "(?, 1, 'fixture', ?::timestamptz, 'system', 'fixture', 0, 0, 0, ?, 0), "
+                    + "(?, 2, 'snapshot', ?::timestamptz, 'operator:a', ?, 1, 1, 1, ?, 0)",
+                    fixture, at, "artifact-" + fixture, imported, at, "graph-handoff:handoff-pg-backfill", "artifact-" + imported);
+
+            org.flywaydb.core.Flyway upgrade = org.flywaydb.core.Flyway.configure()
+                    .dataSource(upgradeUrl, "company_test", password).schemas(schema).defaultSchema(schema).load();
+            upgrade.migrate();
+            upgrade.validate();
+
+            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM " + schema + ".graph_version_sources", Integer.class));
+            Map<String, Object> row = jdbc.queryForMap("SELECT graph_version_id, ordinal, handoff_id, receipt_artifact_id, "
+                    + "bundle_snapshot_artifact_id FROM " + schema + ".graph_version_sources");
+            assertEquals(imported, row.get("graph_version_id"));
+            assertEquals(0, ((Number) row.get("ordinal")).intValue());
+            assertEquals("handoff-pg-backfill", row.get("handoff_id"));
+            assertEquals("artifact-receipt-" + imported, row.get("receipt_artifact_id"));
+            assertEquals(null, row.get("bundle_snapshot_artifact_id"), "no rule-free projection was kept before the migration");
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM " + schema
+                    + ".graph_version_sources WHERE graph_version_id = ?", Integer.class, fixture));
+        } finally {
+            // The schema is this test's alone; the shared test database must not keep a copy per run.
+            jdbc.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+        }
+    }
+
+    /**
+     * The round bridge over the real tables (#428 review): the newest round's import commits its version together with the
+     * round's link to it, in one transaction. When the process stops right after that commit (before the row reaches
+     * {@code imported}), an older round retried afterwards is still skipped, because the order guard reads the committed link;
+     * the newest round's next attempt completes with {@code unchanged} and no second version. A fenced link (the lease taken
+     * over during the import) rolls the whole import back.
+     */
+    @Test
+    void aRoundVersionCommittedBeforeTheStageChangeSupersedesOlderRoundsAndTheNextAttemptCompletesIt() throws Exception {
+        Instant slot1 = Instant.parse("2026-10-30T00:05:00Z");
+        Instant slot2 = Instant.parse("2026-10-30T00:35:00Z");
+        Instant now = Instant.parse("2026-10-30T00:40:00Z");
+        Duration lease = Duration.ofMinutes(10);
+        String handoffId = built.spec().handoffId();
+        rounds.create("round-20261030T0905", slot1, "system:scheduler", now);
+        rounds.create("round-20261030T0935", slot2, "system:scheduler", now);
+        GraphRound older = rounds.advance(rounds.claim("round-20261030T0905", "task-a", lease, now).orElseThrow(),
+                GraphRoundPatch.advanceTo(GraphRoundStage.HANDOFF_READY).handoff(handoffId, built.manifestDigest(),
+                        built.bundleDigest()), GraphRoundEvent.Outcome.ADVANCED, null, null, null, now).orElseThrow();
+        GraphRound newest = rounds.advance(rounds.claim("round-20261030T0935", "task-a", lease, now).orElseThrow(),
+                GraphRoundPatch.advanceTo(GraphRoundStage.HANDOFF_READY).handoff(handoffId, built.manifestDigest(),
+                        built.bundleDigest()), GraphRoundEvent.Outcome.ADVANCED, null, null, null, now).orElseThrow();
+        GraphRoundImportBridge bridge = new GraphRoundImportBridge(importer, rounds, () -> Optional.of(() -> { }), "scheduler",
+                Duration.ofMinutes(1), Duration.ofMinutes(5), 20, Clock.fixed(now, java.time.ZoneOffset.UTC));
+        int versionsBefore = count("SELECT count(*) FROM graph_versions");
+        long filesBefore = files();
+        int newestEventsBefore = rounds.events("round-20261030T0935").size();
+
+        // A link fenced inside the import (the lease was taken over meanwhile) rolls the import back: no version, no files.
+        rounds.claim("round-20261030T0935", "task-b", lease, now.plus(lease).plusSeconds(1)).orElseThrow();
+        GraphRound untouched = bridge.importRound(newest);
+        assertEquals("task-b", untouched.lease().orElseThrow().owner());
+        assertEquals(GraphRoundStage.HANDOFF_READY, untouched.stage());
+        assertTrue(untouched.graphVersionId().isEmpty());
+        assertEquals(versionsBefore, count("SELECT count(*) FROM graph_versions"));
+        assertEquals(filesBefore, files());
+        assertEquals(newestEventsBefore, rounds.events("round-20261030T0935").size(), "nothing is recorded by the fenced worker");
+
+        // The holder's import, stopped right after the commit: what the bridge's transaction leaves, without the advance().
+        GraphRound holder = rounds.find("round-20261030T0935").orElseThrow();
+        GraphHandoffResult committed = importer.run(new GraphHandoffRequest(handoffId, built.manifestDigest(),
+                built.bundleDigest(), "scheduler"), staged -> assertTrue(rounds.link(holder, staged.versionId(), now)));
+        assertTrue(committed.succeeded());
+        GraphRound linked = rounds.find("round-20261030T0935").orElseThrow();
+        assertEquals(Optional.of(built.versionId()), linked.graphVersionId());
+        assertEquals(GraphRoundStage.HANDOFF_READY, linked.stage(), "the stage change was lost");
+        assertEquals(versionsBefore + 1, count("SELECT count(*) FROM graph_versions"));
+        assertEquals(Optional.of("round-20261030T0935"), rounds.newestImported().map(GraphRound::roundId));
+
+        // The recovery attempt fails and the round is retried with a new freeze: the retry drops the link, not the record that
+        // the slot's import committed, so the order guard still sees the slot. (A retry at handoff_ready would keep the link.)
+        GraphRound failedAttempt = rounds.advance(rounds.claim("round-20261030T0935", "task-b", lease, now).orElseThrow(),
+                GraphRoundPatch.fail("import:database_unavailable"), GraphRoundEvent.Outcome.FAILED,
+                "import:database_unavailable", null, null, now).orElseThrow();
+        assertEquals(Optional.of(built.versionId()), failedAttempt.graphVersionId());
+        GraphRound retried = rounds.advance(rounds.claim("round-20261030T0935", "task-b", lease, now).orElseThrow(),
+                GraphRoundPatch.retryAt(GraphRoundStage.FREEZE_REQUESTED), GraphRoundEvent.Outcome.RETRIED, null, null, null,
+                now).orElseThrow();
+        assertTrue(retried.graphVersionId().isEmpty());
+        assertEquals(linked.versionCommittedAt(), retried.versionCommittedAt());
+        assertEquals(Optional.of("round-20261030T0935"), rounds.newestImported().map(GraphRound::roundId),
+                "a retry keeps the commit record");
+        // The new freeze gave the same pins.
+        rounds.advance(retried, GraphRoundPatch.advanceTo(GraphRoundStage.HANDOFF_READY).handoff(handoffId,
+                built.manifestDigest(), built.bundleDigest()), GraphRoundEvent.Outcome.ADVANCED, null, null, null, now)
+                .orElseThrow();
+
+        // The older round retried now: skipped before anything is read, no new version.
+        GraphRound skipped = bridge.importRound(older);
+        assertEquals(GraphRoundStage.SKIPPED, skipped.stage());
+        List<GraphRoundEvent> events = rounds.events("round-20261030T0905");
+        assertEquals("skipped_superseded", events.get(events.size() - 1).code().orElseThrow());
+        assertEquals("round-20261030T0935", events.get(events.size() - 1).detail().orElseThrow().get("supersededBy").stringValue());
+        assertEquals(versionsBefore + 1, count("SELECT count(*) FROM graph_versions"));
+
+        // The newest round's next attempt: the same pins are unchanged, the stage change completes, still one version; the
+        // link is written again and the commit record keeps its first instant.
+        GraphRound completed = bridge.importRound(rounds.claim("round-20261030T0935", "task-b", lease, now).orElseThrow());
+        assertEquals(GraphRoundStage.IMPORTED, completed.stage());
+        assertEquals(Optional.of(built.versionId()), completed.graphVersionId());
+        assertEquals(linked.versionCommittedAt(), completed.versionCommittedAt());
+        assertTrue(completed.lease().isEmpty());
+        List<GraphRoundEvent> newestEvents = rounds.events("round-20261030T0935");
+        assertEquals("unchanged", newestEvents.get(newestEvents.size() - 1).code().orElseThrow());
+        assertEquals(versionsBefore + 1, count("SELECT count(*) FROM graph_versions"));
+        assertEquals(1, count("SELECT count(*) FROM graph_rounds WHERE graph_version_id = ?", built.versionId()));
     }
 }

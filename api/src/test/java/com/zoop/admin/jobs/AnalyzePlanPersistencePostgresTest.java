@@ -132,6 +132,49 @@ class AnalyzePlanPersistencePostgresTest {
         assertEquals(a.reference().planId(),jobs.adminJob(retryId).orElseThrow().planId());
     }
 
+    /** #55 D-R3: the round scheduler queues a plan under the system actor; the command key dedups, a failed job is retried once. */
+    @Test void theSystemEntryPointQueuesAPlanOnceUnderTheSystemActorAndRetriesAFailedJobAsANewOne() throws Exception {
+        String seed=UUID.randomUUID().toString().replace("-","");
+        PlanReference reference=new PlanReference("s2plan-"+seed+seed,DIGEST);
+        var service=new AnalysisJobService(jobs,audit,mapper,keys,Clock.systemUTC(),plans,
+                context.getBeanProvider(AnalyzePlanWorker.class),context.getBeanProvider(ServiceBinding.class));
+        var tx=new TransactionTemplate(transactions);
+        int idempotencyRows=jdbc.queryForObject("SELECT count(*) FROM idempotency_records",Integer.class);
+        var first=tx.execute(s->service.createForSystem(reference,"정기 회차 round-20261030T0905","round-20261030T0905"));
+        created.add(first.job().id());
+        assertFalse(first.deduplicated());
+        assertEquals(AnalysisJobService.SYSTEM_ACTOR,first.job().requestedBy());
+        assertEquals(AnalysisJobService.SYSTEM_ACTOR,jdbc.queryForObject("SELECT registered_by FROM analysis_plans WHERE plan_id=?",String.class,reference.planId()));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM audit_logs WHERE action='analysis.job.create' AND target_id=? AND actor_kind='system' AND admin_id IS NULL AND actor_id=?",Integer.class,first.job().id(),AnalysisJobService.SYSTEM_ACTOR));
+        assertEquals(idempotencyRows,jdbc.queryForObject("SELECT count(*) FROM idempotency_records",Integer.class),"the command key is the idempotency; no admin record");
+        var again=tx.execute(s->service.createForSystem(reference,"정기 회차 round-20261030T0905","round-again"));
+        assertTrue(again.deduplicated());
+        assertEquals(first.job().id(),again.job().id());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM analysis_jobs WHERE plan_id=?",Integer.class,reference.planId()));
+        // The job fails; the next round asking for the same plan gets one retry job, chained to the failed one.
+        var claim=plans.claimNext().orElseThrow();assertEquals(first.job().id(),claim.appJobId());
+        assertTrue(plans.finish(claim,new AnalyzePlanTerminal("failed","transient","admission_unavailable")));
+        var retried=tx.execute(s->service.createForSystem(reference,"정기 회차 round-20261030T0935","round-20261030T0935"));
+        created.add(retried.job().id());
+        assertFalse(retried.deduplicated());
+        assertEquals(first.job().id(),retried.job().retryOf());
+        assertEquals(AnalysisJobService.SYSTEM_ACTOR,retried.job().requestedBy());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM audit_logs WHERE action='analysis.job.retry' AND target_id=? AND actor_kind='system'",Integer.class,first.job().id()));
+        var queued=tx.execute(s->service.createForSystem(reference,"정기 회차 round-20261030T1005","round-20261030T1005"));
+        assertTrue(queued.deduplicated(),"the retry job is the plan's current job now");
+        assertEquals(retried.job().id(),queued.job().id());
+        // A retry of a retry is found through the chain, so the plan never gets two live jobs.
+        var claim2=plans.claimNext().orElseThrow();assertEquals(retried.job().id(),claim2.appJobId());
+        assertTrue(plans.finish(claim2,new AnalyzePlanTerminal("failed","transient","admission_unavailable")));
+        var second=tx.execute(s->service.createForSystem(reference,"정기 회차 round-20261030T1035","round-20261030T1035"));
+        created.add(second.job().id());
+        assertEquals(retried.job().id(),second.job().retryOf());
+        var third=tx.execute(s->service.createForSystem(reference,"정기 회차 round-20261030T1105","round-20261030T1105"));
+        assertTrue(third.deduplicated());
+        assertEquals(second.job().id(),third.job().id());
+        assertEquals(3,jdbc.queryForObject("SELECT count(*) FROM analysis_jobs WHERE plan_id=?",Integer.class,reference.planId()));
+    }
+
     @Test void queuedCancelFreezesSummaryAndRetryContinuesOneRegisteredExecution() throws Exception {
         Accepted a=accept();
         String cancelKey="cancel-"+UUID.randomUUID();

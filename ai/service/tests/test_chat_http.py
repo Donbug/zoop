@@ -43,7 +43,7 @@ class ChatStub:
         self.grants = root / "chat-grants.json"
         self.grants.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-1", "grants": []}), encoding="utf-8")
         self.replay = root / "chat-replay.json"
-        self.replay.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-1", "recordingKind": "authored-test", "responses": []}), encoding="utf-8")
+        self.replay.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-4", "recordingKind": "authored-test", "responses": []}), encoding="utf-8")
         self.answer(succeeded())
 
     def answer(self, output: Any, exit_code: int = 0) -> None:
@@ -65,14 +65,14 @@ RECEIPT = {"provider": "authored-replay", "providerRevision": "authored-replay-1
 
 
 def succeeded(status: str = "succeeded") -> dict[str, Any]:
-    return {"schemaVersion": "zoop-ai-chat-1", "invocationId": "x", "stage": "chat-router", "status": status,
+    return {"schemaVersion": "zoop-ai-chat-4", "invocationId": "x", "stage": "chat-router", "status": status,
             "answer": {"requirements": []} if status == "succeeded" else None,
             "failure": None if status == "succeeded" else {"code": "chat_live_disabled", "sent": False, "unknown": False},
             "receipt": dict(RECEIPT) if status == "succeeded" else None}
 
 
 def body(invocation: str = "job-00000001:1:chat-router", **change: Any) -> dict[str, Any]:
-    value = {"schemaVersion": "zoop-ai-chat-1", "invocationId": invocation, "stage": "chat-router", "mode": "replay",
+    value = {"schemaVersion": "zoop-ai-chat-4", "invocationId": invocation, "stage": "chat-router", "mode": "replay",
              "input": {"turns": [{"text": "HBM이 뭐야?"}]}}
     value.update(change)
     return value
@@ -169,14 +169,14 @@ def test_the_content_free_probe_runs_with_fixed_argv_and_returns_reachability(tm
     stub = ChatStub(tmp_path / "chat")
     service = start(workspace=ws, env=stub.env())
 
-    stub.answer({"schemaVersion": "zoop-ai-chat-1", "mcp": "reachable"})
+    stub.answer({"schemaVersion": "zoop-ai-chat-4", "mcp": "reachable"})
     reachable = service.request("GET", PROBE_URL, as_="chatter")
-    assert reachable.status_code == 200 and reachable.json() == {"schemaVersion": "zoop-ai-chat-1", "mcp": "reachable", "reason": None}
+    assert reachable.status_code == 200 and reachable.json() == {"schemaVersion": "zoop-ai-chat-4", "mcp": "reachable", "reason": None}
     call = stub.calls()[0]
     assert call["argv"] == ["probe-mcp"] and json.loads(call["stdin"]) == {}
     assert "ZOOP_AI_API_KEY" not in call["env"] and "TYPESAFE_API_KEY" not in call["env"]
 
-    stub.answer({"schemaVersion": "zoop-ai-chat-1", "mcp": "unreachable", "reason": "mcp_timeout"}, exit_code=2)
+    stub.answer({"schemaVersion": "zoop-ai-chat-4", "mcp": "unreachable", "reason": "mcp_timeout"}, exit_code=2)
     unreachable = service.request("GET", PROBE_URL, as_="chatter")
     assert unreachable.status_code == 200 and unreachable.json()["reason"] == "mcp_timeout"
 
@@ -194,7 +194,7 @@ def test_probe_configuration_and_abnormal_results_are_transport_errors(tmp_path,
     assert configured.status_code == 503 and configured.json()["error"]["code"] == "service_configuration_invalid"
     assert configured.json()["error"]["runtimeCode"] == "mcp_server_url_invalid"
 
-    stub.answer({"schemaVersion": "zoop-ai-chat-1", "mcp": "unreachable"}, exit_code=2)
+    stub.answer({"schemaVersion": "zoop-ai-chat-4", "mcp": "unreachable"}, exit_code=2)
     invalid = service.request("GET", PROBE_URL, as_="chatter")
     assert invalid.status_code == 502 and invalid.json()["error"]["code"] == "probe_failed"
 

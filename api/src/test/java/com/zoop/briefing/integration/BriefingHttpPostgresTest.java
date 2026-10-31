@@ -126,6 +126,78 @@ class BriefingHttpPostgresTest {
         }
     }
 
+    @Autowired com.zoop.auth.service.MemberSessionService personalSessions;
+
+    @Test
+    void personalSelectionUsesDbWatchlistWholePoolAndPreservesPublication() throws Exception {
+        String member="personal-test-"+UUID.randomUUID();
+        String other="personal-test-"+UUID.randomUUID();
+        String before=jdbc.queryForObject("SELECT payload_sha256 FROM briefing_rounds WHERE id=?",String.class,ROUND);
+        try {
+            for(String id:java.util.List.of(member,other)) {
+                jdbc.update("""
+                    INSERT INTO members(id,analytics_key,email,email_key,display_name,signup_method,status,created_at,
+                    mode,completed,tutorial_completed,settings_version,updated_at)
+                    VALUES(?,?,?,?,?,'google','active',now(),'watchlist',true,true,1,now())
+                    """,id,id,id+"@example.invalid",id+"@example.invalid","[합성] 개인화 시험");
+            }
+            jdbc.update("INSERT INTO member_watchlist(member_id,company_id,position) VALUES(?,?,0)",member,"brf-test-company");
+            jdbc.update("""
+                INSERT INTO article_versions(article_id,version,title,publisher,url,published_at,publication_precision,text_artifact_id,collected_at)
+                SELECT article_id,'synthetic-personal-v1',title,publisher,url,'2026-10-15T01:00:00Z','datetime',text_artifact_id,collected_at
+                FROM article_versions WHERE article_id='brf-test-document' AND version='synthetic-v1'
+                """);
+            var pool=JSON.createObjectNode().put("schemaVersion","personal-candidate-pool-v1").put("complete",true)
+                .put("roundId",ROUND).put("inputSha256","c".repeat(64)).put("cutoff","2026-10-15T08:30:00Z")
+                .put("candidateCount",4).put("previousRoundId","").put("scope","synthetic_test")
+                .put("publicationPayloadSha256",before);
+            var candidates=pool.putArray("candidates");
+            for(int i=0;i<4;i++) {
+                var c=candidates.addObject().put("issueId","personal-event-"+i).put("eventKey","independent-event-"+i)
+                    .put("title","[합성] 독립 계약 "+i).put("verified",true).put("importance",i==3?1:2)
+                    .put("informationChange","new_event").put("whyImportant","[합성] 계약 변경").put("whyNow","[합성] 이번 확정");
+                c.putArray("companies").addObject().put("companyId","brf-test-company").put("name","[합성] 시험기업")
+                    .put("directness","direct").put("reason","[합성] 계약 당사자").putArray("evidenceIds").add("personal-e-"+i);
+                var source=c.putArray("sources").addObject().put("evidenceId","personal-e-"+i).put("documentId","brf-test-document")
+                    .put("documentVersion","synthetic-personal-v1").put("bodySha256","a".repeat(64)).put("grantId","brf-test-grant")
+                    .put("grantRevision","synthetic-v1").put("publishedAt","2026-10-15T01:00:00Z").put("quoteVerified",true)
+                    .put("quote","[합성] 독립 계약 "+i).put("url","https://example.invalid/synthetic");
+                source.putArray("recipients").add("authored-replay");
+            }
+            String raw=pool.toString();
+            jdbc.update("""
+                INSERT INTO briefing_personal_pools(id,round_id,input_sha256,snapshot,snapshot_sha256)
+                VALUES('personal-test-pool',?,'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',?::jsonb,
+                encode(sha256(convert_to((?::jsonb)::text,'UTF8')),'hex'))
+                """,ROUND,raw,raw);
+            assertThrows(DataAccessException.class,()->jdbc.update("UPDATE briefing_personal_pools SET snapshot='{}'"));
+            var unauth=http.send(HttpRequest.newBuilder(URI.create(base()+"/api/v1/briefings/"+ROUND+"/personalized/issues")).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(401,unauth.statusCode());
+            String token=personalSessions.issue(member,null,"personal-test").token();
+            var response=http.send(HttpRequest.newBuilder(URI.create(base()+"/api/v1/briefings/"+ROUND+"/personalized/issues?memberId="+other))
+                .header("Cookie","zoop_session="+token).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,response.statusCode(),response.body());
+            assertEquals("no-store",response.headers().firstValue("Cache-Control").orElse(null));
+            var result=JSON.readTree(response.body());
+            assertEquals(3,result.path("items").size());
+            assertEquals(3,result.path("eligibleCount").asInt());
+            assertTrue(result.path("items").valueStream().noneMatch(c->c.path("issueId").asString().equals("brf-test-event")));
+            assertFalse(response.body().contains("grantId"));
+            String otherToken=personalSessions.issue(other,null,"personal-test").token();
+            var otherResponse=http.send(HttpRequest.newBuilder(URI.create(base()+"/api/v1/briefings/"+ROUND+"/personalized/issues?memberId="+member))
+                .header("Cookie","zoop_session="+otherToken).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals("no_companies",JSON.readTree(otherResponse.body()).path("status").asString());
+            jdbc.update("UPDATE articles SET access_status='private' WHERE id='brf-test-document'");
+            var revoked=http.send(HttpRequest.newBuilder(URI.create(base()+"/api/v1/briefings/"+ROUND+"/personalized/issues"))
+                .header("Cookie","zoop_session="+token).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(503,revoked.statusCode());
+            assertEquals(before,jdbc.queryForObject("SELECT payload_sha256 FROM briefing_rounds WHERE id=?",String.class,ROUND));
+        } finally {
+            jdbc.execute("TRUNCATE briefing_personal_pools");
+            jdbc.update("DELETE FROM members WHERE id IN (?,?)",member,other);
+        }
+    }
+
     @Test
     void publishedMorningAndEveningRestoreOriginalIssuesMarketAndComparisonOverRealHttp() throws Exception {
         var morning = get(MORNING, "morning-http-request");

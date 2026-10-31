@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.zoop.admin.pipeline.PipelineOverviewResponse.CandidateCounts;
+import com.zoop.admin.review.JdbcCandidateRepository;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -19,15 +20,15 @@ public class JdbcPipelineOverviewReader {
         this.jdbc = jdbc;
     }
 
-    /** Current candidate targets; the status counts are of the active ones only. */
+    /** Current candidate targets, newest analysis of each event only; the status counts are of the active ones only. */
     public CandidateCounts candidates() {
         return jdbc.getJdbcTemplate().queryForObject("""
                 SELECT count(*) AS total, count(*) FILTER (WHERE active) AS active, count(*) FILTER (WHERE NOT active) AS inactive,
                        count(*) FILTER (WHERE active AND status = 'ALLOW') AS allow,
                        count(*) FILTER (WHERE active AND status = 'HOLD') AS hold,
                        count(*) FILTER (WHERE active AND status = 'REJECT') AS reject
-                FROM review_targets WHERE target_type = 'candidate' AND is_current
-                """, (rs, row) -> new CandidateCounts(rs.getLong("total"), rs.getLong("active"), rs.getLong("inactive"),
+                FROM review_targets t WHERE target_type = 'candidate' AND is_current AND %s
+                """.formatted(JdbcCandidateRepository.newestAnalysis("t")), (rs, row) -> new CandidateCounts(rs.getLong("total"), rs.getLong("active"), rs.getLong("inactive"),
                 rs.getLong("allow"), rs.getLong("hold"), rs.getLong("reject")));
     }
 
@@ -36,7 +37,7 @@ public class JdbcPipelineOverviewReader {
 
     /**
      * The administrators' decisions ({@code origin='admin'}; a migrated decision is not a review) and the HOLD relations still
-     * waiting for one (active, current). {@code revision} is the app-wide global revision, whatever the origin.
+     * waiting for one (active, current, under the newest analysis of their event). {@code revision} is the app-wide global revision, whatever the origin.
      */
     public Decisions decisions() {
         return jdbc.getJdbcTemplate().queryForObject("""
@@ -44,9 +45,13 @@ public class JdbcPipelineOverviewReader {
                        (SELECT count(*) FROM review_decisions WHERE origin = 'admin') AS total,
                        (SELECT count(*) FROM review_decisions WHERE origin = 'admin' AND decision = 'allow') AS allowed,
                        (SELECT count(*) FROM review_decisions WHERE origin = 'admin' AND decision = 'reject') AS rejected,
-                       (SELECT count(*) FROM review_targets
-                         WHERE target_type = 'relation' AND is_current AND active AND status = 'HOLD') AS hold_pending
-                """, (rs, row) -> new Decisions(rs.getLong("revision"), rs.getLong("total"), rs.getLong("allowed"),
+                       (SELECT count(*) FROM review_targets r
+                         WHERE r.target_type = 'relation' AND r.is_current AND r.active AND r.status = 'HOLD'
+                           AND NOT EXISTS (SELECT 1 FROM review_targets t
+                                            WHERE t.target_type = 'candidate' AND t.is_current
+                                              AND t.source_job_id = r.source_job_id AND t.candidate_id = r.candidate_id
+                                              AND NOT %s)) AS hold_pending
+                """.formatted(JdbcCandidateRepository.newestAnalysis("t")), (rs, row) -> new Decisions(rs.getLong("revision"), rs.getLong("total"), rs.getLong("allowed"),
                 rs.getLong("rejected"), rs.getLong("hold_pending")));
     }
 

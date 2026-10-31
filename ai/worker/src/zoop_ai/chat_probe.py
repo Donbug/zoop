@@ -4,8 +4,9 @@ application's preflight before an agent run (MCP actions contract 3.4).
 The probe carries nothing: an MCP `ping` with no grant, so no token and no data leave and nothing is run. The server must refuse
 it as unauthenticated (401 with a Bearer challenge): that proves the request reached the ZOOP MCP endpoint itself, through
 DNS, TLS and any proxy in front of it, the way the model provider reaches it. Anything else is `unreachable` with a reason:
-`mcp_timeout`, `mcp_connect_failed` or `mcp_status_unexpected` (another status, or 401 without the challenge). No redirect is
-followed. No model is called and nothing is counted against the live budget.
+`mcp_timeout`, `mcp_connect_failed`, `mcp_unavailable` (502, 503 or 504: a proxy or gateway in front answered for a backend it
+could not reach) or `mcp_status_unexpected` (any other status, or 401 without the challenge). No redirect is followed. No model
+is called and nothing is counted against the live budget.
 """
 from __future__ import annotations
 
@@ -20,6 +21,8 @@ from .provider import ProviderError
 
 PROBE_TIMEOUT = 3.0
 PING = {"jsonrpc": "2.0", "id": 1, "method": "ping"}
+# A gateway's answers for a backend it could not reach: a connection failure behind the proxy, not the endpoint answering.
+GATEWAY_UNAVAILABLE = frozenset({502, 503, 504})
 
 
 def server_url(env: dict[str, str] | None = None) -> str:
@@ -43,7 +46,9 @@ def probe(env: dict[str, str] | None = None, transport: httpx.BaseTransport | No
         with httpx.Client(timeout=PROBE_TIMEOUT, follow_redirects=False, transport=transport) as client:
             response = client.post(url, json=PING, headers={"Accept": "application/json, text/event-stream"})
         challenge = response.headers.get("www-authenticate", "").split(None, 1)
-        if response.status_code != 401 or not challenge or challenge[0].lower() != "bearer":
+        if response.status_code in GATEWAY_UNAVAILABLE:
+            reason = "mcp_unavailable"
+        elif response.status_code != 401 or not challenge or challenge[0].lower() != "bearer":
             reason = "mcp_status_unexpected"
     except httpx.TimeoutException:
         reason = "mcp_timeout"

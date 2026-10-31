@@ -51,13 +51,13 @@ class HttpChatStageClientTest {
 
     private static String result(String invocation, String stage, String status, String answer, String failure, String receipt) {
         return """
-                {"schemaVersion":"zoop-ai-chat-1","invocationId":"%s","stage":"%s","status":"%s","answer":%s,"failure":%s,\
+                {"schemaVersion":"zoop-ai-chat-4","invocationId":"%s","stage":"%s","status":"%s","answer":%s,"failure":%s,\
                 "receipt":%s}""".formatted(invocation, stage, status, answer, failure, receipt);
     }
 
     private static final String RECEIPT = """
             {"provider":"typesafe","providerRevision":"systemone-v1","model":"jev","promptVersion":"chat-router-1",\
-            "executionMode":"replay","usage":{"inputTokens":120,"outputTokens":null,"cachedTokens":null,"reasoningTokens":null},\
+            "executionMode":"replay","usage":{"inputTokens":120,"outputTokens":null,"cachedTokens":null,"reasoningTokens":7},\
             "sentAt":"2026-10-22T01:00:00Z","receivedAt":"2026-10-22T01:00:01Z"}""";
 
     @Test
@@ -69,6 +69,7 @@ class HttpChatStageClientTest {
         assertTrue(reply.answer().get("requirements").isArray());
         assertEquals("jev", reply.receipt().model());
         assertEquals(120L, reply.receipt().inputTokens());
+        assertEquals(7L, reply.receipt().reasoningTokens());
         assertNull(reply.receipt().outputTokens());
         assertEquals(Instant.parse("2026-10-22T01:00:00Z"), reply.receipt().sentAt());
 
@@ -77,13 +78,13 @@ class HttpChatStageClientTest {
         assertEquals("/internal/v1/chat-stages/chat-router", seen.path());
         assertEquals(INVOCATION, seen.header("Idempotency-Key"));
         assertEquals("Bearer " + TOKEN, seen.header("Authorization"));
-        assertEquals("{\"schemaVersion\":\"zoop-ai-chat-1\",\"invocationId\":\"" + INVOCATION + "\",\"stage\":\"chat-router\","
+        assertEquals("{\"schemaVersion\":\"zoop-ai-chat-4\",\"invocationId\":\"" + INVOCATION + "\",\"stage\":\"chat-router\","
                 + "\"mode\":\"replay\",\"input\":{\"probe\":true}}", seen.body());
     }
 
     @Test
     void getsTheContentFreeMcpHealthWithoutAnIdempotencyKey() {
-        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-1\",\"mcp\":\"reachable\",\"reason\":null}"));
+        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-4\",\"mcp\":\"reachable\",\"reason\":null}"));
 
         ChatMcpHealth health = client.probeMcp();
 
@@ -98,14 +99,14 @@ class HttpChatStageClientTest {
 
     @Test
     void decodesOnlyTheClosedMcpHealthReasons() {
-        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-1\",\"mcp\":\"unreachable\"," +
+        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-4\",\"mcp\":\"unreachable\"," +
                 "\"reason\":\"mcp_timeout\"}"));
         assertEquals(ChatMcpHealth.Reason.TIMEOUT, client.probeMcp().reason());
 
         for (String body : new String[] {
-                "{\"schemaVersion\":\"zoop-ai-chat-1\",\"mcp\":\"reachable\",\"reason\":\"mcp_timeout\"}",
-                "{\"schemaVersion\":\"zoop-ai-chat-1\",\"mcp\":\"unreachable\",\"reason\":null}",
-                "{\"schemaVersion\":\"zoop-ai-chat-1\",\"mcp\":\"unreachable\",\"reason\":\"other\"}"}) {
+                "{\"schemaVersion\":\"zoop-ai-chat-4\",\"mcp\":\"reachable\",\"reason\":\"mcp_timeout\"}",
+                "{\"schemaVersion\":\"zoop-ai-chat-4\",\"mcp\":\"unreachable\",\"reason\":null}",
+                "{\"schemaVersion\":\"zoop-ai-chat-4\",\"mcp\":\"unreachable\",\"reason\":\"other\"}"}) {
             server.respond(Reply.json(200, body));
             AiTransportException malformed = assertThrows(AiTransportException.class, client::probeMcp);
             assertEquals(Failure.RESPONSE_MALFORMED, malformed.failure());

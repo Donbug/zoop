@@ -4,6 +4,7 @@ import com.zoop.chat.executor.ChatJobExecutor;
 import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.executor.ChatRunSuperseded;
+import com.zoop.chat.executor.ChatWebBudgetExhausted;
 import com.zoop.chat.repository.ChatKeptToolResult;
 import com.zoop.chat.orchestrator.ChatPeriods;
 import com.zoop.chat.tool.ChatCapability;
@@ -15,6 +16,9 @@ import com.zoop.chat.tool.ChatToolRequest;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.chat.tool.ChatToolRunner;
 import com.zoop.chat.tool.ChatToolUnavailable;
+import com.zoop.chat.tool.ChatWebQueryPolicy;
+import com.zoop.chat.tool.ChatWebResult;
+import com.zoop.chat.tool.ChatWebSearchTool;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema;
@@ -58,6 +62,8 @@ public final class ChatMcpTools {
     /** The ledger's plan revision of MCP calls: a run that hands tools to a model has no server plan of its own. */
     static final int PLAN_REVISION = 1;
     static final String VIA = "mcp";
+    /** The argument naming the requirements a call serves: decided at its approval, no part of what it reads. */
+    static final String REQUIREMENT_IDS = "requirementIds";
     /**
      * Largest result a call returns; a larger one is refused instead of being cut. Checked early on the serialized output,
      * and again as stored when it is recorded ({@link ChatRunControl#toolCallFinished}).
@@ -69,6 +75,11 @@ public final class ChatMcpTools {
     private static final TypeReference<List<ChatToolItem>> ITEMS = new TypeReference<>() { };
     private static final TypeReference<List<ChatToolPath>> PATHS = new TypeReference<>() { };
     private static final TypeReference<List<String>> STRINGS = new TypeReference<>() { };
+    private static final TypeReference<List<ChatWebResult>> WEB = new TypeReference<>() { };
+
+    private static final Map<String, Object> REQUIREMENT_IDS_SCHEMA = Map.of("type", "array", "minItems", 1, "uniqueItems", true,
+            "items", Map.of("type", "string", "minLength", 1, "maxLength", 32),
+            "description", "이 호출이 답하는 요구의 requirementId. 구간은 자기 요구를 지목한 호출의 결과만 인용할 수 있음");
 
     /** Room for the result envelope's own fields beyond the adapter output. */
     private static final int ENVELOPE_BYTES = 1024;
@@ -79,6 +90,8 @@ public final class ChatMcpTools {
     static final String GRANT_MISMATCH = "grant_mismatch";
     static final String INVALID_ARGUMENTS = "invalid_arguments";
     static final String BUDGET_EXHAUSTED = "tool_budget_exhausted";
+    /** The job's web searches, or the member's or project's for the day, are used up (web search design 3). */
+    static final String WEB_BUDGET_EXHAUSTED = "web_budget_exhausted";
     static final String RESULT_TOO_LARGE = ChatRunControl.RESULT_TOO_LARGE;
     static final String SEND_GRANTS_UNAVAILABLE = "send_grants_unavailable";
     /** What a result says when part of it was withheld for want of a send grant. */
@@ -111,11 +124,21 @@ public final class ChatMcpTools {
                 : java.util.Arrays.stream(ChatCapability.values()).filter(c -> name(c).equals(name)).findFirst();
     }
 
-    /** The capabilities exposed as MCP tools, in declaration order. */
+    /**
+     * The capabilities exposed as MCP tools, in declaration order: every planned read but the member scope, and the web
+     * search when it is registered. The web search is never planned by the server ({@link ChatToolRegistry#bound}); on the
+     * agent path Luna may ask for it and the server decides each call ({@link ChatMcpAgent}).
+     */
     public List<ChatCapability> exposed() {
         Set<String> bound = registry.bound();
+        boolean web = registry.bind(ChatCapability.WEB_SEARCH.id()).isPresent();
         return java.util.Arrays.stream(ChatCapability.values())
-                .filter(c -> c != ChatCapability.PORTFOLIO_SCOPE_READ && bound.contains(c.id())).toList();
+                // A briefing read's round comes from the requirement's words, which the agent's arguments cannot carry.
+                // A selection read's round comes from those words too, and its records are not sent to the agent.
+                .filter(c -> c != ChatCapability.PORTFOLIO_SCOPE_READ && c != ChatCapability.BRIEFING_READ
+                        && c != ChatCapability.BRIEFING_EVIDENCE && c != ChatCapability.SELECTION_RULE_READ
+                        && bound.contains(c.id())
+                        || c == ChatCapability.WEB_SEARCH && web).toList();
     }
 
     public List<SyncToolSpecification> specifications() {
@@ -141,9 +164,10 @@ public final class ChatMcpTools {
      * named MCP tool with these arguments, completed by what the server injects. Approving reserves the call in
      * {@code chat_tool_calls}, so it counts against the attempt's call limit at once; {@code /mcp} then runs only a call
      * that matches a reservation, and each reservation only once. A reservation never called is closed as
-     * {@code cancelled} with the job.
+     * {@code cancelled} with the job. {@code requirementIds} go on the call's record; they do not change what is read.
      */
-    public Approval approve(ChatJobExecutor.Attached attached, String toolName, Map<String, Object> arguments) {
+    public Approval approve(ChatJobExecutor.Attached attached, String toolName, Map<String, Object> arguments,
+            List<String> requirementIds) {
         Optional<ChatCapability> capability = capability(toolName).filter(exposed()::contains);
         if (capability.isEmpty()) return new Approval(null, NOT_GRANTED);
         ChatRun run = attached.run();
@@ -153,12 +177,14 @@ public final class ChatMcpTools {
         } catch (IllegalArgumentException invalid) {
             return new Approval(null, INVALID_ARGUMENTS);
         }
-        var reservation = runner.reservation(run, call, VIA);
+        var reservation = runner.reservation(run, call, VIA, requirementIds);
         try {
             return new Approval(attached.control().reserveToolCalls(PLAN_REVISION, List.of(reservation)).getFirst(),
                     null);
         } catch (ChatRunSuperseded ended) {
             return new Approval(null, RUN_NOT_ACTIVE);
+        } catch (ChatWebBudgetExhausted spent) {
+            return new Approval(null, WEB_BUDGET_EXHAUSTED);
         } catch (IllegalArgumentException overLimit) {
             // The attempt already reserved every call it may make.
             return new Approval(null, BUDGET_EXHAUSTED);
@@ -212,7 +238,7 @@ public final class ChatMcpTools {
                 delivery.cachedFrom = kept.toolCallId();
                 result = runner.runCached(run, control, approved.get(), call, new ChatToolOutput(
                         kept.dataVersion(), kept.items(), kept.evidenceIds(), Boolean.TRUE.equals(kept.truncated()),
-                        Boolean.TRUE.equals(kept.nextAllowed()), kept.paths()), delivery);
+                        Boolean.TRUE.equals(kept.nextAllowed()), kept.paths(), kept.webResults()), delivery);
             } else {
                 result = runner.runClaimed(run, control, approved.get(), call, delivery);
             }
@@ -282,10 +308,14 @@ public final class ChatMcpTools {
 
     /**
      * The call a model's arguments make: {@code targets} (1 to 5 distinct ids) and an optional {@code limit} (1 to 20), and
-     * nothing else. A fixed-document read takes no targets; a graph diff without targets reads the whole public graph.
+     * nothing else. A fixed-document read takes no targets; a graph diff without targets reads the whole public graph. A
+     * web search takes exactly one query that {@link ChatWebQueryPolicy} lets out, normalized as it is sent, and at most
+     * {@link ChatWebSearchTool#MAX_HITS} hits. {@link #REQUIREMENT_IDS} is set aside: the approval already took it.
      */
     static ChatToolRequest request(ChatRun run, ChatCapability capability, Map<String, Object> arguments) {
-        Map<String, Object> args = arguments == null ? Map.of() : arguments;
+        Map<String, Object> args = arguments == null ? new LinkedHashMap<>() : new LinkedHashMap<>(arguments);
+        args.remove(REQUIREMENT_IDS);
+        if (capability.web()) return webRequest(args);
         boolean fixed = !capability.documents().isEmpty();
         Set<String> allowed = fixed ? Set.of("limit") : Set.of("targets", "limit");
         if (!allowed.containsAll(args.keySet())) throw new IllegalArgumentException("unknown argument");
@@ -315,7 +345,7 @@ public final class ChatMcpTools {
         }
         var selection = run.selection();
         List<String> scope = fixed || selection.evidenceIds().isEmpty() ? null : selection.evidencePool();
-        var period = run.context().period();
+        var period = run.period();
         var since = capability != ChatCapability.GRAPH_VERSION_DIFF || period == null ? null
                 : new ChatPeriods.Period(LocalDate.parse(period.start()), LocalDate.parse(period.end()), null)
                         .startInstant();
@@ -323,7 +353,26 @@ public final class ChatMcpTools {
         return new ChatToolRequest(capability.id(), targets, limit, scope, since);
     }
 
+    private static ChatToolRequest webRequest(Map<String, Object> args) {
+        if (!Set.of("targets", "limit").containsAll(args.keySet())) throw new IllegalArgumentException("unknown argument");
+        if (!(args.get("targets") instanceof List<?> given) || given.size() != 1 || !(given.getFirst() instanceof String q)) {
+            throw new IllegalArgumentException("a web search takes exactly one query");
+        }
+        String query = ChatWebQueryPolicy.checked(q).orElseThrow(() -> new IllegalArgumentException("query may not leave"));
+        int limit = ChatWebSearchTool.MAX_HITS;
+        if (args.containsKey("limit")) {
+            if (!(args.get("limit") instanceof Number n) || n.doubleValue() != Math.rint(n.doubleValue())
+                    || n.intValue() < 1 || n.intValue() > ChatWebSearchTool.MAX_HITS) {
+                throw new IllegalArgumentException("limit is 1 to " + ChatWebSearchTool.MAX_HITS);
+            }
+            limit = n.intValue();
+        }
+        // No evidence scope and no period: a web hit is no ZOOP evidence, and the query names its own period.
+        return new ChatToolRequest(ChatCapability.WEB_SEARCH.id(), List.of(query), limit);
+    }
+
     private static McpSchema.Tool tool(ChatCapability capability) {
+        if (capability.web()) return webTool();
         boolean fixed = !capability.documents().isEmpty();
         Map<String, Object> properties = new LinkedHashMap<>();
         if (!fixed) {
@@ -333,14 +382,36 @@ public final class ChatMcpTools {
         }
         properties.put("limit", Map.of("type", "integer", "minimum", 1, "maximum", ChatToolRequest.MAX_LIMIT,
                 "description", "전달받을 근거 수 상한(기본 " + ChatToolRequest.MAX_LIMIT + ")"));
+        properties.put(REQUIREMENT_IDS, REQUIREMENT_IDS_SCHEMA);
         Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
         schema.put("properties", properties);
-        schema.put("required", fixed || !capability.untargeted().isEmpty() ? List.of() : List.of("targets"));
+        schema.put("required", fixed || !capability.untargeted().isEmpty() ? List.of(REQUIREMENT_IDS)
+                : List.of("targets", REQUIREMENT_IDS));
         schema.put("additionalProperties", false);
         return McpSchema.Tool.builder(name(capability), schema).title(capability.id())
                 .description(capability.description())
                 .annotations(new McpSchema.ToolAnnotations(capability.id(), true, false, true, false, null))
+                .build();
+    }
+
+    private static McpSchema.Tool webTool() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("targets", Map.of("type", "array", "minItems", 1, "maxItems", 1, "items",
+                Map.of("type", "string", "minLength", 2, "maxLength", ChatWebQueryPolicy.MAX_LENGTH),
+                "description", "검색어 하나. 공개 기업명·공개 키워드·기간만 쓰고 질문 원문이나 회원 정보(보유·수익률 등)는 쓰지 않음"));
+        properties.put("limit", Map.of("type", "integer", "minimum", 1, "maximum", ChatWebSearchTool.MAX_HITS,
+                "description", "받을 결과 수 상한(기본 " + ChatWebSearchTool.MAX_HITS + ")"));
+        properties.put(REQUIREMENT_IDS, REQUIREMENT_IDS_SCHEMA);
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("properties", properties);
+        schema.put("required", List.of("targets", REQUIREMENT_IDS));
+        schema.put("additionalProperties", false);
+        var capability = ChatCapability.WEB_SEARCH;
+        return McpSchema.Tool.builder(name(capability), schema).title(capability.id())
+                .description(capability.description() + ". 줍의 조회로 답할 수 없는 부분에만 쓰고, 결과는 줍의 근거가 아님")
+                .annotations(new McpSchema.ToolAnnotations(capability.id(), true, false, true, true, null))
                 .build();
     }
 
@@ -361,6 +432,7 @@ public final class ChatMcpTools {
         out.put("nextAllowed", result.nextAllowed());
         out.put("error", result.error());
         if (!result.paths().isEmpty()) out.put("paths", result.paths());
+        if (!result.webResults().isEmpty()) out.put("webResults", result.webResults());
         // A reuse says which call read it: the same data, not a second lookup.
         if (result.succeeded() && cachedFrom != null) out.put("cachedFrom", cachedFrom);
         if (result.succeeded() && withheld.any()) {
@@ -369,6 +441,7 @@ public final class ChatMcpTools {
             left.put("items", withheld.items());
             left.put("evidenceIds", withheld.evidenceIds());
             left.put("paths", withheld.paths());
+            if (withheld.webResults() > 0) left.put("webResults", withheld.webResults());
             out.put("withheld", left);
         }
         return out;
@@ -395,9 +468,11 @@ public final class ChatMcpTools {
         return new ChatToolResult(node.path("schemaVersion").asString(), kept.toolCallId(), kept.capabilityId(),
                 node.path("dataVersion").asString(null), mapper.convertValue(node.path("items"), ITEMS),
                 mapper.convertValue(node.path("evidenceIds"), STRINGS),
-                node.path("truncated").isBoolean() ? node.path("truncated").asBoolean() : null,
+                node.path("truncated").isBoolean()
+                        ? node.path("truncated").asBoolean() || node.path("withheld").path("items").asInt(0) > 0 : null,
                 node.path("nextAllowed").isBoolean() ? node.path("nextAllowed").asBoolean() : null, null,
-                node.has("paths") ? mapper.convertValue(node.path("paths"), PATHS) : List.of());
+                node.has("paths") ? mapper.convertValue(node.path("paths"), PATHS) : List.of(),
+                node.has("webResults") ? mapper.convertValue(node.path("webResults"), WEB) : List.of(), null);
     }
 
     private static McpSchema.CallToolResult refused(String code) {

@@ -42,7 +42,7 @@ class HandoffExportParserTest {
         assertEquals(HandoffFixtures.HANDOFF_ID, verified.bundle().handoffId());
         assertEquals(1, verified.bundle().sources().size());
         assertEquals(verified.manifest().sources(), verified.bundle().sources());
-        assertEquals(1, verified.attemptsNode().size());
+        assertEquals(1, verified.producerNode().get("attempts").size());
     }
 
     @Test

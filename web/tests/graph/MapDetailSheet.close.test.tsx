@@ -133,7 +133,6 @@ it.each(['loading', 'error'] as const)(
             onClose={close}
             onSelectIssue={vi.fn()}
             onFocus={vi.fn()}
-            onConnections={vi.fn()}
             onAskAi={vi.fn()}
           />
         ),

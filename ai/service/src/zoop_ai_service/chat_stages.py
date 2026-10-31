@@ -6,7 +6,7 @@ file, a fixed minimal environment (the chat group's own), stderr discarded, its 
   * the invocation id is the caller's; the child sees it prefixed with the principal (`<principal>:<id>`), so two principals never share a ledger row.
     The child's result is checked as it came (exactly that prefixed id, the stage, the requested mode in the receipt, the stage's closed answer model
     and the outcome invariants) and only then answered with the caller's id; any mismatch is `stage_outcome_unknown`, never a relabelled 200;
-  * a child that exits 0 or 2 with a `zoop-ai-chat-1` result is a 200 whatever the stage outcome (`status=failed` carries the stage failure and
+  * a child that exits 0 or 2 with a `zoop-ai-chat-4` result is a 200 whatever the stage outcome (`status=failed` carries the stage failure and
     whether anything was sent); exit 64 is the runtime refusing the request or its own configuration;
   * a deadline (the stage limit plus a small margin) or an abnormal end means the runtime may have sent: 504/502 `stage_outcome_unknown`, which the
     caller must never resend. Only a child that provably never started sent nothing: 503 `runtime_unavailable`. An `unavailable` outcome after the
@@ -28,6 +28,9 @@ from .chat_wire import ANSWERS, CHAT_SCHEMA, INVOCATION_ID, ChatMcpHealth, ChatS
 
 SLOTS = 4
 SLOT_WAIT = 1.0
+# Probes have their own slots: a busy stage pool (agent steps hold one for up to 33 s) never makes a reachable MCP server look
+# unproven. A probe sends nothing to a model and holds its slot for at most its deadline.
+PROBE_SLOTS = 2
 # The worker's own client timeout per stage plus process start and ledger writes.
 STAGE_DEADLINE = {"chat-router": 4.0 + 3.0, "chat-answer": 25.0 + 3.0, "chat-verification": 6.0 + 3.0, "chat-agent": 30.0 + 3.0}
 # The probe's own 3 s client timeout plus process start.
@@ -105,16 +108,22 @@ class ChatProcess:
 
 
 class ChatStages:
-    def __init__(self, config: ServiceConfig, process: ChatProcess, *, slots: int = SLOTS, slot_wait: float = SLOT_WAIT):
+    def __init__(self, config: ServiceConfig, process: ChatProcess, *, slots: int = SLOTS, slot_wait: float = SLOT_WAIT,
+                 probe_slots: int = PROBE_SLOTS):
         assert config.chat is not None
         self._chat, self._process = config.chat, process
         self._slots, self._slot_wait = threading.BoundedSemaphore(slots), slot_wait
+        self._probe_slots = threading.BoundedSemaphore(probe_slots)
 
     def invoke(self, principal: str, stage: str, request: ChatStageRequest, seen: Observation) -> tuple[int, ChatStageResult]:
         if request.stage != stage:
             raise ApiError(422, "invalid_request", field="stage")
         if not INVOCATION_ID.fullmatch(request.invocation_id):
             raise ApiError(422, "invalid_request", field="invocationId")
+        if stage == "chat-verification":
+            binding = request.input.get("requestBinding")
+            if not isinstance(binding, dict) or binding.get("invocationId") != request.invocation_id:
+                raise ApiError(422, "invalid_request", field="input.requestBinding.invocationId")
         if request.mode == "replay" and self._chat.replay_path is None:
             raise ApiError(409, "execution_unavailable")
         payload = {**request.wire(), "invocationId": f"{principal}:{request.invocation_id}"}
@@ -147,12 +156,12 @@ class ChatStages:
     def probe_mcp(self, seen: Observation) -> ChatMcpHealth:
         """The MCP server's reachability as the installed runtime probes it. It sends no grant, runs nothing and calls no model, so it shares
         no ledger; a probe that cannot run, or whose child ends abnormally, is an error and never a health answer."""
-        if not self._slots.acquire(timeout=self._slot_wait):
+        if not self._probe_slots.acquire(timeout=self._slot_wait):
             raise ApiError(503, "service_busy", retry_after=1)
         try:
             outcome = self._process.probe(PROBE_DEADLINE)
         finally:
-            self._slots.release()
+            self._probe_slots.release()
         seen.runtime.append({"command": "probe-mcp", "kind": outcome.kind, "exit": outcome.exit_code, "code": outcome.code})
         if outcome.kind == "result":
             try:

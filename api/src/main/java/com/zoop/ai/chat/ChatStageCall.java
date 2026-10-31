@@ -8,7 +8,7 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * One stage request. {@code invocationId} names one stage of one job attempt and doubles as the Idempotency-Key; {@code input} is
- * the stage input of the {@code zoop-ai-chat-1} contract, which the AI service validates completely.
+ * the stage input of the {@code zoop-ai-chat-4} contract, which the AI service validates completely.
  */
 public record ChatStageCall(String invocationId, String stage, String mode, JsonNode input) {
     public static final Set<String> STAGES = Set.of("chat-router", "chat-answer", "chat-verification", "chat-agent");

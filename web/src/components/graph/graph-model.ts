@@ -154,7 +154,7 @@ export function toG6Data(
                 fill: themeColor('muted'),
                 background: false,
                 fontSize: 7.178 * scale,
-                fontFamily: 'JetBrains Mono Variable',
+                fontFamily: 'SUIT Variable',
               },
             ]
           : []),
@@ -204,14 +204,16 @@ export function toG6Data(
           iconHeight: iconSize,
           iconRadius: logoScale(logo) === 1 ? size / 2 : 0,
           iconFontSize: size * 0.34,
-          iconFontFamily: 'Inter Variable',
+          iconFontFamily: 'SUIT Variable',
           iconFontWeight: 700,
           iconFill: n.brandColor ?? themeColor('ink'),
           labelText: company
             ? n.label
             : shortTitle(n.label, 15 * scale, 220 * scale),
           labelPlacement: company ? 'bottom' : 'top',
-          labelFontFamily: company ? 'Inter Variable' : 'Pretendard Variable',
+          labelFontFamily: company
+            ? 'Pretendard Variable'
+            : 'Wanted Sans Variable',
           labelFontSize: (company ? (chosen ? 24 : 19) : 15) * scale,
           labelFontWeight: chosen ? 800 : company ? 500 : 700,
           labelFill:
@@ -247,7 +249,7 @@ export function toG6Data(
               e.relationType === 'FOLLOWS'
                 ? themeColor('ink')
                 : themeColor('faint'),
-            lineWidth: 0.65,
+            lineWidth: 1.3,
             strokeOpacity: dimmed
               ? 0.08
               : e.relationType === 'SHARES_ISSUE'
@@ -255,7 +257,7 @@ export function toG6Data(
                 : 0.75,
             lineDash: e.relationType === 'SHARES_ISSUE' ? [2, 4] : undefined,
             endArrow: e.relationType === 'FOLLOWS',
-            endArrowSize: 4,
+            endArrowSize: 6,
             cursor: isSelectableRelation(e) ? 'pointer' : 'default',
             increasedLineWidthForHitTesting: isSelectableRelation(e) ? 8 : 0,
           },

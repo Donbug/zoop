@@ -1,0 +1,79 @@
+package com.zoop.ai.config;
+
+import com.zoop.ai.AiClientConfigurationException;
+import com.zoop.ai.handoff.HandoffExposureClient;
+import com.zoop.ai.handoff.HandoffReadClient;
+import com.zoop.ai.http.HttpHandoffReadClient;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.core.env.StandardEnvironment;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class AiHandoffReadClientConfigurationTest {
+    private static final String TOKEN = "read-token-0123456789abcdefghijklmnopqrstuvwxyz";
+    private final ApplicationContextRunner runner = new ApplicationContextRunner()
+            .withInitializer(context -> {
+                context.getEnvironment().getPropertySources().remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME);
+                context.getEnvironment().getPropertySources().remove(StandardEnvironment.SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME);
+            })
+            .withInitializer(new ConfigDataApplicationContextInitializer())
+            .withUserConfiguration(AiHandoffReadClientConfiguration.class, AiHandoffExposureClientConfiguration.class);
+
+    @Test
+    void absentConfigurationIsOffAndIndependentOfTheExposureClient() {
+        runner.run(context -> {
+            assertNull(context.getStartupFailure());
+            assertTrue(context.getBeansOfType(HandoffReadClient.class).isEmpty());
+            assertTrue(context.getBeansOfType(HandoffExposureClient.class).isEmpty());
+        });
+        runner.withPropertyValues("ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_ENABLED=true",
+                "ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_BASE_URL=https://ai.internal.example", "ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_TOKEN=" + TOKEN)
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertTrue(context.getBeansOfType(HandoffReadClient.class).isEmpty(), "exposure never implies read");
+                });
+    }
+
+    @Test
+    void enabledRegistersTheHttpClientWithTheDocumentedDefaultsAndRedactsTheToken() {
+        runner.withPropertyValues("ZOOP_AI_HANDOFF_READ_CLIENT_ENABLED=true", "ZOOP_AI_HANDOFF_READ_CLIENT_BASE_URL=https://ai.internal.example/ai",
+                "ZOOP_AI_HANDOFF_READ_CLIENT_TOKEN=" + TOKEN).run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertInstanceOf(HttpHandoffReadClient.class, context.getBean(HandoffReadClient.class));
+                    var properties = context.getBean(AiHandoffReadClientProperties.class);
+                    assertEquals(16 * 1024 * 1024, properties.maxResponseBytes());
+                    assertEquals(java.time.Duration.ofSeconds(60), properties.requestTimeout());
+                    assertEquals("/ai", properties.toSettings().baseUri().getPath());
+                    assertFalse(properties.toString().contains(TOKEN));
+                    assertTrue(context.getBeansOfType(HandoffExposureClient.class).isEmpty());
+                });
+    }
+
+    @Test
+    void badEnabledTransportFailsClosedWithOnlyItsSettingName() {
+        for (String bad : new String[]{"ZOOP_AI_HANDOFF_READ_CLIENT_BASE_URL=http://outside.example",
+                "ZOOP_AI_HANDOFF_READ_CLIENT_TOKEN=short", "ZOOP_AI_HANDOFF_READ_CLIENT_REQUEST_TIMEOUT=0s",
+                "ZOOP_AI_HANDOFF_READ_CLIENT_MAX_RESPONSE_BYTES=1"}) {
+            runner.withPropertyValues("ZOOP_AI_HANDOFF_READ_CLIENT_ENABLED=true", "ZOOP_AI_HANDOFF_READ_CLIENT_BASE_URL=https://ai.internal.example",
+                    "ZOOP_AI_HANDOFF_READ_CLIENT_TOKEN=" + TOKEN, bad).run(context -> {
+                        Throwable failure = context.getStartupFailure();
+                        assertNotNull(failure, bad);
+                        Throwable cause = failure;
+                        while (cause != null && !(cause instanceof AiClientConfigurationException)) {
+                            cause = cause.getCause();
+                        }
+                        assertNotNull(cause, bad);
+                        assertTrue(cause.getMessage().startsWith("zoop.ai.handoff-read-client."), cause.getMessage());
+                        assertFalse(cause.getMessage().contains(TOKEN), cause.getMessage());
+                        assertFalse(cause.getMessage().contains("outside.example"), cause.getMessage());
+                    });
+        }
+    }
+}

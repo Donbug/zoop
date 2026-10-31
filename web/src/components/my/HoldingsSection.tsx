@@ -101,30 +101,30 @@ export default function HoldingsSection({
       className="rounded-xl border border-gray-200 bg-white p-5"
     >
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 id="my-holdings" className="flex-1 text-lg font-semibold">
+        <h2 id="my-holdings" className="flex-1 text-title-sm font-semibold">
           보유 종목(가상 계좌)
         </h2>
         {connection && (
           <>
-            <span className="text-sm text-gray-500 tabular-nums">
+            <span className="text-body text-zoop-ink tabular-nums">
               {data?.holdings.length ?? 0}개
             </span>
             <button
               type="button"
               onClick={() => setConfirming(true)}
-              className="rounded-lg px-2 py-1 text-sm font-medium text-gray-700 hover:bg-gray-100"
+              className="rounded-lg px-2 py-1 text-body font-medium text-zoop-ink hover:bg-gray-100"
             >
               연결 끊기
             </button>
           </>
         )}
         {data && !data.connected && (
-          <span className="text-sm text-gray-500">연결 안 됨</span>
+          <span className="text-body text-zoop-ink">연결 안 됨</span>
         )}
       </div>
 
       {portfolio.status === 'loading' && (
-        <p role="status" className="text-sm text-gray-500">
+        <p role="status" className="text-body text-zoop-ink">
           보유 종목을 불러오고 있어요
         </p>
       )}
@@ -137,7 +137,7 @@ export default function HoldingsSection({
 
       {data && connection && (
         <>
-          <div className="mb-2 flex flex-col gap-0.5 text-sm text-gray-500 tabular-nums">
+          <div className="mb-2 flex flex-col gap-0.5 text-body text-zoop-ink tabular-nums">
             <p>
               모의 계좌 {connection.accountId ?? '식별 정보 미제공'} · 예수금{' '}
               {connection.cash
@@ -152,7 +152,7 @@ export default function HoldingsSection({
               )}
           </div>
           {data.holdings.length === 0 ? (
-            <p className="text-sm text-gray-500">
+            <p className="text-body text-zoop-ink">
               이 계좌에는 보유 종목이 없어요.
             </p>
           ) : (
@@ -182,17 +182,17 @@ export default function HoldingsSection({
       {data && !data.connected && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-gray-300 px-4 py-3">
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-gray-900">
+            <p className="text-body text-zoop-ink">
               가상 계좌를 연결하면 모의 보유 종목과 평가 금액을 볼 수 있어요.
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-body text-zoop-ink">
               실제 증권 계좌가 아니에요. 준비된 모의 데이터로 만든 계좌예요.
             </p>
           </div>
           <button
             type="button"
             onClick={onConnect}
-            className="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
+            className="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-body font-medium text-zoop-ink hover:bg-gray-50"
           >
             가상 계좌 연결하기
           </button>
@@ -207,7 +207,7 @@ export default function HoldingsSection({
           onConfirm={() => void disconnect()}
           onCancel={closeConfirm}
         >
-          <p className="text-sm text-gray-700">
+          <p className="text-body text-zoop-ink">
             {connection.label}의 보유 종목이 내 종목과 지도에서 빠져요. 관심
             종목은 그대로예요. 나중에 다시 연결할 수 있어요.
           </p>

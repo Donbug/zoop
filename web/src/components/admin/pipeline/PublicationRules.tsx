@@ -79,7 +79,7 @@ function RuleSwitchForm({
       onSubmit={(event) => void submit(event)}
       className="flex flex-col gap-3 rounded-2xl bg-zoop-soft p-5"
     >
-      <p className="text-sm font-bold">
+      <p className="text-body font-bold">
         {rule.title} · {rule.enabled ? '규칙 끄기' : '규칙 켜기'}
       </p>
       <Note>
@@ -87,7 +87,7 @@ function RuleSwitchForm({
         바꾸지 않아요. 변경은 다음 그래프 버전부터 반영돼요. 사유는 감사 로그에
         남아요.
       </Note>
-      <label htmlFor={id} className="text-xs">
+      <label htmlFor={id} className="text-caption">
         전환 사유
       </label>
       <textarea
@@ -101,20 +101,20 @@ function RuleSwitchForm({
         onChange={(event) => setReason(event.target.value)}
         className={TEXTAREA}
       />
-      <p id={`${id}-count`} className="text-[11px] text-zoop-muted">
+      <p id={`${id}-count`} className="text-caption text-zoop-muted">
         {reason.length}/500자
       </p>
-      <p id={`${id}-guide`} className="text-[11px] text-zoop-muted">
+      <p id={`${id}-guide`} className="text-caption text-zoop-muted">
         1~500자 한 줄로 써 주세요. 이메일·웹 주소·비밀번호/인증 관련
         단어·토큰처럼 긴 문자열은 넣지 마세요.
       </p>
       {invalid && (
-        <p role="alert" className="text-xs text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           사유를 1~500자로 입력해 주세요.
         </p>
       )}
       {error && (
-        <p role="alert" className="text-xs text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           {switchError(error)}
         </p>
       )}
@@ -181,7 +181,7 @@ function RulesContent() {
         집계는 –로 표시해요.
       </Note>
       {message && (
-        <p role="status" className="text-xs">
+        <p role="status" className="text-caption">
           {message}
         </p>
       )}
@@ -213,11 +213,11 @@ function RulesContent() {
               <li key={rule.id} className="flex flex-col gap-3 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <h3 className="text-sm font-bold">
+                    <h3 className="text-body font-bold">
                       {rule.title} · {rule.enabled ? '켜짐' : '꺼짐'}
                     </h3>
-                    <p className="text-[11px] text-zoop-muted">{rule.id}</p>
-                    <p className="text-xs">{rule.summary}</p>
+                    <p className="text-caption text-zoop-muted">{rule.id}</p>
+                    <p className="text-caption">{rule.summary}</p>
                     <Note>
                       다루는 보류 후보 {count(rule.eligible)} · 활성 버전 공개
                       사건 {count(rule.publishedEvents)} · 공개 후보{' '}
@@ -251,7 +251,7 @@ function RulesContent() {
                   </button>
                 </div>
                 {rule.history.length > 0 && (
-                  <details className="text-xs">
+                  <details className="text-caption">
                     <summary className="cursor-pointer">
                       전환 이력 {rule.history.length}건 · {rule.title}
                     </summary>

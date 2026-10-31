@@ -1,6 +1,6 @@
 # 문서 등록 import (S2-1 export → PostgreSQL)
 
-FS056(WBS 6.5.2)의 **문서 쪽** 저장입니다. 설치된 `zoop-ai-ingest export`가 내보낸 정제 텍스트 한 건(문서 버전)을 앱 DB의 `artifacts`·`articles`·`article_versions`(ERD v6 §14–16)와 로컬 파일로 등록합니다. 운영자가 실행하는 **비웹 Spring 프로세스**이며 HTTP 경로는 없습니다. 목표 OpenAPI에도 문서 쓰기 경로가 없습니다.
+FS056(WBS 6.5.2)의 **문서 쪽** 저장입니다. S2-1 export(설치된 `zoop-ai-ingest export`, 또는 `observation-source=http`면 ai/service가 같은 CLI를 실행해 돌려주는 응답)가 내보낸 정제 텍스트 한 건(문서 버전)을 앱 DB의 `artifacts`·`articles`·`article_versions`(ERD v6 §14–16)와 로컬 파일로 등록합니다. 운영자가 실행하는 **비웹 Spring 프로세스**이며 HTTP 경로는 없습니다. 목표 OpenAPI에도 문서 쓰기 경로가 없습니다.
 
 **하지 않는 것:** 분석·요약·감성 결과 import(별도의 operator 실행인 [문서 분석](DOCUMENT_ANALYSIS.md)이 `document_analyses`·`evidence`·`ai_executions`에 저장하며 여기서는 쓰지 않음, `analysis_jobs`는 아직 없음), 그래프 반영, 공개·발행, 사건(event) 쪽 FS056 항목, 수집 실행·스케줄, 원문(raw) 바이트 저장(S2-1이 내보내지 않으므로 `raw_artifact_id`는 NULL). 등록된 행은 **읽기 권한이 아니라 이력**입니다(아래 [접근](#접근과-권리)). 문서 목록은 [기업 문서 조회](COMPANY_DOCUMENTS.md)를 참고하세요.
 
@@ -8,7 +8,7 @@ FS056(WBS 6.5.2)의 **문서 쪽** 저장입니다. 설치된 `zoop-ai-ingest ex
 
 항목마다 순서대로, 항목 하나가 끝난 뒤 다음으로 갑니다.
 
-1. **새 export.** `zoop-ai-ingest export --require-store`를 항목마다 새 하위 프로세스로 실행합니다. 미리 만든 JSON이나 이전 export를 받는 입력은 없습니다. CLI가 그 시점의 현재 source registry(`--sources`)로 권한을 확인합니다(grant 활성, `rights=known`, 근거 있음, **`read`·`store`·`quote-display` 모두 허용**, 미만료, 범위 설정 불변). 텍스트를 저장하는 소비자라서 `store`를 명시적으로 요구하며(`--require-store`는 export 전용이고 기본 export의 두 권리 계약은 그대로), export 문서에는 grant id·revision만 있어 Java는 권리를 직접 평가하지도 registry를 읽지도 않습니다.
+1. **새 export.** `cli`면 `zoop-ai-ingest export --require-store`를 항목마다 새 하위 프로세스로 실행하고, `http`면 항목마다 ai/service `exportObservation`을 한 번 호출합니다(서비스가 자기 현재 registry로 같은 CLI를 실행해 같은 JSON을 돌려주며, 이 프로세스에는 CLI도 registry도 없습니다). 아래는 `cli` 기준이고 검증(2~4)은 두 경로가 같습니다. 미리 만든 JSON이나 이전 export를 받는 입력은 없습니다. CLI가 그 시점의 현재 source registry(`--sources`)로 권한을 확인합니다(grant 활성, `rights=known`, 근거 있음, **`read`·`store`·`quote-display` 모두 허용**, 미만료, 범위 설정 불변). 텍스트를 저장하는 소비자라서 `store`를 명시적으로 요구하며(`--require-store`는 export 전용이고 기본 export의 두 권리 계약은 그대로), export 문서에는 grant id·revision만 있어 Java는 권리를 직접 평가하지도 registry를 읽지도 않습니다.
 2. **엄격 검증.** 키 집합이 정확히 일치하고, 선택자 7개 값이 요청과 같고, `textArtifactId == "text-" + documentVersion`이고, 텍스트가 `sourceHash`(= Python `sha256(json.dumps(text, ensure_ascii=False))`)와 일치해야 합니다. 시각은 ISO-8601 + offset, 마이크로초 이하만 받고 Python이 다르게 읽을 수 있는 형식은 추측하지 않고 거부합니다.
 3. **파일.** `<artifact-root>/extracted_text/<textArtifactId>.txt`에 UTF-8 바이트를 한 번만 씁니다(0600, 임시 파일 → fsync → 덮어쓰기 없는 hard link → 파일·내용 디렉터리·루트 fsync). 같은 이름의 파일이 이미 있으면 **루트와 같은 소유자·정확히 0600·같은 바이트인 정규 파일만** 채택하며, 채택하기 전에 그 파일·내용 디렉터리·루트를 fsync합니다. 바이트가 다르거나 정규 파일이 아니면 `artifact_file_conflict`, 소유자·권한이 다르면 `artifact_store_unavailable`이고 어떤 경우에도 **덮어쓰거나 chmod로 고치지 않습니다.** 규칙 전체는 [파일 저장소 규칙](#파일-저장소-규칙)입니다.
 4. **DB transaction 한 번**(외부 호출 없음). 아래 [트랜잭션](#트랜잭션)을 참고하세요. 실패하면 이 항목이 만든 행은 전부 롤백됩니다.
@@ -24,14 +24,15 @@ FS056(WBS 6.5.2)의 **문서 쪽** 저장입니다. 설치된 `zoop-ai-ingest ex
 | `ZOOP_DOCUMENT_IMPORT_ENABLED` | `true`일 때만 동작(기본 `false`). **웹 서버와 함께는 시작을 거부**하므로 `--spring.main.web-application-type=none`이 필수 |
 | `ZOOP_DOCUMENT_IMPORT_REQUEST` | 운영자 요청 JSON(존재하는 파일, 최대 1 MiB) |
 | `ZOOP_DOCUMENT_IMPORT_RESULT` | 결과 파일. **없어야 하며** 실행 시작 시 배타적으로 만들어집니다 |
-| `ZOOP_INGESTION_CLI` | 설치된 `zoop-ai-ingest` 실행 파일(예: `ai/pipeline/.venv/bin/zoop-ai-ingest`) |
-| `ZOOP_INGESTION_STATE_DIR` | 기존 S2-1 ledger 디렉터리. CLI가 읽기 전용으로 엽니다(Java는 열지 않음) |
-| `ZOOP_INGESTION_SOURCES` | 현재 운영자 source registry. **이것이 import 시점의 권한입니다** |
+| `ZOOP_DOCUMENT_IMPORT_OBSERVATION_SOURCE` | 관측(정제 텍스트와 현재 권리)을 어디서 받을지. `cli`(기본, 빈 값도 `cli`): 아래 `ZOOP_INGESTION_*` 셋으로 설치된 `zoop-ai-ingest export --require-store`를 실행. `http`: ai/service `POST /internal/v1/observations/export`(scope `observation.read`, AI PR #431)를 `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED=true`·`_BASE_URL`·`_TOKEN`으로 호출하며, 이때 `ZOOP_INGESTION_*` 셋은 **비워 둡니다**(설정되어 있으면 그 이름으로 기동 거절). `http`인데 클라이언트가 꺼져 있으면 `observation-source`로 기동 거절, `cli`는 켜진 클라이언트를 무시합니다. 응답은 CLI JSON 그대로라 같은 파서·같은 실패 코드이며, 503·전송 실패는 `ingestion_export_unavailable`, 그 밖의 4xx·5xx envelope는 `ingestion_export_failed`(그 코드), 계약 밖 응답은 `export_invalid`입니다([그래프 handoff 문서의 10-30 절](GRAPH_READ_HANDOFF.md#2026-10-30-관측-재확인의-http-전환-55-pr-r2a-ai-pr-431)) |
+| `ZOOP_INGESTION_CLI` | (`cli`만) 설치된 `zoop-ai-ingest` 실행 파일(예: `ai/pipeline/.venv/bin/zoop-ai-ingest`) |
+| `ZOOP_INGESTION_STATE_DIR` | (`cli`만) 기존 S2-1 ledger 디렉터리. CLI가 읽기 전용으로 엽니다(Java는 열지 않음) |
+| `ZOOP_INGESTION_SOURCES` | (`cli`만) 현재 운영자 source registry. **이것이 import 시점의 권한입니다.** `http`에서는 AI 서비스가 자기 현재 registry로 같은 검사를 합니다 |
 | `ZOOP_ARTIFACT_ROOT` | 앱 파일 저장소 루트. 존재하는 POSIX 디렉터리, symlink 성분 없는 실경로(macOS는 `/var/...`가 아니라 `/private/var/...`), 소유자 외 group·world 쓰기 불가, ingestion state와 서로 포함하지 않음. 이 중 하나라도 어기면 기동이 닫힘 실패하고 매 실행(락 취득 전)에도 다시 확인합니다 |
 | `DB_URL` `DB_USERNAME` `DB_PASSWORD` | 기존 DB 연결. **하위 CLI에는 전달되지 않습니다** |
 | `ZOOP_STATE_DIR` `ZOOP_AI_WORKER_STATE_DIR` | 설정돼 있으면 CLI에만 그대로 전달(설치형 S2-1 패키지의 상태 소유권 필수 값) |
 
-모든 경로는 정규화된 절대 경로여야 합니다. 요청·결과 파일은 ingestion state 디렉터리 안에 둘 수 없습니다(CLI가 낯선 파일이 있는 state를 거부합니다).
+모든 경로는 정규화된 절대 경로여야 합니다. 요청·결과 파일은 ingestion state 디렉터리 안에 둘 수 없습니다(CLI가 낯선 파일이 있는 state를 거부합니다). `http`에서는 state 디렉터리가 없으므로 이 검사도 없습니다.
 
 ```sh
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)

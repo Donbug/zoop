@@ -7,7 +7,6 @@ import {
   ErrorBox,
   Loading,
   MoreButton,
-  Note,
   Section,
   Table,
 } from '@/components/admin/common/AdminUi';
@@ -16,17 +15,14 @@ import { editionLabel } from '@/constants/adminLabels';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useCursorPages } from '@/hooks/useCursorPages';
 import type { StatsMetric, StatsWindow } from '@/types/admin/insights';
-import { formatKst } from '@/util/format';
 import { MetricBasis, MetricValue } from './insightsFormat';
 
 function MetricTable({
   caption,
   metrics,
-  minSample,
 }: {
   caption: string;
   metrics: StatsMetric[];
-  minSample: number;
 }) {
   if (metrics.length === 0)
     return <Empty>이 묶음에 제공하는 지표가 없어요.</Empty>;
@@ -48,7 +44,7 @@ function MetricTable({
               <MetricValue metric={metric} />
             </td>
             <td className={`${TD} text-right text-zoop-muted`}>
-              <MetricBasis metric={metric} minSample={minSample} />
+              <MetricBasis metric={metric} />
             </td>
             <td className={`${TD} min-w-60 text-zoop-muted`}>
               {metric.definition}
@@ -85,34 +81,21 @@ export function StatsSummaryPanel({ window }: { window: StatsWindow }) {
   return (
     <>
       {summary.refreshError && (
-        <p role="status" className="text-[11px] text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}
-      <Note>
-        집계 시각 {formatKst(data.asOf)} · 비율은 분모가 {data.minSample}{' '}
-        미만이면 숨기고 건수만 보여 줘요.
-      </Note>
       <Section title="서비스 이용">
-        <MetricTable
-          caption="서비스 이용 지표"
-          metrics={byGroup('usage')}
-          minSample={data.minSample}
-        />
+        <MetricTable caption="서비스 이용 지표" metrics={byGroup('usage')} />
       </Section>
       <Section title="브리핑 관심도">
         <MetricTable
           caption="브리핑 관심도 지표"
           metrics={byGroup('interest')}
-          minSample={data.minSample}
         />
       </Section>
       <Section title="AI 질문">
-        <MetricTable
-          caption="AI 질문 지표"
-          metrics={byGroup('ai')}
-          minSample={data.minSample}
-        />
+        <MetricTable caption="AI 질문 지표" metrics={byGroup('ai')} />
       </Section>
       <Section title="일별 추이">
         {trend.length === 0 ? (
@@ -132,9 +115,7 @@ export function StatsSummaryPanel({ window }: { window: StatsWindow }) {
             <tbody>
               {trend.map((day) => (
                 <tr key={day.date}>
-                  <td className={`${TD} font-inter tabular-nums`}>
-                    {day.date}
-                  </td>
+                  <td className={`${TD} font-num tabular-nums`}>{day.date}</td>
                   <td className={`${TD} text-right tabular-nums`}>
                     {count(day.activeUsers)}
                   </td>
@@ -220,21 +201,16 @@ export function CompanyRankingPanel({ window }: { window: StatsWindow }) {
         onRetry={ranking.reload}
       />
     );
-  const first = ranking.pages[0];
   const rows = ranking.items;
   const windowQuery = window === '7d' ? '' : `?window=${window}`;
 
   return (
     <>
       {ranking.refreshError && (
-        <p role="status" className="text-[11px] text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}
-      <Note>
-        기업 {count(first.totalCompanies)}개 중 활동이 있는 기업 · 집계 시각{' '}
-        {formatKst(first.asOf)} · {first.holdingsNote}
-      </Note>
       {rows.length === 0 ? (
         <Empty>
           아직 집계할 종목 활동이 없어요. 사용자가 지도에서 기업을 고르거나 관심
@@ -267,7 +243,7 @@ export function CompanyRankingPanel({ window }: { window: StatsWindow }) {
                     {row.name}
                   </Link>
                   {row.ticker && (
-                    <span className="ml-2 font-inter text-[11px] text-zoop-faint">
+                    <span className="ml-2 font-num text-caption text-zoop-faint">
                       {row.ticker}
                     </span>
                   )}
