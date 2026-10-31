@@ -617,7 +617,7 @@ bundle 스키마만 `zoop-graph-handoff-bundle-3` → `-4`로 한 번에 바꿨�
 1. 공개 `PublicGraphReader.read(null, graphVersion, asOf)`로 버전을 고정합니다(selector의 409/422, snapshot 저장소의 503은 그대로). staged(한 번도 활성화되지 않은) 버전은 409이고 fallback도 활성화도 없습니다.
 2. 가시성: 필터된 snapshot의 evidence 목록에 있고 **보이는 issue(`evidenceIds`·`geographyEvidenceIds`) 또는 보이는 relation이 인용**해야 합니다. 아니면 404 `EVIDENCE_UNAVAILABLE`. `eventIds`는 그 id를 인용하는 보이는 issue입니다. 예외는 **basis-only span**입니다(아래 2026-10-21 bundle `-5` 절): 어떤 보이는 issue·relation도 직접 인용하지 않지만 보이는 구조 basis가 그 span의 기사 버전을 가리키면, 선택된 버전의 receipt가 정확히 그 relation의 그 basis가 이 id를 인용함을 증명할 때만 서비스하며 `eventIds`는 비어 있습니다.
 3. span `(articleId, articleVersion, start, end)`가 행과 같아야 하고, 현재 article이 `available`이며, 그 버전 행·텍스트 artifact가 행과 맞고, 인용 문자열의 코드 포인트 수가 offset과 맞아야 합니다. 버전은 snapshot이 고정하므로 `current_version`은 요구하지 않습니다.
-4. **선택된 버전의** receipt(`artifact-receipt-<versionId>`, 행 자신의 receipt가 아님: 행을 공유한 뒤의 import는 첫 import의 receipt를 가리킵니다)를 등록된 해시·크기로 검증해 읽습니다. 파일 불일치·등록 없음·종류 오류는 404, artifact root 미설정·I/O 실패는 503입니다. 스키마 `zoop-graph-handoff-import-receipt-1`, `"gv-"+sha256(handoffId)==versionId`, 해당 article 버전이 `bundle.articles[]`에 정확히 하나, 각 observation의 `sourceId`가 `articles.provider`와 같음을 요구하고 `(sourceId, grantId, revision)` pin을 얻습니다. 형식이 맞지 않으면 fail closed(404)입니다. receipt는 pin만 줄 뿐 권한을 주지 않습니다.
+4. **선택된 버전의** receipt(`artifact-receipt-<versionId>`, 행 자신의 receipt가 아님: 행을 공유한 뒤의 import는 첫 import의 receipt를 가리킵니다)를 등록된 해시·크기로 검증해 읽습니다. 공통 `GraphPublicationReader`가 원본·누적 publication의 proof를 검증하므로 파일 불일치·등록 없음·종류 오류·artifact root 미설정·I/O 실패는 `503 SOURCE_UNAVAILABLE`입니다. 원본 native receipt는 스키마 `zoop-graph-handoff-import-receipt-1`과 `"gv-"+sha256(handoffId)==versionId`를 요구하며, 이 식별 계약의 오류도 503입니다. 검증된 receipt에서 해당 article 버전이 `bundle.articles[]`에 정확히 하나이고 각 observation의 `sourceId`가 `articles.provider`와 같아야 `(sourceId, grantId, revision)` pin을 얻습니다. 이 근거별 소속·grant pin 검사가 거절되면 `404 EVIDENCE_UNAVAILABLE`입니다. receipt는 pin만 줄 뿐 권한을 주지 않습니다.
 5. **현재** source registry에서 모든 pin이 통과해야 합니다: source 존재, grant id·revision 일치, enabled, rights=known, 비어 있지 않은 evidence, `read`·`store`·`quote-display` 허용, **지금** 만료되지 않음(`asOf`는 권한 시계를 옮기지 않음). `model-send`는 요구하지 않습니다(인용 표시는 모델에 보내지 않음). registry 미설정·읽기 불가·검증 실패는 503, 거절은 404이며 사유는 로그에만 남습니다.
 6. `companyId`는 증거 판정 뒤 확인합니다(모르는 id 404 `RESOURCE_NOT_FOUND`, 알면 `partial=true`와 sentiment 실패 구역·`sentiment=null`).
 
@@ -633,7 +633,7 @@ authority-set의 각 leaf는 기존 S2-1 검증을 그대로 적용합니다. �
 
 **한계.** source registry의 scope만 제거하는 철회는 이미 노출된 근거를 막지 못합니다(scope pin이 handoff에 없음): grant를 disable하거나 revision을 바꾸거나 operation을 빼야 합니다. 공개 제외 overlay와 관리자 활성화는 이후 구현됐으며 현재 계약은 [지금 상태](#지금-상태-사실)와 [공개 제외 명령](../README.md#공개-제외-명령-fs081)을 따릅니다. 요청마다 registry·snapshot·receipt를 읽고 캐시하지 않습니다.
 
-**검증.** `EvidenceServiceTest`·`GraphEvidenceServiceTest`·`GraphEvidenceSnapshotReaderTest`·`SourceRegistryTest`·`DocumentReadPropertiesTest`(단위), `make api-graph-handoff-import-smoke`(실제 jar·PostgreSQL·HTTP; 기본으로 evidence 읽기 단계 포함, `--no-with-evidence-read`로 끔). 이 smoke는 **시험 harness 전용** psql 활성화 2건(`harnessActivations: 2`: evidence 읽기 단계 1건, bundle `-4` verdict 세계의 공개 그래프 읽기 1건; import의 `importActivationsWritten: 0`과 별개, production 게시 아님)을 격리 DB에서 수행합니다. 앞의 한 건 뒤에는 공유 행·나중 receipt, 권한 변경별 CLI parity(`read`/`store`/`quote-display` 제거, disabled, rights, 빈 evidence, 만료, revision·grant id 변경, `model-send` 대조), 과거 `asOf`+현재 권한, registry 변조·삭제 503, receipt 변조·비공개 article 404, 읽기 전용(표·artifact 트리 불변)을 확인합니다.
+**검증.** `EvidenceServiceTest`·`GraphEvidenceServiceTest`·`GraphEvidenceSnapshotReaderTest`·`SourceRegistryTest`·`DocumentReadPropertiesTest`(단위), `make api-graph-handoff-import-smoke`(실제 jar·PostgreSQL·HTTP; 기본으로 evidence 읽기 단계 포함, `--no-with-evidence-read`로 끔). 이 smoke는 **시험 harness 전용** psql 활성화 2건(`harnessActivations: 2`: evidence 읽기 단계 1건, bundle `-4` verdict 세계의 공개 그래프 읽기 1건; import의 `importActivationsWritten: 0`과 별개, production 게시 아님)을 격리 DB에서 수행합니다. 앞의 한 건 뒤에는 공유 행·나중 receipt, 권한 변경별 CLI parity(`read`/`store`/`quote-display` 제거, disabled, rights, 빈 evidence, 만료, revision·grant id 변경, `model-send` 대조), 과거 `asOf`+현재 권한, registry 변조·삭제 503, receipt 변조 503 `SOURCE_UNAVAILABLE`, 비공개 article 404, 읽기 전용(표·artifact 트리 불변)을 확인합니다.
 
 **발행 매체 검증.** 같은 smoke는 운영자가 실제 수집 매니페스트 항목에 선언한 발행 매체(문서 `a`만 `합성일보 Synthetic Daily`, `a2`·`b`는 선언 없음)가 실제 export → Spring import → `article_versions.publisher` → 공개 `GET /api/v1/evidence/{id}`의 `article.publisher`까지 정확히 같은 문자열로 오고(`a`), 선언이 없는 버전은 DB도 응답도 `null`임을 smoke 안에 손으로 적은 기대값으로 확인합니다. `api/scripts/document_import_smoke.py`는 같은 문서 A의 선언 없는 이전 버전(NULL)이 매체를 선언한 새 버전 import 뒤에도 NULL로 남고, 저장된 NULL과 선언 값이 충돌하면 `version_conflict`임을 확인합니다.
 
@@ -897,7 +897,7 @@ Document evidence reader는 항상 등록되므로 별도 `document-read.enabled
 
 nonweb 실행도 기존 Spring 시작 설정을 읽으므로 `DB_URL/DB_USERNAME/DB_PASSWORD`와 관리되는 `ZOOP_AUTH_CSRF_ACTIVE_KEY_ID/ZOOP_AUTH_CSRF_KEYS`를 공급해야 한다. 이 값은 패키지·manifest·결과 파일에 넣지 않는다.
 
-`V20261031110000`은 제외 감사 원인 `legacy-operator`를 추가한다. 이 원인의 `report_sha256`은 실제 legacy receipt의 SHA-256이며, native 제외의 exposure report digest와 원인 값으로 구분한다. 기존 제외 이력은 유지한다. 이미 main에 반영된 회차 migration `V20261031100000` 다음에 실행되도록 새 migration에만 순방향 번호를 부여했다. 이어서 delivery(`V20261031120000`), 누적 발행(`V20261031130000`), 누적 delivery(`V20261031140000`) 순서로 적용한다. 기존 migration의 번호·내용은 유지하며, delivery 명령은 적용이 완료된 schema를 검증한다.
+`V20261031150000`은 제외 감사 원인 `legacy-operator`를 추가한다. 이 원인의 `report_sha256`은 실제 legacy receipt의 SHA-256이며, native 제외의 exposure report digest와 원인 값으로 구분한다. 기존 제외 이력은 유지한다. 이미 main에 반영된 회차 migration `V20261031100000__create_graph_rounds.sql`과 `V20261031130000__graph_rounds_ingestion_round.sql` 뒤에 실행되도록 새 migration에만 순방향 번호를 부여했다. 이어서 delivery(`V20261031160000`), 누적 발행(`V20261031170000`), 누적 delivery(`V20261031180000`) 순서로 적용한다. 기존 migration의 파일명·내용·체크섬은 유지하며, delivery 명령은 적용이 완료된 schema를 검증한다.
 
 ### Legacy 활성화와 호환 이미지 배포 순서
 
@@ -926,6 +926,8 @@ nonweb 실행은 `--zoop.graph-publication-compose.enabled=true`와 정규화된
 명령당 새 입력은 최대 20개다. 누적 원본은 21개 이상도 유지하며 실제 artifact·collection·closure 경계에서 후보 전체를 거절한다. artifact당 16 MiB, 전송 closure 1,003개 파일·256 MiB, pending/destination 기본 1 GiB 한도를 사용한다. 과거 원본이나 규칙으로 숨긴 자료를 연령·입력 개수 때문에 지우지 않는다.
 
 모든 공개·고정 버전·과거·asOf 읽기는 같은 `GraphPublicationReader`와 현재 권한 overlay를 거친다. 원본별 최신 제외와 정확한 기사 버전의 철회·권한을 적용한 뒤 표시용 파생 관계를 만든다. 한 원본의 허용으로 다른 적용 대상 원본의 거절을 상쇄할 수 없다. 선택된 제목·핵심 필드 근거가 철회되면 해당 이슈를 숨기며, 읽을 수 없는 proof나 잘못된 현재 권한은 `503 SOURCE_UNAVAILABLE`이다.
+
+`round` 없는 근거 조회에서 현재 권한으로 숨겨진 근거는 `404 EVIDENCE_UNAVAILABLE`이다. `round`를 지정하면 먼저 저장된 브리핑 전체의 원천 binding과 그 발행본이 참조하는 이슈·근거의 현재 공개 가능 여부를 검사한다. 필수 ingestion grant 또는 별도 briefing-purpose grant가 철회되어 저장된 발행본을 제공할 수 없으면 `503 SOURCE_UNAVAILABLE`이다. 이 검사를 통과한 회차 안에서 요청 근거가 범위 밖이거나 구조·영향 소속 증명을 충족하지 못하면 404다. 회차에 고정된 버전·마감 시각은 현재 권한 검사를 대신하지 않는다.
 
 복합 버전을 대상으로 제외하려면 기존 `zoop-disclosure-exclusion-1` 요청에 `action:exclude-publication`을 사용한다. 키는 `requestId/action/operator/reason/graphVersionId/receiptSha256/targets`이며 실제 복합 receipt SHA를 고정한다. 한 요청의 모든 대상을 모든 해당 원본 소유자로 해석하고 같은 publication lock·revision 아래 원본 범위에 원자적으로 기록한다. 소유자가 없는 대상과 표시용 파생 edge ID는 거절한다. 빈 입력이나 작은 결과는 기존 제외를 해제하지 않는다. 해제는 원본 버전과 대상·`expectedRevision`을 명시한 기존 `lift`로 수행한다.
 

@@ -231,9 +231,11 @@ jobs:
           digest_image="$ECR_REGISTRY/$ECR_REPOSITORY@$image_digest"
 
           echo "Resolved image: $digest_image"
-          echo "image=$digest_image" >> "$GITHUB_OUTPUT"
-          echo "tagged-image=$tagged_image" >> "$GITHUB_OUTPUT"
-          echo "commit=$IMAGE_COMMIT" >> "$GITHUB_OUTPUT"
+          {
+            echo "image=$digest_image"
+            echo "tagged-image=$tagged_image"
+            echo "commit=$IMAGE_COMMIT"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Download current task definition
         if: ${{ inputs.operation == 'deploy' }}

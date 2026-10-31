@@ -40,6 +40,14 @@ public interface GraphRoundRepository {
     void release(String roundId, String owner);
 
     /**
+     * Extends {@code held}'s lease to {@code now + lease} as a conditional extension only: the row must still carry
+     * {@code held}'s owner and token at {@code held}'s stage. No token is issued and nothing else changes, so an expired lease
+     * nobody took over is extended with its token kept. Empty when the row was taken over or moved on: the holder lost it and
+     * must not write the result of the step it started under that lease.
+     */
+    Optional<GraphRound> extend(GraphRound held, Duration lease, Instant now);
+
+    /**
      * Applies the patch and appends the event in one transaction, only while the row is still at {@code expected}'s stage under
      * {@code expected}'s lease token (fenced); the lease is kept with an open stage and dropped with a terminal one. Empty when
      * the row moved on or the lease was taken over: nothing is written, and the caller reads the row again.

@@ -292,7 +292,7 @@ def scenario(args, db, scratch, evidence, layouts, runs):
     conflict.write_bytes(b"different existing target")
     conflict.chmod(0o600)
     delivery.refused("last-target-conflict", "target_conflict", root=conflict_root, **install_args)
-    migration = "20261031120000"
+    migration = "20261031160000"
     checksum = db.scalar(f"SELECT checksum FROM flyway_schema_history WHERE version={literal(migration)}")
     db.run(f"UPDATE flyway_schema_history SET checksum={checksum + 1} WHERE version={literal(migration)}")
     try:
