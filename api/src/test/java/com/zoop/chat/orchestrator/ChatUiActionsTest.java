@@ -138,6 +138,17 @@ class ChatUiActionsTest {
     }
 
     @Test
+    void anActionStoredBeforeTheNewTargetFieldsStillReads() {
+        var stored = tools.jackson.databind.json.JsonMapper.builder().build().readValue("""
+                {"actionId":"action-1","kind":"open_company","label":"기업 상세 · 삼성전자","requirementIds":["r1"],
+                 "target":{"companyId":"KRX:005930","fromId":null,"toId":null,"date":null,"edition":null,
+                 "graphVersion":null,"asOf":null}}
+                """, ChatUiAction.class);
+
+        assertEquals(Target.company("KRX:005930"), stored.target());
+    }
+
+    @Test
     void aRequirementThatWasNotAnsweredOffersNothing() {
         assertTrue(ChatUiActions.of(List.of(branch("r1", read("company.read", "gv-1", List.of(SAMSUNG), List.of()))),
                 Set.of("r2"), BOTH, Map.of(), "gv-1", null).isEmpty());
