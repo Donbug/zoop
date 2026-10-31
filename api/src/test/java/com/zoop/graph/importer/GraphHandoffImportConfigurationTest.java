@@ -11,6 +11,7 @@ import java.util.Map;
 
 import com.zoop.ai.config.AiHandoffReadClientConfiguration;
 import com.zoop.ai.config.AiObservationExportClientConfiguration;
+import com.zoop.document.importer.ObservationSource;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.document.service.InMemoryDocumentRegistry;
@@ -331,7 +332,7 @@ class GraphHandoffImportConfigurationTest {
                     assertNull(context.getStartupFailure());
                     assertNotNull(context.getBean(GraphHandoffRunner.class));
                     GraphHandoffImportSettings settings = context.getBean(GraphHandoffImportSettings.class);
-                    assertEquals(GraphHandoffImportSettings.ObservationSourceKind.HTTP, settings.observationSource());
+                    assertEquals(ObservationSource.HTTP, settings.observationSource());
                     assertEquals(GraphHandoffImportSettings.HandoffSourceKind.CLI, settings.handoffSource());
                     assertNull(settings.ingestionCli());
                     assertEquals(base.resolve("ingestion"), settings.ingestionState(), "the handoff CLI still reads the ledger");
@@ -368,7 +369,7 @@ class GraphHandoffImportConfigurationTest {
     }
 
     @Test
-    void theObservationSourceAndTheExportClientAreExclusiveInBothDirectionsAndAnUnknownValueFailsClosed() {
+    void theHttpObservationSourceNeedsTheExportClientWhileCliIgnoresOneAndAnUnknownValueFailsClosed() {
         Map<String, String> httpWithoutClient = observationHttp(valid);
         httpWithoutClient.put("ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED", "false");
         runner().withPropertyValues(array(httpWithoutClient)).run(context -> {
@@ -380,12 +381,13 @@ class GraphHandoffImportConfigurationTest {
         Map<String, String> cliWithClient = observationHttp(valid);
         cliWithClient.put("ZOOP_GRAPH_HANDOFF_IMPORT_OBSERVATION_SOURCE", "cli");
         cliWithClient.put("ZOOP_INGESTION_CLI", valid.get("ZOOP_INGESTION_CLI"));
+        // The web application sharing this environment may hold the export client: cli does not refuse it.
         runner().withUserConfiguration(AiObservationExportClientConfiguration.class).withPropertyValues(array(cliWithClient))
                 .run(context -> {
-                    Throwable failure = configurationFailure(context.getStartupFailure());
-                    assertNotNull(failure);
-                    assertTrue(failure.getMessage().startsWith("zoop.graph-handoff-import.observation-source "), failure.getMessage());
-                    assertTrue(failure.getMessage().contains("zoop.ai.observation-export-client.enabled"), failure.getMessage());
+                    assertNull(context.getStartupFailure());
+                    assertNotNull(context.getBean(GraphHandoffRunner.class));
+                    assertEquals(ObservationSource.CLI,
+                            context.getBean(GraphHandoffImportSettings.class).observationSource());
                 });
         Map<String, String> httpWithCli = observationHttp(valid);
         httpWithCli.put("ZOOP_INGESTION_CLI", valid.get("ZOOP_INGESTION_CLI"));

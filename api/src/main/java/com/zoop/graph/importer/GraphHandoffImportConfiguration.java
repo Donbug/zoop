@@ -6,7 +6,7 @@ import com.zoop.ai.handoff.HandoffReadClient;
 import com.zoop.ai.observation.ObservationExportClient;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.artifact.storage.ArtifactStoreException;
-import com.zoop.document.importer.HttpIngestionExporter;
+import com.zoop.document.importer.IngestionExporters;
 import com.zoop.document.importer.IngestionExportParser;
 import com.zoop.document.importer.IngestionExporter;
 import com.zoop.document.importer.ProcessIngestionExporter;
@@ -81,25 +81,17 @@ public class GraphHandoffImportConfiguration {
     }
 
     /**
-     * The installed S2-1 CLI, or the observation export client that {@code zoop.ai.observation-export-client} registers. The
-     * two are exclusive in both directions: {@code http} needs the client, and {@code cli} must not have one (an
-     * {@code observation.read} token nobody uses would only suggest an authority this run does not have).
+     * The installed S2-1 CLI, or the observation export client that {@code zoop.ai.observation-export-client} registers.
+     * {@code http} needs the client; {@code cli} ignores one that is enabled, for the same reason as {@link #handoffSource}: the
+     * web application sharing this environment may hold one (its round bridge binds it in a follow-up). See
+     * {@link IngestionExporters}.
      */
     static IngestionExporter ingestionExporter(GraphHandoffImportSettings settings,
             ObjectProvider<ObservationExportClient> observationExports) {
-        ObservationExportClient client = observationExports.getIfAvailable();
-        if (settings.observationSource() == GraphHandoffImportSettings.ObservationSourceKind.HTTP) {
-            if (client == null) {
-                throw new GraphHandoffImportConfigurationException("observation-source",
-                        "http requires zoop.ai.observation-export-client.enabled=true");
-            }
-            return new HttpIngestionExporter(client);
-        }
-        if (client != null) {
-            throw new GraphHandoffImportConfigurationException("observation-source",
-                    "cli must not be combined with zoop.ai.observation-export-client.enabled=true");
-        }
-        return ProcessIngestionExporter.forPaths(settings.ingestionCli(), settings.ingestionState(), settings.ingestionSources());
+        return IngestionExporters.forSource(settings.observationSource(),
+                () -> ProcessIngestionExporter.forPaths(settings.ingestionCli(), settings.ingestionState(), settings.ingestionSources()),
+                observationExports, () -> new GraphHandoffImportConfigurationException("observation-source",
+                        "http requires zoop.ai.observation-export-client.enabled=true"));
     }
 
     /**

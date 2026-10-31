@@ -5,6 +5,8 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+
+import com.zoop.document.importer.ObservationSource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -49,7 +51,7 @@ import java.util.Locale;
  * @param bindings        the server-owned app document bindings file the handoff was frozen with (CLI source only)
  * @param artifactRoot    root of the local artifact file store
  */
-public record GraphHandoffImportSettings(HandoffSourceKind handoffSource, ObservationSourceKind observationSource, Path request,
+public record GraphHandoffImportSettings(HandoffSourceKind handoffSource, ObservationSource observationSource, Path request,
         Path result, Path handoffCli, Path handoffState, Path relationState, Path extractionState, Path ingestionCli,
         Path ingestionState, Path ingestionSources, Path canonical, Path decisions, Path bindings, Path artifactRoot) {
 
@@ -69,35 +71,20 @@ public record GraphHandoffImportSettings(HandoffSourceKind handoffSource, Observ
         }
     }
 
-    /** {@code cli}: the installed {@code zoop-ai-ingest export --require-store}; {@code http}: ai/service {@code exportObservation}. */
-    public enum ObservationSourceKind {
-        CLI, HTTP;
-
-        static ObservationSourceKind parse(String value) {
-            if (value == null || value.isBlank()) {
-                return CLI;
-            }
-            return switch (value.strip().toLowerCase(Locale.ROOT)) {
-                case "cli" -> CLI;
-                case "http" -> HTTP;
-                default -> throw new GraphHandoffImportConfigurationException("observation-source", "must be cli or http");
-            };
-        }
-    }
-
     /** The CLI source with every path set, as before the HTTP source existed. */
     public GraphHandoffImportSettings(Path request, Path result, Path handoffCli, Path handoffState, Path relationState,
             Path extractionState, Path ingestionCli, Path ingestionState, Path ingestionSources, Path canonical, Path decisions,
             Path bindings, Path artifactRoot) {
-        this(HandoffSourceKind.CLI, ObservationSourceKind.CLI, request, result, handoffCli, handoffState, relationState,
+        this(HandoffSourceKind.CLI, ObservationSource.CLI, request, result, handoffCli, handoffState, relationState,
                 extractionState, ingestionCli, ingestionState, ingestionSources, canonical, decisions, bindings, artifactRoot);
     }
 
     public static GraphHandoffImportSettings of(GraphHandoffImportProperties p) {
         HandoffSourceKind source = HandoffSourceKind.parse(p.handoffSource());
-        ObservationSourceKind observation = ObservationSourceKind.parse(p.observationSource());
+        ObservationSource observation = ObservationSource.parse(p.observationSource())
+                .orElseThrow(() -> new GraphHandoffImportConfigurationException("observation-source", "must be cli or http"));
         boolean cli = source == HandoffSourceKind.CLI;
-        boolean observationCli = observation == ObservationSourceKind.CLI;
+        boolean observationCli = observation == ObservationSource.CLI;
         boolean anyCli = cli || observationCli;
         Path request = absolute("request", p.request());
         Path result = absolute("result", p.result());

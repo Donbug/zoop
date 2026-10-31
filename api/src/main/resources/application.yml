@@ -193,7 +193,7 @@ zoop:
     observation-export-client:
       # Observation export route (scope observation.read): POST /internal/v1/observations/export runs the installed
       # zoop-ai-ingest export --require-store on the AI side for ONE observation and answers the CLI's JSON (document.text
-      # included). Used only by the graph handoff import with observation-source=http. The AI child runs at most 45 s and the
+      # included). Used by the graph handoff import and the document import with observation-source=http. The AI child runs at most 45 s and the
       # answer is at most 16 MiB, so the request deadline stays above 45 s. One request = one observation; no batch, no job.
       enabled: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED:false}
       base-url: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL:}
@@ -219,6 +219,11 @@ zoop:
     enabled: ${ZOOP_DOCUMENT_IMPORT_ENABLED:false}
     request: ${ZOOP_DOCUMENT_IMPORT_REQUEST:}
     result: ${ZOOP_DOCUMENT_IMPORT_RESULT:}
+    # observation-source: cli (default; the installed zoop-ai-ingest export --require-store, which needs the three
+    # ZOOP_INGESTION_* settings) or http (ai/service POST /internal/v1/observations/export through
+    # zoop.ai.observation-export-client, which must then be enabled; the three ZOOP_INGESTION_* settings must be left unset).
+    # cli ignores an enabled export client (the web application sharing this environment may hold one).
+    observation-source: ${ZOOP_DOCUMENT_IMPORT_OBSERVATION_SOURCE:cli}
     ingestion-cli: ${ZOOP_INGESTION_CLI:}
     ingestion-state-dir: ${ZOOP_INGESTION_STATE_DIR:}
     ingestion-sources: ${ZOOP_INGESTION_SOURCES:}
@@ -264,7 +269,8 @@ zoop:
     # observation-source: cli (default; the installed zoop-ai-ingest export --require-store, which needs ingestion-cli) or http
     # (ai/service POST /internal/v1/observations/export through zoop.ai.observation-export-client, which must then be enabled;
     # ingestion-cli must be left unset). ingestion-state-dir and ingestion-sources are read by whichever CLI still runs here and
-    # must be left unset when both sources are http. For the export client the exclusivity rule applies: cli refuses an idle one.
+    # must be left unset when both sources are http. As for the read client, cli ignores an enabled export client (the web
+    # application sharing this environment may hold one).
     enabled: ${ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED:false}
     handoff-source: ${ZOOP_GRAPH_HANDOFF_IMPORT_HANDOFF_SOURCE:cli}
     observation-source: ${ZOOP_GRAPH_HANDOFF_IMPORT_OBSERVATION_SOURCE:cli}
