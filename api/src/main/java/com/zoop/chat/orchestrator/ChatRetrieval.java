@@ -32,8 +32,10 @@ import java.util.Set;
  * <ul>
  * <li>A call that timed out or found its data unavailable leaves the requirements it served unanswered
  * ({@code tool_unavailable}), and the requirements that depend on them too; the others go on ({@code faulted} keeps the
- * first such call, so the engine can still fail the job when nothing is answered). An adapter fault is a bug, not a
- * passing fault: it ends retrieval at once, with no checkpoint evaluated and no later stage run.</li>
+ * first such call, so the engine can still fail the job when nothing is answered). A requirement whose other reads did
+ * return items goes on with those ({@code partial}), unless another requirement depends on it: a stage is never planned on
+ * part of what its source would have found. An adapter fault is a bug, not a passing fault: it ends retrieval at once, with
+ * no checkpoint evaluated and no later stage run.</li>
  * <li>Checkpoint over the companies the source found: more than the condition allows (or more than a stage can fan out to)
  * stops with a clarification built from what was actually found; fewer makes the dependent requirement
  * {@code precondition_unmet}; none at all, when the source was not cut by a limit, lets the source answer that nothing was
@@ -51,14 +53,15 @@ final class ChatRetrieval {
      * What retrieval produced: results per requirement, the limitations it decided, or a stop or failed call. {@code cut}
      * holds the requirements that read on only part of the member's companies (Q07: more than a stage fans out to).
      * {@code outside} holds the Q07 requirements that name a company that is not the member's, by how it was named.
-     * {@code faulted} is the first call that left a requirement {@link #TOOL_UNAVAILABLE}, null when none did.
+     * {@code faulted} is the first call that faulted, null when none did. {@code partial} holds the requirements going on
+     * with only some of their reads.
      */
     record Outcome(Map<String, List<ChatToolResult>> results, Map<String, String> limitations, Set<String> noneFound,
             ChatPlan.Stop stop, ChatToolResult failed, Set<String> cut, Map<String, Outside> outside,
-            ChatToolResult faulted) {
+            ChatToolResult faulted, Set<String> partial) {
         Outcome(Map<String, List<ChatToolResult>> results, Map<String, String> limitations, Set<String> noneFound,
                 ChatPlan.Stop stop, ChatToolResult failed) {
-            this(results, limitations, noneFound, stop, failed, Set.of(), Map.of(), null);
+            this(results, limitations, noneFound, stop, failed, Set.of(), Map.of(), null, Set.of());
         }
     }
 
@@ -80,6 +83,7 @@ final class ChatRetrieval {
         Set<String> noneFound = new LinkedHashSet<>();
         Set<String> cut = new LinkedHashSet<>();
         Map<String, Outside> outside = new LinkedHashMap<>();
+        Set<String> partial = new LinkedHashSet<>();
         Map<String, Planned> byId = new HashMap<>();
         plan.requirements().forEach(p -> byId.put(p.id(), p));
         ChatToolResult faulted = null;
@@ -180,9 +184,14 @@ final class ChatRetrieval {
                     results.put(entry.getKey(), mine);
                     continue;
                 }
-                // Part of a requirement's reads is not its answer: the whole requirement is left unanswered.
-                limitations.put(entry.getKey(), TOOL_UNAVAILABLE);
                 if (faulted == null) faulted = fault.get();
+                List<ChatToolResult> read = mine.stream().filter(ChatToolResult::succeeded).toList();
+                if (read.stream().anyMatch(r -> !r.items().isEmpty()) && !source(plan, entry.getKey())) {
+                    results.put(entry.getKey(), read);
+                    partial.add(entry.getKey());
+                    continue;
+                }
+                limitations.put(entry.getKey(), TOOL_UNAVAILABLE);
             }
         }
         for (Planned p : plan.requirements()) {
@@ -192,7 +201,12 @@ final class ChatRetrieval {
                 noneFound.add(p.id());
             }
         }
-        return new Outcome(results, limitations, noneFound, null, null, cut, outside, faulted);
+        return new Outcome(results, limitations, noneFound, null, null, cut, outside, faulted, partial);
+    }
+
+    /** Whether another requirement reads on what this one finds. */
+    private static boolean source(ChatPlan.Run plan, String id) {
+        return plan.requirements().stream().anyMatch(p -> p.dependsOn() != null && id.equals(p.dependsOn().requirementId()));
     }
 
     /** A timeout or unavailable data: a fault of the moment that leaves its requirement unanswered, not a bug. */

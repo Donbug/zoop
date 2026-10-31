@@ -47,7 +47,8 @@ import tools.jackson.databind.json.JsonMapper;
  * exactly what the model received, whichever instance served the call, with the requirements each one was approved for:
  * a section may cite only the results of its own requirements. Results are never synthesized for a denied
  * call. Beside it go the web faults the answer went on without: an approved search that left no result
- * ({@code web_unavailable}), one that found nothing ({@code web_no_results}), a spent budget.</li>
+ * ({@code web_unavailable}), one that found nothing ({@code web_no_results}), a spent budget; and the requirements an approved
+ * internal call left without its result.</li>
  * </ul>
  */
 public final class ChatMcpAgent implements ChatAgentPath {
@@ -116,6 +117,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
         requirements.stream().filter(ChatModels.AgentRequirement::web).forEach(r -> searchable.add(r.id()));
         // The concepts that had their search: a search binds to the requirements it names, so it spends only theirs.
         Set<String> searched = new LinkedHashSet<>();
+        Set<String> searches = new LinkedHashSet<>();
         for (int step = 1, rounds = 0; ; step++) {
             var input = new ChatModels.AgentInput(requirements, token, names, recipient, maxCitations, previous,
                     decisions);
@@ -131,7 +133,8 @@ public final class ChatMcpAgent implements ChatAgentPath {
             if (outcome.completed()) {
                 List<ChatToolResult> results = kept(run);
                 return new Outcome(outcome.answer(), results, served, step, approved, denied,
-                        webNotices(results, webApproved, notices, withheldWeb(run)));
+                        webNotices(results, webApproved, notices, withheldWeb(run)),
+                        faulted(served, searches, results, concepts));
             }
             if (rounds > MAX_ROUNDS) {
                 throw new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, "the agent kept asking after its last round");
@@ -173,6 +176,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
                     if (approve) served.put(approval.toolCallId(), serves);
                     if (approve && search) {
                         webApproved++;
+                        searches.add(approval.toolCallId());
                         searched.addAll(serves);
                         searched.retainAll(concepts);
                         webOpen.removeAll(searched);
@@ -214,6 +218,19 @@ public final class ChatMcpAgent implements ChatAgentPath {
         open.removeAll(searched);
         open.retainAll(searchable);
         return open;
+    }
+
+    /** The requirements of the approved internal calls that left no result: failed, timed out or never came back. */
+    static Set<String> faulted(Map<String, List<String>> served, Set<String> searches, List<ChatToolResult> results,
+            Set<String> concepts) {
+        Set<String> ran = new LinkedHashSet<>();
+        results.forEach(r -> ran.add(r.toolCallId()));
+        Set<String> faulted = new LinkedHashSet<>();
+        served.forEach((call, requirements) -> {
+            if (!searches.contains(call) && !ran.contains(call)) faulted.addAll(requirements);
+        });
+        faulted.removeAll(concepts);
+        return faulted;
     }
 
     /** The web faults of a finished run, in a fixed order. */

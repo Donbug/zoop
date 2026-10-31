@@ -897,6 +897,31 @@ class ChatMcpAgentTest {
         }
     }
 
+    private static final String UNREADABLE = "KRX:000001";
+
+    @org.junit.jupiter.api.Test
+    void anApprovedReadThatFailedFaultsTheRequirementsItServedAndNoOthers() {
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(serving("a", UNREADABLE, "r1"),
+                serving("b", "KRX:000660", "r2")), null));
+        luna.script.add(n -> done());
+
+        var outcome = runFor(new ChatModels.AgentRequirement("r1", "상장 준비 기업", false, List.of(UNREADABLE), true),
+                new ChatModels.AgentRequirement("r2", "SK하이닉스", false, List.of("KRX:000660"), true));
+
+        assertEquals(2, outcome.approved());
+        assertEquals(java.util.Set.of("r1"), outcome.faulted());
+        assertTrue(outcome.resultsOf("r1").isEmpty());
+        assertEquals(1, outcome.resultsOf("r2").size());
+    }
+
+    @org.junit.jupiter.api.Test
+    void aFailedSearchIsAWebFaultNoRequirementsFault() {
+        assertEquals(java.util.Set.of(), ChatMcpAgent.faulted(Map.of("w", List.of("r1")), java.util.Set.of("w"), List.of(),
+                java.util.Set.of()));
+        assertEquals(java.util.Set.of("r2"), ChatMcpAgent.faulted(Map.of("c", List.of("r1", "r2")), java.util.Set.of(), List.of(),
+                java.util.Set.of("r1")), "a concept named beside a fact never rested on the read");
+    }
+
     private static ChatTool tool(ChatCapability capability) {
         return new ChatTool() {
             @Override
@@ -912,6 +937,7 @@ class ChatMcpAgentTest {
                                     List.of("KRX:000660"), List.of("ev-1"))), List.of("ev-1"), false, false);
                 }
                 String id = request.targets().getFirst();
+                if (UNREADABLE.equals(id)) throw new com.zoop.chat.tool.ChatToolUnavailable("snapshot");
                 // Each company relates to Samsung Electronics, which a later round may then read.
                 return new ChatToolOutput(scope.graphVersionId(),
                         List.of(new ChatToolItem(id, "company", "SK하이닉스", List.of(id, "KRX:005930"), List.of("ev-1"))),

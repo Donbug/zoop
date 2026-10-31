@@ -82,6 +82,7 @@ class ChatAgentPathEngineTest {
         ChatModels.Failure failure;
         /** The requirements each call served, by call id; null when every call served every requirement. */
         Map<String, List<String>> served;
+        Set<String> faulted = Set.of();
 
         Agent(Set<ChatCapability> exposed) {
             this.exposed = exposed;
@@ -113,7 +114,7 @@ class ChatAgentPathEngineTest {
                     calls.put(result.toolCallId(), given.stream().map(ChatModels.AgentRequirement::id).toList());
                 }
             }
-            return new Outcome(answer, results, calls, 1, 1, 0, notices);
+            return new Outcome(answer, results, calls, 1, 1, 0, notices, faulted);
         }
     }
 
@@ -224,6 +225,31 @@ class ChatAgentPathEngineTest {
 
         assertTrue(agent.allowed.getFirst().contains(ChatCapability.WEB_SEARCH));
         assertEquals(List.of(false, true), agent.requirements.getFirst().stream().map(ChatModels.AgentRequirement::web).toList());
+    }
+
+    @Test
+    void aFaultedCallOfAnAnsweredRequirementIsANoticeAndOfAnUnansweredOneALimitation() {
+        decision = ChatPlannerTest.decision(
+                req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ));
+        agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of("r2"),
+                List.of());
+        agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
+
+        agent.faulted = Set.of("r1");
+        ChatResult answered = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertEquals(List.of("tool_unavailable"), answered.notices().stream().map(n -> n.code()).toList());
+        assertEquals(List.of("요구 r1"), answered.notices().getFirst().labels());
+        assertEquals(List.of("evidence_insufficient"), answered.limitations().stream().map(l -> l.kind()).toList());
+
+        agent.faulted = Set.of("r2");
+        ChatResult limited = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertTrue(limited.notices().isEmpty());
+        assertEquals(List.of("tool_unavailable"), limited.limitations().stream().map(l -> l.kind()).toList());
+        assertEquals("partial", limited.answerStatus());
     }
 
     private static final String HIT = "web-" + "a".repeat(32);
