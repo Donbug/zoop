@@ -16,6 +16,30 @@
     "KRX:000660": "메모리 반도체(DRAM·HBM·NAND)를 만든다.",
     "KRX:005930": "메모리·시스템 반도체와 휴대전화를 만든다."
   },
+  "briefings": [
+    {
+      "id": "br-eval-morning", "date": "2026-10-21", "edition": "morning", "status": "published",
+      "publishedAt": "2026-10-20T23:20:00Z",
+      "items": [
+        {
+          "eventId": "iss-fixture-hbm-supply", "rank": 1, "title": "[합성] 차세대 GPU용 HBM 공급 계약", "reason": "관심 기업 두 곳이 함께 연결",
+          "companies": [{"id": "KRX:000660", "name": "SK하이닉스"}, {"id": "NASDAQ:NVDA", "name": "NVIDIA"}],
+          "evidenceIds": ["ev-912843a071ee90c12ee7e909c65f06ce748d2a35c7c29c6c871faac130e4f395", "ev-bb3008cb36e9b51c0d2fd77af059259332b1887cc04862e185a496c3dcc9e421"]
+        }
+      ]
+    }
+  ],
+  "documents": {
+    "KRX:000660": [
+      {"id": "art-eval-hbm", "title": "[합성] 차세대 GPU용 HBM 공급 계약", "evidenceIds": ["ev-912843a071ee90c12ee7e909c65f06ce748d2a35c7c29c6c871faac130e4f395"]}
+    ]
+  },
+  "publications": {
+    "iss-fixture-hbm-supply": {
+      "reviewRevision": 12, "ruleRevision": 3, "decision": "allow", "decisionPath": "admin_review", "decidedAt": "2026-10-07T05:00:00Z",
+      "rules": [{"ruleId": "single-source@1", "title": "출처가 기사 1개뿐인 관계 숨기기", "summary": "근거 기사 2개 미만인 관계를 숨깁니다."}]
+    }
+  },
   "cases": [
     {
       "id": "q01-policy-retention",
@@ -144,12 +168,31 @@
       "expect": {
         "targets": {"r1": ["KRX:035720"]},
         "stages": ["router", "answer"],
-        "tools": ["company.read"],
+        "tools": ["company.read", "document.search"],
         "outcome": "insufficient_evidence",
         "reason": "nothing_found",
         "appliedCompanies": []
       },
-      "gap": "카탈로그에는 있지만 공개 그래프에 없는 기업. 실제 데이터에서 이런 기업의 비율이 근거 부족의 주원인인지 잰다(document.search 미연결)."
+      "gap": "카탈로그에는 있지만 공개 그래프에 없는 기업. 문서 읽기도 공개 그래프의 사건에 연결된 문서만 보므로 이 기업에는 결과가 없다. 실제 데이터에서 이런 기업의 비율이 근거 부족의 주원인인지 잰다."
+    },
+    {
+      "id": "q03-company-documents",
+      "group": "Q03",
+      "question": "SK하이닉스 최근 소식 알려줘",
+      "script": {
+        "router": {"r1": {"types": {"Q03": 0.9}, "capabilities": {"document.search": 0.9}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 차세대 GPU용 HBM 공급 계약 보도가 있습니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}]}
+      },
+      "expect": {
+        "targets": {"r1": ["KRX:000660"]},
+        "stages": ["router", "answer", "verify"],
+        "tools": ["company.read", "document.search"],
+        "outcome": "answered",
+        "answerBasis": "evidence_grounded",
+        "citationKinds": ["article", "company_profile"],
+        "limitations": [],
+        "appliedCompanies": ["KRX:000660"]
+      }
     },
     {
       "id": "q03-issue-named",
@@ -306,10 +349,49 @@
       "group": "Q06",
       "question": "오늘 출근 브리핑 요약해줘",
       "script": {
-        "router": {"r1": {"types": {"Q06": 0.93}, "capabilities": {"briefing.read": 0.9}}}
+        "router": {"r1": {"types": {"Q06": 0.93}, "capabilities": {"briefing.read": 0.9}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "오늘 출근 브리핑 1위는 차세대 GPU용 HBM 공급 계약입니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch:1"]}]}
       },
-      "expect": {"stages": ["router"], "tools": [], "outcome": "guidance", "reason": "out_of_scope"},
-      "gap": "Q06 도구(briefing.read) 미구현."
+      "expect": {
+        "stages": ["router", "answer", "verify"],
+        "tools": ["briefing.read"],
+        "outcome": "answered",
+        "answerBasis": "evidence_grounded",
+        "citationKinds": ["article"],
+        "limitations": []
+      }
+    },
+    {
+      "id": "q06-briefing-evidence",
+      "group": "Q06",
+      "question": "오늘 출근 브리핑 근거 보여줘",
+      "script": {
+        "router": {"r1": {"types": {"Q06": 0.93}, "capabilities": {"briefing.evidence": 0.9}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "오늘 출근 브리핑 1위 사건의 근거는 차세대 GPU용 HBM 공급 계약 보도입니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch:1"]}]}
+      },
+      "expect": {
+        "stages": ["router", "answer", "verify"],
+        "tools": ["briefing.evidence"],
+        "outcome": "answered",
+        "answerBasis": "evidence_grounded",
+        "citationKinds": ["article"],
+        "limitations": []
+      }
+    },
+    {
+      "id": "q06-round-not-published",
+      "group": "Q06",
+      "question": "어제 퇴근 브리핑 요약해줘",
+      "script": {
+        "router": {"r1": {"types": {"Q06": 0.93}, "capabilities": {"briefing.read": 0.9}}},
+        "answer": {"sections": [], "insufficientRequirementIds": ["r1"]}
+      },
+      "expect": {
+        "stages": ["router", "answer"],
+        "tools": ["briefing.read"],
+        "outcome": "insufficient_evidence",
+        "reason": "nothing_found"
+      }
     },
     {
       "id": "q07-my-stocks-issues",
@@ -347,6 +429,38 @@
         "planned": ["r1:tools"],
         "outcome": "answered",
         "citationKinds": []
+      }
+    },
+    {
+      "id": "q07-dependent-company-details",
+      "group": "Q07",
+      "question": "내 종목을 찾아줘? 정확히 두 곳이면 그 회사들을 설명해줘",
+      "memberScope": [
+        {"id": "KRX:000660", "name": "SK하이닉스", "held": true},
+        {"id": "KRX:005930", "name": "삼성전자", "watched": true}
+      ],
+      "script": {
+        "router": {
+          "r1": {"types": {"Q07": 0.9}, "capabilities": {}},
+          "r2": {
+            "types": {"Q03": 0.9},
+            "capabilities": {"company.read": 0.9},
+            "dependsOn": {"requirementId": "r1", "cardinality": "exactly", "count": 2}
+          }
+        },
+        "answer": {"sections": [
+          {"basis": "evidence_grounded", "text": "내 종목은 SK하이닉스와 삼성전자입니다.", "requirementIds": ["r1"], "evidenceIds": []},
+          {"basis": "evidence_grounded", "text": "두 회사는 메모리 반도체를 만듭니다.", "requirementIds": ["r2"], "evidenceIds": ["$branch"]}
+        ]}
+      },
+      "expect": {
+        "requirements": ["내 종목을 찾아줘", "정확히 두 곳이면 그 회사들을 설명해줘"],
+        "stages": ["router", "answer", "verify"],
+        "tools": ["company.read", "portfolio.scope.read"],
+        "planned": ["r1:tools", "r2:tools"],
+        "outcome": "answered",
+        "appliedCompanies": ["KRX:000660", "KRX:005930"],
+        "limitations": []
       }
     },
     {
@@ -464,10 +578,33 @@
       "question": "이 사건은 왜 지도에 올라왔어?",
       "selection": {"contextIds": ["iss-fixture-hbm-supply"]},
       "script": {
-        "router": {"r1": {"types": {"Q08": 0.9}, "capabilities": {"selectionRule.read": 0.9}}}
+        "router": {"r1": {"types": {"Q08": 0.9}, "capabilities": {"selectionRule.read": 0.9}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "이 사건은 관리자 검수에서 공개 승인됐습니다.", "requirementIds": ["r1"], "evidenceIds": []}]}
       },
-      "expect": {"stages": ["router"], "tools": [], "outcome": "guidance", "reason": "out_of_scope"},
-      "gap": "Q08 도구(selectionRule.read) 미구현."
+      "expect": {
+        "stages": ["router", "answer", "verify"],
+        "tools": ["selectionRule.read"],
+        "outcome": "answered",
+        "citationKinds": [],
+        "limitations": []
+      }
+    },
+    {
+      "id": "q08-selection-in-briefing",
+      "group": "Q08",
+      "question": "이 사건은 오늘 출근 브리핑에 왜 올라왔어?",
+      "selection": {"contextIds": ["iss-fixture-hbm-supply"]},
+      "script": {
+        "router": {"r1": {"types": {"Q08": 0.9}, "capabilities": {"selectionRule.read": 0.9}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "오늘 출근 브리핑에서 관심 기업 두 곳이 함께 연결돼 1위로 선정됐습니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch:1"]}]}
+      },
+      "expect": {
+        "stages": ["router", "answer", "verify"],
+        "tools": ["selectionRule.read"],
+        "outcome": "answered",
+        "citationKinds": ["article"],
+        "limitations": []
+      }
     },
     {
       "id": "compound-concept-and-fact",
@@ -528,18 +665,39 @@
     {
       "id": "compound-two-parts-one-unsupported",
       "group": "compound",
-      "question": "SK하이닉스는 어떤 회사야? 오늘 브리핑도 보여줘",
+      "question": "SK하이닉스는 어떤 회사야? 지도 노드 색도 알려줘",
+      "script": {
+        "router": {
+          "r1": {"types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}},
+          "r2": {"types": {"Q01": 0.9}, "capabilities": {"help.search": 0.9, "screenSpec.read": 0.8}}
+        },
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 메모리 반도체를 만듭니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch:1"]}]}
+      },
+      "expect": {
+        "requirements": ["SK하이닉스는 어떤 회사야", "지도 노드 색도 알려줘"],
+        "outcome": "answered",
+        "limitations": [{"kind": "out_of_scope", "label": "지도 노드 색도 알려줘"}]
+      }
+    },
+    {
+      "id": "compound-company-and-briefing",
+      "group": "compound",
+      "question": "SK하이닉스는 어떤 회사야? 오늘 출근 브리핑도 보여줘",
       "script": {
         "router": {
           "r1": {"types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}},
           "r2": {"types": {"Q06": 0.9}, "capabilities": {"briefing.read": 0.9}}
         },
-        "answer": {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 메모리 반도체를 만듭니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch:1"]}]}
+        "answer": {"sections": [
+          {"basis": "evidence_grounded", "text": "SK하이닉스는 메모리 반도체를 만듭니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch:1"]},
+          {"basis": "evidence_grounded", "text": "오늘 출근 브리핑 1위는 차세대 GPU용 HBM 공급 계약입니다.", "requirementIds": ["r2"], "evidenceIds": ["$branch:1"]}
+        ]}
       },
       "expect": {
-        "requirements": ["SK하이닉스는 어떤 회사야", "오늘 브리핑도 보여줘"],
+        "requirements": ["SK하이닉스는 어떤 회사야", "오늘 출근 브리핑도 보여줘"],
+        "tools": ["briefing.read", "company.read"],
         "outcome": "answered",
-        "limitations": [{"kind": "out_of_scope", "label": "오늘 브리핑도 보여줘"}]
+        "limitations": []
       }
     },
     {

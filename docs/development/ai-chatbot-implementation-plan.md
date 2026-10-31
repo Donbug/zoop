@@ -50,10 +50,10 @@
 | 루트 웹 | `web/src/apis/chat`, `use-chat-conversation`, `AiChatDrawer`·`ChatJobCard`가 대화 생성·복원, 질문 접수·polling·취소·재시도와 답변·인용·확인 질문·실패 렌더링을 구현함(Vitest) | 구현됨. 타입은 손으로 쓴 `web/src/types/ai`이고 실제 백엔드·모델 종단 시험은 없음 |
 | AI worker | `zoop-ai-chat`이 `chat-router`(Jev), `chat-answer`(Luna), `chat-agent`(Luna Responses MCP), `chat-verification`(Jev)을 별도 계약·원장·grant·live gate로 실행함 | 구현됨, 기본 비활성. 임계값 보정과 실제 승인 호출은 별도 |
 | AI 내부 서비스 | `/internal/v1/chat-stages/{stage}`가 인증된 synchronous stage door로 구현되고 생성 OpenAPI에 포함됨 | 구현됨. 앱은 `HttpChatStageClient`로만 호출 |
-| 데이터 기반 | 기업·문서·evidence·공개 그래프 버전과 현재 권리 재검사 경로가 있고 `company.read`·`issue.read`·`evidence.resolve`·`graph.path.read`·`graph.version.diff`·`portfolio.scope.read`·`briefing.read`·`selectionRule.read`·`zoopPolicy.read`와 합성 공급자 `web.search`가 연결됨(`company.read`는 기업 카탈로그 개요를 `company_profile` 인용으로, `zoopPolicy.read`는 승인 약관을 `zoop_doc` 인용으로 전달) | Q01은 정책 문서만, Q02~Q08 도구 구현. Q01 도움말·화면 명세, `document.search`, `briefing.evidence`, 실제 웹 공급자와 종단 공개 시험은 추가 필요 |
+| 데이터 기반 | 기업·문서·evidence·공개 그래프 버전과 현재 권리 재검사 경로가 있고 `company.read`·`issue.read`·`evidence.resolve`·`graph.path.read`·`graph.version.diff`·`portfolio.scope.read`·`briefing.read`·`briefing.evidence`·`selectionRule.read`·`zoopPolicy.read`·`document.search`와 합성 공급자 `web.search`가 연결됨(`company.read`는 기업 카탈로그 개요를 `company_profile` 인용으로, `zoopPolicy.read`는 승인 약관을 `zoop_doc` 인용으로 전달) | Q01은 정책 문서만, Q02~Q08 도구 구현. Q01 도움말·화면 명세, 실제 웹 공급자와 종단 공개 시험은 추가 필요 |
 | 와이어프레임 | 네 정적 화면은 질문·되묻기·회수·조회 오류의 시각 기준을 제공하지만 동작 상태를 증명하지 않음 | 별도 상태 계약으로 로딩·오류·근거 수준·복구를 고정함 |
 
-결론적으로 백엔드의 저장·공개 API·작업 실행기·라우터·오케스트레이터·도구 레지스트리·Luna 생성·Jev 검증과 웹 D-AI-01~02b 연결은 구현돼 있다. Luna Responses MCP agent 경로도 기본 꺼진 상태로 구현돼 있다. 다만 서버 requirement coverage, claim 단위 `unsupportedCausality`, `uiActions[]`, 미연결 도구, live spike, 평가 보정과 출시 증명은 남아 있다. 기능 플래그와 live gate는 기본적으로 꺼져 있으므로 “코드가 있음”은 “출시됨”이나 “실제 모델 호출 승인됨”을 뜻하지 않는다.
+결론적으로 백엔드의 저장·공개 API·작업 실행기·라우터·오케스트레이터·도구 레지스트리·Luna 생성·Jev 검증과 웹 D-AI-01~02b 연결은 구현돼 있다. Luna Responses MCP agent 경로도 기본 꺼진 상태로 구현돼 있다. 다만 claim 단위 `unsupportedCausality`, 관계·근거·내 종목 `uiActions[]`, 미연결 도구, live spike, 평가 보정과 출시 증명은 남아 있다. 기능 플래그와 live gate는 기본적으로 꺼져 있으므로 “코드가 있음”은 “출시됨”이나 “실제 모델 호출 승인됨”을 뜻하지 않는다.
 
 ### 구현된 도구 결정 기록 (현재 코드 기준)
 
@@ -99,11 +99,11 @@ flowchart LR
 | --- | --- | --- |
 | 0 계약·fixture | 부분 구현 | 목표 내부 schema 전체와 고정 평가 fixture 정리 |
 | 1 저장·job 수명주기 | 구현 | 복구본을 DB에 두므로 DB 장애 자체는 복구 대상이 아님 |
-| 2 오케스트레이터 | 부분 구현 | 서버 requirement coverage, direct 경로 45초(단계 한도 실측 후) |
-| 3 router·Luna agent | 부분 구현 | Jev router·Luna Responses MCP·Java 승인 루프는 구현(합성 replay로만 확인). live 확인, 라우터 wire `dependsOn`, 승인 요청의 요구 매핑 |
-| 4 읽기 도구 | 부분 구현 | Q03 일부, Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 공급자) 구현, Q01 도움말·화면 명세, `document.search`, `briefing.evidence` 미연결, 실제 웹 공급자 미정 |
+| 2 오케스트레이터 | 부분 구현 | direct 경로 45초(단계 한도 실측 후). 서버 requirement coverage는 구현(2026-10-31, `route_summary.coverage`) |
+| 3 router·Luna agent | 부분 구현 | Jev router·Luna Responses MCP·Java 승인 루프는 구현(합성 replay로만 확인). 라우터 wire `dependsOn`도 구현(2026-10-30, `zoop-ai-chat-3`, 확신이 낮거나 요구가 대상을 지목하면 의존 없음). 승인 요청의 요구 매핑도 구현(2026-10-30, `zoop-ai-chat-4`). live 확인 |
+| 4 읽기 도구 | 부분 구현 | Q03(`document.search`는 기업별 문서 읽기, 2026-10-31. 본문 검색 색인은 없음), Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`·`briefing.evidence`, 2026-10-31), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 공급자) 구현, Q01 도움말·화면 명세 미연결, 실제 웹 공급자 미정 |
 | 5 생성·출력 검증 | 부분 구현 | 구간 단위 생성·검증과 입력 24k·답변 2k는 구현, claim 단위 검증 미구현 |
-| 6 웹 | 구현 | `uiActions[]`, OpenAPI 타입 생성 seam, 실제 백엔드와의 종단 확인 |
+| 6 웹 | 구현 | 관계·근거·내 종목 `uiActions[]`, OpenAPI 타입 생성 seam, 실제 백엔드와의 종단 확인 |
 | 7 평가·출시 | 부분 구현 | 고정 평가 세트 v1(대본 실행)만 있음. 실제 모델·데이터 평가와 임계값 보정, 보안·종단·배포 증명 |
 
 ### 단계 0 — 계약 고정과 fixture
@@ -151,7 +151,7 @@ flowchart LR
 
 현재 상태(2026-10-29, Java 쪽): agent 경로를 연결했다(`ZOOP_CHAT_AGENT_ENABLED` 기본 꺼짐, `/mcp`·모델 단계 필요, MCP 서버 URL은 AI 쪽 운영자 설정 `ZOOP_AI_CHAT_MCP_SERVER_URL`). 라우터·계획은 그대로이고, 읽기가 모두 독립 1단계이며 MCP로 노출된 계획만 agent 경로다(Q07 본인 범위·의존 단계·읽기 없는 계획은 direct). Java가 grant를 발급하고 `chat-agent` 단계를 부르며, 요구마다 planner가 해석한 대상 ID를 `targets`로 넘긴다. 승인 요청은 run의 허용 도구이면서 `ChatMcpTools.approve`가 예약에 성공한 것만 승인하고, 승인 라운드는 최대 3회이며 마지막·시간 부족 시 모두 거부해 다음 단계가 답을 쓰게 한다. `/mcp`는 성공 결과 봉투를 `chat_tool_calls.result`(migration `V20261028140000`)에 남기고, 오케스트레이터는 그 결과로 branch를 만들어 기존 결정론 검사·인용·Jev 검증·결과 생성을 그대로 거친다. agent 후보 plan은 첫 Responses 단계 전에 AI service health를 확인하고, 실패·circuit open이면 direct로 시작한다. endpoint별 인스턴스 circuit은 최근 5회 중 연결 실패 3회에 30초 열리고 하나의 half-open probe로 닫으며, 실행 중 `mcp_unreachable`는 다음 run에만 반영하고 같은 run의 direct 대체는 없다. 인증·정책·grant·schema·DB 오류는 연결 통계에서 제외한다. 단계 대기 한도는 `min(35초, 남은 시간 − 검증·서버)`, 10초 미만이면 `deadline_guard`다. `/mcp` 결과는 원장 기록·반환 전에 운영자 챗봇 grant 레지스트리(AI runtime과 같은 파일)로 출처마다 `chat-agent` 목적·agent 수신자의 모델 전송 grant를 확인하고, 허용되지 않은 항목·근거 ID·경로는 통째로 빼고 개수만 `withheld`로 남긴다(판단할 수 없으면 호출 거부). 예산(2026-10-29): job 단위 호출 상한 6회(8/6/2의 내부 몫, 웹 2회는 웹 검색 도구와 함께, rerun 포함), agent 라운드당 승인 4건(job 동시 4), fan-out 5 초과 계획은 direct, agent run 45초(run 기한을 앞당겨 검증·저장까지 강제)·Luna 합산 35초(job 기한 60초는 direct 경로용으로 유지). 같은 attempt의 같은 요청은 한 번만 읽고 재사용(`cachedFrom`, 재사용 시 전송 gate 재검사, 인스턴스 안 single-flight), job당 남긴 결과 1 MiB(기록 시 job 행 잠금). 남은 것: 승인 요청의 요구 매핑, live spike([챗봇 MCP 엔드포인트](../../api/docs/chat-mcp.md) 5절).
 
-현재 상태(2026-10-29, 검증 서버 사실): 단계 계약이 `zoop-ai-chat-2`다(grant registry는 v1 그대로). `chat-verification` 입력은 `requestBinding`(호출 ID·고정 버전·asOf)과 구간별 `sectionId`·`requirementIds`·`serverFacts`를 받는다. Java는 성공한 현재 조회에서만 `portfolio_scope`(Q07)와 `graph_comparison`(Q05), `publication_record`·`briefing_selection`(Q08, 2026-10-30)을 만들고, direct 경로는 읽은 결과에서, agent 경로는 `chat_tool_calls` 장부의 결과를 예약 기록과 대조해 복원한 결과에서 같은 규칙으로 만든다. 사실은 기사 인용이 아니며 회원 ID·계좌·수량·금액을 담지 않고, 검증 단계에서 회원 범위를 다시 조회하지 않는다. 실제 모델의 판정 품질은 확인하지 않았다(합성 replay·로컬 가짜 Jev 수신자만 사용).
+현재 상태(2026-10-29, 검증 서버 사실): 단계 계약이 `zoop-ai-chat-3`다(grant registry는 v1 그대로). `chat-verification` 입력은 `requestBinding`(호출 ID·고정 버전·asOf)과 구간별 `sectionId`·`requirementIds`·`serverFacts`를 받는다. Java는 성공한 현재 조회에서만 `portfolio_scope`(Q07)와 `graph_comparison`(Q05), `publication_record`·`briefing_selection`(Q08, 2026-10-30)을 만들고, direct 경로는 읽은 결과에서, agent 경로는 `chat_tool_calls` 장부의 결과를 예약 기록과 대조해 복원한 결과에서 같은 규칙으로 만든다. 사실은 기사 인용이 아니며 회원 ID·계좌·수량·금액을 담지 않고, 검증 단계에서 회원 범위를 다시 조회하지 않는다. 실제 모델의 판정 품질은 확인하지 않았다(합성 replay·로컬 가짜 Jev 수신자만 사용).
 
 ### 단계 4 — Tool Service, MCP 서버, 웹
 
@@ -191,7 +191,7 @@ Q07의 `portfolio.scope.read`는 Java server-only precondition으로 실행하�
 5. Q01 문서 경로 → Q02 웹 보조 → Q03 사실 → Q04/Q07 → Q05/Q06/Q08 순으로 feature flag를 연다.
 6. 고정 평가와 보안 시험을 통과한 registry/model/prompt/policy 조합만 활성화한다.
 
-현재 상태: 모델·도구 호출 원장과 다수의 단위·PostgreSQL 시험은 있다. 고정 평가 세트 `chat-eval-v1`(45문항: Q01~Q08·복합·투자 판단·공격·확인 질문·장애)은 질문 문장부터 실제 요구 분해·이름 해석·계획·읽기 도구·검사를 거치고 모델 세 단계만 대본으로 바꿔 기본 `test`에서 돈다([고정 평가 세트](ai-chatbot-eval-set.md)). 흐름 회귀만 확인하며, 실제 모델·데이터로 잰 챗봇 한국어 금융 평가 보정과 실제 배포·종단 출시 증명은 없다. live gate와 질문 접수 플래그는 기본 비활성이다.
+현재 상태: 모델·도구 호출 원장과 다수의 단위·PostgreSQL 시험은 있다. 고정 평가 세트 `chat-eval-v1`(46문항: Q01~Q08·복합·투자 판단·공격·확인 질문·장애)은 질문 문장부터 실제 요구 분해·이름 해석·계획·읽기 도구·검사를 거치고 모델 세 단계만 대본으로 바꿔 기본 `test`에서 돈다([고정 평가 세트](ai-chatbot-eval-set.md)). 흐름 회귀만 확인하며, 실제 모델·데이터로 잰 챗봇 한국어 금융 평가 보정과 실제 배포·종단 출시 증명은 없다. live gate와 질문 접수 플래그는 기본 비활성이다.
 
 ## 4. 내부 챗봇 계약에 필요한 최소 스키마
 
@@ -201,7 +201,7 @@ Q07의 `portfolio.scope.read`는 Java server-only precondition으로 실행하�
 | --- | --- |
 | `ChatOrchestrationSubmit` | schemaVersion, jobId, attemptNo, question, frozenContext, requirements, policyVersion, registryVersion, budget, server-issued principal scope reference |
 | `ChatRouteDecision` | requirementId별 Q type·probability·required, capability 후보, model/prompt version, typed validation result |
-| `ChatRequirementCoverage` | 서버가 계산한 requirementId별 answered/limited/clarify/pending, 사용한 toolCallId, 남은 이유 |
+| `ChatRequirementCoverage` | 서버가 계산한 requirementId별 answered/limited/clarify/pending, 사용한 toolCallId, 남은 이유. 구현은 wire가 아니라 `chat_jobs.route_summary.coverage`이고, pending이 남은 답은 `validation_failed`로 끝난다 |
 | `ChatToolAllowance` | allowed capability·MCP tool, schema/policy revision, subject scope, version/asOf, 8/6/2 budget·deadline |
 | `ChatCheckpointResult` | stage, observed count, truncated, decision(continue/clarify/limit/none_found/insufficient), 생성한 choice id |
 | `ChatToolResult` | logicalCallId, transport(mcp/direct/cache), capabilityId, dataVersion, items, evidenceIds, coverageStatus, truncated, cachedFrom, error |
@@ -214,7 +214,7 @@ Q07의 `portfolio.scope.read`는 Java server-only precondition으로 실행하�
 ## 5. 다음 PR 범위
 
 1. latency spike: MCP 서버 단독 시험, 합성 Responses replay, 승인된 소량 live 도구 1·4·8회 측정. 무내용 evidence와 p50/p95·토큰·비용·45초 gate는 [live spike 절차](chat-live-spike.md)와 `scripts/chat_live_spike_report.py`에 고정했다. 운영 HTTPS·grant·Responses 보유 조건·키 회전·사고 대응 결정은 [운영 readiness gate](chat-operations-readiness.md)가 같은 후보 commit의 spike와 결속한다. 실제 호출은 운영 승인 뒤 별도 실행하며, 총 8회 시나리오는 합성 공급자로 실행해 통과하기 전까지 미충족으로 남긴다.
-2. ~~StageLimits 8/6/2·45초, 요청 캐시·single-flight~~ 구현(direct 경로 45초 제외). 서버 requirement coverage는 남음
+2. ~~StageLimits 8/6/2·45초, 요청 캐시·single-flight, 서버 requirement coverage~~ 구현(direct 경로 45초 제외)
 3. ~~Java Tool Service 추출, 원격 MCP endpoint·서비스 인증·크기/rate limit·grant, preflight direct 시작·circuit breaker~~ 구현
 4. ~~ai/service Luna Responses 전환, allowed_tools·Java 승인 continuation·usage/deadline~~ 구현(`chat-agent` 단계, direct의 `chat-answer`는 유지)
 5. ~~answerStatus/notices·부분 결과·재열람 guard의 DTO·migration·OpenAPI·웹 동시 변경~~ 구현(migration 없음)

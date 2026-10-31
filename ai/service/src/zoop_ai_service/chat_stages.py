@@ -6,7 +6,7 @@ file, a fixed minimal environment (the chat group's own), stderr discarded, its 
   * the invocation id is the caller's; the child sees it prefixed with the principal (`<principal>:<id>`), so two principals never share a ledger row.
     The child's result is checked as it came (exactly that prefixed id, the stage, the requested mode in the receipt, the stage's closed answer model
     and the outcome invariants) and only then answered with the caller's id; any mismatch is `stage_outcome_unknown`, never a relabelled 200;
-  * a child that exits 0 or 2 with a `zoop-ai-chat-2` result is a 200 whatever the stage outcome (`status=failed` carries the stage failure and
+  * a child that exits 0 or 2 with a `zoop-ai-chat-4` result is a 200 whatever the stage outcome (`status=failed` carries the stage failure and
     whether anything was sent); exit 64 is the runtime refusing the request or its own configuration;
   * a deadline (the stage limit plus a small margin) or an abnormal end means the runtime may have sent: 504/502 `stage_outcome_unknown`, which the
     caller must never resend. Only a child that provably never started sent nothing: 503 `runtime_unavailable`. An `unavailable` outcome after the

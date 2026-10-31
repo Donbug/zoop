@@ -13,7 +13,7 @@ slot 도래 → R1 round-run 요청 → R2 계획 조회 → R3 analyze_plan 접
 
 행의 `stage`는 `scheduled → run_requested → plan_ready → analysis_queued → analysis_done → freeze_requested → handoff_ready → imported` 순으로 전진하고, `skipped`(새 자료 없음, 또는 더 새로운 회차가 이미 수입됨)와 `failed`(사유 코드)로 끝날 수 있습니다. 같은 핀의 재수입(`unchanged`)은 `imported`입니다. **실패한 회차는 roundId를 유지한 채 멈춘 단계부터 재시도**합니다. AI 쪽 멱등 키가 roundId에 묶여 있고, AI는 "결과 불명 상태를 지우고 다음 회차에서 재전송하는 방식"을 받지 않기 때문입니다. 다음 슬롯은 실패와 무관하게 새 회차로 시작합니다(결정 D-R4).
 
-## 상태 저장 (`V20261030140000__create_graph_rounds.sql`)
+## 상태 저장 (`V20261031100000__create_graph_rounds.sql`)
 
 | 테이블 | 내용 |
 |---|---|

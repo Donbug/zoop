@@ -58,10 +58,13 @@ import tools.jackson.databind.node.ObjectNode;
  * that runs out ends as {@code response_unknown}. The executor refuses a completion past the run deadline.</li>
  * <li>A model failure is {@code transient}: {@code provider_error} (rerunnable) when nothing was processed or the answer was
  * malformed, {@code response_unknown} (never rerun) when the provider may have processed it.</li>
- * <li>A tool failure ends the run before any count is evaluated: {@code tool_timeout} and unavailable data are transient,
- * an adapter fault is internal. None of them becomes a limitation or "nothing found".</li>
+ * <li>A tool failure leaving nothing answered ends the run before any count is evaluated: {@code tool_timeout} and unavailable
+ * data are transient, an adapter fault is internal. None of them becomes "nothing found". A requirement answered on the rest
+ * of its reads says so in a {@code tool_unavailable} notice; one left unanswered is that limitation.</li>
  * <li>A failed deterministic check, a contradicted claim or prohibited advice is {@code validation_failed}; nothing is
  * regenerated. A section held by the verifier drops the requirements it answers as {@code evidence_insufficient}.</li>
+ * <li>Each requirement's end is the server's own record ({@link ChatRequirementCoverage}, in the route summary): an answer
+ * leaving one undecided is {@code validation_failed}.</li>
  * <li>Limitations are recorded for the requirements the member stated; one the router only inferred is dropped silently
  * when it cannot be served. So is a concept requirement the planner split off ({@link ChatPlan.Origin#CONCEPT}): its
  * general section is answered beside its parent's result or limitation, and dropped when it breaks a general rule.</li>
@@ -202,9 +205,11 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 limits.generate().plus(limits.verify()).plus(limits.server()),
                 () -> router.route(run, bound));
         ChatPlan plan = planner.plan(run, decision, bound);
-        if (plan instanceof ChatPlan.Stop stop) return stopped(run, route, stop);
+        var coverage = new ChatRequirementCoverage(decision);
+        if (plan instanceof ChatPlan.Stop stop) return stopped(run, route, stop, coverage);
         var confirmed = (ChatPlan.Run) plan;
         record(route, confirmed);
+        coverage.plan(confirmed);
 
         var retrieved = new ChatRetrieval.Outcome(Map.of(), Map.of(), Set.of(), null, null);
         ChatGeneratedAnswer agentAnswer = null;
@@ -222,7 +227,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         }
         if (agentTools != null) {
             // The agent path: Luna chooses and chains the allowed reads, the server decides each one, and the answer is
-            // checked below against exactly the results of the calls that ran (shared by the requirements they serve).
+            // checked below against exactly the results of the calls that ran, each requirement against its own.
             control.phase("retrieving");
             if (control.toolCallsLeft() < 1) throw new Stop(TOOL_BUDGET_SPENT);
             // The run's deadline becomes 45 s from the job's start: verification and the final store keep to it too.
@@ -251,14 +256,14 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                     });
             Map<String, List<ChatToolResult>> results = new LinkedHashMap<>();
             confirmed.requirements().stream().filter(p -> p.mode() == Mode.TOOLS)
-                    .forEach(p -> results.put(p.id(), ran.results()));
-            // A concept part may rest on the run's web hits (Q02's first support), never on its internal reads.
-            List<ChatToolResult> web = ran.results().stream().filter(r -> !r.webResults().isEmpty()).toList();
-            if (!web.isEmpty()) {
-                confirmed.requirements().stream().filter(p -> p.mode() == Mode.GENERAL)
-                        .forEach(p -> results.put(p.id(), web));
-            }
-            retrieved = new ChatRetrieval.Outcome(results, Map.of(), Set.of(), null, null);
+                    .forEach(p -> results.put(p.id(), ran.resultsOf(p.id())));
+            // A concept part may rest on its web hits (Q02's first support), never on internal reads.
+            confirmed.requirements().stream().filter(p -> p.mode() == Mode.GENERAL).forEach(p -> {
+                List<ChatToolResult> web = ran.resultsOf(p.id()).stream().filter(r -> !r.webResults().isEmpty()).toList();
+                if (!web.isEmpty()) results.put(p.id(), web);
+            });
+            retrieved = new ChatRetrieval.Outcome(results, Map.of(), Set.of(), null, null, Set.of(), Map.of(), null, ran.faulted());
+            coverage.read(confirmed, results);
             agentAnswer = ran.answer();
             agentNotices = ran.notices();
             route.put("path", "agent").put("agentSteps", ran.steps()).put("approvedCalls", ran.approved())
@@ -272,7 +277,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             guard(control, limits.tools().plus(limits.generate()).plus(limits.verify()).plus(limits.server()));
             retrieved = retrieval.run(run, control, confirmed);
             if (retrieved.failed() != null) throw new Stop(toolFailure(retrieved.failed()));
-            if (retrieved.stop() != null) return stopped(run, route, retrieved.stop());
+            coverage.read(confirmed, retrieved.results());
+            if (retrieved.stop() != null) return stopped(run, route, retrieved.stop(), coverage);
             if (retrieved.faulted() != null) {
                 route.putArray("toolFaults").addAll(strings(retrieved.limitations().entrySet().stream()
                         .filter(e -> ChatRetrieval.TOOL_UNAVAILABLE.equals(e.getValue())).map(Map.Entry::getKey).toList()));
@@ -284,6 +290,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         Map<String, String> limited = new LinkedHashMap<>();
         confirmed.requirements().stream().filter(p -> p.mode() == Mode.LIMITED).forEach(p -> limited.put(p.id(), p.limitation()));
         limited.putAll(retrieved.limitations());
+        limited.forEach(coverage::limited);
         List<Branch> branches = new ArrayList<>();
         for (Planned p : confirmed.requirements()) {
             // A member-scope source is no branch: its companies go with the requirement it serves.
@@ -303,12 +310,13 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             boolean unanswerable = limited.values().stream().allMatch(k -> k.equals("investment_advice") || k.equals("out_of_scope"));
             if (unanswerable) {
                 return stopped(run, route, new ChatPlan.Stop("guidance",
-                        limited.containsValue("investment_advice") ? "investment_advice" : "out_of_scope", List.of()));
+                        limited.containsValue("investment_advice") ? "investment_advice" : "out_of_scope", List.of()),
+                        coverage);
             }
             return insufficient(run, route, limited.containsValue("results_truncated") ? RESULTS_TRUNCATED
                     : limited.containsValue("not_in_member_scope") ? NOT_IN_MEMBER_SCOPE
                     : limited.containsValue("precondition_unmet") ? PRECONDITION_UNMET : EVIDENCE_INSUFFICIENT,
-                    confirmed, retrieved);
+                    confirmed, retrieved, coverage);
         }
 
         ChatGeneratedAnswer generated;
@@ -366,6 +374,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         // A requirement still answered by a kept section of its own is answered; a joining section goes with any held part.
         insufficient.removeIf(id -> kept.stream().anyMatch(s -> s.requirementIds().contains(id)));
         if (kept.isEmpty() && retrieved.faulted() != null) throw new Stop(toolFailure(retrieved.faulted()));
+        if (kept.isEmpty() && !retrieved.partial().isEmpty()) throw new Stop(new ChatEngineOutcome.Failed("transient", null, true));
         if (kept.isEmpty()) {
             // The most specific cause the server knows: a limit it hit, then a verdict, then a lookup that found nothing.
             List<String> unanswered = insufficient.stream().filter(id -> byId.get(id).parent() == null).toList();
@@ -374,7 +383,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                     : unanswered.stream().anyMatch(held::contains) ? EVIDENCE_HELD
                     : !unanswered.isEmpty() && retrieved.noneFound().containsAll(unanswered) ? NOTHING_FOUND
                     : limited.containsValue("precondition_unmet") ? PRECONDITION_UNMET : EVIDENCE_INSUFFICIENT;
-            return insufficient(run, route, cause, confirmed, retrieved);
+            return insufficient(run, route, cause, confirmed, retrieved, coverage);
         }
 
         Set<String> keptEvidence = new HashSet<>();
@@ -385,12 +394,22 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             Planned p = byId.get(entry.getKey());
             if (explicit(decision, p.id())) limitations.add(ChatResults.limitation(entry.getValue(), p.label()));
         }
+        kept.forEach(s -> s.requirementIds().forEach(coverage::answered));
         for (String id : insufficient) {
-            if (!explicit(decision, id)) continue;
+            if (retrieved.partial().contains(id)) {
+                // Unanswered with a read missing: the fault, never "no evidence".
+                coverage.limited(id, ChatRetrieval.TOOL_UNAVAILABLE);
+                if (explicit(decision, id)) {
+                    limitations.add(ChatResults.limitation(ChatRetrieval.TOOL_UNAVAILABLE, byId.get(id).label()));
+                }
+                continue;
+            }
             InsufficientCause cause = held.contains(id) ? EVIDENCE_HELD
                     : retrieved.noneFound().contains(id) ? NOTHING_FOUND : EVIDENCE_INSUFFICIENT;
-            limitations.add(ChatResults.insufficient(cause, byId.get(id).label()));
+            coverage.limited(id, cause.code());
+            if (explicit(decision, id)) limitations.add(ChatResults.insufficient(cause, byId.get(id).label()));
         }
+        if (!coverage.settled()) return validationFailed();
         for (String id : retrieved.cut()) {
             // Answered on only the first of the member's companies: say so beside the answer.
             if (explicit(decision, id) && kept.stream().anyMatch(s -> s.requirementIds().contains(id))) {
@@ -412,6 +431,10 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
 
         Set<String> answered = new HashSet<>();
         kept.forEach(s -> answered.addAll(s.requirementIds()));
+        Set<String> partialFaults = retrieved.partial();
+        List<String> readInPart = confirmed.requirements().stream().map(Planned::id)
+                .filter(id -> partialFaults.contains(id) && answered.contains(id)).toList();
+        if (!partialFaults.isEmpty()) route.putArray("partialFaults").addAll(strings(partialFaults));
         // A map target stays only while a requirement whose tools returned it is still answered.
         Set<String> reachable = new HashSet<>();
         branches.stream().filter(b -> answered.contains(b.requirementId()))
@@ -419,9 +442,11 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         var targets = passed.graphTargets().stream().filter(g -> reachable.contains(g.id())).toList();
         ChatResult result = ChatResults.answered(run, kept, keptCitations, targets,
                 items(retrieved, answered, "company"), items(retrieved, answered, "issue"), limitations, partial,
-                notices(directStart, agentNotices), overrode(run, confirmed, answered),
-                writtenPeriod(run, confirmed, answered), clock.instant());
-        route.put("outcome", "answered");
+                notices(directStart, agentNotices, readInPart.stream().filter(id -> explicit(decision, id))
+                        .map(id -> byId.get(id).label()).toList()), overrode(run, confirmed, answered),
+                writtenPeriod(run, confirmed, answered),
+                ChatUiActions.of(branches, answered, targets, run.graphVersionId(), run.context().asOf()), clock.instant());
+        route.put("outcome", "answered").set("coverage", coverage.json());
         return new ChatEngineOutcome.Completed(result, route);
     }
 
@@ -430,8 +455,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      * (every requirement's, since none was answered).
      */
     private ChatEngineOutcome insufficient(ChatRun run, ObjectNode route, InsufficientCause cause, ChatPlan.Run plan,
-            ChatRetrieval.Outcome retrieved) {
-        route.put("outcome", "insufficient_evidence").put("reason", cause.code());
+            ChatRetrieval.Outcome retrieved, ChatRequirementCoverage coverage) {
+        coverage.end(ChatRequirementCoverage.Status.LIMITED, cause.code());
+        route.put("outcome", "insufficient_evidence").put("reason", cause.code()).set("coverage", coverage.json());
         Set<String> all = new HashSet<>();
         plan.requirements().forEach(p -> all.add(p.id()));
         return new ChatEngineOutcome.Completed(ChatResults.insufficient(run, cause, narrowed(plan, retrieved),
@@ -560,14 +586,11 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             tools.addAll(p.capabilities());
         }
         // The web (web search design 1) is the first support of a concept (Q02: one search, tried by default) and the last
-        // resort of a fact question (Q03~Q08: approved only once the internal reads left something unmet). A question
-        // with a service-rule part (Q01) is never offered it: its answer may not rest on the web, and a search cannot yet
-        // be tied to the part it serves.
-        boolean concept = plan.requirements().stream().anyMatch(p -> p.mode() == Mode.GENERAL);
-        boolean fact = plan.requirements().stream().anyMatch(p -> p.mode() == Mode.TOOLS
-                && p.types().stream().anyMatch(WEB_TYPES::contains));
-        boolean rules = plan.requirements().stream().anyMatch(p -> p.types().contains(ChatQueryType.Q01));
-        if ((concept || fact) && !rules && exposed.contains(ChatCapability.WEB_SEARCH)) {
+        // resort of a fact part (Q03~Q08: approved only once the internal reads serving it left something unmet). A
+        // service-rule part (Q01) may not rest on it; the other parts of its question still may, each search bound to the
+        // parts it names.
+        if (plan.requirements().stream().anyMatch(OrchestratedChatEngine::webMayServe)
+                && exposed.contains(ChatCapability.WEB_SEARCH)) {
             // A concept question with no read of its own goes to the agent for its search alone.
             tools.add(ChatCapability.WEB_SEARCH);
         }
@@ -589,11 +612,12 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 hit.url());
     }
 
-    /** What the answer went on without: a direct start, and the web faults of an agent run. */
-    private static List<ChatNotice> notices(boolean directStart, List<String> agentNotices) {
+    /** What the answer went on without: a direct start, the web faults of an agent run, and reads of answered requirements. */
+    private static List<ChatNotice> notices(boolean directStart, List<String> agentNotices, List<String> readInPart) {
         List<ChatNotice> notices = new ArrayList<>();
         if (directStart) notices.add(ChatResults.notice("mcp_direct_start"));
         agentNotices.forEach(code -> notices.add(ChatResults.notice(code)));
+        if (!readInPart.isEmpty()) notices.add(ChatResults.notice(ChatRetrieval.TOOL_UNAVAILABLE, readInPart));
         return notices;
     }
 
@@ -601,11 +625,17 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     private static final Set<ChatQueryType> WEB_TYPES = Set.of(ChatQueryType.Q03, ChatQueryType.Q04, ChatQueryType.Q05,
             ChatQueryType.Q06, ChatQueryType.Q07, ChatQueryType.Q08);
 
+    /** Whether a search may serve this requirement at all: a concept or a fact part, and no service rule. */
+    private static boolean webMayServe(Planned p) {
+        return !p.types().contains(ChatQueryType.Q01) && (p.mode() == Mode.GENERAL
+                || p.mode() == Mode.TOOLS && p.types().stream().anyMatch(WEB_TYPES::contains));
+    }
+
     /** The answerable requirements of the plan as the agent sees them: reads with their resolved targets, general parts. */
     private static List<ChatModels.AgentRequirement> agentRequirements(ChatPlan.Run plan) {
         return plan.requirements().stream().filter(p -> p.mode() == Mode.TOOLS || p.mode() == Mode.GENERAL)
                 .map(p -> new ChatModels.AgentRequirement(p.id(), p.label(), p.mode() == Mode.GENERAL,
-                        p.mode() == Mode.TOOLS ? p.targets() : List.of()))
+                        p.mode() == Mode.TOOLS ? p.targets() : List.of(), webMayServe(p)))
                 .toList();
     }
 
@@ -629,8 +659,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         return new ChatEngineOutcome.Failed("validation_failed", null, false);
     }
 
-    private ChatEngineOutcome stopped(ChatRun run, ObjectNode route, ChatPlan.Stop stop) {
-        route.put("outcome", stop.outcome()).put("reason", stop.reason());
+    private ChatEngineOutcome stopped(ChatRun run, ObjectNode route, ChatPlan.Stop stop, ChatRequirementCoverage coverage) {
+        coverage.stopped(stop);
+        route.put("outcome", stop.outcome()).put("reason", stop.reason()).set("coverage", coverage.json());
         return new ChatEngineOutcome.Completed(
                 ChatResults.withoutAnswer(run, stop.outcome(), stop.reason(), stop.choices(), clock.instant()), route);
     }

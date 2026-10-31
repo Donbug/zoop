@@ -55,7 +55,7 @@ public class ChatPlanner {
     static final int MAX_REQUIREMENTS = 6;
     static final int MAX_STAGES = 3;
     static final int MAX_CHOICES = 6;
-    /** Branches the answer stage takes at most, and the longest requirement id it accepts (zoop-ai-chat-2). */
+    /** Branches the answer stage takes at most, and the longest requirement id it accepts (zoop-ai-chat-4). */
     static final int MAX_BRANCHES = 6;
     static final int MAX_ID = 32;
     /** Words pointing back at a company or an event; the lookbehind keeps a particle out ("삼성이 기업을"). */
@@ -213,6 +213,8 @@ public class ChatPlanner {
         long issues = r.dependsOn() == null ? r.targets().size() - companies : 0;
         if (companies > 0 && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.COMPANY_READ);
         if (issues > 0 && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.ISSUE_READ);
+        // An issue a briefing question names reads that issue's evidence: a round's own read shares its limit with the others.
+        if (issues > 0 && all.contains(ChatQueryType.Q06)) defaults.add(ChatCapability.BRIEFING_EVIDENCE);
         // A period comparison compares the public graph, with or without a named target.
         if (r.dependsOn() == null && all.contains(ChatQueryType.Q05)) defaults.add(ChatCapability.GRAPH_VERSION_DIFF);
         // "My stocks" reads the member's own companies first, and a company fact reads them. A company the question names is

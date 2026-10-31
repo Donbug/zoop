@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "zoop-chat-live-spike-scenarios-1",
+  "description": "live spike의 합성 질문. 합성 그래프 fixture-2026-10-08과 합성 웹 공급자로만 실행한다. 호출 수는 Luna가 고르므로 질문은 모양을 유도할 뿐 보장하지 않는다. 절차: docs/development/chat-live-spike.md",
+  "scenarios": {
+    "tools-1-rounds-1": {
+      "question": "SK하이닉스는 어떤 회사야?",
+      "intendedRounds": [["company_read"]]
+    },
+    "tools-4-rounds-1": {
+      "question": "SK하이닉스와 관련된 사건, 삼성전자와 관련된 사건, NVIDIA와 관련된 사건, TSMC와 관련된 사건을 각각 따로 알려줘",
+      "intendedRounds": [["issue_read", "issue_read", "issue_read", "issue_read"]]
+    },
+    "tools-4-rounds-3": {
+      "question": "SK하이닉스와 NVIDIA는 어떻게 연결돼 있어? 먼저 두 회사의 사건을 찾고, 그 사건의 근거를 확인한 뒤 경로로 설명해줘",
+      "intendedRounds": [["company_read", "company_read"], ["issue_read"], ["graph_path_read"]]
+    },
+    "tools-8-rounds-3": {
+      "question": "카카오, SK하이닉스, 삼성전자, NVIDIA, TSMC, ASML의 최근 사건을 알려주고, 줍 자료에 없는 내용은 외부 보도도 찾아줘",
+      "intendedRounds": [
+        ["issue_read", "issue_read", "issue_read", "issue_read"],
+        ["issue_read", "issue_read", "web_search"],
+        ["web_search"]
+      ],
+      "requires": "카카오는 카탈로그에만 있고 그래프에는 없어 그 내부 조회가 비어야 웹 검색이 승인된다."
+    }
+  }
+}

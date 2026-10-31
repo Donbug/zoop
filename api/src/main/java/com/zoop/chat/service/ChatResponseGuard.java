@@ -6,11 +6,14 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import com.zoop.chat.dto.ChatApplied;
 import com.zoop.chat.dto.ChatAppliedItem;
 import com.zoop.chat.dto.ChatContextItem;
+import com.zoop.chat.dto.ChatUiAction;
 import com.zoop.chat.dto.ChatConversation;
 import com.zoop.chat.dto.ChatCurrentResponse;
 import com.zoop.chat.dto.ChatFrozenContext;
@@ -143,6 +146,7 @@ public class ChatResponseGuard {
             nullSafe(applied.issues()).forEach(i -> ids.add(i.id()));
         }
         nullSafe(r.graphTargets()).forEach(g -> ids.add(g.id()));
+        r.uiActions().forEach(a -> ids.addAll(graphIds(a)));
         String at = "@" + version + "@" + asOf;
         Set<String> unchecked = new LinkedHashSet<>();
         ids.forEach(id -> {
@@ -155,6 +159,9 @@ public class ChatResponseGuard {
         List<GraphTarget> graphTargets = nullSafe(r.graphTargets()).stream()
                 .filter(g -> seen.getOrDefault(g.id() + at, false)).toList();
         boolean targetsKept = graphTargets.size() == nullSafe(r.graphTargets()).size();
+        List<ChatUiAction> uiActions = r.uiActions().stream()
+                .filter(a -> graphIds(a).stream().allMatch(id -> seen.getOrDefault(id + at, false))).toList();
+        boolean actionsKept = uiActions.size() == r.uiActions().size();
         ChatApplied shown = applied;
         if (applied != null) {
             List<ChatAppliedItem> companies = visibleOnly(applied.companies(), seen, at);
@@ -165,10 +172,16 @@ public class ChatResponseGuard {
                         applied.questionOverrodeContext());
             }
         }
-        if (targetsKept && shown == applied) return r;
+        if (targetsKept && actionsKept && shown == applied) return r;
         return new ChatResult(r.outcome(), r.messageId(), r.answer(), r.sections(), r.answerBasis(), r.reason(), r.sources(),
                 r.citations(), targetsKept ? r.graphTargets() : graphTargets, shown, r.choices(), r.action(),
-                r.limitations(), r.metadata(), r.answerStatus(), r.notices());
+                r.limitations(), r.metadata(), r.answerStatus(), r.notices(), uiActions);
+    }
+
+    /** The graph ids an action opens; a briefing round names none, its screen checks itself. */
+    private static List<String> graphIds(ChatUiAction action) {
+        var target = action.target();
+        return Stream.of(target.companyId(), target.fromId(), target.toId()).filter(Objects::nonNull).toList();
     }
 
     private static List<ChatAppliedItem> visibleOnly(List<ChatAppliedItem> items, Map<String, Boolean> seen, String at) {
@@ -179,7 +192,7 @@ public class ChatResponseGuard {
         return new ChatResult(r.outcome(), r.messageId(), WITHHELD_ANSWER, List.of(), "none", r.reason(), List.of(),
                 List.of(), List.of(), r.applied(), r.choices(), r.action(), r.limitations(), r.metadata(),
                 // Nothing of the answer is shown, only the fixed sentence.
-                "guidance", r.notices());
+                "guidance", r.notices(), List.of());
     }
 
     private static <T> List<T> nullSafe(List<T> values) {

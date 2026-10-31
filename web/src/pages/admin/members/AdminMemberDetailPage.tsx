@@ -57,7 +57,7 @@ function MemberDetail({ memberId }: { memberId: string }) {
     >
       <Link
         to="/admin/members"
-        className={`self-start text-[11px] text-zoop-muted hover:text-zoop-ink ${FOCUS_RING}`}
+        className={`self-start text-caption text-zoop-muted hover:text-zoop-ink ${FOCUS_RING}`}
       >
         ← 회원 목록
       </Link>
@@ -80,7 +80,7 @@ function MemberDetail({ memberId }: { memberId: string }) {
         }
       />
       {done && (
-        <p role="status" className="text-[11px] font-semibold">
+        <p role="status" className="text-caption font-semibold">
           {done}
         </p>
       )}
@@ -114,7 +114,7 @@ function MemberDetail({ memberId }: { memberId: string }) {
               }}
             />
           )}
-          <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+          <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-caption">
             <span
               className={`font-semibold ${row.status === 'blocked' ? 'text-zoop-alert' : ''}`}
             >
@@ -186,7 +186,7 @@ function MemberDetail({ memberId }: { memberId: string }) {
                   {data.history.map((entry, index) => (
                     <tr key={`${entry.at}-${index}`}>
                       <td
-                        className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                        className={`${TD} whitespace-nowrap font-num tabular-nums`}
                       >
                         {formatKst(entry.at)}
                       </td>

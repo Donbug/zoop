@@ -36,7 +36,7 @@
 }
 
 .relationship-logo strong {
-  font-size: 16px;
+  font-size: var(--text-lead);
   font-weight: 800;
   line-height: 24px;
   letter-spacing: -0.4px;
@@ -44,7 +44,7 @@
 
 .relationship-logo span {
   color: var(--zoop-muted);
-  font-size: 11px;
+  font-size: var(--text-caption);
   font-weight: 500;
 }
 
@@ -62,7 +62,7 @@
   gap: 6px;
   padding: 0 12px;
   color: var(--zoop-muted);
-  font-size: 15px;
+  font-size: var(--text-lead);
   font-weight: 600;
   line-height: 22px;
   white-space: nowrap;
@@ -95,7 +95,7 @@
   align-items: center;
   gap: 6px;
   color: var(--zoop-muted);
-  font-size: 12px;
+  font-size: var(--text-caption);
   line-height: 16px;
 }
 

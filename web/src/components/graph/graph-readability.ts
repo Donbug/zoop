@@ -141,6 +141,75 @@ export function readingStyles(
   };
 }
 
+/** Label styles last pushed per graph; a new base (setData) starts over. */
+const appliedLabels = new WeakMap<
+  Graph,
+  { base: GraphData; styles: Map<string, string> }
+>();
+
+/** Keys readingStyles derives from zoom; other label styles (colours) still come from the new data. */
+const READING_KEYS = new Set([
+  'labelText',
+  'labelVisibility',
+  'labelFontSize',
+  'labelWordWrap',
+  'labelWordWrapWidth',
+  'labelMaxWidth',
+  'labelMaxLines',
+  'badges',
+]);
+
+/**
+ * Carry the label styles the reading pass applied into new graph data, and fill
+ * keys the new data leaves out (G6's zIndex, sourceNode/targetNode, ...) from the
+ * model. G6 updateData keeps omitted keys anyway, but its diff counts them as
+ * changes: setData would redraw every element, then the reading pass again.
+ * An element whose own label input changed (text, badges, ...) keeps the new
+ * data's values instead, so it never shows the old label until the next reading.
+ */
+export function keepAppliedStyles(graph: Graph, data: GraphData): GraphData {
+  if (
+    typeof graph.getNodeData !== 'function' ||
+    typeof graph.getEdgeData !== 'function'
+  )
+    return data;
+  const current = new Map(
+    [...graph.getNodeData(), ...graph.getEdgeData()].map((item) => [
+      String(item.id),
+      item.style ?? {},
+    ]),
+  );
+  const read = appliedLabels.get(graph)?.base;
+  const before = new Map(
+    [...(read?.nodes ?? []), ...(read?.edges ?? [])].map((item) => [
+      String(item.id),
+      item.style ?? {},
+    ]),
+  );
+  const keep = <T extends { id?: unknown; style?: Record<string, unknown> }>(
+    item: T,
+  ): T => {
+    const model = current.get(String(item.id));
+    if (!model) return item;
+    const style: Record<string, unknown> = { ...item.style };
+    const last = before.get(String(item.id));
+    const sameLabel =
+      !last ||
+      [...READING_KEYS].every(
+        (key) => JSON.stringify(last[key]) === JSON.stringify(style[key]),
+      );
+    for (const [key, value] of Object.entries(model))
+      if ((sameLabel && READING_KEYS.has(key)) || !(key in style))
+        style[key] = value;
+    return { ...item, style };
+  };
+  return {
+    ...data,
+    nodes: data.nodes?.map(keep),
+    edges: data.edges?.map(keep),
+  };
+}
+
 // Public G6 canvas/display-object APIs give actual label bounds (font/wrap/padding/rotation).
 export async function applyGraphReading(
   graph: Graph,
@@ -161,16 +230,41 @@ export async function applyGraphReading(
         ([key]) => key.startsWith('label') || (badges && key === 'badges'),
       ),
     );
-  graph.updateNodeData(
-    (styles.nodes ?? []).map((n) => ({
-      id: n.id,
-      style: labelStyle(n.style, true),
-    })),
-  );
-  graph.updateEdgeData(
-    (styles.edges ?? []).map((e) => ({ id: e.id, style: labelStyle(e.style) })),
-  );
-  await graph.draw();
+  // Hover keeps the zoom, so most label styles are unchanged: only push and redraw the changed ones.
+  let applied = appliedLabels.get(graph);
+  if (!applied) {
+    applied = { base, styles: new Map() };
+    appliedLabels.set(graph, applied);
+  } else if (applied.base !== base) {
+    // setData keeps applied label styles on elements that stay (keepAppliedStyles);
+    // elements that left the data start from their defaults if they come back.
+    const after = new Set(
+      [...(base.nodes ?? []), ...(base.edges ?? [])].map((item) =>
+        String(item.id),
+      ),
+    );
+    for (const id of applied.styles.keys())
+      if (!after.has(id)) applied.styles.delete(id);
+    applied.base = base;
+  }
+  const { styles: previous } = applied;
+  const changed = (
+    items: { id?: unknown; style?: Record<string, unknown> }[] | undefined,
+    badges = false,
+  ) =>
+    (items ?? []).flatMap((item) => {
+      const id = String(item.id);
+      const style = labelStyle(item.style, badges);
+      const key = JSON.stringify(style);
+      if (previous.get(id) === key) return [];
+      previous.set(id, key);
+      return [{ id, style }];
+    });
+  const nodeUpdates = changed(styles.nodes, true);
+  const edgeUpdates = changed(styles.edges);
+  if (nodeUpdates.length) graph.updateNodeData(nodeUpdates);
+  if (edgeUpdates.length) graph.updateEdgeData(edgeUpdates);
+  if (nodeUpdates.length || edgeUpdates.length) await graph.draw();
   if (graph.destroyed) return;
   const document = graph.getCanvas().document;
   type Shape = {
@@ -210,8 +304,25 @@ export async function applyGraphReading(
     });
   };
   type ElementShape = { getShape: (name: string) => Shape | undefined };
+  // G's getElementById walks the whole scene; collect every element in one walk instead.
+  const wanted = new Set([
+    ...(styles.nodes ?? []).map((node) => String(node.id)),
+    ...(styles.edges ?? []).map((edge) => String(edge.id)),
+  ]);
+  const elements = new Map<string, ElementShape>();
+  type SceneNode = { id?: string; childNodes?: SceneNode[] };
+  const collect = (scene: SceneNode) => {
+    if (scene.id && wanted.has(scene.id)) {
+      elements.set(scene.id, scene as unknown as ElementShape);
+      return;
+    }
+    scene.childNodes?.forEach(collect);
+  };
+  const root = document.documentElement as unknown as SceneNode | undefined;
+  if (root) collect(root);
   const element = (id: string) =>
-    document.getElementById(id) as unknown as ElementShape | null;
+    elements.get(id) ??
+    (document.getElementById(id) as unknown as ElementShape | null);
   const screenBox = (shape: Shape | undefined): Rect | null => {
     if (!shape) return null;
     const bounds = shape.getRenderBounds();

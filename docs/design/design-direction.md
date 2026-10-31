@@ -2,12 +2,14 @@
 
 > **v3 개정(2026-09-29)**: §4 그래프를 GraphDB 시각화(Neo4j Browser·Bloom) 관례로 다시 썼고, §4.5 모션(당근 SEED 값)과 §4.6 메타 문구·아이콘 규칙을 새로 두었습니다. 아래 v2 규칙 중 **'노드를 모양으로 구분'(기업 원·사건 육각형), `QuietValue`의 '준비 중' 표기, `SourceIndicator`의 출처 글자 표시는 폐기**합니다. 폐기한 문장은 이력으로 남기되 각 항목 옆에 `[v3 폐기]`를 붙였습니다.
 
+> **v4 개정(2026-10-30, 서비스 `web/` #451)**: 서체와 글자 크기를 `web/` 기준으로 다시 정했습니다. 본문은 Pretendard Variable, 제목(h1~h4·ZOOP 로고)은 Wanted Sans Variable, 숫자·시세·시각은 SUIT Variable을 씁니다. 글자 크기는 caption 12 / body 14 / lead 16 / title-sm 18 / title 22 / display 28px의 6단계이고, 12px보다 작은 글자는 쓰지 않습니다. 라이트 테마 글자색은 #212121 하나이며, 위계는 크기와 굵기로 나눕니다. 아래 §1.2의 1번, §2.1의 서체 항목, §2.2의 서체 행은 프로토타입 기준이라 `[v4 개정]`을 붙였습니다. 서비스 값은 `web/docs/ui-style-guide.md`의 Typography와 `tokens.json`의 `typography.web`을 따릅니다.
+
 | 항목 | 내용 |
 |:---|:---|
 | **작성일** | 2026-09-29 |
 | **목적** | 줍(Zoop) 금융 지식 지도 프로토타입의 AI 슬롭 전면 제거, UX 흐름 혁신, 모바일(≤768px) UI 신설 및 토큰·컴포넌트·화면별 구현 명세 확정 |
 | **대상 독자** | 프론트엔드 개발자(구현 담당 에이전트), 백엔드/BFF 개발자, 기획·PM |
-| **적용 스택** | Vite + React + TypeScript, Tailwind CSS v4 (`@theme`), Radix Primitives, Cytoscape.js, `@sun-typeface/suit` |
+| **적용 스택** | Vite + React + TypeScript, Tailwind CSS v4 (`@theme`), Radix Primitives, Cytoscape.js, `@sun-typeface/suit` `[v4 개정]` 서비스 `web/`은 G6와 `pretendard`·`wanted-sans`·`@sun-typeface/suit` |
 | **토큰 소스** | `/Users/asqi/zoop/docs/design/tokens.json` (W3C DTCG 2025.10 포맷, 단일 원천. 색은 Main 확정 팔레트로 교체됨 — 아래 §2의 slate 계열 hex는 역사 기록) |
 | **기준 뷰포트** | 모바일 우선 390×844px (CSS 뷰포트 폭 390px), 데스크톱 1440×900px |
 
@@ -21,7 +23,7 @@
 v2의 시각 언어는 **"조용한 신뢰(Quiet Confidence)와 정밀한 정보 구조"**입니다. 화면의 90% 이상을 차분하고 절제된 중성 회색(Neutral Grays)으로 채우고, 브랜드 컬러는 사용자의 단 하나의 주 행동(Primary CTA)과 현재 선택된 상태에만 제한적으로 사용합니다. 정보를 전달하는 주체는 장식적인 컨테이너가 아니라 **정돈된 행(Row), 명확한 타이포그래피 대비, 그리고 조작 가능한 선(Edge)**입니다.
 
 ### 1.2 v1에서 완전히 버리는 것 목록 (Discarded in v2)
-1. **Pretendard 전면 단독 사용 탈피**: 웹 생태계에 획일화된 Pretendard를 제거하고, UI 본문 정렬과 GSUB 고정폭 숫자(`tnum`)를 완벽히 지원하는 `SUIT Variable` 단일 패밀리로 교체합니다.
+1. **Pretendard 전면 단독 사용 탈피**: 웹 생태계에 획일화된 Pretendard를 제거하고, UI 본문 정렬과 GSUB 고정폭 숫자(`tnum`)를 완벽히 지원하는 `SUIT Variable` 단일 패밀리로 교체합니다. `[v4 개정]` 서비스 `web/`은 본문에 Pretendard를 다시 쓰고, SUIT는 숫자에만 씁니다.
 2. **카드 중첩 (Cards inside Cards)**: 브리핑 카드 안에 이슈 카드, 패널 안에 카드, 모달 안에 카드가 들어가는 다중 박스 중첩을 전면 금지합니다.
 3. **테두리와 그림자의 동시 사용 (Border + Shadow)**: 동일 컨테이너에 1px border와 drop shadow를 함께 주어 테두리가 두 번 정의되는 시각적 슬롭을 배제합니다.
 4. **사이드 스트라이프 (Side-tab Accent Border)**: 카드나 인용문 좌측에 3~4px 두께로 긋던 유색 막대를 전면 제거합니다.
@@ -43,8 +45,8 @@ v2의 시각 언어는 **"조용한 신뢰(Quiet Confidence)와 정밀한 정보
 ### 2.1 토큰 결정 근거
 1. **서체 (Typography)**:
    - npm 패키지 `@sun-typeface/suit@2.0.5`의 `SUIT-Variable.woff2`(OFL-1.1, wght 100~900, GSUB `tnum` 내장)를 채택합니다.
-   - SUIT Variable은 KS X 1001 한글 완성형 2,668자만 포함하므로, 기사 본문의 외래어·미등록 글자가 깨지지 않도록 CSS font-family에 `"Apple SD Gothic Neo"`, `"Malgun Gothic"`, `system-ui`, `sans-serif`를 필수 폴백으로 정의합니다.
-   - 글자 크기는 9단계에서 6단계(`sm`, `base`, `md`, `lg`, `xl`, `2xl`)로 대폭 압축했습니다. **본문 최소 15px**, **모바일 폼 입력 16px(iOS 사파리 자동 확대 방지)**, **13px 미만 사용 엄격 금지(법적 고지·데이터 출처 포함)**를 규칙화했습니다.
+   - SUIT Variable은 KS X 1001 한글 완성형 2,668자만 포함하므로, 기사 본문의 외래어·미등록 글자가 깨지지 않도록 CSS font-family에 `"Apple SD Gothic Neo"`, `"Malgun Gothic"`, `system-ui`, `sans-serif`를 필수 폴백으로 정의합니다. `[v4 개정]` 서비스 `web/`에서는 SUIT를 숫자에만 쓰고, 그 밖의 글자는 Pretendard로 폴백합니다.
+   - 글자 크기는 9단계에서 6단계(`sm`, `base`, `md`, `lg`, `xl`, `2xl`)로 대폭 압축했습니다. **본문 최소 15px**, **모바일 폼 입력 16px(iOS 사파리 자동 확대 방지)**, **13px 미만 사용 엄격 금지(법적 고지·데이터 출처 포함)**를 규칙화했습니다. `[v4 개정]` 서비스 `web/`은 본문 14px, 최소 12px(출처·시각·배지)의 6단계를 씁니다.
 2. **형태 (Radius)**:
    - 스케일을 유효 3단계(`none: 0px`, `sm: 8px`, `lg: 16px`) + `full: 9999px`로 제한합니다.
    - 리스트 항목, 패널 내부 콘텐츠, 테이블, 캔버스는 모두 `radius-none(0px)`으로 평탄화합니다.
@@ -63,9 +65,9 @@ v2의 시각 언어는 **"조용한 신뢰(Quiet Confidence)와 정밀한 정보
 
 | v1 토큰 경로 | v2 토큰 경로 | 변경 유형 | 사유 및 대체 가이드 |
 |:---|:---|:---:|:---|
-| `typography.fontFamily.sans` | `typography.fontFamily.sans` | **수정** | Pretendard 제거, `SUIT Variable` + 한글 음절 폴백 스택 명세 |
+| `typography.fontFamily.sans` | `typography.fontFamily.sans` | **수정** | Pretendard 제거, `SUIT Variable` + 한글 음절 폴백 스택 명세. `[v4 개정]` 서비스 값은 `typography.web.fontFamily`(body·heading·num) |
 | `typography.fontSize.2xs` (11px) | — | **삭제** | 13px 미만 사용 엄격 금지 규칙에 따라 삭제. `text-sm`(13px)으로 대체 |
-| `typography.fontSize.xs` (12px) | — | **삭제** | 13px 미만 금지 규칙. `text-sm`(13px)으로 대체 |
+| `typography.fontSize.xs` (12px) | — | **삭제** | 13px 미만 금지 규칙. `text-sm`(13px)으로 대체. `[v4 개정]` 서비스 값은 `typography.web.fontSize`(caption 12px ~ display 28px) |
 | `typography.fontSize.base` (14px) | `typography.fontSize.base` (15px) | **수정** | 본문 가독성 하한선 15px로 상향 |
 | `typography.fontSize.xl` (20px) | `typography.fontSize.xl` (22px) | **수정** | 제목/본문 대비 강화를 위해 22px로 조정 |
 | `typography.fontSize.2xl` (24px) | `typography.fontSize.2xl` (28px) | **수정** | 대형 헤딩 크기 통일 |

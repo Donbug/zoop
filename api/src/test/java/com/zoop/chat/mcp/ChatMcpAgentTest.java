@@ -67,7 +67,7 @@ class ChatMcpAgentTest {
             + "\"asOf\":\"2026-10-27T00:00:00Z\",\"graphVersion\":\"gv-1\"}";
     private static final String SELECTION = "{\"contextIds\":[],\"evidenceIds\":[],\"evidencePool\":[]}";
     private static final List<ChatModels.AgentRequirement> REQUIREMENTS =
-            List.of(new ChatModels.AgentRequirement("r1", "SK하이닉스 최근 사건", false, List.of("KRX:000660")));
+            List.of(new ChatModels.AgentRequirement("r1", "SK하이닉스 최근 사건", false, List.of("KRX:000660"), true));
     private static final ChatGeneratedAnswer ANSWER = new ChatGeneratedAnswer(List.of(new ChatGeneratedAnswer.Section(
             "evidence_grounded", "SK하이닉스는 HBM을 공급한다.", List.of("r1"), List.of("ev-1"))), List.of(), List.of());
 
@@ -127,7 +127,10 @@ class ChatMcpAgentTest {
             for (ChatModels.Decision decision : input.decisions()) {
                 if (!decision.approve()) continue;
                 var request = asked.get(decision.approvalRequestId());
-                made.add(tools.call(context, new McpSchema.CallToolRequest(request.toolName(), request.arguments())));
+                // The provider calls with the arguments the model wrote, the requirements still among them.
+                Map<String, Object> called = new HashMap<>(request.arguments());
+                called.put(ChatMcpTools.REQUIREMENT_IDS, request.requirementIds());
+                made.add(tools.call(context, new McpSchema.CallToolRequest(request.toolName(), called)));
             }
             ChatModels.AgentStep next = script.get(Math.min(step, script.size()) - 1).apply(step);
             next.approvals().forEach(a -> asked.put(a.id(), a));
@@ -135,8 +138,13 @@ class ChatMcpAgentTest {
         }
     }
 
+    /** A call serving the run's one requirement, as most scripts ask it. */
+    private static ChatModels.ApprovalRequest ask(String id, String tool, Map<String, Object> arguments) {
+        return new ChatModels.ApprovalRequest(id, tool, arguments, List.of("r1"));
+    }
+
     private static ChatModels.AgentStep held(String id, String tool, Map<String, Object> arguments) {
-        return new ChatModels.AgentStep("resp_" + id, List.of(new ChatModels.ApprovalRequest(id, tool, arguments)), null);
+        return new ChatModels.AgentStep("resp_" + id, List.of(ask(id, tool, arguments)), null);
     }
 
     private static ChatModels.AgentStep done() {
@@ -144,7 +152,7 @@ class ChatMcpAgentTest {
     }
 
     private static ChatModels.AgentStep heldAt(long inputTokens) {
-        return new ChatModels.AgentStep("resp_a", List.of(new ChatModels.ApprovalRequest("a", "company_read",
+        return new ChatModels.AgentStep("resp_a", List.of(ask("a", "company_read",
                 Map.of("targets", List.of("KRX:000660")))), null, inputTokens);
     }
 
@@ -243,7 +251,74 @@ class ChatMcpAgentTest {
     }
 
     private static ChatModels.ApprovalRequest search(String id, String query) {
-        return new ChatModels.ApprovalRequest(id, "web_search", Map.of("targets", List.of(query)));
+        return ask(id, "web_search", Map.of("targets", List.of(query)));
+    }
+
+    private static ChatModels.ApprovalRequest read(String id, String company) {
+        return ask(id, "company_read", Map.of("targets", List.of(company)));
+    }
+
+    private static ChatModels.AgentStep round(long inputTokens, ChatModels.ApprovalRequest... requests) {
+        return new ChatModels.AgentStep("resp_" + requests[0].id(), List.of(requests), null, inputTokens);
+    }
+
+    /** One spike scenario (docs/development/chat-live-spike.md): the agent step count, and every asked call made. */
+    private void assertShape(int calls, int rounds, ChatModels.AgentStep... steps) {
+        useWeb();
+        List<String> companies = List.of("KRX:035720", "KRX:000660", "KRX:005930", "NASDAQ:NVDA", "NYSE:TSM", "NASDAQ:ASML");
+        for (ChatModels.AgentStep step : steps) luna.script.add(n -> step);
+        luna.script.add(n -> done());
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit());
+        var attached = executor.attach(JOB, 1).orElseThrow();
+
+        var outcome = agent.run(attached.run(), attached.control(), List.of(new ChatModels.AgentRequirement("r1",
+                "최근 사건", false, companies, true)), List.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH), 20, steps(false));
+
+        assertEquals(rounds + 1, outcome.steps(), "providerCalls is approvalRounds + 1");
+        assertEquals(calls, outcome.approved());
+        assertEquals(0, outcome.denied());
+        assertEquals(calls, luna.made.size());
+        assertTrue(luna.made.stream().noneMatch(McpSchema.CallToolResult::isError));
+    }
+
+    @Test
+    void oneCallInOneRoundFits() {
+        assertShape(1, 1, round(2_000, read("a", "KRX:000660")));
+    }
+
+    @Test
+    void fourCallsInOneRoundFit() {
+        assertShape(4, 1, round(2_000, read("a", "KRX:000660"), read("b", "KRX:005930"), read("c", "NASDAQ:NVDA"),
+                read("d", "NYSE:TSM")));
+    }
+
+    @Test
+    void fourCallsInThreeRoundsFit() {
+        assertShape(4, 3, round(2_000, read("a", "KRX:000660"), read("b", "KRX:005930")), round(3_000, read("c", "NASDAQ:NVDA")),
+                round(4_000, read("d", "NYSE:TSM")));
+    }
+
+    @Test
+    void sixInternalAndTwoWebCallsInThreeRoundsFitWhenAnInternalReadCameBackEmpty() {
+        assertShape(8, 3, round(2_000, read("a", "KRX:035720"), read("b", "KRX:000660"), read("c", "KRX:005930"),
+                read("d", "NASDAQ:NVDA")), round(3_000, read("e", "NYSE:TSM"), read("f", "NASDAQ:ASML"), search("g", "HBM")),
+                round(4_000, search("h", "EUV")));
+    }
+
+    @Test
+    void theThirdRoundNeedsItsInputThreeTimesOverWithinTheInputBudget() {
+        // D-AI-02: a third round needs a + b + 3c <= 24k for step inputs a, b, c; 3k + 5k + 21k does not fit.
+        useWeb();
+        luna.script.add(n -> round(3_000, read("a", "KRX:000660")));
+        luna.script.add(n -> round(5_000, read("b", "KRX:000660")));
+        luna.script.add(n -> round(7_000, read("c", "KRX:000660")));
+        luna.script.add(n -> done());
+
+        var outcome = run(steps(false));
+
+        assertEquals(4, outcome.steps());
+        assertEquals(2, outcome.approved());
+        assertEquals(1, outcome.denied(), "the third round is refused, so a three-round run needs smaller steps");
     }
 
     @Test
@@ -252,7 +327,7 @@ class ChatMcpAgentTest {
         assertTrue(tools.exposed().contains(ChatCapability.WEB_SEARCH), "the web search is an MCP tool when registered");
         // Round 1: the web first is refused; the company read runs and finds nothing.
         luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(search("w0", "HBM"),
-                new ChatModels.ApprovalRequest("c1", "company_read", Map.of("targets", List.of("KRX:000660")))), null));
+                ask("c1", "company_read", Map.of("targets", List.of("KRX:000660")))), null));
         // Round 2: a query about the member is refused, a public one runs.
         luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(search("w1", "SK하이닉스 보유 수량"),
                 search("w2", "HBM")), null));
@@ -284,7 +359,7 @@ class ChatMcpAgentTest {
         var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit);
         var attached = executor.attach(JOB, 1).orElseThrow();
         var outcome = agent.run(attached.run(), attached.control(),
-                List.of(new ChatModels.AgentRequirement("r1", "HBM이 뭐야", true, List.of())),
+                List.of(new ChatModels.AgentRequirement("r1", "HBM이 뭐야", true, List.of(), true)),
                 List.of(ChatCapability.WEB_SEARCH), 20, steps(false));
 
         assertEquals(List.of(new ChatModels.Decision("w1", true), new ChatModels.Decision("w2", false)),
@@ -293,23 +368,184 @@ class ChatMcpAgentTest {
         assertEquals(2, outcome.results().getFirst().webResults().size());
     }
 
+    private static ChatModels.ApprovalRequest serving(String id, String company, String... requirements) {
+        return new ChatModels.ApprovalRequest(id, "company_read", Map.of("targets", List.of(company)), List.of(requirements));
+    }
+
+    private ChatAgentPath.Outcome runFor(ChatModels.AgentRequirement... requirements) {
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit());
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        return agent.run(attached.run(), attached.control(), List.of(requirements), List.of(ChatCapability.COMPANY_READ), 20,
+                steps(false));
+    }
+
+    private static final ChatModels.AgentRequirement HYNIX_PART =
+            new ChatModels.AgentRequirement("r1", "SK하이닉스", false, List.of("KRX:000660"), true);
+    private static final ChatModels.AgentRequirement SAMSUNG_PART =
+            new ChatModels.AgentRequirement("r2", "삼성전자", false, List.of("KRX:005930"), true);
+
     @Test
-    void aMixedConceptAndFactRunCannotUseTheConceptExceptionForAFactQuery() {
+    void aCallNamingNoRequirementOfTheRunIsDeniedAndNeverRuns() {
+        luna.script.add(n -> round(1_000, serving("a", "KRX:000660"), serving("b", "KRX:000660", "r9"),
+                serving("c", "KRX:000660", "r1", "r9")));
+        luna.script.add(n -> done());
+
+        var outcome = runFor(HYNIX_PART);
+
+        assertEquals(0, outcome.approved());
+        assertEquals(3, outcome.denied());
+        assertTrue(luna.made.isEmpty());
+    }
+
+    @Test
+    void aResultServesOnlyTheRequirementsItsCallNamedAndTheLedgerSaysSo() {
+        luna.script.add(n -> round(1_000, serving("a", "KRX:000660", "r1"), serving("b", "KRX:005930", "r2")));
+        luna.script.add(n -> done());
+
+        var outcome = runFor(HYNIX_PART, SAMSUNG_PART);
+
+        assertEquals(2, outcome.results().size());
+        assertEquals(List.of("KRX:000660"), outcome.resultsOf("r1").getFirst().items().stream().map(i -> i.id()).toList());
+        assertEquals(1, outcome.resultsOf("r1").size());
+        assertEquals(List.of("KRX:005930"), outcome.resultsOf("r2").getFirst().items().stream().map(i -> i.id()).toList());
+        assertEquals(1, outcome.resultsOf("r2").size());
+        var kept = store.keptToolResults(JOB, 1);
+        assertTrue(kept.get(0).requestMeta().contains("\"requirementIds\":[\"r1\"]"), kept.get(0).requestMeta());
+        assertTrue(kept.get(1).requestMeta().contains("\"requirementIds\":[\"r2\"]"), kept.get(1).requestMeta());
+    }
+
+    @Test
+    void aTargetIsReachableOnlyForTheRequirementsThatResolvedOrReturnedIt() {
+        luna.script.add(n -> round(1_000, serving("a", "KRX:005930", "r1"), serving("b", "KRX:005930", "r1", "r2")));
+        luna.script.add(n -> done());
+
+        var outcome = runFor(HYNIX_PART, SAMSUNG_PART);
+
+        assertEquals(List.of(new ChatModels.Decision("a", false), new ChatModels.Decision("b", true)),
+                luna.inputs.get(1).decisions(), "r2's company is out of r1's reach until a call names r2 too");
+        assertEquals(1, outcome.resultsOf("r1").size());
+        assertEquals(1, outcome.resultsOf("r2").size());
+    }
+
+    @Test
+    void aReadServingOnlyAConceptIsDenied() {
+        luna.script.add(n -> round(1_000, serving("a", "KRX:000660", "r1"), serving("b", "KRX:000660", "r1", "r2")));
+        luna.script.add(n -> done());
+
+        var outcome = runFor(new ChatModels.AgentRequirement("r1", "HBM이 뭐야", true, List.of(), true),
+                new ChatModels.AgentRequirement("r2", "SK하이닉스", false, List.of("KRX:000660"), true));
+
+        assertEquals(List.of(new ChatModels.Decision("a", false), new ChatModels.Decision("b", true)),
+                luna.inputs.get(1).decisions());
+        assertEquals(1, outcome.approved());
+    }
+
+    @Test
+    void theSameReadForAnotherRequirementIsReadOnceAndServesBoth() {
+        luna.script.add(n -> round(1_000, serving("a", "KRX:000660", "r1")));
+        luna.script.add(n -> round(1_000, serving("b", "KRX:000660", "r2")));
+        luna.script.add(n -> done());
+
+        var outcome = runFor(HYNIX_PART, new ChatModels.AgentRequirement("r2", "SK하이닉스 공급망", false, List.of("KRX:000660"), true));
+
+        assertEquals(2, outcome.approved());
+        assertTrue(luna.made.get(1).structuredContent() instanceof Map<?, ?> second && second.containsKey("cachedFrom"),
+                "the requirements are no part of the request, so the second call reuses the first read");
+        assertEquals(1, outcome.resultsOf("r1").size());
+        assertEquals(1, outcome.resultsOf("r2").size());
+    }
+
+    private static ChatModels.ApprovalRequest searchFor(String id, String query, String... requirements) {
+        return new ChatModels.ApprovalRequest(id, "web_search", Map.of("targets", List.of(query)), List.of(requirements));
+    }
+
+    private ChatAgentPath.Outcome webRun(ChatModels.AgentRequirement... requirements) {
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner,
+                new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock));
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        return agent.run(attached.run(), attached.control(), List.of(requirements),
+                List.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH), 20, steps(false));
+    }
+
+    private static final ChatModels.AgentRequirement CONCEPT = new ChatModels.AgentRequirement("r1", "HBM이 뭐야", true, List.of(), true);
+    private static final ChatModels.AgentRequirement FACT =
+            new ChatModels.AgentRequirement("r2", "SK하이닉스 최신 소식", false, List.of("KRX:000660"), true);
+
+    @Test
+    void aConceptOfAMixedRunSearchesFirstWhileItsFactPartWaitsForItsOwnRead() {
         useWeb();
-        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(search("w0", "SK하이닉스 최신 소식"),
-                new ChatModels.ApprovalRequest("c1", "company_read", Map.of("targets", List.of("KRX:000660")))), null));
-        luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(search("w1", "SK하이닉스 최신 소식")), null));
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(searchFor("w0", "HBM", "r1"),
+                searchFor("w1", "HBM 수요", "r1", "r2"), serving("c1", "KRX:000660", "r2")), null));
+        luna.script.add(n -> done());
+
+        var outcome = webRun(CONCEPT, FACT);
+
+        assertEquals(List.of(new ChatModels.Decision("w0", true), new ChatModels.Decision("w1", false),
+                new ChatModels.Decision("c1", true)), luna.inputs.get(1).decisions(),
+                "the concept's search binds to the concept; one naming the fact too is the fact's first look");
+        assertEquals(1, outcome.resultsOf("r1").size());
+        assertTrue(outcome.resultsOf("r1").getFirst().capabilityId().equals("web.search"));
+        assertTrue(outcome.resultsOf("r2").stream().noneMatch(r -> r.capabilityId().equals("web.search")));
+    }
+
+    @Test
+    void anotherRequirementsGapOpensNoSearch() {
+        useWeb();
+        var unread = new ChatModels.AgentRequirement("r3", "삼성전자 소식", false, List.of("KRX:005930"), true);
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(serving("c1", "KRX:000660", "r2")), null));
+        luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(searchFor("w0", "삼성전자 소식", "r3"),
+                searchFor("w1", "SK하이닉스 소식", "r2")), null));
+        luna.script.add(n -> done());
+
+        webRun(FACT, unread);
+
+        assertEquals(List.of(new ChatModels.Decision("w0", false), new ChatModels.Decision("w1", true)),
+                luna.inputs.get(2).decisions(), "only r2's own read came back empty; r3 has had no look yet");
+    }
+
+    @Test
+    void aReadThatFoundSomethingLeavesItsRequirementClosed() {
+        var empty = new ChatToolResult("chat-tool/v1", "tc-1", "company.read", "v", List.of(), List.of(), false, false, null);
+        var found = new ChatToolResult("chat-tool/v1", "tc-2", "company.read", "v",
+                List.of(new com.zoop.chat.tool.ChatToolItem("KRX:005930", "company", "삼성전자", List.of(), List.of())), List.of(),
+                false, false, null);
+
+        assertEquals(java.util.Set.of("r2"), ChatMcpAgent.unmet(List.of(empty, found),
+                Map.of("tc-1", List.of("r2"), "tc-2", List.of("r3"))));
+    }
+
+    @Test
+    void aServiceRulePartNeverOpensTheWebAndTheOtherPartsStillDo() {
+        useWeb();
+        var rule = new ChatModels.AgentRequirement("r1", "알림 설정 방법", false, List.of("KRX:000660"), false);
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(serving("c1", "KRX:000660", "r1", "r2")), null));
+        luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(searchFor("w0", "알림 설정", "r1"),
+                searchFor("w1", "알림 설정 소식", "r1", "r2"), searchFor("w2", "SK하이닉스 소식", "r2")), null));
+        luna.script.add(n -> done());
+
+        webRun(rule, FACT);
+
+        assertEquals(List.of(new ChatModels.Decision("w0", false), new ChatModels.Decision("w1", false),
+                new ChatModels.Decision("w2", true)), luna.inputs.get(2).decisions());
+    }
+
+    @Test
+    void aMixedRunsFactPartSearchesAfterItsReadFoundNothing() {
+        useWeb();
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(searchFor("w0", "SK하이닉스 최신 소식", "r2"),
+                serving("c1", "KRX:000660", "r2")), null));
+        luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(searchFor("w1", "SK하이닉스 최신 소식", "r2")), null));
         luna.script.add(n -> done());
         var circuit = new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
         var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit);
         var attached = executor.attach(JOB, 1).orElseThrow();
         agent.run(attached.run(), attached.control(), List.of(
-                new ChatModels.AgentRequirement("r1", "HBM이 뭐야", true, List.of()),
-                new ChatModels.AgentRequirement("r2", "SK하이닉스 최신 소식", false, List.of("KRX:000660"))),
+                new ChatModels.AgentRequirement("r1", "HBM이 뭐야", true, List.of(), true),
+                new ChatModels.AgentRequirement("r2", "SK하이닉스 최신 소식", false, List.of("KRX:000660"), true)),
                 List.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH), 20, steps(false));
 
         assertEquals(List.of(new ChatModels.Decision("w0", false), new ChatModels.Decision("c1", true)),
-                luna.inputs.get(1).decisions(), "a mixed run cannot bind the early query to its concept requirement");
+                luna.inputs.get(1).decisions(), "a fact's query names the fact, whose first look is internal");
         assertEquals(List.of(new ChatModels.Decision("w1", true)), luna.inputs.get(2).decisions(),
                 "after the internal read found nothing, the normal last-resort rule opens the web");
     }
@@ -407,7 +643,7 @@ class ChatMcpAgentTest {
     void atMostFourCallsAreApprovedInARoundSoAtMostFourRunAtOnce() {
         // Five reachable calls asked at once (the resolved company at five result limits): the fifth waits a round.
         luna.script.add(n -> new ChatModels.AgentStep("resp_1", java.util.stream.IntStream.rangeClosed(1, 5)
-                .mapToObj(i -> new ChatModels.ApprovalRequest("mcpr_" + i, "company_read",
+                .mapToObj(i -> ask("mcpr_" + i, "company_read",
                         Map.of("targets", List.of("KRX:000660"), "limit", i)))
                 .toList(), null));
         luna.script.add(n -> done());
@@ -425,15 +661,15 @@ class ChatMcpAgentTest {
     void aTargetTheServerNeverResolvedAndNoApprovedCallReturnedIsDenied() {
         // Round 1: an id nobody resolved is denied; the resolved company is approved.
         luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(
-                new ChatModels.ApprovalRequest("mcpr_guess", "company_read", Map.of("targets", List.of("KRX:999999"))),
-                new ChatModels.ApprovalRequest("mcpr_known", "company_read", Map.of("targets", List.of("KRX:000660")))),
+                ask("mcpr_guess", "company_read", Map.of("targets", List.of("KRX:999999"))),
+                ask("mcpr_known", "company_read", Map.of("targets", List.of("KRX:000660")))),
                 null));
         // Round 2: a company the approved call returned is now reachable; one mixed with a guess is not.
         luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(
-                new ChatModels.ApprovalRequest("mcpr_related", "company_read", Map.of("targets", List.of("KRX:005930"))),
-                new ChatModels.ApprovalRequest("mcpr_mixed", "company_read",
+                ask("mcpr_related", "company_read", Map.of("targets", List.of("KRX:005930"))),
+                ask("mcpr_mixed", "company_read",
                         Map.of("targets", List.of("KRX:005930", "KRX:999999"))),
-                new ChatModels.ApprovalRequest("mcpr_shape", "company_read", Map.of("targets", "KRX:005930"))),
+                ask("mcpr_shape", "company_read", Map.of("targets", "KRX:005930"))),
                 null));
         luna.script.add(n -> done());
 
@@ -661,6 +897,31 @@ class ChatMcpAgentTest {
         }
     }
 
+    private static final String UNREADABLE = "KRX:000001";
+
+    @org.junit.jupiter.api.Test
+    void anApprovedReadThatFailedFaultsTheRequirementsItServedAndNoOthers() {
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(serving("a", UNREADABLE, "r1"),
+                serving("b", "KRX:000660", "r2")), null));
+        luna.script.add(n -> done());
+
+        var outcome = runFor(new ChatModels.AgentRequirement("r1", "상장 준비 기업", false, List.of(UNREADABLE), true),
+                new ChatModels.AgentRequirement("r2", "SK하이닉스", false, List.of("KRX:000660"), true));
+
+        assertEquals(2, outcome.approved());
+        assertEquals(java.util.Set.of("r1"), outcome.faulted());
+        assertTrue(outcome.resultsOf("r1").isEmpty());
+        assertEquals(1, outcome.resultsOf("r2").size());
+    }
+
+    @org.junit.jupiter.api.Test
+    void aFailedSearchIsAWebFaultNoRequirementsFault() {
+        assertEquals(java.util.Set.of(), ChatMcpAgent.faulted(Map.of("w", List.of("r1")), java.util.Set.of("w"), List.of(),
+                java.util.Set.of()));
+        assertEquals(java.util.Set.of("r2"), ChatMcpAgent.faulted(Map.of("c", List.of("r1", "r2")), java.util.Set.of(), List.of(),
+                java.util.Set.of("r1")), "a concept named beside a fact never rested on the read");
+    }
+
     private static ChatTool tool(ChatCapability capability) {
         return new ChatTool() {
             @Override
@@ -676,6 +937,7 @@ class ChatMcpAgentTest {
                                     List.of("KRX:000660"), List.of("ev-1"))), List.of("ev-1"), false, false);
                 }
                 String id = request.targets().getFirst();
+                if (UNREADABLE.equals(id)) throw new com.zoop.chat.tool.ChatToolUnavailable("snapshot");
                 // Each company relates to Samsung Electronics, which a later round may then read.
                 return new ChatToolOutput(scope.graphVersionId(),
                         List.of(new ChatToolItem(id, "company", "SK하이닉스", List.of(id, "KRX:005930"), List.of("ev-1"))),

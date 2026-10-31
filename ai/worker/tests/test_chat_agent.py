@@ -41,7 +41,7 @@ def continuation(*decisions: tuple[str, bool], previous: str = "resp_1") -> dict
 
 
 def request(payload: dict[str, Any], *, mode: str = "live", invocation: str = "job-1:a1:agent-1") -> StageRequest:
-    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-2", "invocationId": invocation, "stage": "chat-agent",
+    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-4", "invocationId": invocation, "stage": "chat-agent",
                                         "mode": mode, "input": payload})
 
 
@@ -161,17 +161,30 @@ def test_the_grant_token_never_enters_an_identity():
 
 # ---- live steps --------------------------------------------------------------------------------------------------------------
 
+@pytest.mark.parametrize("named", [None, "r1", [], ["r1", "r1"], ["r 1"], [1], ["r1"] * 7])
+def test_a_malformed_requirementIds_names_no_requirement_and_is_left_for_the_application_to_deny(named, tmp_path):
+    arguments = {"targets": ["KRX:000660"]} if named is None else {"targets": ["KRX:000660"], "requirementIds": named}
+    result = run(request(agent_input()), tmp_path, Endpoint(approval_response(("mcpr_1", "company_read", arguments))))
+
+    assert result.status == "succeeded", result
+    assert result.answer["approvalRequests"] == [{"approvalRequestId": "mcpr_1", "toolName": "company_read",
+                                                  "arguments": {"targets": ["KRX:000660"]}, "requirementIds": []}]
+
+
 def test_a_step_that_stops_at_approval_requests_relays_them_and_never_stores_the_token(tmp_path):
-    endpoint = Endpoint(approval_response(("mcpr_1", "company_read", {"targets": ["KRX:000660"]}),
-                                          ("mcpr_2", "graph_path_read", {"targets": ["KRX:000660", "KRX:005930"]})))
+    endpoint = Endpoint(approval_response(("mcpr_1", "company_read", {"targets": ["KRX:000660"], "requirementIds": ["r1"]}),
+                                          ("mcpr_2", "graph_path_read", {"targets": ["KRX:000660", "KRX:005930"],
+                                                                         "requirementIds": ["r1", "r2"]})))
     result = run(request(agent_input()), tmp_path, endpoint)
 
     assert result.status == "succeeded", result
     step = result.answer
     assert step["status"] == "approval_required" and step["responseId"] == "resp_1" and step["answer"] is None
     assert step["approvalRequests"] == [
-        {"approvalRequestId": "mcpr_1", "toolName": "company_read", "arguments": {"targets": ["KRX:000660"]}},
-        {"approvalRequestId": "mcpr_2", "toolName": "graph_path_read", "arguments": {"targets": ["KRX:000660", "KRX:005930"]}}]
+        {"approvalRequestId": "mcpr_1", "toolName": "company_read", "arguments": {"targets": ["KRX:000660"]},
+         "requirementIds": ["r1"]},
+        {"approvalRequestId": "mcpr_2", "toolName": "graph_path_read", "arguments": {"targets": ["KRX:000660", "KRX:005930"]},
+         "requirementIds": ["r1", "r2"]}]
     path, body, authorization = endpoint.calls[0]
     assert path.endswith("/responses") and authorization == "Bearer luna-key-synthetic"
     assert body["tools"][0]["authorization"] == TOKEN and body["tools"][0]["server_url"] == URL
@@ -299,7 +312,7 @@ def test_the_agent_configuration_pins_luna_at_medium():
 def test_an_authored_replay_step_matches_its_input_whatever_the_token(tmp_path):
     config = stage_config("chat-agent", "replay")
     fixture = tmp_path / "replay.json"
-    fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-2", "recordingKind": "authored-test", "responses": [
+    fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-4", "recordingKind": "authored-test", "responses": [
         {"stage": "chat-agent", "inputDigest": request_identity(request(agent_input(mcp={**agent_input()["mcp"], "recipient": "authored-replay"}),
                                                 mode="replay"), config),
          "response": {**approval_response(("mcpr_1", "company_read", {"targets": ["KRX:000660"]})),
@@ -325,7 +338,7 @@ def test_a_step_for_another_recipient_than_the_stages_own_is_never_sent(tmp_path
         result = run(request(payload), tmp_path, endpoint)
     else:
         fixture = tmp_path / "replay.json"
-        fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-2", "recordingKind": "authored-test",
+        fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-4", "recordingKind": "authored-test",
                                        "responses": []}), encoding="utf-8")
         result = invoke(request(payload, mode="replay"), state_dir=tmp_path, registry=None, sender=ReplaySender(fixture))
     assert result.status == "failed" and result.failure.code == "mcp_recipient_mismatch"

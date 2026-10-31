@@ -4902,7 +4902,38 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | limitations | 필수 | [ChatLimitation](#schema-chatlimitation)[] | answered에서 답하지 않은 요구. 모든 필수 요구는 본문에서 근거와 함께 답했거나 이 배열의 항목 중 정확히 하나에 속한다. answered가 아니면 빈 배열이며 전체 이유는 reason을 쓴다. 일부 요구의 조회만 시간 초과·자료 일시 불가로 실패하면 그 요구는 tool_unavailable 항목이고 나머지는 답한다. 답한 요구가 하나도 없거나 어댑터 오류면 결과가 아니라 failed다. 답한 요구 옆의 주의(내 종목 앞 5개만 확인한 results_truncated, 질문한 기업이나 기준점이 보유·관심 종목이 아닌 not_in_member_scope)도 여기에 둔다. |
 | answerStatus | 필수 | string {complete, partial, guidance} | job.status·outcome과 별개인 답변 완결 정도. answered에서 명시 요구를 모두 답했으면 complete(notices가 있어도), 일부라도 답하지 못했으면 partial(limitations가 있으면 partial이며, 예외는 기준점만 보유·관심 종목 밖이고 조회는 한 not_in_member_scope 하나), clarification·guidance·insufficient_evidence이거나 돌려줄 때 인용 근거를 읽을 수 없어 본문을 고정 안내로 바꿨으면 guidance다. 서버가 정하며 모델 자기평가로 정하지 않는다. 이 필드 이전에 저장된 결과는 outcome과 limitations로 계산한다(answered이고 limitations가 있으면 partial). |
 | notices | 필수 | [ChatNotice](#schema-chatnotice)[] | 답변을 막지 않은 장애·우회. 이 필드 이전에 저장된 결과는 빈 배열이다. |
+| uiActions | 필수 | [ChatUiAction](#schema-chatuiaction)[] | 답변에서 회원이 눌러 열 수 있는 화면. 서버가 답한 요구의 실제 조회 결과로만 만들며 모델이 제안하지 않는다. 눌렀을 때만 실행하고, polling·재열람으로 실행하지 않는다. 돌려줄 때 지금 볼 수 없는 기업이 들어간 항목은 뺀다. 이 필드 이전에 저장된 결과는 빈 배열이다. |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
+
+<a id="schema-chatuiaction"></a>
+
+### ChatUiAction
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| actionId | 필수 | string | 이 결과 안에서만 유일한 서버 발급 ID |
+| kind | 필수 | string {open_company, focus_path, open_briefing} | open_company: 기업 상세. focus_path: 지도에서 두 기업 사이 경로. open_briefing: 해당 회차 브리핑. 클라이언트는 모르는 kind를 표시하지 않는다. |
+| label | 필수 | string | 서버가 조회 결과의 이름으로 만든 표시 문구 |
+| requirementIds | 필수 | string[] | 이 동작을 낳은 답한 요구 |
+| target | 필수 | [ChatUiActionTarget](#schema-chatuiactiontarget) |  |
+
+<a id="schema-chatuiactiontarget"></a>
+
+### ChatUiActionTarget
+
+kind에 해당하는 필드만 값이 있다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 필수 | string / null | open_company |
+| fromId | 필수 | string / null | focus_path 시작 기업 |
+| toId | 필수 | string / null | focus_path 끝 기업 |
+| date | 필수 | string / null | open_briefing 회차의 KST 날짜 |
+| edition | 필수 | string {morning, evening} / null | open_briefing 회차 |
+| graphVersion | 필수 | string / null | focus_path: 경로를 읽은 그래프 버전. 지금 지도가 다른 스냅샷이면 열지 않고 안내한다. |
+| asOf | 필수 | string (date-time) / null | focus_path: 질문에 고정된 기준 시각 |
 
 <a id="schema-chatsessionresponse"></a>
 

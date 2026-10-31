@@ -29,11 +29,11 @@
   - 실행이나 관측 중 예외로 끝난 사례도 실패로 보고한다. `observed.outcome=error`이고, `error`에 던져진 예외, `observed.stages`에 도달한 단계를 남긴 뒤 예외를 다시 던진다. 예: 대본에 없는 생성 단계가 호출된 경우.
   - 요약의 `setCases`는 세트 전체 사례 수, `cases`는 보고된 사례 수, `errors`는 예외로 끝난 사례 수다. 세트에는 있는데 보고되지 않은 사례 ID는 `notReported`에 적고 표 위에 따로 표시한다. 필터로 일부만 돌렸거나 시작하지 못한 사례이며 통과로 세지 않는다.
 
-실행 경로는 운영과 같다. 질문 → `ChatModelStages`(요구 분해·이름 해석, 모델 단계 wire) → `OrchestratedChatEngine`(계획·조회·검사·결과) → 실제 읽기 도구(`company.read`, `issue.read`, `evidence.resolve`, `graph.path.read`, `zoopPolicy.read`). 다른 점은 세 가지뿐이다.
+실행 경로는 운영과 같다. 질문 → `ChatModelStages`(요구 분해·이름 해석, 모델 단계 wire) → `OrchestratedChatEngine`(계획·조회·검사·결과) → 실제 읽기 도구(`company.read`, `issue.read`, `evidence.resolve`, `graph.path.read`, `zoopPolicy.read`, `briefing.read`, `selectionRule.read`). 다른 점은 세 가지뿐이다.
 
 1. AI 서비스 대신 대본 클라이언트가 라우터·생성·검증 단계에 답한다.
 2. 그래프는 합성 fixture `fixture-2026-10-08`(기업 7개, 사건 4개)을 고정 버전으로 읽는다. 모든 근거는 읽을 수 있다.
-3. 카탈로그 이름, 기업 개요 2건, 약관·개인정보 처리방침 각 2구간은 세트 파일의 합성 값이다. 카탈로그에는 그래프에 없는 기업(한미약품, 카카오)과 같은 별칭을 가진 두 기업(`한미`)을 일부러 넣었다.
+3. 카탈로그 이름, 기업 개요 2건, 약관·개인정보 처리방침 각 2구간, 발행 브리핑 회차(`briefings`), 사건의 공개 기록(`publications`)은 세트 파일의 합성 값이다. 카탈로그에는 그래프에 없는 기업(한미약품, 카카오)과 같은 별칭을 가진 두 기업(`한미`)을 일부러 넣었다. 세트에 없는 회차는 `not_ready`, 공개 기록이 없는 사건은 결정 기록 없음으로 읽는다.
 
 ## 3. 사례 형식
 
@@ -98,7 +98,7 @@ export JAVA_HOME=<JDK 21>
 
 ## 5. v1 사례와 드러난 공백
 
-45개 사례: Q01 2, Q02 2, Q03 8, Q04 2, Q05 3, Q06 1, Q07 8, Q08 1, 복합 6, 투자 판단 4, 공격 3, 확인 질문 1, 장애 4. 2026-10-27 기준 모두 통과한다(대본 실행).
+51개 사례: Q01 2, Q02 2, Q03 9, Q04 2, Q05 3, Q06 3, Q07 9, Q08 2, 복합 7, 투자 판단 4, 공격 3, 확인 질문 1, 장애 4. 2026-10-30 기준 모두 통과한다(대본 실행).
 
 세트를 만들며 확인한 현재 공백(`gap` 표시 사례):
 
@@ -106,7 +106,8 @@ export JAVA_HOME=<JDK 21>
 | --- | --- |
 | `q03-catalog-only-company` | 카탈로그에만 있고 공개 그래프에 없는 기업은 `nothing_found`다. 실제 데이터에서 근거 부족의 주원인인지 잰다. |
 | `q01-help-unbound` | 도움말 도구 미연결로 `out_of_scope` 안내다. |
-| `q06-briefing`, `q08-selection-rule` | 도구는 구현됐지만(`briefing.read`, `selectionRule.read`, 2026-10-30) 이 실행기의 레지스트리에 없어 아직 `out_of_scope`로 고정돼 있다. 도구를 등록하고 기대값을 고쳐야 한다. |
+
+Q06은 `q06-briefing`(발행 회차와 기사 인용), `q06-briefing-evidence`(회차의 근거 읽기), `q06-round-not-published`(회차 없음은 `nothing_found`), `compound-company-and-briefing`이 고정한다. Q08은 `q08-selection-rule`(공개 기록만 있어 인용 없는 답), `q08-selection-in-briefing`(브리핑 선정 기록과 기사 인용)이 고정한다. `compound-two-parts-one-unsupported`는 미연결 도구 사례로 남기려고 두 번째 요구를 도움말 질문으로 바꿨다.
 
 v1에서 찾은 공백 중 사건 이름 미해석과 기업 대상 `issue.read`의 빈 결과는 2026-10-27에 고쳤다(구현 계획 사건 지목 결정 (5)·(6)). `q03-issue-named`, `q03-issue-and-company-named`, `q03-company-issues-by-name`이 그 동작을 고정하고, `failure-graph-unreadable-concept`는 그래프를 읽을 수 없어도 순수 개념 질문은 답하는지(사건 이름을 필요할 때만 해석하는지) 확인한다. 같은 말에 맞는 사건이 여럿인 확인 질문은 fixture에 그런 사건이 없어 `IssueNameResolverTest`·`ChatModelStagesTest`가 다룬다.
 
@@ -114,7 +115,7 @@ Q07에서 질문이 기업을 지목하는 경우(구현 계획 결정 (11))는 
 
 세트에 넣지 못한 것:
 
-- **체크포인트·의존 단계**: 라우터 wire(`zoop-ai-chat-2`)에 의존 관계 필드가 없어 `ChatModelStages`는 항상 `dependsOn: null`을 만든다. 질문에서 `exactly(2)` 같은 체크포인트를 만들 경로가 없으므로, 그 흐름은 `OrchestratedChatEngineTest`의 결정 대본으로만 확인된다. 라우터 계약에 의존 관계가 들어오면 이 세트에 사례를 추가한다.
+- **체크포인트·의존 단계의 나머지**: 라우터 wire(`zoop-ai-chat-3`)가 `dependsOn`을 전달한다(2026-10-30). 세트에는 `q07-dependent-company-details`(`exactly(2)` 충족)만 있고, 0개·미달·초과 분기는 아직 `OrchestratedChatEngineTest`의 결정 대본으로만 확인된다. 실제 Jev가 의존 관계를 얼마나 맞히는지는 재지 않았다.
 - **확인 질문의 답(깊이 1·2)**, **선택 근거로 좁힌 질문(`evidencePool`)**, **시간 한도(`deadline_guard`)**: 실행기가 단일 턴·고정 시간만 다룬다. 필요하면 사례 형식에 `turns`와 남은 시간을 더한다.
 
 ## 6. 다음 단계

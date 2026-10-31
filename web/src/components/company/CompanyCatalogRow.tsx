@@ -37,23 +37,23 @@ export default function CompanyCatalogRow({
       <CompanyLogo
         name={row?.name ?? id}
         logoUrl={row?.logoUrl}
-        className="size-7 rounded-full border border-zoop-muted bg-white text-[11px] font-bold"
+        className="size-7 rounded-full border border-zoop-muted bg-white text-caption font-bold"
       />
       <span className="min-w-0 flex-1">
-        <strong className="block truncate text-[11px] font-semibold text-zoop-ink">
+        <strong className="block truncate text-caption font-semibold text-zoop-ink">
           {row?.name ?? id}
         </strong>
         {quote ? (
-          <span className="block [&_span]:min-w-0 [&_span]:flex-row [&_span]:flex-wrap [&_span]:items-baseline [&_span]:justify-start [&_span]:gap-1 [&_strong]:text-[11px]">
+          <span className="block [&_span]:min-w-0 [&_span]:flex-row [&_span]:flex-wrap [&_span]:items-baseline [&_span]:justify-start [&_span]:gap-1 [&_strong]:text-caption">
             <StockQuote companyId={id} />
           </span>
         ) : (
-          <small className="block text-[11px] text-zoop-muted">
+          <small className="block text-caption text-zoop-muted">
             {row?.ticker ?? (detail.loading ? '확인 중…' : '코드 미제공')}
           </small>
         )}
         {detail.error && (
-          <span className="text-[11px] text-zoop-muted">
+          <span className="text-caption text-zoop-muted">
             기업 정보 확인 실패
           </span>
         )}

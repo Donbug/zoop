@@ -80,6 +80,9 @@ class ChatAgentPathEngineTest {
         List<String> notices = List.of();
         boolean available = true;
         ChatModels.Failure failure;
+        /** The requirements each call served, by call id; null when every call served every requirement. */
+        Map<String, List<String>> served;
+        Set<String> faulted = Set.of();
 
         Agent(Set<ChatCapability> exposed) {
             this.exposed = exposed;
@@ -104,7 +107,14 @@ class ChatAgentPathEngineTest {
             // One step through the engine's guard and limit, like the real path.
             closing.add(steps.closing());
             steps.run(() -> new ChatModels.AgentStep("resp_1", List.of(), answer));
-            return new Outcome(answer, results, 1, 1, 0, notices);
+            Map<String, List<String>> calls = served;
+            if (calls == null) {
+                calls = new java.util.HashMap<>();
+                for (ChatToolResult result : results) {
+                    calls.put(result.toolCallId(), given.stream().map(ChatModels.AgentRequirement::id).toList());
+                }
+            }
+            return new Outcome(answer, results, calls, 1, 1, 0, notices, faulted);
         }
     }
 
@@ -202,6 +212,46 @@ class ChatAgentPathEngineTest {
         assertEquals(List.of(List.of(ChatCapability.COMPANY_READ)), agent.allowed);
     }
 
+    @Test
+    void aServiceRulePartClosesTheWebForItselfNotForTheFactBesideIt() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q01, 0.9), Map.of("zoopPolicy.read", 0.9)),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.ZOOP_POLICY_READ, ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH));
+        agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of(),
+                List.of());
+        agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
+
+        engine(agent).answer(run(), new Control(Duration.ofSeconds(60)));
+
+        assertTrue(agent.allowed.getFirst().contains(ChatCapability.WEB_SEARCH));
+        assertEquals(List.of(false, true), agent.requirements.getFirst().stream().map(ChatModels.AgentRequirement::web).toList());
+    }
+
+    @Test
+    void aFaultedCallOfAnAnsweredRequirementIsANoticeAndOfAnUnansweredOneALimitation() {
+        decision = ChatPlannerTest.decision(
+                req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ));
+        agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of("r2"),
+                List.of());
+        agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
+
+        agent.faulted = Set.of("r1");
+        ChatResult answered = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertEquals(List.of("tool_unavailable"), answered.notices().stream().map(n -> n.code()).toList());
+        assertEquals(List.of("요구 r1"), answered.notices().getFirst().labels());
+        assertEquals(List.of("evidence_insufficient"), answered.limitations().stream().map(l -> l.kind()).toList());
+
+        agent.faulted = Set.of("r2");
+        ChatResult limited = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertTrue(limited.notices().isEmpty());
+        assertEquals(List.of("tool_unavailable"), limited.limitations().stream().map(l -> l.kind()).toList());
+        assertEquals("partial", limited.answerStatus());
+    }
+
     private static final String HIT = "web-" + "a".repeat(32);
 
     private static ChatToolResult webResult() {
@@ -246,6 +296,34 @@ class ChatAgentPathEngineTest {
             assertEquals(new ChatEngineOutcome.Failed("validation_failed", null, false),
                     engine(agent).answer(run(), new Control(Duration.ofSeconds(60))), mixed.basis());
         }
+    }
+
+    @Test
+    void aSectionCitesOnlyTheResultsOfCallsThatServedItsRequirement() {
+        // D-AI-02: the evidence of a read approved for r2 cannot back a section answering r1.
+        decision = ChatPlannerTest.decision(
+                req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ));
+        agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of("r2"),
+                List.of());
+        agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
+
+        agent.served = Map.of("tc-0", List.of("r2"));
+        assertEquals(new ChatEngineOutcome.Failed("validation_failed", null, false),
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+
+        agent.served = Map.of("tc-0", List.of("r1"));
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = outcome.result();
+        assertEquals("answered", result.outcome());
+        assertEquals(List.of(EV_HYNIX), result.citations().stream().map(Citation::evidenceId).toList());
+        var coverage = outcome.routeSummary().path("coverage");
+        assertEquals("answered", coverage.get(0).path("status").asString());
+        assertEquals("tc-0", coverage.get(0).path("toolCallIds").get(0).asString());
+        assertEquals("limited", coverage.get(1).path("status").asString());
+        assertTrue(coverage.get(1).path("toolCallIds").isEmpty(), "no call named r2");
     }
 
     @Test
@@ -458,7 +536,13 @@ class ChatAgentPathEngineTest {
                 return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
             }
         };
-        var registry = new ChatToolRegistry(List.of(company, issue));
+        ChatTool policy = new ChatTool() {
+            public ChatCapability capability() { return ChatCapability.ZOOP_POLICY_READ; }
+            public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
+                return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
+            }
+        };
+        var registry = new ChatToolRegistry(List.of(company, issue, policy));
         var runner = new ChatToolRunner(registry);
         runners.add(runner);
         ChatModels.Router router = (run, bound) -> {

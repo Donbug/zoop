@@ -31,8 +31,8 @@ import type { FeedbackPeriod, TranscriptFilter } from '@/types/admin/insights';
 import { formatKst } from '@/util/format';
 import { transcriptPath } from './transcriptPath';
 
-const INPUT = `h-10 rounded-full border border-transparent bg-zoop-soft px-4 text-xs text-zoop-ink focus:border-zoop-ink ${FOCUS_RING}`;
-const FIELD_LABEL = 'flex flex-col gap-1 text-[11px] text-zoop-muted';
+const INPUT = `h-10 rounded-full border border-transparent bg-zoop-soft px-4 text-caption text-zoop-ink focus:border-zoop-ink ${FOCUS_RING}`;
+const FIELD_LABEL = 'flex flex-col gap-1 text-caption text-zoop-muted';
 
 /** 지금 적용된 기간을 한 줄로: 직접 고른 날짜가 있으면 그것, 아니면 미리 정한 기간 */
 function periodText({ window, start, end }: FeedbackPeriod) {
@@ -92,7 +92,7 @@ export function DateRangeForm({
           value={from}
           max={to || undefined}
           onChange={(event) => setFrom(event.target.value)}
-          className={`${INPUT} w-40 font-inter`}
+          className={`${INPUT} w-40 font-num`}
         />
       </label>
       <label className={FIELD_LABEL}>
@@ -102,7 +102,7 @@ export function DateRangeForm({
           value={to}
           min={from || undefined}
           onChange={(event) => setTo(event.target.value)}
-          className={`${INPUT} w-40 font-inter`}
+          className={`${INPUT} w-40 font-num`}
         />
       </label>
       <button
@@ -126,7 +126,7 @@ export function DateRangeForm({
         </button>
       )}
       {invalid && (
-        <p role="alert" className="basis-full text-[11px] text-zoop-alert">
+        <p role="alert" className="basis-full text-caption text-zoop-alert">
           시작일이 종료일보다 늦어요.
         </p>
       )}
@@ -199,11 +199,11 @@ export function FeedbackSummaryPanel({ period }: { period: FeedbackPeriod }) {
                 </td>
                 <td className={`${TD} text-right`}>
                   {feature.total === 0 ? (
-                    <span className="text-[11px] text-zoop-muted">
+                    <span className="text-caption text-zoop-muted">
                       평가 없음
                     </span>
                   ) : feature.rate === null ? (
-                    <span className="text-[11px] text-zoop-muted">
+                    <span className="text-caption text-zoop-muted">
                       표본 부족({count(feature.total)}/{data.minSample})
                     </span>
                   ) : (
@@ -233,7 +233,7 @@ export function FeedbackSummaryPanel({ period }: { period: FeedbackPeriod }) {
                 {data.features.map((feature) => (
                   <th key={feature.feature} className={`${TH} text-right`}>
                     {feature.label}
-                    <span className="block text-[11px] font-normal">
+                    <span className="block text-caption font-normal">
                       좋아요 / 싫어요(비율)
                     </span>
                   </th>
@@ -243,7 +243,7 @@ export function FeedbackSummaryPanel({ period }: { period: FeedbackPeriod }) {
             <tbody>
               {dates.map((date) => (
                 <tr key={date}>
-                  <td className={`${TD} font-inter tabular-nums`}>{date}</td>
+                  <td className={`${TD} font-num tabular-nums`}>{date}</td>
                   {data.features.map((feature) => {
                     const day = feature.days.find((item) => item.date === date);
                     return (
@@ -313,7 +313,7 @@ export function DislikesPanel({
         <tbody>
           {rows.map((row) => (
             <tr key={`${row.feature}-${row.targetId}-${row.voter}`}>
-              <td className={`${TD} whitespace-nowrap font-inter tabular-nums`}>
+              <td className={`${TD} whitespace-nowrap font-num tabular-nums`}>
                 {formatKst(row.at)}
               </td>
               <td className={`${TD} whitespace-nowrap`}>{row.featureLabel}</td>
@@ -325,7 +325,7 @@ export function DislikesPanel({
                   <span className="text-zoop-faint">사유 없음</span>
                 )}
               </td>
-              <td className={`${TD} whitespace-nowrap font-inter`}>
+              <td className={`${TD} whitespace-nowrap font-num`}>
                 {row.voter}
               </td>
               <td className={TD}>
@@ -394,7 +394,7 @@ export function PurposeForm({
         {purpose ? '목적 바꾸기' : '대화록 열기'}
       </button>
       {missing && (
-        <p role="alert" className="basis-full text-[11px] text-zoop-alert">
+        <p role="alert" className="basis-full text-caption text-zoop-alert">
           열람 목적을 입력해 주세요.
         </p>
       )}
@@ -485,10 +485,10 @@ function TranscriptList({
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td className={`${TD} whitespace-nowrap font-inter tabular-nums`}>
+              <td className={`${TD} whitespace-nowrap font-num tabular-nums`}>
                 {formatKst(row.lastAt)}
               </td>
-              <td className={`${TD} whitespace-nowrap font-inter`}>
+              <td className={`${TD} whitespace-nowrap font-num`}>
                 {row.user}
                 <span className="ml-2 font-sans text-zoop-muted">
                   {row.userKind === 'member' ? '회원' : '비회원'}

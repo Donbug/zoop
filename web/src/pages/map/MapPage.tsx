@@ -730,6 +730,16 @@ function MapWorkspace({
     const sameSnapshot =
       (!target.graphVersion || target.graphVersion === shownVersion) &&
       (target.asOf ?? null) === (asOf ?? null);
+    if (target.kind === 'path') {
+      const ends = target.id.split(',');
+      if (
+        !sameSnapshot ||
+        !ends.every((id) => data?.nodes.some((node) => node.id === id))
+      )
+        return false;
+      updateQuery({ path: target.id, focus: null, hops: null, select: null });
+      return true;
+    }
     if (sameSnapshot) {
       if (!data?.nodes.some((node) => node.id === target.id)) return false;
       updateQuery({ focus: target.id, hops: '1', path: null });
@@ -940,7 +950,7 @@ function MapWorkspace({
       <h1 className="sr-only">지도</h1>
       <ServiceHeader />
       {tutorialOpen && (
-        <p className="border-b border-zoop-line bg-zoop-soft px-4 py-2 text-xs max-md:hidden">
+        <p className="border-b border-zoop-line bg-zoop-soft px-4 py-2 text-caption max-md:hidden">
           실제 시장 전체 지도 · 삼성전자를 중심으로 안내합니다.
         </p>
       )}
@@ -948,7 +958,7 @@ function MapWorkspace({
         <Link to={returnTo}>기업 상세로 돌아가기</Link>
       )}
       {historical && (
-        <p className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-xs">
+        <p className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-caption">
           기업 상세에서 선택한 시점 · {asOf} · {graphVersion ?? '버전 미제공'}
         </p>
       )}
@@ -1245,7 +1255,7 @@ function MapWorkspace({
                 role="group"
                 aria-label="지도 경로"
                 data-screen-id="D-GRP-07"
-                className={`absolute top-2 left-2 z-20 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-1 rounded-lg border border-zoop-line bg-zoop-paper p-2 text-[13px] text-zoop-ink ${pathIsCollapsed ? '' : 'max-md:hidden'}`}
+                className={`absolute top-2 left-2 z-20 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-1 rounded-lg border border-zoop-line bg-zoop-paper p-2 text-body text-zoop-ink ${pathIsCollapsed ? '' : 'max-md:hidden'}`}
               >
                 {data?.nodes
                   .filter((n) => n.id === pathFrom)
@@ -1254,7 +1264,7 @@ function MapWorkspace({
                       key={n.id}
                       name={n.label}
                       logoUrl={n.logoUrl}
-                      className="size-6 rounded-full bg-zoop-ink text-xs text-zoop-paper"
+                      className="size-6 rounded-full bg-zoop-ink text-caption text-zoop-paper"
                     />
                   ))}
                 <strong className="min-w-0 flex-1 truncate">
@@ -1274,7 +1284,7 @@ function MapWorkspace({
                       key={n.id}
                       name={n.label}
                       logoUrl={n.logoUrl}
-                      className="size-6 rounded-full bg-zoop-ink text-xs text-zoop-paper"
+                      className="size-6 rounded-full bg-zoop-ink text-caption text-zoop-paper"
                     />
                   ))}
                 <button
@@ -1456,7 +1466,7 @@ function MapWorkspace({
               )}
               {pathFrom && !tutorialOpen && (
                 <button
-                  className="min-h-11 w-full border-b border-zoop-line bg-zoop-paper px-4 text-left text-[13px] text-zoop-ink md:hidden"
+                  className="min-h-11 w-full border-b border-zoop-line bg-zoop-paper px-4 text-left text-body text-zoop-ink md:hidden"
                   onClick={() => setCollapsedPath(params.get('path'))}
                 >
                   지도로 접기
@@ -1692,17 +1702,8 @@ function MapWorkspace({
                 : undefined
             }
             onClosed={() => {
-              // 근거를 불러오지 못한 경우에도 창을 확인하고 닫으면 다음 단계로 이어 간다.
+              // D-GRP-T4/T5: 근거 창을 닫은 뒤 AI 버튼을 강조해 모달이 남지 않게 한다.
               if (tutorialOpen && tutorialStep === 4) setTutorialStep(5);
-            }}
-            onReady={(id) => {
-              if (
-                tutorialOpen &&
-                tutorialStep === 4 &&
-                target &&
-                id === `${target.company.id},${target.issue.id}`
-              )
-                setTutorialStep(5);
             }}
             mapResult={
               activeEvidence

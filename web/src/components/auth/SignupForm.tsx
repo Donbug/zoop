@@ -23,7 +23,7 @@ import {
 } from './authStyles';
 
 const checkLabel =
-  'flex min-h-8 items-center gap-2.5 text-sm font-medium text-gray-900';
+  'flex min-h-8 items-center gap-2.5 text-body font-medium text-zoop-ink';
 const checkbox = 'size-[18px] shrink-0 accent-gray-950';
 
 const usable = (term: SignupTerm) =>
@@ -96,14 +96,14 @@ export default function SignupForm({ social = false }: { social?: boolean }) {
       {frozen ? (
         <span
           aria-disabled="true"
-          className="text-sm font-semibold text-gray-400"
+          className="text-body font-semibold text-gray-400"
         >
           ← 시작 화면으로
         </span>
       ) : (
         <Link
           to="/login"
-          className="self-start text-sm font-semibold text-gray-700 hover:text-gray-950"
+          className="self-start text-body font-semibold text-zoop-ink hover:text-zoop-ink"
         >
           ← 시작 화면으로
         </Link>
@@ -293,11 +293,11 @@ export default function SignupForm({ social = false }: { social?: boolean }) {
                       {t.required ? '(필수)' : '(선택)'}
                     </span>
                   </label>
-                  <details className="ml-7 text-xs text-zoop-muted">
+                  <details className="ml-7 text-caption text-zoop-muted">
                     <summary className="cursor-pointer py-1">
                       {t.title} 본문 보기
                     </summary>
-                    <div className="mt-1 max-h-[200px] overflow-auto bg-white p-3 text-gray-700">
+                    <div className="mt-1 max-h-[200px] overflow-auto bg-white p-3 text-zoop-ink">
                       {usable(t) ? (
                         <MarkdownContent source={t.body!} headingOffset={1} />
                       ) : (

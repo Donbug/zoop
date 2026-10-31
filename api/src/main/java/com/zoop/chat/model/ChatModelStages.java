@@ -40,7 +40,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-2}). The server decides what is
+ * The orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-4}). The server decides what is
  * sent: the router gets the question chain, the requirements split by {@link ChatRequirementSplitter} and the descriptions of
  * the bound capabilities; company and issue names are resolved here, never by the model. Company names
  * ({@link CompanyNameResolver}) are resolved before the router, so a name that fits several companies becomes a clarification
@@ -157,7 +157,8 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
                 probabilities(r, "capabilities").forEach((k, v) -> {
                     if (boundCapabilities.contains(k)) caps.put(k, v);
                 });
-                decided.add(requirement(piece, types, caps, targets.get(piece.id()), number(r.get("prohibitedAdvice"))));
+                decided.add(new ChatRouteDecision.Requirement(piece.id(), piece.text(), true, types, caps,
+                        targets.get(piece.id()), number(r.get("prohibitedAdvice")), unlessNamed(targets.get(piece.id()), dependency(r))));
             }
             return new ChatRouteDecision(decided, null);
         });
@@ -170,7 +171,12 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         if (named.ambiguity() != null) return new ChatRouteDecision(List.of(), named.ambiguity());
         return new ChatRouteDecision(decision.requirements().stream().map(r -> new ChatRouteDecision.Requirement(r.id(),
                 r.label(), r.explicit(), r.types(), r.capabilities(), named.targets().get(r.id()), r.prohibitedAdvice(),
-                r.dependsOn())).toList(), null);
+                unlessNamed(named.targets().get(r.id()), r.dependsOn()))).toList(), null);
+    }
+
+    /** A requirement that names its target reads it: a dependent stage would read only what its source finds. */
+    private static ChatRouteDecision.Dependency unlessNamed(List<String> targets, ChatRouteDecision.Dependency dependency) {
+        return targets.isEmpty() ? dependency : null;
     }
 
     /**
@@ -479,7 +485,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
                 JsonNode arguments = request.get("arguments");
                 if (arguments == null || !arguments.isObject()) throw new IllegalArgumentException("arguments");
                 approvals.add(new ChatModels.ApprovalRequest(text(request, "approvalRequestId"), text(request, "toolName"),
-                        ARGUMENTS.convertValue(arguments, ARGUMENT_MAP)));
+                        ARGUMENTS.convertValue(arguments, ARGUMENT_MAP), strings(request, "requirementIds")));
             }
             JsonNode written = answer.get("answer");
             ChatGeneratedAnswer generated = null;
@@ -661,6 +667,16 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     private static double number(JsonNode value) {
         if (value == null || !value.isNumber()) throw new IllegalArgumentException("number");
         return value.doubleValue();
+    }
+
+    private static ChatRouteDecision.Dependency dependency(JsonNode requirement) {
+        JsonNode value = requirement.get("dependsOn");
+        if (value == null) throw new IllegalArgumentException("dependsOn");
+        if (value.isNull()) return null;
+        if (!value.isObject()) throw new IllegalArgumentException("dependsOn");
+        JsonNode count = value.get("count");
+        if (count == null || !count.isIntegralNumber()) throw new IllegalArgumentException("dependsOn.count");
+        return new ChatRouteDecision.Dependency(text(value, "requirementId"), text(value, "cardinality"), count.intValue());
     }
 
     private static Map<String, Double> probabilities(JsonNode node, String name) {
