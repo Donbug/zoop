@@ -371,6 +371,8 @@ class ChatEvalSetTest {
         var completed = (ChatEngineOutcome.Completed) outcome;
         ChatResult result = completed.result();
         JsonNode route = completed.routeSummary();
+        route.path("coverage").forEach(entry -> org.junit.jupiter.api.Assertions.assertNotEquals("pending",
+                entry.path("status").asString(), entry.toString()));
         // The reason code the server decided; the result carries its wording.
         o.put("outcome", result.outcome()).put("reason", route.path("reason").isString() ? route.get("reason").stringValue() : null)
                 .put("reasonText", result.reason()).put("answerBasis", result.answerBasis())

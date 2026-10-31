@@ -62,6 +62,8 @@ import tools.jackson.databind.node.ObjectNode;
  * an adapter fault is internal. None of them becomes a limitation or "nothing found".</li>
  * <li>A failed deterministic check, a contradicted claim or prohibited advice is {@code validation_failed}; nothing is
  * regenerated. A section held by the verifier drops the requirements it answers as {@code evidence_insufficient}.</li>
+ * <li>Each requirement's end is the server's own record ({@link ChatRequirementCoverage}, in the route summary): an answer
+ * leaving one undecided is {@code validation_failed}.</li>
  * <li>Limitations are recorded for the requirements the member stated; one the router only inferred is dropped silently
  * when it cannot be served. So is a concept requirement the planner split off ({@link ChatPlan.Origin#CONCEPT}): its
  * general section is answered beside its parent's result or limitation, and dropped when it breaks a general rule.</li>
@@ -202,9 +204,11 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 limits.generate().plus(limits.verify()).plus(limits.server()),
                 () -> router.route(run, bound));
         ChatPlan plan = planner.plan(run, decision, bound);
-        if (plan instanceof ChatPlan.Stop stop) return stopped(run, route, stop);
+        var coverage = new ChatRequirementCoverage(decision);
+        if (plan instanceof ChatPlan.Stop stop) return stopped(run, route, stop, coverage);
         var confirmed = (ChatPlan.Run) plan;
         record(route, confirmed);
+        coverage.plan(confirmed);
 
         var retrieved = new ChatRetrieval.Outcome(Map.of(), Map.of(), Set.of(), null, null);
         ChatGeneratedAnswer agentAnswer = null;
@@ -258,6 +262,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 if (!web.isEmpty()) results.put(p.id(), web);
             });
             retrieved = new ChatRetrieval.Outcome(results, Map.of(), Set.of(), null, null);
+            coverage.read(confirmed, results);
             agentAnswer = ran.answer();
             agentNotices = ran.notices();
             route.put("path", "agent").put("agentSteps", ran.steps()).put("approvedCalls", ran.approved())
@@ -271,7 +276,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             guard(control, limits.tools().plus(limits.generate()).plus(limits.verify()).plus(limits.server()));
             retrieved = retrieval.run(run, control, confirmed);
             if (retrieved.failed() != null) throw new Stop(toolFailure(retrieved.failed()));
-            if (retrieved.stop() != null) return stopped(run, route, retrieved.stop());
+            coverage.read(confirmed, retrieved.results());
+            if (retrieved.stop() != null) return stopped(run, route, retrieved.stop(), coverage);
             if (retrieved.faulted() != null) {
                 route.putArray("toolFaults").addAll(strings(retrieved.limitations().entrySet().stream()
                         .filter(e -> ChatRetrieval.TOOL_UNAVAILABLE.equals(e.getValue())).map(Map.Entry::getKey).toList()));
@@ -283,6 +289,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         Map<String, String> limited = new LinkedHashMap<>();
         confirmed.requirements().stream().filter(p -> p.mode() == Mode.LIMITED).forEach(p -> limited.put(p.id(), p.limitation()));
         limited.putAll(retrieved.limitations());
+        limited.forEach(coverage::limited);
         List<Branch> branches = new ArrayList<>();
         for (Planned p : confirmed.requirements()) {
             // A member-scope source is no branch: its companies go with the requirement it serves.
@@ -302,12 +309,13 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             boolean unanswerable = limited.values().stream().allMatch(k -> k.equals("investment_advice") || k.equals("out_of_scope"));
             if (unanswerable) {
                 return stopped(run, route, new ChatPlan.Stop("guidance",
-                        limited.containsValue("investment_advice") ? "investment_advice" : "out_of_scope", List.of()));
+                        limited.containsValue("investment_advice") ? "investment_advice" : "out_of_scope", List.of()),
+                        coverage);
             }
             return insufficient(run, route, limited.containsValue("results_truncated") ? RESULTS_TRUNCATED
                     : limited.containsValue("not_in_member_scope") ? NOT_IN_MEMBER_SCOPE
                     : limited.containsValue("precondition_unmet") ? PRECONDITION_UNMET : EVIDENCE_INSUFFICIENT,
-                    confirmed, retrieved);
+                    confirmed, retrieved, coverage);
         }
 
         ChatGeneratedAnswer generated;
@@ -373,7 +381,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                     : unanswered.stream().anyMatch(held::contains) ? EVIDENCE_HELD
                     : !unanswered.isEmpty() && retrieved.noneFound().containsAll(unanswered) ? NOTHING_FOUND
                     : limited.containsValue("precondition_unmet") ? PRECONDITION_UNMET : EVIDENCE_INSUFFICIENT;
-            return insufficient(run, route, cause, confirmed, retrieved);
+            return insufficient(run, route, cause, confirmed, retrieved, coverage);
         }
 
         Set<String> keptEvidence = new HashSet<>();
@@ -384,12 +392,14 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             Planned p = byId.get(entry.getKey());
             if (explicit(decision, p.id())) limitations.add(ChatResults.limitation(entry.getValue(), p.label()));
         }
+        kept.forEach(s -> s.requirementIds().forEach(coverage::answered));
         for (String id : insufficient) {
-            if (!explicit(decision, id)) continue;
             InsufficientCause cause = held.contains(id) ? EVIDENCE_HELD
                     : retrieved.noneFound().contains(id) ? NOTHING_FOUND : EVIDENCE_INSUFFICIENT;
-            limitations.add(ChatResults.insufficient(cause, byId.get(id).label()));
+            coverage.limited(id, cause.code());
+            if (explicit(decision, id)) limitations.add(ChatResults.insufficient(cause, byId.get(id).label()));
         }
+        if (!coverage.settled()) return validationFailed();
         for (String id : retrieved.cut()) {
             // Answered on only the first of the member's companies: say so beside the answer.
             if (explicit(decision, id) && kept.stream().anyMatch(s -> s.requirementIds().contains(id))) {
@@ -421,7 +431,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 notices(directStart, agentNotices), overrode(run, confirmed, answered),
                 writtenPeriod(run, confirmed, answered),
                 ChatUiActions.of(branches, answered, targets, run.graphVersionId(), run.context().asOf()), clock.instant());
-        route.put("outcome", "answered");
+        route.put("outcome", "answered").set("coverage", coverage.json());
         return new ChatEngineOutcome.Completed(result, route);
     }
 
@@ -430,8 +440,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      * (every requirement's, since none was answered).
      */
     private ChatEngineOutcome insufficient(ChatRun run, ObjectNode route, InsufficientCause cause, ChatPlan.Run plan,
-            ChatRetrieval.Outcome retrieved) {
-        route.put("outcome", "insufficient_evidence").put("reason", cause.code());
+            ChatRetrieval.Outcome retrieved, ChatRequirementCoverage coverage) {
+        coverage.end(ChatRequirementCoverage.Status.LIMITED, cause.code());
+        route.put("outcome", "insufficient_evidence").put("reason", cause.code()).set("coverage", coverage.json());
         Set<String> all = new HashSet<>();
         plan.requirements().forEach(p -> all.add(p.id()));
         return new ChatEngineOutcome.Completed(ChatResults.insufficient(run, cause, narrowed(plan, retrieved),
@@ -629,8 +640,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         return new ChatEngineOutcome.Failed("validation_failed", null, false);
     }
 
-    private ChatEngineOutcome stopped(ChatRun run, ObjectNode route, ChatPlan.Stop stop) {
-        route.put("outcome", stop.outcome()).put("reason", stop.reason());
+    private ChatEngineOutcome stopped(ChatRun run, ObjectNode route, ChatPlan.Stop stop, ChatRequirementCoverage coverage) {
+        coverage.stopped(stop);
+        route.put("outcome", stop.outcome()).put("reason", stop.reason()).set("coverage", coverage.json());
         return new ChatEngineOutcome.Completed(
                 ChatResults.withoutAnswer(run, stop.outcome(), stop.reason(), stop.choices(), clock.instant()), route);
     }

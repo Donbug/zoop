@@ -246,6 +246,50 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
+    void theRouteRecordsWhereEachRequirementEndedAndWhichCallsServedIt() {
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(),
+                List.of(new ChatToolItem(HYNIX, "company", "SK하이닉스", List.of(HYNIX), List.of())), List.of(), false, false));
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of(HYNIX)));
+        answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리 칩을 쌓은 메모리입니다.", "r1-c")), List.of("r1"),
+                List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        var coverage = outcome.routeSummary().path("coverage");
+        assertEquals(2, coverage.size());
+        var fact = coverage.get(0);
+        assertEquals("r1", fact.path("requirementId").asString());
+        assertTrue(fact.path("explicit").asBoolean());
+        assertEquals("limited", fact.path("status").asString());
+        assertEquals("evidence_insufficient", fact.path("reason").asString());
+        assertEquals(1, fact.path("toolCallIds").size(), "the read that found nothing to cite");
+        var concept = coverage.get(1);
+        assertEquals("r1-c", concept.path("requirementId").asString());
+        assertFalse(concept.path("explicit").asBoolean(), "the server split it off");
+        assertEquals("answered", concept.path("status").asString());
+        assertTrue(concept.path("toolCallIds").isEmpty());
+        assertTrue(concept.path("reason").isMissingNode());
+    }
+
+    @Test
+    void aStopAtACheckpointRecordsTheRequirementsAsAskedBack() {
+        issueCompanies = List.of(HYNIX, NVDA, AMD);
+        decision = dependent("exactly", 2);
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        assertEquals("clarification", outcome.result().outcome());
+        var coverage = outcome.routeSummary().path("coverage");
+        assertFalse(coverage.isEmpty());
+        coverage.forEach(entry -> assertEquals("clarify", entry.path("status").asString(), entry.toString()));
+        assertEquals(1, coverage.get(0).path("toolCallIds").size(), "the source read that ran before the stop");
+    }
+
+    @Test
     void whenTheFactPartHasNoEvidenceOrNoLookupTheConceptIsStillAnswered() {
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(),
                 List.of(new ChatToolItem(HYNIX, "company", "SK하이닉스", List.of(HYNIX), List.of())), List.of(), false, false));
