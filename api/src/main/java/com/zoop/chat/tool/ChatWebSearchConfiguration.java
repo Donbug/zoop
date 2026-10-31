@@ -10,8 +10,8 @@ import org.springframework.context.annotation.Configuration;
  * Registers {@code web.search} only when {@code zoop.chat.web.enabled=true} (off by default). The provider is chosen by
  * {@code zoop.chat.web.provider}: only {@code synthetic} exists until a real one is selected (web search design 7), and
  * startup is refused for anything else rather than running without a provider. Registered, the tool is never planned by
- * the router ({@link ChatToolRegistry#bound}); it is an MCP tool of the agent path, which cannot be on with it until web
- * results can be cited.
+ * the router ({@link ChatToolRegistry#bound}); it is an MCP tool of the agent path, whose answers cite its hits as
+ * {@code web_result} (web search design 6).
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = "zoop.chat.web.enabled", havingValue = "true")

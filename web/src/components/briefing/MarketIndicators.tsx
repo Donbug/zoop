@@ -53,7 +53,7 @@ function Change({ item }: { item: MarketIndicator }) {
         : 'text-zoop-muted';
   const arrow = item.change > 0 ? '▲ ' : item.change < 0 ? '▼ ' : '';
   return (
-    <p className={`text-[11px] font-semibold tabular-nums ${tone}`}>
+    <p className={`text-caption font-semibold tabular-nums ${tone}`}>
       {arrow}
       {signed(item.change)}
       {item.unit === 'KRW' ? '원' : ''} (
@@ -111,9 +111,9 @@ export default function MarketIndicators({
               }
             >
               <p className="flex items-center gap-2">
-                <strong className="text-xs">{label}</strong>
+                <strong className="text-caption">{label}</strong>
                 {item && item.status !== 'ok' && (
-                  <span className="text-[11px] font-semibold text-zoop-alert">
+                  <span className="text-caption font-semibold text-zoop-alert">
                     {statuses[item.status]}
                   </span>
                 )}
@@ -127,8 +127,8 @@ export default function MarketIndicators({
                   <p
                     className={
                       compact
-                        ? 'mt-3 text-base font-bold tracking-tight tabular-nums'
-                        : 'mt-3 mb-1 text-2xl font-[750] tracking-[-0.03em] tabular-nums'
+                        ? 'mt-3 text-lead font-bold tracking-tight tabular-nums'
+                        : 'mt-3 mb-1 text-title font-[750] tracking-[-0.03em] tabular-nums'
                     }
                   >
                     {number(item.value!)}
@@ -136,7 +136,7 @@ export default function MarketIndicators({
                   </p>
                   {compact ? (
                     <p
-                      className={`mt-2 text-xs font-semibold tabular-nums ${item.changeRate !== null && item.changeRate < 0 ? 'text-zoop-down' : item.changeRate !== null && item.changeRate > 0 ? 'text-zoop-up' : 'text-zoop-muted'}`}
+                      className={`mt-2 text-caption font-semibold tabular-nums ${item.changeRate !== null && item.changeRate < 0 ? 'text-zoop-down' : item.changeRate !== null && item.changeRate > 0 ? 'text-zoop-up' : 'text-zoop-muted'}`}
                     >
                       {item.changeRate === null
                         ? '등락률 미확인'
@@ -157,6 +157,7 @@ export default function MarketIndicators({
                       : '지표 데이터 준비 중')}
                 </p>
               )}
+
               {item?.source && !compact && (
                 <p className={`${NOTE} mt-1 text-zoop-faint`}>
                   출처 {item.source.name}

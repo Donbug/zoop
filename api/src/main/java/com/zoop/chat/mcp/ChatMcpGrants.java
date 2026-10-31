@@ -129,7 +129,7 @@ public final class ChatMcpGrants {
         var selection = run.selection();
         var evidence = scope.putArray("evidence");
         if (!selection.evidenceIds().isEmpty()) selection.evidencePool().forEach(evidence::add);
-        var period = run.context().period();
+        var period = run.period();
         scope.put("period", period == null ? null : period.start() + "/" + period.end());
         return Canonical.digest(scope);
     }

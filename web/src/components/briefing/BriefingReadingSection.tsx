@@ -15,7 +15,7 @@ export default function BriefingReadingSection({
   return (
     <details className={SECTION}>
       <summary
-        className={`min-h-11 cursor-pointer content-center text-sm font-semibold transition-transform duration-150 ease-out active:scale-[0.99] motion-reduce:transition-none ${FOCUS_RING}`}
+        className={`min-h-11 cursor-pointer content-center text-body font-semibold transition-transform duration-150 ease-out active:scale-[0.99] motion-reduce:transition-none ${FOCUS_RING}`}
       >
         {title}
       </summary>

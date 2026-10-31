@@ -30,7 +30,7 @@ function loadRating(wanted: Target, signal: AbortSignal) {
   readQueue = request.catch(() => undefined);
   return request;
 }
-const BUTTON = `inline-flex min-h-11 items-center gap-2 rounded-md border border-zoop-line px-3 text-xs font-semibold hover:bg-zoop-wash aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper disabled:opacity-50 ${FOCUS_RING}`;
+const BUTTON = `inline-flex min-h-11 items-center gap-2 rounded-md border border-zoop-line px-3 text-caption font-semibold hover:bg-zoop-wash aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper disabled:opacity-50 ${FOCUS_RING}`;
 
 function Thumb({ down = false }: { down?: boolean }) {
   return (
@@ -183,7 +183,7 @@ function PreviewFeedbackForm({ subject, ...target }: Props) {
       {reasonOpen && saved?.value === 'down' && (
         <form onSubmit={submit} className="flex flex-col gap-2">
           <label
-            className="text-xs font-semibold"
+            className="text-caption font-semibold"
             htmlFor={`preview-reason-${target.feature}-${target.targetId}`}
           >
             어떤 점이 아쉬웠나요?{' '}
@@ -197,7 +197,7 @@ function PreviewFeedbackForm({ subject, ...target }: Props) {
             disabled={pending}
             onChange={(event) => setReason(event.target.value)}
             placeholder="예: 선정 이유를 더 자세히 알고 싶어요."
-            className={`w-full rounded-md border border-zoop-line bg-zoop-paper p-3 text-xs ${FOCUS_RING}`}
+            className={`w-full rounded-md border border-zoop-line bg-zoop-paper p-3 text-caption ${FOCUS_RING}`}
           />
           <div className="flex items-center justify-between gap-2">
             <span className={NOTE}>{reason.length}/200자</span>
@@ -214,7 +214,7 @@ function PreviewFeedbackForm({ subject, ...target }: Props) {
       {error && (
         <div
           role={error.vote ? 'alert' : 'status'}
-          className={`text-xs ${error.vote ? 'text-zoop-alert' : 'text-zoop-muted'}`}
+          className={`text-caption ${error.vote ? 'text-zoop-alert' : 'text-zoop-muted'}`}
         >
           <p>{error.message}</p>
           {error.vote && saved && (

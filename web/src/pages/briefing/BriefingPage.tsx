@@ -7,8 +7,8 @@ import type { BriefingEdition } from '@/types/briefing';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import { useScreenView } from '@/util/track';
 
-const FILTER_BUTTON = `min-h-10 min-w-[88px] whitespace-nowrap rounded-full border border-zoop-line bg-zoop-paper px-4 text-xs font-semibold text-zoop-ink transition-colors aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper max-sm:flex-1 ${FOCUS_RING}`;
-const READING_BUTTON = `min-w-[76px] whitespace-nowrap rounded-[2px] text-xs font-semibold text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:text-zoop-ink aria-pressed:shadow-[0_0_0_0.5px_#1a1a1a14] max-sm:flex-1 ${FOCUS_RING}`;
+const FILTER_BUTTON = `min-h-10 min-w-[88px] whitespace-nowrap rounded-full border border-zoop-line bg-zoop-paper px-4 text-caption font-semibold text-zoop-ink transition-colors aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper max-sm:flex-1 ${FOCUS_RING}`;
+const READING_BUTTON = `min-w-[76px] whitespace-nowrap rounded-[2px] text-caption font-semibold text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:text-zoop-ink aria-pressed:shadow-[0_0_0_0.5px_#1a1a1a14] max-sm:flex-1 ${FOCUS_RING}`;
 
 // D-BRF-01 출근 · D-BRF-02 퇴근 브리핑 (/briefing). 날짜·회차는 주소(?date=&edition=)에 남는다.
 export default function BriefingPage() {
@@ -29,12 +29,12 @@ export default function BriefingPage() {
       className="mx-auto w-full max-w-[1040px] text-zoop-ink"
       data-screen-id={edition === 'morning' ? 'D-BRF-01' : 'D-BRF-02'}
     >
-      <h1 className="text-[28px] font-[750] tracking-[-0.045em]">
+      <h1 className="text-display font-[750] tracking-[-0.045em]">
         출퇴근 브리핑
       </h1>
 
       {auth.failed && (
-        <p role="alert" className="mt-3 text-xs text-zoop-muted">
+        <p role="alert" className="mt-3 text-caption text-zoop-muted">
           로그인 상태를 확인하지 못해 공통 브리핑을 표시합니다.{' '}
           <button type="button" className={FOCUS_RING} onClick={auth.retry}>
             로그인 상태 다시 확인

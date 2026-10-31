@@ -102,7 +102,7 @@ export default function CandidateDecisionForm({
       onSubmit={(event) => void submit(event)}
       className="flex flex-col gap-3 rounded-2xl bg-zoop-soft p-5"
     >
-      <p className="text-sm font-bold">
+      <p className="text-body font-bold">
         {title} · {relationLabel(relation.relationType)} {relation.source} →{' '}
         {relation.target}
       </p>
@@ -112,7 +112,7 @@ export default function CandidateDecisionForm({
           : '이 관계를 그래프 후보에서 빼요. 거부한 결정은 되돌릴 수 없어요.'}{' '}
         사유는 감사 로그에 남아요.
       </Note>
-      <label htmlFor={reasonId} className="text-xs">
+      <label htmlFor={reasonId} className="text-caption">
         {allow ? '승인 사유' : '거부 사유'}
       </label>
       <textarea
@@ -126,28 +126,28 @@ export default function CandidateDecisionForm({
         onChange={(event) => setReason(event.target.value)}
         className={`${TEXTAREA} bg-zoop-paper`}
       />
-      <p id={`${reasonId}-count`} className="text-[11px] text-zoop-muted">
+      <p id={`${reasonId}-count`} className="text-caption text-zoop-muted">
         {reason.length}/500자
       </p>
       {invalid && (
-        <p role="alert" className="text-xs text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           사유를 1~500자로 입력해 주세요.
         </p>
       )}
       {error && (
-        <p role="alert" className="text-xs text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           {title}에 실패했어요. {decisionError(error)}
         </p>
       )}
       {conflicted && refresh === 'reloading' && (
-        <p role="status" className="text-xs text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           상세를 새로 읽고 있어요. 입력한 사유는 그대로 남아요.
         </p>
       )}
       {conflicted && refresh === 'failed' && (
         <p
           role="alert"
-          className="flex flex-wrap items-center gap-2 text-xs text-zoop-alert"
+          className="flex flex-wrap items-center gap-2 text-caption text-zoop-alert"
         >
           상세를 새로 읽지 못했어요. 예전 상태로는 보낼 수 없어요.
           <button type="button" className={BUTTON} onClick={onRetryRefresh}>
@@ -156,7 +156,7 @@ export default function CandidateDecisionForm({
         </p>
       )}
       {conflicted && refresh === 'idle' && (
-        <p role="status" className="text-xs text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           상세를 새로 읽었어요. 바뀐 내용을 확인하고 다시 보내 주세요.
         </p>
       )}

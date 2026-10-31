@@ -47,7 +47,7 @@ function OverviewContent({ onOpenJobs }: { onOpenJobs: () => void }) {
   return (
     <section aria-label="이슈 관제 개요" className="flex flex-col gap-3">
       {overview.refreshError && (
-        <p role="status" className="text-[11px] text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}
@@ -81,12 +81,12 @@ function OverviewContent({ onOpenJobs }: { onOpenJobs: () => void }) {
         <Metric
           label="원장 확인"
           value={
-            <span className="text-sm">{formatKst(o.ledger.checkedAt)}</span>
+            <span className="text-body">{formatKst(o.ledger.checkedAt)}</span>
           }
           detail={`이슈 ${count(o.issues.approved)} · 관계 ${count(o.issues.relations)} · 기사 ${count(o.issues.articles)}`}
         />
       </dl>
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-caption">
         <span className="font-semibold">분석 작업</span>
         <span className="tabular-nums">
           실행 중 {count(jobs.running)} · 대기 {count(jobs.queued)} · 24시간
@@ -107,7 +107,7 @@ function OverviewContent({ onOpenJobs }: { onOpenJobs: () => void }) {
           작업 로그 보기
         </button>
       </div>
-      <p className="text-[11px] text-zoop-faint">
+      <p className="text-caption text-zoop-faint">
         조회 {formatKst(o.asOf)} · 10초마다 자동 갱신
       </p>
     </section>

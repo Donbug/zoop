@@ -137,7 +137,7 @@ export default function CompanyPathPanel({
           <section className={ui.section}>
             <div className="flex items-center justify-between gap-2">
               <h3>{path.edgeIds.length}단계 연결</h3>
-              <details className="relative text-xs">
+              <details className="relative text-caption">
                 <summary
                   aria-label="경로를 찾는 방법"
                   className="cursor-pointer rounded-full border border-panel-line px-2"
@@ -169,11 +169,13 @@ export default function CompanyPathPanel({
                         logoUrl={node.logoUrl}
                         className={ui.avatar}
                       />
-                      <strong className="text-xs">{node.label}</strong>
+                      <strong className="text-caption">{node.label}</strong>
                     </button>
                   ) : (
                     <>
-                      <strong className="block text-xs">{node.label}</strong>
+                      <strong className="block text-caption">
+                        {node.label}
+                      </strong>
                       <p className={ui.muted}>
                         {formatEventTime(
                           node.eventTime,

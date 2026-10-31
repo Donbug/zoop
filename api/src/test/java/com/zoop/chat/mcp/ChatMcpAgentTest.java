@@ -143,6 +143,42 @@ class ChatMcpAgentTest {
         return new ChatModels.AgentStep("resp_done", List.of(), ANSWER);
     }
 
+    private static ChatModels.AgentStep heldAt(long inputTokens) {
+        return new ChatModels.AgentStep("resp_a", List.of(new ChatModels.ApprovalRequest("a", "company_read",
+                Map.of("targets", List.of("KRX:000660")))), null, inputTokens);
+    }
+
+    @org.junit.jupiter.api.Test
+    void withTokensForOnlyOneMoreStepNoNewToolRunsAndThatStepAnswers() {
+        luna.script.add(n -> heldAt(9_000));
+        luna.script.add(n -> done());
+
+        var outcome = run(steps(false));
+
+        assertEquals(2, outcome.steps());
+        assertEquals(0, outcome.approved());
+        assertEquals(1, outcome.denied());
+    }
+
+    @org.junit.jupiter.api.Test
+    void withNoTokensForAnotherStepTheRunStopsAsAContextTooLarge() {
+        luna.script.add(n -> heldAt(12_001));
+        luna.script.add(n -> done());
+
+        var failure = assertThrows(ChatModels.Failure.class, () -> run(steps(false)));
+
+        assertEquals(ChatModels.INPUT_BUDGET_EXCEEDED, failure.code());
+        assertEquals(1, luna.inputs.size(), "nothing more is sent");
+    }
+
+    @org.junit.jupiter.api.Test
+    void aProviderThatReportsNoTokensKeepsTheRoundRules() {
+        luna.script.add(n -> held("a", "company_read", Map.of("targets", List.of("KRX:000660"))));
+        luna.script.add(n -> done());
+
+        assertEquals(1, run(steps(false)).approved());
+    }
+
     private ChatMcpCircuitBreaker circuit() {
         return new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
     }
@@ -208,6 +244,73 @@ class ChatMcpAgentTest {
 
     private static ChatModels.ApprovalRequest search(String id, String query) {
         return new ChatModels.ApprovalRequest(id, "web_search", Map.of("targets", List.of(query)));
+    }
+
+    private static ChatModels.ApprovalRequest read(String id, String company) {
+        return new ChatModels.ApprovalRequest(id, "company_read", Map.of("targets", List.of(company)));
+    }
+
+    private static ChatModels.AgentStep round(long inputTokens, ChatModels.ApprovalRequest... requests) {
+        return new ChatModels.AgentStep("resp_" + requests[0].id(), List.of(requests), null, inputTokens);
+    }
+
+    /** One spike scenario (docs/development/chat-live-spike.md): the agent step count, and every asked call made. */
+    private void assertShape(int calls, int rounds, ChatModels.AgentStep... steps) {
+        useWeb();
+        List<String> companies = List.of("KRX:035720", "KRX:000660", "KRX:005930", "NASDAQ:NVDA", "NYSE:TSM", "NASDAQ:ASML");
+        for (ChatModels.AgentStep step : steps) luna.script.add(n -> step);
+        luna.script.add(n -> done());
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit());
+        var attached = executor.attach(JOB, 1).orElseThrow();
+
+        var outcome = agent.run(attached.run(), attached.control(), List.of(new ChatModels.AgentRequirement("r1",
+                "최근 사건", false, companies)), List.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH), 20, steps(false));
+
+        assertEquals(rounds + 1, outcome.steps(), "providerCalls is approvalRounds + 1");
+        assertEquals(calls, outcome.approved());
+        assertEquals(0, outcome.denied());
+        assertEquals(calls, luna.made.size());
+        assertTrue(luna.made.stream().noneMatch(McpSchema.CallToolResult::isError));
+    }
+
+    @Test
+    void oneCallInOneRoundFits() {
+        assertShape(1, 1, round(2_000, read("a", "KRX:000660")));
+    }
+
+    @Test
+    void fourCallsInOneRoundFit() {
+        assertShape(4, 1, round(2_000, read("a", "KRX:000660"), read("b", "KRX:005930"), read("c", "NASDAQ:NVDA"),
+                read("d", "NYSE:TSM")));
+    }
+
+    @Test
+    void fourCallsInThreeRoundsFit() {
+        assertShape(4, 3, round(2_000, read("a", "KRX:000660"), read("b", "KRX:005930")), round(3_000, read("c", "NASDAQ:NVDA")),
+                round(4_000, read("d", "NYSE:TSM")));
+    }
+
+    @Test
+    void sixInternalAndTwoWebCallsInThreeRoundsFitWhenAnInternalReadCameBackEmpty() {
+        assertShape(8, 3, round(2_000, read("a", "KRX:035720"), read("b", "KRX:000660"), read("c", "KRX:005930"),
+                read("d", "NASDAQ:NVDA")), round(3_000, read("e", "NYSE:TSM"), read("f", "NASDAQ:ASML"), search("g", "HBM")),
+                round(4_000, search("h", "EUV")));
+    }
+
+    @Test
+    void theThirdRoundNeedsItsInputThreeTimesOverWithinTheInputBudget() {
+        // D-AI-02: a third round needs a + b + 3c <= 24k for step inputs a, b, c; 3k + 5k + 21k does not fit.
+        useWeb();
+        luna.script.add(n -> round(3_000, read("a", "KRX:000660")));
+        luna.script.add(n -> round(5_000, read("b", "KRX:000660")));
+        luna.script.add(n -> round(7_000, read("c", "KRX:000660")));
+        luna.script.add(n -> done());
+
+        var outcome = run(steps(false));
+
+        assertEquals(4, outcome.steps());
+        assertEquals(2, outcome.approved());
+        assertEquals(1, outcome.denied(), "the third round is refused, so a three-round run needs smaller steps");
     }
 
     @Test

@@ -16,6 +16,7 @@ import com.zoop.chat.dto.ChatFrozenContext;
 import com.zoop.chat.dto.ChatJob;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.ChatSessionResponse;
+import com.zoop.chat.dto.ChatUiAction;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.dto.GraphTarget;
 import com.zoop.common.response.Metadata;
@@ -70,6 +71,24 @@ class ChatResponseGuardTest {
                 result.reason(), result.sources(), result.citations(), result.graphTargets(), result.applied(),
                 result.choices(), result.action(), result.limitations(), result.metadata());
         assertEquals(ChatResponseGuard.WITHHELD_ANSWER, guard(Set.of("ev-1")).job(job(List.of(), widened), "r").result().answer());
+    }
+
+    @Test
+    void aSyntheticWebCitationIsShownAgainAndAnyOtherProvidersIsWithheld() {
+        // Until a real provider's redisplay rights are decided (web search design 7), only the synthetic one is shown again.
+        var job = job(List.of(), web("synthetic"));
+        assertSame(job, guard(Set.of()).job(job, "r"), "no evidence record is read for a web hit");
+        assertEquals(ChatResponseGuard.WITHHELD_ANSWER, guard(Set.of()).job(job(List.of(), web("other")), "r").result()
+                .answer());
+    }
+
+    private static ChatResult web(String provider) {
+        String hit = "web-" + "b".repeat(32);
+        var citation = new Citation("web_result", hit, "[합성] snippet", null, null, provider, null, 0, 12, "[합성] 제목",
+                "news.example.com", AT, "https://news.example.com/a");
+        return new ChatResult("answered", "msg-job-00001", "웹 본문",
+                List.of(new ChatAnswerSection("web_reported", "웹 본문", List.of(hit))), "web_reported", null, List.of(),
+                List.of(citation), List.of(), applied(), List.of(), null, List.of(), metadata());
     }
 
     @Test
@@ -146,6 +165,27 @@ class ChatResponseGuardTest {
             assertTrue(job.result().applied().issues().isEmpty());
         }
         assertEquals(1, targetChecks.size(), "each target is checked once per conversation");
+    }
+
+    @Test
+    void anActionOnASinceHiddenCompanyIsLeftOutWhileARoundStaysForItsScreenToCheck() {
+        var result = answered("ev-1");
+        var open = new ChatUiAction("action-1", ChatUiAction.OPEN_COMPANY, "기업 상세 · 숨은 기업", List.of("r1"),
+                ChatUiAction.Target.company("KRX:hidden"));
+        var path = new ChatUiAction("action-2", ChatUiAction.FOCUS_PATH, "경로 보기", List.of("r1"),
+                ChatUiAction.Target.path("KRX:000660", "KRX:hidden", "gv-1", null));
+        var round = new ChatUiAction("action-3", ChatUiAction.OPEN_BRIEFING, "브리핑 열기", List.of("r1"),
+                ChatUiAction.Target.briefing("2026-10-30", "morning"));
+        var offered = new ChatResult(result.outcome(), result.messageId(), result.answer(), result.sections(),
+                result.answerBasis(), result.reason(), result.sources(), result.citations(), result.graphTargets(),
+                result.applied(), result.choices(), result.action(), result.limitations(), result.metadata(),
+                result.answerStatus(), result.notices(), List.of(open, path, round));
+
+        var shown = guard(Set.of("ev-1"), Optional.of(Set.of("KRX:000660"))).job(job(List.of(), offered), "req-1").result();
+        assertEquals(List.of(round), shown.uiActions());
+
+        var withheld = guard(Set.of()).job(job(List.of(), offered), "req-2").result();
+        assertTrue(withheld.uiActions().isEmpty(), "a withheld answer offers nothing");
     }
 
     @Test

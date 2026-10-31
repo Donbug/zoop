@@ -151,7 +151,8 @@ final class ChatRetrieval {
                     // the fixed ZOOP documents, which it is not about.
                     boolean fixed = !capability.documents().isEmpty();
                     var read = fixed ? capability.documents()
-                            : capability == ChatCapability.BRIEFING_READ ? briefingTargets(run, p, targets) : targets;
+                            : capability == ChatCapability.BRIEFING_READ ? briefingTargets(run, p, targets)
+                            : capability == ChatCapability.SELECTION_RULE_READ ? selectionTargets(run, p, targets) : targets;
                     List<String> scope = fixed ? null : p.evidenceScope();
                     Instant since = capability == ChatCapability.GRAPH_VERSION_DIFF ? since(run, p).orElse(null) : null;
                     for (List<String> chunk : batches(capability, read)) {
@@ -201,12 +202,12 @@ final class ChatRetrieval {
 
     /**
      * The period a comparison compares with: the one the requirement's own words write ({@link ChatPeriods}), else the one
-     * the member selected with the question; empty for "the previous public graph".
+     * the member selected with the question, else the one the last answers used; empty for "the previous public graph".
      */
     static Optional<ChatPeriods.Period> period(ChatRun run, Planned p) {
         var written = ChatPeriods.parse(p.label(), run.askedAt());
-        if (written.isPresent() || run.context().period() == null) return written;
-        var selected = run.context().period();
+        if (written.isPresent() || run.period() == null) return written;
+        var selected = run.period();
         return Optional.of(new ChatPeriods.Period(LocalDate.parse(selected.start()), LocalDate.parse(selected.end()), null));
     }
 
@@ -220,6 +221,18 @@ final class ChatRetrieval {
         List<String> read = new ArrayList<>();
         read.add(ChatBriefingRound.ref(p.label(), day.orElse(null), today));
         targets.stream().filter(t -> ChatPlanner.companyId(t) && !ChatBriefingRound.isRef(t))
+                .limit(ChatToolRequest.MAX_TARGETS - 1).forEach(read::add);
+        return List.copyOf(read);
+    }
+
+    /**
+     * A selection read's targets: the round the requirement's words name, as for a briefing read, then the issues it
+     * names (a selection is about issues, never companies).
+     */
+    static List<String> selectionTargets(ChatRun run, Planned p, List<String> targets) {
+        List<String> read = new ArrayList<>();
+        read.add(briefingTargets(run, p, List.of()).getFirst());
+        targets.stream().filter(t -> !ChatBriefingRound.isRef(t) && !ChatPlanner.companyId(t))
                 .limit(ChatToolRequest.MAX_TARGETS - 1).forEach(read::add);
         return List.copyOf(read);
     }

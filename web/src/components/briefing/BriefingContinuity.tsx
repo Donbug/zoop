@@ -45,7 +45,7 @@ export default function BriefingContinuity({
             key={item.issueId}
             className="rounded border border-zoop-line p-3"
           >
-            <h4 className="text-sm font-semibold">{item.title}</h4>
+            <h4 className="text-body font-semibold">{item.title}</h4>
             <p className={NOTE}>
               {item.companies.map((company) => company.name).join(' · ')} ·{' '}
               {item.label}
@@ -62,7 +62,7 @@ export default function BriefingContinuity({
             )}
             <details className="mt-2" open={compact ? undefined : true}>
               <summary
-                className={`cursor-pointer text-xs underline ${FOCUS_RING}`}
+                className={`cursor-pointer text-caption underline ${FOCUS_RING}`}
               >
                 원문 인용·출처 보기 · {item.sources.length}건
               </summary>
@@ -95,7 +95,7 @@ export default function BriefingContinuity({
         ))}
       </div>
       <div className="mt-4">
-        <h4 className="text-sm font-semibold">이전 이슈 다시 보기</h4>
+        <h4 className="text-body font-semibold">이전 이슈 다시 보기</h4>
         <p className={NOTE}>{value.recap.message}</p>
         {value.recap.status === 'available' && (
           <>
@@ -108,7 +108,9 @@ export default function BriefingContinuity({
                 <li key={item.eventId} className={BODY}>
                   {item.title}
                   <details>
-                    <summary className={`cursor-pointer text-xs ${FOCUS_RING}`}>
+                    <summary
+                      className={`cursor-pointer text-caption ${FOCUS_RING}`}
+                    >
                       당시 요약 보기
                     </summary>
                     <p>
@@ -121,7 +123,7 @@ export default function BriefingContinuity({
               ))}
             </ul>
             <Link
-              className={`mt-2 inline-block text-xs underline ${FOCUS_RING}`}
+              className={`mt-2 inline-block text-caption underline ${FOCUS_RING}`}
               to={`/briefing?date=${value.recap.date}&edition=${value.recap.edition}&reading=full`}
             >
               이전 브리핑 전문 보기
@@ -130,7 +132,7 @@ export default function BriefingContinuity({
         )}
       </div>
       <div className="mt-4">
-        <h4 className="text-sm font-semibold">다음에 확인할 조건</h4>
+        <h4 className="text-body font-semibold">다음에 확인할 조건</h4>
         <ul className="mt-2 list-disc pl-5">
           {value.watchConditions.map((condition, index) => (
             <li key={`${condition.kind}:${index}`} className={BODY}>

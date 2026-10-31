@@ -3,7 +3,7 @@ import { listBriefingRounds } from '@/apis/briefing/briefing';
 import type { BriefingEdition, BriefingRoundRef } from '@/types/briefing';
 import { FOCUS_RING } from './briefingStyles';
 
-const EDITION_BUTTON = `min-h-10 min-w-[88px] whitespace-nowrap rounded-full border border-zoop-line bg-zoop-paper px-4 text-xs font-semibold text-zoop-ink transition-colors aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper disabled:cursor-not-allowed disabled:opacity-50 max-sm:flex-1 ${FOCUS_RING}`;
+const EDITION_BUTTON = `min-h-10 min-w-[88px] whitespace-nowrap rounded-full border border-zoop-line bg-zoop-paper px-4 text-caption font-semibold text-zoop-ink transition-colors aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper disabled:cursor-not-allowed disabled:opacity-50 max-sm:flex-1 ${FOCUS_RING}`;
 const LABELS = { morning: '출근', evening: '퇴근' };
 const EDITIONS = ['morning', 'evening'] as const;
 type Availability = 'published' | 'suspended' | 'absent' | 'unknown';
@@ -38,7 +38,7 @@ function chooseEdition(
   );
 }
 
-const CONTROL = `h-[38px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3 text-xs text-zoop-ink max-sm:w-full ${FOCUS_RING}`;
+const CONTROL = `h-[38px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3 text-caption text-zoop-ink max-sm:w-full ${FOCUS_RING}`;
 
 type State = {
   rounds: BriefingRoundRef[];
@@ -211,7 +211,7 @@ export default function BriefingRoundPicker({
           onChange={(event) => void selectDate(event.target.value)}
           className={CONTROL}
         />
-        <p className="text-[11px] text-zoop-muted">
+        <p className="text-caption text-zoop-muted">
           회차 이력을 불러오지 못해 날짜를 직접 골라요.{' '}
           <button
             type="button"
@@ -269,13 +269,13 @@ export default function BriefingRoundPicker({
           type="button"
           disabled={state.loading || selecting !== null}
           onClick={() => void load(state.nextCursor ?? undefined)}
-          className={`shrink-0 text-[11px] text-zoop-muted underline underline-offset-4 hover:text-zoop-ink disabled:opacity-60 ${FOCUS_RING}`}
+          className={`shrink-0 text-caption text-zoop-muted underline underline-offset-4 hover:text-zoop-ink disabled:opacity-60 ${FOCUS_RING}`}
         >
           {state.loading ? '불러오고 있어요' : '이전 회차 더 보기'}
         </button>
       )}
       {state.error && state.rounds.length > 0 && (
-        <p role="alert" className="text-[11px] text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           이전 회차를 불러오지 못했어요.
         </p>
       )}
@@ -318,7 +318,7 @@ export default function BriefingRoundPicker({
         <p
           id="briefing-round-availability"
           role="status"
-          className="w-full text-[11px] text-zoop-muted"
+          className="w-full text-caption text-zoop-muted"
           aria-live="polite"
         >
           {message}

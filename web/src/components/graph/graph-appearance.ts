@@ -18,9 +18,9 @@ export const GraphAppearanceContext = createContext<GraphAppearance | null>(
 export function appearanceColors(appearance: GraphAppearance) {
   const dark = appearance.theme === 'dark';
   return {
-    ink: dark ? '#f5f5f5' : '#1a1a1a',
+    ink: dark ? '#ededed' : '#212121',
     paper: dark ? '#262626' : '#ffffff',
-    muted: dark ? '#d4d4d4' : '#55554f',
+    muted: dark ? '#a0a0a0' : '#212121',
     line: dark ? '#a5a9b1' : '#71757c',
     selected:
       appearance.variant === 'improved'
@@ -95,8 +95,8 @@ export function styleGraph(
           // D-GRP-01: selected/related G6 states and impact paths supply
           // their own stronger stroke (3/3.5px, opacity 1). Background links (2/2.2px) stay
           // thinner but keep 3:1 contrast on the map (opacity 0.8: light 3.1, dark 5.1).
-          // Follow arrows keep their stronger ink. Dimmed links match the
-          // inactive state (0.2) so becoming inactive never makes them brighter.
+          // Follow arrows keep their stronger ink. Dimmed links stay faint so the
+          // dimming cover (graph-dimming.ts) never leaves them brighter than before.
           lineWidth: shared ? 2 : 2.2,
           strokeOpacity: dimmed ? 0.2 : follows ? 0.95 : 0.8,
         },

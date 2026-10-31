@@ -9,6 +9,7 @@ import com.zoop.chat.dto.ChatLimitation;
 import com.zoop.chat.dto.ChatNotice;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.Citation;
+import com.zoop.chat.dto.ChatUiAction;
 import com.zoop.chat.dto.GraphTarget;
 import com.zoop.chat.executor.ChatRun;
 import com.zoop.common.response.Metadata;
@@ -177,7 +178,7 @@ final class ChatResults {
     static ChatResult answered(ChatRun run, List<ChatGeneratedAnswer.Section> sections, List<Citation> citations,
             List<GraphTarget> targets, List<ChatAppliedItem> companies, List<ChatAppliedItem> issues,
             List<ChatLimitation> limitations, boolean partial, List<ChatNotice> notices, boolean questionOverrodeContext,
-            ChatAppliedPeriod writtenPeriod, Instant now) {
+            ChatAppliedPeriod writtenPeriod, List<ChatUiAction> uiActions, Instant now) {
         List<ChatAnswerSection> publicSections = sections.stream()
                 .map(s -> new ChatAnswerSection(s.basis(), s.text(), s.evidenceIds())).toList();
         Set<String> sources = new LinkedHashSet<>();
@@ -187,7 +188,7 @@ final class ChatResults {
                 answerBasis(sections), null, List.copyOf(sources), List.copyOf(citations), List.copyOf(targets),
                 applied(run, companies, issues, questionOverrodeContext, writtenPeriod, now), List.of(), null,
                 List.copyOf(limitations),
-                metadata(run, now), partial ? "partial" : "complete", notices);
+                metadata(run, now), partial ? "partial" : "complete", notices, uiActions);
     }
 
     /** A notice about the whole run. */

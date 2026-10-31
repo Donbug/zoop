@@ -58,6 +58,8 @@ import com.zoop.chat.service.ChatEvidenceAccess;
 import com.zoop.chat.service.ChatMemberScope;
 import com.zoop.chat.service.ChatZoopDocs;
 import com.zoop.chat.service.FrozenSelection;
+import com.zoop.chat.tool.BriefingReadTool;
+import com.zoop.chat.tool.ChatSelectionRecord;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRunner;
 import com.zoop.chat.tool.CompanyReadTool;
@@ -66,9 +68,11 @@ import com.zoop.chat.tool.GraphPathTool;
 import com.zoop.chat.tool.GraphVersionDiffTool;
 import com.zoop.chat.tool.PortfolioScopeReadTool;
 import com.zoop.chat.tool.IssueReadTool;
+import com.zoop.chat.tool.SelectionRuleReadTool;
 import com.zoop.chat.tool.ZoopPolicyReadTool;
 import com.zoop.common.json.StrictJson;
 import com.zoop.graph.read.DisclosureExclusions;
+import com.zoop.graph.read.GraphContextLookup;
 import com.zoop.graph.read.PublicGraphReader;
 import com.zoop.graph.snapshot.FixtureGraphSnapshotStore;
 import com.zoop.graph.version.GraphVersionRecord;
@@ -109,7 +113,7 @@ class ChatEvalSetTest {
     private static final Map<String, String> STAGE_NAMES = Map.of(ChatModelStages.ROUTER, "router", ChatModelStages.ANSWER,
             "answer", ChatModelStages.VERIFICATION, "verify");
     private static final ChatStageReply.Receipt RECEIPT = new ChatStageReply.Receipt("replay", "chat-eval", "scripted",
-            "chat-eval-v1", "replay", null, null, NOW, NOW);
+            "chat-eval-v1", "replay", null, null, null, NOW, NOW);
 
     private static final List<ObjectNode> reported = Collections.synchronizedList(new ArrayList<>());
     private static JsonNode set;
@@ -271,9 +275,13 @@ class ChatEvalSetTest {
                     String id = requirement.get("requirementId").stringValue();
                     JsonNode r = routed.get(id);
                     if (r == null) throw new AssertionError("the script does not route " + id);
-                    requirements.addObject().put("requirementId", id).<ObjectNode>set("types", r.get("types"))
+                    ObjectNode decided = requirements.addObject().put("requirementId", id)
+                            .<ObjectNode>set("types", r.get("types"))
                             .<ObjectNode>set("capabilities", r.get("capabilities"))
                             .put("prohibitedAdvice", r.path("prohibitedAdvice").asDouble(0.0));
+                    JsonNode dependency = r.get("dependsOn");
+                    if (dependency == null) decided.putNull("dependsOn");
+                    else decided.set("dependsOn", dependency);
                 }
                 answer = out;
             }
@@ -614,7 +622,39 @@ class ChatEvalSetTest {
                         public List<Company> of(String memberId) {
                             return memberScope;
                         }
-                    })));
+                    }), new BriefingReadTool(briefings(set), access),
+                    new SelectionRuleReadTool((version, asOf, issue) -> new GraphContextLookup(
+                            reader.readPinned(version, asOf, asOf != null).graph()).find(issue)
+                            .filter(t -> "issue".equals(t.kind())).map(GraphContextLookup.Target::label),
+                            publications(set), briefings(set), access)));
+        }
+
+        /** The set's published rounds; asked for no date, the first (latest); any other round is not ready. */
+        private static BriefingReadTool.Rounds briefings(JsonNode set) {
+            return (date, edition, trace) -> {
+                for (JsonNode round : set.get("briefings")) {
+                    if ((date == null || date.toString().equals(round.get("date").stringValue()))
+                            && (edition == null || edition.equals(round.get("edition").stringValue()))) return round;
+                }
+                return StrictJson.newObject().put("status", "not_ready");
+            };
+        }
+
+        /** The set's recorded publication of an issue; an issue without one has no recorded decision. */
+        private static SelectionRuleReadTool.Publications publications(JsonNode set) {
+            return (version, issue, title) -> {
+                JsonNode p = set.get("publications").get(issue);
+                if (p == null) {
+                    return Optional.of(new ChatSelectionRecord.Publication(issue, title, version, 0, null, null, "none", null,
+                            List.of()));
+                }
+                List<ChatSelectionRecord.Rule> rules = new ArrayList<>();
+                p.get("rules").forEach(r -> rules.add(new ChatSelectionRecord.Rule(r.get("ruleId").stringValue(),
+                        r.get("title").stringValue(), r.get("summary").stringValue())));
+                return Optional.of(new ChatSelectionRecord.Publication(issue, title, version, p.get("reviewRevision").asInt(),
+                        p.get("ruleRevision").asLong(), p.get("decision").stringValue(), p.get("decisionPath").stringValue(),
+                        Instant.parse(p.get("decidedAt").stringValue()), rules));
+            };
         }
 
         private static void policy(Map<String, ChatZoopDocs.Document> policies, Map<String, Citation> citations, String docId,
