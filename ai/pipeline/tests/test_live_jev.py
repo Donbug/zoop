@@ -10,7 +10,7 @@ from zoop_ai_pipeline import live_jev as jev
 from zoop_ai_pipeline import relation_rules as rules
 from zoop_ai_pipeline.live_runtime import LiveFailure, LiveRuntime
 from zoop_ai_pipeline.relation_contracts import ImpactVerifierResponse, VerifierResponse
-from zoop_ai_pipeline.relation_rules import decide_impact, decide_relation
+from zoop_ai_pipeline.relation_rules import claims, decide_impact, decide_relation
 
 MODEL = "jev-1.14.0"
 
@@ -49,6 +49,20 @@ def test_the_relation_request_sends_only_quote_text_and_fixed_facts_and_one_type
     assert list(body["questions"]["claim-0"]["criteria"]) == ["supported", "contradicted", "insufficient"], "reversed is illegal for a subject"
     assert "Q1" in body["questions"]["claim-2"]["instructions"]["question"] and "Q2" not in body["questions"]["claim-2"]["instructions"]["question"], \
         "a claim names only its own allowed quotes (ev-b is the first quote of the payload, so Q1)"
+
+
+
+@pytest.mark.parametrize("business, product, count", [(None, None, 4), (None, "반도체", 5), ("제조", None, 5), ("제조", "반도체", 5)])
+def test_scope_questions_cover_only_stated_attributes_with_the_same_allowed_quotes(business, product, count):
+    payload = verify_relation_payload()
+    payload["relation"].update(businessScope=business, productScope=product)
+    payload["claims"] = claims({**payload["relation"], "citations": [{"evidenceId": "ev-a"}, {"evidenceId": "ev-b"}],
+                                "validity": {"from": None, "until": None, "citations": []}})
+    body, expect = jev.build_relation_request(payload, MODEL)
+    assert len(body["questions"]) == count
+    assert body["state"]["relation"]["businessScope"] == business and body["state"]["relation"]["productScope"] == product
+    assert expect["claims"] == [{"claimId": name, "quoteIds": ["ev-a", "ev-b"], "options": list(jev.REVERSIBLE_OPTIONS if name == "direction" else jev.CLAIM_OPTIONS)}
+                                for name in (["subject", "object", "type", "direction"] + (["scope"] if count == 5 else []))]
 
 
 @pytest.mark.parametrize("business, product, text, verdicts, eligibility", [

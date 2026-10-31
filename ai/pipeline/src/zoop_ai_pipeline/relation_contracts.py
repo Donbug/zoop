@@ -145,6 +145,7 @@ class Step(Wire):
 
 
 class Proposal(Wire):
+    """Each non-null scope is an asserted restriction; null is unspecified, not unrestricted applicability."""
     type: str = Field(min_length=1, max_length=100)  # an unsupported type is a private hold, not a malformed reply
     subject: Endpoint
     object: Endpoint

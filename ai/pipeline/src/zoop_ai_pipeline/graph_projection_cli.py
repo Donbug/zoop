@@ -21,7 +21,7 @@ from neo4j.exceptions import DriverError, Neo4jError
 from pydantic import ValidationError
 
 from . import graph_neo4j as neo
-from .graph_projection import Paths, Projector, Store, open_legacy_history, preflight
+from .graph_projection import Paths, Projector, Store, open_legacy_history, preflight, preflight_analysis
 from .graph_projection_contracts import MAX_COMMAND, SCHEMA, ExtractionFailure, Focus, Freeze, Init, Selector, canonical
 from .ingestion_contracts import IngestionFailure
 
@@ -71,6 +71,8 @@ def main() -> int:
         # A version frozen under an earlier plan contract is history: decided from the ledger alone, read-only, BEFORE any writer (chmod, WAL checkpoint, DDL)
         # is opened. `init` has no version yet.
         legacy = None if args.command == "init" else open_legacy_history(args.state_dir, *roots, version_id=request.version_id)
+        if legacy is None and args.command in {"freeze", "project", "recover"}:
+            preflight_analysis(args.state_dir, paths, request)
         store = legacy if legacy is not None else Store(args.state_dir, *roots, mode=WRITERS.get(args.command, "read"))
         projector = Projector(store, paths)
         if args.command == "init":

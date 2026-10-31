@@ -44,9 +44,6 @@ public record EventDetail(String title, String id, String eventTime, String time
 
     public record Unavailable(String status, String reason) { }
 
-    /**
-     * An operator's final approval behind a shown relation of this event (always {@code admin-review}); ruleId stays null because
-     * publication rules only hide content (AI 5-A), so no rule ever puts it on the graph.
-     */
+    /** Retained approval provenance: native administrator review or the legacy BFF's named effective publication rule. */
     public record ApprovalOut(String source, String label, String scope, String ruleId) { }
 }

@@ -23,9 +23,10 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .handoff import Handoff, HandoffPaths, Store, open_legacy_history
+from .handoff import Handoff, HandoffPaths, Store, open_legacy_history, require_current_sources
 from .handoff_contracts import ID, MAX_COMMAND, SCHEMA, ExtractionFailure, Manifest, Selector, canonical
-from .handoff_round import RoundPaths, check_files_dir, freeze_round
+from .handoff_contexts import configured, source_flags
+from .handoff_round import RoundPaths, check_files_dir, freeze_round, preflight_round
 from .ingestion_contracts import IngestionFailure
 
 COMMANDS = ("freeze", "freeze-round", "recover", "inspect", "export")
@@ -48,8 +49,9 @@ def main() -> int:
     parser.add_argument("--extraction-state-dir", type=Path)
     parser.add_argument("--ingestion-state-dir", type=Path)
     parser.add_argument("--sources", type=Path, help="S1/S2 source and grant registry, consumed only through the owner seams")
+    source_flags(parser)
     parser.add_argument("--canonical", type=Path, help="server-owned canonical decision registry (zoop-graph-canonical-1)")
-    parser.add_argument("--decisions", type=Path, help="operator public-projection decisions (zoop-public-decisions-3, with per-issue fieldVerdicts and summary pin)")
+    parser.add_argument("--decisions", type=Path, help="operator public-projection decisions (decisions4/P2 or decisions5/P3, with fieldVerdicts and summary pin)")
     parser.add_argument("--bindings", type=Path, help="server-owned app document bindings (zoop-app-document-bindings-1)")
     parser.add_argument("--issue-summary-state-dir", type=Path,
                         help="freeze and freeze-round only, and only when the decisions pin an issue-summary result: the `zoop-ai-issue-summary` ledger it is read from (read-only; export never needs it)")
@@ -65,10 +67,12 @@ def main() -> int:
         sourced = args.command in SOURCED or rounded
         flags = (args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources, args.canonical, args.decisions, args.bindings)
         round_args = tuple(getattr(args, name) for name in ROUND_FLAGS)
-        if (any(f is not None for f in flags) and not sourced) or (sourced and any(f is None for f in flags)) \
+        if not configured(args, sourced=sourced) or (sourced and any(f is None for f in flags[4:])) \
+                or (not sourced and any(f is not None for f in flags[4:])) \
                 or (args.issue_summary_state_dir is not None and args.command not in ("freeze", "freeze-round")) \
                 or (any(a is not None for a in round_args) and not rounded) \
-                or (rounded and (not args.round_id or len(args.round_id) > 200 or args.files_dir is None or (args.plan_id is None) != (args.plan_root is None)
+                or (rounded and (any(f is None for f in flags[:4]) or not args.round_id or len(args.round_id) > 200 or args.files_dir is None
+                                 or (args.plan_id is None) != (args.plan_root is None)
                                  or (args.plan_id is not None and not PLAN_ID.fullmatch(args.plan_id))
                                  or (args.recovery_attempt_id is not None and not re.fullmatch(ID, args.recovery_attempt_id)))):
             raise ExtractionFailure("input_or_configuration_invalid")
@@ -76,6 +80,7 @@ def main() -> int:
             paths = RoundPaths(*flags, files_dir=args.files_dir, plan_root=args.plan_root, summaries=args.issue_summary_state_dir)
             check_files_dir(paths.files_dir, args.state_dir, paths.canonical, paths.decisions)
             roots = (args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, *([args.issue_summary_state_dir] if args.issue_summary_state_dir else []))
+            preflight_round(paths, args.round_id, args.plan_id)
             store = Store(args.state_dir, *roots, mode="create")
             print(canonical(freeze_round(store, paths, args.round_id, args.plan_id, args.recovery_attempt_id)))
             return 0
@@ -84,10 +89,14 @@ def main() -> int:
             raise ExtractionFailure("command_input_limit")
         # Every hostile or malformed input is refused here, before any ledger is opened or any state is touched.
         request = (Manifest if args.command == "freeze" else Selector).model_validate(json.loads(raw))
-        paths = HandoffPaths(*flags, summaries=args.issue_summary_state_dir) if sourced else None
-        roots = (paths.relation, paths.extraction, paths.ingestion, *([paths.summaries] if paths.summaries is not None else [])) if paths else ()
+        paths = HandoffPaths(*flags, summaries=args.issue_summary_state_dir, source_contexts=args.source_contexts,
+                             source_contexts_sha256=args.source_contexts_sha256) if sourced else None
+        roots = ((paths.relation, paths.extraction, paths.ingestion, *((paths.summaries,) if paths.summaries is not None else ()))
+                 if paths and paths.source_contexts is None else ())
         legacy = open_legacy_history(args.state_dir, *roots, handoff_id=request.handoff_id)
-        store = legacy if legacy is not None else Store(args.state_dir, *roots, mode=WRITERS.get(args.command, "read"))
+        if legacy is None and args.command == "freeze":
+            require_current_sources(paths, request)
+        store = legacy if legacy is not None else Store(args.state_dir, *(paths.roots() if paths else ()), mode=WRITERS.get(args.command, "read"))
         handoff = Handoff(store, paths)
         if args.command == "export":
             result, line = handoff.export(request, serialized=True)

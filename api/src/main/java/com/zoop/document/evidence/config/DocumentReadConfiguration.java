@@ -13,11 +13,13 @@ import com.zoop.document.evidence.service.EvidenceArtifactReader;
 import com.zoop.document.evidence.service.EvidenceService;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Wires the public evidence read. Always registered: unconfigured, the application still starts and the read answers 503. The
@@ -34,9 +36,12 @@ public class DocumentReadConfiguration {
     @Bean
     EvidenceService evidenceService(EvidenceReadRepository evidence, DocumentRegistryRepository registry,
             GraphEvidenceReader graph, DocumentReadProperties properties, Clock clock,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager, ApplicationContext context,
+            com.zoop.graph.publication.GraphPublicationReader publications) {
         Path grants = properties.grantsPath();
-        Path sources = properties.ingestionSourcesPath();
+        boolean deliveryInstall = !(context instanceof WebApplicationContext)
+                && context.getEnvironment().getProperty("zoop.graph-delivery.install.enabled", Boolean.class, false);
+        Path sources = properties.ingestionSourcesPath(!deliveryInstall);
         Path root = properties.artifactRootPath();
         ArtifactFileStore store = null;
         if (root != null) {
@@ -51,6 +56,6 @@ public class DocumentReadConfiguration {
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         transaction.setTimeout(TRANSACTION_TIMEOUT_SECONDS);
         return new EvidenceService(evidence, registry, new DocumentReadGrants(grants), new DocumentReadSources(sources), graph,
-                new EvidenceArtifactReader(store), clock, transaction);
+                new EvidenceArtifactReader(store), clock, transaction, publications);
     }
 }

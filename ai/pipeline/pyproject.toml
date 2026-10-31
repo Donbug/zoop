@@ -21,6 +21,7 @@ zoop-ai-graph = "zoop_ai_pipeline.graph_projection_cli:main"
 zoop-ai-handoff = "zoop_ai_pipeline.handoff_cli:main"
 zoop-ai-handoff-exposure = "zoop_ai_pipeline.handoff_exposure_cli:main"
 zoop-ai-issue-summary = "zoop_ai_pipeline.issue_summary_cli:main"
+zoop-ai-operate = "zoop_ai_pipeline.operating:main"
 zoop-ai-private-news = "zoop_ai_pipeline.private_intake_cli:main"
 zoop-ai-collector = "zoop_ai_pipeline.collector_cli:main"
 

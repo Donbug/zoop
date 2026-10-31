@@ -106,7 +106,7 @@ class ExposureCounts(Bx):
 
 class ExposureHandoff(Bx):
     handoff_id: Id
-    bundle_schema: Literal["zoop-graph-handoff-bundle-7"]
+    bundle_schema: Literal["zoop-graph-handoff-bundle-8", "zoop-graph-handoff-bundle-9"]
     manifest_digest: Hash
     bundle_digest: Hash
     content_digest: Hash

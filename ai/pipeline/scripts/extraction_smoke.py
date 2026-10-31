@@ -721,14 +721,14 @@ def live_scenario(world: LiveWorld, requests=None) -> dict:
 FAKE_KEYS = {"ZOOP_AI_API_KEY": "sk-offline-simulator-openai-key", "TYPESAFE_API_KEY": "tsk-offline-simulator-jev-key"}
 
 
-def _first_line(text: str) -> str:
-    return next(line.strip() for line in text.split("\n") if line.strip())
+def first_reference(source: dict) -> dict:
+    return {"segmentId": next(s["segmentId"] for s in source["segments"] if s["segmentId"] is not None and s["text"].strip())}
 
 
-def simulated_answer(stage: str, projection: dict) -> dict:
+def simulated_answer(stage: str, projection: dict, sources: list[dict]) -> dict:
     if stage == "extract":
         article = projection["article"]
-        evidence = {"article_id": article["article_id"], "article_version": article["article_version"], "start": None, "end": None, "quote": _first_line(article["body"])}
+        evidence = first_reference(sources[0])
         return {"mentions": [{"mention_id": "m-sim-1", "article_id": article["article_id"], "article_version": article["article_version"], "title": "합성 공급 계약",
                               "event_type": "supply_contract", "action": "공급 계약 발표", "target": "공급 계약", "event_time": None, "period": "2026Q3",
                               "assertion_status": "announced", "participants": [{"company_id": "SYNTH-1", "name": "합성기업", "role": "issuer"}],
@@ -736,14 +736,25 @@ def simulated_answer(stage: str, projection: dict) -> dict:
     if stage == "compare":
         incoming, member = projection["article"], projection["issue"]["articles"][0]
         return {"relation": "SAME", "reason": "simulated: same 2026Q3 supply contract", "evidence": [
-            {"article_id": a["article_id"], "article_version": a["article_version"], "start": None, "end": None, "quote": _first_line(a["body"])} for a in (incoming, member)]}
+            first_reference(next(s for s in sources if s["article_version"] == a["article_version"])) for a in (incoming, member)]}
     if stage == "topic":
         # The request carries schemaVersion zoop-topic-request-1, but the reply contract (and the strict schema the provider enforces) pins the RESPONSE literal.
         return {"schemaVersion": TOPIC_RESPONSE, "producerVersion": projection["producerVersion"], "topics": [{
             "label": "합성 공급 계약", "criteria": "simulated: same company contract events", "rationale": "simulated grouping",
             "members": [{"kind": e["kind"], "ref": e["ref"]} for e in projection["events"]],
-            "citations": [{"documentId": d["documentId"], "documentVersion": d["documentVersion"], "start": None, "end": None, "quote": _first_line(d["text"])}
-                          for d in projection["documents"][:2]]}]}
+            "citations": [first_reference(d) for d in sources[:2]]}]}
+    if stage == "relation":
+        event = next(e for e in projection["events"] if e["origin"] == "event-candidate")
+        document = event["documents"][0]
+        src = next(s for s in sources if all(s[k] == document[k] for k in ("documentId", "documentVersion")))
+        return {"schemaVersion": "zoop-relation-response-1", "producerVersion": "zoop-relation-producer-1", "relations": [{
+            "type": "PARTICIPATES_IN", "subject": {"kind": "company", "ref": "SYNTH-1"}, "object": {"kind": "event", "ref": event["ref"]},
+            "connection": "direct", "businessScope": None, "productScope": "공급 계약", "validity": {"from": None, "until": None, "citations": []},
+            "countries": [], "reason": "synthetic control", "citations": [first_reference(src)], "path": []}]}
+    if stage == "impact":
+        return {"schemaVersion": "zoop-impact-response-1", "producerVersion": "zoop-impact-producer-1", "impacts": [{
+            "impactedCompanyId": "SYNTH-1", "direction": "positive", "reason": "synthetic control",
+            "supporting": [first_reference(sources[0])], "opposing": [], "limitations": None}]}
     raise AssertionError(stage)
 
 
@@ -755,8 +766,17 @@ def chat_reply(content: str, *, prompt_tokens: int = 1200, completion_tokens: in
 
 
 def simulate(body: dict) -> dict:
+    if "questions" in body:
+        answers = {}
+        for key, question in body["questions"].items():
+            choices = list(question["criteria"])
+            winner = "supported" if "supported" in choices else "positive"
+            answers[key] = {"type": "choice", "choice": winner, "confidence": .95,
+                            "probabilities": {c: .97 if c == winner else .03 / (len(choices) - 1) for c in choices}}
+        return {"model": "jev-1.14.0", "answers": answers, "usage": {"input_tokens": 1200, "output_tokens": 0}}
     stage_input = json.loads(body["messages"][1]["content"])
-    return chat_reply(json.dumps(simulated_answer(stage_input["stage"], stage_input["input"]), ensure_ascii=False))
+    answer = simulated_answer(stage_input["stage"], stage_input["input"], stage_input["sources"])
+    return chat_reply(json.dumps({**answer, "citationFormat": stage_input["citationFormat"]}, ensure_ascii=False))
 
 
 class SimulatedProvider:
@@ -808,13 +828,47 @@ def simulator_env(base_url: str, budget: Path, **changes: str) -> dict[str, str]
             "ZOOP_AI_PIPELINE_LIVE_MAX_USD": "5", "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS": "40", "ZOOP_AI_PIPELINE_LIVE_TIMEOUT_SECONDS": "10", **FAKE_KEYS, **changes}
 
 
+def relation_scenario(world: LiveWorld, hits: list) -> dict:
+    """Actual S3 module CLI over the completed S2 job and the same synthetic loopback provider."""
+    kit = world.kit
+    upstream = world.run("inspect", kit.job_selector("live-main"), env={})
+    request = {"schemaVersion": "zoop-relation-s3", "jobId": "live-relation", "provenance": upstream["provenance"],
+               "upstream": {"jobId": "live-main", "inputDigest": upstream["inputDigest"]}}
+    common = ["--state-dir", str(kit.root / "relation"), "--extraction-state-dir", str(kit.root / "extraction"),
+              "--ingestion-state-dir", str(kit.root / "ingestion"), "--sources", str(kit.registry_path)]
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", **ownership_env(), **CUSTOM}
+
+    def run(command, value, live):
+        child = subprocess.run([sys.executable, "-m", "zoop_ai_pipeline.relation_cli", command, *common], input=json_bytes(value),
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, env={**env, **(world.env if live else {})}, cwd=PIPELINE, timeout=120)
+        assert child.returncode == 0 and not child.stderr, (child.returncode, child.stdout.decode(), child.stderr.decode())
+        return json.loads(child.stdout)
+
+    before = len(hits)
+    done = run("run", request, True)
+    assert done["state"] == "ready" and done["delivery"]["status"] == "current", done
+    assert done["counts"]["eligibility"]["eligible"] == 1 and done["counts"]["impactLabels"]["positive"] == 1, done
+    assert len(hits) == before + 4 and all(c["state"] == "received" and c["verdict"] is None for c in done["calls"])
+    assert {c["stage"] for c in done["calls"]} == {"relation", "verify-relation", "impact", "verify-impact"}
+    for hit in hits[before:]:
+        key = "TYPESAFE_API_KEY" if hit["path"].endswith("systemone") else "ZOOP_AI_API_KEY"
+        assert hit["authorization"] == "Bearer " + FAKE_KEYS[key]
+    texts = world.documents()
+    for c in done["relations"][0]["citations"]:
+        assert texts[(c["documentId"], c["documentVersion"])][c["start"]:c["end"]] == c["quote"]
+    selector = {"schemaVersion": "zoop-relation-s3", "jobId": "live-relation"}
+    assert run("inspect", selector, False) == done and run("resume", selector, False) == done and len(hits) == before + 4
+    return {"state": done["state"], "delivery": done["delivery"]["status"], "counts": done["counts"], "providerRequests": 4}
+
+
 def loopback_smoke(root: Path) -> dict:
     """The live path through actual CLI subprocesses against the simulator: the main scenario plus every provider/process fault the contract names."""
     checks = []
     with SimulatedProvider() as provider:
-        env = simulator_env(provider.base_url, root / "budget")
+        env = simulator_env(provider.base_url, root / "budget", TYPESAFE_BASE_URL=provider.base_url)
         world = LiveWorld(root / "world", env)
         kit, hits = world.kit, provider.requests
+        kit.allow_model_send(world.runtime, ("extract", "compare", "topic", "relation", "verify-relation", "impact", "verify-impact"))
 
         report = live_scenario(world, hits)
         assert report["state"] == "ready" and report["usage"]["providerCalls"] == 3 == len(hits) and report["counts"]["topicCandidates"] == 1, report
@@ -822,6 +876,8 @@ def loopback_smoke(root: Path) -> dict:
         assert all(h["authorization"] == "Bearer " + FAKE_KEYS["ZOOP_AI_API_KEY"] for h in hits)
         assert not any(leak in h["body"]["messages"][1]["content"] for h in hits for leak in ("allow_model_send", "example.invalid", "operator-grant"))
         checks.append("main scenario: frozen live binding, one automatic dispatch, extract+compare+topic receipts, exact citations, env-free inspect, no resend, no key in any state file")
+        relation_report = relation_scenario(world, hits)
+        checks.append("S3 module CLI: relation+impact references expand after raw receipts, independent verifier requests, ready/current, env-free read and resume")
 
         # Provider silence after the request left: reconciling, never resent, usage unknown rather than zero.
         before, provider.mode = len(hits), "silent"
@@ -883,7 +939,7 @@ def loopback_smoke(root: Path) -> dict:
         checks.append("model-send rights (operation, purpose, recipient) and the frozen configuration are enforced before any send; a drifted environment cannot resume or re-freeze a job")
 
         no_secret_anywhere(root, env)
-    return {"status": "passed", "schemaVersion": SCHEMA, "checks": checks, "providerRequests": len(hits), "paidModelCalls": 0,
+    return {"status": "passed", "schemaVersion": SCHEMA, "checks": checks, "s2": report, "s3": relation_report, "providerRequests": len(hits), "paidModelCalls": 0,
             "network": "loopback simulator only (no external host, fake keys)"}
 
 

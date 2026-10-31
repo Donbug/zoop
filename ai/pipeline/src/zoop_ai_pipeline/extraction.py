@@ -12,8 +12,10 @@ import fcntl
 import json
 import os
 import sqlite3
+import stat
 import uuid
-from contextlib import contextmanager
+import tempfile
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -21,13 +23,14 @@ from pathlib import Path
 from . import extraction_replay as analysis
 from . import extraction_topic as topics
 from . import live_prompts
+from .native_read_contracts import s2_historical, validate_s2_historical_read
 from .dependency_contracts import array, cites, invalid
 from .extraction_contracts import (ADAPTER_VERSION, CANDIDATE_VERSION, LEDGER_VERSION, LIVE_ADAPTER_VERSION, MAX_COMPARISONS, MAX_DOCUMENTS, SCHEMA, Article,
     CitationFailure, ExtractionFailure, Mention, ObservationRef, ProviderResponseUnknown, ReplyInvalid, Submit, canonical, digest)
 from .ingestion import Ingestor
 from .ingestion import Store as IngestionStore
 from .ingestion_contracts import Authority, Export, IngestionFailure, Inspect, byte_hash, now, reserved_state_roots
-from .live_runtime import LiveFailure, LiveRuntime, physical_attempts
+from .live_runtime import LiveDeferred, LiveFailure, LiveRuntime, physical_attempts
 
 
 _SQL = """
@@ -58,7 +61,7 @@ _RELATIONS = ("SAME", "DIFFERENT", "FOLLOWS", "CONFLICT", "HOLD")
 
 
 class Store:
-    def __init__(self, root: Path, ingestion_root: Path, *, existing: bool = False):
+    def __init__(self, root: Path, ingestion_root: Path, *, existing: bool = False, inspection_job: str | None = None):
         root, ingestion_root = Path(os.path.abspath(root)), Path(os.path.abspath(ingestion_root))
         forbidden = [*reserved_state_roots(), ingestion_root]
         if any(root == p or root.is_relative_to(p) or p.is_relative_to(root) for p in forbidden):
@@ -67,7 +70,7 @@ class Store:
             if parent.exists() and parent.is_symlink():
                 raise ExtractionFailure("state_namespace_invalid")
         if existing:
-            self._open_existing(root)
+            self._open_existing(root, inspection_job)
             return
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
         if any(p.name not in _FILES or p.is_symlink() for p in root.iterdir()):
@@ -110,10 +113,9 @@ class Store:
             self.close()
             raise
 
-    def _open_existing(self, root: Path):
-        """Read-only downstream access (same policy as the ingestion consumer): shared non-blocking flock on the existing lock, no
-        mkdir/chmod/create/PRAGMA/schema/WAL write, immutable read-only SQLite. A non-empty -wal is committed data a reader must not
-        ignore or recover, so the operator runs the extraction writer (resume) first. An active writer makes the reader fail busy."""
+    def _open_existing(self, root: Path, inspection_job: str | None = None):
+        """Shared, non-blocking read access. Downstream reads require a checkpointed original; targeted current-job inspection
+        may recover a private copy while retaining the original shared lock through projection."""
         database, lock = root / "extraction.sqlite3", root / "extraction.lock"
         if not root.is_dir() or not database.is_file() or not lock.is_file():
             raise ExtractionFailure("extraction_state_missing")
@@ -128,8 +130,12 @@ class Store:
         try:
             wal = root / "extraction.sqlite3-wal"
             if wal.exists() and wal.stat().st_size > 0:
-                raise ExtractionFailure("extraction_recovery_required")
-            self.db = sqlite3.connect(database.as_uri() + "?mode=ro&immutable=1", uri=True, isolation_level=None)
+                if inspection_job is None:
+                    raise ExtractionFailure("extraction_recovery_required")
+                self._snapshot = ExitStack()
+                self.db = self._snapshot.enter_context(_current_job_snapshot(root, "extraction", inspection_job, current))
+            else:
+                self.db = sqlite3.connect(database.as_uri() + "?mode=ro&immutable=1", uri=True, isolation_level=None)
             self.db.row_factory = sqlite3.Row
             self.db.execute("PRAGMA query_only=ON")
             self.db.execute("SELECT 1 FROM jobs LIMIT 1")
@@ -144,7 +150,9 @@ class Store:
             raise
 
     def close(self):
-        if hasattr(self, "db"):
+        if hasattr(self, "_snapshot"):
+            self._snapshot.close()
+        elif hasattr(self, "db"):
             self.db.close()
         if hasattr(self, "lock"):
             os.close(self.lock)
@@ -313,11 +321,11 @@ def doc_key(ref: ObservationRef) -> str:
 
 
 def current(binding: dict) -> bool:
-    """A job is native only when its frozen adapter is this build's (replay or live). Anything else (ledger rows written before the native
-    cutover) stays readable as history but is never resumed, delivered or re-analysed: its analysis contract cannot be reproduced."""
+    """Execution eligibility for this build; historical delivery uses a separate read contract."""
     adapter = binding.get("adapter")
     version = adapter.get("version") if isinstance(adapter, dict) else None
-    return version == ADAPTER_VERSION or (version == LIVE_ADAPTER_VERSION and "live" in binding)
+    return ((version == ADAPTER_VERSION and "replay" in binding and "live" not in binding)
+            or (version == LIVE_ADAPTER_VERSION and "live" in binding and "replay" not in binding))
 
 
 def is_live(binding: dict) -> bool:
@@ -396,6 +404,33 @@ def live_call(binding: dict, call) -> dict:
     return result
 
 
+def save_live_deferral(store, attempt: str, proof: dict) -> None:
+    """Persist causal pre-HTTP evidence independently of a contended monetary ledger, atomically with the native call state."""
+    with store.transaction():
+        row = store.one("SELECT state,response FROM calls WHERE attempt_id=?", (attempt,))
+        if row is None or row["state"] != "started" or row["response"] is not None or proof["attemptId"] != attempt:
+            raise ExtractionFailure("receipt_request_mismatch")
+        store.db.execute("INSERT INTO meta VALUES(?,?)", ("operating-deferral:" + attempt + ":" + uuid.uuid4().hex, canonical(proof)))
+        store.db.execute("UPDATE calls SET state='deferred' WHERE attempt_id=?", (attempt,))
+
+
+def load_live_deferral(store, attempt: str) -> dict | None:
+    row = store.one("SELECT value FROM meta WHERE key LIKE ? ORDER BY rowid DESC LIMIT 1", ("operating-deferral:" + attempt + ":%",))
+    return json.loads(row["value"]) if row else None
+
+
+def open_job_inspection(store_type, root: Path, *upstream_roots: Path, job_id: str, ledger: str):
+    """Inspect one current crash target from a private copy; validated absent/empty namespaces prove job absence."""
+    try:
+        return store_type(root, *upstream_roots, existing=True, inspection_job=job_id)
+    except ExtractionFailure as exc:
+        if exc.code != f"{ledger}_state_missing":
+            raise
+        if not os.path.lexists(root) or (root.is_dir() and not any(root.iterdir())):
+            raise ExtractionFailure("job_not_found") from exc
+        raise
+
+
 def open_legacy_history(root: Path, ingestion_root: Path, job_id: str) -> "Store | None":
     """Ledger-only, read-only preflight. Returns an open read-only Store when the ledger holds `job_id` under a non-current adapter, else None.
 
@@ -413,6 +448,111 @@ def open_legacy_history(root: Path, ingestion_root: Path, job_id: str) -> "Store
         pass
     store.close()
     return None
+
+
+def _copy_ledger_snapshot(source: Path, target: Path) -> None:
+    """Stream exactly the opened regular file's observed size while its ledger lock is held."""
+    try:
+        fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError as exc:
+        raise ValueError("ledger_copy") from exc
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError("ledger_copy")
+        out = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            remaining = before.st_size
+            while remaining:
+                chunk = os.read(fd, min(1 << 20, remaining))
+                if not chunk:
+                    raise ValueError("ledger_copy")
+                remaining -= len(chunk)
+                view = memoryview(chunk)
+                while view:
+                    written = os.write(out, view)
+                    if written == 0:
+                        raise ValueError("ledger_copy")
+                    view = view[written:]
+            if os.read(fd, 1):
+                raise ValueError("ledger_copy")
+            after = os.fstat(fd)
+            named = os.stat(source, follow_symlinks=False)
+            def identity(info):
+                return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+            if identity(before) != identity(after) or identity(after) != identity(named):
+                raise ValueError("ledger_copy")
+        finally:
+            os.close(out)
+    except OSError as exc:
+        raise ValueError("ledger_copy") from exc
+    finally:
+        os.close(fd)
+
+
+@contextmanager
+def _ledger_snapshot(root: Path, ledger: str):
+    """Recover DB+WAL only in a private directory; the caller holds the original shared lock until this view closes."""
+    with tempfile.TemporaryDirectory(prefix=f"zoop-{ledger}-snapshot-") as scratch:
+        directory = Path(scratch)
+        try:
+            for suffix in (".sqlite3", ".sqlite3-wal"):
+                _copy_ledger_snapshot(root / (ledger + suffix), directory / (ledger + suffix))
+        except ValueError as exc:
+            raise ExtractionFailure(f"{ledger}_state_invalid") from exc
+        db = sqlite3.connect(directory / f"{ledger}.sqlite3", isolation_level=None)
+        try:
+            db.row_factory = sqlite3.Row
+            db.execute("PRAGMA query_only=ON")
+            yield db
+        finally:
+            db.close()
+
+
+@contextmanager
+def _current_job_snapshot(root: Path, ledger: str, job_id: str, is_current):
+    with _ledger_snapshot(root, ledger) as db:
+        row = db.execute("SELECT binding FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+        try:
+            binding = json.loads(row["binding"]) if row is not None else None
+            supported = isinstance(binding, dict) and is_current(binding)
+        except (ValueError, TypeError):
+            supported = False
+        if not supported:
+            raise ExtractionFailure(f"{ledger}_recovery_required")
+        yield db
+
+
+def mutation_job(store_type, root: Path, *upstream_roots: Path, job_id: str, ledger: str):
+    """Read a mutation target before opening its writer. Hot WALs are read only in a private copy.
+
+    This preserves explicit recovery of current jobs while refusing historical
+    mutations before chmod, DDL or checkpointing the original archive.
+    """
+    if not (root / f"{ledger}.sqlite3").exists():
+        return None
+    try:
+        store = store_type(root, *upstream_roots, existing=True)
+    except ExtractionFailure as exc:
+        if exc.code != f"{ledger}_recovery_required":
+            raise
+    else:
+        try:
+            row = store.one("SELECT * FROM jobs WHERE job_id=?", (job_id,))
+            return dict(row) if row is not None else None
+        finally:
+            store.close()
+    lock = os.open(root / f"{ledger}.lock", os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise ExtractionFailure(f"{ledger}_busy") from exc
+        with _ledger_snapshot(root, ledger) as db:
+            row = db.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+            return dict(row) if row is not None else None
+    finally:
+        os.close(lock)
 
 
 def locators_containing(document: dict, start: int, end: int) -> list[str]:
@@ -650,7 +790,19 @@ class Extractor:
             raise ExtractionFailure(result["delivery"]["code"])
         return Submit.model_validate_json(row["request"]), result
 
+    def require_current_analysis(self, job_id: str) -> None:
+        if not current(json.loads(self._job(job_id)["binding"])):
+            raise ExtractionFailure("analysis_contract_changed")
+
+    def export_for_analysis(self, job_id: str) -> tuple[Submit, dict]:
+        """Current analysis input, distinct from export of an already frozen historical result."""
+        self.require_current_analysis(job_id)
+        return self.export(job_id)
+
     def cancel(self, job_id: str) -> dict:
+        binding = json.loads(self._job(job_id)["binding"])
+        if not current(binding) and str(binding.get("adapter", {}).get("version", "")).startswith("zoop-extraction-native-"):
+            raise ExtractionFailure("analysis_contract_changed")
         with self.store.transaction():
             row = self._job(job_id)
             if row["state"] not in {"ready", "cancelled"}:
@@ -793,11 +945,12 @@ class Extractor:
         job_id = row["job_id"]
         live = json.loads(row["binding"])["live"]
         frozen = live["runtime"]
+        payload = {**payload, "citationSources": [live_prompts.source(ctx.docs[k].export, ctx.docs[k].article) for k in sorted(set(keys))]}
         decoder = self.live.frozen(frozen)
         send = (decoder.purpose(stage), decoder.recipient(stage), frozenset(keys))
         fallback = decoder.fallback_recipient(stage)
         call = self.store.one("SELECT * FROM calls WHERE job_id=? AND stage=? AND ref=?", (job_id, stage, ref))
-        if call is None:
+        if call is None or call["state"] == "deferred":
             sender = self.live.sender()
             if not sender.accepts(frozen):
                 raise ExtractionFailure("live_config_changed")
@@ -808,7 +961,15 @@ class Extractor:
             if (prepared["purpose"], prepared["recipient"]) != send[:2]:
                 raise ExtractionFailure("live_prepared_invalid")
             self._verify(ctx, send)
-            attempt = self._reserve(job_id, fence, stage, ref, key, live["bindingDigest"])
+            unsent_proof = None
+            if call is None:
+                attempt = self._reserve(job_id, fence, stage, ref, key, live["bindingDigest"])
+            else:
+                if call["request_digest"] != key or "funding" not in frozen:
+                    raise ExtractionFailure("receipt_request_mismatch")
+                attempt = call["attempt_id"]
+                unsent_proof = load_live_deferral(self.store, attempt)
+                self.db.execute("UPDATE calls SET state='started' WHERE attempt_id=? AND state='deferred'", (attempt,))
 
             def authorize():
                 # Runs inside send(), immediately before the one request: config, fence/cancel and every sent document's current rights.
@@ -825,7 +986,11 @@ class Extractor:
 
             try:
                 receipt = sender.send(prepared, attempt_id=attempt, authorize=authorize,
+                                      **({"unsent_proof": unsent_proof} if unsent_proof is not None else {}),
                                       **({"authorize_fallback": authorize_fallback} if fallback is not None else {}))
+            except LiveDeferred as exc:
+                save_live_deferral(self.store, attempt, exc.proof)
+                raise ExtractionFailure(exc.code) from exc
             except ExtractionFailure as exc:
                 self._unsent(attempt, exc.code)
                 raise
@@ -869,7 +1034,7 @@ class Extractor:
             self._reject(attempt, exc.code)
             raise ReplyInvalid(exc.code) from exc
         try:
-            result = parse(answer)
+            result = parse(live_prompts.expand(stage, payload, answer))
         except ReplyInvalid as exc:
             self._reject(attempt, exc.code)
             raise
@@ -1030,12 +1195,8 @@ class Extractor:
             return topics.candidates(request, response, cite)
 
         if is_live(stored):
-            # The model can only quote what it is shown: the LIVE payload adds each sent document's prepared text (the replay request and its digest
-            # stay as they are). Offsets the model leaves null are resolved from a unique literal quote of the cited document, never repaired otherwise.
-            texts = {(d["documentId"], d["documentVersion"]): ctx.by_document(d["documentId"], d["documentVersion"]).export["document"]["text"] for d in documents}
-            payload = {**request, "documents": [{**d, "text": texts[(d["documentId"], d["documentVersion"])]} for d in documents]}
-            found = self._live_receipted(row, ctx, fence, "topic", "topic", key, payload, sorted(doc_keys),
-                                         lambda raw: topics.parse(live_prompts.resolve_citations(raw, texts)), membership)
+            found = self._live_receipted(row, ctx, fence, "topic", "topic", key, request, sorted(doc_keys),
+                                         topics.parse, membership)
         else:
             def lookup():
                 if fixtures.topic_raw is None:
@@ -1065,7 +1226,7 @@ class Extractor:
         row = self._job(job_id)
         request = Submit.model_validate_json(row["request"])
         binding = json.loads(row["binding"])
-        live = is_live(binding)
+        live = request.provenance.execution_mode == "live"
         stages = {s["stage"]: json.loads(s["summary"]) for s in self.store.all("SELECT * FROM stages WHERE job_id=?", (job_id,))}
         calls = self.store.all("SELECT * FROM calls WHERE job_id=? ORDER BY started_at,attempt_id", (job_id,))
         events, comparisons, dispositions, topic_rows = candidate_rows(self.store, job_id)
@@ -1091,13 +1252,24 @@ class Extractor:
         if row["state"] == "cancelled":
             result["delivery"] = {"status": "withheld", "code": "job_cancelled"}
             return result
-        if not current(binding):
-            # Stored history stays inspectable verbatim, but a job frozen under another analysis contract delivers nothing and reads no source.
+        historical = s2_historical(binding)
+        if not current(binding) and not historical:
             result["delivery"] = {"status": "withheld", "code": "analysis_contract_changed"}
             return result
+        if historical and row["state"] != "ready":
+            result["delivery"] = {"status": "withheld", "code": "upstream_not_ready"}
+            return result
         try:
-            ctx = self._context(request)
-            self._check_binding(ctx, row)
+            if historical:
+                refs = {doc_key(request.incoming): request.incoming}
+                for event in request.snapshot.events:
+                    for member in event.members:
+                        refs.setdefault(doc_key(member.observation), member.observation)
+                exports = {key: self.sources.export(ref) for key, ref in refs.items()}
+                validate_s2_historical_read(row, request, exports)
+            else:
+                ctx = self._context(request)
+                self._check_binding(ctx, row)
         except ExtractionFailure as exc:
             result["delivery"] = {"status": "withheld", "code": exc.code}
             return result

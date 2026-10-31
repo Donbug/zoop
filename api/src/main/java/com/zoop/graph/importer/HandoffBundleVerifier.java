@@ -31,7 +31,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The strict, closed validator of a {@code zoop-graph-handoff-bundle-7} and of its frozen manifest: a Java port of the
+ * The strict, closed validator of a {@code zoop-graph-handoff-bundle-8} and of its frozen manifest: a Java port of the
  * producer's own {@code validate_bundle} ({@code ai/pipeline/.../handoff_contracts.py}), so the app never trusts a producer
  * claim it did not recompute. Every object has exactly the keys the producer writes, every value its type and pattern, every
  * reference is closed (articles, evidence, companies, issues, relations, source pins, review revisions), every id formula
@@ -43,8 +43,10 @@ import tools.jackson.databind.node.ObjectNode;
  */
 final class HandoffBundleVerifier {
     static final String MANIFEST_SCHEMA = "zoop-ai-handoff-1";
-    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-7";
-    static final String POLICY = "zoop-public-projection-policy-1";
+    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-8";
+    static final String POLICY = "zoop-public-projection-policy-2";
+    static final String UNKNOWN_POLICY = "zoop-public-projection-policy-3";
+    static final String UNKNOWN_BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-9";
     static final String EVIDENCE_KIND = "graph-body-span";
     static final String OFFSET_UNIT = "unicode_code_point";
 
@@ -148,7 +150,7 @@ final class HandoffBundleVerifier {
         String sourceKind = manifest.string("sourceKind");
         need(sourceKind.equals("synthetic") || sourceKind.equals("actual"));
         String policyVersion = manifest.string("policyVersion");
-        need(POLICY.equals(policyVersion));
+        need(POLICY.equals(policyVersion) || UNKNOWN_POLICY.equals(policyVersion));
         List<Obj> sourceNodes = manifest.objects("sources");
         need(sourceNodes.size() >= 1 && sourceNodes.size() <= MAX_SOURCES);
         List<SourcePin> pins = new ArrayList<>();
@@ -197,7 +199,8 @@ final class HandoffBundleVerifier {
         Obj bundle = Obj.of(node).exactly(Set.of("schemaVersion", "handoffId", "manifestDigest", "provenance", "policy",
                 "sources", "companies", "pathCompanies", "issues", "relations", "evidence", "articles", "exclusions", "counts",
                 "checks", "readiness", "digests", "impacts"));
-        need(BUNDLE_SCHEMA.equals(bundle.string("schemaVersion")));
+        boolean explicitUnknown = UNKNOWN_BUNDLE_SCHEMA.equals(bundle.string("schemaVersion"));
+        need(explicitUnknown || BUNDLE_SCHEMA.equals(bundle.string("schemaVersion")));
         String handoffId = text(bundle, "handoffId", ID);
         String manifestDigest = text(bundle, "manifestDigest", HASH);
 
@@ -215,9 +218,9 @@ final class HandoffBundleVerifier {
         Obj policy = bundle.object("policy").exactly(Set.of("version", "files", "evidenceIdKind", "offsetUnit", "geography",
                 "structural", "sequence", "sourceSupport", "impacts", "issueSummary"));
         String policyVersion = policy.string("version");
-        need(POLICY.equals(policyVersion) && EVIDENCE_KIND.equals(policy.string("evidenceIdKind"))
+        need((explicitUnknown ? UNKNOWN_POLICY : POLICY).equals(policyVersion) && EVIDENCE_KIND.equals(policy.string("evidenceIdKind"))
                 && OFFSET_UNIT.equals(policy.string("offsetUnit")));
-        need("operator-field-verdict".equals(policy.string("geography")));
+        need((explicitUnknown ? "operator-field-verdict-or-explicit-unknown" : "operator-field-verdict").equals(policy.string("geography")));
         need("manual-operator-review".equals(policy.string("structural")));
         need("s2-comparison-with-operator-decision".equals(policy.string("sequence")));
         need(SOURCE_SUPPORT_POLICY.equals(policy.string("sourceSupport")));
@@ -404,6 +407,7 @@ final class HandoffBundleVerifier {
         // issues --------------------------------------------------------------------------------------------------------
         Map<String, Issue> issues = new LinkedHashMap<>();
         List<Obj> issueNodes = bundle.objects("issues");
+        Map<String, List<String>> issueCountries = new HashMap<>();
         need(issueNodes.size() <= MAX_ISSUES);
         for (Obj i : issueNodes) {
             i.exactly(Set.of("id", "canonicalId", "title", "action", "target", "eventTime", "timePrecision", "period",
@@ -420,18 +424,30 @@ final class HandoffBundleVerifier {
             String assertionStatus = i.stringOrNull("assertionStatus");
             String timePrecision = i.string("timePrecision");
             need(TIME_PRECISIONS.contains(timePrecision));
-            Obj geography = i.object("geography").exactly(Set.of("value", "decisionRef", "decisionVersion", "policyVersion",
+            Obj geography = i.object("geography");
+            boolean unknown = explicitUnknown && geography.isNull("value");
+            Set<String> geoKeys = new HashSet<>(Set.of("value", "decisionRef", "decisionVersion", "policyVersion",
                     "countries", "verification", "evidenceIds", "basis"));
-            String geographyValue = geography.string("value");
+            if (unknown) geoKeys.add("reasonCode");
+            geography.exactly(geoKeys);
+            String geographyValue = geography.stringOrNull("value");
             String geographyPolicy = geography.string("policyVersion");
-            need((geographyValue.equals("domestic") || geographyValue.equals("international")) && POLICY.equals(geographyPolicy));
-            need("operator-field-verdict".equals(geography.string("verification")));
+            need(policyVersion.equals(geographyPolicy));
             text(geography, "decisionRef", ID);
             text(geography, "decisionVersion", ID);
             List<String> countries = strings(geography, "countries", 10);
-            need(countriesClass(countries).equals(geographyValue));
+            if (unknown) {
+                need(countries.isEmpty() && geography.strings("evidenceIds").isEmpty()
+                        && "not-established".equals(geography.string("verification"))
+                        && Set.of("not-stated", "not-supported", "conflicting").contains(geography.string("reasonCode")));
+            } else {
+                need(("domestic".equals(geographyValue) || "international".equals(geographyValue))
+                        && countriesClass(countries).equals(geographyValue)
+                        && "operator-field-verdict".equals(geography.string("verification")));
+            }
+            issueCountries.put(id, countries);
             List<String> evidenceIds = evidenceIds(i, "evidenceIds", 1, evidence, referenced);
-            List<String> geographyEvidence = evidenceIds(geography, "evidenceIds", 1, evidence, referenced);
+            List<String> geographyEvidence = evidenceIds(geography, "evidenceIds", unknown ? 0 : 1, evidence, referenced);
 
             List<Obj> events = i.objects("sourceEvents");
             need(events.size() >= 1 && events.size() <= 1000);
@@ -441,11 +457,17 @@ final class HandoffBundleVerifier {
                 eventKeys.add(Canonical.write(event.node()));
             }
             need(sortedUnique(eventKeys));
+            for (String evidenceId : geographyEvidence) {
+                Evidence row = evidence.get(evidenceId);
+                need(events.stream().anyMatch(event -> event.string("documentId").equals(row.documentId())
+                        && event.string("documentVersion").equals(row.documentVersion())));
+            }
             Set<String> mentionEvidence = mentions(i, events, articles, companies, evidence, referenced);
             Set<String> expectedEvidence = new HashSet<>(mentionEvidence);
             expectedEvidence.addAll(geographyEvidence);
             Obj representativeNode = i.isNull("representative") ? null : i.object("representative");
             expectedEvidence.addAll(fieldSelection(i, representativeNode, evidence, referenced));
+            HandoffTime.mentionEventTime(eventTime, timePrecision);
             need(expectedEvidence.equals(new HashSet<>(evidenceIds)));
             sourceSupport(i.object("sourceSupport"), evidenceIds, evidence, articles);
             List<Obj> basis = geography.objects("basis");
@@ -460,7 +482,8 @@ final class HandoffBundleVerifier {
                     }
                 }
                 sourceEvent(Obj.of(stripped), upstreams);
-                need(item.strings("countries").equals(countries));
+                List<String> declared = strings(item, "countries", 10);
+                need(unknown || declared.isEmpty() || declared.equals(countries));
                 need(Canonical.write(stripped).equals(eventKeys.get(index)));
             }
             if (!i.isNull("representative")) {
@@ -538,7 +561,19 @@ final class HandoffBundleVerifier {
                 need(verifiedAt.equals(usedReviews.get(jobId).get(candidate).decidedAt()));
                 String validFrom = b.stringOrNull("validFrom");
                 String validUntil = b.stringOrNull("validUntil");
-                strings(b, "countries", 10);
+                List<String> constrainedCountries = strings(b, "countries", 10);
+                if (explicitUnknown) {
+                    List<String> sourceCountries = issueCountries.get(source);
+                    need(constrainedCountries.isEmpty() || (!sourceCountries.isEmpty() && constrainedCountries.containsAll(sourceCountries)));
+                    if (validFrom != null || validUntil != null) {
+                        Issue issue = issues.get(source);
+                        need(issue.eventTime() != null && Set.of("day", "datetime").contains(issue.timePrecision()));
+                        String day = issue.eventTime().substring(0, 10);
+                        HandoffTime.day(day);
+                        need((validFrom == null || day.compareTo(HandoffTime.day(validFrom)) >= 0)
+                                && (validUntil == null || day.compareTo(HandoffTime.day(validUntil)) <= 0));
+                    }
+                }
                 // The scopes are the operator's S3 text copied as it stands: text, never an entity id and never a node.
                 for (String scope : List.of("businessScope", "productScope")) {
                     String value = b.stringOrNull(scope);
@@ -1143,8 +1178,8 @@ final class HandoffBundleVerifier {
             mention.stringOrNull("target");
             mention.stringOrNull("period");
             String timePrecision = mention.string("timePrecision");
-            need(TIME_PRECISIONS.contains(timePrecision));
-            HandoffTime.mentionEventTime(mention.stringOrNull("eventTime"), timePrecision);
+            need(TIME_PRECISIONS.contains(timePrecision) || "unresolved".equals(timePrecision));
+            HandoffTime.receiptEventTime(mention.stringOrNull("eventTime"), timePrecision);
             need(ASSERTION_STATUSES.contains(mention.string("assertionStatus")));
             mention.bool("background");
 
@@ -1225,6 +1260,7 @@ final class HandoffBundleVerifier {
         need(verdicts.size() <= MAX_VERDICTS);
         Set<String> verdictEvidence = new HashSet<>();
         Set<String> withheld = new HashSet<>();
+        Set<String> unresolvedReviewed = new HashSet<>();
         String previousKey = null;
         int previousField = -1;
         for (Obj verdict : verdicts) {
@@ -1256,10 +1292,12 @@ final class HandoffBundleVerifier {
             switch (decision) {
                 case "ALLOW" -> need(reason.equals("stated") && !cited.isEmpty());
                 case "HOLD" -> need((reason.equals("unstated") && cited.isEmpty())
-                        || (reason.equals("ambiguous") && !cited.isEmpty()));
+                        || ((reason.equals("ambiguous") || reason.equals("unsupported-format")) && !cited.isEmpty()));
                 case "REJECT" -> need(reason.equals("contradicted") && !cited.isEmpty());
                 default -> need(false);
             }
+            need(!reason.equals("unsupported-format") || (field.equals("eventTime") && mention.string("timePrecision").equals("unresolved")));
+            if (field.equals("eventTime") && !decision.equals("ALLOW")) unresolvedReviewed.add(key);
             need("operator-field-verdict".equals(verdict.string("verification")));
             for (String name : List.of("reviewer", "decisionRef", "decisionVersion")) {
                 text(verdict, name, ID);
@@ -1268,6 +1306,9 @@ final class HandoffBundleVerifier {
             if (!decision.equals("ALLOW") && (chosen == null || key.equals(chosen))) {
                 withheld.add(field);
             }
+        }
+        for (Map.Entry<String, Obj> entry : byKey.entrySet()) {
+            need(!entry.getValue().string("timePrecision").equals("unresolved") || unresolvedReviewed.contains(entry.getKey()));
         }
 
         // fieldProvenance -----------------------------------------------------------------------------------------------

@@ -65,7 +65,7 @@ def runtime(monkeypatch, tmp_path, *, go=False, handler=None, family=live.PIPELI
     values.update(overrides)
     environment(monkeypatch, tmp_path, **values)
     model = funding.GO_MODEL if go else live.MODEL
-    peer = Fake(handler or (lambda request: json_response(openai_reply({"mentions": []}, model=model))))
+    peer = Fake(handler or (lambda request: json_response(openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"}, model=model))))
     return LiveRuntime.from_env(transport=peer.transport, family=family), peer
 
 
@@ -225,7 +225,7 @@ def test_funded_profile_rejects_routing_and_model_drift(monkeypatch, tmp_path, o
 
 
 def test_go_wire_session_schema_usage_and_nominal_allowance_are_honest(monkeypatch, tmp_path):
-    reply = openai_reply({"mentions": []}, model=funding.GO_MODEL)
+    reply = openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"}, model=funding.GO_MODEL)
     reply["usage"].update(cost=0, opencode={"billing_source": "go", "allowance": 0.0009, "list_cost": 0.0009})
     rt, peer = runtime(monkeypatch, tmp_path, go=True, handler=lambda request: json_response(reply))
     prepared = rt.prepare("extract", extract_payload())
@@ -239,7 +239,7 @@ def test_go_wire_session_schema_usage_and_nominal_allowance_are_honest(monkeypat
     assert str(peer.requests[0].url) == funding.GO_URL + "/chat/completions"
     assert peer.requests[0].headers["user-agent"] == "zoop-data-pipeline/1.0"
     assert peer.requests[0].headers["x-opencode-session"] == peer.requests[1].headers["x-opencode-session"]
-    assert first["format"] == "zoop-live-receipt-2" and rt.answer("extract", first) == {"mentions": []}
+    assert first["format"] == "zoop-live-receipt-2" and rt.answer("extract", first) == {"mentions": [], "citationFormat": "zoop-live-source-segments-1"}
     assert first["cost"]["chargedUsd"] == "0.000900000" and first["cost"]["basis"] == "go-nominal-allowance-upper-estimate"
     assert first["cost"]["providerReported"] == {"billingSource": "go", "billableUsd": "0", "allowanceUsd": "0.0009", "listUsd": "0.0009"}
     assert first["timing"]["durationMs"] >= 0 and first["timing"]["provenance"] == "http-transport-monotonic"
@@ -248,7 +248,7 @@ def test_go_wire_session_schema_usage_and_nominal_allowance_are_honest(monkeypat
 
 
 def test_standard_tier_is_explicit_and_unexpected_fast_usage_is_not_accepted(monkeypatch, tmp_path):
-    reply = openai_reply({"mentions": []}, model=live.MODEL)
+    reply = openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"}, model=live.MODEL)
     reply["service_tier"] = "priority"
     rt, peer = runtime(monkeypatch, tmp_path, handler=lambda request: json_response(reply))
     receipt = send(rt)
@@ -260,13 +260,15 @@ def test_standard_tier_is_explicit_and_unexpected_fast_usage_is_not_accepted(mon
 
 @pytest.mark.parametrize("model", ["deepseek-flash", "deepseek-v4.1-flash-other", "gpt-6-luna", None])
 def test_reported_model_mismatch_retains_worst_and_cannot_be_accepted(monkeypatch, tmp_path, model):
-    rt, _ = runtime(monkeypatch, tmp_path, go=True, handler=lambda request: json_response(openai_reply({"mentions": []}, model=model)))
+    rt, _ = runtime(monkeypatch, tmp_path, go=True, handler=lambda request: json_response(openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"}, model=model)))
     receipt = send(rt)
     assert receipt["cost"]["estimatedUsd"] is None and receipt["cost"]["chargedUsd"] == receipt["cost"]["reservedUsd"]
     refused(lambda: rt.answer("extract", receipt), "live_model_mismatch", LiveFailure)
 
 
-@pytest.mark.parametrize("answer", [{}, {"mentions": [], "extra": True}, {"mentions": "[]"}, {"mentions": [{}]}])
+@pytest.mark.parametrize("answer", [{}, {"mentions": [], "extra": True, "citationFormat": "zoop-live-source-segments-1"},
+                                    {"mentions": "[]", "citationFormat": "zoop-live-source-segments-1"},
+                                    {"mentions": [{}], "citationFormat": "zoop-live-source-segments-1"}])
 def test_json_object_is_not_mistaken_for_schema_validity(monkeypatch, tmp_path, answer):
     rt, _ = runtime(monkeypatch, tmp_path, go=True, handler=lambda request: json_response(openai_reply(answer, model=funding.GO_MODEL)))
     receipt = send(rt)
@@ -329,8 +331,8 @@ def test_authorization_and_deadline_refusals_release_only_unsent_attempts(monkey
 
 
 @pytest.mark.parametrize("response", [httpx.Response(429, json={"usage": {"prompt_tokens": 0, "completion_tokens": 0}}),
-                                      json_response(openai_reply({"mentions": []}, model=funding.GO_MODEL, usage=None)),
-                                      json_response(openai_reply({"mentions": []}, model=funding.GO_MODEL,
+                                      json_response(openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"}, model=funding.GO_MODEL, usage=None)),
+                                      json_response(openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"}, model=funding.GO_MODEL,
                                                                 usage={"prompt_tokens": 1000, "completion_tokens": 24001}))])
 def test_missing_bad_or_non_success_usage_never_releases_reserved_exposure(monkeypatch, tmp_path, response):
     rt, peer = runtime(monkeypatch, tmp_path, go=True, handler=lambda request: response)
@@ -344,13 +346,13 @@ def test_missing_bad_or_non_success_usage_never_releases_reserved_exposure(monke
 def test_legacy_receipt_decoding_and_unfunded_ledgers_are_not_reinterpreted(monkeypatch, tmp_path):
     environment(monkeypatch, tmp_path)
     monkeypatch.delenv(live.PROFILE_VAR, raising=False)
-    peer = Fake(lambda request: json_response(openai_reply({"mentions": []})))
+    peer = Fake(lambda request: json_response(openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"})))
     rt = LiveRuntime.from_env(transport=peer.transport)
     old_binding = rt.binding()
     receipt = send(rt)
     assert receipt["format"] == "zoop-live-receipt-1" and "funding" not in receipt and "timing" not in receipt
     assert "funding" not in old_binding and old_binding["version"] == "zoop-live-runtime-1"
-    assert LiveRuntime.from_binding(old_binding).answer("extract", receipt) == {"mentions": []}
+    assert LiveRuntime.from_binding(old_binding).answer("extract", receipt) == {"mentions": [], "citationFormat": "zoop-live-source-segments-1"}
     assert "buckets" not in Budget(tmp_path / "budget", NANO, 10).snapshot()
     funded, _ = runtime(monkeypatch, tmp_path)
     refused(lambda: funded.answer("extract", receipt), "live_receipt_invalid", LiveFailure)
@@ -631,7 +633,7 @@ def test_capped_runtime_binding_and_boundary_drain_are_distinct_from_old_receipt
     assert receipt["format"] == live.CHAIN_RECEIPT
     assert len(live.physical_attempts(receipt)) == 1
     assert receipt["admittedSet"] == {"setId": "set-one"}
-    assert rt.answer("extract", receipt) == {"mentions": []}
+    assert rt.answer("extract", receipt) == {"mentions": [], "citationFormat": "zoop-live-source-segments-1"}
     refused(lambda: b.admit_set("next", "b" * 64, finite_plan()), "live_set_admission_closed")
 
 
@@ -719,13 +721,13 @@ def test_request_granular_fallback_journals_primary_before_successor_and_keeps_b
         assert attempts[0]["receipt"]["http"]["status"] == 503
         assert attempts[0]["error"]["code"] == "live_http_503"
         assert authorized == ["primary", "fallback"]
-        return json_response(openai_reply({"mentions": []}, model=direct_deepseek.MODEL))
+        return json_response(openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"}, model=direct_deepseek.MODEL))
     rt, peer, b = chain_runtime(monkeypatch, tmp_path, handler)
     holder["budget"] = b
     receipt = rt.send(rt.prepare("extract", extract_payload()), attempt_id="logical",
                       authorize=lambda: authorized.append("primary"), authorize_fallback=lambda: authorized.append("fallback"))
-    assert rt.answer("extract", receipt) == {"mentions": []}
-    assert LiveRuntime.from_binding(rt.binding()).answer("extract", receipt) == {"mentions": []}
+    assert rt.answer("extract", receipt) == {"mentions": [], "citationFormat": "zoop-live-source-segments-1"}
+    assert LiveRuntime.from_binding(rt.binding()).answer("extract", receipt) == {"mentions": [], "citationFormat": "zoop-live-source-segments-1"}
     attempts = live.physical_attempts(receipt)
     assert len(peer.requests) == len(attempts) == 2
     assert receipt["winnerAttemptId"] == attempts[1]["attemptId"]
@@ -772,7 +774,7 @@ def test_chain_never_model_hops_source_refusal_or_unknown(tmp_path, monkeypatch,
             return httpx.ReadTimeout("authored")
         if mode == "gateway-unknown":
             return json_response({"error": "upstream"}, 502)
-        return json_response(openai_reply({"mentions": []}, model="wrong" if mode == "model-mismatch" else live.MODEL,
+        return json_response(openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"}, model="wrong" if mode == "model-mismatch" else live.MODEL,
                                          refusal="policy" if mode == "refusal" else None))
     rt, peer, b = chain_runtime(monkeypatch, tmp_path, handler)
     def authorize():
@@ -814,12 +816,12 @@ def test_chain_can_finish_after_cutoff_but_missing_set_and_third_attempt_are_ref
             monkeypatch.setattr(live_budget, "_now", lambda: "2026-10-28T08:30:00+00:00")
             holder["budget"].close_admission("admission_cutoff")
             return json_response({"error": "capacity"}, 503)
-        return json_response(openai_reply({"mentions": []}, model=direct_deepseek.MODEL))
+        return json_response(openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"}, model=direct_deepseek.MODEL))
     rt, peer, b = chain_runtime(monkeypatch, tmp_path, handler)
     holder["budget"] = b
     receipt = rt.send(rt.prepare("extract", extract_payload()), attempt_id="logical",
                       authorize=no_authorization, authorize_fallback=no_authorization)
-    assert rt.answer("extract", receipt) == {"mentions": []}
+    assert rt.answer("extract", receipt) == {"mentions": [], "citationFormat": "zoop-live-source-segments-1"}
     refused(lambda: b.admit_set("next", "b" * 64, finite_plan()), "live_set_admission_closed")
     next_payload = extract_payload()
     next_payload["prompt_version"] = "different-input"
@@ -834,7 +836,7 @@ def test_forged_chain_winner_or_fallback_input_is_not_decoded(tmp_path, monkeypa
     from zoop_ai_pipeline import direct_deepseek
     rt, _, _ = chain_runtime(monkeypatch, tmp_path, lambda request:
         json_response({"error": "capacity"}, 503) if request.url.host == "api.openai.com"
-        else json_response(openai_reply({"mentions": []}, model=direct_deepseek.MODEL)))
+        else json_response(openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"}, model=direct_deepseek.MODEL)))
     receipt = rt.send(rt.prepare("extract", extract_payload()), attempt_id="logical",
                       authorize=no_authorization, authorize_fallback=no_authorization)
     wrong_winner = copy.deepcopy(receipt)
@@ -847,7 +849,7 @@ def test_forged_chain_winner_or_fallback_input_is_not_decoded(tmp_path, monkeypa
 
 @pytest.mark.parametrize("cache_write", [None, 0, 500, 1000])
 def test_v2_cache_write_highest_rate_covers_unknown_retention_without_double_counting(tmp_path, monkeypatch, cache_write):
-    reply = openai_reply({"mentions": []}, model=live.MODEL)
+    reply = openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"}, model=live.MODEL)
     if cache_write is not None:
         reply["usage"]["prompt_tokens_details"]["cache_write_tokens"] = cache_write
     # Unknown future breakdown does not produce a discount: total input still
@@ -863,7 +865,7 @@ def test_v2_cache_write_highest_rate_covers_unknown_retention_without_double_cou
     assert physical["cost"]["chargedUsd"] == physical["cost"]["estimatedUsd"] == "0.000875000"
     assert physical["cost"]["usageKnown"] is True
     assert budget.snapshot()["chargedUsd"] == "0.000875000"
-    assert rt.answer("extract", receipt) == {"mentions": []}
+    assert rt.answer("extract", receipt) == {"mentions": [], "citationFormat": "zoop-live-source-segments-1"}
     assert len(peer.requests) == 1
     pricing = rt.binding()["pricing"]
     assert pricing["revision"] == "zoop-set-pricing-cache-write-1"
@@ -877,7 +879,7 @@ def test_v2_cache_write_highest_rate_covers_unknown_retention_without_double_cou
     (None, "cache_write_usage_invalid"), (1001, "cache_write_exceeds_input"),
 ])
 def test_v2_cache_write_invalid_usage_keeps_reservation_and_never_falls_back(tmp_path, monkeypatch, cache_write, reason):
-    reply = openai_reply({"mentions": []}, model=live.MODEL)
+    reply = openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"}, model=live.MODEL)
     reply["usage"]["prompt_tokens_details"]["cache_write_tokens"] = cache_write
     rt, peer, budget = chain_runtime(monkeypatch, tmp_path, lambda request: json_response(reply))
     prepared = rt.prepare("extract", extract_payload())
@@ -892,7 +894,7 @@ def test_v2_cache_write_invalid_usage_keeps_reservation_and_never_falls_back(tmp
 
 
 def test_cache_write_v2_pricing_does_not_reinterpret_v1_bindings_or_receipts(tmp_path, monkeypatch):
-    reply = openai_reply({"mentions": []}, model=live.MODEL)
+    reply = openai_reply({"mentions": [], "citationFormat": "zoop-live-source-segments-1"}, model=live.MODEL)
     reply["usage"]["prompt_tokens_details"]["cache_write_tokens"] = 1000
     rt, peer = runtime(monkeypatch, tmp_path, handler=lambda request: json_response(reply))
     prepared = rt.prepare("extract", extract_payload())
@@ -902,7 +904,7 @@ def test_cache_write_v2_pricing_does_not_reinterpret_v1_bindings_or_receipts(tmp
     assert receipt["cost"]["chargedUsd"] == "0.000575000"
     assert rt.binding()["pricing"] == live.FUNDED_PRICING
     assert live.PRICING[live.MODEL] == live.FUNDED_PRICING[live.MODEL] == {"input": 200, "output": 750}
-    assert LiveRuntime.from_binding(rt.binding()).answer("extract", receipt) == {"mentions": []}
+    assert LiveRuntime.from_binding(rt.binding()).answer("extract", receipt) == {"mentions": [], "citationFormat": "zoop-live-source-segments-1"}
     assert len(peer.requests) == 1
 
 

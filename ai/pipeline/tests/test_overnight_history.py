@@ -22,11 +22,12 @@ sys.path.insert(0, str(PIPELINE / "scripts"))
 from scripts import overnight_history as history
 from overnight_inputs import bind_execution, encoded, file_pin, load, prepare_item, save, sha
 from tests.live_support import environment, openai_reply
-from zoop_ai_pipeline import extraction_replay as analysis, ingestion, live_runtime as live
+from zoop_ai_pipeline import extraction_replay as analysis, ingestion, live_prompts, live_runtime as live
 from zoop_ai_pipeline.extraction import Extractor, Fixtures, LiveAccess, Sources, Store as ExtractionStore
 from zoop_ai_pipeline.extraction_contracts import Catalogue, Submit
 from zoop_ai_pipeline.ingestion import Ingestor, Store
 from zoop_ai_pipeline.ingestion_contracts import Authority, Export, Run
+from zoop_ai_pipeline.live_budget import Budget, NANO
 from zoop_ai_pipeline.live_runtime import LiveRuntime
 from zoop_ai_pipeline.private_processing import PrivateAuthority
 
@@ -141,7 +142,22 @@ def author_mention(unit, ident="m1", *, background=False):
     return article, mention
 
 
-def run_s2(world, index, job, *, relation="DIFFERENT", mentions=None, topic=False, complete_topic=True, catalogue=None, replay=False):
+def source_references(sources, evidence):
+    references = {}
+    for source in sources:
+        start = 0
+        for segment in source["segments"]:
+            end = start + len(segment["text"])
+            if segment["segmentId"] is not None:
+                key = (source["article_id"], source["article_version"], start, end, segment["text"])
+                references[key] = {"segmentId": segment["segmentId"]}
+            start = end
+    return [references[tuple(citation[key] for key in ("article_id", "article_version", "start", "end", "quote"))]
+            for citation in evidence]
+
+
+def run_s2(world, index, job, *, relation="DIFFERENT", mentions=None, topic=False, complete_topic=True, catalogue=None, replay=False,
+           extract_response=None):
     """Real native LIVE adapter; the authored HTTP peer is the only replacement."""
     unit = world.units[index]
     catalogue = catalogue or CATALOGUE
@@ -160,12 +176,17 @@ def run_s2(world, index, job, *, relation="DIFFERENT", mentions=None, topic=Fals
         stage, projection = payload["stage"], payload["input"]
         stages.append(stage)
         if stage == "extract":
-            answer = {"mentions": mentions}
+            answer = (extract_response if extract_response is not None else
+                      {"citationFormat": live_prompts.CITATION_FORMAT, "mentions": [
+                          {**mention, "evidence": source_references(payload["sources"], mention["evidence"])} for mention in mentions]})
         elif stage == "compare":
-            answer = {"relation": relation, "reason": "authored transport control; not model quality or gold",
-                      "evidence": projection["mention"]["evidence"] + members[projection["issue"]["issue_id"]]["evidence"]}
+            incoming = next(m for m in mentions if m["mention_id"] == projection["mention"]["mention_id"])
+            answer = {"citationFormat": live_prompts.CITATION_FORMAT, "relation": relation,
+                      "reason": "authored transport control; not model quality or gold",
+                      "evidence": source_references(payload["sources"], incoming["evidence"] + members[projection["issue"]["issue_id"]]["evidence"])}
         elif stage == "topic":
-            answer = ({"schemaVersion": "zoop-topic-response-1", "producerVersion": "zoop-topic-replay-producer-1", "topics": []}
+            answer = ({"citationFormat": live_prompts.CITATION_FORMAT, "schemaVersion": "zoop-topic-response-1",
+                       "producerVersion": "zoop-topic-replay-producer-1", "topics": []}
                       if complete_topic else "deliberately invalid topic response")
         else:
             raise AssertionError(stage)
@@ -289,26 +310,40 @@ def test_nonready_forged_and_foreign_catalogue_results_never_enter_history(world
 def test_history_is_deterministic_bounded_candidate_coverage_not_merged_gold(world):
     mentions = [author_mention(world.units[0], "mention-" + str(n))[1] for n in range(23)]
     article, rejected_mention = author_mention(world.units[0], "unmapped")
-    # Exact clean-text evidence crosses a generated paragraph separator. Native
-    # parsing accepts the same article/mention identity; raw mapping rejects it.
+    # A generated paragraph separator cannot be cited by the source-segment wire.
     assert "\n" in article.body
     rejected_mention["evidence"] = [{"article_id": article.article_id, "article_version": article.version,
                                    "start": 0, "end": len(article.body), "quote": article.body}]
-    mentions.append(rejected_mention)
+    invalid, invalid_state, _ = run_s2(world, 0, "a-unmapped", extract_response={"mentions": [*mentions, rejected_mention]})
+    code = "live_citation_format_invalid"
+    assert invalid["state"] == "stopped" and invalid["failure"]["code"] == code
+    assert invalid["eventCandidates"] == [] and invalid["counts"]["eventCandidates"] == {"total": 0, "candidate": 0, "rejected": 0}
+    assert [(call["state"], call["verdict"], call["httpStatus"]) for call in invalid["calls"]] == [("received", code, 200)]
+    assert invalid["usage"]["providerCalls"] == invalid["usage"]["receivedCalls"] == 1
+    budget = Budget(world.root / "control/offline-verification/budget", 10 * NANO, 100)
+    assert budget.snapshot()["calls"] == 1 and budget.snapshot()["states"] == {"settled": 1}
+    store = ExtractionStore(invalid_state, Path(world.units[0]["ingestionStateDir"]), existing=True)
+    try:
+        assert store.one("SELECT COUNT(*) AS count FROM event_candidates WHERE job_id=?", ("a-unmapped",))["count"] == 0
+        receipt = json.loads(store.one("SELECT response FROM calls WHERE job_id=?", ("a-unmapped",))["response"])
+        body = json.loads(receipt["http"]["bodyText"])
+        assert json.loads(body["choices"][0]["message"]["content"]) == {"mentions": [*mentions, rejected_mention]}
+    finally:
+        store.close()
+    with pytest.raises(ValueError, match="history_s2_not_ready_current"):
+        history.record_ready(world.units[0], invalid, CATALOGUE, invalid_state)
     a, state, _ = run_s2(world, 0, "a-many", mentions=mentions)
     assert a["state"] == "ready"
-    rejected = next(c for c in a["eventCandidates"] if c["localMentionId"] == "unmapped")
-    assert rejected["mention"]["mention_id"] == rejected["localMentionId"]
-    assert rejected["state"] == "rejected" and rejected["reason"] == "raw_locator_mismatch" and rejected["citations"] == []
-    assert a["counts"]["eventCandidates"] == {"total": 24, "candidate": 23, "rejected": 1}
+    assert a["counts"]["eventCandidates"] == {"total": 23, "candidate": 23, "rejected": 0}
+    assert budget.snapshot()["calls"] == 2 and budget.snapshot()["states"] == {"settled": 2}
     receipt = history.record_ready(world.units[0], a, CATALOGUE, state)
-    assert receipt["eligibleCandidates"] == 23 and receipt["excluded"] == {"rejected-candidate": 1}
+    assert receipt["eligibleCandidates"] == 23 and receipt["excluded"] == {}
     frozen = history.snapshot_for(world.units[1], CATALOGUE)
     assert frozen == history.snapshot_for(world.units[1], CATALOGUE)
     assert frozen["coverage"]["selectedEvents"] == frozen["coverage"]["selectedMembers"] == 8
-    assert frozen["coverage"]["examinedPriorCandidates"] == 24
+    assert frozen["coverage"]["examinedPriorCandidates"] == 23
     assert frozen["coverage"]["eligibleHistoryTotal"] == 23
-    assert frozen["coverage"]["excluded"] == {"bounded-coverage": 15, "rejected-candidate": 1}
+    assert frozen["coverage"]["excluded"] == {"bounded-coverage": 15}
     manifest = load(Path(world.units[0]["history"]["directory"]) / "group.json")
     assert manifest["historyLimits"] == {"maxEvents": 8, "maxMembersTotal": 20, "membersPerEvent": 1}
     assert all(len(event["members"]) == 1 for event in frozen["snapshot"]["events"])

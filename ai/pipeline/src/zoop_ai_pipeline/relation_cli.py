@@ -12,11 +12,12 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .extraction import Sources
+from .extraction import Extractor, Sources, mutation_job, open_job_inspection
+from .extraction import Store as ExtractionStore
 from .extraction_contracts import MAX_REPLAY
 from .ingestion_contracts import IngestionFailure, read_file
 from .live_runtime import LiveFailure, LiveRuntime
-from .relation import Engine, Fixtures, Store
+from .relation import Engine, Fixtures, Store, current
 from .relation_contracts import MAX_COMMAND, SCHEMA, ExtractionFailure, Review, Selector, Submit, canonical, digest
 from .private_processing import runtime_factory, select_authority
 
@@ -55,10 +56,23 @@ def main() -> int:
         if args.command in {"inspect", "cancel", "review", "submit"} and (args.replay or args.verifier_replay):
             # Fixtures are per-call inputs of a later `run`/`resume`; a submit freezes none of them.
             raise ExtractionFailure("fixture_not_allowed")
+        if args.command != "inspect":
+            row = mutation_job(Store, args.state_dir, args.extraction_state_dir, args.ingestion_state_dir,
+                               job_id=request.job_id, ledger="relation")
+            if row is not None and not current(json.loads(row["binding"])):
+                raise ExtractionFailure("analysis_contract_changed")
+            submit = Submit.model_validate_json(row["request"]) if row is not None else request if isinstance(request, Submit) else None
+            if submit is not None:
+                upstream = ExtractionStore(args.extraction_state_dir, args.ingestion_state_dir, existing=True)
+                try:
+                    Extractor(upstream, Sources(args.ingestion_state_dir, None)).require_current_analysis(submit.upstream.job_id)
+                finally:
+                    upstream.close()
         fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None,
                             read_file(args.verifier_replay, MAX_REPLAY) if args.verifier_replay else None)
         authority = select_authority(args.sources, args.private_processing)
-        store = Store(args.state_dir, args.extraction_state_dir, args.ingestion_state_dir)
+        store = (open_job_inspection(Store, args.state_dir, args.extraction_state_dir, args.ingestion_state_dir, job_id=request.job_id, ledger="relation")
+                 if args.command == "inspect" else Store(args.state_dir, args.extraction_state_dir, args.ingestion_state_dir))
         factory = runtime_factory(authority) if args.command in {"run", "submit", "resume"} else None
         engine = Engine(store, Sources(args.ingestion_state_dir, authority), args.extraction_state_dir, args.ingestion_state_dir, factory)
         if args.command == "run":

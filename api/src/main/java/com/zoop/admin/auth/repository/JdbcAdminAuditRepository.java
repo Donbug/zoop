@@ -89,7 +89,7 @@ public class JdbcAdminAuditRepository implements AdminAuditRepository {
 
     @Override
     public void recordGraphActivation(String adminId, String email, String versionId, String previousVersionId,
-            boolean pointerChanged, String reason, String requestId, Instant occurredAt) {
+            boolean pointerChanged, String reason, String mode, String requestId, Instant occurredAt) {
         jdbc.update("""
                 INSERT INTO audit_logs
                   (actor_kind, admin_id, actor_id, actor_email_snapshot, action,
@@ -98,11 +98,11 @@ public class JdbcAdminAuditRepository implements AdminAuditRepository {
                         'graph_version', :versionId, 'succeeded', 'graph_publication', :reason,
                         :requestId, jsonb_build_object(
                             'previousVersionId', CAST(:previousVersionId AS text),
-                            'pointerChanged', :pointerChanged), :occurredAt)
+                            'pointerChanged', :pointerChanged, 'mode', CAST(:mode AS text)), :occurredAt)
                 """, new MapSqlParameterSource("adminId", adminId)
                 .addValue("email", email).addValue("versionId", versionId)
                 .addValue("previousVersionId", previousVersionId).addValue("pointerChanged", pointerChanged)
-                .addValue("reason", reason).addValue("requestId", requestId)
+                .addValue("reason", reason).addValue("mode", mode).addValue("requestId", requestId)
                 .addValue("occurredAt", Timestamp.from(occurredAt)));
     }
 

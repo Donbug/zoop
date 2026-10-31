@@ -185,6 +185,18 @@ public final class GraphHandoffImporter {
                     ? GraphHandoffFailure.IMPORT_BUSY : GraphHandoffFailure.ARTIFACT_STORE_UNAVAILABLE));
         }
         try (session) {
+            return run(session, request, recorder);
+        }
+    }
+
+    /** Uses the caller's root lock; staging retains its own transaction boundary. */
+    public GraphHandoffResult run(ArtifactFileStore.Session session, GraphHandoffRequest request) {
+        return run(session, request, NO_RECORD);
+    }
+
+    /** Preserves a delivery caller's root lock while the recorder joins the staging transaction. */
+    public GraphHandoffResult run(ArtifactFileStore.Session session, GraphHandoffRequest request, VersionRecorder recorder) {
+        try {
             return GraphHandoffResult.succeeded(stage(session, request, recorder));
         } catch (GraphHandoffException failure) {
             log.warn("graph handoff import failed: {}", failure.failure().code());
@@ -197,6 +209,25 @@ public final class GraphHandoffImporter {
             log.error("graph handoff import failed unexpectedly: {}", unexpected.getClass().getName());
             return GraphHandoffResult.failed(new GraphHandoffException(GraphHandoffFailure.INTERNAL_ERROR));
         }
+    }
+
+    /** Fresh source admission immediately before the delivery commit, with app article locks held through that commit. */
+    public void revalidateCurrent(GraphHandoffRequest request, byte[] expectedReceipt) {
+        Checked current = check(request);
+        if (!Arrays.equals(expectedReceipt, receiptBytes(current.handoff()))) {
+            throw new GraphHandoffException(GraphHandoffFailure.RIGHTS_CHANGED);
+        }
+        for (ObservationFacts fact : current.facts()) {
+            VersionRow version = registry.findVersion(fact.articleId(), fact.articleVersion()).orElseThrow(
+                    () -> new GraphHandoffException(GraphHandoffFailure.TEXT_MISMATCH));
+            ArtifactRow text = registry.findArtifact(fact.textArtifactId()).orElseThrow(
+                    () -> new GraphHandoffException(GraphHandoffFailure.TEXT_MISMATCH));
+            if (!fact.textArtifactId().equals(version.textArtifactId()) || !"extracted_text".equals(text.kind())
+                    || !fact.textSha256().equals(text.sha256()) || fact.textBytes() != text.bytes()) {
+                throw new GraphHandoffException(GraphHandoffFailure.TEXT_MISMATCH);
+            }
+        }
+        revalidateArticles(current.handoff().bundle());
     }
 
     private Staged stage(ArtifactFileStore.Session session, GraphHandoffRequest request, VersionRecorder recorder) {
@@ -545,7 +576,7 @@ public final class GraphHandoffImporter {
      * against a graph {@code verification_receipt} (of this or an earlier handoff, which is why the receipt id is NOT compared).
      * A row without that provenance would make the staged evidence look verified when nothing verified it.
      */
-    private static boolean sameEvidence(StoredEvidence stored, EvidenceRow wanted) {
+    static boolean sameEvidence(StoredEvidence stored, EvidenceRow wanted) {
         EvidenceRow row = stored.row();
         return row.articleId().equals(wanted.articleId()) && row.articleVersion().equals(wanted.articleVersion())
                 && row.textArtifactId().equals(wanted.textArtifactId()) && row.quote().equals(wanted.quote())

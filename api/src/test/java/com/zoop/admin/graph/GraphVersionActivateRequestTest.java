@@ -32,13 +32,28 @@ class GraphVersionActivateRequestTest {
                 GraphVersionActivateRequest.class);
 
         assertNull(explicitNull.expectedActiveVersionId());
+        assertEquals("forward", explicitNull.mode());
         assertTrue(validator.validate(explicitNull).isEmpty());
         assertEquals("gv-1", value.expectedActiveVersionId());
         assertTrue(validator.validate(value).isEmpty());
     }
 
     @Test
+    void explicitModesBindAndOtherValuesFailValidation() {
+        for (String mode : new String[] {"forward", "rollback"}) {
+            var request = mapper.readValue(
+                    "{\"reason\":\"go\",\"expectedActiveVersionId\":null,\"mode\":\"" + mode + "\"}",
+                    GraphVersionActivateRequest.class);
+            assertEquals(mode, request.mode());
+            assertTrue(validator.validate(request).isEmpty());
+        }
+        for (String mode : new String[] {"", "ROLLBACK", "replace", " forward "}) {
+            assertFalse(validator.validate(new GraphVersionActivateRequest("go", null, mode)).isEmpty());
+        }
+    }
+
+    @Test
     void overlongExpectedVersionIsInvalid() {
-        assertFalse(validator.validate(new GraphVersionActivateRequest("go", "v".repeat(121))).isEmpty());
+        assertFalse(validator.validate(new GraphVersionActivateRequest("go", "v".repeat(121), "forward")).isEmpty());
     }
 }

@@ -26,6 +26,7 @@ from scripts.ingestion_smoke import json_bytes
 from scripts.relation_smoke import RelKit, converge, co, ev, proposal, world_cite
 from tests.test_round_enqueue import simple_round, world  # noqa: F401 - `world` is a fixture
 from tests.test_round_plan import make
+from tests.test_native_historical_reads import inspect as inspect_native, inventory, restore
 from zoop_ai_pipeline import handoff_cli as cli
 from zoop_ai_pipeline import handoff_round
 from zoop_ai_pipeline.extraction_plan import PLAN_SCHEMA, RECEIPT_SCHEMA
@@ -87,7 +88,7 @@ class Units:
 
 
 def empty_decisions() -> dict:
-    return {"schemaVersion": "zoop-public-decisions-3", "policyVersion": POLICY, "companies": [], "issues": [], "structural": [], "follows": [], "origins": []}
+    return {"schemaVersion": "zoop-public-decisions-4", "policyVersion": POLICY, "companies": [], "issues": [], "structural": [], "follows": [], "origins": []}
 
 
 EMPTY_BINDINGS = {"schemaVersion": "zoop-app-document-bindings-1", "bindings": []}
@@ -511,9 +512,10 @@ def test_a_representative_pushed_out_of_the_window_excludes_only_its_issue(tmp_p
     assert {i["jobId"]: (i["status"], i.get("neverFrozen")) for i in out["selection"]["jobs"]} == {"rel-b": ("selected", None), "rel-a": ("out_of_window", True)}
     assert out["narrowing"]["summaryPinsDropped"] == [{"issueId": hs.SUPPLY, "code": "issue_not_public"}]
     bundle = rig.bundle(out)
-    assert {i["id"] for i in bundle["issues"]} == {hs.FACTORY}                       # the overseas issue is never public: its mention states no country (`geography_unproven`), in every window
+    assert {i["id"] for i in bundle["issues"]} == {hs.FACTORY}
+    # The overseas mention declares US, while this operator decision declares KR.
     assert sorted((e["id"], e["code"]) for e in bundle["exclusions"]["items"] if e["kind"] == "issue") == [
-        ("issue:overseas", "geography_unproven"), ("issue:supply", "issue_representative_invalid")]
+        ("issue:overseas", "geography_countries_disagree"), ("issue:supply", "issue_representative_invalid")]
 
 
 def test_out_of_window_verdicts_and_stale_summary_pins_are_dropped_and_current_ones_kept(tmp_path_factory, tmp_path, monkeypatch):
@@ -563,7 +565,7 @@ def test_out_of_window_verdicts_and_stale_summary_pins_are_dropped_and_current_o
 
 # ---------------------------------------------------------------- byte-exact narrowing (pure) ------------------------------------------
 
-MASTER_DECISIONS = """{ "schemaVersion" : "zoop-public-decisions-3", "policyVersion":"p",
+MASTER_DECISIONS = """{ "schemaVersion" : "zoop-public-decisions-4", "policyVersion":"zoop-public-projection-policy-2",
  "companies":[ {"canonicalId":"co:1","publicId":"A","label":"é\\u00e9","decisionRef":"d:1"} ],
  "issues":[
   {"canonicalId":"issue:keep","publicId":"pub:keep","fieldVerdicts":[ {"documentId":"d1","documentVersion":"v1","mentionId":"m1",  "field":"period"},
@@ -650,3 +652,70 @@ def test_a_real_plan_round_directory_names_the_units_of_its_round(world, tmp_pat
     with pytest.raises(ExtractionFailure) as refused:
         handoff_round.plan_units(plans, receipt["planId"], "another-round")
     assert refused.value.code == "plan_round_mismatch"
+
+
+@pytest.mark.parametrize("schema,policy,bundle_schema", [
+    ("zoop-public-decisions-4", "zoop-public-projection-policy-2", "zoop-graph-handoff-bundle-8"),
+    ("zoop-public-decisions-5", "zoop-public-projection-policy-3", "zoop-graph-handoff-bundle-9"),
+])
+def test_freeze_round_preserves_the_current_operator_policy_variant(units, tmp_path, schema, policy, bundle_schema):
+    units.round("policy", 1, ["policy"])
+    units.relate("policy")
+    rig = light_rig(tmp_path, units, ["policy"])
+    decisions = empty_decisions()
+    decisions.update(schemaVersion=schema, policyVersion=policy)
+    rig.write(decisions=decisions)
+    frozen = rig.freeze_round("round-policy")
+    exported = rig.export(frozen["handoffId"])
+    assert exported["manifest"]["policyVersion"] == policy
+    assert exported["bundle"]["schemaVersion"] == frozen["freeze"]["receipt"]["bundleSchema"] == bundle_schema
+    assert exported["bundle"]["policy"]["version"] == policy
+    assert json.loads((rig.files / "decisions.json").read_text())["schemaVersion"] == schema
+
+
+def test_historical_jobs_take_no_window_slot_and_an_all_historical_window_opens_no_writer(tmp_path, monkeypatch):
+    fixture = json.loads((Path(__file__).parent / "fixtures/native_historical/timed-round.json").read_text())
+    root = restore(tmp_path / "mixed-ledgers", fixture["files"])
+    kit = RelKit(tmp_path / "current-authoring")
+    kit.root, kit.registry_path = root, root / "sources.json"
+    kit.registry = json.loads(kit.registry_path.read_text())
+    historical = fixture["result"]
+    assert inspect_native(root, "extraction", historical["jobId"]) == historical
+    assert inspect_native(root, "relation", "rel-a-historical") == fixture["relation"]
+
+    def mapping(result, canonical_id):
+        return {"upstream": {"jobId": result["jobId"], "inputDigest": result["inputDigest"]}, "kind": "event",
+                "ref": result["eventCandidates"][0]["eventCandidateId"], "canonicalId": canonical_id, "decisionRef": "synthetic-round-selection"}
+
+    entries = [mapping(historical, "issue:historical")]
+    rig = RoundRig(tmp_path, kit, {"schemaVersion": "zoop-graph-canonical-1", "entries": entries}, empty_decisions(), EMPTY_BINDINGS)
+    before = inventory(tmp_path)
+
+    def writer_forbidden(*args, **kwargs):
+        raise AssertionError("An all-historical window reached a writer or staging")
+
+    with monkeypatch.context() as guard:
+        guard.setattr(cli, "Store", writer_forbidden)
+        guard.setattr(handoff_round, "_staging", writer_forbidden)
+        refused = rig.freeze_round("round-historical", expected=2)
+    assert refused["error"]["code"] == "window_empty"
+    skipped = refused["error"]["detail"]["selection"]["jobs"]
+    assert [(item["jobId"], item["status"], item["code"]) for item in skipped] == [
+        ("rel-a-historical", "withheld", "analysis_contract_changed")]
+    assert inventory(tmp_path) == before
+
+    ref = fixture["request"]["incoming"]
+    article = kit.article(ref)
+    mention = kit.mention(article, "m-current", [kit.evidence(article, article.body)])
+    current = kit.job("run", kit.submit("s2-current", ref), replay=kit.replay("current").extract(article, [mention]).write())
+    relation = converge(SimpleNamespace(kit=kit, s2=current), "rel-z-current", [])
+    assert relation["binding"]["versions"]["policy"] == "zoop-relation-policy-2"
+    rig.write(canonical_doc={"schemaVersion": "zoop-graph-canonical-1", "entries": [*entries, mapping(current, "issue:current")]})
+    monkeypatch.setattr(handoff_round, "WINDOW", 1)
+    frozen = rig.freeze_round("round-historical")
+    assert jobs_of(frozen) == ["rel-z-current"]
+    assert statuses(frozen) == {"rel-a-historical": "withheld", "rel-z-current": "selected"}
+    assert next(item for item in frozen["selection"]["jobs"] if item["jobId"] == "rel-a-historical")["code"] == "analysis_contract_changed"
+    assert rig.bundle(frozen)["schemaVersion"] == "zoop-graph-handoff-bundle-8"
+    assert inspect_native(root, "extraction", historical["jobId"]) == historical
+    assert inspect_native(root, "relation", "rel-a-historical") == fixture["relation"]

@@ -47,6 +47,16 @@ env -i PATH=/usr/bin:/bin HOME="$HOME" \
 
 종료 코드는 모든 항목이 성공했을 때만 0입니다. 실패하면 결과 파일을 쓴 뒤 코드만 담은 예외로 끝나 JVM이 0이 아닌 값으로 종료합니다. 같은 JVM은 시작할 때 Flyway migration(`V20261014120000`)도 적용합니다.
 
+### HTTP 관측 원천
+
+`ZOOP_DOCUMENT_IMPORT_OBSERVATION_SOURCE=http`와 `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED=true`를 함께 설정합니다. `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL`은 운영자가 확정한 서비스 주소이고, `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_TOKEN`은 `observation.read` scope가 있는 앱 수입 principal의 토큰입니다. 주소와 토큰 값은 저장소 예시에서 정하지 않습니다. 비-loopback 주소는 HTTPS만 허용하며 proxy·redirect·자동 재시도는 사용하지 않습니다.
+
+선택 설정은 `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_CONNECT_TIMEOUT`(기본 `3s`), `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_REQUEST_TIMEOUT`(`50s`), `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_MAX_RESPONSE_BYTES`(`16777216`)입니다. 요청은 관측마다 직렬로 보냅니다. 응답 파서는 native 선택 키 `language`도 검증하며 본문·저장 메타데이터는 바꾸지 않습니다.
+
+HTTP profile에서는 importer 쪽 `ZOOP_INGESTION_CLI`, `ZOOP_INGESTION_STATE_DIR`, `ZOOP_INGESTION_SOURCES`를 설정하면 시작을 거절합니다. 대상 DB, 요청·결과 파일과 artifact root는 계속 필요합니다. `cli` profile에서는 같은 환경에 켜진 observation HTTP client를 무시하고 CLI를 사용합니다. HTTP 503과 연결 실패는 `ingestion_export_unavailable`, 다른 error envelope는 `ingestion_export_failed`와 서비스 코드, 계약 밖 응답은 `export_invalid`입니다.
+
+등록 뒤 [document bindings export](DOCUMENT_BINDINGS.md)를 **같은 대상 DB**에서 실행해 handoff의 binding과 비교합니다. 텍스트를 받았다는 사실만으로 공개 권한이나 graph 활성화가 성립하지 않습니다.
+
 ## 요청 (`zoop-document-import-1`)
 
 ```json

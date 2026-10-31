@@ -1,4 +1,4 @@
-"""Synchronous native reads: no cache, ingestion writes, retry, recovery or jobs."""
+"""Synchronous, fresh native observation export with bounded concurrency."""
 from __future__ import annotations
 
 import threading

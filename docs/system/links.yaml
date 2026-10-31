@@ -36,6 +36,12 @@ authority:
   design: {current: "기존 UI 코드", target: "Figma(폰트 제외 최종)", font: "SUIT 유지", sequence: "기능 먼저·디자인 후"}
   migration: {stackFrozen: false, backendCandidate: "Java/Spring(유력 후보)", frontendReuseRequired: false, backendReuseRequired: false}
   ai: {sequence: "설계 먼저", additionalApiResearch: true, liveBudget: "미정", modelConfiguration: ".env", executionApproval: "별도"}
+  metadataProjection:
+    decisionId: "user-2026-10-31-unknown-metadata"
+    source: "api/docs/GRAPH_READ_HANDOFF.md#명시적-미확인-메타데이터"
+    effectivePolicy: "사건·기업 연결 근거와 현재 read/store/quote-display 권한이 충족되면 지역·날짜·기간의 불확실성은 명시적 null로 공개한다. 국가 제한 구조 근거는 지역 미확인 상태에서 성립하지 않으며, 날짜 제한 근거는 충분한 날짜 정밀도를 요구한다."
+    versions: ["zoop-graph-handoff-bundle-9", "zoop-public-projection-policy-3", "zoop-legacy-real-manifest-3", "legacy-real-projection-3", "snapshotFormat:4"]
+    provenance: "기존 S2/S3 판단·원본 국가·시각·HOLD·R1@2·수동 제외와 고정본은 보존한다. 기존 native8/P2·legacy2·snapshot3은 각 버전의 의미를 유지한다."
 detailAuthority:
   decisionId: "user-2026-10-10-feedback"
   basis: "팀 보고: 목차의 FS017~027 영역이 메인그래프 v2로, AI 목차가 v2 FS045~051 7행으로 정리됐고 옛 AI 행 4개가 줄었다. 실제 관측: 목차 B27:B37=메인그래프 v2, AI 목차 7행·옛 ID 5개 삭제·FS050 신규, 목차 98개. 옛 `메인 그래프`/`AI 챗봇` 탭과 `변경 내역` 시트는 그대로 남았다. 10-12 재수집(functional-spec_2026-10-12 XLSX)에서도 옛 두 탭은 삭제되지 않고 숨김(sheet_state=hidden) 상태로 남아 있으며 이력 정의의 출처 파일·행은 10-10과 같다. 10-10 이후 상세 시트의 변경은 작업자가 공유 시트에 기록한 브리핑 B134·기업 상세 B56·변경 내역 A63:F66뿐이다. 2026-10-18 22:04(KST) 재수집(functional-spec_2026-10-18)에서 옛 `메인 그래프`/`AI 챗봇` 두 탭은 공유 원본에서 삭제되어 시트 목록에 없다(팀 결정). 10-12까지 숨김 상태로 남아 있던 기록은 그대로 두고, 두 탭의 이력 정의와 의미 이행은 탭이 마지막으로 남아 있던 functional-spec_2026-10-12 고정본의 CSV에서 계속 읽는다(sourceCapture)."

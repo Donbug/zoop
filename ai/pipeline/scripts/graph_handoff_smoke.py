@@ -152,10 +152,10 @@ def set_grant(world, source_id: str, enabled: bool) -> None:
     world.kit.registry_path.write_bytes(json_bytes(registry))
 
 
-def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a2_countries: tuple = ("KR",), dated: bool = False,
+def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a_countries: tuple = ("KR",), a2_countries: tuple = ("KR",), dated: bool = False,
                 valid_from: str | None = "2026-01-01", valid_until: str | None = "2026-12-31", event_time: str | None = "2026-09-30",
-                a2_event_time=SAME, snapshot_differs: bool = False, approve: bool = False, chain: bool = False, impact: str | None = None, uncited_source: bool = False,
-                slots: tuple | None = None, defer_b: bool = False) -> SimpleNamespace:
+                a2_event_time=SAME, snapshot_differs: bool = False, approve: bool = False, chain: bool = False, impact: str | None = None,
+                uncited_source: bool = False, raw_time_evidence: bool = False, slots: tuple | None = None, defer_b: bool = False) -> SimpleNamespace:
     """The authored world. Variants (each is a REAL ingestion + S2 + S3 world, used by the integrity regressions):
     collide: the two documents of snapshot event-a use the SAME local mention id (S2 scopes member identity by documentVersion + mentionId, so this is legal);
     a2_differs: the second member's title differs (a metadata conflict unless the operator picks a representative); a2_countries: its country field;
@@ -178,8 +178,10 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
     defer_b: S3 job rel-b is only registered (`queued`); `world.finish_rel_b()` runs it to `ready` later."""
     kit = HandoffKit(root)
     valid_text = validity_sentence(valid_from, valid_until) if dated else None
-    docs = [{"supplier": "supplier-a", "html": page(SUP, INV, EVT_A, GEO_A, *((CHAIN,) if chain else ())), "publisher": PUBLISHERS["a"]},
-            {"supplier": "supplier-a2", "html": page(EVT_A2)},
+    raw_a = (f"계약 날짜 표기는 {event_time}이다.",) if raw_time_evidence else ()
+    raw_a2 = (f"계약 날짜 표기는 {event_time if a2_event_time is SAME else a2_event_time}이다.",) if raw_time_evidence else ()
+    docs = [{"supplier": "supplier-a", "html": page(SUP, INV, EVT_A, GEO_A, *raw_a, *((CHAIN,) if chain else ())), "publisher": PUBLISHERS["a"]},
+            {"supplier": "supplier-a2", "html": page(EVT_A2, *raw_a2)},
             {"supplier": "supplier-b", "html": page(QB, GEO_B, QB3, *((valid_text,) if valid_text else ())), "published": None}]
     if uncited_source:
         kit.registry["sources"].append(uncited_source_entry(kit.registry["sources"][0]))
@@ -194,13 +196,13 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
         d1, d2, d3 = kit.ingest("docs", docs)
     refs = {"a": d1, "a2": d2, "b": d3}
     art = {name: kit.article(ref) for name, ref in refs.items()}
-    m_a = {**kit.mention(art["a"], "m-a", [kit.evidence(art["a"], EVT_A)], event_time=event_time), "countries": ["KR"], "participants": [ISSUER, SUPPLIER, UNKNOWN]}
+    m_a = {**kit.mention(art["a"], "m-a", [kit.evidence(art["a"], EVT_A)], event_time=event_time), "countries": list(a_countries), "participants": [ISSUER, SUPPLIER, UNKNOWN]}
     second = {} if a2_differs else {"title": "합성 공급 계약"}
     m_a2 = {**kit.mention(art["a2"], "m-a" if collide else "m-a2", [kit.evidence(art["a2"], EVT_A2)], event_time=event_time if a2_event_time is SAME else a2_event_time,
                           **({"title": "합성 공급 계약 체결 공개"} | second)), "countries": list(a2_countries)}
     m_b = {**kit.mention(art["b"], "m-b", [kit.evidence(art["b"], QB)], period="2026Q4", title="합성 공장 착공", action="공장 착공 알림", event_time="2026-11-15"),
            "countries": ["US"], "participants": [ISSUER, PARTNER, STRANGER]}
-    m_b3 = {**kit.mention(art["b"], "m-b3", [kit.evidence(art["b"], QB3)], period="2026Q4", title="해외 합작 공장 지분 인수", action="지분 인수"), "countries": []}
+    m_b3 = {**kit.mention(art["b"], "m-b3", [kit.evidence(art["b"], QB3)], period="2026Q4", title="해외 합작 공장 지분 인수", action="지분 인수"), "countries": ["US"]}
     s2a = kit.job("run", kit.submit("s2-a", d1), replay=kit.replay("s2a").extract(art["a"], [m_a]).write())
     assert s2a["state"] == "ready", s2a.get("failure")
     m_a_snapshot = {**m_a, "action": ACTION_SNAPSHOT} if snapshot_differs else m_a
@@ -266,6 +268,103 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
 
     world.finish_rel_b = finish_rel_b
     return world
+
+
+def build_context_world(root: Path, *, count: int = 2):
+    """Two genuine operating ledgers with independent grants and native jobs, generated only by a loopback fixture."""
+    from scripts.extraction_smoke import FAKE_KEYS, Kit, Q3, SimulatedProvider
+    from scripts.operating_smoke import CONFIG, MANIFEST, Owner, STAGES, policy
+    from zoop_ai_pipeline.extraction import Extractor, Sources, Store as ExtractionStore
+    from zoop_ai_pipeline.graph_projection import Paths, Source
+    from zoop_ai_pipeline.ingestion_contracts import Authority
+
+    assert count >= 2
+    root.mkdir()
+    contexts, jobs, refs, art, runtimes = [], {}, {}, {}, []
+    canonical_document = {"schemaVersion": "zoop-graph-canonical-1", "entries": []}
+    decisions = {"schemaVersion": "zoop-public-decisions-4", "policyVersion": POLICY,
+                 "companies": [{"canonicalId": "co:context", "publicId": "KRX:005930", "label": "합성기업", "decisionRef": "synthetic-catalog"}],
+                 "issues": [], "structural": [], "follows": [], "origins": []}
+    native = []
+    with SimulatedProvider() as provider:
+        for index in range(2):
+            cid = f"context-{index}"
+            directory = root / cid
+            directory.mkdir()
+            kit = Kit(directory / "inputs")
+            kit.registry["sources"][0]["grant"].update(grantId=f"grant-{cid}", revision=f"revision-{cid}")
+            kit.save_registry()
+            selected = kit.ingest(cid, [{"supplier": f"{cid}-document-{n}", "html": page(Q3, "계약은 국내 시장 중심이다.")}
+                                        for n in range(index, count, 2)])
+            config = {"schemaVersion": CONFIG, "policy": {**policy(), "operationId": f"operation-{cid}"},
+                      "ledgerDirectory": str(directory / "metering"), "stateDirectory": str(directory / "native"),
+                      "runtime": {"model": "gpt-6-luna", "effort": "high", "maxOutputTokens": 24000,
+                                  "openaiEndpoint": provider.base_url, "verifierEndpoint": provider.base_url, "verifierModel": "jev-1.14.0"}}
+            units = [{"setId": f"{cid}-{n}", "extraction": kit.submit_live(f"s2-{cid}-{n}", ref),
+                      "relationJobId": f"s3-{cid}-{n}", "stageAllowances": {stage: 10 for stage in STAGES},
+                      "ingestionStateDirectory": str(kit.root / "ingestion"), "sources": str(kit.registry_path)}
+                     for n, ref in enumerate(selected)]
+            config_path, input_path = directory / "config.json", directory / "inputs.json"
+            config_path.write_bytes(json_bytes(config))
+            input_path.write_bytes(json_bytes({"schemaVersion": MANIFEST, "sets": units}))
+            env = {"PATH": os.defpath, "HOME": str(Path.home()), "PYTHONDONTWRITEBYTECODE": "1",
+                   **ownership_env(), "ZOOP_AI_PIPELINE_LIVE_ENABLED": "1", **FAKE_KEYS}
+
+            def operate(command, *args):
+                child = subprocess.run([sys.executable, "-m", "zoop_ai_pipeline.operating", command, "--config", str(config_path), *args],
+                                       env=env, capture_output=True, timeout=300)
+                assert child.returncode == 0, (command, child.stdout.decode(), child.stderr.decode())
+                return json.loads(child.stdout)
+
+            operate("init")
+            kit.allow_model_send(Owner(config).runtime(units[0], "offline"), STAGES)
+            operate("register", "--manifest", str(input_path))
+            for _ in units:
+                operate("run", "--max-sets", "1")
+            status = operate("status")
+            assert status["reconciliation"] == {"monetaryWithoutNative": [], "nativeWithoutMonetary": [], "receiptsAwaitingNativeRecovery": []}
+            paths = Paths(directory / "native/s3", directory / "native/s2", kit.root / "ingestion", kit.registry_path, root / "canonical.json")
+            pins = []
+            with Source(paths) as source:
+                for n, unit in enumerate(units):
+                    result = source.inspect(unit["relationJobId"])
+                    assert result["state"] == "ready" and result["delivery"]["status"] == "current", result
+                    jobs[result["jobId"]] = result
+                    pins.append({"relation": {"jobId": result["jobId"], "inputDigest": result["inputDigest"]},
+                                 "upstream": result["binding"]["upstream"], "reviewDigest": digest(review_state(result))})
+                    store = ExtractionStore(paths.extraction, paths.ingestion, existing=True)
+                    try:
+                        _, s2 = Extractor(store, Sources(paths.ingestion, Authority(paths.sources))).export(unit["extraction"]["jobId"])
+                    finally:
+                        store.close()
+                    runtimes.append(s2["binding"])
+                    upstream_pin = {"jobId": s2["jobId"], "inputDigest": s2["inputDigest"]}
+                    for candidate in s2["eventCandidates"]:
+                        canonical_document["entries"].append({"upstream": upstream_pin, "kind": "event", "ref": candidate["eventCandidateId"],
+                                                              "canonicalId": f"issue:{cid}", "decisionRef": "synthetic-event"})
+                    canonical_document["entries"].append({"upstream": upstream_pin, "kind": "company", "ref": "SYNTH-1",
+                                                          "canonicalId": "co:context", "decisionRef": "synthetic-company"})
+                    name = f"{cid}-{n}"
+                    refs[name], art[name] = selected[n], kit.article(selected[n])
+            first_name = f"{cid}-0"
+            partial = SimpleNamespace(refs=refs, art=art)
+            decisions["issues"].append({"canonicalId": f"issue:{cid}", "publicId": f"issue:{cid}", "decisionRef": "synthetic-issue",
+                                       "geography": {"classification": "domestic", "countries": ["KR"],
+                                                     "evidence": [span(partial, first_name, "계약은 국내 시장 중심이다.")],
+                                                     "decisionRef": "synthetic-geography", "decisionVersion": "1"},
+                                       "representative": None, "fieldVerdicts": [], "summary": None})
+            contexts.append({"contextId": cid, "relationStateDirectory": str(paths.relation), "extractionStateDirectory": str(paths.extraction),
+                             "ingestionStateDirectory": str(paths.ingestion), "sources": str(paths.sources), "sourcePins": pins, "observations": selected})
+            native.append(SimpleNamespace(kit=kit, paths=paths, refs=selected, metering=directory / "metering", status=status))
+    context_file = root / "source-contexts.json"
+    context_file.write_bytes(json_bytes({"schemaVersion": "zoop-handoff-source-contexts-1", "contexts": contexts}))
+    context_file.chmod(0o600)
+    world = SimpleNamespace(root=root, kit=native[0].kit, refs=refs, art=art, jobs=jobs, native_contexts=native,
+                            context_file=context_file, context_sha=digest_text(context_file.read_text()), contexts=contexts,
+                            runtime_bindings=runtimes, fixture_requests=len(provider.requests))
+    write_operator(world, canonical_document=canonical_document, decisions=decisions, bindings=bindings_doc(world))
+    return world
+
 
 
 # ---------------------------------------------------------------- operator documents ---------------------------------------------
@@ -336,7 +435,7 @@ def decisions_doc(world, *, verdicts: dict | None = None, published_time=UNSET, 
     r = find(world.jobs[job], "SUPPLIES", "SYNTH-3", "SYNTH-1")
     comparison = next(c for c in next(x for x in world.s2["b"]["eventCandidates"] if x["eventCandidateId"] == world.evc["b"])["comparisons"]
                       if c["targetEventId"] == "event-a")
-    return {"schemaVersion": "zoop-public-decisions-3", "policyVersion": POLICY,
+    return {"schemaVersion": "zoop-public-decisions-4", "policyVersion": POLICY,
             "companies": [{"canonicalId": "co:synth-1", "publicId": "KRX:005930", "label": "합성기업", "decisionRef": "catalog-2026-10-16:1"},
                           {"canonicalId": "co:synth-3", "publicId": "KRX:000660", "label": "합성부품", "decisionRef": "catalog-2026-10-16:3"}],
             "issues": [{"canonicalId": "issue:supply", "publicId": "issue:supply-2026q3", "decisionRef": "issue-2026-10-16:supply",
@@ -491,7 +590,7 @@ def observation_docs(world) -> dict:
     return {"canonical": {"schemaVersion": "zoop-graph-canonical-1", "entries": [
                 {"upstream": up, "kind": "company", "ref": "SYNTH-1", "canonicalId": "co:synth-1", "decisionRef": "canon-2026-10-16:company"},
                 {"upstream": up, "kind": "event", "ref": "event-y", "canonicalId": "issue:y", "decisionRef": "canon-2026-10-16:event"}]},
-            "decisions": {"schemaVersion": "zoop-public-decisions-3", "policyVersion": POLICY,
+            "decisions": {"schemaVersion": "zoop-public-decisions-4", "policyVersion": POLICY,
                           "companies": [{"canonicalId": "co:synth-1", "publicId": "KRX:005930", "label": "합성기업", "decisionRef": "catalog-2026-10-16:1"}],
                           "issues": [{"canonicalId": "issue:y", "publicId": "issue:y-2026q3", "decisionRef": "issue-2026-10-16:y",
                                       "geography": {"classification": "domestic", "countries": ["KR"], "evidence": [span(world, "y1", GEO_Y)],
@@ -543,7 +642,7 @@ def expected(world, public_ids: dict | None = None) -> dict:
                       ("STRUCTURALLY_RELATED_TO", "issue:supply-2026q3", pub("KRX:000660")): sorted([e["EVT_A"], e["EVT_A2"]]),
                       ("FOLLOWS", "issue:factory-2026q4", "issue:supply-2026q3"): sorted([e["QB"], e["EVT_A"]])},
         "basisEvidence": [e["SUP"]],
-        "exclusions": {"geography_unproven": 1, "company_unmapped": 1, "issue_not_public": 1},
+        "exclusions": {"geography_countries_disagree": 1, "company_unmapped": 1, "issue_not_public": 1},
         "counts": {"companies": 2, "pathCompanies": 0, "issues": 2, "relations": {"INVOLVES": 2, "STRUCTURALLY_RELATED_TO": 1, "FOLLOWS": 1},
                    "evidence": len(e) + (1 if getattr(world, "impact", None) == "rich" else 0), "articles": 3, "impacts": len(rows), "exclusions": 3},
         "impacts": rows}
@@ -876,9 +975,12 @@ class Operator:
         argv = [sys.executable, "-c", program, command, "--state-dir", str(state or self.state)]
         if command in {"freeze", "export"}:
             base = self.root / "absent" if absent else self.root
-            argv += ["--relation-state-dir", str(base / "relation"), "--extraction-state-dir", str(base / "extraction"),
-                     "--ingestion-state-dir", str(base / "ingestion"), "--sources", str(base / "sources.json" if absent else self.world.kit.registry_path),
-                     "--canonical", str(base / "canonical.json"), "--decisions", str(base / "decisions.json"), "--bindings", str(base / "bindings.json")]
+            if hasattr(self.world, "context_file"):
+                argv += ["--source-contexts", str(self.world.context_file), "--source-contexts-sha256", self.world.context_sha]
+            else:
+                argv += ["--relation-state-dir", str(base / "relation"), "--extraction-state-dir", str(base / "extraction"),
+                         "--ingestion-state-dir", str(base / "ingestion"), "--sources", str(base / "sources.json" if absent else self.world.kit.registry_path)]
+            argv += ["--canonical", str(base / "canonical.json"), "--decisions", str(base / "decisions.json"), "--bindings", str(base / "bindings.json")]
         if summaries is not None:
             argv += ["--issue-summary-state-dir", str(summaries)]
         child = subprocess.run(argv, input=json_bytes(request), stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=PIPELINE, timeout=300)
@@ -946,8 +1048,8 @@ def mention_exclusions(root: Path) -> str:
     is chosen, merged or overwritten; (2) another document's mention whose event time has no offset, which cannot be classified without guessing (the issue's own time,
     the operator's representative's, is a clean day; the earlier bundle schema never looked at the other members' times)."""
     for name, variant, code in (("mention-conflict", {"snapshot_differs": True}, "mention_values_conflict"),
-                                ("mention-time", {"a2_event_time": "2026-09-30T10:00:00"}, "mention_event_time_unsupported"),
-                                ("mention-week", {"event_time": "2026-W40-3"}, "mention_event_time_unsupported")):
+                                ("mention-time", {"a2_event_time": "2026-09-30T10:00:00"}, "mention_event_time_unreviewed"),
+                                ("mention-week", {"event_time": "2026-W40-3"}, "mention_event_time_unreviewed")):
         world = build_world(root.parent / name, **variant)
         write_operator(world)
         operator = Operator(world)
@@ -962,7 +1064,7 @@ def mention_exclusions(root: Path) -> str:
         assert {a["articleId"] for a in bundle["articles"]} == {world.refs["b"]["documentId"]}, f"{name}: a source of the excluded issue reached the bundle"
         assert ACTION_SNAPSHOT not in canonical(out), f"{name}: a value of the conflicting mention reached the bundle"
     return ("mention values: one identity carried by two upstreams with different actions -> issue excluded (mention_values_conflict), no value published; a member's offset-less "
-            "event time -> issue excluded (mention_event_time_unsupported), never widened or guessed")
+            "event time -> issue excluded (mention_event_time_unreviewed) until explicitly reviewed")
 
 
 def source_support_variants(root: Path) -> str:
@@ -1020,7 +1122,7 @@ def check_chain_export(world, bundle: dict, middle: str) -> None:
     """The chain world's export equals the hand-written expectation: published companies, private path companies, every edge's ordered path with directed links,
     the S3 scopes copied exactly, the unchanged edge id formula and the participants the bundle does not publish."""
     want = expected_chain(middle)
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8"
     assert [c["id"] for c in bundle["companies"]] == want["companies"] and bundle["pathCompanies"] == want["pathCompanies"], (middle, bundle["pathCompanies"])
     assert not {c["id"] for c in bundle["pathCompanies"]} & ({c["id"] for c in bundle["companies"]} | {i["id"] for i in bundle["issues"]})
     assert bundle["counts"]["companies"] == len(want["companies"]) and bundle["counts"]["pathCompanies"] == len(want["pathCompanies"]), bundle["counts"]
@@ -1125,6 +1227,7 @@ BUNDLE_3 = "zoop-graph-handoff-bundle-3"           # before field verdicts: `fie
 BUNDLE_4 = "zoop-graph-handoff-bundle-4"           # before structural paths: no `pathCompanies`, `structuralPath` or basis scopes
 BUNDLE_5 = "zoop-graph-handoff-bundle-5"           # before impacts: no `impacts`, `counts.impacts` or `policy.impacts`
 BUNDLE_6 = "zoop-graph-handoff-bundle-6"           # before issue summaries: no issue `summary`, no `policy.issueSummary`
+BUNDLE_7 = "zoop-graph-handoff-bundle-7"           # policy 1 requires nonempty source countries and supported original times
 LEGACY_AT = "2026-10-15T00:00:00+00:00"
 LEGACY_CODE = "handoff_contract_changed"
 
@@ -1136,8 +1239,18 @@ def legacy_bundle(bundle: dict, manifest: dict, schema: str) -> dict:
     `pathCompanies`, no relation `structuralPath`, no basis `businessScope`/`productScope` and no `counts.pathCompanies`; `-3` also has no issue `fieldVerdicts` and no
     `fieldProvenance.withheld`; `-2` has no `fieldProvenance` either; `-1` has none of them nor the issues' `mentions`. The content digest is recomputed over the earlier
     collections (its formula never included `pathCompanies`)."""
-    assert schema in (BUNDLE_1, BUNDLE_2, BUNDLE_3, BUNDLE_4, BUNDLE_5, BUNDLE_6), schema
+    assert schema in (BUNDLE_1, BUNDLE_2, BUNDLE_3, BUNDLE_4, BUNDLE_5, BUNDLE_6, BUNDLE_7), schema
     old = json.loads(json.dumps(bundle))
+    old["policy"]["version"] = "zoop-public-projection-policy-1"
+    for issue in old["issues"]:
+        assert all(b["countries"] == issue["geography"]["countries"] for b in issue["geography"]["basis"])
+        assert all(m["timePrecision"] != "unresolved" for m in issue["mentions"])
+        assert all(v["reasonCode"] != "unsupported-format" for v in issue["fieldVerdicts"])
+        issue["geography"]["policyVersion"] = "zoop-public-projection-policy-1"
+    if schema == BUNDLE_7:
+        old.update(schemaVersion=schema, handoffId=manifest["handoffId"], manifestDigest=digest(manifest))
+        old["digests"]["content"] = content_digest(old)
+        return old
     for issue in old["issues"]:
         del issue["summary"]                                                        # `-7` added the closed per-issue summary and its policy literal
     del old["policy"]["issueSummary"]
@@ -1191,6 +1304,7 @@ def plant_legacy_handoff(state: Path, manifest: dict, bundle: dict, *, row_state
     pre-cutover writer leaves behind."""
     import hashlib
     import sqlite3
+    manifest = {**manifest, "policyVersion": "zoop-public-projection-policy-1"}
     old = legacy_bundle(bundle, manifest, schema)
     raw = canonical(old).encode("utf-8")
     bundle_digest = hashlib.sha256(raw).hexdigest()
@@ -1392,7 +1506,7 @@ def verdict_export(root: Path, public_ids: dict | None = None) -> tuple[SimpleNa
     out = freeze_export(Operator(world), world, VERDICT_HANDOFF, decisions)
     bundle = out["bundle"]
     ids = {name: evidence_id(world, name, quote) for name, quote in (("a", PERIOD_A), ("a2", PERIOD_A2), ("b", PERIOD_B))}
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["handoffId"] == VERDICT_HANDOFF
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and bundle["handoffId"] == VERDICT_HANDOFF
     assert {i["id"]: i["fieldVerdicts"] for i in bundle["issues"]} == expected_verdicts(world, cases)
     assert {i["id"]: i["fieldProvenance"] for i in bundle["issues"]} == expected_field_provenance(world, VERDICT_WITHHELD)
     assert {i["id"]: i["mentions"] for i in bundle["issues"]} == expected_mentions(world, public_ids), "an original mention value was changed by a verdict"
@@ -1425,7 +1539,7 @@ def approved_export(root: Path, public_ids: dict | None = None) -> tuple[SimpleN
         company["publicId"] = (public_ids or {}).get(company["publicId"], company["publicId"])
     out = freeze_export(Operator(world), world, APPROVED_HANDOFF, decisions)
     bundle = out["bundle"]
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["handoffId"] == APPROVED_HANDOFF
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and bundle["handoffId"] == APPROVED_HANDOFF
     check_export(world, out, public_ids)
     kinds = sorted(u["approvalBasis"]["kind"] for s in bundle["sources"] for u in s["reviewUsed"])
     assert kinds == ["automatic-verifier", "automatic-verifier", "operator-final-approval", "operator-final-approval"], kinds
@@ -1448,7 +1562,7 @@ def impact_export(root: Path, public_ids: dict | None = None) -> tuple[SimpleNam
         company["publicId"] = (public_ids or {}).get(company["publicId"], company["publicId"])
     out = freeze_export(Operator(world), world, IMPACT_HANDOFF, decisions)
     bundle = out["bundle"]
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["handoffId"] == IMPACT_HANDOFF
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and bundle["handoffId"] == IMPACT_HANDOFF
     check_export(world, out, public_ids)
     assert sorted(((r["status"], r["code"]) for r in bundle["impacts"]), key=repr) == sorted(RICH_STATUSES, key=repr), [(r["status"], r["code"]) for r in bundle["impacts"]]
     assert len({r["edgeId"] for r in bundle["impacts"] if r["issueId"] == "issue:supply-2026q3"}) == 1 and sum(r["issueId"] == "issue:supply-2026q3" for r in bundle["impacts"]) == 4
@@ -1839,7 +1953,7 @@ def summary_world(root: Path, handoff_id: str, outcome: str, public_ids: dict | 
     uncited = evidence_id(world, *UNCITED)
     assert summary["source"]["basisDigest"] == digest(basis) and len(basis["quotes"]) == 2, "the summary rests on both mention quotes of the supply issue"
     assert uncited in {q["evidenceId"] for q in basis["quotes"]} and uncited not in summary.get("evidenceIds", []), "the uncited quote must be part of the basis although no claim cites it"
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["handoffId"] == handoff_id
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and bundle["handoffId"] == handoff_id
     assert canonical(bundle).encode() == (operator.state / "bundles" / f"{frozen['receipt']['bundleDigest']}.json").read_bytes(), "export is not the frozen artifact"
     dumped = json.dumps(out, ensure_ascii=False)
     assert all(text not in dumped for text in PRIVATE), "source text leaked"
@@ -2371,16 +2485,67 @@ def verify_package(directory: Path, export_out: Path | None) -> dict:
             "exportOut": export_out is not None, "providerCalls": 0, "modelCalls": 0}
 
 
+def verify_historical_delivery(root: Path) -> dict:
+    """Read an existing delivery with this consumer; the original wrappers and source stores remain untouched."""
+    import hashlib
+
+    root = root.resolve(strict=True)
+    commands = json.loads((root / "origin-commands.json").read_bytes())
+    matches = [entry["argv"] for entry in commands if entry["label"] == "handoff-export"]
+    assert len(matches) == 1, "one pinned historical export command required"
+    historical = matches[0]
+    args = historical[historical.index("export") + 1:]
+    flags = dict(zip(args[::2], args[1::2], strict=True))
+    assert len(args) == 16 and set(flags) == {"--state-dir", "--relation-state-dir", "--extraction-state-dir", "--ingestion-state-dir",
+                                             "--sources", "--canonical", "--decisions", "--bindings"}, "historical source flags differ"
+    assert Path(flags["--state-dir"]) == root / "handoff", "historical handoff ownership differs"
+    manifest = json.loads((root / "handoff-manifest.json").read_bytes())
+    expected = json.loads((root / "export-envelope.json").read_bytes())
+    stored_bundle = (root / "bundle.json").read_bytes()
+    assert canonical(json.loads(stored_bundle)) == canonical(expected["bundle"]), "historical bundle pins disagree"
+    watched = [root, *(Path(flags[name]) for name in ("--relation-state-dir", "--extraction-state-dir", "--ingestion-state-dir"))]
+    authority = Path(flags["--sources"])
+
+    def fingerprint():
+        info = authority.stat()
+        return {"trees": [ledger_snapshot(path) for path in watched],
+                "authority": (stat.S_IMODE(info.st_mode), info.st_mtime_ns, info.st_size, hashlib.sha256(authority.read_bytes()).hexdigest())}
+
+    before = fingerprint()
+    sandbox = "(version 1) (allow default) (deny network*) (deny file-write*)"
+    env = {"PATH": os.defpath, "HOME": str(Path.home()), "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1",
+           "PYTHONNOUSERSITE": "1", "PYTHONPATH": str(PIPELINE / "src"), **ownership_env()}
+    try:
+        child = subprocess.run(["/usr/bin/sandbox-exec", "-p", sandbox, sys.executable, "-B", "-m", "zoop_ai_pipeline.handoff_cli", "export", *args],
+                               input=json_bytes({"schemaVersion": "zoop-ai-handoff-1", "handoffId": manifest["handoffId"]}),
+                               capture_output=True, env=env, cwd=PIPELINE, timeout=600)
+        result = json.loads(child.stdout)
+        assert child.returncode == 0, result.get("error", result.get("delivery"))
+        assert result["delivery"]["status"] == "current", result["delivery"]
+        assert result["manifest"] == manifest and result["bundle"] == expected["bundle"], "historical native output changed"
+        assert result["receipt"] == expected["receipt"], "historical receipt changed"
+    finally:
+        assert fingerprint() == before, "historical source bytes, modes or mtimes changed"
+    return {"status": "passed", "bundleSchema": result["bundle"]["schemaVersion"],
+            "sources": len(result["bundle"]["sources"]), "issues": len(result["bundle"]["issues"]),
+            "bundleDigest": result["receipt"]["bundleDigest"], "ledgerReadOnly": True,
+            "networkDenied": True, "fileWritesDenied": True, "providerCalls": 0, "modelCalls": 0}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--write-fixture", type=Path, help="run the full smoke and write the importer fixtures into this NEW directory")
     parser.add_argument("--write-package", type=Path, help="build the retained operator package in this NEW directory (no smoke, nothing temporary)")
     parser.add_argument("--verify-package", type=Path, help="re-export an existing package in fresh processes and compare with its pins")
+    parser.add_argument("--verify-historical-delivery", type=Path, help="read-only new-consumer check against pinned origin-commands/export files; macOS sandbox required")
     parser.add_argument("--export-out", type=Path, help="with --verify-package: write the current export envelope to this NEW file")
     args = parser.parse_args()
-    modes = [name for name in ("write_fixture", "write_package", "verify_package") if getattr(args, name) is not None]
+    modes = [name for name in ("write_fixture", "write_package", "verify_package", "verify_historical_delivery") if getattr(args, name) is not None]
     if len(modes) > 1 or (args.export_out is not None and args.verify_package is None):
-        parser.error("--write-fixture, --write-package and --verify-package are exclusive; --export-out needs --verify-package")
+        parser.error("choose one verification or fixture mode; --export-out needs --verify-package")
+    if args.verify_historical_delivery is not None:
+        print(json.dumps(verify_historical_delivery(args.verify_historical_delivery), ensure_ascii=False, indent=1))
+        return 0
     if args.verify_package is not None:
         print(json.dumps(verify_package(args.verify_package, new_output(args.export_out) if args.export_out else None), ensure_ascii=False, indent=1))
         return 0

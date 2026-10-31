@@ -46,45 +46,54 @@ ai/service/.venv/bin/python -m zoop_ai_service.main   # 또는 zoop-ai-service (
 | `ZOOP_AI_SERVICE_WORKER_COMMAND` | 필수. 설치된 `zoop-ai`의 절대 경로. |
 | `ZOOP_AI_SERVICE_GRANTS` | 필수. 운영자 소유 현재 grant registry. 제출·실행 때 `--grants`로, 결과 전달 때 서비스가 직접 다시 읽는다. |
 | `ZOOP_AI_SERVICE_REPLAY` | 선택. authored replay fixture. 없으면 `mode=replay`는 409 `execution_unavailable`. |
-| `ZOOP_AI_SERVICE_PORT` | 선택, 기본 8797(1024–65535). **호스트는 항상 `127.0.0.1`**이며 설정이 없다. |
+| `ZOOP_AI_SERVICE_PORT` | 선택, 기본 8797(1024–65535). |
+| `ZOOP_AI_SERVICE_HOST` | 선택, 기본 `127.0.0.1`. literal IPv4/IPv6만 받으며 호스트 이름·URL·zone ID·multicast는 거절합니다. `0.0.0.0`·`::` 등 비-loopback 바인드는 승인된 TLS ingress와 접근 제한을 갖춘 TaskDefinition에서만 명시합니다. |
 | live 통과 | `ZOOP_AI_LIVE_ENABLED=1`과 양수 `ZOOP_AI_GLOBAL_MAX_CALLS`가 **모두 있을 때만** live가 열리고, 그렇지 않으면 `ZOOP_AI_LIVE_ENABLED/GLOBAL_MAX_CALLS/PROVIDER/BASE_URL/API_KEY`와 네이티브 검증용 `ZOOP_AI_VERIFY_PROVIDER`·`TYPESAFE_API_KEY/BASE_URL/VALIDATION_MODEL`은 child에 전달되지 않는다(Jev key는 live가 열린 S1 child에만 가고 S2/S3/그래프 child에는 가지 않는다). stage별 `ZOOP_AI_{DOCUMENT_SUMMARY,DOCUMENT_SENTIMENT,VERIFY,BRIEFING_OUTLOOK}_{MODEL,REASONING_EFFORT}`는 입력 digest에 영향을 주므로 항상 통과한다. |
 
 잘못된 설정은 종료 코드 78과 `{"error":"service_config_invalid","field":"<VAR>","reason":"<code>"}`만 출력합니다(값 출력 없음). child 환경은 `PATH=/usr/bin:/bin`, `LANG=C.UTF-8`, `PYTHON*` 몇 개와 위 통과 값뿐입니다. 요청이 경로·명령·환경·provider URL·모델·fixture·grant registry를 고를 수는 없습니다.
 
-### 관측 export(선택, 기본 꺼짐)
+### 관측 export와 앱 수입용 읽기 profile(선택, 기본 꺼짐)
 
-`POST /internal/v1/observations/export`에는 `observation.read`가 필요합니다. 이 scope는 운영자가 지정한 내부 문서 수입 principal에만 명시적으로 부여하며, 기존 principal에 자동으로 추가하지 않습니다. 저장소에 관측별 소유자 정보가 없으므로 이 scope는 **서버가 설정한 공용 ingestion 저장소 전체의 정확한 관측 조회 권한**입니다. 다른 principal에도 운영자가 같은 scope를 명시적으로 부여하면 동일한 현재 source 권리 검사를 거쳐 조회할 수 있습니다. Scope가 없는 인증된 principal은 403, 알 수 없는 토큰은 401입니다.
+`POST /internal/v1/observations/export`는 `observation.read` scope로 관측 한 건을 동기 조회합니다. 이 scope는 운영자가 지정한 내부 문서 수입 principal에 명시적으로 부여하며, 기존 principal에 자동으로 추가하지 않습니다. **서버가 설정한 ingestion 저장소 또는 inventory 전체의 정확한 관측 조회 권한**이며 관측별 소유권은 아닙니다. 같은 scope를 명시적으로 받은 principal은 동일한 현재 source 권리 검사를 거쳐 조회할 수 있습니다. Scope가 없는 인증된 principal은 403, 알 수 없는 토큰은 401입니다.
 
-| 설정 | 규칙 |
+| 설정 | profile 조건 |
 |---|---|
-| `ZOOP_AI_SERVICE_INGESTION_COMMAND` | 설치된 `zoop-ai-ingest` 실행 파일의 절대 경로입니다. 이 설정이 관측 export 그룹을 켭니다. |
-| `ZOOP_AI_INGESTION_STATE_DIR` | 기존 ingestion 저장소의 절대 경로입니다. 새 저장소를 만들거나 복구하지 않습니다. |
-| `ZOOP_AI_SERVICE_SOURCES` | 현재 운영자 source registry 파일입니다. CLI가 요청마다 다시 읽습니다. |
-| `ZOOP_STATE_DIR` | 기존 pipeline 소유권 검사에 필요한 앱 상태 경로입니다. 서비스·worker·ingestion 상태 경로와 겹칠 수 없습니다. |
+| `ZOOP_AI_SERVICE_INGESTION_COMMAND` | 그룹을 켜는 설치 CLI의 절대 경로입니다. 이미지 경로는 `/opt/zoop/pipeline/.venv/bin/zoop-ai-ingest`입니다. |
+| `ZOOP_AI_INGESTION_STATE_DIR`, `ZOOP_AI_SERVICE_SOURCES` | 단일 context에서 기존 ingestion 저장소와 현재 운영자 registry를 지정합니다. 함께 켠 실행·graph·handoff 그룹과 같은 원장·현재 registry를 사용하며, CLI가 registry를 요청마다 다시 읽습니다. |
+| `ZOOP_AI_SERVICE_OBSERVATION_SOURCE_CONTEXTS`, `ZOOP_AI_SERVICE_OBSERVATION_SOURCE_CONTEXTS_SHA256` | 여러 context에서 단일 설정을 대신합니다. 기존 `zoop-handoff-source-contexts-1` inventory의 정확한 파일과 SHA-256을 지정합니다. handoff 그룹이 켜져 있으면 `ZOOP_AI_SERVICE_HANDOFF_SOURCE_CONTEXTS` 쌍과 파일·SHA가 모두 같아야 합니다. |
+| `ZOOP_STATE_DIR` | native 상태 소유권 검사의 앱 경로입니다. service·worker·native 원장과 겹치면 시작을 거절합니다. |
 
-기존 서비스 필수 설정도 필요합니다. S2·S3와 함께 사용할 때 ingestion·sources 설정을 그대로 공유하며, graph·handoff가 함께 설정되어 있으면 같은 ingestion·registry를 가리켜야 합니다. Command 설정이 없으면 인증 후 503 `execution_unavailable`, command만 있고 필수 설정이 빠졌으면 시작을 거부합니다. 수집 설정만으로 S2·S3 실행 그룹을 켜지 않습니다.
+기존 서비스 필수 설정도 필요합니다. 그룹을 설정하지 않으면 인증 후 503 `execution_unavailable`이며, 그룹 설정이 불완전하면 시작을 거절합니다. 관측 export가 공유 ingestion·sources 설정을 사용하더라도 S2·S3 실행 그룹은 별도로 설정해야 합니다.
 
 요청은 닫힌 native selector입니다. `schemaVersion`은 필수이며 값은 `zoop-ingestion-s2-1`입니다. 나머지 필드는 정확히 `roundId`, `sourceId`, `page`, `ordinal`, `documentId`, `rawVersion`, `documentVersion`입니다. `observationId`, 클라이언트 경로·CLI 인자·registry·`requireStore` 옵션과 query parameter는 받지 않습니다. `Idempotency-Key`는 필요하지 않고 권한이나 캐시 신원을 만들지 않습니다.
 
-서버는 항상 `export --require-store`만 실행합니다. CLI가 현재 `read`·`store`·`quote-display`, 고정된 source 설정과 관측 버전을 검사하며, 서비스는 응답의 selector 일치, 본문의 `sourceHash`, document version과 locator hash를 검증합니다. 성공 응답은 **CLI의 정확한 JSON**이며 `document.text`, locator와 선택적 publisher·language·collection 필드를 보존합니다. `language`는 native가 선언한 2~35자 문자열만 받고, 미지정 필드는 추가하지 않습니다. 별도 wrapper나 상태 조회 경로는 없습니다. 한 요청은 관측 하나를 동기 200으로 돌려주며, 묶음 조회와 비동기(202) 전달은 #407에서 정할 열린 항목입니다. 요청은 2,000,000바이트, stdout·응답은 16 MiB, child 실행은 45초, 동시 export는 2개로 제한합니다. 모든 응답에 `Cache-Control: no-store`가 붙습니다.
+서버는 매 요청에서 설치된 `zoop-ai-ingest export --require-store`만 실행합니다. CLI가 현재 `read`·`store`·`quote-display`, 고정된 source 설정과 관측 버전을 검사하며, 서비스는 응답의 selector 일치, 본문의 `sourceHash`, document version과 locator hash를 검증합니다. 성공 응답은 **CLI의 정확한 JSON**이며 `document.text`, locator와 선택적 publisher·language·collection 필드를 보존합니다. `language`는 native가 선언한 2~35자 문자열만 받고, 미지정 필드는 추가하지 않습니다. 별도 wrapper나 상태 조회 경로는 없습니다. 한 요청은 관측 하나를 동기 200으로 돌려주며, 묶음 조회와 비동기(202) 전달은 #407에서 정할 열린 항목입니다. 요청은 2,000,000바이트, stdout·응답은 16 MiB, child 실행은 45초, 동시 export는 2개로 제한합니다. 모든 응답에 `Cache-Control: no-store`가 붙습니다.
+
+여러 context에서는 전체 7-field selector에 정확히 대응하는 원장 하나만 읽습니다. 다른 원장을 검색해 대신 제공하지 않습니다. 중복 route는 시작 때 거절하고, 파일 hash를 export 전후에 다시 확인합니다. 현재 registry 내용은 inventory hash에 고정하지 않으므로 권리 철회는 다음 조회부터 적용됩니다.
 
 | 결과 | HTTP |
 |---|---|
 | 허용된 native export | 200 |
 | `source_unauthorized` | 403 |
-| `round_not_found`, `observation_not_found`, `document_version_not_in_round` | 404 |
+| `round_not_found`, `observation_not_found`, `document_version_not_in_round`, 알 수 없는 inventory selector | 404 |
 | `registry_changed`, `scope_configuration_conflict`, `preparation_profile_unbound` | 409 |
 | writer lock의 `ingestion_busy` | 503 `runtime_busy`, `runtimeCode=ingestion_busy`, `Retry-After: 2` |
-| hot WAL·손상된 설정 등 native 상태 거부 | 503 `service_configuration_invalid`와 안전한 `runtimeCode` |
+| inventory 변경·hot WAL·손상된 설정 등 native 상태 거부 | 503 `service_configuration_invalid`와 안전한 `runtimeCode` |
 | stdout 계약·본문 hash·응답 신원 불일치 | 500 `runtime_contract_mismatch` 또는 `runtime_binding_mismatch` |
 
-오류와 로그에는 본문·운영자 경로·키·raw stderr를 넣지 않습니다. 요청마다 권리를 새로 확인하며, 캐시·ingestion 쓰기·자동 재시도·복구·job 등록은 하지 않습니다. 권리 검사와 HTTP 전달은 별개 시점이므로 이미 전달한 본문을 회수하거나 원자적 철회를 보장하지 않습니다. 이 조회는 모델 송신·grant 발급·게시·활성화를 허가하지 않습니다.
+오류와 로그에는 본문·운영자 경로·키·raw stderr를 넣지 않습니다. 요청마다 권리를 새로 확인하며, 캐시·ingestion 쓰기·자동 재시도·복구·job 등록은 하지 않습니다. 권리 검사와 HTTP 전달은 별개 시점이므로 이미 전달한 본문을 회수하거나 원자적 철회를 보장하지 않습니다. 이 조회는 모델 송신·grant 발급·게시·활성화를 허가하지 않습니다. 읽기 child는 필터링된 환경만 받고 provider 자격 증명이나 앱 DB 자격 증명을 받지 않습니다.
 
-**기존 온라인 profile에 scope만 추가해 재시작하면 안 됩니다.** Plan authority binding은 모든 principal 이름과 scope를 고정하므로 `observation.read` 추가도 기존 binding을 바꾸며 시작이 거부됩니다. 이 변경은 기존 profile·binding·quota·영수증을 수정하거나 초기화하지 않습니다. 운영자는 기존 이력을 보존한 별도 읽기 전용 서비스 profile을 사용하거나, 별도 승인된 migration 절차를 준비해야 합니다. 새 profile은 기존 실행 예산이나 admission 한도를 초기화하는 수단이 아닙니다.
+앱 수입 전용 principal에는 `handoff.read`와 `observation.read`를 명시적으로 부여합니다. **기존 온라인 profile에 scope만 추가해 재시작하면 안 됩니다.** Plan authority binding은 모든 principal 이름과 scope를 고정하므로 `observation.read` 추가도 기존 binding을 바꾸며 시작이 거부됩니다. 기존 profile·binding·회차·예산·quota·영수증을 보존한 별도 읽기 profile과 service state를 사용합니다. 기존 profile을 바꾸려면 별도 승인된 migration 절차가 필요하며, 새 profile은 기존 실행 예산이나 admission 한도를 초기화하는 수단이 아닙니다.
 
-배포에는 pipeline CLI 설치, 내구성 있는 동일 ingestion 저장소·현재 registry, 명시적 importer scope와 기존 loopback/TLS proxy 구성이 필요합니다. 기본 개발 컨테이너는 pipeline 설치를 포함하지 않습니다. 앱의 `IngestionExporter.export(Observation)`와 selector·응답은 호환되지만 기존 `ProcessIngestionExporter`는 여전히 로컬 CLI를 호출하며, HTTP 전송 구현은 앱의 별도 작업입니다. 비공개 처리 권한·retained provenance를 공개 권한으로 바꾸지 않으며, 공개 OpenAPI·AWS 설정은 그대로입니다.
+ECS의 AI service TaskDefinition에는 위 경로와 기존 필수 `ZOOP_AI_SERVICE_PRINCIPALS`, `ZOOP_AI_SERVICE_STATE_DIR`, `ZOOP_AI_WORKER_STATE_DIR`, `ZOOP_AI_SERVICE_WORKER_COMMAND`, `ZOOP_AI_SERVICE_GRANTS`, port·bind 설정을 제공합니다. source mount와 현재 registry는 AI task가 읽고, API importer task에는 HTTP client 설정과 실제 대상 DB·artifact root만 제공합니다. 서비스 진입점은 이미지의 `zoop-ai-service`이며 native pipeline도 동일 이미지에 설치됩니다. 외부 client base URL은 승인된 HTTPS 주소여야 합니다. 이 설정 예시는 endpoint·token을 발급하거나 ingress를 배포하지 않습니다.
 
-오프라인 실제 HTTP→CLI smoke: `ai/service/.venv/bin/python ai/service/scripts/observation_export_smoke.py`. 합성 HTML로 만든 native 저장소만 사용하며 네트워크는 loopback으로 제한하고 `.env` 읽기를 거부합니다. 설치된 pipeline 환경이 필요하며 의존성을 자동으로 설치하지 않습니다.
+읽기 archive는 writer가 정상 종료한 ingestion·extraction·relation·handoff 저장소의 **디렉터리 전체**로 준비합니다. DB와 잠금 파일, 존재하는 `-wal`·`-shm` sidecar를 함께 보존하고 읽기 전용으로 mount합니다. reader는 비어 있지 않은 WAL을 복구가 필요한 상태로 거절합니다. 복구는 원래 producer의 소유권과 별도 승인 아래 처리합니다.
+
+배치 위치를 바꿀 때는 source-context의 운영 경로와 authority-set의 바깥 `sources` 경로를 대상 위치로 옮기고 inventory SHA-256을 다시 고정합니다. registry 내부의 `inputRoot` 문자열은 과거 ingestion 설정의 고정 identity이므로 원래 값 그대로 보존합니다. 현재 권한 leaf는 AI와 API가 같은 canonical 파일을 읽도록 공유하고, 애플리케이션의 읽기 전용 mount와 별개로 운영자가 갱신합니다. API의 control 접근 권한은 [API mount 지침](../../api/README.md#여러-원장-읽기와-현재-권한)을 따릅니다.
+
+단일 context의 오프라인 실제 HTTP→CLI smoke는 `ai/service/.venv/bin/python ai/service/scripts/observation_export_smoke.py`입니다. 합성 HTML로 만든 native 저장소만 사용하며 네트워크는 loopback으로 제한하고 `.env` 읽기를 거부합니다. 설치된 pipeline 환경이 필요하며 의존성을 자동으로 설치하지 않습니다.
+
+여러 context의 합성 종단 시나리오는 `api/scripts/http_native_delivery_smoke.py`입니다. 두 native context의 실제 HTTP 인증·selector·misroute·권리 철회, Java/PostgreSQL 문서 등록, target bindings, 최종 commit 직전 권리 재확인, native-8 수입과 공개 graph·본문 근거를 검사합니다. 실행 전제와 명령은 [HTTP 수입 안내](../../api/docs/GRAPH_READ_HANDOFF.md#http로-문서와-native-handoff-수입)를 따릅니다.
 
 ### 온라인 plan admission(선택, 기본 꺼짐)
 
@@ -139,11 +148,15 @@ python3 -c 'import hashlib,secrets;t=secrets.token_urlsafe(48);print(hashlib.sha
 
 1. **접수 순서.** 인증→헤더→본문 검증→(소유자·본문 digest 조회)→**`reserved`로 소유 의도를 durable하게 기록**→`zoop-ai submit`(모델 호출 0, 실제 등록)→**`accepted`+dispatch 의도를 한 transaction으로 기록**→202. 요청 본문은 서비스 원장에 저장하지 않는다.
 2. **고아 소유권 차단.** 런타임에는 등록됐지만 서비스가 응답 전에 죽었다면 `reserved` 행이 소유자를 이미 묶고 있어 다른 principal은 같은 jobId를 가질 수 없다(409 `job_id_unavailable`). 소유자가 같은 key·본문으로 다시 보내면 완료된다. 예약은 **시간으로 청소하지 않는다.** 런타임이 첫 시도에서 명확히 거절한 경우(입력 검증, `job_input_conflict`, 모델/effort/provider 설정 코드, grant registry 코드)에만 지운다.
-3. **dispatcher.** 한 스레드·한 child. 오래된 pending부터 `in_flight`로 확정한 뒤 `zoop-ai run|resume`을 고정 argv로 실행한다. 요청 데이터는 이름 없는 임시 파일 stdin으로만 넘기고 stderr는 버린다. child는 자기 세션이며 데드라인(30초/300초) 초과 시 process group을 종료한다. 살아 있는 child를 서비스가 종료 시 기다리거나 죽이지 않는다.
+3. **dispatcher.** 한 스레드·한 child. 오래된 pending부터 `in_flight`로 확정한 뒤 `zoop-ai run|resume`을 고정 argv로 실행한다. 요청 데이터는 이름 없는 임시 파일 stdin으로만 넘기고 stderr는 버린다. child는 자기 세션이며 데드라인(30초/300초) 초과 시 process group을 종료한다. 서비스 종료 시 실행 중인 dispatch child를 기다리거나 죽이지 않는다.
 4. **정책.** 처음 접수된 dispatch와 명시적 `recover`는 그대로(제한 없이) `run`/`resume`을 실행한다. **자동 재dispatch**(서비스 재시작, 비정상·데드라인 child, busy 폴링)는 worker CLI의 내부 권한 `--initial-only`로 실행한다. 이 제한은 먼저 읽어 둔 스냅샷이 아니라 **런타임 job lock 안에서** 판정된다. 호출 기록이 하나도 없는 job(원래 접수 의도)만 시작할 수 있고, 호출 기록이 하나라도 있으면 이미 저장된 receipt를 저장만 하며 어떤 단계도 reserve하거나 보내지 않는다(provider도 만들지 않는다). started/unknown 시도는 기존처럼 `reconciling`이 된다. 따라서 어떤 단계의 receipt는 저장됐는데 필요한 다른 단계는 아직 보내지 않은 job(예: 생성 receipt 뒤, 검증 reserve 전에 orphan이 죽음)은 `get`과 `run` 사이에 상태가 바뀌어도 자동으로 이어지지 않고, 서비스는 `idle`+`lastOutcome=needs_recover`(`next=recover`)로 기록한다. 이어 가는 것은 제한 없는 명시적 `recover`뿐이다. 런타임이 `queued/running`을 돌려주면 다른 프로세스가 잡고 있다는 뜻이므로 지수 backoff(≤60초). 자동 `resume`은 **필요한 모든 단계의 receipt가 이미 저장된 `save_only`**에서만 한다. 그 밖의 `persisting`, `failed`(`unsent_only` 포함)는 자동 재개하지 않고 `next=recover`다. 데드라인/signal/비정상 종료는 `transport_unknown`으로 기록하고 최대 3번 같은 job을 런타임에 다시 맡길 뿐이며 결과를 서비스가 판정하지 않는다. child가 끝난 뒤 dispatch 결과를 원장에 쓰는 일이 일시적으로 실패하면 서비스는 **그 결과를 보관하고 그 쓰기만 재시도**한다(worker를 다시 실행하지 않고 그동안 다른 행도 claim하지 않는다).
 5. **재시작.** 이전 프로세스가 `in_flight`로 남긴 행은 `pending`으로 돌아간다. 같은 상태 디렉터리의 두 번째 인스턴스는 `service_state_busy`로 거부된다.
 6. **취소.** 런타임 fence를 올리고 pending dispatch를 끝낸다. 진행 중 child는 죽이지 않으므로 늦게 온 응답은 receipt로 저장되고(사용량 보존) artifact 저장과 verify 송신만 막힌다. 취소는 환불 보장이 아니다.
 7. **`reconciling`.** 어떤 명령도 미확인 provider 결과를 정산하지 못한다. `recover`는 409 `reconcile_required`이고 운영자 판단(공급자 측 사용량 증거)이 필요하다.
+
+**HTTP 종료와 교체.** SIGTERM을 받으면 새 연결 접수를 멈추고 진행 중인 HTTP 요청을 최대 60초 동안 기다린다. 이는 native 읽기 child의 45초 제한과 선택적인 pipeline gate 대기 10초, child 종료 유예 5초를 반영한 값이다. 배포 담당자는 ingress에서 기존 연결을 먼저 drain하고, 컨테이너 강제 종료 제한을 이 60초보다 여유 있게 설정해야 한다(ECS `stopTimeout`은 예를 들어 120초). 읽기 전용 replica는 닫힌 archive와 현재 권한 파일을 읽기 전용으로 공유하되, writable service·worker·app scratch는 task별로 분리한다. 같은 writable service state를 유지하는 교체는 기존 프로세스가 잠금을 해제한 뒤 새 프로세스를 시작해야 한다.
+
+task별 임시 scratch는 순수 읽기 replica에 적용합니다. 처리·분석 producer는 영속 상태와 독점 소유권을 유지합니다.
 
 ## 결과 전달과 개인정보
 
@@ -293,17 +306,17 @@ ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli recover \
 | 라우트 | scope | 응답 |
 |---|---|---|
 | `GET /internal/v1/graph-handoffs/{handoffId}` | `handoff.read` | 200 `HdStatus`: 신원·`state`·`delivery`와, current일 때만 `verification`(manifest·bundle·content digest, 바이트 수, bundle 자신의 개수, source job 수, provenance 선언). 노드·source id·제목·본문 없음 |
-| `GET /internal/v1/graph-handoffs/{handoffId}/bundle` | `handoff.read` | 200 `HdBundle`: 위와 같은 형제 필드 + current이고 두 pin이 맞을 때만 `manifest`(freeze 때 원장에 동결된 manifest 본문, 닫힌 모델 `HandoffManifest`)와 `bundle`(`zoop-graph-handoff-bundle-7` 전체. 각 issue의 `mentions[]`는 닫힌 `BMention`/`BParticipant` 모델, `fieldProvenance`는 닫힌 `BFieldProvenance`/`BSameValueMentions`/`BMentionRef` 모델, `fieldVerdicts[]`는 닫힌 `BFieldVerdict` 모델, 최상위 비공개 `pathCompanies[]`와 relation의 `structuralPath`·basis의 `businessScope`/`productScope`는 아래 `-5` 문단, 최상위 비공개 `impacts[]`는 `-6` 문단, 각 issue의 `summary`와 `policy.issueSummary`는 `-7` 문단의 닫힌 모델입니다). 백엔드는 이 한 응답으로 `sha256(canonical(manifest))`=`manifestDigest`와 `sha256(canonical(bundle))`=`bundleDigest`를 모두 재계산합니다. 서비스는 manifest 누락·미지 필드(500 `runtime_contract_mismatch`)와 digest·handoffId·선언·정책 버전·파일 해시·source 핀 불일치(500 `runtime_binding_mismatch`)를 거절하며 status·withheld에는 manifest가 없습니다 |
+| `GET /internal/v1/graph-handoffs/{handoffId}/bundle` | `handoff.read` | 200 `HdBundle`: 위와 같은 형제 필드 + current이고 두 pin이 맞을 때만 `manifest`(freeze 때 원장에 동결된 manifest 본문, 닫힌 모델 `HandoffManifest`)와 `bundle`(`zoop-graph-handoff-bundle-8` 전체. 각 issue의 `mentions[]`는 닫힌 `BMention`/`BParticipant` 모델, `fieldProvenance`는 닫힌 `BFieldProvenance`/`BSameValueMentions`/`BMentionRef` 모델, `fieldVerdicts[]`는 닫힌 `BFieldVerdict` 모델, 최상위 비공개 `pathCompanies[]`와 relation의 `structuralPath`·basis의 `businessScope`/`productScope`는 아래 `-5` 문단, 최상위 비공개 `impacts[]`는 `-6` 문단, 각 issue의 `summary`와 `policy.issueSummary`는 `-7` 문단의 닫힌 모델입니다). 백엔드는 이 한 응답으로 `sha256(canonical(manifest))`=`manifestDigest`와 `sha256(canonical(bundle))`=`bundleDigest`를 모두 재계산합니다. 서비스는 manifest 누락·미지 필드(500 `runtime_contract_mismatch`)와 digest·handoffId·선언·정책 버전·파일 해시·source 핀 불일치(500 `runtime_binding_mismatch`)를 거절하며 status·withheld에는 manifest가 없습니다 |
 
 쿼리 파라미터는 **하나도 허용하지 않습니다**(422). 목록·생성·복구 route는 없습니다.
 
-**설정(10개 모두 있어야 켜지는 그룹, S2/S3·graph와 별개).** `ZOOP_AI_SERVICE_HANDOFF_COMMAND`(설치된 `zoop-ai-handoff` 절대 경로), `ZOOP_AI_HANDOFF_STATE_DIR`(운영자가 `freeze`로 만든 handoff 원장 루트, 읽기 전용으로만 넘김), `ZOOP_AI_HANDOFF_RELATION_STATE_DIR`·`ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR`·`ZOOP_AI_HANDOFF_INGESTION_STATE_DIR`(존재하는 디렉터리), `ZOOP_AI_SERVICE_HANDOFF_SOURCES`, 매니페스트가 sha256으로 고정한 운영자 파일 `ZOOP_AI_SERVICE_HANDOFF_CANONICAL`·`ZOOP_AI_SERVICE_HANDOFF_DECISIONS`·`ZOOP_AI_SERVICE_HANDOFF_BINDINGS`, `ZOOP_AI_SERVICE_HANDOFF_EXPORTS`(아래 allowlist), 그리고 모든 그룹이 쓰는 `ZOOP_STATE_DIR`. 일부만 있거나 값이 잘못되면 필드 이름과 사유 코드만 내고 시작을 거부합니다(`handoff_group_incomplete`·`handoff_roots_overlap`·`handoff_source_inconsistent`). S2/S3 그룹이 같은 프로세스에 있으면 같은 루트·registry여야 하고(다르면 시작 거부) 같은 gate를 공유합니다. child 환경은 소유 환경(`ZOOP_STATE_DIR`·`ZOOP_AI_WORKER_STATE_DIR`)만이며 그래프 자격·provider 키·토큰 digest·모델 설정은 들어가지 않습니다.
+**설정(S2/S3·graph와 별개).** 공통 필수값은 `ZOOP_AI_SERVICE_HANDOFF_COMMAND`(설치된 `zoop-ai-handoff` 절대 경로), `ZOOP_AI_HANDOFF_STATE_DIR`(기존 handoff 원장), `ZOOP_AI_SERVICE_HANDOFF_CANONICAL`·`_DECISIONS`·`_BINDINGS`, `ZOOP_AI_SERVICE_HANDOFF_EXPORTS`(아래 allowlist), 소유 경계용 `ZOOP_STATE_DIR`입니다. 원천은 다음 중 한 방식으로 지정합니다. 단일 context는 `ZOOP_AI_HANDOFF_RELATION_STATE_DIR`·`ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR`·`ZOOP_AI_HANDOFF_INGESTION_STATE_DIR`·`ZOOP_AI_SERVICE_HANDOFF_SOURCES`를 모두 설정합니다. 여러 context는 이 네 값 대신 `ZOOP_AI_SERVICE_HANDOFF_SOURCE_CONTEXTS`와 `ZOOP_AI_SERVICE_HANDOFF_SOURCE_CONTEXTS_SHA256`을 설정합니다. 파일 형식은 [pipeline의 context 계약](../pipeline/README.md#여러-운영-원장의-native-handoff-읽기)을 따릅니다. 두 방식을 함께 지정하거나 일부만 지정하면 시작을 거절합니다. 같은 프로세스의 S2/S3 그룹은 inventory의 한 context와 원장·registry 경로가 정확히 일치해야 하며 같은 gate를 공유합니다. child 환경에는 소유 경계값만 전달합니다.
 
 **handoff allowlist(`ZOOP_AI_SERVICE_HANDOFF_EXPORTS`).** handoff id는 라벨일 뿐이므로 운영자가 principal별로 정확한 `{handoffId, manifestDigest, bundleDigest}`(둘 다 필수 sha256 pin: manifest 해시와 canonical bundle 바이트 해시)를 `{"schemaVersion":"zoop-ai-handoff-exports-1","handoffs":[…]}`로 적습니다. 알 수 없는 키·pin 누락·중복 `(principal, handoffId)`·모르는 principal은 시작을 거부합니다. 목록에 없으면(없는 id·다른 principal의 것 포함) 같은 403 `handoff_not_allowed`를 child 전에 돌려줍니다. 파일은 요청마다 다시 읽고 slot·gate 대기 뒤 child 시작 전, child 응답 직후 답의 어떤 부분이든 쓰기 전, 내용 조립 직전에 다시 읽어 바뀌었으면 403입니다.
 
 **전달 규칙.** 내용은 아래가 **모두** 성립할 때만 나갑니다. (1) 생산자가 `ready`·`delivery.status=current`를 말하고(운영자 파일 3개의 매니페스트 pin, S3 권한·S2 upstream pin·grant, 사용한 검수 revision, 재구성한 content digest를 매 export마다 다시 검증), (2) 받은 bundle의 canonical 바이트 sha256이 생산자 receipt와 **운영자 `bundleDigest` pin** 둘 다와 같고 manifest digest가 `manifestDigest` pin과 같으며, (3) bundle이 모든 중첩 수준에서 **닫힌 모델**(`handoff_wire.Bundle`)을 통과하고 모델이 다시 내보낸 canonical 바이트가 해시한 바이트와 정확히 같을 때. 아니면 **200 + `delivery.state=withheld`**와 사유(`source_unauthorized`·`upstream_changed`·`canonical_mapping_changed`·`decisions_changed`·`bindings_changed`·`review_revision_changed`·`handoff_content_changed`·`handoff_not_ready`·`handoff_pin_mismatch`·`handoff_contract_changed`, 요약 pin·basis가 바뀐 `issue_summary_pin_mismatch`·`issue_summary_basis_changed`·`issue_summary_issue_not_public`·`issue_summary_temporal_review_pending`·`issue_summary_input_too_large` …)만 있고 `verification`·`bundle`은 null입니다(개수·source id도 없음). 생산자 receipt와 받은 바이트가 서로 어긋나면 500 `runtime_binding_mismatch`, 닫힌 모델이 거부하면(모르는 중첩 필드, 타입·범위 위반, basis·digest·검증 규칙을 따르지 않는 summary — **digest와 pin을 새 내용에 맞춰 갱신했어도**) 500 `runtime_contract_mismatch`입니다. 둘 다 재시도해도 바뀌지 않으므로 retryable이 아닙니다. 검사들은 서로 다른 시각의 읽기라 그 사이의 철회는 잡지 못하고 이미 나간 내용은 회수되지 않습니다.
 
-**bundle 스키마 `-7`와 이전 handoff.** 서비스의 닫힌 `Bundle` 모델과 receipt 투영(`RtReceipt.bundle_schema`)은 `zoop-graph-handoff-bundle-7`만 받습니다. `zoop-graph-handoff-bundle-1`~`-6`으로 freeze된 handoff는 생산자가 내용 없이 `handoff_contract_changed`로 withheld하며, 서비스는 그 사유 코드만 200 withheld로 그대로 전달하고 옛 receipt·bundle 내용은 어떤 것도 싣지 않습니다(운영자가 새 handoff id를 freeze합니다). `-1`~`-6` 모양의 current 응답(`-4`는 `pathCompanies`·`structuralPath`·basis scope가 없는 모양, `-5`는 `impacts`·`counts.impacts`·`policy.impacts`가 없고 content digest가 여섯 목록 위에 있는 모양, `-6`은 issue `summary`와 `policy.issueSummary`가 없는 모양)은 닫힌 모델이 아니라 receipt 투영에서 500 `runtime_contract_mismatch`로 거절되며 어떤 별칭·변환·보정도 없습니다. issue의 `mentions[]`는 S2 원본 mention 값(문서·버전·S2 local id로 식별, `verification`은 항상 `none`, 참가자의 `role`은 S2 텍스트 그대로)이며 병합된 issue 필드에서 만들어지지 않고 verdict가 있어도 바뀌지 않습니다. 서비스는 이 값들의 의미(partition·시간 정밀도·회사 매핑)를 다시 판단하지 않고 구조만 고정합니다.
+**bundle 스키마 `-8`와 이전 handoff.** 서비스의 닫힌 `Bundle` 모델과 receipt 투영은 `zoop-graph-handoff-bundle-8` 및 `zoop-public-projection-policy-2`를 받습니다. `-1`~`-7`로 동결된 행은 생산자의 이력 전용 경로를 따라 `handoff_contract_changed`로 withheld되고, 저장된 receipt·bundle은 원래 바이트로 보존됩니다. 이전 스키마를 current 응답으로 보내면 500 `runtime_contract_mismatch`로 거절합니다. 원본 mention은 그대로 전달하되 지원하지 않는 비어 있지 않은 시각은 receipt 전용 `unresolved`로 구분합니다. 각 unresolved mention의 정확한 값에 묶인 non-ALLOW verdict와 자기 문서 근거를 검사하며, `HOLD/unsupported-format`은 근거 1개 이상이 필수입니다. 원천 국가 `[]`를 보존하면서 명시적 운영자 결정으로 보완할 수 있고, 비어 있지 않은 원천 집합은 모두 결정 집합과 정확히 같아야 합니다. 서비스는 이 닫힌 규칙을 검사하며 인용의 의미적 국가 관련성은 운영자가 판단합니다.
 
 `sources[].policies`는 `policy` 값으로 구분하는 닫힌 두 모양입니다. 현재 `zoop-relation-policy-2`에는 기존 일곱 키와 정확한 `countryContext: "zoop-country-context-1"`이 필수입니다. 보존된 `zoop-relation-policy-1`은 원래 일곱 키만 받으며 새 pin을 허용하지 않습니다. 누락·null·빈 문자열·알 수 없는 policy/context 버전이나 두 모양을 섞은 응답은 거부합니다. 이전 모양을 읽더라도 필드나 기본값을 추가하지 않으며, 이전 작업을 실행·재검증하거나 withheld를 current로 바꾸지 않습니다.
 
@@ -339,7 +352,9 @@ ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli recover \
 | `ZOOP_AI_HANDOFF_EXPOSURE_INGESTION_STATE_DIR` | 기존 ingestion 원장 루트 |
 | `ZOOP_AI_SERVICE_HANDOFF_EXPOSURE_EXPORTS` | 기존 `zoop-ai-handoff-exports-1` 형식의 principal별 manifest/bundle pin allowlist |
 
-세 루트는 서로 및 앱·서비스·S1 상태와 겹칠 수 없고 symlink를 허용하지 않습니다. 함께 설정된 S2/S3·graph·일반 handoff 그룹과 원천 루트가 같아야 하며, 일반 handoff가 있으면 handoff 루트와 allowlist 파일도 같아야 합니다. exposure만 켤 때는 source registry·canonical·decisions·bindings·S3 원장·모델/graph 자격 증명이 필요하지 않으며 다른 그룹도 켜지지 않습니다.
+여러 context에서는 위 두 source 원장 변수 대신 `ZOOP_AI_SERVICE_HANDOFF_EXPOSURE_SOURCE_CONTEXTS`와 `ZOOP_AI_SERVICE_HANDOFF_EXPOSURE_SOURCE_CONTEXTS_SHA256`을 지정합니다. 일반 handoff도 켜면 두 그룹이 같은 context 파일·SHA-256, handoff 원장, allowlist를 사용해야 합니다. context 파일 오류·해시 변경·누락·잘못된 연결은 `503 service_configuration_invalid`로 전달합니다. 실제 export/exposure child가 매 명령 고정 파일을 다시 확인하며, source grant의 내용은 이 SHA-256에 포함하지 않습니다.
+
+원장 루트는 서로 및 앱·서비스·S1 상태와 겹칠 수 없고 symlink를 허용하지 않습니다. 함께 설정된 S2/S3·graph 그룹은 inventory의 정확한 source context와 일치해야 하며, 일반 handoff가 있으면 handoff 루트와 allowlist 파일도 같아야 합니다. exposure는 context에 기록된 ingestion/S2만 열고 source registry의 내용이나 현재 권한을 평가하지 않습니다. 단일 context의 exposure만 켤 때는 기존 두 source 원장 경로를 사용합니다.
 
 챗봇을 함께 켜면 `ZOOP_AI_CHAT_STATE_DIR`도 이 세 원장 루트와 같거나 그 상위·하위 경로일 수 없습니다(`chat_roots_overlap`). 일반 handoff가 꺼져 있어도 이 검사는 적용됩니다. 챗봇이나 S2/S3의 live 설정·키가 있어도 exposure child에는 전달되지 않습니다.
 
@@ -395,7 +410,7 @@ ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli recover \
 
 ## 네트워크와 한계
 
-- 서비스는 `127.0.0.1`에만 묻습니다. 운영에서는 같은 호스트/네임스페이스의 HTTPS reverse proxy가 TLS, 본문 2,000,000B 상한, `Authorization` 비로깅을 맡고 App SG에서만 접근되게 해야 합니다. **이는 가정이며 관측·배포한 사실이 없습니다**(WBS 6.11.2/8의 실관측 과제).
+- 서비스는 기본 `127.0.0.1`에 바인드합니다. 운영자가 `ZOOP_AI_SERVICE_HOST`로 다른 literal IP를 지정할 때는 승인된 HTTPS ingress, 본문 2,000,000B 상한, `Authorization` 비로깅과 앱 접근 제한을 함께 준비해야 합니다. 설정 지원과 실제 배포·접속 증거는 구분합니다.
 - 동시 CLI 호출은 4개(초과 시 503 `service_busy`), pending dispatch는 1,000개(초과 시 503 `queue_full`)입니다. dispatcher는 직렬입니다(replay ordinal이 ledger 전체 순서이므로). 처리량 향상은 지연 측정 뒤 결정합니다.
 - live 모드의 빈 회차 outlook job은 모델 호출이 없어 호출 기록이 없으므로 recipient를 증명할 수 없다. 그래서 `result`는 `recipient_unproven`으로 내용을 내보내지 않는다(실패 시 닫힘, 허용된 현재 동작이며 receipt/상태 조회는 영향이 없다).
 - 재시작한 서비스는 이전 child의 pid를 모르므로 종료하지 않습니다. 매달린 child는 job lock을 잡은 채 `busy`로 폴링되며 운영자가 끝내야 합니다.

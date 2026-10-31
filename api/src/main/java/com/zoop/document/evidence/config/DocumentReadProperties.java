@@ -34,8 +34,12 @@ public record DocumentReadProperties(String grants, String ingestionSources, Str
 
     /** The S2-1 source registry path, or {@code null} when unset. */
     public Path ingestionSourcesPath() {
+        return ingestionSourcesPath(true);
+    }
+
+    public Path ingestionSourcesPath(boolean requireExistingFile) {
         Path path = path("ingestion-sources", ingestionSources);
-        if (path != null && !Files.isRegularFile(path)) {
+        if (requireExistingFile && path != null && !Files.isRegularFile(path)) {
             throw new DocumentReadConfigurationException("ingestion-sources", "must be an existing file");
         }
         return path;

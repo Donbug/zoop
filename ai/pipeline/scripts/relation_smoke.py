@@ -193,12 +193,12 @@ class RelKit(Kit):
             store.close()
 
 
-def build_world(root: Path, countries: tuple[str, ...] = (), *, snapshot_countries: tuple[str, ...] = ()) -> SimpleNamespace:
+def build_world(root: Path, countries: tuple[str, ...] = (), *, slot: str | None = None, snapshot_countries: tuple[str, ...] = ()) -> SimpleNamespace:
     """Actual ingestion subprocess + actual S2 extraction (in-process) producing one READY upstream job with an event candidate,
     a snapshot event and a topic candidate. Nothing downstream may be written into it."""
     kit = RelKit(root)
     main, other = kit.ingest("docs", [{"supplier": "supplier-main", "html": page(*MAIN_TEXT)},
-                                      {"supplier": "supplier-b", "html": page(QB, "착공은 2026년 11월 예정이다."), "published": None}])
+                                      {"supplier": "supplier-b", "html": page(QB, "착공은 2026년 11월 예정이다."), "published": None}], slot=slot)
     art = {"main": kit.article(main), "b": kit.article(other)}
     mention = {**kit.mention(art["main"], "m-main", [kit.evidence(art["main"], EVT)]), "countries": list(countries)}
     mention_b = kit.mention(art["b"], "m-b", [kit.evidence(art["b"], QB)], period="2026Q4", title="합성 공장 착공", action="공장 착공 알림")

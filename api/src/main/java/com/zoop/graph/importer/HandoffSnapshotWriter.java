@@ -83,7 +83,7 @@ import tools.jackson.databind.node.ObjectNode;
  * structural paths, path companies and basis scopes live ONLY here, never in the snapshot), the producer's own receipt and attempts,
  * and what this app verified (and did not). Evidence rows point at it as their verification artifact.
  */
-final class HandoffSnapshotWriter {
+public final class HandoffSnapshotWriter {
     static final String RECEIPT_SCHEMA = "zoop-graph-handoff-import-receipt-1";
     static final String IMPORTER = "zoop-graph-handoff-import-1";
 
@@ -122,7 +122,8 @@ final class HandoffSnapshotWriter {
         }
 
         ObjectNode root = StrictJson.newObject();
-        root.put("snapshotFormat", PublicGraphSnapshot.FORMAT);
+        root.put("snapshotFormat", HandoffBundleVerifier.UNKNOWN_POLICY.equals(bundle.policyVersion())
+                ? PublicGraphSnapshot.EXPLICIT_UNKNOWN_FORMAT : PublicGraphSnapshot.FORMAT);
         root.put("versionId", versionId);
         root.put("sourceBundleId", bundle.handoffId());
 
@@ -359,7 +360,7 @@ final class HandoffSnapshotWriter {
      * instant are compared by when each starts to count ({@link HandoffTime#effective}); a tie keeps the larger text, so the result
      * never depends on iteration order.
      */
-    static String latestPublished(Iterable<String> published) {
+    public static String latestPublished(Iterable<String> published) {
         String latest = null;
         Instant latestAt = null;
         for (String value : published) {

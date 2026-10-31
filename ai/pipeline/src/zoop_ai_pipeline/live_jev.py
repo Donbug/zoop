@@ -101,7 +101,7 @@ CLAIM_TEMPLATES = {
               "scope fact in `state.relation.businessScope` (business) and `state.relation.productScope` (product), for this same "
               "relationship, subject, object, type and direction? A null scope is unknown: ignore that field, without asserting "
               "unrestricted or whole-business coverage. A non-null scope identifies a business or product where the relationship "
-              "holds; it does not assert an exclusive boundary unless the supplied value explicitly claims exclusivity. Require "
+              "holds; do not broaden a narrower source restriction. It does not assert an exclusive boundary unless the supplied value explicitly claims exclusivity. Require "
               "quote support for every non-null scope fact, including any explicitly claimed exclusivity. Choose insufficient "
               "when any supplied fact is not established, or contradicted when the quotes conflict with it. Merely operating in "
               "the same business or mentioning the same product does not establish this relationship."),

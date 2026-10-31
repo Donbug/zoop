@@ -1,14 +1,14 @@
 # 그래프 정기 회차 (#55, WBS 6.5.4) — 앱 쪽 상태·수입 bridge·스케줄러·관리자 보기
 
-공개 그래프를 30분 회차마다 자동으로 갱신하는 작업의 **앱(api) 쪽**입니다. PR-R1(2026-10-29)은 회차 상태 테이블, 웹 애플리케이션 안의 수입 bridge, 관리자 회차 읽기를, PR-R2(2026-10-30)는 회차 스케줄러 본체(AI `round-runs`·`round-handoffs` 호출, `analyze_plan` 접수, 단계 전진), 슬롯 달력(18개 정규 슬롯 + 18:05 freeze 전용 슬롯), retry·수동 시작을 넣었습니다. 전체는 **기본 꺼짐**이며, AI 쪽 #387 ①②의 HTTP 구현과 앱 수입 전용 principal이 있어야 실제로 돕니다. 그 전에는 가짜 클라이언트 시험으로만 검증했습니다.
+그래프 수입을 30분 회차마다 실행하는 작업의 **앱(api) 쪽**입니다. PR-R1(2026-10-29)은 회차 상태 테이블, 웹 애플리케이션 안의 수입 bridge, 관리자 회차 읽기를, PR-R2(2026-10-30)는 회차 스케줄러 본체(AI `round-runs`·`round-handoffs` 호출, `analyze_plan` 접수, 단계 전진), 슬롯 달력(18개 정규 슬롯 + 18:05 freeze 전용 슬롯), retry·수동 시작을 넣었습니다. 전체는 **기본 꺼짐**이며, AI 쪽 #387 ①②의 HTTP 구현과 앱 수입 전용 principal이 있어야 실제로 돕니다. 그 전에는 가짜 클라이언트 시험으로만 검증했습니다.
 
-전제(바뀌지 않는 것): API와 AI는 별도 Task이고 공유 디스크가 없으며 Spring은 AI CLI를 실행하지 않습니다. 회차 스케줄러는 앱 쪽 하나입니다. 묶음 1개 = 비활성 버전 1개이고, 활성화는 자동 활성화 스케줄러(FS059)나 관리자가 합니다. 수입은 publication lock을 잡지 않습니다.
+배포 목표는 API와 AI를 별도 Task로 두고 공유 디스크 없이 HTTP로 연결하는 것입니다. 현재 회차 bridge의 관측 재확인은 로컬 CLI를 사용하므로 로컬·단일 인스턴스 실행에 한정됩니다. 회차 스케줄러는 앱 쪽 하나이며, 묶음 1개를 비활성 원본 버전 1개로 수입합니다. 자동 활성화(FS059)는 활성 포인터가 없거나 fixture인 첫 native 공개에만 적용됩니다. 실데이터가 활성화된 뒤에는 그 버전을 base로 삼아 누적 publication을 구성하고 관리자가 CAS로 활성화합니다([누적 발행 계약](GRAPH_READ_HANDOFF.md#누적-발행과-원본별-현재-권한)). 원본 수입은 publication lock을 잡지 않습니다.
 
 ## 회차 한 바퀴
 
 ```
 slot 도래 → R1 round-run 요청 → R2 계획 조회 → R3 analyze_plan 접수 → R4 분석 완료 대기
-         → R5 freeze 요청 → R6 handoff 조회 → R7 수입(이 문서의 bridge) → R8 활성화(자동 활성화 스케줄러)
+         → R5 freeze 요청 → R6 handoff 조회 → R7 수입(이 문서의 bridge) → 공개 정책에 따른 활성화
 ```
 
 행의 `stage`는 `scheduled → run_requested → plan_ready → analysis_queued → analysis_done → freeze_requested → handoff_ready → imported` 순으로 전진하고, `skipped`(공개할 것 없음 `no_public_material`, 또는 더 새로운 회차가 이미 수입됨 `skipped_superseded`)와 `failed`(사유 코드)로 끝날 수 있습니다. 새 자료가 없는 슬롯(R2 `no_new_material`)과 freeze 전용 슬롯은 R3·R4를 건너뛰고 `analysis_done`에서 **계획 없는 freeze**(carry-only)를 요청합니다(#407 AI 회신 앱 변경 2, 팀 결정 8). 같은 핀의 재수입(`unchanged`)은 `imported`입니다. **실패한 회차는 roundId를 유지한 채 멈춘 단계부터 재시도**합니다. AI 쪽 멱등 키가 roundId에 묶여 있고, AI는 "결과 불명 상태를 지우고 다음 회차에서 재전송하는 방식"을 받지 않기 때문입니다. 다음 슬롯은 실패와 무관하게 새 회차로 시작합니다(결정 D-R4).
@@ -47,7 +47,7 @@ trigger로 `graph_rounds`는 DELETE와 식별 열(`round_id`·`slot_at`·`starte
 운영자 명령(`GraphHandoffRunner`, 비웹)이 쓰는 **같은** `GraphHandoffImporter`를 웹 애플리케이션 안에서 호출합니다(결정 D-R1 a안). 바뀌는 것은 입력·출력뿐입니다.
 
 - 입력: 호출자가 `claim`한 회차 행(`importRound(GraphRound claimed)`, `handoff_ready`·lease 필수)의 `handoff_id`·`manifest_digest`·`bundle_digest`가 요청의 핀이 되고, `operator`는 `zoop.graph.round.operator`(기본 `scheduler`, 운영자 요청과 같은 알파벳 → `created_by=operator:scheduler`)입니다. 회차 행의 `started_by`는 이와 별개로 `system:scheduler`입니다. handoff는 ai/service의 읽기 전용 HTTP(`zoop.ai.handoff-read-client`, `handoff-source=http`와 같은 `HttpHandoffSource`)로 받습니다.
-- 출력: 결과 파일 대신 회차 행과 이벤트에 기록합니다. 버전과 회차의 연결(`graph_version_id`)은 importer의 `VersionRecorder`로 **수입 트랜잭션 안에서** 기록되어(`GraphRoundRepository.link`) 버전 등록과 함께 commit되거나 함께 취소되고, 단계 변경 `imported`(이벤트 code `staged`|`unchanged`)는 그 뒤 별도 트랜잭션입니다. 두 트랜잭션 사이에서 프로세스가 멈추면 행은 `handoff_ready`인 채 `graph_version_id`만 가진 상태로 남고, 다음 시도가 같은 핀을 다시 수입해(`unchanged`) 단계 변경을 마칩니다. 활성화는 자동 활성화 스케줄러가 다음 tick에 가져갑니다.
+- 출력: 결과 파일 대신 회차 행과 이벤트에 기록합니다. 버전과 회차의 연결(`graph_version_id`)은 importer의 `VersionRecorder`로 **수입 트랜잭션 안에서** 기록되어(`GraphRoundRepository.link`) 버전 등록과 함께 commit되거나 함께 취소되고, 단계 변경 `imported`(이벤트 code `staged`|`unchanged`)는 그 뒤 별도 트랜잭션입니다. 두 트랜잭션 사이에서 프로세스가 멈추면 행은 `handoff_ready`인 채 `graph_version_id`만 가진 상태로 남고, 다음 시도가 같은 핀을 다시 수입해(`unchanged`) 단계 변경을 마칩니다. `imported`는 비활성 원본의 수입 완료이며, 실제 공개는 위 활성화 정책에 따릅니다.
 - **수입 순서 보호** (`skipped_superseded`): 수입이 commit된 가장 최근 회차(`newestImported`: `imported`이거나 `version_committed_at`이 있는 행. 단계가 아니라 commit된 기록을 기준으로 한다)보다 **오래된** 슬롯은 읽지도 않고 `skipped`로 끝냅니다. 자동 활성화가 commit 순(`sequence`)으로 고르므로 뒤늦게 수입된 옛 회차가 공개되는 일을 막습니다. 건너뛴 회차의 내용은 다음 세 조건이 모두 성립할 때만 최종 공개 상태에서 잃지 않습니다(#407 AI 회신 2026-10-29): (1) AI의 선택이 freeze 시점의 원장만으로 정해지고 이전 묶음을 이어 쓰지 않는다, (2) 앱이 새 계획이 없는 슬롯에도 freeze를 요청한다(PR-R2), (3) 어떤 ready handoff에도 아직 들어가지 않은 job이 있는 가장 오래된 회차부터 현재 회차까지 매핑된 S3 job이 20개 이하다(넘으면 오래된 job은 `out_of_window`로 기록되고 공개되지 않는다). 잃는 것은 잠깐 공개됐을 중간 버전뿐입니다. 자동 실행을 연결하기 전에(PR-R2 전) 지연 완료·범위 경계를 포함한 합성 연속 회차 검증이 필요합니다. 자기 수입이 이미 commit된 회차(`graph_version_id`가 있는 행)는 이 검사의 대상이 아니며 그 사이에 더 새로운 회차가 수입되었어도 `unchanged`로 완료합니다. 연결된 버전이 이 회차의 handoff가 만드는 버전 id(`gv-` + handoffId의 SHA-256)와 다르면 읽기 전에 `failed(import:version_conflict)`입니다(행 guard가 버전 연결을 다른 값으로 바꾸지 못하게 하므로). retry(`GraphRoundPatch.retryAt`)는 핀을 그대로 두는 `handoff_ready` 재개면 연결을 유지하고, freeze를 다시 하는 그 전 단계 재개면 연결(`graph_version_id`)을 비웁니다. 어느 쪽이든 `version_committed_at`은 남으므로, 최신 회차의 버전 commit → 단계 변경 유실 → 복구 실패 → retry 뒤에도 이전 슬롯은 계속 `skipped_superseded`이고 retry된 회차는 같은 핀이면 `unchanged`로 완료합니다. 연결이 비워진 회차가 더 새로운 회차 뒤에 다시 수입을 시도하면 다른 옛 슬롯과 같이 건너뛰며(먼저 만든 버전은 그대로 등록돼 있음), 그 skip 이벤트 detail에 `versionCommittedAt`이 실립니다.
 - **lease fencing**: bridge의 모든 기록(연결·`imported`·`failed`·대기)은 호출자가 claim한 행의 `lease_token`과 `handoff_ready` 단계를 조건으로 씁니다. 수입 중에 lease가 만료되어 다른 인스턴스가 행을 가져갔으면 연결이 거절되어 수입 트랜잭션이 취소되고(버전·파일 없음, `GraphHandoffImporter.RecordRefused`) 아무것도 기록하지 않으며, 늦게 도착한 대기·실패 기록도 같은 조건으로 거절됩니다. 그 경우 bridge는 새 holder가 남긴 행을 돌려줍니다. lease는 수입(수 분)을 덮을 만큼 길거나 holder가 갱신해야 하며 같은 holder의 갱신은 token을 유지합니다.
 - 일시 실패는 기다립니다: `import_busy`(다른 수입·운영자 명령이 artifact store lock 보유) → `busy-retry-after`(기본 5분), `handoff_export_unavailable`·`ingestion_export_unavailable`·`database_unavailable`·`artifact_store_unavailable` → `wait-retry-after`(기본 1분). `max-attempts-per-stage`(기본 20)에 이르면 `failed(import_timeout)`.
@@ -69,12 +69,12 @@ trigger로 `graph_rounds`는 DELETE와 식별 열(`round_id`·`slot_at`·`starte
 | `ZOOP_GRAPH_ROUND_OPERATOR` | 수입 요청의 `operator`(기본 `scheduler`, 운영자 요청 알파벳 `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`). 회차의 `started_by`와는 별개 |
 | `ZOOP_GRAPH_ROUND_WAIT_RETRY_AFTER` / `BUSY_RETRY_AFTER` | 대기 단계 재시도 간격(기본 `PT1M` / `PT5M`) |
 | `ZOOP_GRAPH_ROUND_MAX_ATTEMPTS_PER_STAGE` | 단계당 시도 상한(기본 20) |
-| `ZOOP_GRAPH_ROUND_IMPORT_SOURCE` | 관측 재확인 방식. `cli`(기본): 설치된 `zoop-ai-ingest export --require-store`를 실행(로컬·단일 인스턴스 운영만 가능. API 컨테이너 이미지에는 CLI가 없음). `http`는 AI 쪽 관측 export route(#387 ③)가 생길 때까지 **기동 거절** |
+| `ZOOP_GRAPH_ROUND_IMPORT_SOURCE` | 관측 재확인 방식. `cli`(기본): 설치된 `zoop-ai-ingest export --require-store`를 실행(로컬·단일 인스턴스 운영만 가능. API 컨테이너 이미지에는 CLI가 없음). `http`는 관측 export client를 회차 bridge에 연결하기 전까지 **기동 거절** |
 | `ZOOP_GRAPH_ROUND_INGESTION_CLI` / `INGESTION_STATE_DIR` / `INGESTION_SOURCES` | `import-source=cli`일 때 필수(실행 파일·디렉터리·파일, 정규화된 절대 경로) |
 
 켜면 다음도 요구합니다(아니면 설정 이름을 담은 메시지로 기동 거절): `ZOOP_GRAPH_SNAPSHOT_SOURCE=artifact`와 존재하는 `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT`(bridge가 올린 버전을 같은 프로세스의 자동 활성화가 읽어야 하므로 **같은 root**에 씁니다. `fixture`는 seeder가 활성화하므로 거절), `ZOOP_AI_HANDOFF_READ_CLIENT_ENABLED=true`, `ZOOP_AI_ROUND_CLIENT_ENABLED=true`(+`_BASE_URL`·`_TOKEN`, scope `round.run`·`round.read`; R1·R2·R5·R6), `ZOOP_ANALYSIS_ANALYZE_PLAN_ENABLED=true`(R3·R4). 앱 수입 전용 principal 하나가 `handoff.read`·`observation.read`·`round.run`·`round.read`를 가집니다(#431 답, 10-30). 운영자 명령의 `ZOOP_GRAPH_HANDOFF_IMPORT_*`·`ZOOP_ARTIFACT_ROOT`와는 별개 설정이며, 둘이 같은 root를 가리키면 lock으로 서로 `import_busy`가 됩니다.
 
-**배포 제약.** artifact store는 로컬 POSIX 디스크 전용(0600/0700, 단일 소유자)이라 웹 인스턴스가 둘 이상이면 한쪽이 쓴 스냅샷을 다른 쪽이 읽지 못합니다. 단일 인스턴스, 공유 POSIX 디스크(uid 매핑), 객체 저장소 전환 중 하나를 Infra가 정해야 합니다(결정 D-I1). ECS에서 bridge를 켜려면 관측 export HTTP(A-5)가 먼저 필요합니다.
+**배포 제약.** artifact store는 로컬 POSIX 디스크 전용(0600/0700, 단일 소유자)이라 웹 인스턴스가 둘 이상이면 한쪽이 쓴 스냅샷을 다른 쪽이 읽지 못합니다. 단일 인스턴스, 공유 POSIX 디스크(uid 매핑), 객체 저장소 전환 중 하나를 Infra가 정해야 합니다(결정 D-I1). ECS에서 bridge를 켜려면 관측 export HTTP client를 회차 수입에 연결하는 작업(A-5)이 먼저 필요합니다.
 
 ## 관리자 읽기 (A-ADM-03)
 

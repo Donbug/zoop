@@ -29,6 +29,7 @@ keys and with a drifted environment; `accepts(binding)` is the separate "may a N
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import os
@@ -44,8 +45,9 @@ import httpx
 
 from . import issue_summary_jev, issue_summary_prompts, live_jev, live_prompts
 from . import direct_deepseek, fallback_decision, live_funding
-from .live_budget import Budget, BudgetError, nano_from_usd, usd
+from .live_budget import Budget, BudgetBusy, BudgetError, nano_from_usd, usd
 from .live_family import Family, Verifier
+from .live_funding import MODE, operating_policy
 from .relation_contracts import canonical, digest
 
 VERSION = "zoop-live-runtime-1"
@@ -83,6 +85,9 @@ BUDGET_DIR_VAR = "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"
 MAX_USD_VAR = "ZOOP_AI_PIPELINE_LIVE_MAX_USD"
 MAX_CALLS_VAR = "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS"
 PROFILE_VAR = "ZOOP_AI_PIPELINE_LIVE_PROFILE"
+POLICY_VAR = "ZOOP_AI_PIPELINE_OPERATING_POLICY"
+SET_VAR = "ZOOP_AI_PIPELINE_OPERATING_SET"
+OWNER_VAR = "ZOOP_AI_PIPELINE_OPERATING_OWNER"
 RUN_ID_VAR = "ZOOP_AI_PIPELINE_LIVE_RUN_ID"
 NOT_AFTER_VAR = "ZOOP_AI_PIPELINE_LIVE_NOT_AFTER"
 SHARED_MAX_VAR = "ZOOP_AI_PIPELINE_LIVE_SHARED_MAX_USD"
@@ -154,6 +159,15 @@ class LiveFailure(Exception):
         self.kind = ("unavailable" if code.startswith("live_http_") else
                      next((kind for kind, codes in _KINDS.items() if code in codes), "config"))
         super().__init__(code)
+
+
+class LiveDeferred(LiveFailure):
+    """This invocation stopped before HTTP. Its owner persists exact-request proof before allowing same-attempt continuation."""
+
+    def __init__(self, code: str, attempt_id: str, prepared_digest: str):
+        super().__init__(code)
+        self.proof = {"format": "zoop-live-unsent-proof-1", "phase": "before-dispatch", "attemptId": attempt_id,
+                      "preparedDigest": prepared_digest, "reason": code}
 
 
 def physical_attempts(receipt: dict) -> list[dict]:
@@ -271,8 +285,11 @@ class LiveRuntime:
     def __init__(self, *, model: str, effort: str, max_output: int, timeout: int, openai_url: str, jev_url: str, jev_model: str,
                  budget_identity: str, send: dict[str, Any] | None, send_code: str, family: Family = PIPELINE,
                  funding: dict | None = None, finish_by: str | None = None):
+        self._operating = isinstance(funding, dict) and funding.get("mode") == MODE
+        self._funded = funding is not None and not self._operating
         try:
-            self._funding = live_funding.validate_policy(funding) if funding is not None else None
+            self._funding = (operating_policy(funding) if self._operating else
+                             live_funding.validate_policy(funding) if funding is not None else None)
         except ValueError:
             raise LiveFailure("live_funding_config_invalid") from None
         self._set_funding = live_funding.is_set_policy(self._funding)
@@ -282,11 +299,11 @@ class LiveRuntime:
                 raise ValueError
         except ValueError:
             raise LiveFailure("live_finish_policy_invalid") from None
-        self._prepared_format = SET_FUNDED_PREPARED if self._set_funding else FUNDED_PREPARED if self._funding else PREPARED
-        self._receipt_format = SET_FUNDED_RECEIPT if self._set_funding else FUNDED_RECEIPT if self._funding else RECEIPT
+        self._prepared_format = SET_FUNDED_PREPARED if self._set_funding else FUNDED_PREPARED if self._funded else PREPARED
+        self._receipt_format = SET_FUNDED_RECEIPT if self._set_funding else FUNDED_RECEIPT if self._funded else RECEIPT
         self._direct = self._set_funding and model == direct_deepseek.MODEL
         self._chain = self._set_funding and model == MODEL
-        go = bool(self._funding) and not self._set_funding and model == live_funding.GO_MODEL
+        go = self._funded and not self._set_funding and model == live_funding.GO_MODEL
         if model != MODEL and not go and not self._direct:
             raise LiveFailure("live_model_unsupported")
         if (go and effort != "provider-default") or (not go and effort not in EFFORTS):
@@ -301,13 +318,16 @@ class LiveRuntime:
         self._model, self._effort, self._max_output, self._timeout = model, effort, max_output, timeout
         self._openai_url, self._jev_url = _base_url(openai_url), _base_url(jev_url)
         self._send, self._send_code, self._budget_identity_value = send, send_code, budget_identity
-        if self._funding:
+        if self._operating:
+            if family is not PIPELINE or timeout != self._funding["requestTimeoutSeconds"]:
+                raise LiveFailure("operating_config_invalid")
+        if self._funded:
             expected_url = direct_deepseek.BASE_URL if self._direct else live_funding.GO_URL if go else DEFAULT_OPENAI_URL
             if self._openai_url != expected_url or self._jev_url != DEFAULT_JEV_URL:
                 raise LiveFailure("live_endpoint_invalid")
             if (not go and effort != "high") or timeout > 300:
                 raise LiveFailure("live_limit_invalid")
-        self._pricing = SET_PRICING if self._set_funding else FUNDED_PRICING if self._funding else PRICING
+        self._pricing = SET_PRICING if self._set_funding else FUNDED_PRICING if self._funded else PRICING
         self._binding = self._build_binding()
         self._identity = self._binding["identity"]
 
@@ -330,7 +350,16 @@ class LiveRuntime:
         directory = env.get(BUDGET_DIR_VAR, "")
         identity = cls._budget_identity(directory)  # the budget directory is pinned at freeze time; it is never created here
         profile = env.get(PROFILE_VAR, "").strip()
-        if profile not in ("", live_funding.PROFILE, live_funding.CAPPED_PROFILE):
+        funding = None
+        if profile == MODE:
+            if any(env.get(name) for name in (MAX_USD_VAR, MAX_CALLS_VAR, TIMEOUT_VAR,
+                                              "ZOOP_AI_PIPELINE_LIVE_SHARED_MAX_USD", "ZOOP_AI_PIPELINE_LIVE_PERSONAL_MAX_USD")):
+                raise LiveFailure("operating_caps_forbidden")
+            try:
+                funding = operating_policy(json.loads(Path(env[POLICY_VAR]).read_text()))
+            except (OSError, KeyError, ValueError, TypeError):
+                raise LiveFailure("operating_policy_invalid") from None
+        elif profile not in ("", live_funding.PROFILE, live_funding.CAPPED_PROFILE):
             raise LiveFailure("live_profile_unsupported")
         try:
             funding = (live_funding.capped_set_funding_policy(
@@ -338,7 +367,8 @@ class LiveRuntime:
                 *live_funding.funding_amounts({"totalMaxUsd": env.get(MAX_USD_VAR), "sharedMaxUsd": env.get(SHARED_MAX_VAR),
                                               "personalMaxUsd": env.get(PERSONAL_MAX_VAR)}))
                 if profile == live_funding.CAPPED_PROFILE else
-                live_funding.funding_policy(env.get(RUN_ID_VAR, ""), env.get(NOT_AFTER_VAR, "")) if profile else None)
+                live_funding.funding_policy(env.get(RUN_ID_VAR, ""), env.get(NOT_AFTER_VAR, ""))
+                if profile == live_funding.PROFILE else funding)
         except ValueError:
             raise LiveFailure("live_funding_config_invalid") from None
         if funding and env.get(MODEL_VAR, "").strip() == live_funding.GO_MODEL and not env.get(MAX_OUTPUT_VAR):
@@ -351,7 +381,8 @@ class LiveRuntime:
             raise LiveFailure(next(code for code in send["problems"].values() if code))
         return cls(model=env.get(MODEL_VAR, "").strip(), effort=env.get(EFFORT_VAR, "").strip(),
                    max_output=_positive_int(env.get(MAX_OUTPUT_VAR) or str(DEFAULT_MAX_OUTPUT), 0, 10**9, "live_limit_invalid"),
-                   timeout=_positive_int(env.get(TIMEOUT_VAR) or str(DEFAULT_TIMEOUT), 0, 10**9, "live_limit_invalid"),
+                   timeout=funding["requestTimeoutSeconds"] if profile == MODE else
+                   _positive_int(env.get(TIMEOUT_VAR) or str(DEFAULT_TIMEOUT), 0, 10**9, "live_limit_invalid"),
                    openai_url=env.get(OPENAI_URL_VAR, "").strip() or DEFAULT_OPENAI_URL,
                    jev_url=env.get(JEV_URL_VAR, "").strip() or DEFAULT_JEV_URL, jev_model=env.get(JEV_MODEL_VAR, "").strip(),
                    budget_identity=identity, send={**send, "directory": directory}, send_code="live_send_unavailable", family=family,
@@ -367,26 +398,29 @@ class LiveRuntime:
     @staticmethod
     def _env_send(env: Any, transport: httpx.BaseTransport | None, directory: str, funding: dict | None = None,
                   finish_by: str | None = None) -> dict[str, Any]:
-        """Send settings; capped policies already pin the exact monetary ceilings at freeze time."""
+        """Send settings for the explicit operating or capped authority."""
         problems: dict[str, str | None] = {"budget": None, "openai": None, "typesafe": None}
         budget = None
         try:
-            try:
-                max_nano = nano_from_usd(env.get(MAX_USD_VAR, ""))
-            except ValueError:
-                raise LiveFailure("live_budget_config_invalid") from None
-            caps = None
-            if funding and funding["version"] == live_funding.CAPPED_POLICY_VERSION:
-                max_nano, caps = funding["totalMaxNanoUsd"], funding["bucketMaxNanoUsd"]
-            elif funding:
+            if funding is not None and funding.get("mode") == MODE:
+                budget = Budget(Path(os.path.realpath(directory)), None, None, policy=funding)
+            else:
                 try:
-                    caps = {name: (0 if env.get(var) == "0" else nano_from_usd(env.get(var, "10")))
-                            for name, var in (("shared", SHARED_MAX_VAR), ("personal", PERSONAL_MAX_VAR))}
+                    max_nano = nano_from_usd(env.get(MAX_USD_VAR, ""))
                 except ValueError:
-                    raise LiveFailure("live_funding_config_invalid") from None
-            budget = Budget(Path(os.path.realpath(directory)), max_nano,
-                            _positive_int(env.get(MAX_CALLS_VAR, ""), 1, 100_000, "live_budget_config_invalid"),
-                            funding=funding, bucket_caps=caps, finish_by=finish_by)
+                    raise LiveFailure("live_budget_config_invalid") from None
+                caps = None
+                if funding and funding["version"] == live_funding.CAPPED_POLICY_VERSION:
+                    max_nano, caps = funding["totalMaxNanoUsd"], funding["bucketMaxNanoUsd"]
+                elif funding:
+                    try:
+                        caps = {name: (0 if env.get(var) == "0" else nano_from_usd(env.get(var, "10")))
+                                for name, var in (("shared", SHARED_MAX_VAR), ("personal", PERSONAL_MAX_VAR))}
+                    except ValueError:
+                        raise LiveFailure("live_funding_config_invalid") from None
+                budget = Budget(Path(os.path.realpath(directory)), max_nano,
+                                _positive_int(env.get(MAX_CALLS_VAR, ""), 1, 100_000, "live_budget_config_invalid"),
+                                funding=funding, bucket_caps=caps, finish_by=finish_by)
         except (LiveFailure, BudgetError) as exc:
             problems["budget"] = exc.code
         keys: dict[str, str | None] = {}
@@ -403,7 +437,7 @@ class LiveRuntime:
         except LiveFailure as exc:
             deepseek_key, deepseek_problem = None, exc.code
         return {"budget": budget, "transport": transport, "openaiKey": keys["openai"], "jevKey": keys["typesafe"],
-                "problems": problems, "setId": env.get(SET_ID_VAR),
+                "problems": problems, "setId": env.get(SET_ID_VAR), "set": env.get(SET_VAR), "owner": env.get(OWNER_VAR),
                 "sendBefore": env.get(live_funding.SEND_BEFORE_ENV),
                 "deepseekKey": deepseek_key, "deepseekProblem": deepseek_problem}
 
@@ -418,12 +452,14 @@ class LiveRuntime:
             funded = bool(suffix)
             family = FAMILIES[version.removesuffix(suffix) if funded else version]
             generation, verifier = binding["generation"], binding["verifier"]
+            funding = binding.get("funding")
             runtime = cls(model=generation["model"], effort=generation["reasoningEffort"], max_output=generation["maxOutputTokens"],
-                          timeout=DEFAULT_TIMEOUT, openai_url=generation["endpoint"], jev_url=verifier["endpoint"],
+                          timeout=funding["requestTimeoutSeconds"] if funding and funding.get("mode") == MODE else DEFAULT_TIMEOUT,
+                          openai_url=generation["endpoint"], jev_url=verifier["endpoint"],
                           jev_model=verifier["model"], budget_identity=binding["budget"]["directoryIdentity"], send=None,
-                          send_code="live_send_unavailable", family=family, funding=binding["funding"] if funded else None,
+                          send_code="live_send_unavailable", family=family, funding=funding,
                           finish_by=binding["finishPolicy"]["finishBy"] if suffix == FINISH_FUNDED_SUFFIX else None)
-        except (KeyError, TypeError, AttributeError, LiveFailure):
+        except (KeyError, TypeError, ValueError, AttributeError, LiveFailure):
             raise LiveFailure("live_binding_mismatch") from None
         if runtime.binding() != binding:
             raise LiveFailure("live_binding_mismatch")
@@ -487,7 +523,9 @@ class LiveRuntime:
                 "budget": {"scope": "directory", "directoryIdentity": self._budget_identity_value, "unit": "nanoUsd"},
                 "limits": {"maxRequestBytes": MAX_REQUEST_BYTES, "maxVerifierRequestBytes": MAX_VERIFIER_REQUEST_BYTES,
                            "maxResponseBytes": MAX_RESPONSE_BYTES, "inputOverheadTokens": INPUT_OVERHEAD_TOKENS}}
-        if self._funding:
+        if self._operating:
+            body["funding"] = self._funding
+        if self._funded:
             body["version"] = family.version + (FINISH_FUNDED_SUFFIX if self._finish else SET_FUNDED_SUFFIX if self._set_funding else FUNDED_SUFFIX)
             body["funding"] = self._funding
             body["pricing"] = self._pricing
@@ -559,7 +597,7 @@ class LiveRuntime:
                 body = {"model": self._model, "messages": spec.messages(payload),
                         "response_format": {"type": "json_schema", "json_schema": {"name": spec.schema_name, "strict": True, "schema": spec.schema}},
                         "max_completion_tokens": self._max_output, "reasoning_effort": self._effort}
-                if self._funding and self._model == live_funding.GO_MODEL:
+                if self._funded and self._model == live_funding.GO_MODEL:
                     # The provider documents max_tokens and JSON-object mode, not strict JSON-schema mode.
                     # Schema is trusted instruction text; the user's projected data remains a separate message.
                     body = {"model": self._model, "messages": spec.messages(payload), "max_tokens": self._max_output,
@@ -567,7 +605,7 @@ class LiveRuntime:
                     body["messages"][0]["content"] += "\nRequired JSON response schema:\n" + canonical(spec.schema)
                 elif self._direct:
                     body = direct_deepseek.build_body(spec.messages(payload), spec.schema, self._max_output, self._effort)
-                elif self._funding:
+                elif self._funded:
                     body["service_tier"] = "default"  # explicit Standard pricing, never the project's implicit auto/Fast setting
                 path, limit, schema_digest = "chat/completions", MAX_REQUEST_BYTES, entry["schemaDigest"]
             else:
@@ -599,7 +637,7 @@ class LiveRuntime:
                      and prepared["provider"] == entry["provider"] and prepared["recipient"] == entry["recipient"]
                      and prepared["purpose"] == entry["purpose"] and prepared["reservation"] == self._worst_case(stage, size, self._questions(stage, body))
                      and prepared["path"] == ("chat/completions" if stage in self._family.generation_stages else "systemone"))
-            if self._funding:
+            if self._funded:
                 if stage in self._family.generation_stages:
                     go = self._model == live_funding.GO_MODEL
                     spec = self._family.generation[stage]
@@ -653,10 +691,20 @@ class LiveRuntime:
                          "reservedUsd": _sum_usd(cost["reservedUsd"] for cost in costs)}}
 
     def send(self, prepared: dict, *, attempt_id: str, authorize: Callable[[], None],
-             authorize_fallback: Callable[[], None] | None = None) -> dict[str, Any]:
+             authorize_fallback: Callable[[], None] | None = None, unsent_proof: dict | None = None) -> dict[str, Any]:
+        if self._operating and self._send is not None and self._send["budget"] is not None:
+            budget = self._send["budget"]
+            try:
+                with budget.lock("send.lock") as send_lock:
+                    if not self._send["owner"] or not self._send["set"]:
+                        raise BudgetError("operating_owner_required")
+                    self._send["sendLockFd"] = send_lock
+                    return self._send_once(prepared, attempt_id=attempt_id, authorize=authorize, unsent_proof=unsent_proof)
+            except BudgetError as exc:
+                raise LiveFailure(exc.code) from None
         prepared = self._check_prepared(prepared)
         if not self._chain or prepared["stage"] not in self._family.generation_stages:
-            return self._send_once(prepared, attempt_id=attempt_id, authorize=authorize)
+            return self._send_once(prepared, attempt_id=attempt_id, authorize=authorize, unsent_proof=unsent_proof)
         if self._send is None:
             raise LiveFailure(self._send_code)
         if self._budget_identity(self._send["directory"]) != self._budget_identity_value:
@@ -764,7 +812,7 @@ class LiveRuntime:
         except (KeyError, TypeError, ValueError, IndexError):
             raise LiveFailure("live_receipt_invalid") from None
 
-    def _send_once(self, prepared: dict, *, attempt_id: str, authorize: Callable[[], None]) -> dict[str, Any]:
+    def _send_once(self, prepared: dict, *, attempt_id: str, authorize: Callable[[], None], unsent_proof: dict | None = None) -> dict[str, Any]:
         """Reserve the shared budget, authorize, send ONCE, settle reported usage and return the receipt envelope.
 
         The owner has already reserved `attempt_id` durably in its own ledger. A refusal before the socket (budget, `authorize`)
@@ -777,6 +825,12 @@ class LiveRuntime:
             raise LiveFailure("live_config_changed")
         if not isinstance(attempt_id, str) or not 1 <= len(attempt_id) <= 200:
             raise LiveFailure("live_prepared_invalid")
+        if unsent_proof is not None:
+            if (not self._operating or not isinstance(unsent_proof, dict)
+                    or unsent_proof.get("reason") not in {"operating_paused", "operating_ledger_busy"}
+                    or unsent_proof != {"format": "zoop-live-unsent-proof-1", "phase": "before-dispatch", "attemptId": attempt_id,
+                                        "preparedDigest": prepared["digest"], "reason": unsent_proof["reason"]}):
+                raise LiveFailure("operating_unsent_proof_invalid")
         stage, provider = prepared["stage"], prepared["provider"]
         problems = self._send["problems"]
         missing = problems["budget"] or problems["openai" if provider == "openai-compatible" else "typesafe"]
@@ -791,17 +845,38 @@ class LiveRuntime:
         budget: Budget = self._send["budget"]
         try:
             budget.reserve(attempt_id, stage, prepared["recipient"], prepared["requestDigest"], prepared["reservation"]["worstCaseNanoUsd"],
-                           **({"account_role": self._funding_entry(stage)["accountRole"]} if self._funding else {}),
+                           **({"set_id": self._send["set"], "owner": self._send["owner"], "binding_identity": self._identity,
+                               "allow_defer": True, "resume_unsent": unsent_proof is not None} if self._operating else {}),
+                           **({"account_role": self._funding_entry(stage)["accountRole"]} if self._funded else {}),
                            **({"set_id": self._send["setId"]} if self._set_funding else {}))
         except BudgetError as exc:
+            if self._operating and isinstance(exc, BudgetBusy):
+                raise LiveDeferred(exc.code, attempt_id, prepared["digest"]) from None
             raise LiveFailure(exc.code) from None
         try:
+            if self._operating:
+                budget.check_active(self._send["owner"])
+                while (delay := budget.pacing_delay()) > 0:
+                    time.sleep(min(delay, 0.05))
+                    budget.check_active(self._send["owner"])
             authorize()
-        except BaseException:
+            if self._operating:
+                budget.begin_send(attempt_id, self._send["owner"])
+        except BaseException as exc:
+            if self._operating and isinstance(exc, BudgetBusy):
+                raise LiveDeferred(exc.code, attempt_id, prepared["digest"]) from None
+            if self._operating and isinstance(exc, BudgetError) and exc.code == "operating_paused":
+                try:
+                    budget.defer(attempt_id, exc.code)
+                except BudgetBusy as busy:
+                    raise LiveDeferred(busy.code, attempt_id, prepared["digest"]) from None
+                raise LiveDeferred(exc.code, attempt_id, prepared["digest"]) from None
             try:
                 budget.release(attempt_id)
             except BudgetError:
                 pass  # the reservation stays charged: conservative, and nothing was sent
+            if isinstance(exc, BudgetError):
+                raise LiveFailure(exc.code) from None
             raise
         base = self._openai_url if provider == "openai-compatible" else self._jev_url
         key = self._send["openaiKey"] if provider == "openai-compatible" else self._send["jevKey"]
@@ -809,8 +884,11 @@ class LiveRuntime:
         try:
             status, content_type, raw_bytes, truncated = self._post(
                 base, prepared["path"], key, canonical(prepared["body"]).encode("utf-8"),
-                **({"before_send": lambda: budget.check_send(attempt_id), "timing": transport_timing} if self._funding else {}))
-        except BudgetError as exc:  # deadline/policy recheck is before client.stream: provably unsent
+                **({"before_send": lambda: budget.check_send(attempt_id), "timing": transport_timing} if self._funded else {}))
+        except BudgetError as exc:
+            if self._operating:  # operating control is also polled after dispatch
+                raise LiveFailure("live_response_unknown", uncertain=True) from None
+            # The capped transport's budget guard runs before client.stream.
             try:
                 budget.release(attempt_id)
             except BudgetError:
@@ -832,23 +910,26 @@ class LiveRuntime:
         actual, rejected = None, cache_write_error
         model = raw["model"][:200] if isinstance(raw, dict) and isinstance(raw.get("model"), str) else None
         service_tier = raw.get("service_tier") if isinstance(raw, dict) else None
-        standard = bool(self._funding) and provider == "openai-compatible" and self._model == MODEL
+        standard = self._funded and provider == "openai-compatible" and self._model == MODEL
         if standard and service_tier not in (None, "default"):
             rejected = "service_tier_mismatch"
         # Only a 2xx response with fully reported usage may settle below the worst case; a non-2xx stays at it whatever its body says.
         if rejected is None and 200 <= status < 300 and reported["inputTokens"] is not None and reported["outputTokens"] is not None:
             model_ok = direct_deepseek.model_matches(model) if self._direct and provider == "openai-compatible" else model == prepared["body"]["model"]
-            rejected = ("model_mismatch" if self._funding and not model_ok else
+            rejected = ("model_mismatch" if self._funded and not model_ok else
                         _usage_over_bound(reported, prepared["reservation"], provider))
             if rejected is None and self._direct and provider == "openai-compatible":
                 rejected = direct_deepseek.usage_rejection(raw)
             if rejected is None:
                 rate_in, rate_out = self._rate(provider)
                 actual = reported["inputTokens"] * rate_in + reported["outputTokens"] * rate_out
-        try:
-            charged, settled = budget.settle(attempt_id, actual), True
-        except Exception:  # incl. an overflow or a database failure: the worst-case charge simply stays and the receipt says so
-            charged, settled = reserved, False
+        if self._operating:
+            charged, settled = actual if actual is not None else reserved, True
+        else:
+            try:
+                charged, settled = budget.settle(attempt_id, actual), True
+            except Exception:  # conservative charge stays when settlement fails; receipt still belongs to the native owner
+                charged, settled = reserved, False
         # `usage` keeps what the provider reported, even when it is rejected as implausible (`cost.usageRejected`), so nothing is hidden.
         receipt = {"format": self._receipt_format, "stage": stage, "attemptId": attempt_id, "recipient": prepared["recipient"], "purpose": prepared["purpose"],
                 "bindingIdentity": self._identity, "requestDigest": prepared["requestDigest"],
@@ -859,7 +940,18 @@ class LiveRuntime:
                          "settled": settled, "estimatedUsd": usd(actual) if actual is not None else None, "chargedUsd": usd(charged),
                          "reservedUsd": usd(reserved)},
                 "expect": prepared["expect"]}
-        if self._funding:
+        if self._operating:
+            fault = None
+            if stage in self._family.verify_stages:
+                try:
+                    self.answer(stage, receipt)
+                except LiveFailure as exc:
+                    fault = "verifier-" + exc.code
+            try:
+                budget.record_response(attempt_id, receipt, actual, fault=fault)
+            except BudgetError:
+                receipt["cost"].update(settled=False, chargedUsd=usd(reserved))
+        if self._funded:
             receipt["funding"] = self._funding_entry(stage)
             if self._set_funding:
                 receipt["admittedSet"] = {"setId": self._send["setId"]}
@@ -875,9 +967,16 @@ class LiveRuntime:
 
     def _post(self, base: str, path: str, key: str, body: bytes, *,
               before_send: Callable[[], None] | None = None, timing: dict | None = None) -> tuple[int, str | None, bytes, bool]:
+        if self._operating:
+            if self._send["transport"] is not None:
+                return asyncio.run(self._operating_post(base, path, key, body))
+            from .operating_transport import post
+            return post(base, path, key, body, timeout=self._timeout, cleanup=self._funding["cleanupSeconds"],
+                        max_response=MAX_RESPONSE_BYTES, send_lock=self._send["sendLockFd"],
+                        check=lambda: self._send["budget"].check_active(self._send["owner"]))
         deadline = time.monotonic() + self._timeout
         headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json", "Accept": "application/json"}
-        if self._funding:
+        if self._funded:
             headers["User-Agent"] = live_funding.USER_AGENT
             if base == live_funding.GO_URL:
                 headers["x-opencode-session"] = self._binding["generation"]["session"]
@@ -908,6 +1007,41 @@ class LiveRuntime:
                     timing.update(durationMs=(time.monotonic_ns() - started) / 1_000_000, provenance="http-transport-monotonic")
                 return response.status_code, response.headers.get("content-type"), b"".join(chunks), truncated
 
+    async def _operating_post(self, base: str, path: str, key: str, body: bytes) -> tuple[int, str | None, bytes, bool]:
+        """An absolute all-phase deadline; cancellation closes the owned HTTP exchange before releasing the send gate."""
+        headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json", "Accept": "application/json"}
+
+        async def request():
+            async with httpx.AsyncClient(base_url=base + "/", timeout=self._timeout, headers=headers, follow_redirects=False,
+                                         trust_env=False, transport=self._send["transport"]) as client:
+                async with client.stream("POST", path, content=body) as response:
+                    chunks, size = [], 0
+                    async for chunk in response.aiter_bytes():
+                        if size + len(chunk) > MAX_RESPONSE_BYTES:
+                            chunks.append(chunk[:MAX_RESPONSE_BYTES - size])
+                            return response.status_code, response.headers.get("content-type"), b"".join(chunks), True
+                        chunks.append(chunk)
+                        size += len(chunk)
+                    return response.status_code, response.headers.get("content-type"), b"".join(chunks), False
+
+        task = asyncio.create_task(request())
+        deadline = time.monotonic() + self._timeout
+        try:
+            while not task.done():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("request_deadline")
+                self._send["budget"].check_active(self._send["owner"])
+                await asyncio.wait({task}, timeout=min(remaining, 0.05))
+            return task.result()
+        finally:
+            if not task.done():
+                task.cancel()
+                try:
+                    await asyncio.wait_for(task, timeout=self._funding["cleanupSeconds"])
+                except asyncio.CancelledError:
+                    pass
+
     # ------------------------------------------------------------ decode (pure, receipt only) ---------------------------
 
     def _receipt(self, stage: str, receipt: Any) -> tuple[dict, dict]:
@@ -917,7 +1051,7 @@ class LiveRuntime:
             http = receipt["http"]
             if type(http["status"]) is not int or not isinstance(http["bodyText"], str) or not isinstance(receipt["model"]["requested"], str):
                 raise LiveFailure("live_receipt_invalid")
-            if self._funding and (receipt["bindingIdentity"] != self._identity or receipt["funding"] != self._funding_entry(stage)
+            if self._funded and (receipt["bindingIdentity"] != self._identity or receipt["funding"] != self._funding_entry(stage)
                                  or receipt["recipient"] != self.recipient(stage) or receipt["purpose"] != self.purpose(stage)):
                 raise LiveFailure("live_receipt_invalid")
         except (KeyError, TypeError):
@@ -932,7 +1066,7 @@ class LiveRuntime:
             raise LiveFailure(f"live_http_{http['status']}")
         if http.get("truncated") is True:
             raise LiveFailure("live_response_oversize")
-        if self._funding:
+        if self._funded:
             expected_model = self._family.verifier.model if stage in self._family.verify_stages else self._model
             model_ok = (direct_deepseek.model_matches(receipt["model"].get("reported"))
                         if self._direct and stage in self._family.generation_stages else receipt["model"].get("reported") == expected_model)
@@ -945,7 +1079,7 @@ class LiveRuntime:
             raw = json.loads(http["bodyText"])
         except (ValueError, RecursionError, MemoryError):
             raise LiveFailure("live_reply_not_json") from None
-        if self._funding and (not isinstance(raw, dict) or not (
+        if self._funded and (not isinstance(raw, dict) or not (
                 direct_deepseek.model_matches(raw.get("model")) if self._direct and stage in self._family.generation_stages else raw.get("model") == expected_model)):
             raise LiveFailure("live_model_mismatch")
         if self._direct and stage in self._family.generation_stages:
@@ -971,7 +1105,7 @@ class LiveRuntime:
                 raise LiveFailure("live_model_refusal")
             if choice.get("finish_reason") == "length":
                 raise LiveFailure("live_output_truncated")
-            if self._funding and choice.get("finish_reason") != "stop":
+            if self._funded and choice.get("finish_reason") != "stop":
                 raise LiveFailure("live_answers_invalid")
             content = message["content"]
         except (KeyError, IndexError, TypeError, AttributeError):
@@ -984,7 +1118,7 @@ class LiveRuntime:
             raise LiveFailure("live_reply_not_json") from None
         if not isinstance(answer, dict):
             raise LiveFailure("live_reply_not_json")
-        if self._funding:
+        if self._funded:
             try:
                 valid = live_funding.schema_matches(answer, self._family.generation[stage].schema)
             except (KeyError, TypeError, ValueError, RecursionError):

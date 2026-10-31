@@ -4,6 +4,11 @@ import com.zoop.graph.snapshot.GraphSnapshotStore;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.version.GraphVersionSelector;
 import com.zoop.graph.version.SelectedGraphVersion;
+import com.zoop.graph.publication.GraphPublicationReader;
+import com.zoop.graph.publication.GraphPublicationAuthority;
+import com.zoop.graph.publication.PublicationException;
+import com.zoop.common.exception.CustomException;
+import com.zoop.common.exception.ErrorCode;
 import com.zoop.graph.version.BriefingGraphUnavailableException;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
@@ -17,11 +22,16 @@ public class PublicGraphReader {
     private final GraphVersionSelector selector;
     private final GraphSnapshotStore store;
     private final DisclosureExclusionReader exclusions;
+    private final GraphPublicationReader publications;
+    private final GraphPublicationAuthority authority;
 
-    public PublicGraphReader(GraphVersionSelector selector, GraphSnapshotStore store, DisclosureExclusionReader exclusions) {
+    public PublicGraphReader(GraphVersionSelector selector, GraphSnapshotStore store, DisclosureExclusionReader exclusions,
+            GraphPublicationReader publications, GraphPublicationAuthority authority) {
         this.selector = selector;
         this.store = store;
         this.exclusions = exclusions;
+        this.publications = publications;
+        this.authority = authority;
     }
 
     /** One pinned version and what is publicly visible in it for this request. */
@@ -36,17 +46,27 @@ public class PublicGraphReader {
     }
 
     public Pinned read(String round, String graphVersion, Instant asOf, String requestId) {
-        return read(selector.select(round, graphVersion, asOf, requestId));
+        return read(selector.select(round, graphVersion, asOf, requestId), requestId);
     }
 
     /** A version an earlier step of this read already pinned, kept as it was ({@link GraphVersionSelector#pinned}). */
     public Pinned readPinned(String versionId, Instant asOf, boolean asOfRequested) {
-        return read(selector.pinned(versionId, asOf, asOfRequested));
+        return read(selector.pinned(versionId, asOf, asOfRequested), null);
     }
 
-    private Pinned read(SelectedGraphVersion selected) {
+    private Pinned read(SelectedGraphVersion selected, String requestId) {
         PublicGraphSnapshot snapshot = store.load(selected.version());
-        DisclosureExclusions currentExclusions = exclusions.current(selected.version().id());
+        DisclosureExclusions currentExclusions;
+        if ("snapshot".equals(selected.version().kind())) {
+            try {
+                var publication = publications.read(selected.version().id(), snapshot);
+                currentExclusions = authority.current(publication, requestId);
+            } catch (PublicationException invalid) {
+                throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
+            }
+        } else {
+            currentExclusions = exclusions.current(selected.version().id());
+        }
         PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot,
                 selected.asOfRequested() ? selected.asOf() : null, currentExclusions,
                 selected.briefing() != null && selected.briefing().reconstruction() != null);

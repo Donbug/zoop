@@ -22,7 +22,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from scripts.extraction_smoke import (FAKE_KEYS, LIVE_ENV_NAMES, Q3, Q3B, LiveWorld, chat_reply, loopback_smoke, simulate, simulator_env)
+from scripts.extraction_smoke import (FAKE_KEYS, LIVE_ENV_NAMES, Q3, Q3B, LiveWorld, chat_reply, first_reference, loopback_smoke, simulate, simulator_env)
 from scripts.ingestion_smoke import ownership_env
 from tests.live_support import jev_reply
 from zoop_ai_pipeline import direct_deepseek, live_budget, live_funding, live_runtime
@@ -55,7 +55,7 @@ class Provider:
         reply = simulate(body)
         if self.mode == "ungrounded":
             answer = json.loads(reply["choices"][0]["message"]["content"])
-            answer["mentions"][0]["evidence"][0]["quote"] = "원문에 없는 문장이다."
+            answer["mentions"][0]["evidence"][0]["segmentId"] = "q-unknown"
             reply = chat_reply(json.dumps(answer, ensure_ascii=False))
         if self.after is not None:
             self.after()
@@ -391,7 +391,7 @@ def test_provider_silence_is_reconciling_never_resent_and_its_usage_is_unknown(l
     assert cancelled["state"] == "cancelled" and len(p.requests) == 1
 
 
-@pytest.mark.parametrize("mode,code", [("garbage", "live_reply_not_json"), ("http500", "live_http_500"), ("ungrounded", "extraction_reply_invalid")])
+@pytest.mark.parametrize("mode,code", [("garbage", "live_reply_not_json"), ("http500", "live_http_500"), ("ungrounded", "live_citation_reference_unknown")])
 def test_an_unusable_reply_stays_a_durable_failed_receipt_and_is_never_repaired(lw, mode, code):
     w, p = lw, lw.provider
     p.mode = mode
@@ -487,7 +487,8 @@ def test_a_replay_job_never_reads_the_live_runtime_or_environment(lw):
 
 def test_the_loopback_cli_smoke_exercises_the_live_path_through_real_processes(tmp_path):
     report = loopback_smoke(tmp_path)
-    assert report["status"] == "passed" and report["paidModelCalls"] == 0 and len(report["checks"]) == 6
+    assert report["status"] == "passed" and report["paidModelCalls"] == 0
+    assert report["s2"]["state"] == "ready" and report["s3"]["state"] == "ready" and report["s3"]["delivery"] == "current"
 
 
 # Admitted-set chains use actual native CLI processes and loopback sockets. Only transport routing is substituted:
@@ -518,15 +519,12 @@ class ChainPeer:
                 else:
                     if stage == "relation":
                         from scripts.relation_smoke import co, proposal, relation_reply
-                        doc = projection["input"]["documents"][0]
-                        quote = next(line for line in doc["text"].splitlines() if line.strip())
-                        citation = {"documentId": doc["documentId"], "documentVersion": doc["documentVersion"],
-                                    "start": None, "end": None, "quote": quote}
+                        citation = first_reference(projection["sources"][0])
                         answer = relation_reply([proposal("SUPPLIES", co("SYNTH-1"), co("SYNTH-2"), [citation])])
-                        reply = chat_reply(json.dumps(answer, ensure_ascii=False))
+                        reply = chat_reply(json.dumps({**answer, "citationFormat": projection["citationFormat"]}, ensure_ascii=False))
                     elif stage == "impact":
                         from scripts.relation_smoke import impact_reply
-                        reply = chat_reply(json.dumps(impact_reply([])))
+                        reply = chat_reply(json.dumps({**impact_reply([]), "citationFormat": projection["citationFormat"]}))
                     else:
                         reply = simulate(body)
                     reply["model"] = direct_deepseek.MODEL_REVISION if role == "deepseek" else live_runtime.MODEL
@@ -536,7 +534,7 @@ class ChainPeer:
                         reply["choices"][0]["message"]["refusal"] = "authored refusal"
                     elif action == "ungrounded":
                         answer = json.loads(reply["choices"][0]["message"]["content"])
-                        answer["evidence"][0]["quote"] = "Not present in either source."
+                        answer["evidence"][0]["segmentId"] = "q-unknown"
                         reply["choices"][0]["message"]["content"] = json.dumps(answer)
                     elif action == "http500":
                         reply = {"error": {"message": "authored unavailable"}}

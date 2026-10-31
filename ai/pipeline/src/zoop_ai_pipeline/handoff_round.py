@@ -5,9 +5,9 @@ Selection (recomputed at every freeze from the three ledgers, master canonical r
   * candidates: S3 jobs in state `ready` whose S2 upstream (jobId + inputDigest) has at least one master canonical entry and a declared round slot. A `ready` job without
     a mapping is `awaiting_mapping`; a mapped job without a slot is `unavailable` (`round_slot_unavailable`). Neither takes a window slot.
     A job in any other state is `not_ready` (`cancelled` is reported as such);
-  * order: the slot (`window.through`) of the S2 incoming observation's ingestion round, newest first, then sourceId, page, ordinal, then the S3 jobId. Check delivery in
-    this order until `WINDOW` (= MAX_SOURCES) jobs are `selected`; withheld jobs report their reason and take no slot. Remaining candidates are `out_of_window`
-    (`neverFrozen` while no `ready` handoff ever pinned them). An empty deliverable window fails with `window_empty`;
+  * order: the slot (`window.through`) of the S2 incoming observation's ingestion round, newest first, then sourceId, page, ordinal, then the S3 jobId. Historical
+    processing-ineligible jobs report `withheld/analysis_contract_changed` and take no slot. Check current delivery until `WINDOW` (= MAX_SOURCES) jobs are selected;
+    withheld jobs also take no slot. Remaining eligible candidates are `out_of_window`. An empty deliverable window fails with `window_empty`;
   * own-round gate: every S3 job admitted for the requested round (the jobs whose S2 upstream was observed in that round, plus every unit of the optional plan) must be
     `ready` or `cancelled`, else `analysis_incomplete` and nothing is written. Earlier rounds are never waited for.
 
@@ -35,7 +35,7 @@ from .graph_projection import Paths as SourcePaths
 from .graph_projection import Registry, Source, gate, load_registry, review_state
 from .graph_projection_contracts import Withheld
 from .handoff import Handoff, HandoffPaths, IgnoredSummaries, LedgerSummaries, Loaded, Operator, Planner, Store, load_operator, load_source
-from .handoff_contracts import MAX_OPERATOR_FILE, MAX_SOURCES, POLICY, SCHEMA, Bindings, Decisions, Manifest
+from .handoff_contracts import MAX_OPERATOR_FILE, MAX_SOURCES, SCHEMA, Bindings, Decisions, Manifest
 from .ingestion import Store as IngestionStore
 from .ingestion_contracts import IngestionFailure, byte_hash, canonical, digest, read_file, timestamp
 from .issue_summary_contracts import deterministic_code, summary_basis
@@ -422,68 +422,95 @@ def bindings_hash(path: Path) -> str:
         raise ExtractionFailure("bindings_invalid") from None
 
 
+def _select_window(source: Source, paths: RoundPaths, registry: Registry, round_id: str, plan_id: str | None):
+    """Read-only selection shared by pre-writer admission and the locked freeze."""
+    units = plan_units(paths.plan_root, plan_id, round_id) if plan_id else set()
+    jobs = read_jobs(source, paths.extraction, paths.ingestion)
+    blocking = own_round_gate(jobs, round_id, units)
+    if blocking:
+        raise ExtractionFailure("analysis_incomplete", {"roundId": round_id, "jobs": blocking})
+    mapped = {(job_id, input_digest) for job_id, input_digest, _, _ in registry.entries}
+    candidates, report = classify(jobs, mapped)
+    selection = {"schemaVersion": SELECTION_SCHEMA, "roundId": round_id, "planId": plan_id, "limit": WINDOW}
+    window, pins, kinds = [], [], []
+    for job in candidates:
+        try:
+            source.require_current_analysis(job.job_id)
+        except ExtractionFailure as exc:
+            report.append(entry(job, "withheld", exc.code))
+            continue
+        if len(window) == WINDOW:
+            report.append(entry(job, "out_of_window", "window_full"))
+            continue
+        relation = {"jobId": job.job_id, "inputDigest": job.input_digest}
+        try:
+            result = gate(source, relation, None)
+        except Withheld as exc:
+            report.append(entry(job, "withheld", exc.code))
+            continue
+        window.append(job)
+        report.append(entry(job, "selected"))
+        kinds.append(result["provenance"]["sourceKind"])
+        pins.append({"relation": relation, "upstream": result["binding"]["upstream"], "reviewDigest": digest(review_state(result))})
+    selection["jobs"] = report_order(report)
+    if not window:
+        raise ExtractionFailure("window_empty", {"selection": selection})
+    return window, pins, kinds, selection
+
+
+def preflight_round(paths: RoundPaths, round_id: str, plan_id: str | None) -> None:
+    """Require a current-eligible deliverable window before any handoff writer or staging."""
+    registry, _, _ = read_master(paths)
+    bindings_hash(paths.bindings)
+    source_paths = SourcePaths(paths.relation, paths.extraction, paths.ingestion, paths.sources, paths.canonical)
+    with Source(source_paths) as source:
+        _select_window(source, paths, registry, round_id, plan_id)
+
+
 def freeze_round(store: Store, paths: RoundPaths, round_id: str, plan_id: str | None, recovery_attempt_id: str | None = None) -> dict:
     """Select, narrow and freeze; install only ready results. An explicit recovery attempt selects a separate deterministic handoff identity."""
     files_dir = check_files_dir(paths.files_dir, store.root, paths.canonical, paths.decisions)
     registry, decisions_raw, decisions = read_master(paths)
     bindings = bindings_hash(paths.bindings)
-    units = plan_units(paths.plan_root, plan_id, round_id) if plan_id else set()
-    mapped = {(job_id, input_digest) for job_id, input_digest, _, _ in registry.entries}
     source_paths = SourcePaths(paths.relation, paths.extraction, paths.ingestion, paths.sources, paths.canonical)
-    with Source(source_paths) as source, _staging() as stage_name:
-        stage = Path(stage_name)
-        jobs = read_jobs(source, paths.extraction, paths.ingestion)
-        blocking = own_round_gate(jobs, round_id, units)
-        if blocking:
-            raise ExtractionFailure("analysis_incomplete", {"roundId": round_id, "jobs": blocking})
-        candidates, report = classify(jobs, mapped)
+    with Source(source_paths) as source:
+        window, pins, kinds, selection = _select_window(source, paths, registry, round_id, plan_id)
         previously_frozen = frozen_jobs(store)
-        selection = {"schemaVersion": SELECTION_SCHEMA, "roundId": round_id, "planId": plan_id, "limit": WINDOW}
-        window, pins, kinds = [], [], []
-        for job in candidates:
-            if len(window) == WINDOW:
-                report.append(entry(job, "out_of_window", "window_full", neverFrozen=job.job_id not in previously_frozen))
-                continue
-            relation = {"jobId": job.job_id, "inputDigest": job.input_digest}
-            try:
-                result = gate(source, relation, None)
-            except Withheld as exc:
-                report.append(entry(job, "withheld", exc.code))
-                continue
-            window.append(job)
-            report.append(entry(job, "selected"))
-            kinds.append(result["provenance"]["sourceKind"])
-            pins.append({"relation": relation, "upstream": result["binding"]["upstream"], "reviewDigest": digest(review_state(result))})
-        selection["jobs"] = report_order(report)
-        if not window:
-            raise ExtractionFailure("window_empty", {"selection": selection})
-
-        upstreams = {job.upstream for job in window}
-        canonical_raw, kept = narrow_registry(registry.raw, upstreams)
-        (stage / "canonical.json").write_bytes(canonical_raw)
-        probe = HandoffPaths(paths.relation, paths.extraction, paths.ingestion, paths.sources, stage / "canonical.json", stage / "decisions.json", paths.bindings)
-        (stage / "decisions.json").write_bytes(decisions_raw)
-        files = {"canonical": byte_hash(canonical_raw), "decisions": _PLACEHOLDER, "bindings": bindings}
-        provisional = Manifest.model_validate_json(canonical({"schemaVersion": SCHEMA, "handoffId": "round-probe", "sourceKind": kinds[0], "policyVersion": POLICY,
-                                                              "sources": pins, "files": files}))
-        loaded: list[Loaded] = [load_source(source, probe, provisional, pin, strict=True) for pin in sorted(provisional.sources, key=lambda p: p.relation.job_id)]
-        operator = load_operator(probe)
-        groups = Planner(provisional, "round-probe", _PLACEHOLDER, loaded, operator).groups()
-        mentions = {canonical_id: {(m.doc[0], m.doc[1], m.mention_id) for m in members} for canonical_id, members in groups.items()}
-        narrowed = narrow_decisions(decisions_raw, mentions, {key for item in loaded for key in item.docs})
-        decisions_final, dropped_pins = narrowed.raw, {}
-        if any(d.summary is not None for d in Decisions.model_validate_json(narrowed.raw).issues):
-            (stage / "decisions.json").write_bytes(narrowed.raw)
-            narrowed_decisions = Decisions.model_validate_json(narrowed.raw)
-            dry = Planner(provisional, "round-probe", _PLACEHOLDER, loaded,
-                          Operator(operator.registry, narrowed_decisions, narrowed.raw, operator.bindings, operator.bindings_raw), IgnoredSummaries()).run()
-            ledger = LedgerSummaries(paths.summaries, paths.relation, paths.extraction, paths.ingestion, store.root) if paths.summaries else None
-            dropped_pins = stale_pins(narrowed_decisions, dry, ledger)
-            decisions_final = drop_summary_pins(narrowed.raw, set(dropped_pins))
+        for item in selection["jobs"]:
+            if item["status"] == "out_of_window":
+                item["neverFrozen"] = item["jobId"] not in previously_frozen
+        with _staging() as stage_name:
+            stage = Path(stage_name)
+            upstreams = {job.upstream for job in window}
+            canonical_raw, kept = narrow_registry(registry.raw, upstreams)
+            (stage / "canonical.json").write_bytes(canonical_raw)
+            probe = HandoffPaths(paths.relation, paths.extraction, paths.ingestion, paths.sources, stage / "canonical.json", stage / "decisions.json", paths.bindings)
+            (stage / "decisions.json").write_bytes(decisions_raw)
+            files = {"canonical": byte_hash(canonical_raw), "decisions": _PLACEHOLDER, "bindings": bindings}
+            provisional = Manifest.model_validate_json(canonical({"schemaVersion": SCHEMA, "handoffId": "round-probe", "sourceKind": kinds[0],
+                                                                  "policyVersion": decisions.policy_version, "sources": pins, "files": files}))
+            contexts = probe.contexts()
+            readers = {contexts.routes[0].context_id: source}
+            loaded: list[Loaded] = [load_source(readers, contexts, provisional, pin, strict=True)
+                                    for pin in sorted(provisional.sources, key=lambda p: p.relation.job_id)]
+            operator = load_operator(probe)
+            groups = Planner(provisional, "round-probe", _PLACEHOLDER, loaded, operator).groups()
+            mentions = {canonical_id: {(m.doc[0], m.doc[1], m.mention_id) for m in members} for canonical_id, members in groups.items()}
+            narrowed = narrow_decisions(decisions_raw, mentions, {key for item in loaded for key in item.docs})
+            decisions_final, dropped_pins = narrowed.raw, {}
+            if any(d.summary is not None for d in Decisions.model_validate_json(narrowed.raw).issues):
+                (stage / "decisions.json").write_bytes(narrowed.raw)
+                narrowed_decisions = Decisions.model_validate_json(narrowed.raw)
+                dry = Planner(provisional, "round-probe", _PLACEHOLDER, loaded,
+                              Operator(operator.registry, narrowed_decisions, narrowed.raw, operator.bindings, operator.bindings_raw), IgnoredSummaries()).run()
+                ledger = LedgerSummaries(paths.summaries, paths.relation, paths.extraction, paths.ingestion, store.root) if paths.summaries else None
+                dropped_pins = stale_pins(narrowed_decisions, dry, ledger)
+                decisions_final = drop_summary_pins(narrowed.raw, set(dropped_pins))
 
     final = Decisions.model_validate_json(decisions_final)
     files = {"canonical": byte_hash(canonical_raw), "decisions": byte_hash(decisions_final), "bindings": bindings}
-    body = {"schemaVersion": SCHEMA, "sourceKind": kinds[0], "policyVersion": POLICY, "sources": sorted(pins, key=lambda p: p["relation"]["jobId"]), "files": files}
+    body = {"schemaVersion": SCHEMA, "sourceKind": kinds[0], "policyVersion": decisions.policy_version,
+            "sources": sorted(pins, key=lambda p: p["relation"]["jobId"]), "files": files}
     identity = body if recovery_attempt_id is None else {**body, "recoveryAttemptId": recovery_attempt_id}
     manifest = Manifest.model_validate_json(canonical({**body, "handoffId": "hr-" + digest(identity)}))
     pinned = any(d.summary is not None for d in final.issues)

@@ -13,7 +13,7 @@ import os
 import sqlite3
 import uuid
 from collections.abc import Callable
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,11 +21,12 @@ from . import live_prompts
 from . import relation_rules as rules
 from . import country_context
 from .dependency_contracts import array, cites, invalid
-from .extraction import Extractor, Sources, cite_exact, live_physical_calls, live_usage, upstream_digest
+from .native_read_contracts import s3_historical, validate_s3_historical_read
+from .extraction import Extractor, Sources, _current_job_snapshot, cite_exact, live_physical_calls, live_usage, load_live_deferral, save_live_deferral, upstream_digest
 from .extraction import Store as ExtractionStore
 from .extraction_contracts import ObservationRef, ProviderResponseUnknown
 from .ingestion_contracts import byte_hash, now, reserved_state_roots
-from .live_runtime import LiveFailure, LiveRuntime, physical_attempts
+from .live_runtime import LiveDeferred, LiveFailure, LiveRuntime, physical_attempts
 from .relation_contracts import (BASIS_AUTOMATIC, BASIS_OPERATOR, CANDIDATE_VERSION, EFFECT_APPROVED, EFFECT_EXCLUDED, EFFECT_LEGACY_REVALIDATION,
     EFFECT_OF, IMPACT_CANDIDATE_VERSION, IMPACT_POLICY, IMPACT_PRODUCER, IMPACT_VERIFIER, LABEL_NOTE, LABELS, LEDGER_VERSION, MAX_DOCUMENTS, POLICY,
     PRODUCER, REQUEST, REVALIDATION_POLICY, SCHEMA, VERIFIER, VOCABULARY, CitationFailure, ExtractionFailure, Replay, ReplyInvalid, Review, Submit,
@@ -58,7 +59,7 @@ _STAGES = ("relation", "verify-relation", "impact", "verify-impact")
 
 
 class Store:
-    def __init__(self, root: Path, *upstream_roots: Path, existing: bool = False):
+    def __init__(self, root: Path, *upstream_roots: Path, existing: bool = False, inspection_job: str | None = None):
         root = Path(os.path.abspath(root))
         forbidden = [*reserved_state_roots(),
                      *(Path(os.path.abspath(p)) for p in upstream_roots)]
@@ -68,7 +69,7 @@ class Store:
             if parent.exists() and parent.is_symlink():
                 raise ExtractionFailure("state_namespace_invalid")
         if existing:
-            self._open_existing(root)
+            self._open_existing(root, inspection_job)
             return
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
         if any(p.name not in _FILES or p.is_symlink() for p in root.iterdir()):
@@ -110,10 +111,9 @@ class Store:
             self.close()
             raise
 
-    def _open_existing(self, root: Path):
-        """Read-only access for the S4 dependents report (same policy as the extraction and ingestion readers): shared non-blocking flock
-        on the existing lock, no mkdir/chmod/create/PRAGMA/schema/WAL write, immutable read-only SQLite. A non-empty -wal is committed data a
-        reader must not ignore or recover, so the operator runs the relation writer (resume) first. An active writer makes the reader fail busy."""
+    def _open_existing(self, root: Path, inspection_job: str | None = None):
+        """Shared, non-blocking read access. Downstream reads require a checkpointed original; targeted current-job inspection
+        may recover a private copy while retaining the original shared lock through projection."""
         database, lock = root / "relation.sqlite3", root / "relation.lock"
         if not root.is_dir() or not database.is_file() or not lock.is_file():
             raise ExtractionFailure("relation_state_missing")
@@ -128,8 +128,12 @@ class Store:
         try:
             wal = root / "relation.sqlite3-wal"
             if wal.exists() and wal.stat().st_size > 0:
-                raise ExtractionFailure("relation_recovery_required")
-            self.db = sqlite3.connect(database.as_uri() + "?mode=ro&immutable=1", uri=True, isolation_level=None)
+                if inspection_job is None:
+                    raise ExtractionFailure("relation_recovery_required")
+                self._snapshot = ExitStack()
+                self.db = self._snapshot.enter_context(_current_job_snapshot(root, "relation", inspection_job, current))
+            else:
+                self.db = sqlite3.connect(database.as_uri() + "?mode=ro&immutable=1", uri=True, isolation_level=None)
             self.db.row_factory = sqlite3.Row
             self.db.execute("PRAGMA query_only=ON")
             self.db.execute("SELECT 1 FROM jobs LIMIT 1")
@@ -144,7 +148,9 @@ class Store:
             raise
 
     def close(self):
-        if hasattr(self, "db"):
+        if hasattr(self, "_snapshot"):
+            self._snapshot.close()
+        elif hasattr(self, "db"):
             self.db.close()
         if hasattr(self, "lock"):
             os.close(self.lock)
@@ -238,6 +244,14 @@ def document_view(export: dict) -> dict:
 INITIAL_ATTEMPT = rules.attempt_wire("initial", 0, POLICY, None)
 
 
+def current(binding: dict) -> bool:
+    return binding.get("versions") == {
+        "producer": PRODUCER, "verifier": VERIFIER, "impactProducer": IMPACT_PRODUCER, "impactVerifier": IMPACT_VERIFIER,
+        "policy": POLICY, "revalidationPolicy": REVALIDATION_POLICY, "impactPolicy": IMPACT_POLICY,
+        "countryContext": country_context.VERSION,
+    }
+
+
 def chain(store: Store, job_id: str, rc: str) -> list[dict]:
     """The append-only verdict/review events of one relation candidate in order (shared by the engine and the S4 read-only report)."""
     return [{"seq": e["seq"], "kind": e["kind"], "createdAt": e["created_at"], **json.loads(e["payload"])}
@@ -292,7 +306,7 @@ class Engine:
         """Fresh read-only snapshot of the completed S2 job; rights/binding are re-verified by the owner on every call."""
         store = ExtractionStore(self.extraction_dir, self.ingestion_dir, existing=True)
         try:
-            return Extractor(store, self.sources).export(job_id)
+            return Extractor(store, self.sources).export_for_analysis(job_id)
         finally:
             store.close()
 
@@ -420,6 +434,28 @@ class Engine:
             raise ExtractionFailure("job_not_found")
         return row
 
+    def require_current_analysis(self, job_id: str) -> None:
+        row = self._job(job_id)
+        binding = json.loads(row["binding"])
+        if not current(binding):
+            raise ExtractionFailure("analysis_contract_changed")
+        request = Submit.model_validate_json(row["request"])
+        if ("runtime" in binding) != (request.provenance.execution_mode == "live"):
+            raise ExtractionFailure("job_binding_changed")
+        store = ExtractionStore(self.extraction_dir, self.ingestion_dir, existing=True)
+        try:
+            Extractor(store, self.sources).require_current_analysis(request.upstream.job_id)
+        finally:
+            store.close()
+
+    def _historical_binding(self, row, request: Submit) -> None:
+        store = ExtractionStore(self.extraction_dir, self.ingestion_dir, existing=True)
+        try:
+            submit, result = Extractor(store, self.sources).export(request.upstream.job_id)
+        finally:
+            store.close()
+        validate_s3_historical_read(row, request, submit, result, upstream_digest(result))
+
     def freeze(self, request: Submit) -> None:
         """The only registration path: durably freeze the exact upstream (a ready, currently authorized S2 job) as `queued`, with no replay
         fixture, call or candidate effect. The producer/verifier fixtures are per-call inputs, not part of the frozen job. A live job also
@@ -431,6 +467,7 @@ class Engine:
         input_digest = digest(request.wire())
         row = self.store.one("SELECT * FROM jobs WHERE job_id=?", (request.job_id,))
         if row is not None:
+            self.require_current_analysis(request.job_id)
             if row["input_digest"] != input_digest:
                 raise ExtractionFailure("job_input_conflict")
             return
@@ -452,6 +489,7 @@ class Engine:
         durably, and any later initial-only dispatch is `initial_dispatch_taken` with no effect, so a retrying caller can never resume or
         stimulate work; plain `resume` is explicit operator recovery."""
         row = self._job(job_id)
+        self.require_current_analysis(job_id)
         if self._is_live(row) and fixtures.provided:
             raise ExtractionFailure("fixture_not_allowed")
         with self.store.transaction():
@@ -467,6 +505,7 @@ class Engine:
         return self.result(job_id)
 
     def cancel(self, job_id: str) -> dict:
+        self.require_current_analysis(job_id)
         with self.store.transaction():
             row = self._job(job_id)
             if row["state"] != "cancelled":
@@ -478,6 +517,7 @@ class Engine:
         current-rights gate it appends effect `approved` and nothing else (no model, verifier or impact call, no revalidation). `reject` excludes.
         Only a HOLD can be decided (approving an eligible relation or reversing a reject is not supported)."""
         row = self._job(request.job_id)
+        self.require_current_analysis(request.job_id)
         if row["state"] == "cancelled":
             raise ExtractionFailure("job_cancelled")
         ctx = self._context(Submit.model_validate_json(row["request"]))
@@ -646,15 +686,22 @@ class Engine:
         """
         job_id = row["job_id"]
         key = digest(payload)
+        if ctx.live and stage in {"relation", "impact"}:
+            provider_payload = {**payload, "citationSources": [live_prompts.source(ctx.docs[k].export) for k in sorted(documents)]}
+        else:
+            provider_payload = payload
         unknown = "live_response_unknown" if ctx.live else "replay_response_unknown"
         call = self.store.one("SELECT * FROM calls WHERE job_id=? AND stage=? AND ref=?", (job_id, stage, ref))
         if call is not None and ctx.live and call["state"] == "started" and call["response"] is None and self.store.one(
                 "SELECT 1 FROM stages WHERE job_id=? AND stage='refusal' AND ref=?", (job_id, call["attempt_id"])):
             call = None  # definitively never sent: `_reserve` re-arms the same row under a new attempt id
-        if call is None:
+        if call is None or (ctx.live and call["state"] == "deferred"):
             if ctx.live:
-                attempt, receipt = self._send(row, ctx, fence, stage, ref, key, payload, documents)
-                result = self._answer(row, ctx, stage, attempt, receipt, payload, parse, documents)
+                if call is not None and call["request_digest"] != key:
+                    raise ExtractionFailure("receipt_request_mismatch")
+                attempt, receipt = self._send(row, ctx, fence, stage, ref, key, provider_payload, documents,
+                                              attempt=call["attempt_id"] if call is not None else None)
+                result = self._answer(row, ctx, stage, attempt, receipt, provider_payload, parse, documents)
             else:
                 raw, fixture_hash = fixtures.find(role, stage, key, ctx.synthetic)
                 self._verify(ctx)
@@ -680,7 +727,7 @@ class Engine:
             if ctx.live:
                 if not isinstance(raw, dict) or raw.get("attemptId") != attempt:
                     raise ExtractionFailure("receipt_integrity_failed")
-                result = self._answer(row, ctx, stage, attempt, raw, payload, parse, documents)
+                result = self._answer(row, ctx, stage, attempt, raw, provider_payload, parse, documents)
             else:
                 try:
                     result = parse(raw)
@@ -698,7 +745,7 @@ class Engine:
                 raise
         return result
 
-    def _send(self, row, ctx: Context, fence: int, stage: str, ref: str, key: str, payload: dict, documents):
+    def _send(self, row, ctx: Context, fence: int, stage: str, ref: str, key: str, payload: dict, documents, *, attempt: str | None = None):
         """Reserve one logical invocation; runtime journals each physical attempt before considering fallback.
         Primary and fallback callbacks independently authorize the same source dependency closure for the exact recipient. A partial unknown
         envelope is stored once with state started, never treated as a completed receipt or permission to resend."""
@@ -711,7 +758,14 @@ class Engine:
             raise ExtractionFailure(exc.code) from exc
         self._authorize_send(ctx, runtime, stage, documents)
         self._verify(ctx)
-        attempt = self._reserve(job_id, fence, stage, ref, key, digest(json.loads(row["binding"])["runtime"]))
+        unsent_proof = None
+        if attempt is None:
+            attempt = self._reserve(job_id, fence, stage, ref, key, digest(json.loads(row["binding"])["runtime"]))
+        else:
+            if "funding" not in json.loads(row["binding"])["runtime"]:
+                raise ExtractionFailure("receipt_request_mismatch")
+            unsent_proof = load_live_deferral(self.store, attempt)
+            self.db.execute("UPDATE calls SET state='started' WHERE attempt_id=? AND state='deferred'", (attempt,))
 
         def authorize() -> None:
             self._guard(job_id, fence)
@@ -725,7 +779,11 @@ class Engine:
 
         try:
             receipt = runtime.send(prepared, attempt_id=attempt, authorize=authorize,
+                                   **({"unsent_proof": unsent_proof} if unsent_proof is not None else {}),
                                    **({"authorize_fallback": authorize_fallback} if fallback is not None else {}))
+        except LiveDeferred as exc:
+            save_live_deferral(self.store, attempt, exc.proof)
+            raise ExtractionFailure(exc.code) from exc
         except LiveFailure as exc:
             if exc.receipt is not None:
                 self._receive(attempt, exc.receipt)
@@ -741,10 +799,7 @@ class Engine:
         return attempt, receipt
 
     def _answer(self, row, ctx: Context, stage: str, attempt: str, receipt: dict, payload: dict, parse, documents):
-        """Strict decode of a PERSISTED receipt into the native response and its pure parser. Any fault marks the receipt permanently.
-
-        A producer model cannot count code points, so its citations may carry no offsets: `resolve_citations` fills them ONLY from a unique literal
-        quote in the exact prepared text of a document that was sent (identity is never repaired); everything else still faces the exact check."""
+        """Decode a persisted raw receipt, expand request-local producer references, then apply the native parser."""
         runtime = self._runtime(row, send=False)
         frozen = json.loads(row["binding"])["runtime"]
         if "fallback" in frozen.get("generation", {}):
@@ -758,8 +813,6 @@ class Engine:
                 raise ExtractionFailure("receipt_binding_mismatch")
         try:
             raw = runtime.answer(stage, receipt)
-            if stage in {"relation", "impact"}:
-                raw = live_prompts.resolve_citations(raw, {key: ctx.docs[key].export["document"]["text"] for key in documents})
         except LiveFailure as exc:
             if exc.uncertain:
                 raise ProviderResponseUnknown(exc.code) from exc
@@ -770,6 +823,8 @@ class Engine:
                 if physical["state"] == "received":
                     self._authorize_send(ctx, runtime, stage, documents, recipient=physical["receipt"]["recipient"])
         try:
+            if stage in {"relation", "impact"}:
+                raw = live_prompts.expand(stage, payload, raw)
             return parse(raw)
         except ReplyInvalid as exc:
             self._mark(attempt, exc.code)
@@ -942,9 +997,18 @@ class Engine:
         if row["state"] == "cancelled":
             result["delivery"] = {"status": "withheld", "code": "job_cancelled"}
             return result
+        historical = s3_historical(binding)
+        if historical and row["state"] != "ready":
+            result["delivery"] = {"status": "withheld", "code": "upstream_not_ready"}
+            return result
         try:
-            ctx = self._context(request)
-            self._check_binding(ctx, row)
+            if historical:
+                self._historical_binding(row, request)
+            else:
+                if not current(binding):
+                    raise ExtractionFailure("analysis_contract_changed")
+                ctx = self._context(request)
+                self._check_binding(ctx, row)
         except ExtractionFailure as exc:
             result["delivery"] = {"status": "withheld", "code": exc.code}
             return result

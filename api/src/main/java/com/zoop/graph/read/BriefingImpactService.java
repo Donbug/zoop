@@ -44,8 +44,8 @@ public class BriefingImpactService {
             if (!"snapshot".equals(pinned.selected().version().kind()))
                 return new BriefingImpacts(roundId, eventId, round.graphVersion(), round.windowTo(), "unavailable", "s3_receipt_not_recorded", List.of(), metadata);
             var relations = graph.snapshot.relations().stream().filter(r -> eventId.equals(r.source()) && "INVOLVES".equals(r.relationType())).toList();
-            var bundle = evidence.graphImportBundle(round.graphVersion(), requestId);
-            var rows = S3ImpactRows.read(bundle, relations);
+            var publication = evidence.graphPublication(round.graphVersion(), requestId);
+            var rows = S3ImpactRows.read(publication, relations);
             Map<String, EvidenceResponse> readable = new HashMap<>();
             Set<String> denied = new HashSet<>();
             // Checks relation membership as well as effect quotes. A revoked relation cannot leave its label behind.

@@ -90,6 +90,19 @@
       "liveBudget": "미정",
       "modelConfiguration": ".env",
       "executionApproval": "별도"
+    },
+    "metadataProjection": {
+      "decisionId": "user-2026-10-31-unknown-metadata",
+      "source": "api/docs/GRAPH_READ_HANDOFF.md#명시적-미확인-메타데이터",
+      "effectivePolicy": "사건·기업 연결 근거와 현재 read/store/quote-display 권한이 충족되면 지역·날짜·기간의 불확실성은 명시적 null로 공개한다. 국가 제한 구조 근거는 지역 미확인 상태에서 성립하지 않으며, 날짜 제한 근거는 충분한 날짜 정밀도를 요구한다.",
+      "versions": [
+        "zoop-graph-handoff-bundle-9",
+        "zoop-public-projection-policy-3",
+        "zoop-legacy-real-manifest-3",
+        "legacy-real-projection-3",
+        "snapshotFormat:4"
+      ],
+      "provenance": "기존 S2/S3 판단·원본 국가·시각·HOLD·R1@2·수동 제외와 고정본은 보존한다. 기존 native8/P2·legacy2·snapshot3은 각 버전의 의미를 유지한다."
     }
   },
   "valid": true,

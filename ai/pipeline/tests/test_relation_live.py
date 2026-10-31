@@ -13,8 +13,8 @@ from types import SimpleNamespace
 import pytest
 
 from scripts.relation_smoke import GOOD, SUP, build_world, co, converge, find, impact_item, proposal, world_cite
+from zoop_ai_pipeline import relation, live_jev
 from tests.test_extraction_live import ChainPeer, chain_cli, chain_receipts, chain_world
-from zoop_ai_pipeline import relation
 from zoop_ai_pipeline.extraction_contracts import ExtractionFailure, Provenance
 from zoop_ai_pipeline.live_runtime import LiveFailure
 from zoop_ai_pipeline.relation import Engine
@@ -45,7 +45,7 @@ def database(w):
 
 def make_runtime(replies):
     """(runtime class, state). `state.behavior(prepared)` may answer 'unknown' (lost reply), 'refuse' (refused before sending) or None."""
-    state = SimpleNamespace(replies=replies, sends=[], behavior=None, after_send=None, binding=dict(BINDING), authorized=0)
+    state = SimpleNamespace(replies=replies, sends=[], requests=[], behavior=None, after_send=None, binding=dict(BINDING), authorized=0)
 
     class Fake:
         def __init__(self, need_send: bool):
@@ -73,7 +73,7 @@ def make_runtime(replies):
             return None
 
         def prepare(self, stage, payload):
-            return {"stage": stage, "digest": digest(payload)}
+            return {"stage": stage, "digest": digest({k: v for k, v in payload.items() if k != "citationSources"}), "payload": payload}
 
         def send(self, prepared, *, attempt_id, authorize):
             if not self.need_send:
@@ -84,9 +84,13 @@ def make_runtime(replies):
             if action == "refuse":
                 raise LiveFailure("live_budget_exhausted_usd")
             state.sends.append((prepared["stage"], attempt_id))
+            state.requests.append(prepared)
             if action == "unknown":
                 raise LiveFailure("live_response_unknown", uncertain=True)
             reply = state.replies.get((prepared["stage"], prepared["digest"]))
+            if prepared["stage"] in {"relation", "impact"} and reply is not None:
+                from tests.live_support import reference_answer
+                reply = reference_answer(prepared["stage"], prepared["payload"], reply)
             if state.after_send:
                 state.after_send()
             return {"format": "fake-receipt", "stage": prepared["stage"], "attemptId": attempt_id,
@@ -157,6 +161,22 @@ def test_the_live_path_reproduces_the_replay_candidates_with_durable_receipts_an
     assert '"attemptId"' in stored  # the raw receipt envelope is what is persisted
     again = w.kit.rel_job("resume", w.kit.rsel("lv"))
     assert again == out and len(state.sends) == calls  # a finished job resends nothing
+
+
+def test_future_topic_relation_passes_both_selected_passages_to_the_verifier(world, monkeypatch):
+    w = world
+    item = proposal("RELATES_TO_TOPIC", co("SYNTH-3"), {"kind": "topic", "ref": w.tp}, [c(w, SUP), c(w, GOOD)], product="배터리 부품")
+    item["reason"] = "GENERATOR-PROSE-IS-NOT-EVIDENCE"
+    authored = converge(w, "topic-ref", [item])
+    replies = {(stage, key): response for records in authored["fixtures"] for stage, key, response in records}
+    _, state, factory = go_live(w, monkeypatch, replies=replies)
+    out = w.kit.rel_job("run", live_request(w, "topic-live"), runtime_factory=factory)
+    assert out["state"] == "ready" and out["counts"]["eligibility"]["eligible"] == 1
+    payload = next(p["payload"] for p in state.requests if p["stage"] == "verify-relation")
+    body, expect = live_jev.build_relation_request(payload, live_jev.MODEL)
+    assert {q["text"] for q in body["state"]["quotes"]} == {SUP, GOOD}
+    assert all(set(c["quoteIds"]) == {q["quoteId"] for q in payload["quotes"]} for c in expect["claims"])
+    assert item["reason"] not in str(body) and w.art["b"].body not in str(body)
 
 
 def test_a_live_job_never_accepts_replay_fixtures_and_needs_a_runtime(world, monkeypatch):

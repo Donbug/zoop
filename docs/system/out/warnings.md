@@ -333,7 +333,7 @@
 | BFF_PATH_DIFFERENCE | difference | publishGraphVersion | 목표 /api/v1/admin/graph/versions ↔ BFF /api/admin/graph/versions |  |
 | BFF_FIELD_DIFFERENCE | difference | publishGraphVersion | 목표만 162 · BFF만 14 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | activateGraphVersion | 목표 /api/v1/admin/graph/versions/{version_id}/activate ↔ BFF /api/admin/graph/versions/{version_id}/activate |  |
-| BFF_FIELD_DIFFERENCE | difference | activateGraphVersion | 목표만 165 · BFF만 12 · 형식/필수/권한 변경 9 |  |
+| BFF_FIELD_DIFFERENCE | difference | activateGraphVersion | 목표만 167 · BFF만 12 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | listAnalysisJobs | 목표 /api/v1/admin/jobs ↔ BFF /api/admin/jobs |  |
 | BFF_FIELD_DIFFERENCE | difference | listAnalysisJobs | 목표만 804 · BFF만 393 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | createAnalysisJob | 목표 /api/v1/admin/jobs ↔ BFF /api/admin/jobs |  |

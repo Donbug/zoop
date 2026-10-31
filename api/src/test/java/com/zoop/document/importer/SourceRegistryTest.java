@@ -582,4 +582,47 @@ class SourceRegistryTest {
         assertEquals("source_registry_too_large", assertThrows(SourceRegistry.Invalid.class, () -> SourceRegistry.parse(over)).code());
         assertEquals(SourceRegistry.MAX_BYTES + 1, Files.size(large));
     }
+    @Test
+    void exactTupleRoutesKeepBothGrantsCurrentAndRevocationLocal(@TempDir Path temp) throws Exception {
+        Path root = temp.toRealPath();
+        Path left = root.resolve("left.json");
+        Path right = root.resolve("right.json");
+        ObjectNode first = registry(entry(SOURCE, "old-grant", "r1"));
+        ObjectNode second = registry(entry(SOURCE, "new-grant", "r2"));
+        Files.write(left, bytes(first));
+        Files.write(right, bytes(second));
+        ObjectNode wrapper = JSON.createObjectNode().put("schemaVersion", SourceRegistry.AUTHORITY_SET_SCHEMA);
+        ArrayNode routes = wrapper.putArray("authorities");
+        routes.addObject().put("sourceId", SOURCE).put("grantId", "old-grant").put("revision", "r1").put("sources", left.toString());
+        routes.addObject().put("sourceId", SOURCE).put("grantId", "new-grant").put("revision", "r2").put("sources", right.toString());
+        Path file = root.resolve("authorities.json");
+        Files.write(file, bytes(wrapper));
+        SourceRegistry current = SourceRegistry.read(file);
+        assertNull(current.denial(SOURCE, "old-grant", "r1", NOW));
+        assertNull(current.denial(SOURCE, "new-grant", "r2", NOW));
+        assertEquals("source_unknown", current.denial(SOURCE, "old-grant", "r2", NOW));
+        assertEquals("source_url_outside_grant", current.denialForUrl(SOURCE, "new-grant", "r2", "https://foreign.invalid/a", NOW));
+        for (int revoked = 0; revoked < 2; revoked++) {
+            ObjectNode leaf = revoked == 0 ? first : second;
+            Path path = revoked == 0 ? left : right;
+            grant(leaf).put("enabled", false);
+            Files.write(path, bytes(leaf));
+            assertEquals("source_rights_unknown_or_denied",
+                    current.denial(SOURCE, revoked == 0 ? "old-grant" : "new-grant", revoked == 0 ? "r1" : "r2", NOW));
+            assertNull(current.denial(SOURCE, revoked == 0 ? "new-grant" : "old-grant", revoked == 0 ? "r2" : "r1", NOW));
+            grant(leaf).put("enabled", true);
+            Files.write(path, bytes(leaf));
+        }
+        Files.delete(left);
+        assertEquals("source_registry_unreadable",
+                assertThrows(SourceRegistry.Invalid.class, () -> current.denial(SOURCE, "old-grant", "r1", NOW)).code());
+        assertNull(current.denial(SOURCE, "new-grant", "r2", NOW));
+        Files.write(left, bytes(wrapper));
+        assertEquals("source_registry_invalid",
+                assertThrows(SourceRegistry.Invalid.class, () -> current.denial(SOURCE, "old-grant", "r1", NOW)).code());
+        routes.add(routes.get(1).deepCopy());
+        Files.write(file, bytes(wrapper));
+        assertThrows(SourceRegistry.Invalid.class, () -> SourceRegistry.read(file));
+        assertThrows(SourceRegistry.Invalid.class, () -> current.denial(SOURCE, "new-grant", "r2", NOW));
+    }
 }
