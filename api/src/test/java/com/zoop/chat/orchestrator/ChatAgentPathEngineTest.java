@@ -273,10 +273,16 @@ class ChatAgentPathEngineTest {
                 engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
 
         agent.served = Map.of("tc-0", List.of("r1"));
-        ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = outcome.result();
         assertEquals("answered", result.outcome());
         assertEquals(List.of(EV_HYNIX), result.citations().stream().map(Citation::evidenceId).toList());
+        var coverage = outcome.routeSummary().path("coverage");
+        assertEquals("answered", coverage.get(0).path("status").asString());
+        assertEquals("tc-0", coverage.get(0).path("toolCallIds").get(0).asString());
+        assertEquals("limited", coverage.get(1).path("status").asString());
+        assertTrue(coverage.get(1).path("toolCallIds").isEmpty(), "no call named r2");
     }
 
     @Test
