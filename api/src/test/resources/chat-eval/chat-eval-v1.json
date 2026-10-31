@@ -29,6 +29,11 @@
       ]
     }
   ],
+  "documents": {
+    "KRX:000660": [
+      {"id": "art-eval-hbm", "title": "[합성] 차세대 GPU용 HBM 공급 계약", "evidenceIds": ["ev-912843a071ee90c12ee7e909c65f06ce748d2a35c7c29c6c871faac130e4f395"]}
+    ]
+  },
   "publications": {
     "iss-fixture-hbm-supply": {
       "reviewRevision": 12, "ruleRevision": 3, "decision": "allow", "decisionPath": "admin_review", "decidedAt": "2026-10-07T05:00:00Z",
@@ -163,12 +168,31 @@
       "expect": {
         "targets": {"r1": ["KRX:035720"]},
         "stages": ["router", "answer"],
-        "tools": ["company.read"],
+        "tools": ["company.read", "document.search"],
         "outcome": "insufficient_evidence",
         "reason": "nothing_found",
         "appliedCompanies": []
       },
-      "gap": "카탈로그에는 있지만 공개 그래프에 없는 기업. 실제 데이터에서 이런 기업의 비율이 근거 부족의 주원인인지 잰다(document.search 미연결)."
+      "gap": "카탈로그에는 있지만 공개 그래프에 없는 기업. 문서 읽기도 공개 그래프의 사건에 연결된 문서만 보므로 이 기업에는 결과가 없다. 실제 데이터에서 이런 기업의 비율이 근거 부족의 주원인인지 잰다."
+    },
+    {
+      "id": "q03-company-documents",
+      "group": "Q03",
+      "question": "SK하이닉스 최근 소식 알려줘",
+      "script": {
+        "router": {"r1": {"types": {"Q03": 0.9}, "capabilities": {"document.search": 0.9}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 차세대 GPU용 HBM 공급 계약 보도가 있습니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}]}
+      },
+      "expect": {
+        "targets": {"r1": ["KRX:000660"]},
+        "stages": ["router", "answer", "verify"],
+        "tools": ["company.read", "document.search"],
+        "outcome": "answered",
+        "answerBasis": "evidence_grounded",
+        "citationKinds": ["article", "company_profile"],
+        "limitations": [],
+        "appliedCompanies": ["KRX:000660"]
+      }
     },
     {
       "id": "q03-issue-named",

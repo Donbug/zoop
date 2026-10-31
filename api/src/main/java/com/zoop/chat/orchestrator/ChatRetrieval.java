@@ -159,7 +159,8 @@ final class ChatRetrieval {
                             : capability == ChatCapability.BRIEFING_EVIDENCE ? briefingEvidenceTargets(run, p, targets)
                             : capability == ChatCapability.SELECTION_RULE_READ ? selectionTargets(run, p, targets) : targets;
                     List<String> scope = fixed ? null : p.evidenceScope();
-                    Instant since = capability == ChatCapability.GRAPH_VERSION_DIFF ? since(run, p).orElse(null) : null;
+                    Instant since = capability == ChatCapability.GRAPH_VERSION_DIFF
+                            || capability == ChatCapability.DOCUMENT_SEARCH ? since(run, p).orElse(null) : null;
                     for (List<String> chunk : batches(capability, read)) {
                         String key = capability.id() + "\u0000" + String.join("\u0000", chunk) + "\u0001"
                                 + (scope == null ? "*" : String.join("\u0000", scope)) + "\u0001" + since;
