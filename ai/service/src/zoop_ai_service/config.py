@@ -23,7 +23,8 @@ GRAPH_SCOPES = ("graph.read",)
 HANDOFF_SCOPES = ("handoff.read", "handoff.exposure")
 CHAT_SCOPES = ("chat.invoke",)
 PLAN_SCOPES = ("plan.admit", "plan.read", "plan.policy")
-SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES, *GRAPH_SCOPES, *HANDOFF_SCOPES, *CHAT_SCOPES, *PLAN_SCOPES)
+OBSERVATION_SCOPES = ("observation.read",)
+SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES, *GRAPH_SCOPES, *HANDOFF_SCOPES, *CHAT_SCOPES, *PLAN_SCOPES, *OBSERVATION_SCOPES)
 PRINCIPAL = re.compile(r"[a-z][a-z0-9-]{0,62}")
 DIGEST = re.compile(r"[0-9a-f]{64}")
 HOST = "127.0.0.1"
@@ -51,6 +52,9 @@ RELATION_OWN = tuple(name for name in RELATION_VARS if name not in SHARED_VARS)
 EXTRACTION_OWN = ("ZOOP_AI_SERVICE_EXTRACTION_COMMAND", "ZOOP_AI_SERVICE_EXTRACTION_REPLAY", "ZOOP_AI_SERVICE_EXTRACTION_APPROVALS")
 EXTRACTION_TOPIC = "ZOOP_AI_SERVICE_EXTRACTION_TOPIC_REPLAY"
 EXTRACTION_VARS = (*EXTRACTION_OWN, *SHARED_VARS)
+# The command alone switches on observation export; shared ingestion/registry settings never enable another family.
+OBSERVATION_COMMAND = "ZOOP_AI_SERVICE_INGESTION_COMMAND"
+OBSERVATION_VARS = (OBSERVATION_COMMAND, "ZOOP_AI_INGESTION_STATE_DIR", "ZOOP_AI_SERVICE_SOURCES")
 # The read-only graph door is a third, separate all-or-nothing group. It names its OWN source roots and registry (they are not the S2/S3 group's
 # variables, so setting them never switches those groups on); when an S2/S3 group is configured they must be exactly the same paths, because the
 # graph reads the very ledgers those groups write. `ZOOP_GRAPH_AUTH` alone never switches the group on (an operator shell may export it for the
@@ -200,6 +204,14 @@ class ChatConfig:
 
 
 @dataclass(frozen=True)
+class ObservationConfig:
+    command: Path
+    ingestion_state_dir: Path
+    sources_path: Path
+    child_env: Mapping[str, str]
+
+
+@dataclass(frozen=True)
 class ServiceConfig:
     principals: tuple[Principal, ...]
     state_dir: Path
@@ -218,6 +230,7 @@ class ServiceConfig:
     handoff_exposure: HandoffExposureConfig | None = None
     chat: ChatConfig | None = None
     plan_root: Path | None = None
+    observation: ObservationConfig | None = None
 
     @property
     def transport_dir(self) -> Path:
@@ -658,6 +671,26 @@ def _chat(environ: Mapping[str, str], state_dir: Path, worker_state: Path, *,
     return ChatConfig(command, chat_state, grants_path, replay, live, child)
 
 
+def _observation(environ: Mapping[str, str], state_dir: Path, worker_state: Path, *,
+                 relation: RelationConfig | None, extraction: ExtractionConfig | None,
+                 graph: GraphConfig | None, handoff: HandoffConfig | None) -> ObservationConfig | None:
+    if OBSERVATION_COMMAND not in environ:
+        return None
+    for name in OBSERVATION_VARS:
+        if name not in environ:
+            raise ConfigError(name, "observation_group_incomplete")
+    command = _file(environ[OBSERVATION_COMMAND], OBSERVATION_COMMAND, executable=True)
+    ingestion = _existing_dir(environ["ZOOP_AI_INGESTION_STATE_DIR"], "ZOOP_AI_INGESTION_STATE_DIR")
+    sources = _file(environ["ZOOP_AI_SERVICE_SOURCES"], "ZOOP_AI_SERVICE_SOURCES")
+    app_state = _absolute(environ.get("ZOOP_STATE_DIR"), "ZOOP_STATE_DIR")
+    _disjoint({"ZOOP_AI_SERVICE_STATE_DIR": state_dir, "ZOOP_AI_WORKER_STATE_DIR": worker_state,
+               "ZOOP_STATE_DIR": app_state, "ZOOP_AI_INGESTION_STATE_DIR": ingestion}, "observation_roots_overlap")
+    for group in (relation, extraction, graph, handoff):
+        if group is not None and (group.ingestion_state_dir != ingestion or group.sources_path != sources):
+            raise ConfigError(OBSERVATION_COMMAND, "observation_sources_disagree")
+    return ObservationConfig(command, ingestion, sources, _child_env(app_state, worker_state))
+
+
 def load(environ: Mapping[str, str]) -> ServiceConfig:
     principals = _principals(environ.get("ZOOP_AI_SERVICE_PRINCIPALS"))
     admission = environ.get("ZOOP_AI_SERVICE_PLAN_ADMISSION")
@@ -690,9 +723,9 @@ def load(environ: Mapping[str, str]) -> ServiceConfig:
         if key in environ:
             child[key] = environ[key]
     extraction_enabled = any(name in environ for name in (*EXTRACTION_OWN, EXTRACTION_TOPIC))
-    # The S3 group is on when any variable of its own is set, or (as before this group existed) when only the shared ones are set and the
-    # S2 group does not claim them.
-    relation_enabled = any(name in environ for name in RELATION_OWN) or (not extraction_enabled and any(name in environ for name in SHARED_VARS))
+    # Shared settings alone retain the legacy S3 incomplete-group refusal unless S2 or observation export claims them.
+    relation_enabled = any(name in environ for name in RELATION_OWN) or (
+        not extraction_enabled and OBSERVATION_COMMAND not in environ and any(name in environ for name in SHARED_VARS))
     relation = _relation(environ, principals, state_dir, worker_state, relation_enabled)
     extraction = _extraction(environ, principals, state_dir, worker_state)
     if plan_root is not None:
@@ -702,8 +735,9 @@ def load(environ: Mapping[str, str]) -> ServiceConfig:
             raise ConfigError("ZOOP_AI_SERVICE_PLAN_ROOT", "plan_roots_overlap")
     graph = _graph(environ, principals, state_dir, worker_state, relation, extraction)
     handoff = _handoff(environ, principals, state_dir, worker_state, relation, extraction, graph)
+    observation = _observation(environ, state_dir, worker_state, relation=relation, extraction=extraction, graph=graph, handoff=handoff)
     pipeline_live = _pipeline_live(environ, state_dir, relation, extraction)
     exposure = _handoff_exposure(environ, principals, state_dir, worker_state, relation, extraction, graph, handoff)
     chat = _chat(environ, state_dir, worker_state, relation=relation, extraction=extraction, graph=graph, handoff=handoff, exposure=exposure)
     return ServiceConfig(principals, state_dir, worker_state, command, grants_path, replay, port, live, child, relation, extraction, graph, handoff,
-                         pipeline_live, handoff_exposure=exposure, chat=chat, plan_root=plan_root)
+                         pipeline_live, handoff_exposure=exposure, chat=chat, plan_root=plan_root, observation=observation)

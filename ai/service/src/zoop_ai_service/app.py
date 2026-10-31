@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Annotated, Any
 from fastapi import Depends, FastAPI, Header, Path, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -34,6 +34,8 @@ from .handoff_reads import HandoffError, HandoffReads
 from .handoff_wire import HANDOFF_ID_PATTERN, HdBundle, HdErrorEnvelope, HdStatus
 from .handoff_exposure_reads import HandoffExposureReads
 from .handoff_exposure_wire import MAX_COMMAND as EXPOSURE_MAX_BODY, ExposureQuery, HdExposure
+from .observation_reads import ObservationError, ObservationReads
+from .observation_wire import MAX_INPUT as OBSERVATION_MAX_BODY, ObservationExport, ObservationExportRequest
 from .relation_jobs import RelationError, RelationJobs
 from .relation_wire import RelationErrorEnvelope, RelationJobStatus, RelationOperationStatus, RelationResultEnvelope, RelationReview, RelationSubmit
 from .wire import KINDS, ErrorBody, ErrorEnvelope, JobStatus, ResultEnvelope
@@ -397,11 +399,27 @@ PLAN_ERRORS = {
 }
 
 
+OBSERVATION_ERRORS = {
+    code: {"model": ErrorEnvelope, "description": description}
+    for code, description in {
+        401: "authentication_required: missing, malformed or unknown bearer token.",
+        403: "scope_denied or source_unauthorized: current read/store/quote-display rights are required.",
+        404: "round_not_found, observation_not_found or document_version_not_in_round.",
+        409: "registry_changed, scope_configuration_conflict or preparation_profile_unbound; never recover automatically.",
+        413: "request_too_large: declared or streamed body exceeds 2,000,000 bytes.",
+        415: "unsupported_media_type: requires application/json with UTF-8.",
+        422: "invalid_request: exact closed native selector; no query parameters.",
+        500: "runtime_contract_mismatch, runtime_binding_mismatch or internal_error; no content is returned.",
+        503: "execution_unavailable (group disabled), runtime_busy, service_busy, runtime_unavailable or service_configuration_invalid.",
+    }.items()
+}
+
+
 
 def create_app(service: JobService | None = None, relation: RelationJobs | None = None, extraction: ExtractionJobs | None = None,
                graph: GraphReads | None = None, handoff: HandoffReads | None = None,
                handoff_exposure: HandoffExposureReads | None = None, chat: ChatStages | None = None, *,
-               plans: PlanAdmissionService | None = None) -> FastAPI:
+               plans: PlanAdmissionService | None = None, observation: ObservationReads | None = None) -> FastAPI:
     """With no service this builds the route skeleton only (OpenAPI export); a service makes it serve requests. `relation` is the
     S3 relation-job family, `extraction` the S2 extraction-job family, `graph` the read-only graph-version family and `handoff` the read-only handoff family; without one, every
     route of that family answers 409 `execution_unavailable` after authentication."""
@@ -411,6 +429,7 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
     app.state.handoff_exposure = handoff_exposure
     app.state.chat = chat
     app.state.plans = plans
+    app.state.observation = observation
     app.add_middleware(Gateway)
 
     @app.exception_handler(ApiError)
@@ -768,6 +787,27 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
         seen = context["seen"] = Observation()
         result = await run_in_threadpool(chat_stages.probe_mcp, seen)
         return JSONResponse(result.wire(), status_code=200)
+
+    @app.post("/internal/v1/observations/export", operation_id="exportObservation", tags=["observations"],
+              response_model=ObservationExport, summary="Export one exact observation with current read/store/quote-display rights",
+              responses=OBSERVATION_ERRORS)
+    async def observation_export(request: Request, principal: Annotated[Principal, Depends(require("observation.read"))],
+                                 x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> Response:
+        reads = request.app.state.observation
+        if reads is None:
+            raise ObservationError(503, "execution_unavailable", retry_after=30)
+        graph_query(request, ())
+        plan_headers(request)
+        check_content_type(request)
+        raw = await read_body(request, OBSERVATION_MAX_BODY)
+        try:
+            value = json.loads(raw.decode("utf-8"), object_pairs_hook=_duplicate_free, parse_constant=_no_constant)
+            selector = ObservationExportRequest.model_validate(value)
+        except (UnicodeError, ValueError, RecursionError):
+            raise invalid("body") from None
+        seen = _context(request)["seen"] = Observation()
+        exported = await run_in_threadpool(reads.export, selector, seen)
+        return Response(exported, media_type="application/json")
 
     @app.post("/internal/v1/chat-stages/{stage}", operation_id="invokeChatStage", tags=["chat-stages"], status_code=200,
               response_model=ChatStageResult, summary="Run one chatbot model stage synchronously: router, answer, verification or agent",
