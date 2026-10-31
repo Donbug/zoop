@@ -626,10 +626,28 @@ class ChatEvalSetTest {
                         }
                     }), new BriefingReadTool(briefings(set), access),
                     new com.zoop.chat.tool.BriefingEvidenceTool(new BriefingReadTool(briefings(set), access)),
+                    new com.zoop.chat.tool.DocumentSearchTool(documents(set)),
                     new SelectionRuleReadTool((version, asOf, issue) -> new GraphContextLookup(
                             reader.readPinned(version, asOf, asOf != null).graph()).find(issue)
                             .filter(t -> "issue".equals(t.kind())).map(GraphContextLookup.Target::label),
                             publications(set), briefings(set), access)));
+        }
+
+        /** The set's documents of a company, each quoting its evidence; a company without any has none. */
+        private static com.zoop.chat.tool.DocumentSearchTool.Documents documents(JsonNode set) {
+            return (company, from, version, asOf, limit, trace) -> {
+                List<com.zoop.graph.read.CompanyDocumentsService.Document> found = new java.util.ArrayList<>();
+                set.path("documents").path(company).forEach(d -> {
+                    List<com.zoop.graph.read.CompanyDocumentsService.Quote> quotes = new java.util.ArrayList<>();
+                    d.get("evidenceIds").forEach(e -> quotes.add(new com.zoop.graph.read.CompanyDocumentsService.Quote(
+                            e.stringValue(), "합성 인용", true)));
+                    found.add(new com.zoop.graph.read.CompanyDocumentsService.Document(d.get("id").stringValue(),
+                            d.get("title").stringValue(), "합성 언론사", "https://news.example.com/" + d.get("id").stringValue(), null,
+                            "news", List.of(), quotes, null, "v1", null, null, null, null));
+                });
+                return new com.zoop.graph.read.CompanyDocumentsService.Response(found,
+                        new com.zoop.common.response.Metadata("graph", NOW, version, trace, false, List.of()), null);
+            };
         }
 
         /** The set's published rounds; asked for no date, the first (latest); any other round is not ready. */
