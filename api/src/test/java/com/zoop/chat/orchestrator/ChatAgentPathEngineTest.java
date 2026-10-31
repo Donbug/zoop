@@ -212,6 +212,47 @@ class ChatAgentPathEngineTest {
         assertEquals(List.of(List.of(ChatCapability.COMPANY_READ)), agent.allowed);
     }
 
+    private ChatPlan.Run planned(ChatRun run, ChatRouteDecision.Requirement requirement) {
+        return ChatPlannerTest.run(new ChatPlanner().plan(run, ChatPlannerTest.decision((Object) requirement),
+                Set.of("company.read", "document.search", "graph.version.diff")));
+    }
+
+    private static ChatRouteDecision.Requirement asking(String label, String capability, List<String> targets) {
+        ChatQueryType type = "graph.version.diff".equals(capability) ? ChatQueryType.Q05 : ChatQueryType.Q03;
+        return new ChatRouteDecision.Requirement("r1", label, true, Map.of(type, 0.9), Map.of(capability, 0.9), targets, 0.0, null);
+    }
+
+    @Test
+    void aPeriodInTheQuestionStaysOnTheDirectPathWhereItIsRead() {
+        // MCP arguments carry no period, and the server cannot read it from the run: the two paths would read different data.
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ, ChatCapability.DOCUMENT_SEARCH,
+                ChatCapability.GRAPH_VERSION_DIFF));
+        var engine = engine(agent);
+        var run = ChatPlannerTest.run(0, "v1");
+
+        assertEquals(null, engine.agentTools(run, planned(run, asking("10월 5일 이후 달라진 관계", "graph.version.diff", List.of()))));
+        assertEquals(null, engine.agentTools(run, planned(run, asking("10월 5일 이후 소식", "document.search", List.of(HYNIX)))));
+        assertTrue(engine.agentTools(run, planned(run, asking("달라진 관계", "graph.version.diff", List.of())))
+                .contains(ChatCapability.GRAPH_VERSION_DIFF));
+        assertTrue(engine.agentTools(run, planned(run, asking("최근 소식", "document.search", List.of(HYNIX))))
+                .contains(ChatCapability.DOCUMENT_SEARCH));
+    }
+
+    @Test
+    void namedTargetsBesideANarrowedSelectionStayOnTheDirectPath() {
+        // The plan reads what the question names in full; an MCP call would be bound to the selected evidence.
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ));
+        var engine = engine(agent);
+        var narrowed = ChatPlannerTest.run(0, "v1", List.of(), List.of("ev-1"), List.of("ev-1"));
+
+        assertEquals(null, engine.agentTools(narrowed, planned(narrowed, asking("SK하이닉스 소식", "company.read", List.of(HYNIX)))));
+
+        var selected = ChatPlannerTest.run(0, "v1", List.of(HYNIX), List.of("ev-1"), List.of("ev-1"));
+        assertEquals(List.of(ChatCapability.COMPANY_READ),
+                engine.agentTools(selected, planned(selected, asking("이 기업 소식", "company.read", List.of()))),
+                "the selection's own targets are bound the same way on both paths");
+    }
+
     @Test
     void aServiceRulePartClosesTheWebForItselfNotForTheFactBesideIt() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q01, 0.9), Map.of("zoopPolicy.read", 0.9)),
@@ -542,7 +583,13 @@ class ChatAgentPathEngineTest {
                 return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
             }
         };
-        var registry = new ChatToolRegistry(List.of(company, issue, policy));
+        ChatTool documents = new ChatTool() {
+            public ChatCapability capability() { return ChatCapability.DOCUMENT_SEARCH; }
+            public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
+                return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
+            }
+        };
+        var registry = new ChatToolRegistry(List.of(company, issue, policy, documents));
         var runner = new ChatToolRunner(registry);
         runners.add(runner);
         ChatModels.Router router = (run, bound) -> {
