@@ -214,7 +214,7 @@ describe('FS066-01 브리핑 평가', () => {
       targetVersion: 'v7',
       reason: null,
     });
-    expect(await screen.findByText('도움이 안 됐다고 남겼어요')).toBeTruthy();
+    expect(screen.queryByText('도움이 안 됐다고 남겼어요')).toBeNull();
 
     await user.type(
       screen.getByPlaceholderText('어떤 점이 아쉬웠나요? (선택)'),
