@@ -14,6 +14,7 @@ from typing import Any
 
 from . import chat_doc, extraction_doc, graph_doc, handoff_doc
 from .handoff_exposure_wire import ExposureQuery
+from .observation_wire import ObservationExportRequest
 from .relation_ledger import OperationRow
 from .relation_review import operation_status
 from .relation_wire import (SCHEMA as RELATION_SCHEMA, RelationErrorEnvelope, RelationJobContent, RelationJobStatus, RelationOperationStatus,
@@ -512,6 +513,7 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
                     {"name": "graph-handoffs", "description": "Read-only, nonpublic AI handoff status and whole-bundle delivery over operator-pinned handoffs, through the installed zoop-ai-handoff export command (no write, no model, no network)."},
                     {"name": "chat-stages", "description": "One chatbot model stage (router, answer or verification) per request, synchronously, through the installed zoop-ai-chat runtime (replay, or live behind the chat gate)."},
                     {"name": "plan-admissions", "description": "Bounded exact plan admission and immutable reference reads; no dispatch."},
+                    {"name": "observations", "description": "Synchronous native ingestion export with current read/store/quote-display rights; no ingestion writes or model permission."},
                     {"name": "plan-admission-policy", "description": "Separate operator-only policy CAS control; never application authority."}]
     components = spec["components"]
     components["securitySchemes"] = {"bearerAuth": {"type": "http", "scheme": "bearer",
@@ -529,7 +531,7 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
               "getGraphVersionStatus": "graph.read", "getGraphVersionFocus": "graph.read",
               "getGraphHandoffStatus": "handoff.read", "getGraphHandoffBundle": "handoff.read", "queryGraphHandoffExposure": "handoff.exposure",
               "invokeChatStage": "chat.invoke", "probeChatMcp": "chat.invoke", "admitPlan": "plan.admit", "getPlanAdmission": "plan.read",
-              "getPlanAdmissionPolicy": "plan.policy", "setPlanAdmissionPolicy": "plan.policy"}
+              "getPlanAdmissionPolicy": "plan.policy", "setPlanAdmissionPolicy": "plan.policy", "exportObservation": "observation.read"}
     for path in spec["paths"].values():
         for operation in path.values():
             operation["security"] = [{"bearerAuth": [scopes[operation["operationId"]]]}]
@@ -601,4 +603,27 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     exposure["responses"]["200"]["description"] = "Complete unchanged identity-only report in the handoff envelope; not current delivery authority or import readiness."
     chat_doc.document(spec)
     _document_plans(spec)
+    selector = ObservationExportRequest.model_json_schema(by_alias=True, ref_template="#/components/schemas/{model}")
+    components["schemas"]["ObservationExportRequest"] = selector
+    export = spec["paths"]["/internal/v1/observations/export"]["post"]
+    export["requestBody"] = {"required": True, "content": {"application/json": {
+        "schema": {"$ref": "#/components/schemas/ObservationExportRequest"}}}}
+    export["description"] = (
+        "Requires observation.read, granted only to the configured internal importer principal. This scope permits exact reads across the server's "
+        "ingestion registry; it is not per-observation ownership. One explicit native selector; schemaVersion is required and unknown fields are refused. "
+        "Runs only zoop-ai-ingest export --require-store against server-owned state and sources on every request. "
+        "The native CLI checks current read, store and quote-display grants and frozen source configuration. "
+        "The service additionally validates selector identity, text sourceHash, document version and locator hashes before returning the unchanged native JSON. "
+        "One request returns one observation synchronously with 200; batch and asynchronous (202) delivery are open design items of issue #407. "
+        "Authorized document.text is intentionally present only in a 200 response. No status route, cache, job, ingestion write, retry or recovery. "
+        "No query parameters, client paths/CLI arguments, observationId or requireStore option. Idempotency-Key is not required and conveys no authority; "
+        "a repeated request rechecks current rights rather than replaying a cached result. Input limit 2,000,000 bytes; stdout/response limit 16 MiB; "
+        "45-second child deadline; at most two concurrent exports. Ingestion writer contention is 503 runtime_busy with runtimeCode ingestion_busy. "
+        "Disabled configuration is 503 execution_unavailable after authentication. Error codes contain no text, path, key or raw diagnostics. "
+        "All responses use Cache-Control: no-store. This read does not grant model-send, publication, activation or perpetual rights. "
+        "Rights checks and HTTP delivery are separate observations, not atomic revocation or recall of already delivered text.")
+    export["responses"]["200"]["description"] = "Exact native CLI export JSON, including authorized document.text and optional native provenance; no wrapper or omitted fields."
+    for response in export["responses"].values():
+        response.setdefault("headers", {})["Cache-Control"] = {"schema": {"type": "string", "const": "no-store"}}
+    export["responses"]["503"]["headers"]["Retry-After"]["description"] = "Seconds before another explicit read; the service never retries automatically."
     return spec

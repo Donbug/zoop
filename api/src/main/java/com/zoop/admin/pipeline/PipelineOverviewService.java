@@ -41,6 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <li>{@code review} counts administrators' decisions only, never migrated ones.</li>
  * <li>{@code runs[].usage} is null where the app holds no usage, never a guessed 0.</li>
  * <li>{@code ledgerMatchesActive}: the most recent import is the active version. Issue lists between versions are not compared.</li>
+ * <li>{@code rounds} (#55): the round scheduler's state (disabled until it exists in this application) and the ten most recent
+ *     rounds from {@code graph_rounds}.</li>
  * </ul>
  */
 @Service
@@ -50,11 +52,14 @@ public class PipelineOverviewService {
 
     private final JdbcPipelineOverviewReader reader;
     private final AnalysisJobService jobs;
+    private final GraphRoundAdminService rounds;
     private final Clock clock;
 
-    public PipelineOverviewService(JdbcPipelineOverviewReader reader, AnalysisJobService jobs, Clock clock) {
+    public PipelineOverviewService(JdbcPipelineOverviewReader reader, AnalysisJobService jobs, GraphRoundAdminService rounds,
+            Clock clock) {
         this.reader = reader;
         this.jobs = jobs;
+        this.rounds = rounds;
         this.clock = clock;
     }
 
@@ -86,7 +91,8 @@ public class PipelineOverviewService {
                                     failed.error() == null ? null : failed.error().code(),
                                     failed.error() == null ? null : failed.error().message()),
                             pipeline.ingest()),
-                    pipeline.recent().stream().map(job -> run(job, statuses)).toList());
+                    pipeline.recent().stream().map(job -> run(job, statuses)).toList(),
+                    rounds.section());
         } catch (DataAccessException unavailable) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, unavailable);
         }

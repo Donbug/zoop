@@ -5,7 +5,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.List;
 
+import com.zoop.ai.config.AiObservationExportClientConfiguration;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.document.service.DocumentRegistrationService;
 import com.zoop.document.service.InMemoryDocumentRegistry;
@@ -144,8 +147,79 @@ class DocumentImportConfigurationTest {
             DocumentImportSettings settings = context.getBean(DocumentImportSettings.class);
             assertEquals(base.resolve("result.json"), settings.result());
             assertEquals(base.resolve("artifacts"), settings.artifactRoot());
-            assertEquals("DocumentImportProperties[enabled=true]", context.getBean(DocumentImportProperties.class).toString());
+            assertEquals("DocumentImportProperties[enabled=true, observationSource=cli]",
+                    context.getBean(DocumentImportProperties.class).toString());
+            assertEquals(ObservationSource.CLI, settings.observationSource());
         });
+    }
+
+    /** The HTTP observation source: the three S2-1 CLI settings left out, the observation export client configured. */
+    private String[] observationHttp() {
+        List<String> values = new ArrayList<>();
+        for (String value : valid) {
+            if (!value.startsWith("ZOOP_INGESTION_")) values.add(value);
+        }
+        values.add("ZOOP_DOCUMENT_IMPORT_OBSERVATION_SOURCE=http");
+        values.add("ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED=true");
+        values.add("ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL=https://ai.internal.example");
+        values.add("ZOOP_AI_OBSERVATION_EXPORT_CLIENT_TOKEN=export-token-0123456789abcdefghijklmnopqrstuvwxyz");
+        return values.toArray(String[]::new);
+    }
+
+    private static String[] plus(String[] values, String... more) {
+        List<String> all = new ArrayList<>(List.of(values));
+        all.addAll(List.of(more));
+        return all.toArray(String[]::new);
+    }
+
+    @Test
+    void theHttpObservationSourceNeedsTheExportClientNotTheS2CliAndLeavesTheCliSettingsNull() {
+        runner().withUserConfiguration(AiObservationExportClientConfiguration.class).withPropertyValues(observationHttp())
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertNotNull(context.getBean(DocumentImportRunner.class));
+                    DocumentImportSettings settings = context.getBean(DocumentImportSettings.class);
+                    assertEquals(ObservationSource.HTTP, settings.observationSource());
+                    assertNull(settings.ingestionCli());
+                    assertNull(settings.ingestionState());
+                    assertNull(settings.ingestionSources());
+                    assertEquals(base.resolve("artifacts"), settings.artifactRoot());
+                    assertEquals("DocumentImportProperties[enabled=true, observationSource=http]",
+                            context.getBean(DocumentImportProperties.class).toString());
+                });
+    }
+
+    @Test
+    void theHttpSourceWithoutTheClientOrWithACliSettingOrAnUnknownSourceFailsClosedWhileCliIgnoresTheClient() {
+        runner().withPropertyValues(plus(observationHttp(), "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED=false")).run(context -> {
+            Throwable failure = configurationFailure(context.getStartupFailure());
+            assertNotNull(failure);
+            assertTrue(failure.getMessage().startsWith("zoop.document-import.observation-source "), failure.getMessage());
+            assertTrue(failure.getMessage().contains("zoop.ai.observation-export-client.enabled"), failure.getMessage());
+        });
+        runner().withUserConfiguration(AiObservationExportClientConfiguration.class)
+                .withPropertyValues(plus(observationHttp(), "ZOOP_INGESTION_CLI=" + base.resolve("zoop-ai-ingest"))).run(context -> {
+                    Throwable failure = configurationFailure(context.getStartupFailure());
+                    assertNotNull(failure);
+                    assertTrue(failure.getMessage().startsWith("zoop.document-import.ingestion-cli "), failure.getMessage());
+                    assertTrue(failure.getMessage().contains("observation-source=http"), failure.getMessage());
+                    assertFalse(failure.getMessage().contains(base.toString()), failure.getMessage());
+                });
+        runner().withPropertyValues(plus(valid, "ZOOP_DOCUMENT_IMPORT_OBSERVATION_SOURCE=grpc")).run(context -> {
+            Throwable failure = configurationFailure(context.getStartupFailure());
+            assertNotNull(failure);
+            assertTrue(failure.getMessage().startsWith("zoop.document-import.observation-source "), failure.getMessage());
+        });
+        // The web application sharing this environment may hold the export client: cli does not refuse it.
+        runner().withUserConfiguration(AiObservationExportClientConfiguration.class)
+                .withPropertyValues(plus(valid, "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED=true",
+                        "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL=https://ai.internal.example",
+                        "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_TOKEN=export-token-0123456789abcdefghijklmnopqrstuvwxyz"))
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertEquals(ObservationSource.CLI,
+                            context.getBean(DocumentImportSettings.class).observationSource());
+                });
     }
 
     @Test

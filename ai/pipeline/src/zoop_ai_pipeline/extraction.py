@@ -27,7 +27,7 @@ from .extraction_contracts import (ADAPTER_VERSION, CANDIDATE_VERSION, LEDGER_VE
 from .ingestion import Ingestor
 from .ingestion import Store as IngestionStore
 from .ingestion_contracts import Authority, Export, IngestionFailure, Inspect, byte_hash, now, reserved_state_roots
-from .live_runtime import LiveFailure, LiveRuntime
+from .live_runtime import LiveFailure, LiveRuntime, physical_attempts
 
 
 _SQL = """
@@ -342,29 +342,58 @@ def _usd_total(receipts: list[dict], name: str) -> str | None:
 
 
 def live_usage(job_id: str, calls) -> dict:
-    """Truthful live counts from the stored receipts alone (no runtime, environment or key). `providerCalls` counts every attempt that was or may have
-    been transmitted; the token/USD totals are over received receipts and are null (unknown, never zero) when any value is unreported OR when a
-    transmitted call has no receipt, whose real usage this ledger cannot know."""
-    receipts = [json.loads(c["response"]) for c in calls if c["state"] == "received"]
-    unreceipted = sum(c["state"] == "started" for c in calls)
+    """Count physical sends, not logical invocations. Unknown attempts keep totals unknown; released reservations are not provider calls.
+    Historical single receipts are read as one attempt without changing their stored bytes or attributing a chain total to its primary account."""
+    attempts = []
+    for call in calls:
+        if call["response"] is not None:
+            attempts.extend(physical_attempts(json.loads(call["response"])))
+        else:
+            attempts.append({"state": "unknown" if call["state"] == "started" else "released", "receipt": None})
+    receipts = [a["receipt"] for a in attempts if a["state"] == "received"]
+    unreceipted = sum(a["state"] == "unknown" for a in attempts)
     totals = {} if unreceipted else {"inputTokens": _receipt_total(receipts, "usage", "inputTokens"), "outputTokens": _receipt_total(receipts, "usage", "outputTokens"),
                                      "reasoningTokens": _receipt_total(receipts, "usage", "reasoningTokens"), "estimatedUsd": _usd_total(receipts, "estimatedUsd"),
                                      "chargedUsd": _usd_total(receipts, "chargedUsd")}
     return {"executionMode": "live", "replayCalls": 0, "providerCalls": len(receipts) + unreceipted, "receivedCalls": len(receipts),
-            "startedWithoutReceipt": unreceipted, "unsentCalls": sum(c["state"] == "unsent" for c in calls),
+            "startedWithoutReceipt": unreceipted, "unsentCalls": sum(a["state"] == "released" for a in attempts),
             "paidModelCalls": sum(any(type((r.get("usage") or {}).get(n)) is int and r["usage"][n] > 0 for n in ("inputTokens", "outputTokens")) for r in receipts),
             **{name: totals.get(name) for name in ("inputTokens", "outputTokens", "reasoningTokens", "estimatedUsd", "chargedUsd")}, "creatorJobId": job_id}
 
 
+def live_physical_calls(call) -> list[dict]:
+    """Content-free physical accounting beneath an unchanged logical call identity; never expose provider bodies or prepared source text."""
+    if call["response"] is None:
+        return []
+    projected = []
+    for physical in physical_attempts(json.loads(call["response"])):
+        leaf = physical.get("receipt") or {}
+        projected.append({"attemptId": physical["attemptId"], "logicalAttemptId": call["attempt_id"],
+                          "state": physical["state"], "stage": call["stage"],
+                          "recipient": physical.get("recipient", leaf.get("recipient")),
+                          "funding": physical.get("funding", leaf.get("funding")),
+                          "error": physical.get("error"), "httpStatus": (leaf.get("http") or {}).get("status"),
+                          "model": (leaf.get("model") or {}).get("reported"), "usage": leaf.get("usage"),
+                          "cost": leaf.get("cost", physical.get("cost"))})
+    return projected
+
+
 def live_call(binding: dict, call) -> dict:
-    """One stored call as delivered: purpose/recipient come from the frozen binding, outcome facts from the stored receipt (null when there is none)."""
-    stage = binding["live"]["runtime"]["stages"][call["stage"]]
-    receipt = json.loads(call["response"]) if call["state"] == "received" else {}
+    """Historical single-call output stays unchanged. New chain bindings retain the logical row and expose each physical account separately."""
+    runtime = binding["live"]["runtime"]
+    stage = runtime["stages"][call["stage"]]
+    receipt = json.loads(call["response"]) if call["response"] is not None else {}
+    chain = receipt.get("format") == "zoop-live-chain-receipt-1"
     cost = receipt.get("cost")
-    return {"stage": call["stage"], "state": call["state"], "requestDigest": call["request_digest"], "fixtureHash": None, "responseDigest": call["response_digest"],
-            "verdict": call["verdict"], "attemptId": call["attempt_id"], "recipient": stage["recipient"], "purpose": stage["purpose"],
-            "httpStatus": (receipt.get("http") or {}).get("status"), "model": (receipt.get("model") or {}).get("reported"), "usage": receipt.get("usage"),
-            "cost": {k: cost.get(k) for k in ("usageKnown", "estimatedUsd", "chargedUsd")} if isinstance(cost, dict) else None}
+    result = {"stage": call["stage"], "state": call["state"], "requestDigest": call["request_digest"], "fixtureHash": None, "responseDigest": call["response_digest"],
+              "verdict": call["verdict"], "attemptId": call["attempt_id"], "recipient": None if chain else stage["recipient"], "purpose": stage["purpose"],
+              "httpStatus": (receipt.get("http") or {}).get("status"), "model": (receipt.get("model") or {}).get("reported"), "usage": receipt.get("usage"),
+              "cost": {k: cost.get(k) for k in ("usageKnown", "estimatedUsd", "chargedUsd")} if isinstance(cost, dict) else None}
+    if "fallback" in runtime.get("generation", {}):
+        result["physicalAttempts"] = live_physical_calls(call)
+        if chain and call["state"] == "started":
+            result["cost"] = {"usageKnown": False, "estimatedUsd": None, "chargedUsd": None}
+    return result
 
 
 def open_legacy_history(root: Path, ingestion_root: Path, job_id: str) -> "Store | None":
@@ -432,12 +461,13 @@ class Extractor:
             docs[key] = Doc(key, ref, export, projected, analysis.bind(export, projected))
         incoming = doc_key(request.incoming)
         groups, seen = [], set()
+        names = analysis.company_names(request.catalogue)
         for event in request.snapshot.events:
             members, keys = [], []
             for member in event.members:
                 key = doc_key(member.observation)
                 doc = docs[key]
-                mention = analysis.member_mention(member.mention, doc.article)
+                mention = analysis.member_mention(member.mention, doc.article, names)
                 identity = (doc.ref.document_version, mention.mention_id)
                 if doc.ref.document_version == docs[incoming].ref.document_version or identity in seen:
                     raise ExtractionFailure("snapshot_member_invalid")
@@ -642,7 +672,7 @@ class Extractor:
         job_id, fence = row["job_id"], row["fence"]
         if row["state"] in {"ready", "cancelled", "reconciling"}:
             return
-        if self.store.one("SELECT 1 FROM calls WHERE job_id=? AND state='started' AND response IS NULL", (job_id,)):
+        if self.store.one("SELECT 1 FROM calls WHERE job_id=? AND state='started'", (job_id,)):
             # Holding the lock proves the previous process stopped, not that its call was never sent: never auto-resend.
             code = "live_response_unknown" if is_live(json.loads(row["binding"])) else "replay_response_unknown"
             self._status(job_id, fence, "reconciling", row["phase"], code, "reconcile_only")
@@ -686,8 +716,10 @@ class Extractor:
         return attempt
 
     def _receive(self, attempt: str, raw) -> None:
-        self.db.execute("UPDATE calls SET state='received',response=?,response_digest=?,received_at=? WHERE attempt_id=? AND state='started'",
-            (canonical(raw), digest(raw), now(), attempt))
+        unknown = isinstance(raw, dict) and raw.get("format") == "zoop-live-chain-receipt-1" and any(
+            a["state"] == "unknown" for a in physical_attempts(raw))
+        self.db.execute("UPDATE calls SET state=?,response=?,response_digest=?,received_at=? WHERE attempt_id=? AND state='started' AND response IS NULL",
+            ("started" if unknown else "received", canonical(raw), digest(raw), now(), attempt))
 
     def _receipted(self, row, ctx: Context, fence: int, stage: str, ref: str, key: str, fixture_hash, lookup, fresh, saved, check=None):
         """One provider-style attempt. A saved receipt is validated/saved only; a started call without receipt is unknown.
@@ -739,7 +771,7 @@ class Extractor:
     # ------------------------------------------------------------------ live provider call ---------------------------------
 
     def _sending(self, stored: dict, stage: str, keys) -> tuple | None:
-        """(purpose, recipient, document keys) of the outbound live call of `stage`, from the FROZEN runtime. None for replay, which sends nothing anywhere."""
+        """Primary purpose/recipient and dependency closure for the final rights guard; fallback rights are checked separately for each actual send and receipt."""
         if not is_live(stored):
             return None
         decoder = self.live.frozen(stored["live"]["runtime"])
@@ -753,17 +785,17 @@ class Extractor:
         self.db.execute("UPDATE calls SET verdict=? WHERE attempt_id=? AND verdict IS NULL", (code, attempt))
 
     def _live_receipted(self, row, ctx: Context, fence: int, stage: str, ref: str, key: str, payload: dict, keys: list, parse, check=None):
-        """One provider attempt, in the only safe order: pure prepare -> current config + model-send rights -> durable reservation -> ONE send ->
-        durable raw receipt -> strict decode -> exact parse/grounding -> rights again. `keys` are the documents whose text is in `payload`.
+        """One immutable logical invocation, possibly containing primary and fallback physical attempts.
 
-        A call slot (job, stage, ref) has exactly one attempt: a reservation without a receipt is a possibly-sent request and is never resent
-        (reconciling), a reservation refused before the send is terminal `unsent`, and a received reply that cannot be used keeps its verdict and is
-        never repaired by another call. A stored receipt is decoded from the FROZEN binding, so recovery needs neither the environment nor a key."""
+        Every physical send rechecks its exact recipient's current rights; an unused optional fallback is never required. Runtime journaling makes
+        the primary durable before fallback, and this ledger stores the final or partial envelope once before decoding. Unknown physical attempts
+        leave this logical call started and the job reconciling; no resume replays either the primary or already-paid upstream stages."""
         job_id = row["job_id"]
         live = json.loads(row["binding"])["live"]
         frozen = live["runtime"]
         decoder = self.live.frozen(frozen)
         send = (decoder.purpose(stage), decoder.recipient(stage), frozenset(keys))
+        fallback = decoder.fallback_recipient(stage)
         call = self.store.one("SELECT * FROM calls WHERE job_id=? AND stage=? AND ref=?", (job_id, stage, ref))
         if call is None:
             sender = self.live.sender()
@@ -785,16 +817,26 @@ class Extractor:
                 self._guard(job_id, fence)
                 self._verify(ctx, send)
 
+            def authorize_fallback():
+                if not sender.accepts(frozen):
+                    raise ExtractionFailure("live_config_changed")
+                self._guard(job_id, fence)
+                self._verify(ctx, (send[0], fallback, send[2]))
+
             try:
-                receipt = sender.send(prepared, attempt_id=attempt, authorize=authorize)
+                receipt = sender.send(prepared, attempt_id=attempt, authorize=authorize,
+                                      **({"authorize_fallback": authorize_fallback} if fallback is not None else {}))
             except ExtractionFailure as exc:
                 self._unsent(attempt, exc.code)
                 raise
             except LiveFailure as exc:
+                if exc.receipt is not None:
+                    self._receive(attempt, exc.receipt)
                 if exc.uncertain:
-                    # The request may have reached the provider: the reservation stays `started` and charged; never resent.
+                    # The unknown physical reservation stays charged, even when the primary has a known error receipt.
                     raise ProviderResponseUnknown(exc.code) from exc
-                self._unsent(attempt, exc.code)
+                if exc.receipt is None:
+                    self._unsent(attempt, exc.code)
                 raise ExtractionFailure(exc.code) from exc
             self._receive(attempt, receipt)  # durable BEFORE any parsing, for every HTTP answer
         else:
@@ -810,11 +852,20 @@ class Extractor:
             if digest(receipt) != call["response_digest"]:
                 raise ExtractionFailure("receipt_integrity_failed")
             attempt = call["attempt_id"]
-            if (receipt.get("attemptId"), receipt.get("stage"), receipt.get("bindingIdentity")) != (attempt, stage, live["bindingDigest"]):
+        if fallback is not None and receipt.get("format") != "zoop-live-chain-receipt-1":
+            raise ExtractionFailure("receipt_binding_mismatch")
+        if receipt.get("format") == "zoop-live-chain-receipt-1":
+            expected = decoder.prepare(stage, payload)["requestDigest"]
+            if (receipt.get("attemptId"), receipt.get("logicalAttemptId"), receipt.get("stage"), receipt.get("bindingIdentity"), receipt.get("requestDigest")) != (
+                    attempt, attempt, stage, live["bindingDigest"], expected):
                 raise ExtractionFailure("receipt_binding_mismatch")
+        elif (receipt.get("attemptId"), receipt.get("stage"), receipt.get("bindingIdentity")) != (attempt, stage, live["bindingDigest"]):
+            raise ExtractionFailure("receipt_binding_mismatch")
         try:
             answer = decoder.answer(stage, receipt)
         except LiveFailure as exc:
+            if exc.uncertain:
+                raise ProviderResponseUnknown(exc.code) from exc
             self._reject(attempt, exc.code)
             raise ReplyInvalid(exc.code) from exc
         try:
@@ -823,6 +874,9 @@ class Extractor:
             self._reject(attempt, exc.code)
             raise
         self._verify(ctx, send)
+        for physical in physical_attempts(receipt):
+            if physical["state"] == "received":
+                self._verify(ctx, (send[0], physical["receipt"]["recipient"], send[2]))
         if check is not None:
             try:
                 result = check(result)
@@ -844,7 +898,7 @@ class Extractor:
         key = analysis.request_digest("extract", request_input, analysis_version(stored))
 
         def parse(raw):
-            return analysis.parse_extraction(raw, incoming.article)
+            return analysis.parse_extraction(raw, incoming.article, ctx.request.catalogue)
 
         if is_live(stored):
             extraction = self._live_receipted(row, ctx, fence, "extract", "incoming", key, request_input, [ctx.incoming], parse)

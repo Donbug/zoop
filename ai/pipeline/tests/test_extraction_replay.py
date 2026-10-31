@@ -21,6 +21,11 @@ GOLDEN = json.loads((Path(__file__).parent / "data" / "native_analysis_golden.js
 INPUTS, EXPECTED = GOLDEN["inputs"], GOLDEN["expected"]
 ANALYSIS = INPUTS["analysisVersion"]
 
+# The immutable captured control is explicitly Korean. Preserve its expected
+# hashes, while supplying the known language fact the new projection requires.
+INPUTS = {**INPUTS, "exports": {name: {**export, "observation": {**export["observation"], "language": "ko"}}
+                               for name, export in INPUTS["exports"].items()}}
+
 
 def article(name: str, synthetic: bool = True):
     return analysis.article(INPUTS["exports"][name], synthetic)
@@ -42,6 +47,15 @@ def test_article_projection_and_version_equal_the_captured_original(name):
     assert built.model_dump(mode="json") == EXPECTED["articles"][name]["projection"]
     assert built.version == EXPECTED["articles"][name]["version"]
     assert "collected_at" not in built.model_dump()
+
+
+def test_unknown_and_foreign_language_are_not_relabelled_korean():
+    original = GOLDEN["inputs"]["exports"]["a"]
+    unknown = analysis.article(original, True)
+    english = analysis.article({**original, "observation": {**original["observation"], "language": "en"}}, True)
+    assert unknown.language == "und" and english.language == "en"
+    assert len({unknown.version, english.version, article("a").version}) == 3
+    assert ADAPTER_VERSION == "zoop-extraction-native-replay-3"
 
 
 def test_a_non_synthetic_article_has_the_captured_distinct_version_and_only_that_flag_differs():
@@ -139,19 +153,19 @@ def invalid(raw, parse, code):
 
 
 def extraction_invalid(raw):
-    invalid(raw, lambda r: analysis.parse_extraction(r, A), "extraction_reply_invalid")
+    invalid(raw, lambda r: analysis.parse_extraction(r, A, catalogue("full")), "extraction_reply_invalid")
 
 
 def test_a_valid_reply_keeps_its_exact_spans_and_a_null_unique_quote_is_resolved_from_the_body():
-    kept = analysis.parse_extraction(response(), A).mentions[0].evidence[0]
+    kept = analysis.parse_extraction(response(), A, catalogue("full")).mentions[0].evidence[0]
     assert (kept.start, kept.end, kept.quote) == (16, 21, "공급 계약") and A.body[kept.start:kept.end] == kept.quote
-    resolved = analysis.parse_extraction(span(response(), start=None, end=None), A).mentions[0].evidence[0]
+    resolved = analysis.parse_extraction(span(response(), start=None, end=None), A, catalogue("full")).mentions[0].evidence[0]
     assert (resolved.start, resolved.end) == (16, 21)
 
 
 @pytest.mark.parametrize("wrong", [{"start": 0, "end": 3}, {"start": True, "end": False}, {"start": "16", "end": "21"}, {"start": 99, "end": 100}])
 def test_offsets_that_do_not_select_the_quote_are_never_trusted_and_are_re_derived_from_the_unique_quote(wrong):
-    got = analysis.parse_extraction(span(response(), **wrong), A).mentions[0].evidence[0]
+    got = analysis.parse_extraction(span(response(), **wrong), A, catalogue("full")).mentions[0].evidence[0]
     assert (got.start, got.end) == (16, 21)
 
 
@@ -160,7 +174,7 @@ def test_a_repeated_quote_needs_its_exact_span_and_is_never_guessed():
     assert A.body.count(repeated) == 2
     extraction_invalid(span(response(), quote=repeated, start=None, end=None))
     second = A.body.rindex(repeated)
-    got = analysis.parse_extraction(span(response(), quote=repeated, start=second, end=second + 2), A).mentions[0].evidence[0]
+    got = analysis.parse_extraction(span(response(), quote=repeated, start=second, end=second + 2), A, catalogue("full")).mentions[0].evidence[0]
     assert (got.start, got.end) == (second, second + 2)
 
 
@@ -181,7 +195,7 @@ def test_replies_violating_the_strict_mention_contract_are_permanent_faults(raw)
 
 
 def test_an_empty_mention_list_is_a_valid_empty_extraction():
-    assert analysis.parse_extraction({"mentions": []}, A).mentions == []
+    assert analysis.parse_extraction({"mentions": []}, A, catalogue("full")).mentions == []
 
 
 def decision(**over) -> dict:

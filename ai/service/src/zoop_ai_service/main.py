@@ -27,6 +27,8 @@ from .handoff_reads import HandoffReads
 from .handoff_runtime import HandoffProcess
 from .handoff_exposure_reads import HandoffExposureReads
 from .handoff_exposure_runtime import HandoffExposureProcess
+from .observation_reads import ObservationReads
+from .observation_runtime import ObservationProcess
 from .relation_dispatch import RelationDispatcher
 from .relation_jobs import RelationJobs
 from .relation_ledger import RelationLedger
@@ -57,6 +59,7 @@ class Service:
     handoff_exposure: HandoffExposureReads | None = None
     chat: ChatStages | None = None
     plans: PlanAdmissionService | None = None
+    observation: ObservationReads | None = None
 
 
 def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) -> Service:
@@ -116,6 +119,7 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
     handoff = HandoffReads(config, HandoffProcess(config, deadlines), gate if config.handoff.shared_gate else None) if config.handoff is not None else None
     exposure = (HandoffExposureReads(config, HandoffExposureProcess(config, deadlines), gate if config.handoff_exposure.shared_gate else None)
                 if config.handoff_exposure is not None else None)
+    observation = ObservationReads(ObservationProcess(config, deadlines)) if config.observation is not None else None
     starting: dict[str, object] = {"event": "service_starting", "principals": len(config.principals), "live": config.live_available,
                                    "replay": config.replay_path is not None, "requeuedInFlight": requeued}
     if config.relation is not None:  # a disabled feature leaves the S1 startup line exactly as it was
@@ -135,12 +139,12 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
         starting["chatLive"] = config.chat.live_available
     emit(starting)
     return Service(config, lock, ledger, worker, dispatcher, jobs, relation, relation_dispatcher, relation_ledger, extraction, extraction_dispatcher,
-                   extraction_ledger, graph, handoff, handoff_exposure=exposure, chat=chat, plans=plans)
+                   extraction_ledger, graph, handoff, handoff_exposure=exposure, chat=chat, plans=plans, observation=observation)
 
 
 def serve(service: Service) -> None:
     app = create_app(service.jobs, service.relation, service.extraction, service.graph, service.handoff,
-                     handoff_exposure=service.handoff_exposure, chat=service.chat, plans=service.plans)
+                     handoff_exposure=service.handoff_exposure, chat=service.chat, plans=service.plans, observation=service.observation)
     service.dispatcher.start()
     if service.relation_dispatcher is not None:
         service.relation_dispatcher.start()

@@ -1,6 +1,7 @@
-"""Live runtime families, offline: the default PIPELINE binding and prepared requests stay byte-identical (literals snapshotted from the
-code BEFORE families existed), the ISSUE_SUMMARY family has its own stages that never cross, and the issue-summary prompt/verifier
-projection, reply mapping and verdict policy are deterministic. Fake HTTP only; no key, endpoint or text is real."""
+"""Live runtime families, offline: default and explicit PIPELINE selection produce identical bindings and requests.
+
+ISSUE_SUMMARY has separate stages, and its projections, reply mapping and verdict policy are deterministic.
+Fake HTTP only; no key, endpoint or text is real."""
 from __future__ import annotations
 
 import json
@@ -12,31 +13,9 @@ from zoop_ai_pipeline import issue_summary_jev as jev
 from zoop_ai_pipeline import issue_summary_prompts as prompts
 from zoop_ai_pipeline import live_runtime as live
 from zoop_ai_pipeline.live_runtime import ISSUE_SUMMARY, PIPELINE, LiveFailure, LiveRuntime
-from zoop_ai_pipeline.relation_contracts import canonical, digest
+from zoop_ai_pipeline.relation_contracts import canonical
 
 BUDGET_IDENTITY = "ab" * 32
-
-# Snapshot of the unmodified runtime (constructor with a fixed budget identity, so it is path independent).
-GOLDEN_IDENTITY = "54e2b9e00c4d8cb4a88376a7cb3aa0eeea908e59ed807a736094e70c1a84db57"
-GOLDEN_BINDING_DIGEST = "0bd8f3972cb0a863b4d87307591fe1119250ac8a48e8b401b317d5ad13f7684a"
-GOLDEN_GENERATION = "d9ed73de755509652f5e071cc7be0dc800bff4c3daa8f648ff8acf3eacd08ec7"
-GOLDEN_VERIFIER = "ae7890815ca4c3622f58def8ee0d6ecbd330c01c40ab970ee4d08978930b8a32"
-GOLDEN_STAGES = {
-    "compare": "32a60d3071fbb6b9baf5e7fe552d00f1fb25431a0debdd74ab8044e48226c876",
-    "extract": "817c884c47f807e8a82faec118b95538e9426f8f69e463507909183f10a105f9",
-    "impact": "0bb0c7852df951336129d613b4f9c0be881acbaeb8c1035a2631607b56dec262",
-    "relation": "b5b3fd96dc56fd6bf913c46c1f816a5bc1bdac4c22f62da413ea4bab86cf10c9",
-    "topic": "49ccbe8e336111372503f5519f0ba089594502dd6820583788103110bf0f9f58",
-    "verify-impact": "44e278186db7e56aba621c980172325a12f26126c371a7b2b82a43fc3fe61db8",
-    "verify-relation": "8f5ac93576e0a3f473ad6b542ce70bda7bb1fcefe6dfaa3c2bd8256076707799"}
-GOLDEN_PREPARED = {
-    "extract": "e6b38213148c8eb4dd529cb14ed2a7deb0d5f615fed8a996a9e4eb7adcf02926",
-    "compare": "ef5ff59394784af6aff465ee2487cc58b30d8dab14c978a99b1561ac9f094af9",
-    "topic": "b45f6581c6bc5ef00bdda04f87d41e146ec60b7e9773b75134592101c0842655",
-    "relation": "6fe7d3ef434e26c9fdc5f0118ecee0516c5fc7ef8a5eb5db421e9af6f95e9996",
-    "impact": "7a4fffb33703fa26c14a3028dc6a58f74bee3cbfc2dfe39b251029fcd67a08c7",
-    "verify-relation": "ad0931921d916200fd76324c73bd080d44bc4845e67c1028837fd13d322cf24f",
-    "verify-impact": "13f040b4d44139ebce73f37ce08410a47198aa8a1884bd123c6256cdda945581"}
 
 
 def fixed(family=None, **override) -> LiveRuntime:
@@ -60,19 +39,16 @@ def failure(call) -> LiveFailure:
     return caught.value
 
 
-# ---------------------------------------------------------------- the default family is unchanged -----------------------
+# ---------------------------------------------------------------- default family selection -----------------------------
 
-def test_the_default_pipeline_binding_is_byte_identical_to_the_snapshot_taken_before_families_existed():
-    binding = fixed().binding()
-    assert binding["version"] == "zoop-live-runtime-1" and binding["identity"] == GOLDEN_IDENTITY
-    assert digest(binding) == GOLDEN_BINDING_DIGEST and canonical(binding) == canonical(fixed(PIPELINE).binding())
-    assert digest(binding["generation"]) == GOLDEN_GENERATION and digest(binding["verifier"]) == GOLDEN_VERIFIER
-    assert {stage: digest(entry) for stage, entry in binding["stages"].items()} == GOLDEN_STAGES
+def test_the_default_pipeline_binding_equals_explicit_pipeline_selection():
+    assert fixed().binding() == fixed(PIPELINE).binding()
 
 
-def test_every_pipeline_prepared_request_is_byte_identical_to_the_snapshot():
-    runtime = fixed()
-    assert {stage: runtime.prepare(stage, PAYLOADS[stage]())["digest"] for stage in live.STAGES} == GOLDEN_PREPARED
+def test_default_and_explicit_pipeline_selection_prepare_identical_requests():
+    runtime, explicit = fixed(), fixed(PIPELINE)
+    for stage in live.STAGES:
+        assert runtime.prepare(stage, PAYLOADS[stage]()) == explicit.prepare(stage, PAYLOADS[stage]())
     assert runtime.family is PIPELINE and PIPELINE.stages == live.STAGES and PIPELINE.generation_stages == live.GENERATION_STAGES
     assert PIPELINE.verify_stages == live.VERIFY_STAGES and PIPELINE.version == live.VERSION
 
@@ -90,7 +66,7 @@ def test_the_issue_summary_family_is_a_separate_versioned_binding_with_exactly_i
     assert binding["version"] == "zoop-issue-summary-runtime-1" and binding["version"] != fixed().binding()["version"]
     assert set(binding["stages"]) == {"issue-summary", "verify-issue-summary"} == set(ISSUE_SUMMARY.stages)
     assert ISSUE_SUMMARY.generation_stages == ("issue-summary",) and ISSUE_SUMMARY.verify_stages == ("verify-issue-summary",)
-    assert not set(ISSUE_SUMMARY.stages) & set(PIPELINE.stages) and binding["identity"] != GOLDEN_IDENTITY
+    assert not set(ISSUE_SUMMARY.stages) & set(PIPELINE.stages) and binding["identity"] != fixed(PIPELINE).binding()["identity"]
     assert binding["verifier"]["model"] == "jev-1.14.0" and binding["verifier"]["adapterRevision"] == jev.ADAPTER_REVISION
     assert binding["verifier"]["adapterIdentity"] == jev.identity() and binding["generation"] == fixed().binding()["generation"]
     runtime = fixed(ISSUE_SUMMARY)

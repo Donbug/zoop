@@ -594,19 +594,18 @@ describe('D-BRF-01/02 available edition selection', () => {
       json({ items: fourRounds, nextCursor: null }),
     );
     renderAt('/briefing?date=2026-10-24&edition=morning', <BriefingPage />);
-    await screen.findByText('발행 회차를 확인하고 있어요.');
     expect(
       (
-        screen.getByRole('button', {
+        (await screen.findByRole('button', {
           name: '출근 · 미발행',
-        }) as HTMLButtonElement
+        })) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
     expect(
       (
-        screen.getByRole('button', {
+        (await screen.findByRole('button', {
           name: '퇴근 · 미발행',
-        }) as HTMLButtonElement
+        })) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
     expect(

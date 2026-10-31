@@ -95,7 +95,7 @@ import tools.jackson.databind.node.ObjectNode;
  * Format and fields: docs/development/ai-chatbot-eval-set.md.
  */
 class ChatEvalSetTest {
-    static final String SET = "chat-eval/chat-eval-v1.json";
+    static final String SET = "chat-eval/chat-eval-v2.json";
     static final String GRAPH = "fixture-2026-10-08";
     /** The fixture published before {@link #GRAPH}, for period comparisons. */
     static final String EARLIER = "fixture-2026-10-01";
@@ -105,7 +105,7 @@ class ChatEvalSetTest {
     static final Set<String> EXPECTATIONS = Set.of("requirements", "targets", "stages", "tools", "outcome", "reason", "failure",
             "deterministicCheck", "answerBasis", "answerStatus", "citationKinds", "limitations", "planned", "droppedGeneral",
             "heldRequirements", "appliedCompanies", "appliedIssues", "appliedPeriod", "graphTargets", "questionOverrodeContext",
-            "choices");
+            "choices", "notices", "uiActions", "coverage");
     /** What a limitation's message says for each cause the server names. */
     static final Map<String, String> CAUSE_WORDING = Map.of("evidence_held", "확인하지 못해 뺐어요", "nothing_found",
             "찾지 못했어요", "scope_cut", "만 확인했어요", "named_outside", "아닌 기업은 내 종목으로 확인하지 않았어요",
@@ -113,13 +113,13 @@ class ChatEvalSetTest {
     private static final Map<String, String> STAGE_NAMES = Map.of(ChatModelStages.ROUTER, "router", ChatModelStages.ANSWER,
             "answer", ChatModelStages.VERIFICATION, "verify");
     private static final ChatStageReply.Receipt RECEIPT = new ChatStageReply.Receipt("replay", "chat-eval", "scripted",
-            "chat-eval-v1", "replay", null, null, null, NOW, NOW);
+            "chat-eval-v2", "replay", null, null, null, NOW, NOW);
 
     private static final List<ObjectNode> reported = Collections.synchronizedList(new ArrayList<>());
     private static JsonNode set;
 
     @TestFactory
-    Stream<DynamicTest> chatEvalV1() {
+    Stream<DynamicTest> chatEvalV2() {
         set = read(SET);
         World world = new World(set);
         List<DynamicTest> tests = new ArrayList<>();
@@ -139,8 +139,8 @@ class ChatEvalSetTest {
         set.get("cases").forEach(c -> ids.add(c.get("id").stringValue()));
         report.set("summary", summary(ids, cases));
         report.putArray("cases").addAll(cases);
-        Files.write(REPORT.resolve("chat-eval-v1.json"), StrictJson.write(report));
-        Files.writeString(REPORT.resolve("chat-eval-v1.md"), markdown(report), StandardCharsets.UTF_8);
+        Files.write(REPORT.resolve("chat-eval-v2.json"), StrictJson.write(report));
+        Files.writeString(REPORT.resolve("chat-eval-v2.md"), markdown(report), StandardCharsets.UTF_8);
     }
 
     @Test
@@ -174,6 +174,7 @@ class ChatEvalSetTest {
                 : GRAPH;
         String job = "chat-eval-" + id;
         world.memberScope = memberScope(c.path("memberScope"));
+        world.unavailable = Set.copyOf(list(c.path("unavailableTools")));
         ChatRun run = new ChatRun(job, "chat-eval-session", "chat-eval-member", 1, "run",
                 List.of(new ChatRun.Turn(job, c.get("question").stringValue(), null, null)),
                 new ChatFrozenContext(List.of(), 0, null, null, graph), selection(c.path("selection")), graph, 0, NOW,
@@ -212,7 +213,7 @@ class ChatEvalSetTest {
         List<String> mismatches;
         try {
             ChatEngineOutcome outcome;
-            try (var runner = new ChatToolRunner(world.registry);
+            try (var runner = com.zoop.chat.tool.ChatToolRunners.withAmpleTime(world.registry);
                     var engine = new OrchestratedChatEngine(router, generator, modelStages, world.registry, runner,
                             world.citations, Clock.fixed(NOW, ZoneOffset.UTC))) {
                 outcome = engine.answer(run, control);
@@ -400,6 +401,11 @@ class ChatEvalSetTest {
             o.putNull("appliedPeriod");
         }
         o.putArray("graphTargets").addAll(strings(result.graphTargets().stream().map(GraphTarget::id).toList()));
+        o.putArray("notices").addAll(strings(result.notices().stream().map(n -> n.code()).toList()));
+        o.putArray("uiActions").addAll(strings(result.uiActions().stream().map(a -> a.kind()).toList()));
+        ArrayNode coverage = o.putArray("coverage");
+        route.path("coverage").forEach(entry -> coverage.add(entry.get("requirementId").stringValue() + ":"
+                + entry.get("status").stringValue()));
         o.putArray("choices").addAll(strings(result.choices() == null ? List.<String>of()
                 : result.choices().stream().map(ChatChoice::id).toList()));
         return o;
@@ -548,6 +554,8 @@ class ChatEvalSetTest {
         final ChatToolRegistry registry;
         /** The member's companies for the case being run (cases run one after another). */
         volatile List<ChatMemberScope.Company> memberScope = List.of();
+        /** The capabilities whose data cannot be read now, as the current case says. */
+        volatile Set<String> unavailable = Set.of();
 
         World(JsonNode set) {
             List<Entry> catalog = new ArrayList<>();
@@ -615,7 +623,7 @@ class ChatEvalSetTest {
                     return Optional.ofNullable(policies.get(docId));
                 }
             };
-            registry = new ChatToolRegistry(List.of(new CompanyReadTool(reader, access, companyProfiles),
+            registry = new ChatToolRegistry(Stream.<com.zoop.chat.tool.ChatTool>of(new CompanyReadTool(reader, access, companyProfiles),
                     new IssueReadTool(reader, access), new EvidenceResolveTool(reader, access),
                     new GraphPathTool(reader, access), new ZoopPolicyReadTool(docs),
                     new GraphVersionDiffTool(reader, versions, access, Clock.fixed(NOW, ZoneOffset.UTC)),
@@ -630,7 +638,26 @@ class ChatEvalSetTest {
                     new SelectionRuleReadTool((version, asOf, issue) -> new GraphContextLookup(
                             reader.readPinned(version, asOf, asOf != null).graph()).find(issue)
                             .filter(t -> "issue".equals(t.kind())).map(GraphContextLookup.Target::label),
-                            publications(set), briefings(set), access)));
+                            publications(set), briefings(set), access)).map(this::faultable).toList());
+        }
+
+        /** The tool, failing as data that cannot be read now while the case names its capability. */
+        private com.zoop.chat.tool.ChatTool faultable(com.zoop.chat.tool.ChatTool tool) {
+            return new com.zoop.chat.tool.ChatTool() {
+                @Override
+                public com.zoop.chat.tool.ChatCapability capability() {
+                    return tool.capability();
+                }
+
+                @Override
+                public com.zoop.chat.tool.ChatToolOutput read(com.zoop.chat.tool.ChatToolScope scope,
+                        com.zoop.chat.tool.ChatToolRequest request) {
+                    if (unavailable.contains(tool.capability().id())) {
+                        throw new com.zoop.chat.tool.ChatToolUnavailable("the case took this read down");
+                    }
+                    return tool.read(scope, request);
+                }
+            };
         }
 
         /** The set's documents of a company, each quoting its evidence; a company without any has none. */

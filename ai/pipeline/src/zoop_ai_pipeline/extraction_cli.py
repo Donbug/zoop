@@ -9,11 +9,12 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .extraction import Extractor, Fixtures, Sources, Store, open_legacy_history
+from .extraction import Extractor, Fixtures, LiveAccess, Sources, Store, open_legacy_history
 from .extraction_contracts import MAX_COMMAND, MAX_REPLAY, SCHEMA, EnqueueRound, ExtractionFailure, Selector, Submit, canonical
 from .extraction_enqueue import enqueue_round
 from .extraction_plan import plan_round, strict_json, verify_plan
-from .ingestion_contracts import Authority, IngestionFailure, read_file
+from .ingestion_contracts import IngestionFailure, read_file
+from .private_processing import runtime_factory, select_authority
 
 
 def enqueue(args, incoming) -> int:
@@ -68,7 +69,9 @@ def main() -> int:
     parser.add_argument("command", choices=("run", "submit", "resume", "inspect", "cancel", "enqueue-round", "plan-round", "verify-plan"))
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--ingestion-state-dir", required=True, type=Path)
-    parser.add_argument("--sources", required=True, type=Path)
+    authority_options = parser.add_mutually_exclusive_group(required=True)
+    authority_options.add_argument("--sources", type=Path)
+    authority_options.add_argument("--private-processing", type=Path)
     parser.add_argument("--replay", type=Path)
     parser.add_argument("--topic-replay", type=Path)
     parser.add_argument("--principal", help="plan-round only: the service principal the plan is written for")
@@ -81,6 +84,8 @@ def main() -> int:
         parser.error("--state-dir is required, and --principal/--output belong to plan-round only")
     store = None
     try:
+        if args.private_processing is not None and args.command in {"enqueue-round", "plan-round", "verify-plan"}:
+            raise IngestionFailure("private_processing_not_public")
         raw = sys.stdin.buffer.read(MAX_COMMAND + 1)
         if len(raw) > MAX_COMMAND:
             raise ExtractionFailure("command_input_limit")
@@ -126,9 +131,10 @@ def main() -> int:
                 raise ExtractionFailure("replay_fixture_required")
             fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None,
                                 read_file(args.topic_replay, MAX_REPLAY) if args.topic_replay else None)
-            authority = Authority(args.sources)
+            authority = select_authority(args.sources, args.private_processing)
             store = Store(args.state_dir, args.ingestion_state_dir)
-            extractor = Extractor(store, Sources(args.ingestion_state_dir, authority))
+            extractor = Extractor(store, Sources(args.ingestion_state_dir, authority),
+                                  LiveAccess(from_env=runtime_factory(authority)))
         if args.command == "run":
             result = extractor.run(request, fixtures, initial_only=args.initial_only)
         elif args.command == "submit":
