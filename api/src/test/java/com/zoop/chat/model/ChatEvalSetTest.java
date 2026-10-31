@@ -94,7 +94,7 @@ import tools.jackson.databind.node.ObjectNode;
  * the flow, never answer quality or thresholds. Every case and a summary are written to {@code build/reports/chat-eval/}.
  * Format and fields: docs/development/ai-chatbot-eval-set.md.
  */
-class ChatEvalSetTest {
+public class ChatEvalSetTest {
     static final String SET = "chat-eval/chat-eval-v2.json";
     static final String GRAPH = "fixture-2026-10-08";
     /** The fixture published before {@link #GRAPH}, for period comparisons. */
@@ -117,6 +117,11 @@ class ChatEvalSetTest {
 
     private static final List<ObjectNode> reported = Collections.synchronizedList(new ArrayList<>());
     private static JsonNode set;
+
+    /** The set's synthetic world. */
+    public static World world() {
+        return new World(read(SET));
+    }
 
     @TestFactory
     Stream<DynamicTest> chatEvalV2() {
@@ -547,11 +552,16 @@ class ChatEvalSetTest {
      * What the tools read: the public graph fixture pinned at {@link #GRAPH}, the case set's catalog names and profiles, two
      * ZOOP policies and a citation for every evidence of these. Every evidence is readable.
      */
-    static final class World {
+    public static final class World {
         final CompanyNameResolver names;
         final IssueNameResolver issues;
         final ChatCitationSource citations;
         final ChatToolRegistry registry;
+        /** The real read tools on the synthetic graph, for a test that drives them another way. */
+        public ChatToolRegistry registry() {
+            return registry;
+        }
+
         /** The member's companies for the case being run (cases run one after another). */
         volatile List<ChatMemberScope.Company> memberScope = List.of();
         /** The capabilities whose data cannot be read now, as the current case says. */

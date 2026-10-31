@@ -215,7 +215,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         ChatGeneratedAnswer agentAnswer = null;
         List<String> agentNotices = List.of();
         boolean directStart = false;
-        List<ChatCapability> agentTools = agentTools(confirmed);
+        List<ChatCapability> agentTools = agentTools(run, confirmed);
         if (agentTools != null && !agent.available()) {
             // Preflight/circuit decisions happen before the first agent step. The direct path begins here; a failure after an
             // agent step has started is never replaced with direct results in this run. A concept question that went to
@@ -572,16 +572,18 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      * independent first-stage reads the MCP endpoint exposes: no member-scope read or dependent stage (Q07 and checkpointed
      * plans stay direct, the member scope being a server-only precondition), no requirement over the fan-out of one call
      * ({@link ChatToolRequest#MAX_TARGETS} targets: the server batches those itself, MCP actions contract 3.2) and at least one
-     * read at all (a plan of general and limited requirements needs no tools).
+     * read at all (a plan of general and limited requirements needs no tools). It also leaves to the direct path what a tool's
+     * arguments cannot carry, so a question reads the same on both ({@link #agentReadsLikeDirect}).
      */
-    List<ChatCapability> agentTools(ChatPlan.Run plan) {
+    List<ChatCapability> agentTools(ChatRun run, ChatPlan.Run plan) {
         if (agent == null) return null;
         Set<ChatCapability> exposed = agent.tools();
         Set<ChatCapability> tools = new LinkedHashSet<>();
         for (Planned p : plan.requirements()) {
             if (p.mode() != Mode.TOOLS) continue;
             if (p.origin() == ChatPlan.Origin.SCOPE || p.dependsOn() != null || p.stage() != 1
-                    || p.targets().size() > ChatToolRequest.MAX_TARGETS || !exposed.containsAll(p.capabilities())) {
+                    || p.targets().size() > ChatToolRequest.MAX_TARGETS || !exposed.containsAll(p.capabilities())
+                    || !agentReadsLikeDirect(run, p)) {
                 return null;
             }
             tools.addAll(p.capabilities());
@@ -596,6 +598,22 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             tools.add(ChatCapability.WEB_SEARCH);
         }
         return tools.isEmpty() ? null : List.copyOf(tools);
+    }
+
+    /**
+     * Whether an MCP call would read what the plan reads. Its arguments are targets and a limit, and the server fills in the
+     * rest from the run, which knows neither the requirement's own words nor where its targets came from. So a period read from
+     * the question (or any period of a document read) and a requirement that names its own targets while the member
+     * narrowed the selection to chosen evidence stay on the direct path.
+     */
+    private static boolean agentReadsLikeDirect(ChatRun run, Planned p) {
+        boolean dated = p.capabilities().contains(ChatCapability.DOCUMENT_SEARCH)
+                ? ChatRetrieval.period(run, p).isPresent()
+                : p.capabilities().contains(ChatCapability.GRAPH_VERSION_DIFF)
+                        && ChatPeriods.parse(p.label(), run.askedAt()).isPresent();
+        boolean scopeDiffers = !run.selection().evidenceIds().isEmpty() && p.evidenceScope() == null
+                && p.capabilities().stream().anyMatch(c -> c.documents().isEmpty());
+        return !dated && !scopeDiffers;
     }
 
     /** Whether the agent was offered nothing but the web: a concept question with no read of its own. */

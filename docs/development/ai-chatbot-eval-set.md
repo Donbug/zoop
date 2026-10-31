@@ -151,7 +151,7 @@ Q07에서 질문이 기업을 지목하는 경우(구현 계획 결정 (11))는 
 | 배치 검색·재시도·기한 초과 | 총 8·내부 6·웹 2, job 45초, Luna 잔여 기한·마지막 10초 작성 예약 준수 | 단위: `ChatMcpAgentTest.sixInternalAndTwoWebCallsInThreeRoundsFitWhenAnInternalReadCameBackEmpty`, `ChatAgentPathEngineTest.anAgentStepThatCannotGetTheTimeAnAnswerNeedsEndsAsDeadlineGuard` |
 | 동일 logical call 동시·순차 중복 | single-flight 1회, 성공 0건 포함 요청 cache hit, 권한·grant 재검사 | 단위: `ChatMcpEndpointTest.aRepeatOfACallReusesWhatTheFirstReadAndStillCountsAsACall`, `identicalRequestsArrivingTogetherAreReadOnce`, `aReuseIsCheckedAgainstTheSendGrantsAsTheyAreNow` |
 | cache key의 scope·version·asOf 차이 | 서로 합치지 않음, job 종료 뒤 재사용 없음 | 일부: 재사용은 시도 범위의 원장에서만 찾음. 키 차이를 직접 겨냥한 시험은 없음 |
-| MCP/direct 동일 fixture | 같은 Tool Service의 결과·권한·버전·evidence 정규화 동등 | 없음. 두 경로가 같은 `ChatToolRunner`를 쓰지만 비교 시험은 없음 |
+| MCP/direct 동일 fixture | 같은 Tool Service의 결과·권한·버전·evidence 정규화 동등 | 단위: `ChatMcpDirectParityTest`, `ChatAgentPathEngineTest.aPeriodInTheQuestionStaysOnTheDirectPathWhereItIsRead`. 합성 그래프에서만 비교 |
 | Responses 시작 전 preflight 실패·circuit open | MCP 미노출, 처음부터 direct adapter·BranchContext 경로, 같은 예산·grant | 단위: `ChatAgentPathEngineTest.anUnavailablePreflightStartsDirectBeforeAnyAgentStep` |
 | Responses 실행 중 MCP transport 실패 | direct 결과 끼워 넣기 0회, 성공 결과 유지·notice/limitation, 다음 job circuit 반영 | 일부: 개별 호출 실패는 `ChatMcpAgentTest.anApprovedReadThatFailedFaultsTheRequirementsItServedAndNoOthers`. Luna 단계 자체가 실패하면 답변 후보가 없어 실패로 끝남 |
 | 인증·권한·grant·스키마 거부 | direct 우회 0회, 거부 원인 유지 | 단위: `ChatMcpEndpointTest.withoutAValidBearerGrantNothingIsRead`, `refusedCallsAreToolErrorsAndReadNothing` |
