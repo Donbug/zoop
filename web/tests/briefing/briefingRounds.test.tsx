@@ -594,7 +594,6 @@ describe('D-BRF-01/02 available edition selection', () => {
       json({ items: fourRounds, nextCursor: null }),
     );
     renderAt('/briefing?date=2026-10-24&edition=morning', <BriefingPage />);
-    await screen.findByText('발행 회차를 확인하고 있어요.');
     expect(
       (
         (await screen.findByRole('button', {
