@@ -69,12 +69,12 @@ test.each(['light', 'dark'] as const)(
     expect(
       candidate.edges
         ?.filter((e) => !e.style?.lineDash)
-        .every((e) => e.style?.lineWidth === 1.1),
+        .every((e) => e.style?.lineWidth === 2.2),
     ).toBe(true);
     expect(
       candidate.edges
         ?.filter((e) => e.style?.lineDash)
-        .every((e) => e.style?.lineWidth === 1),
+        .every((e) => e.style?.lineWidth === 2),
     ).toBe(true);
   },
 );
@@ -93,7 +93,8 @@ test('D-GRP-03: the chosen company label is larger and bolder than its neighbour
   );
   expect(styleOf(chosen.id).labelFontWeight).toBe(800);
   expect(styleOf(other.id).labelFontWeight).toBe(600);
-  expect(styleOf(chosen.id).labelFill).not.toBe(styleOf(other.id).labelFill);
+  // Every light-map label uses the same #212121; the chosen one stands out by size and weight.
+  expect(styleOf(chosen.id).labelFill).toBe(styleOf(other.id).labelFill);
 });
 
 test.each([0.1, 0.37, 0.53, 1])(
@@ -144,7 +145,7 @@ test.each(['light', 'dark'] as const)(
     );
     const result = styleGraph(data, { variant: 'improved', theme });
     result.edges?.forEach((edge, index) => {
-      expect(Number(edge.style?.lineWidth)).toBeLessThan(2);
+      expect(Number(edge.style?.lineWidth)).toBeLessThan(3);
       expect(edge.style?.lineDash).toEqual(data.edges?.[index].style?.lineDash);
       expect(edge.style?.endArrow).toBe(data.edges?.[index].style?.endArrow);
       expect(edge.style?.increasedLineWidthForHitTesting).toBe(

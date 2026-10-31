@@ -230,6 +230,8 @@ class ChatServiceTest {
         assertError(ErrorCode.JOB_NOT_RETRYABLE, () -> service.retry(MEMBER, "job-00001", "retry-3"));
         repository.finish("job-00001", "failed", null, null, failure("save_only"), 3);
         assertEquals("queued", service.retry(MEMBER, "job-00001", "retry-4").job().status());
+        assertTrue(repository.findJob("job-00001").orElseThrow().attempts().contains("\"sourceAttemptNo\":"),
+                "a save_only attempt names the attempt that verified the result");
 
         service.cancel(MEMBER, "job-00001", "cancel-1");
         assertError(ErrorCode.JOB_NOT_RETRYABLE, () -> service.retry(MEMBER, "job-00001", "retry-5"));

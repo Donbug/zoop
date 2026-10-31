@@ -8,7 +8,10 @@ import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
+import com.zoop.chat.dto.ChatAppliedItem;
 import com.zoop.chat.dto.ChatFailure;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.repository.ChatJobRow;
@@ -100,6 +103,40 @@ class ChatJobExecutorTest {
     }
 
     @Test
+    void aRunCarriesTheLastAnswersTargetsItCanStillSeeAndAReplyCarriesTheSameOnes() {
+        store.add(answered(queued("job-00001", null, null, 0, "run", "completed"), """
+                {"applied":{"companies":[{"id":"KRX:005930","label":"삼성전자"},{"id":"KRX:000660","label":"SK하이닉스"}],"issues":[],
+                "period":{"start":"2026-10-12","end":"2026-10-18","basis":"question","expression":"지난주"}}}"""));
+        store.add(withResult(queued("job-00002", null, null, 1, "run", "completed"),
+                ScriptedChatEngine.clarification("어느 기업인가요?", "KRX:000660").result()));
+        store.add(queued("job-00003", "job-00002", "KRX:000660", 2, "run"));
+        var engine = new ScriptedChatEngine((run, control) -> ScriptedChatEngine.guidance("안내"));
+
+        var beans = new StaticListableBeanFactory(Map.of("engine", engine));
+        new ChatJobExecutor(store, store, beans.getBeanProvider(ChatEngine.class), mapper, clock, new NoTransactions(),
+                (ids, version, asOf, request) -> Optional.of(Set.of("KRX:000660"))).runOnce();
+
+        var prior = engine.runs.getFirst().prior();
+        assertEquals(List.of(new ChatAppliedItem("KRX:000660", "SK하이닉스")), prior.companies(),
+                "a company no longer visible is no candidate");
+        assertEquals("2026-10-12", prior.period().start());
+    }
+
+    @Test
+    void carriedTargetsThatCannotBeCheckedAreDropped() {
+        store.add(answered(queued("job-00001", null, null, 0, "run", "completed"), """
+                {"applied":{"companies":[{"id":"KRX:005930","label":"삼성전자"}],"issues":[],"period":null}}"""));
+        store.add(queued("job-00002", null, null, 1, "run"));
+        var engine = new ScriptedChatEngine((run, control) -> ScriptedChatEngine.guidance("안내"));
+
+        var beans = new StaticListableBeanFactory(Map.of("engine", engine));
+        new ChatJobExecutor(store, store, beans.getBeanProvider(ChatEngine.class), mapper, clock, new NoTransactions(),
+                (ids, version, asOf, request) -> Optional.empty()).runOnce();
+
+        assertTrue(engine.runs.getFirst().prior().companies().isEmpty());
+    }
+
+    @Test
     void aDepthTwoJobNeverStoresAClarification() {
         store.add(queued("job-00001", null, null, 0, "run", "completed"));
         store.add(queued("job-00002", "job-00001", null, 1, "run", "completed"));
@@ -181,6 +218,87 @@ class ChatJobExecutorTest {
         var notCalled = job(store.job("job-00002"));
         assertEquals(new ChatFailure("transient", "deadline_guard", notCalled.message(), "rerun"), notCalled);
         assertEquals(0, executor.recoverExpired());
+    }
+
+    @Test
+    void aVerifiedResultThatCouldNotBeSavedIsSavedAgainWithoutAnyModelCall() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        var engine = new ScriptedChatEngine((run, control) -> {
+            control.beforeModelCall();
+            return ScriptedChatEngine.generalAnswer("저장에 실패할 답");
+        });
+        store.failingCompletes = 1;
+        var executor = executor(engine);
+        executor.runOnce();
+
+        var failure = job(store.job("job-00001"));
+        assertEquals("save_failed", failure.kind());
+        assertEquals("save_only", failure.retry());
+        assertEquals(1, store.job("job-00001").row.runs());
+        assertTrue(store.verifiedResult("job-00001", 1).isPresent());
+
+        store.jobs.get("job-00001").row = requeuedSaveOnly(store.job("job-00001").row);
+        executor.runOnce();
+
+        assertEquals("completed", store.job("job-00001").row.status());
+        assertEquals("answered", store.job("job-00001").row.outcome());
+        assertEquals(1, store.job("job-00001").row.runs(), "a save is not a run");
+        assertEquals(1, engine.runs.size(), "the engine is not called again");
+        assertEquals("msg-job-00001", store.job("job-00001").messageId);
+        assertTrue(mapper.readValue(store.job("job-00001").result, ChatResult.class).sections().getFirst().text()
+                .contains("저장에 실패할 답"));
+        assertTrue(store.verifiedResult("job-00001", 1).isEmpty(), "the kept copy goes once it is saved");
+    }
+
+    @Test
+    void aLeaseThatRunsOutAfterTheResultWasKeptOffersTheSaveInsteadOfAnUnknownFate() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        var executor = executor(new ScriptedChatEngine((run, control) -> ScriptedChatEngine.guidance("안내")));
+        var claim = executor.claimNext().orElseThrow();
+        store.keepVerified("job-00001", claim.ownerToken(), 1, "{}", null, NOW);
+        clock.advance(ChatJobExecutor.MAX_DEADLINE.plus(ChatJobExecutor.LEASE_GRACE));
+
+        assertEquals(1, executor.recoverExpired());
+
+        assertEquals("save_only", job(store.job("job-00001")).retry());
+    }
+
+    @Test
+    void aResultThatNeverGotSavedAndWasNotKeptEndsByLease() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        store.failingCompletes = 1;
+        store.refuseKeeping = true;
+        var executor = executor(new ScriptedChatEngine((run, control) -> ScriptedChatEngine.generalAnswer("답")));
+        executor.runOnce();
+        assertEquals("running", store.job("job-00001").row.status());
+
+        clock.advance(ChatJobExecutor.MAX_DEADLINE.plus(ChatJobExecutor.LEASE_GRACE));
+        executor.recoverExpired();
+
+        assertEquals("transient", job(store.job("job-00001")).kind());
+    }
+
+    @Test
+    void aFailedRunForgetsWhatItKept() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        var executor = executor(new ScriptedChatEngine((run, control) -> {
+            clock.advance(ChatJobExecutor.MAX_DEADLINE.plusSeconds(1));
+            control.beforeModelCall();
+            return ScriptedChatEngine.generalAnswer("기한 뒤의 답");
+        }));
+        executor.runOnce();
+
+        assertEquals("response_unknown", job(store.job("job-00001")).reason());
+        assertTrue(store.verifiedResult("job-00001", 1).isEmpty());
+    }
+
+    private static ChatJobRow requeuedSaveOnly(ChatJobRow r) {
+        String attempts = r.attempts().substring(0, r.attempts().length() - 1) + ",{\"n\":2,\"mode\":\"save_only\","
+                + "\"requestKey\":\"retry-1\",\"status\":\"queued\",\"sourceAttemptNo\":1}]";
+        return new ChatJobRow(r.id(), r.sessionId(), r.memberId(), r.seq(), r.question(), r.requestHash(), r.askedAt(),
+                r.frozenContext(), r.frozenSelection(), r.contextCompanyIds(), r.graphVersionId(), "queued", null, null,
+                r.resolvesJobId(), r.resolvesChoiceId(), r.clarificationDepth(), null, null, r.runs(), attempts, r.createdAt(),
+                r.updatedAt(), null);
     }
 
     @Test
@@ -272,6 +390,75 @@ class ChatJobExecutorTest {
     }
 
     @Test
+    void webSearchesHaveTheirOwnJobBudgetAndTakeTheDaysQuotasAllOrNothing() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        // 2026-10-21T03:00Z is 12:00 KST on the 21st.
+        String day = "2026-10-21";
+        executor(new ScriptedChatEngine((run, control) -> {
+            // The internal six are untouched by web searches, and the other way round.
+            assertEquals(List.of("tc-0", "tc-1"), control.reserveToolCalls(1, Collections.nCopies(2, web())));
+            assertEquals(ChatRunControl.MAX_TOOL_CALLS, control.toolCallsLeft());
+            var job = assertThrows(ChatWebBudgetExhausted.class, () -> control.reserveToolCalls(2, List.of(web())));
+            assertEquals(ChatWebBudgetExhausted.Budget.JOB, job.budget());
+            // A refused plan reserves none of its internal calls either.
+            assertThrows(ChatWebBudgetExhausted.class,
+                    () -> control.reserveToolCalls(2, List.of(reservation("company.read"), web())));
+            assertEquals(2, store.toolCalls("job-00001").size());
+            assertEquals(List.of("tc-2"), control.reserveToolCalls(2, List.of(reservation("company.read"))));
+            return ScriptedChatEngine.generalAnswer("답");
+        })).runOnce();
+        assertEquals(2, store.webQuotas.get(day + "/project"));
+        assertEquals(2, store.webQuotas.get(day + "/member:member-a"));
+
+        // The member's day is spent: nothing is reserved and the project's quota is not taken.
+        store.add(queued("job-00002", null, null, 0, "run"));
+        store.webQuotas.put(day + "/member:member-a", ChatRunControl.MEMBER_DAILY_WEB_CALLS - 1);
+        executor(new ScriptedChatEngine((run, control) -> {
+            var member = assertThrows(ChatWebBudgetExhausted.class,
+                    () -> control.reserveToolCalls(1, Collections.nCopies(2, web())));
+            assertEquals(ChatWebBudgetExhausted.Budget.MEMBER, member.budget());
+            assertEquals(List.of("tc-0"), control.reserveToolCalls(1, List.of(web())), "one is still left");
+            return ScriptedChatEngine.generalAnswer("답");
+        })).runOnce();
+        assertEquals(ChatRunControl.MEMBER_DAILY_WEB_CALLS, store.webQuotas.get(day + "/member:member-a"));
+        assertEquals(3, store.webQuotas.get(day + "/project"));
+
+        store.add(queued("job-00003", null, null, 0, "run"));
+        store.webQuotas.put(day + "/member:member-a", 0);
+        store.webQuotas.put(day + "/project", ChatRunControl.PROJECT_DAILY_WEB_CALLS);
+        executor(new ScriptedChatEngine((run, control) -> {
+            assertEquals(ChatWebBudgetExhausted.Budget.PROJECT, assertThrows(ChatWebBudgetExhausted.class,
+                    () -> control.reserveToolCalls(1, List.of(web()))).budget());
+            return ScriptedChatEngine.generalAnswer("답");
+        })).runOnce();
+        assertEquals(0, store.webQuotas.get(day + "/member:member-a"));
+        assertTrue(store.toolCalls("job-00003").isEmpty());
+    }
+
+    @Test
+    void aRerunDoesNotReopenTheJobsBudgetForWebSearchesThatNeverStarted() {
+        String attempts = "[{\"n\":1,\"mode\":\"run\",\"requestKey\":\"job-00001\",\"status\":\"failed\"},"
+                + "{\"n\":2,\"mode\":\"rerun\",\"requestKey\":\"job-00001-r\",\"status\":\"queued\"}]";
+        store.add(withAttempts(queued("job-00001", null, null, 0, "run"), attempts));
+        for (int i = 0; i < ChatRunControl.MAX_WEB_CALLS; i++) {
+            store.reserveToolCalls(List.of(new NewChatToolCall("row-" + i, "job-00001", 1, 1, i, "tc-" + i,
+                    ChatToolRegistry.VERSION, "web-search", "web.search", "app:web.search", "chat-tool/v1",
+                    "1".repeat(64), "{}")), NOW);
+        }
+        store.toolCalls("job-00001").forEach(c -> c.status = "cancelled");
+
+        executor(new ScriptedChatEngine((run, control) -> {
+            assertEquals(2, run.attemptNo());
+            var spent = assertThrows(ChatWebBudgetExhausted.class,
+                    () -> control.reserveToolCalls(1, List.of(web())));
+            assertEquals(ChatWebBudgetExhausted.Budget.JOB, spent.budget());
+            assertTrue(store.webQuotas.isEmpty(), "a job-budget refusal takes no daily quota");
+            return ScriptedChatEngine.generalAnswer("답");
+        })).runOnce();
+        assertEquals(ChatRunControl.MAX_WEB_CALLS, store.toolCalls("job-00001").size());
+    }
+
+    @Test
     void aShortenedDeadlineHoldsForTheFinalStoreAndForARequestReachingTheRun() {
         store.add(queued("job-00001", null, null, 0, "run"));
         executor(new ScriptedChatEngine((run, control) -> {
@@ -306,6 +493,11 @@ class ChatJobExecutorTest {
 
         assertEquals(List.of("unknown", "cancelled"),
                 store.toolCalls("job-00001").stream().map(c -> c.status).toList());
+    }
+
+    private static ChatToolCallReservation web() {
+        return new ChatToolCallReservation(ChatToolRegistry.VERSION, "web-search", "web.search", "app:web.search",
+                "chat-tool/v1", "1".repeat(64), "{}");
     }
 
     private static ChatToolCallReservation reservation(String capability) {
@@ -356,6 +548,13 @@ class ChatJobExecutorTest {
                 r.frozenContext(), r.frozenSelection(), r.contextCompanyIds(), r.graphVersionId(), r.status(), r.phase(),
                 r.outcome(), r.resolvesJobId(), r.resolvesChoiceId(), r.clarificationDepth(), r.result(), r.failure(),
                 r.runs(), attempts, r.createdAt(), r.updatedAt(), r.finishedAt());
+    }
+
+    private static ChatJobRow answered(ChatJobRow r, String result) {
+        return new ChatJobRow(r.id(), r.sessionId(), r.memberId(), r.seq(), r.question(), r.requestHash(), r.askedAt(),
+                r.frozenContext(), r.frozenSelection(), r.contextCompanyIds(), r.graphVersionId(), r.status(), r.phase(),
+                "answered", r.resolvesJobId(), r.resolvesChoiceId(), r.clarificationDepth(), result, r.failure(), r.runs(),
+                r.attempts(), r.createdAt(), r.updatedAt(), r.finishedAt());
     }
 
     private ChatJobRow withResult(ChatJobRow r, ChatResult result) {

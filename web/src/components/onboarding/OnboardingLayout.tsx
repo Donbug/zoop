@@ -16,7 +16,7 @@ export default function OnboardingLayout() {
         {social && (
           <p
             role="status"
-            className="mb-3 rounded-panel bg-zoop-soft px-3 py-2 text-xs"
+            className="mb-3 rounded-panel bg-zoop-soft px-3 py-2 text-caption"
           >
             {socialLinkMessage[social]}
           </p>

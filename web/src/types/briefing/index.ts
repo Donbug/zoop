@@ -221,6 +221,8 @@ export type BriefingResponse = {
   };
   issueIntelligence?: import('./issueIntelligence').IssueIntelligence;
   issueReading?: import('./issueReading').IssueReading;
+  issueFollowUps?: import('./issueFollowUps').IssueFollowUps;
+  issueFollowUpReview?: import('./issueFollowUpReview').IssueFollowUpReview;
   judgmentUpdate?: import('./judgmentUpdate').JudgmentUpdate;
   companyOutlooks?: import('./companyOutlook').CompanyOutlooks;
   marketSummary: BriefingMarketSummary;

@@ -70,11 +70,21 @@
         "general_knowledge",
         "zoop_documented",
         "evidence_grounded",
+        "web_reported",
         "mixed",
         "none"
       ]
     },
     "response:200:application/json.result<anyOf:0>.answerBasis:required": true,
+    "response:200:application/json.result<anyOf:0>.answerStatus": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial",
+        "guidance"
+      ]
+    },
+    "response:200:application/json.result<anyOf:0>.answerStatus:required": true,
     "response:200:application/json.result<anyOf:0>.choices[].kind": {
       "type": "string",
       "enum": [
@@ -105,7 +115,8 @@
       "enum": [
         "article",
         "zoop_doc",
-        "company_profile"
+        "company_profile",
+        "web_result"
       ]
     },
     "response:200:application/json.result<anyOf:0>.citations[].sourceKind:required": true,
@@ -125,7 +136,8 @@
         "results_truncated",
         "not_in_member_scope",
         "evidence_insufficient",
-        "out_of_scope"
+        "out_of_scope",
+        "tool_unavailable"
       ]
     },
     "response:200:application/json.result<anyOf:0>.limitations[].kind:required": true,
@@ -184,6 +196,41 @@
       "type": "string"
     },
     "response:200:application/json.result<anyOf:0>.metadata.requestId:required": true,
+    "response:200:application/json.result<anyOf:0>.notices": {
+      "type": "array",
+      "maxItems": 8
+    },
+    "response:200:application/json.result<anyOf:0>.notices:required": true,
+    "response:200:application/json.result<anyOf:0>.notices[]": {
+      "type": "object"
+    },
+    "response:200:application/json.result<anyOf:0>.notices[].code": {
+      "type": "string",
+      "enum": [
+        "mcp_direct_start",
+        "web_unavailable",
+        "web_no_results",
+        "web_budget_exhausted",
+        "web_not_configured",
+        "tool_unavailable",
+        "tool_budget_exhausted"
+      ]
+    },
+    "response:200:application/json.result<anyOf:0>.notices[].code:required": true,
+    "response:200:application/json.result<anyOf:0>.notices[].labels": {
+      "type": "array",
+      "maxItems": 6
+    },
+    "response:200:application/json.result<anyOf:0>.notices[].labels:required": true,
+    "response:200:application/json.result<anyOf:0>.notices[].labels[]": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "response:200:application/json.result<anyOf:0>.notices[].message": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "response:200:application/json.result<anyOf:0>.notices[].message:required": true,
     "response:200:application/json.result<anyOf:0>.sections": {
       "type": "array",
       "maxItems": 12
@@ -197,7 +244,8 @@
       "enum": [
         "general_knowledge",
         "zoop_documented",
-        "evidence_grounded"
+        "evidence_grounded",
+        "web_reported"
       ]
     },
     "response:200:application/json.result<anyOf:0>.sections[].basis:required": true,
@@ -215,6 +263,119 @@
       "maxLength": 12000
     },
     "response:200:application/json.result<anyOf:0>.sections[].text:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions": {
+      "type": "array",
+      "maxItems": 6
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[]": {
+      "type": "object"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].actionId": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].actionId:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].kind": {
+      "type": "string",
+      "enum": [
+        "open_company",
+        "focus_path",
+        "open_briefing",
+        "focus_relation",
+        "open_evidence",
+        "open_watchlist"
+      ]
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].kind:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].label": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].label:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].requirementIds": {
+      "type": "array",
+      "maxItems": 6
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].requirementIds:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].requirementIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target": {
+      "type": "object"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.asOf:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.asOf<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.asOf<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.companyId:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.companyId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.companyId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.date:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.date<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.date<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.edgeId:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.edgeId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.edgeId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.edition:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.edition<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.edition<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.evidenceIds:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.evidenceIds<anyOf:0>": {
+      "type": "array",
+      "maxItems": 20
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.evidenceIds<anyOf:0>[]": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.evidenceIds<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.fromId:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.fromId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.fromId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.graphVersion:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.graphVersion<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.graphVersion<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.toId:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.toId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.toId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target:required": true,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },

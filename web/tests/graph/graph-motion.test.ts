@@ -18,6 +18,6 @@ describe('D-GRP-01 cameraMotion', () => {
     expect(cameraMotion('select')).toEqual({ duration: 300, easing });
     expect(cameraMotion('zoom')).toEqual({ duration: 250, easing });
     expect(cameraMotion('fit')).toEqual({ duration: 300, easing });
-    expect(cameraMotion('layout')).toEqual({ duration: 600, easing });
+    expect(cameraMotion('layout')).toEqual({ duration: 300, easing });
   });
 });

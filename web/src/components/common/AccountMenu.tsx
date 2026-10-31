@@ -186,7 +186,7 @@ function MemberAccountMenu({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         aria-describedby={open ? undefined : tooltipId}
-        className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-1.5 rounded-panel px-1.5 text-xs text-zoop-muted hover:bg-zoop-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+        className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-1.5 rounded-panel px-1.5 text-caption text-zoop-muted hover:bg-zoop-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
         onClick={() => setOpen((value) => !value)}
         onKeyDown={(event) => {
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -210,7 +210,7 @@ function MemberAccountMenu({
         <span
           id={tooltipId}
           role="tooltip"
-          className="pointer-events-none invisible absolute top-full right-0 z-[90] mt-1 whitespace-nowrap rounded-panel bg-zoop-ink px-2 py-1 text-[11px] text-white group-hover:visible group-focus-within:visible"
+          className="pointer-events-none invisible absolute top-full right-0 z-[90] mt-1 whitespace-nowrap rounded-panel bg-zoop-ink px-2 py-1 text-caption text-white group-hover:visible group-focus-within:visible"
         >
           계정 메뉴 열기
         </span>
@@ -218,10 +218,10 @@ function MemberAccountMenu({
       {open && (
         <div className="absolute top-full right-0 z-[80] mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-panel border border-panel-line bg-white text-panel-ink shadow-lg">
           <div className="border-b border-panel-line px-4 py-3">
-            <p className="truncate text-xs font-semibold">
+            <p className="truncate text-caption font-semibold">
               {member.displayName}
             </p>
-            <p className="mt-1 break-all text-[11px] text-panel-muted">
+            <p className="mt-1 break-all text-caption text-panel-muted">
               {member.email}
             </p>
           </div>
@@ -232,7 +232,7 @@ function MemberAccountMenu({
                 type="button"
                 role="menuitem"
                 disabled={pending}
-                className="flex min-h-11 w-full items-center rounded-panel px-3 text-left text-xs hover:bg-panel-soft focus-visible:outline-2 disabled:opacity-60"
+                className="flex min-h-11 w-full items-center rounded-panel px-3 text-left text-caption hover:bg-panel-soft focus-visible:outline-2 disabled:opacity-60"
                 onClick={() => void linkSocial(provider)}
               >
                 {provider === 'google'
@@ -246,7 +246,7 @@ function MemberAccountMenu({
               role="menuitem"
               disabled={pending}
               aria-busy={pending}
-              className="flex min-h-11 w-full cursor-pointer items-center rounded-panel px-3 text-left text-xs hover:bg-panel-soft focus-visible:bg-panel-soft focus-visible:outline-2 focus-visible:outline-panel-ink disabled:cursor-progress disabled:opacity-60"
+              className="flex min-h-11 w-full cursor-pointer items-center rounded-panel px-3 text-left text-caption hover:bg-panel-soft focus-visible:bg-panel-soft focus-visible:outline-2 focus-visible:outline-panel-ink disabled:cursor-progress disabled:opacity-60"
               onClick={() => void signOut()}
             >
               {pending && !linking
@@ -259,14 +259,14 @@ function MemberAccountMenu({
           {failed && (
             <p
               role="alert"
-              className="px-4 pb-3 text-xs leading-relaxed text-zoop-alert"
+              className="px-4 pb-3 text-caption leading-relaxed text-zoop-alert"
             >
               로그아웃하지 못했어요. 로그인 상태가 유지되고 있어요. 다시 시도해
               주세요.
             </p>
           )}
           {linkError && (
-            <p role="alert" className="px-4 pb-3 text-xs text-zoop-alert">
+            <p role="alert" className="px-4 pb-3 text-caption text-zoop-alert">
               {linkError}
             </p>
           )}
@@ -275,7 +275,7 @@ function MemberAccountMenu({
       {socialResult && (
         <p
           role="status"
-          className="absolute right-0 w-64 bg-zoop-paper p-2 text-xs"
+          className="absolute right-0 w-64 bg-zoop-paper p-2 text-caption"
         >
           {socialLinkMessage[socialResult]}
         </p>

@@ -38,5 +38,9 @@
 | 작업 | 메서드·목표 경로 | WBS | 권한 |
 | --- | --- | --- | --- |
 | [getPipelineOverview](../../api/out/zoop-api-spec.md#getpipelineoverview) | GET /api/v1/admin/pipeline/overview | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
+| [listGraphRounds](../../api/out/zoop-api-spec.md#listgraphrounds) | GET /api/v1/admin/pipeline/rounds | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
+| [startGraphRound](../../api/out/zoop-api-spec.md#startgraphround) | POST /api/v1/admin/pipeline/rounds | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
+| [getGraphRound](../../api/out/zoop-api-spec.md#getgraphround) | GET /api/v1/admin/pipeline/rounds/{roundId} | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
+| [retryGraphRound](../../api/out/zoop-api-spec.md#retrygraphround) | POST /api/v1/admin/pipeline/rounds/{roundId}/retry | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
 | [listAnalysisJobs](../../api/out/zoop-api-spec.md#listanalysisjobs) | GET /api/v1/admin/jobs | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4 | 관리자(작업별 권한) |
 | [createAnalysisJob](../../api/out/zoop-api-spec.md#createanalysisjob) | POST /api/v1/admin/jobs | 6.1.2, 6.11.1, 6.5.4, 6.5.5, 6.5.6, 6.5.7 | 관리자(작업별 권한) |

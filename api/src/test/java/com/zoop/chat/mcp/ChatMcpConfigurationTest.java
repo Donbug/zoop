@@ -114,6 +114,35 @@ class ChatMcpConfigurationTest {
     }
 
     @Test
+    void replayRunsHaveNoPreflightWhileLiveRunsStartOnlyAfterTheProbe() {
+        ChatModels.Agent stages = (run, step, input) -> { throw new UnsupportedOperationException(); };
+        // The AI service is nowhere (port 1): a probe could only fail.
+        var agentPath = runner.withBean(ChatExecutionRepository.class, MemoryChatStore::new)
+                .withBean(ChatModels.Agent.class, () -> stages)
+                .withBean(HttpChatStageClient.class, () -> new HttpChatStageClient(AiClientSettings.of(
+                        "http://127.0.0.1:1", "test-chat-token-000000000000000000000001", Duration.ofSeconds(1),
+                        Duration.ofSeconds(1), 65_536)));
+        agentPath.withPropertyValues(endpoint("zoop.chat.mcp.agent-enabled=true"))
+                .run(context -> assertThat(context.getBean(ChatMcpAgent.class).available())
+                        .as("replay reaches no MCP endpoint, so nothing is probed").isTrue());
+        agentPath.withPropertyValues(endpoint("zoop.chat.mcp.agent-enabled=true", "zoop.ai.chat-client.mode=live"))
+                .run(context -> assertThat(context.getBean(ChatMcpAgent.class).available())
+                        .as("a live run whose health was not proven starts on the direct path").isFalse());
+    }
+
+    @Test
+    void theWebSearchAndTheAgentPathMayBeOnTogetherNowThatWebResultsAreCited() {
+        ChatModels.Agent stages = (run, step, input) -> { throw new UnsupportedOperationException(); };
+        runner.withBean(ChatExecutionRepository.class, MemoryChatStore::new)
+                .withBean(ChatModels.Agent.class, () -> stages)
+                .withBean(HttpChatStageClient.class, () -> new HttpChatStageClient(AiClientSettings.of(
+                        "http://127.0.0.1:1", "test-chat-token-000000000000000000000001", Duration.ofSeconds(1),
+                        Duration.ofSeconds(1), 65_536)))
+                .withPropertyValues(endpoint("zoop.chat.mcp.agent-enabled=true", "zoop.chat.web.enabled=true"))
+                .run(context -> assertThat(context).hasSingleBean(ChatMcpAgent.class));
+    }
+
+    @Test
     void theAgentFlagWithoutTheMcpEndpointRefusesToStart() {
         runner.withPropertyValues("zoop.chat.mcp.agent-enabled=true").run(context -> assertThat(context.getStartupFailure())
                 .rootCause().hasMessageContaining("ZOOP_CHAT_MCP_ENABLED"));

@@ -336,7 +336,7 @@ export const fontFamilyTokens: ScalarToken[] = [
     "name": "sans",
     "tokenPath": "typography.fontFamily.sans",
     "value": "\"SUIT Variable\", SUIT, -apple-system, BlinkMacSystemFont, \"Apple SD Gothic Neo\", \"Malgun Gothic\", system-ui, sans-serif",
-    "description": "SUIT Variable(@sun-typeface/suit@2.0.5, OFL-1.1, wght 100~900) 자체 호스팅. KS X 1001 2,668자 밖의 음절은 시스템 한글 서체로 폴백."
+    "description": "프로토타입 값. SUIT Variable(@sun-typeface/suit@2.0.5, OFL-1.1, wght 100~900) 자체 호스팅. KS X 1001 2,668자 밖의 음절은 시스템 한글 서체로 폴백. 서비스 web/은 typography.web.fontFamily를 따른다."
   },
   {
     "name": "mono",

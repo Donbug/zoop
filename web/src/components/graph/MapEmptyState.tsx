@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { GraphResponse } from '@/types/map/graph';
 import type { PersonalScope } from '@/types/map';
 
@@ -75,11 +76,11 @@ export default function MapEmptyState({
       {!uncertain && personal && emptyReason === 'no_personal_stocks' && (
         <>
           {(personalFilter === 'holdings' || personalFilter === 'all') && (
-            <a href="/my">가상 계좌 연결하기</a>
+            <Link to="/my">가상 계좌 연결하기</Link>
           )}
           {(personalFilter === 'watchlist' ||
             personalFilter === 'all' ||
-            personalFilter === null) && <a href="/my">관심 종목 고르기</a>}
+            personalFilter === null) && <Link to="/my">관심 종목 고르기</Link>}
         </>
       )}
       {personal && onPersonalFilter && (

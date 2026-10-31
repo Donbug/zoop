@@ -19,6 +19,7 @@ class ChatMcpHealthDecodeTest {
         assertNull(reachable.reason());
         assertEquals(ChatMcpHealth.Reason.TIMEOUT, decode("unreachable", "\"mcp_timeout\"").reason());
         assertEquals(ChatMcpHealth.Reason.CONNECT_FAILED, decode("unreachable", "\"mcp_connect_failed\"").reason());
+        assertEquals(ChatMcpHealth.Reason.UNAVAILABLE, decode("unreachable", "\"mcp_unavailable\"").reason());
         ChatMcpHealth unexpected = decode("unreachable", "\"mcp_status_unexpected\"");
         assertFalse(unexpected.reachable());
         assertEquals(ChatMcpHealth.Reason.STATUS_UNEXPECTED, unexpected.reason());
@@ -34,7 +35,7 @@ class ChatMcpHealthDecodeTest {
     }
 
     private static ChatMcpHealth decode(String mcp, String reason) {
-        return HttpChatStageClient.decodeHealth(WireJson.parse("{\"schemaVersion\":\"zoop-ai-chat-1\",\"mcp\":\""
+        return HttpChatStageClient.decodeHealth(WireJson.parse("{\"schemaVersion\":\"zoop-ai-chat-4\",\"mcp\":\""
                 + mcp + "\",\"reason\":" + reason + "}", "body"));
     }
 }

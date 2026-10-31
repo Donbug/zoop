@@ -390,9 +390,7 @@ final class HandoffSnapshotWriter {
         root.put("contentDigest", handoff.contentDigest());
         root.set("manifest", handoff.manifestNode());
         root.set("bundle", handoff.bundleNode());
-        ObjectNode producer = root.putObject("producer");
-        producer.set("receipt", handoff.receiptNode());
-        producer.set("attempts", handoff.attemptsNode());
+        root.set("producer", handoff.producerNode());
         ObjectNode app = root.putObject("appVerification");
         app.put("importer", IMPORTER);
         ArrayNode checks = app.putArray("checks");

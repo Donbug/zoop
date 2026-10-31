@@ -32,6 +32,8 @@ import com.zoop.document.evidence.service.EvidenceArtifactReader;
 import com.zoop.document.evidence.service.EvidenceService;
 import com.zoop.graph.importer.GraphHandoffResult.Staged;
 import com.zoop.graph.importer.HandoffFixtures.Built;
+import com.zoop.ai.handoff.HandoffReadClient.HandoffRead;
+import com.zoop.ai.handoff.HandoffReadClient;
 import com.zoop.graph.importer.HandoffFixtures.FakeHandoff;
 import com.zoop.graph.importer.HandoffFixtures.FakeIngestion;
 import com.zoop.graph.importer.HandoffFixtures.Shape;
@@ -172,6 +174,11 @@ class GraphHandoffImporterTest {
         return root.resolve("verification_receipt").resolve(versionId + ".json");
     }
 
+    /** The bundle's rule-free projection (#55 composition): named by the version alone, whatever the rules. */
+    private Path bundleFile(String versionId) {
+        return root.resolve("graph_bundle").resolve(versionId + ".json");
+    }
+
     private static String sha256(byte[] bytes) throws Exception {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
     }
@@ -190,6 +197,7 @@ class GraphHandoffImporterTest {
         assertEquals(filesBefore, fileCount());
         assertFalse(Files.exists(snapshotFile(built.versionId())));
         assertFalse(Files.exists(receiptFile(built.versionId())));
+        assertFalse(Files.exists(bundleFile(built.versionId())));
     }
 
     // ------------------------------------------------------------------------------------------------ the happy path ----
@@ -239,6 +247,15 @@ class GraphHandoffImporterTest {
         assertEquals("verification_receipt", receiptRow.kind());
         assertEquals("artifact-root:verification_receipt/" + versionId + ".json", receiptRow.storageUri());
         assertEquals(sha256(receiptBytes), receiptRow.sha256());
+        // The composition (#55): this one bundle, its receipt and its rule-free projection. With no rule enabled the stored
+        // snapshot IS that projection, so the composition points at the snapshot artifact and no second file is written.
+        assertFalse(Files.exists(bundleFile(versionId)));
+        assertTrue(registry.findArtifact("artifact-bundle-" + versionId).isEmpty());
+        assertEquals(List.of(new GraphHandoffRepository.Source(0, HANDOFF_ID, "artifact-receipt-" + versionId,
+                "artifact-" + versionId)), graph.sources(versionId));
+        assertEquals("artifact-" + versionId, staged.bundleSnapshot().artifactId());
+        assertEquals("created", staged.bundleSnapshot().file());
+        assertEquals(List.of(HANDOFF_ID), staged.sources());
 
         // The receipt retains the COMPLETE original manifest and bundle, and says what the app did not verify.
         JsonNode receipt = HandoffFixtures.parse(receiptBytes);
@@ -296,6 +313,10 @@ class GraphHandoffImporterTest {
         assertEquals(1, written.get("provenance").get("approvalBases").get("automatic-verifier").intValue());
         assertFalse(written.get("provenance").get("approvalBases").has("operator-final-approval"));
         assertEquals(3, written.get("evidenceRows").get("registered").intValue());
+        assertEquals("artifact-" + versionId, written.get("bundleSnapshot").get("artifactId").stringValue());
+        assertEquals("created", written.get("bundleSnapshot").get("file").stringValue());
+        assertEquals("[\"" + HANDOFF_ID + "\"]", written.get("composition").get("sources").toString());
+        assertEquals(HANDOFF_ID, written.get("composition").get("newSource").stringValue());
     }
 
     // ------------------------------------------------------------------------------------------------ publication rules ----
@@ -355,6 +376,19 @@ class GraphHandoffImporterTest {
         assertEquals(List.of(ISSUE), snapshot.issues().stream().map(i -> i.issueId()).toList(),
                 "the issue keeps its structural company relation");
         assertEquals(2, snapshot.companies().size(), "companies are the catalogue and always stay");
+        // The bundle's rule-free projection keeps both relations in its own artifact: a composition re-filters it under the
+        // rules of its own day. (With no rule hiding anything it would be the snapshot artifact itself.)
+        byte[] projectionBytes = Files.readAllBytes(bundleFile(versionId));
+        PublicGraphSnapshot projection = GraphSnapshotCodec.read(projectionBytes, versionId);
+        assertEquals(2, projection.relations().size());
+        assertEquals(HANDOFF_ID, projection.sourceBundleId());
+        ArtifactRow bundleRow = registry.findArtifact("artifact-bundle-" + versionId).orElseThrow();
+        assertEquals("graph_bundle_snapshot", bundleRow.kind());
+        assertEquals("artifact-root:graph_bundle/" + versionId + ".json", bundleRow.storageUri());
+        assertEquals(sha256(projectionBytes), bundleRow.sha256());
+        assertEquals(List.of(new GraphHandoffRepository.Source(0, HANDOFF_ID, "artifact-receipt-" + versionId,
+                "artifact-bundle-" + versionId)), graph.sources(versionId));
+        assertEquals("artifact-bundle-" + versionId, result.staged().bundleSnapshot().artifactId());
         var inserted = graph.inserted().get(0);
         assertEquals(List.of(1L, 1L, 1L), List.of(inserted.issueCount(), inserted.relationCount(), inserted.articleCount()),
                 "the version counts what the stored snapshot holds");
@@ -955,7 +989,7 @@ class GraphHandoffImporterTest {
         InMemoryGraphHandoffRepository.State graphBefore = graph.state();
         InMemoryDocumentRegistry.State registryBefore = registry.state();
         long filesBefore = fileCount();
-        GraphHandoffImporter legacy = new GraphHandoffImporter(handoffId -> {
+        GraphHandoffImporter legacy = new GraphHandoffImporter((HandoffExporter) handoffId -> {
             throw GraphHandoffException.handoffWithheld("handoff_contract_changed");
         }, ingestion, new IngestionExportParser(), store, registry, graph, transaction, Clock.fixed(NOW, ZoneOffset.UTC));
 
@@ -1010,6 +1044,8 @@ class GraphHandoffImporterTest {
         assertEquals(Outcome.UNCHANGED, again.staged().outcome());
         assertEquals("existing", again.staged().snapshot().file());
         assertEquals("existing", again.staged().receipt().file());
+        assertEquals("existing", again.staged().bundleSnapshot().file());
+        assertEquals(List.of(HANDOFF_ID), again.staged().sources());
         assertEquals(0, again.staged().evidenceRegistered());
         assertEquals(3, again.staged().evidenceExisting());
         assertEquals(graphBefore, graph.state());
@@ -1335,7 +1371,67 @@ class GraphHandoffImporterTest {
         assertEquals(Outcome.STAGED, next.staged().outcome());
         assertEquals("existing", next.staged().snapshot().file());
         assertEquals("existing", next.staged().receipt().file());
+        assertEquals("existing", next.staged().bundleSnapshot().file());
         assertEquals(1, graph.state().versions().size());
+    }
+
+    @Test
+    void aVersionStagedBeforeTheCompositionTableAnswersUnchangedWithoutABundleProjection() throws Exception {
+        // Staged under a rule, so the projection is its own artifact; then the migration's backfill shape: one source row per
+        // imported version with no rule-free projection (none was kept then).
+        graph.publication = new PublicationState(3, 0, List.of(INVOLVES_SINGLE));
+        importer.run(built.request());
+        graph.backfillWithoutBundleSnapshot(built.versionId());
+        registry.removeArtifact("artifact-bundle-" + built.versionId());
+        Files.delete(bundleFile(built.versionId()));
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+
+        GraphHandoffResult again = importer.run(built.request());
+
+        assertTrue(again.succeeded(), () -> String.valueOf(again.failure() == null ? null : again.failure().failure()));
+        assertEquals(Outcome.UNCHANGED, again.staged().outcome());
+        assertNull(again.staged().bundleSnapshot());
+        assertEquals(List.of(HANDOFF_ID), again.staged().sources());
+        JsonNode written = HandoffFixtures.parse(GraphHandoffResultWriter.toBytes(again));
+        assertTrue(written.get("bundleSnapshot").isNull());
+        assertTrue(written.get("composition").get("newSource").isNull(), "a re-import composed nothing new");
+        assertEquals("[\"" + HANDOFF_ID + "\"]", written.get("composition").get("sources").toString());
+        assertEquals(graphBefore, graph.state());
+        assertEquals(registryBefore, registry.state());
+        assertEquals(filesBefore, fileCount(), "an unchanged import never writes the projection it did not keep");
+        assertFalse(Files.exists(bundleFile(built.versionId())));
+    }
+
+    @Test
+    void aVersionWhoseCompositionIsNotThisOneBundleIsAConflict() throws Exception {
+        importer.run(built.request());
+        String versionId = built.versionId();
+        graph.insertSource(new GraphHandoffRepository.NewSource(versionId, 1, "handoff-unit-other",
+                "artifact-receipt-" + versionId, null));
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+
+        GraphHandoffResult result = importer.run(built.request());
+
+        assertEquals(GraphHandoffFailure.VERSION_CONFLICT, failure(result).failure());
+        assertEquals(graphBefore, graph.state());
+    }
+
+    @Test
+    void aTamperedBundleProjectionIsRefusedByTheRegistryReadOnTheNextImport() throws Exception {
+        graph.publication = new PublicationState(3, 0, List.of(INVOLVES_SINGLE));
+        importer.run(built.request());
+        String versionId = built.versionId();
+        // Same length, other bytes: the registered hash no longer matches, which the verified read reports as a changed file.
+        Path file = bundleFile(versionId);
+        byte[] bytes = Files.readAllBytes(file);
+        bytes[bytes.length - 2] = (byte) (bytes[bytes.length - 2] == ']' ? '}' : ']');
+        Files.write(file, bytes);
+
+        GraphHandoffResult result = importer.run(built.request());
+
+        assertEquals(GraphHandoffFailure.TEXT_MISMATCH, failure(result).failure());
     }
 
     @Test
@@ -1769,5 +1865,81 @@ class GraphHandoffImporterTest {
         assertEquals(Outcome.UNCHANGED, again.staged().outcome());
         assertTrue(java.util.Arrays.equals(snapshotBytes, Files.readAllBytes(snapshotFile(twoHop.versionId()))));
         assertTrue(java.util.Arrays.equals(receiptBytes, Files.readAllBytes(receiptFile(twoHop.versionId()))));
+    }
+
+    // ------------------------------------------------------------------------------------------ the HTTP handoff source -----
+
+    private GraphHandoffImporter httpImporter(HandoffFixtures.FakeHandoffRead reads) {
+        return new GraphHandoffImporter(new HttpHandoffSource(reads), ingestion, new IngestionExportParser(), store, registry, graph,
+                transaction, Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    @Test
+    void theHttpHandoffSourceStagesTheSameVersionAsTheCliAndTheReceiptSaysWhereTheBundleCameFrom() throws Exception {
+        HandoffFixtures.FakeHandoffRead reads = new HandoffFixtures.FakeHandoffRead(HandoffFixtures.read(built));
+        GraphHandoffImporter http = httpImporter(reads);
+
+        GraphHandoffResult result = http.run(built.request());
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        assertEquals(Outcome.STAGED, result.staged().outcome());
+        String versionId = built.versionId();
+        assertEquals(1, reads.bundleCalls.get(), "one bundle read to check");
+        assertEquals(1, reads.statusCalls.get(), "one content-free status read right before the commit");
+        // The snapshot is a function of the verified bundle alone, so it is byte-identical to the CLI path's.
+        freshSetUp();
+        importer.run(built.request());
+        byte[] cliSnapshot = Files.readAllBytes(snapshotFile(versionId));
+        freshSetUp();
+        reads = new HandoffFixtures.FakeHandoffRead(HandoffFixtures.read(built));
+        http = httpImporter(reads);
+        assertEquals(Outcome.STAGED, http.run(built.request()).staged().outcome());
+        assertTrue(java.util.Arrays.equals(cliSnapshot, Files.readAllBytes(snapshotFile(versionId))));
+        // The receipt keeps the same manifest, bundle and digests, and under `producer` the service's answer instead of a CLI receipt.
+        JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId)));
+        assertEquals(built.manifestDigest(), receipt.get("manifestDigest").stringValue());
+        assertEquals(built.bundleDigest(), receipt.get("bundleDigest").stringValue());
+        assertEquals(built.bundle(), receipt.get("bundle"));
+        JsonNode producer = receipt.get("producer");
+        assertFalse(producer.has("receipt"));
+        assertFalse(producer.has("attempts"));
+        assertEquals(HandoffReadParser.TRANSPORT, producer.get("read").get("transport").stringValue());
+        assertEquals(built.bundleDigest(), producer.get("read").get("verification").get("bundleDigest").stringValue());
+        // The same pins again: unchanged, through the same route.
+        assertEquals(Outcome.UNCHANGED, http.run(built.request()).staged().outcome());
+    }
+
+    @Test
+    void aHandoffWithheldByTheServiceBetweenTheCheckAndTheCommitRollsTheHttpImportBack() throws Exception {
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+        GraphHandoffImporter http = httpImporter(new HandoffFixtures.FakeHandoffRead(HandoffFixtures.read(built)).withholdFrom(2));
+
+        GraphHandoffException failure = failure(http.run(built.request()));
+
+        assertEquals(GraphHandoffFailure.HANDOFF_WITHHELD, failure.failure());
+        assertEquals("source_unauthorized", failure.cliCode());
+        assertNothingWritten(graphBefore, registryBefore, filesBefore);
+    }
+
+    @Test
+    void theSamePinsReadAgainLaterAreUnchangedAlthoughTheServiceStampsEveryAnswerAnew() throws Exception {
+        HandoffFixtures.FakeHandoffRead reads = new HandoffFixtures.FakeHandoffRead(HandoffFixtures.read(built));
+        GraphHandoffImporter http = httpImporter(reads);
+        assertEquals(Outcome.STAGED, http.run(built.request()).staged().outcome());
+        byte[] receipt = Files.readAllBytes(receiptFile(built.versionId()));
+
+        // ai/service stamps observedAt and delivery.checkedAt per request: a later read of the same pins differs only there.
+        HandoffRead first = reads.answer;
+        reads.answer = new HandoffRead(first.handoffId(), first.state(),
+                new HandoffReadClient.Delivery("current", Optional.empty(), Optional.of("2026-10-17T01:00:00+00:00")),
+                first.verification(), first.manifest(), first.bundle(), "2026-10-17T01:00:01Z");
+
+        GraphHandoffResult again = http.run(built.request());
+
+        assertTrue(again.succeeded(), () -> String.valueOf(again.failure() == null ? null : again.failure().failure()));
+        assertEquals(Outcome.UNCHANGED, again.staged().outcome());
+        assertTrue(java.util.Arrays.equals(receipt, Files.readAllBytes(receiptFile(built.versionId()))), "the first receipt is kept");
     }
 }

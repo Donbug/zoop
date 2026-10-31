@@ -138,7 +138,7 @@ describe('D-GRP-02 · prototype event panel completion via /api/v1', () => {
     };
     event.sourceSupport.independentSourceCount = 2;
     server.on('GET', '/api/v1/events/:id', () => json(event));
-    render(<EventDetailPanel {...eventProps} />);
+    render(<EventDetailPanel {...eventProps} />, { wrapper: MemoryRouter });
     await screen.findByText('독립 출처 2곳');
     const list = screen.getByRole('region', { name: '앞뒤로 이어진 사건' });
     expect(
@@ -170,7 +170,7 @@ describe('D-GRP-02 · prototype event panel completion via /api/v1', () => {
       const event = structuredClone(baseEvent);
       event.sourceSupport.independentSourceCount = count;
       server.on('GET', '/api/v1/events/:id', () => json(event));
-      render(<EventDetailPanel {...eventProps} />);
+      render(<EventDetailPanel {...eventProps} />, { wrapper: MemoryRouter });
       await screen.findByRole('heading', { name: baseEvent.title });
       expect(Boolean(screen.queryByText('독립 출처 0곳'))).toBe(count === 0);
     },
@@ -185,7 +185,7 @@ describe('D-GRP-02 · prototype event panel completion via /api/v1', () => {
       scope: 'test',
     };
     server.on('GET', '/api/v1/events/:id', () => json(event));
-    render(<EventDetailPanel {...eventProps} />);
+    render(<EventDetailPanel {...eventProps} />, { wrapper: MemoryRouter });
     await screen.findByRole('heading', { name: baseEvent.title });
     expect(screen.queryByText('합성 승인 표시')).toBeNull();
     expect(
@@ -207,7 +207,7 @@ describe('D-GRP-02 · prototype event panel completion via /api/v1', () => {
     }));
     event.sourceSupport.independentSourceCount = 5;
     server.on('GET', '/api/v1/events/:id', () => json(event));
-    render(<EventDetailPanel {...eventProps} />);
+    render(<EventDetailPanel {...eventProps} />, { wrapper: MemoryRouter });
     await screen.findByText('일부 정보를 불러오지 못했습니다.');
     expect(screen.queryByText('독립 출처 5곳')).toBeNull();
     expect(
@@ -450,7 +450,6 @@ describe('D-GRP-03 · document judgements retain company/event context', () => {
           onClose={vi.fn()}
           onSelectIssue={vi.fn()}
           onFocus={vi.fn()}
-          onConnections={vi.fn()}
           onAskAi={vi.fn()}
         />
       </MemoryRouter>,

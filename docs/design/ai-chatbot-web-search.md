@@ -1,6 +1,6 @@
 # ZOOP AI 챗봇 보조 웹 검색 설계
 
-문서 상태: 2026-10-28 팀 결정 · 구현 예정 · 공급자/출시 확인 별도
+문서 상태: 2026-10-28 팀 결정 · 서버 도구·예산, agent 경로 승인 gate, Q02 기본 검색과 요구별 gate 구현(2026-10-31, [api/docs/chat-web-search.md](../../api/docs/chat-web-search.md)), 답변 인용 계약(`web_reported`·`web_result`, 2026-10-30) · 공급자/출시 확인 별도
 
 기준 정책: [ZOOP-AIG-001 v0.11](../ZOOP_AI_거버넌스_정책.md) / [설계 요약](ai-chatbot-design-summary.md) / [Luna MCP 실행 계약](ai-chatbot-mcp-actions.md)
 
@@ -75,7 +75,7 @@ Q05/Q08의 배경 보도를 ‘이 기사 때문에 변경/선정됐다’고 �
 
 웹 실패 때문에 다른 정상 조회 결과를 버리지 않는다. 내부 근거가 모든 요구를 답하면 complete와 notice, 일부만 답하면 partial과 해당 limitation, 아무것도 답할 수 없으면 guidance/insufficient_evidence의 안내다. Q02 검색 실패 시 일반 개념 설명은 가능하되 출처를 만들어내지 않는다. 항상 사용자 응답을 제공한다는 원칙은 검증 실패 본문을 공개하거나 기술 장애를 성공 처리하는 뜻이 아니다.
 
-장애는 evidence_insufficient로 숨기지 않는다. answered의 미충족 요구에는 원인별 limitation, 답변을 막지 않은 검색 장애에는 notices를 쓴다. 이 필드 확장은 [MCP 실행 계약 3.5절](ai-chatbot-mcp-actions.md#35-사용자-응답과-내부-실패의-구분)의 목표이며 아직 구현되지 않았다.
+장애는 evidence_insufficient로 숨기지 않는다. answered의 미충족 요구에는 원인별 limitation, 답변을 막지 않은 검색 장애에는 notices를 쓴다. `answerStatus`·`notices`와 web_* notice code는 [MCP 실행 계약 3.5절](ai-chatbot-mcp-actions.md#35-사용자-응답과-내부-실패의-구분)대로 공개 계약에 들어갔고(2026-10-30), 웹 검색 도구가 생기면 그 code를 만든다.
 
 ## 5. 개인정보와 모델 전송
 

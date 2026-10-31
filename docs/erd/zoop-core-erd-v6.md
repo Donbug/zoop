@@ -6,7 +6,7 @@
 
 ## 1. 결정 요약
 
-**PostgreSQL 42개 테이블.** 함께 저장하고 읽는 결과는 JSON으로 통합하고 독립 조회·집계·무결성에 필요한 관계는 테이블로 유지한다. v0.7 챗봇 오케스트레이션의 실제 도구 호출은 독립 관측·예산 집계를 위해 `chat_tool_calls`로 분리하고, 고정 계획의 여러 앱 시도가 공유하는 실행 참조는 `analysis_plans`·`analysis_plan_units`로 정규화한다.
+**PostgreSQL 44개 테이블.** 함께 저장하고 읽는 결과는 JSON으로 통합하고 독립 조회·집계·무결성에 필요한 관계는 테이블로 유지한다. v0.7 챗봇 오케스트레이션의 실제 도구 호출은 독립 관측·예산 집계를 위해 `chat_tool_calls`로 분리하고, 고정 계획의 여러 앱 시도가 공유하는 실행 참조는 `analysis_plans`·`analysis_plan_units`로 정규화한다.
 
 기존 설계는 회원과 1:1인 비밀번호·설정, 분석 결과 내부의 주장·인용, 발행본 내부 항목·판정, 응답과 함께 읽는 채팅 인용까지 분리했다. API가 독립 수정·검색을 요구하지 않는 구성 요소에도 별도 테이블을 배정한 것이 개수 증가의 큰 원인이다. 재시도·정정·감사 등 명세가 실제로 요구하는 기능도 개수에 영향을 준다.
 
@@ -24,12 +24,12 @@
 | 기업·관심·모의 계좌 | 5 | 별칭은 배열, 보유내역은 기업 FK가 있는 별도 테이블 |
 | 문서·근거·분석 | 5 | 분석 내부 주장·인용·긍부정을 한 결과에 저장 |
 | 브리핑 | 3 | 회차에 발행 원문 보관, 정정·중단은 한 이력 테이블 |
-| 채팅 | 3 | 작업에 결과·인용·라우팅 요약을 포함하고 실제 도구 호출은 독립 기록 |
+| 채팅 | 4 | 작업에 결과·인용·라우팅 요약을 포함하고 실제 도구 호출은 독립 기록, 웹 검색 일일 한도는 원자 예약용 카운터 |
 | 그래프·검수·공개 규칙·공개 제외 | 10 | 실제 조회 이력 유지, 버전 상태·활성 포인터 통합, 버전별 적용 규칙, 버전별 공개 제외 이력·명령 기록 |
 | 평가·작업·통계·감사 | 8 | 독립 집계·조회가 필요한 기록, 계획 등록·단위별 실행 원장 유지 |
-| **합계** | **42** | Neo4j 노드·관계 및 파일 저장소는 이 개수에 포함하지 않음 |
+| **합계** | **43** | Neo4j 노드·관계 및 파일 저장소는 이 개수에 포함하지 않음 |
 
-42개는 이 설계안의 선택이지 API가 강제하는 최소 개수가 아니다. 개발 일정과 인력 배분은 이 ERD의 범위에서 제외한다.
+44개는 이 설계안의 선택이지 API가 강제하는 최소 개수가 아니다. 개발 일정과 인력 배분은 이 ERD의 범위에서 제외한다.
 
 ## 2. 저장소와 공통 규칙
 
@@ -386,7 +386,7 @@ save_only 시도는 sourceAttemptNo로 원래 검증된 산출물을 읽으며 �
 
 context_company_ids는 최초 접수 때 고정 문맥에서 해석한 중복 없는 기업 ID 배열이다. frozen_context와 함께 불변으로 저장하고 회사 존재를 검증한다. GIN(context_company_ids)와 asked_at 인덱스로 기업별 aiQuestions를 집계해 원문 JSON 전체 스캔을 피한다. 한 job을 기업당 한 번만 세고 retry를 새 질문으로 세지 않는다. issue/edge에서 기업을 포함하는 범위는 API 통계 산식과 일치시켜 고정하며 뒤의 활성 그래프로 다시 해석하지 않는다. 선택 문맥이 없는 질문에 기업을 임의 배정하지 않는다.
 
-검증된 결과를 예측 가능한 recovery_key의 파일에 먼저 내구 저장한 뒤 result 저장과 completed 전이를 같은 트랜잭션에서 한다. DB 저장 실패 후 파일을 다시 찾아 저장만 복구할 수 있어야 한다. API result는 completed 전까지 NULL. completed 결과/최초 문맥은 변경 금지. 취소·늦은 worker 완료는 상태와 실행 토큰을 확인한다. 재시도 시에도 대화당 활성 작업 하나 제약을 다시 적용한다.
+검증된 결과는 먼저 `chat_recovery_results`(36B)에 시도별로 커밋한 뒤 result 저장과 completed 전이를 같은 트랜잭션에서 한다. 저장 실패 뒤에는 그 행을 읽어 저장만 복구한다(2026-10-30, 파일 대신 DB: 앱 산출물 저장소가 작업 로컬 파일이라 인스턴스 교체에 남지 않음. 위 `recovery_key`·`recovery_artifact_id`·`recoveryKey`·`recoveryArtifactId`는 쓰지 않고, 시도의 `sourceAttemptNo`만 쓴다). API result는 completed 전까지 NULL. completed 결과/최초 문맥은 변경 금지. 취소·늦은 worker 완료는 상태와 실행 토큰을 확인한다. 재시도 시에도 대화당 활성 작업 하나 제약을 다시 적용한다.
 
 ### 24. graph_versions — 공개 버전·투영 상태·활성 여부
 
@@ -581,7 +581,7 @@ ai_job_id text?; ai_attempt_id text?; stage text?; receipt_artifact_id text? FK 
 grant_id text?; grant_revision text?; grant_checked_at timestamptz?; grant_scope jsonb?
 attempt_no integer?; provider_send_state text?; provider_revision text?; receipt_execution_mode text?
 provider_sent_at timestamptz?; provider_received_at timestamptz?; provider text?; model text?; prompt_version text?; reasoning_effort text?
-input_tokens bigint?; output_tokens bigint?; estimated_cost numeric?; actual_cost numeric?; currency text?
+input_tokens bigint?; output_tokens bigint?; reasoning_tokens bigint?; estimated_cost numeric?; actual_cost numeric?; currency text?
 error_code text?; error_message text?; started_at timestamptz; finished_at timestamptz?
 transmission_confirmed boolean?; retry_unit_id text?; cost_basis jsonb?
 UNIQUE(ai_job_id, ai_attempt_id) WHERE ai_job_id IS NOT NULL AND ai_attempt_id IS NOT NULL
@@ -665,6 +665,26 @@ UNIQUE(chat_job_id, attempt_no, call_index)
 `result`는 챗봇 MCP 경로(`request_meta.via = "mcp"`)의 성공 호출만 가지는 정규화 결과 봉투(`chat-tool/v1`의 items·evidenceIds·paths·truncated 등, 256 KiB 이하)다. 모델이 공급자 쪽에서 받은 것과 같은 결과를 남겨, 앱이 최종 답의 인용·지도 대상을 바로 그 결과로 결정론 검사한다. 성공 종료 기록과 같은 fenced 갱신에서만 쓰며, 서버 계획(direct) 호출은 남기지 않는다. 작업과 같은 보존·삭제 정책을 따른다(2026-10-28).
 
 `evidence_ids`는 성공 응답에서 답변 후보에 전달한 근거 ID이며 저장 시 현재 공개 문서 버전과 일치하는지 검사한다. 응답의 `data_version`, `truncated`, `next_allowed`와 artifact가 있으면 그 내용이 일치해야 한다. 기본 인덱스는 `(chat_job_id, attempt_no, call_index)`, `(tool_id, started_at)`, `(status, started_at)`이다. 요청당 호출 수·지연·오류·중복 제거율은 이 테이블에서 집계하고 모델 호출·토큰·비용은 `ai_executions`에서 별도로 집계한다.
+
+### 36A. chat_web_search_quotas — 챗봇 웹 검색 일일 한도
+
+```text
+quota_date date; subject_key text('project' | 'member:<member_id>'); member_id text? FK members ON DELETE CASCADE
+used integer(>= 0)
+PRIMARY KEY(quota_date, subject_key)
+```
+
+챗봇 보조 웹 검색의 KST 날짜별 사용량이다(웹 검색 설계 3절: 회원 하루 20회, 프로젝트 전체 하루 500회). `subject_key`가 `project`이면 `member_id`는 NULL이고, 회원 행은 `member:<member_id>`다. 웹 검색 호출을 `chat_tool_calls`에 `reserved`로 기록하는 같은 트랜잭션에서 프로젝트 행, 회원 행 순서로 조건부 증가(`used + n <= 한도`)하고, 하나라도 모자라면 예약 전체를 되돌린다. 그래서 동시 요청이 함께 한도를 넘지 못한다. 예약된 웹 호출은 성공·실패·timeout·미시작과 관계없이 모두 센다. 대화 삭제로 줄지 않으며 회원 탈퇴 시 회원 행만 함께 지운다. job당 웹 2회는 이 테이블이 아니라 `chat_tool_calls`의 `registry_group = 'web-search'` 행으로 센다(2026-10-30).
+
+### 36B. chat_recovery_results — 챗봇 검증 결과 복구본
+
+```text
+chat_job_id text FK chat_jobs ON DELETE CASCADE; attempt_no integer(>= 1)
+result jsonb; route_summary jsonb?; created_at timestamptz
+PRIMARY KEY(chat_job_id, attempt_no)
+```
+
+시도가 검증을 끝낸 `ChatResult`를 작업에 저장하기 전에 별도 트랜잭션으로, 실행의 owner token·lease 조건 아래에서 한 번만 쓴다. 저장이 실패하거나 복구본을 쓴 뒤 lease가 만료되면 작업은 `save_failed`·`retry=save_only`로 끝나고, save_only 시도는 `sourceAttemptNo`의 행으로 저장만 다시 한다. 모델을 호출하지 않고 `runs`에 더하지 않는다. 작업이 저장되거나 다른 실패로 끝나면 행을 지우고, 대화·회원 삭제 때 작업과 함께 지운다. 공개 응답은 지금처럼 반환할 때마다 현재 권한으로 다시 확인한다. DB 자체가 장애면 복구본도 쓰지 못하므로 그때는 기존 lease 회수 규칙으로 끝난다.
 
 ### 37–39. disclosure_exclusion_changes, disclosure_exclusion_targets, disclosure_exclusion_requests — 공개 제외(FS081)
 

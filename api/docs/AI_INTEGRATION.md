@@ -153,14 +153,16 @@ ai/service/.venv/bin/python ai/service/scripts/online_admission_actual_smoke.py 
 
 ## 챗봇 모델 단계 클라이언트
 
-`com.zoop.ai.chat.ChatStageClient`(`HttpChatStageClient`)는 `POST /internal/v1/chat-stages/{stage}`(계약 `zoop-ai-chat-1`)로 챗봇 모델 단계 하나를 동기로 실행합니다. 단계는 `chat-router`(Jev), `chat-answer`(Luna), `chat-verification`(Jev)입니다. 같은 전송 계층(`AiHttpTransport`: 재시도·redirect·proxy 없음, 응답 크기·마감 제한, `X-Request-ID` 대조)을 쓰고 오류 봉투는 S1(`zoop-ai-internal-1`)입니다. `Idempotency-Key`는 `invocationId`(`<chatJobId>.<attemptNo>.<router|answer|verify>`)라서 같은 시도의 같은 단계는 AI 쪽에서 두 번 보내지지 않고, 재실행(rerun)은 새 시도 번호로 새 invocation이 됩니다.
+`com.zoop.ai.chat.ChatStageClient`(`HttpChatStageClient`)는 `POST /internal/v1/chat-stages/{stage}`(계약 `zoop-ai-chat-4`)로 챗봇 모델 단계 하나를 동기로 실행합니다. 단계는 `chat-router`(Jev), `chat-answer`(Luna), `chat-verification`(Jev), `chat-agent`(Luna Responses 승인 루프의 한 단계)입니다. 같은 전송 계층(`AiHttpTransport`: 재시도·redirect·proxy 없음, 응답 크기·마감 제한, `X-Request-ID` 대조)을 쓰고 오류 봉투는 S1(`zoop-ai-internal-1`)입니다. `Idempotency-Key`는 `invocationId`(`<chatJobId>.<attemptNo>.<router|answer|verify|agent-n>`)입니다. 같은 시도의 같은 단계는 AI 쪽에서 두 번 보내지지 않고, 재실행(rerun)은 새 시도 번호로 새 invocation이 됩니다.
 
-`com.zoop.chat.model.ChatModelStages`가 오케스트레이터의 세 포트(`ChatModels.Router/Generator/Verifier`)를 구현합니다.
+`com.zoop.chat.model.ChatModelStages`가 오케스트레이터의 네 포트(`ChatModels.Router/Generator/Verifier/Agent`)를 구현합니다.
 
-- **보내는 것.** 확인 질문 사슬(질문과 고른 선택지 이름), 서버가 나눈 요구사항, 바인딩된 논리 기능의 설명, 도구 결과 항목 중 ZOOP 그래프·카탈로그 데이터인 기업·사건·관계 항목(id·종류·이름. 이름이 기사 제목인 `evidence` 항목은 보내지 않음), 근거 인용 구간(근거 레코드에서 만든 `quote`와 그 기사의 `articles.provider`인 `sourceId`, 제목, 발행 시각)만 보냅니다. 회원 ID, 계정 정보, 기사 전문은 보내지 않습니다. 인용 전송 허용 여부는 AI 쪽 챗봇 grant registry가 `sourceId`로 판단하며 허용되지 않으면 단계가 거절됩니다(fail closed).
+- **보내는 것.** 확인 질문 사슬(질문과 고른 선택지 이름), 서버가 나눈 요구사항, 바인딩된 논리 기능의 설명, 도구 결과 항목 중 ZOOP 그래프·카탈로그 데이터인 기업·사건·관계 항목(id·종류·이름. 이름이 기사 제목인 `evidence` 항목은 보내지 않음), 근거 인용 구간(근거 레코드에서 만든 `quote`와 그 기사의 `articles.provider`인 `sourceId`, 제목, 발행 시각), 아래의 서버 검증 문맥을 보냅니다. 회원 ID, 계정 정보, 기사 전문은 보내지 않습니다. 인용 전송 허용 여부는 AI 쪽 챗봇 grant registry가 `sourceId`로 판단하며 허용되지 않으면 단계가 거절됩니다(fail closed).
 - **잠정 규칙(2026-10-22).** 요구사항 분해는 결정론적입니다(`ChatRequirementSplitter`: 물음표·줄바꿈·세미콜론·독립된 "그리고"/"또한"에서만 나누고, 나누지 못하면 질문 전체가 요구 하나). 기업명은 모델이 아니라 서버가 카탈로그 이름·별칭과 **정확히 일치**할 때만 해석하고, 겹치면 긴 이름이 이깁니다(`CompanyNameResolver`). 같은 이름이 여러 기업이면 모델을 호출하지 않고 `kind=company` 확인 질문을 만듭니다. 다음 실행에서는 회원이 고른 선택지 id 또는 자유 입력 답에 쓴 정확한 기업명으로 해석합니다. 확인 답 실행은 루트 질문과 답을 순서대로 반영한 뒤 제한·모호성을 판단합니다. 루트의 요구가 6개를 넘으면 자유 입력 답을 나눈 요구가 그 자리를 대신합니다.
 - **실패 의미.** 단계 결과 `failed`는 `unknown`이면 `UNKNOWN`(재전송 금지), 보냈지만 확정 실패면 `NOT_SENT`(재실행 가능), 보내지 않았으면(설정·grant·live gate·호출 상한 거절) `REFUSED`(같은 실행은 다시 거절되므로 재실행하지 않음, 공개 실패 `internal`)입니다. HTTP 502/504 `stage_outcome_unknown`과 연결 이후 전송 실패는 `UNKNOWN`, 503은 시작되지 않았으므로 `NOT_SENT`, 그 밖의 4xx(409 `execution_unavailable` 등)는 `REFUSED`입니다. 형식이 맞지 않는 답은 `NOT_SENT`입니다. 클라이언트는 결과 불변식도 검사해서 어긋나면 `RESPONSE_MALFORMED`(결과 불명)로 처리하고 사용할 답으로 바꾸지 않습니다. 불변식: 성공에는 answer·receipt가 있고 failure가 없으며, 실패에는 answer가 없고, `unknown`이면 `sent`이며, receipt는 보냈을 때만 있고 요청 mode와 같아야 합니다.
 - **기록.** 각 단계는 `ai_executions`에 `feature=chatbot`, `chat_job_id`, `stage`, `execution_mode`와 함께 호출 전 `running`으로 남고, 끝나면 `succeeded`/`failed`/`unknown`, 영수증의 provider·model·prompt version·토큰과 오류 코드로 갱신됩니다. 이 행은 `chat_jobs`를 `ON DELETE RESTRICT`로 참조하므로 기록이 있는 작업의 대화·회원은 이 행을 먼저 정리하지 않으면 삭제되지 않습니다(ERD v6 보존 정책).
+- **검증 문맥.** 검증 입력은 `requestBinding`(호출 ID·고정 그래프 버전·asOf)과 구간별 `sectionId`·`requirementIds`·`serverFacts`를 받습니다. 서버는 성공한 현재 조회에서만 `portfolio_scope`(기업 ID·이름·보유/관심 구분·조회 범위·잘림 여부)와 `graph_comparison`(전후 버전·asOf·since·대상·상한·추가/제거 항목), Q08의 `publication_record`(고정 버전의 검수 revision 이하 마지막 검수 결정의 종류·시점·경로와 그 버전에 적용된 공개 규칙의 제목·요약. 결정한 관리자와 사유 문장은 보내지 않음)·`briefing_selection`(발행 회차가 그 이슈를 고른 순위와 기록된 선정 이유)을 만듭니다(2026-10-30). 기사 인용과 별개이며 회원 ID·계좌·수량·금액·기사 전문은 보내지 않습니다. 보유/관심 정보는 조회 당시의 상태이지 과거 asOf의 상태가 아닙니다. 잘린 목록은 전체나 부재의 근거가 될 수 없습니다. 문맥이 없으면 사실을 만들지 않으며 인용과 사실이 모두 없는 구간을 `supported`로 통과시키지 않습니다.
+- **두 실행 경로의 같은 사실.** direct 경로는 서버가 읽은 결과에서, agent 경로는 성공한 `chat_tool_calls`의 결과와 예약 메타데이터에서 같은 규칙으로 사실을 만듭니다. agent 경로는 job·회원·시도·tool call·capability·고정 버전·asOf·입력 digest를 예약 기록과 대조하고, 하나라도 다르면 복원 없이 run을 `internal`로 끝냅니다. 회원 범위(`portfolio.scope.read`, Q07)는 서버 전용 조회라서 direct 경로에서만 나오고, agent 경로의 사실은 `graph_comparison`입니다. 모델 전송 gate가 항목을 뺀 결과는 잘린 목록처럼 `truncated`로 복원합니다. `cachedFrom`으로 이어진 보관 결과도 같은 요청·버전에 결속되어야 하며, 원본의 잘림과 항목 제외는 재사용 후에도 유지됩니다. 그래프 변경의 표시 이름이 코드 포인트 300개를 넘으면 끝에 `…`를 붙여 300개 이내로 줄이며, 항목 ID와 추가·제거 구분은 그대로 보존합니다. agent 경로의 결과는 run의 요구들이 공유하므로([chat-mcp.md](chat-mcp.md)) 각 사실은 자기 조회 대상(`targetIds`)과 범위를 그대로 지닙니다. 조회 사실은 서버의 조회 기록에서만 나옵니다. 단계 계약은 닫힌 v2이고 출처 grant registry는 v1 그대로입니다.
 
 | 환경 변수 | 기본값 | 규칙 |
 |---|---|---|
@@ -173,8 +175,9 @@ ai/service/.venv/bin/python ai/service/scripts/online_admission_actual_smoke.py 
 - 세 단계의 성공
 - 같은 invocation 재전송 시 저장된 결과 반환(재발송 없음)
 - grant 없는 인용 거절, 모르는 입력 거절, live 거절, `chat.invoke` 없는 principal 거절
+- Q07/Q05 현재 조회 사실을 담은 Java 검증 입력, 실제 HTTP→CLI→Jev 요청 생성 경로, 교차 실행·구간·버전 위조 거절과 문맥 부재 시 HOLD
 
-JUnit 보고서(0건·skip 금지)와 자격 증명 누출도 확인합니다. 모델 호출과 PostgreSQL은 쓰지 않습니다. `ChatCapability` 설명이나 입력 구성을 바꾸면 gate의 시나리오도 함께 갱신해야 합니다. 그 밖의 단위 시험은 stub(loopback 서버·스크립트 클라이언트)이며 실제 모델·live 호출은 하지 않았습니다.
+JUnit 보고서(0건·skip 금지)와 자격 증명 누출도 확인합니다. Java replay 검사 뒤 별도 서비스에서 합성 자격 증명과 loopback 가짜 Jev 수신자를 사용해 실제 요청 본문을 확인합니다. 외부 모델과 PostgreSQL은 쓰지 않습니다. 복제된 가상 환경이 다른 worktree를 가리키지 않도록 서비스와 실제 CLI 모듈의 소스 경로를 고정합니다. `ChatCapability` 설명이나 입력 구성을 바꾸면 gate의 시나리오도 함께 갱신해야 합니다. 합성 응답은 실제 모델의 판정 품질을 입증하지 않습니다.
 
 ## 소유와 격리
 

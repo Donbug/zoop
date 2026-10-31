@@ -8,6 +8,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -19,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
 import com.zoop.chat.dto.ChatJobRequest;
 import com.zoop.chat.repository.ChatExecutionRepository;
+import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatRepository;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.service.ChatService;
@@ -96,6 +98,45 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void theDaysWebSearchQuotasAreTakenTogetherOrNotAtAllAndGoWithTheMember() {
+        // A day of its own, so the project row is this test's alone.
+        var day = java.time.LocalDate.of(2000, 1, 1).plusDays(Math.floorMod(UUID.randomUUID().hashCode(), 3650));
+        var tx = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        assertNull(tx.execute(s -> runs.takeWebSearchQuota(memberId, day, 2, 3, 3)));
+        assertEquals("member", tx.execute(s -> runs.takeWebSearchQuota(memberId, day, 2, 3, 10)));
+        assertEquals(2, used(day, "project"), "the member's refusal takes nothing from the project");
+        assertEquals("project", tx.execute(s -> runs.takeWebSearchQuota(memberId, day, 1, 10, 2)));
+        assertNull(tx.execute(s -> runs.takeWebSearchQuota(memberId, day, 1, 3, 3)));
+        assertEquals(3, used(day, "project"));
+        assertEquals(3, used(day, "member:" + memberId));
+
+        jdbc.update("DELETE FROM members WHERE id = ?", memberId);
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM chat_web_search_quotas WHERE member_id = ?",
+                Integer.class, memberId), "a member's quota rows go with the member");
+        assertEquals(3, used(day, "project"));
+    }
+
+    private int used(java.time.LocalDate day, String subject) {
+        return jdbc.queryForObject("SELECT used FROM chat_web_search_quotas WHERE quota_date = ? AND subject_key = ?",
+                Integer.class, day, subject);
+    }
+
+    @Test
+    void aKeptResultIsOnePerAttemptAndGoesWhenTheResultIsStored() {
+        engine.script((run, control) -> ScriptedChatEngine.generalAnswer("보관한 답"));
+        String jobId = submit("HBM이 뭐야?");
+        var claim = executor.claimNext().orElseThrow();
+        assertTrue(runs.keepVerified(jobId, claim.ownerToken(), 1, "{\"outcome\":\"answered\"}", "{\"path\":\"direct\"}", Instant.now()));
+        assertFalse(runs.keepVerified(jobId, "someone-else", 2, "{}", null, Instant.now()), "the run's fence applies");
+        assertEquals("{\"path\": \"direct\"}", runs.verifiedResult(jobId, 1).orElseThrow().routeSummary());
+
+        executor.execute(claim);
+
+        assertEquals("completed", service.getJob(member, jobId).status());
+        assertTrue(runs.verifiedResult(jobId, 1).isEmpty());
+    }
+
+    @Test
     void aQueuedQuestionRunsToAStoredResultTheMemberCanRead() {
         engine.script((run, control) -> {
             control.beforeModelCall();
@@ -117,6 +158,10 @@ class ChatExecutorPostgresTest {
         assertEquals("chat-result/v1", jdbc.queryForObject("SELECT result_schema_version FROM chat_jobs WHERE id = ?",
                 String.class, jobId));
         assertFalse(executor.runOnce());
+
+        var row = chats.findJob(jobId).orElseThrow();
+        assertEquals(List.of(jobId), chats.answersBefore(row.sessionId(), row.seq() + 1, 2).stream().map(ChatJobRow::id).toList());
+        assertTrue(chats.answersBefore(row.sessionId(), row.seq(), 2).isEmpty());
     }
 
     @Test
@@ -127,16 +172,17 @@ class ChatExecutorPostgresTest {
         String id = recorder.start(jobId, 2, "chat-router", "replay");
         assertEquals("running", jdbc.queryForObject("SELECT status FROM ai_executions WHERE id = ?", String.class, id));
         recorder.finish(id, "succeeded", "sent", new com.zoop.ai.chat.ChatStageReply.Receipt("typesafe", "systemone-v1", "jev",
-                "chat-router-1", "replay", 12L, null, Instant.now(), Instant.now()), null);
+                "chat-router-1", "replay", 12L, null, 5L, Instant.now(), Instant.now()), null);
         recorder.finish(id, "failed", "not_sent", null, "late");
         var row = jdbc.queryForMap("SELECT feature, execution_mode, status, chat_job_id, stage, model, input_tokens, "
-                + "output_tokens, error_code, finished_at, attempt_no, provider_send_state, provider_revision, "
+                + "output_tokens, reasoning_tokens, error_code, finished_at, attempt_no, provider_send_state, provider_revision, "
                 + "receipt_execution_mode, provider_sent_at, provider_received_at FROM ai_executions WHERE id = ?", id);
         assertEquals("chatbot", row.get("feature"));
         assertEquals("replay", row.get("execution_mode"));
         assertEquals("succeeded", row.get("status"), "an ended execution is not rewritten");
         assertEquals(jobId, row.get("chat_job_id"));
         assertEquals("chat-router", row.get("stage"));
+        assertEquals(5L, ((Number) row.get("reasoning_tokens")).longValue());
         assertEquals(2, ((Number) row.get("attempt_no")).intValue());
         assertEquals("sent", row.get("provider_send_state"));
         assertEquals("systemone-v1", row.get("provider_revision"));
@@ -242,6 +288,11 @@ class ChatExecutorPostgresTest {
         assertEquals(1, results.size(), "a failed call keeps nothing");
         assertEquals("tc-0", results.getFirst().toolCallId());
         assertEquals("company.read", results.getFirst().capabilityId());
+        assertEquals(jobId, results.getFirst().jobId(), "a kept result carries its reservation and owner");
+        assertEquals(member.memberId(), results.getFirst().memberId());
+        assertEquals(1, results.getFirst().attemptNo());
+        assertEquals("0".repeat(64), results.getFirst().inputDigest());
+        assertEquals("{\"limit\": 20}", results.getFirst().requestMeta(), "as the jsonb column stores it");
         assertEquals("KRX:000660", mapper.readTree(results.getFirst().result()).path("items").get(0).path("id").asString());
         assertTrue(runs.keptToolResults(jobId, 2).isEmpty());
         // The database refuses a result over its limit or on a call that did not succeed.
@@ -374,6 +425,29 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void aRerunCountsWebReservationsThatNeverStartedAgainstTheJobsWebBudget() {
+        engine.script((run, control) -> {
+            control.reserveToolCalls(1, Collections.nCopies(ChatRunControl.MAX_WEB_CALLS, web()));
+            return new ChatEngineOutcome.Failed("transient", "provider_error", true);
+        });
+        String jobId = submit("웹 예산을 이어 쓰는 질문");
+        assertTrue(executor.runOnce());
+        assertEquals("queued", service.retry(member, jobId, "retry-" + suffix()).job().status());
+
+        engine.script((run, control) -> {
+            assertEquals(2, run.attemptNo());
+            var spent = assertThrows(ChatWebBudgetExhausted.class,
+                    () -> control.reserveToolCalls(1, List.of(web())));
+            assertEquals(ChatWebBudgetExhausted.Budget.JOB, spent.budget());
+            return ScriptedChatEngine.generalAnswer("웹 없이 계속한 답");
+        });
+        assertTrue(executor.runOnce());
+        assertEquals(List.of("1:cancelled", "1:cancelled"), jdbc.queryForList(
+                "SELECT attempt_no || ':' || status FROM chat_tool_calls WHERE chat_job_id = ? ORDER BY call_index",
+                String.class, jobId));
+    }
+
+    @Test
     void aShortenedDeadlineIsStoredReachesAttachedRequestsAndHoldsForTheFinalStore() {
         engine.script((run, control) -> {
             Instant shorter = run.deadline().minusSeconds(15);
@@ -411,6 +485,8 @@ class ChatExecutorPostgresTest {
         control.toolCallFinished("tc-0", new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false, small));
         var kept = executor.keptToolResult(jobId, 1, "company.read", digest).orElseThrow();
         assertEquals("tc-0", kept.toolCallId(), "the first one that kept its result");
+        assertEquals(member.memberId(), kept.memberId());
+        assertEquals(digest, kept.inputDigest());
         assertTrue(executor.keptToolResult(jobId, 1, "issue.read", digest).isEmpty());
         assertTrue(executor.keptToolResult(jobId, 2, "company.read", digest).isEmpty(), "another attempt reads anew");
 
@@ -533,9 +609,46 @@ class ChatExecutorPostgresTest {
                         + "WHERE chat_job_id = ? ORDER BY call_index", String.class, jobId));
     }
 
+    @Test
+    void aKeptMcpResultRestoresToItsOwnRunAfterTheJsonbRoundTrip() {
+        String jobId = submit("보관된 조회 복원");
+        executor.claimNext().orElseThrow();
+        var attached = executor.attach(jobId, 1).orElseThrow();
+        var run = attached.run();
+        var query = new ChatToolRequest("graph.version.diff", List.of("KRX:000660"), 7);
+        String id = attached.control().reserveToolCalls(1, List.of(tools.reservation(run, query, "mcp"))).getFirst();
+        attached.control().toolCallStarted(id);
+        var envelope = new java.util.LinkedHashMap<String, Object>();
+        envelope.put("schemaVersion", ChatToolRegistry.SCHEMA_VERSION);
+        envelope.put("toolCallId", id);
+        envelope.put("capabilityId", "graph.version.diff");
+        envelope.put("dataVersion", "gv-0..gv-1");
+        envelope.put("items", List.of(Map.of("id", "iss-new", "kind", "issue", "label", "[새로 생김] 공급 계약",
+                "companyIds", List.of("KRX:000660"), "evidenceIds", List.of())));
+        envelope.put("evidenceIds", List.of());
+        envelope.put("truncated", false);
+        envelope.put("nextAllowed", false);
+        envelope.put("error", null);
+        attached.control().toolCallFinished(id, new ChatToolCallEnd("succeeded", null, "gv-0..gv-1", List.of(), false,
+                false, mapper.writeValueAsString(envelope)));
+
+        var restored = tools.restore(run, runs.keptToolResults(jobId, 1)).getFirst();
+
+        assertTrue(restored.provenance().belongsTo(run));
+        assertFalse(restored.provenance().belongsTo(executor.attach(jobId, 1).orElseThrow().run()), "another run object");
+        assertEquals(query, restored.provenance().request());
+        assertEquals("gv-0..gv-1", restored.dataVersion());
+        assertEquals("[새로 생김] 공급 계약", restored.items().getFirst().label());
+    }
+
     private static ChatToolCallReservation reservation(String capability) {
         return new ChatToolCallReservation(ChatToolRegistry.VERSION, "zoop-core-read", capability, "app:" + capability,
                 "chat-tool/v1", "0".repeat(64), "{\"limit\":20}");
+    }
+
+    private static ChatToolCallReservation web() {
+        return new ChatToolCallReservation(ChatToolRegistry.VERSION, "web-search", "web.search", "app:web.search",
+                "chat-tool/v1", "1".repeat(64), "{\"limit\":5}");
     }
 
     private String submit(String question) {

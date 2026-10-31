@@ -79,12 +79,6 @@ class IngestionExportParserTest {
             assertEquals("authored", document.title());
             assertNull(document.publisher());
         }
-        for (String language : List.of("", "k", "x".repeat(36))) {
-            assertEquals(DocumentImportFailure.EXPORT_INVALID,
-                    failureOf(e -> observationOf(e).put("language", language)));
-        }
-        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).putNull("language")));
-        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).put("language", 7)));
     }
 
     @Test
@@ -298,6 +292,41 @@ class IngestionExportParserTest {
         assertEquals("합성일보", document.publisher());
         assertNotNull(document.collected());
         assertEquals(LocalDate.of(2026, 10, 14), document.publishedDate());
+    }
+
+    @Test
+    void aLanguageIsOptionalCheckedOnlyAndNeverStoredAbsentOrNullMeanNoneDeclared() {
+        ObjectNode absent = export(observation, PLAIN_TEXT, PLAIN_HASH);
+        assertTrue(!observationOf(absent).has("language"), "the fixture of an older export must not carry the key");
+        assertNotNull(parser.parse(ExportFixtures.bytes(absent), observation));
+
+        ObjectNode none = export(observation, PLAIN_TEXT, PLAIN_HASH);
+        observationOf(none).putNull("language");
+        assertNotNull(parser.parse(ExportFixtures.bytes(none), observation));
+
+        // The collector's declared tag (ai/pipeline, 2026-10-30): 2 to 35 characters, kept out of the verified document.
+        for (String declared : List.of("ko", "en-US", "und", "zh-Hant-TW", "x".repeat(IngestionExportParser.MAX_LANGUAGE_CODE_POINTS))) {
+            ObjectNode export = export(observation, PLAIN_TEXT, PLAIN_HASH);
+            observationOf(export).put("language", declared);
+            VerifiedDocument document = parser.parse(ExportFixtures.bytes(export), observation);
+            assertEquals(PLAIN_TEXT, document.text());
+            assertEquals(observation, document.observation());
+        }
+        ObjectNode collectedWithLanguage = collectedExport("day", "2026-10-14");
+        observationOf(collectedWithLanguage).put("language", "ko");
+        assertNotNull(parser.parse(ExportFixtures.bytes(collectedWithLanguage), observation).collected());
+    }
+
+    @Test
+    void aLanguageMustBeAStringOfTwoToThirtyFiveCodePointsWithoutControlOrSeparatorCharacters() {
+        for (String refused : List.of("", "k", "x".repeat(IngestionExportParser.MAX_LANGUAGE_CODE_POINTS + 1), "a b", "a\tb", "a\nb",
+                "a\u0000b", "  ", "ko\u2028")) {
+            assertEquals(DocumentImportFailure.METADATA_UNSUPPORTED,
+                    failureOf(e -> observationOf(e).put("language", refused)), "language " + refused.length());
+        }
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).put("language", 7)));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).put("language", false)));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).putArray("language").add("ko")));
     }
 
     @Test

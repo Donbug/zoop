@@ -1,6 +1,7 @@
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useEventData } from '@/hooks/useEventData';
 import type { EventContext, EventDetail } from '@/types/map/event';
 import type { GraphNode } from '@/types/map/graph';
@@ -66,7 +67,7 @@ export default function EventDetailPanel({
   function renderCompanies(items: typeof directCompanies) {
     return (
       <ul
-        className={`${ui.list} [&>li]:flex [&>li]:items-center [&>li]:gap-2.5 [&_strong]:text-[12px] [&_strong]:font-semibold [&_strong]:leading-[18px] [&_p]:text-[11px] [&_p]:leading-[16.5px] [&_p]:text-panel-muted`}
+        className={`${ui.list} [&>li]:flex [&>li]:items-center [&>li]:gap-2.5 [&_strong]:text-caption [&_strong]:font-semibold [&_strong]:leading-[18px] [&_p]:text-caption [&_p]:leading-[16.5px] [&_p]:text-panel-muted`}
       >
         {items.map((company, index) => (
           <li key={`${company.id}-${index}`}>
@@ -76,15 +77,15 @@ export default function EventDetailPanel({
               className={ui.avatar}
             />
             <div>
-              <a
-                href={
+              <Link
+                to={
                   companyDetailHref?.(company.id) ??
                   `/companies/${encodeURIComponent(company.id)}`
                 }
                 className="text-zoop-ink underline underline-offset-4 focus-visible:outline-2"
               >
                 <strong>{company.name}</strong>
-              </a>
+              </Link>
               <p>
                 {company.roleUnconfirmed
                   ? '역할 미확인'
@@ -183,7 +184,8 @@ export default function EventDetailPanel({
                   : `근거 ${evidenceCount}건 보기`}
               </button>
               <button onClick={() => action('focus')}>
-                <GraphIcon name="fit" size={14} />이 노드 중심으로 보기
+                <GraphIcon name="fit" size={14} />
+                이슈 중심 그래프
               </button>
               <button onClick={() => action('ai')}>
                 <GraphIcon name="ai" size={14} />

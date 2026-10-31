@@ -43,7 +43,7 @@ class DocumentImportRunnerTest {
         base = temp.toRealPath();
         artifacts = Files.createDirectory(base.resolve("artifacts"));
         settings = new DocumentImportSettings(base.resolve("request.json"), base.resolve("result.json"),
-                base.resolve("cli"), base.resolve("state"), base.resolve("sources.json"), artifacts);
+                base.resolve("cli"), base.resolve("state"), base.resolve("sources.json"), artifacts, ObservationSource.CLI);
         exporter = new DocumentImporterTest.FakeExporter();
         exporter.serve(OBSERVATION, PLAIN_TEXT, PLAIN_HASH, ExportFixtures.OBSERVED_AT);
         registry = new InMemoryDocumentRegistry();

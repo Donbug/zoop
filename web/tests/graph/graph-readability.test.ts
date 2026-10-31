@@ -2,6 +2,7 @@ import { expect, test, vi } from 'vitest';
 import {
   applyGraphReading,
   culledLabels,
+  keepAppliedStyles,
   readingStyles,
   type ReadingContext,
 } from '@/components/graph/graph-readability';
@@ -220,4 +221,66 @@ test('R1 queued reading updates preserve live drag coordinates and current edge 
   expect(live.labelFontSize).toBeGreaterThanOrEqual(13 / context.zoom);
   expect(liveEdge.stroke).toBe('#123456');
   expect(liveEdge.lineWidth).toBe(7);
+});
+
+test('setData keeps applied label styles and model-only keys so unchanged elements do not redraw', () => {
+  const graph = {
+    getNodeData: () => [
+      {
+        id: 'a',
+        style: { x: 1, labelFontSize: 24, labelFill: '#000', zIndex: 0 },
+      },
+    ],
+    getEdgeData: () => [
+      { id: 'e', style: { sourceNode: 'a', targetNode: 'b', zIndex: -1 } },
+    ],
+  } as unknown as Graph;
+  const next = keepAppliedStyles(graph, {
+    nodes: [{ id: 'a', style: { x: 2, labelFontSize: 13, labelFill: '#fff' } }],
+    edges: [{ id: 'e', source: 'a', target: 'b', style: { lineWidth: 1 } }],
+  });
+  // Zoom-derived label sizes stay, new colours and positions win, omitted keys come from the model.
+  expect(next.nodes?.[0].style).toEqual({
+    x: 2,
+    labelFontSize: 24,
+    labelFill: '#fff',
+    zIndex: 0,
+  });
+  expect(next.edges?.[0].style).toEqual({
+    lineWidth: 1,
+    sourceNode: 'a',
+    targetNode: 'b',
+    zIndex: -1,
+  });
+});
+
+test('setData keeps the new label of an element whose label input changed', async () => {
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const base = toG6Data(data, 1200, 700);
+  const [changed, same] = base.nodes!;
+  const graph = {
+    destroyed: false,
+    updateNodeData: () => {},
+    updateEdgeData: () => {},
+    draw: async () => {},
+    getCanvas: () => ({ document: { getElementById: () => null } }),
+    getNodeData: () => [
+      { id: changed.id, style: { ...changed.style, labelFontSize: 99 } },
+      { id: same.id, style: { ...same.style, labelFontSize: 99 } },
+    ],
+    getEdgeData: () => [],
+  } as unknown as Graph;
+  await applyGraphReading(graph, base, data, context);
+  const next = keepAppliedStyles(graph, {
+    nodes: [
+      { ...changed, style: { ...changed.style, labelText: '바뀐 이름' } },
+      same,
+    ],
+  });
+  // The changed element waits for the next reading with its new text; the other keeps the applied size.
+  expect(next.nodes?.[0].style?.labelText).toBe('바뀐 이름');
+  expect(next.nodes?.[0].style?.labelFontSize).toBe(
+    changed.style?.labelFontSize,
+  );
+  expect(next.nodes?.[1].style?.labelFontSize).toBe(99);
 });

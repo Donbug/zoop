@@ -292,7 +292,7 @@ describe('D-BRF-02 회차 전환 및 재조회 회귀', () => {
     );
     await waitFor(() => expect(server.requests).toHaveLength(1));
     expect(screen.getByText('브리핑을 불러오고 있어요.')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '☼ 출근' }));
+    fireEvent.click(screen.getByRole('button', { name: '출근' }));
     await screen.findByText('전환된 출근 회차');
     await act(async () => pending.resolve(json(evening())));
     expect(screen.queryByText('합성 퇴근 시장 요약')).toBeNull();

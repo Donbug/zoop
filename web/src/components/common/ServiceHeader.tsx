@@ -31,7 +31,7 @@ export default function ServiceHeader({
     <header className="relationship-header">
       <NavLink to="/" className="relationship-logo">
         {/* 로고는 영문 ZOOP 한 단어로, 메뉴 타이틀과 같은 색·크기로 둔다. */}
-        <strong className="font-inter">ZOOP</strong>
+        <strong className="font-heading">ZOOP</strong>
       </NavLink>
       <nav aria-label={navLabel}>
         {menus.map((menu) => (
@@ -44,13 +44,6 @@ export default function ServiceHeader({
         </button>
       </nav>
       <div className="relationship-user-tools">
-        <button
-          disabled
-          aria-label="AI 기능"
-          title="현재 담당 구현 범위 밖 기능"
-        >
-          <GraphIcon name="ai" size={16} />
-        </button>
         <button
           aria-label="화면 모드"
           title="라이트·다크 화면 전환"

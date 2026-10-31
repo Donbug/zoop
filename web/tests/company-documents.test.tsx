@@ -555,3 +555,33 @@ test('early evidence waits for its document list without a false mismatch error'
   );
   await screen.findByText('상세 합성 근거 인용');
 });
+
+test('D-COM-01 N-k shows document and judgment times in KST with the shared undetermined label', async () => {
+  server.on('GET', '/api/v1/companies/:id/documents', () =>
+    json({
+      items: [
+        {
+          ...doc,
+          sentiment: {
+            companyId,
+            label: 'undetermined',
+            rationale: '합성 판정 보류 근거',
+            quotes: ['합성 근거'],
+            judgedAt: asOf,
+            model: 'synthetic',
+            promptVersion: 'v1',
+          },
+        },
+      ],
+      nextCursor: null,
+      metadata,
+    }),
+  );
+  open();
+  const judged = await screen.findByText(/합성 판정 보류 근거/);
+  expect(judged.textContent).toContain('판단 보류');
+  expect(judged.textContent).not.toContain('판단 유보');
+  expect(judged.textContent).toContain('판정 시각 2026-10-06 12:00 KST');
+  expect(screen.getAllByText(/2026-10-05 12:00 KST/).length).toBeGreaterThan(0);
+  expect(screen.queryByText(/2026-10-05T03:00:00Z/)).toBeNull();
+});

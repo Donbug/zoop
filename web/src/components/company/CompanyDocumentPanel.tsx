@@ -3,6 +3,7 @@ import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useCompanyResource, type Resource } from '@/hooks/useCompanyResource';
 import { companyUrl } from '@/apis/company/company';
 import { exactTime, safeHref, versionOnlyAddress } from './detail-model';
+import { formatKst } from '@/util/format';
 import type { CompanyDocuments, Evidence } from '@/types/company/documents';
 import type { DocumentAnalysis } from '@/types/evidence';
 
@@ -98,10 +99,10 @@ function Analysis({
               positive: '긍정',
               negative: '부정',
               mixed: '혼재',
-              undetermined: '판단 유보',
+              undetermined: '판단 보류',
             }[sentiment.label]
           }{' '}
-          · {sentiment.rationale} · 판정 시각 {sentiment.judgedAt}
+          · {sentiment.rationale} · 판정 시각 {formatKst(sentiment.judgedAt)}
         </p>
       ) : value.sentiment ? (
         <p>조회 기업과 다른 맥락의 판정은 표시하지 않았어요.</p>
@@ -199,7 +200,7 @@ export default function CompanyDocumentPanel() {
     <section
       aria-label="뉴스·공시"
       data-screen-id="D-COM-02"
-      className="[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-zoop-line [&_blockquote]:bg-zoop-wash [&_blockquote]:p-3 [&_blockquote]:text-xs [&_blockquote]:leading-[1.7] [&_blockquote]:wrap-anywhere [&_summary]:cursor-pointer [&_h4]:font-semibold"
+      className="[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-zoop-line [&_blockquote]:bg-zoop-wash [&_blockquote]:p-3 [&_blockquote]:text-caption [&_blockquote]:leading-[1.7] [&_blockquote]:wrap-anywhere [&_summary]:cursor-pointer [&_h4]:font-semibold"
     >
       <h2>뉴스·공시 · 근거 문서</h2>
       <nav aria-label="문서 종류">
@@ -304,7 +305,9 @@ export default function CompanyDocumentPanel() {
                     ? '뉴스'
                     : '종류 미제공'}{' '}
                 · {doc.publisher ?? '출처 미제공'} ·{' '}
-                {doc.publishedAt ?? '발행 시각 미제공'}
+                {doc.publishedAt
+                  ? formatKst(doc.publishedAt)
+                  : '발행 시각 미제공'}
               </p>
               <h3>{doc.title ?? '제목 미제공'}</h3>
               {(doc.events ?? []).map((event) => (
@@ -392,7 +395,9 @@ export default function CompanyDocumentPanel() {
                 <h4>{evidence.data.article?.title ?? '문서 제목 미제공'}</h4>
                 <p>
                   {evidence.data.article?.publisher ?? '출처 미제공'} ·{' '}
-                  {evidence.data.article?.publishedAt ?? '발행 시각 미제공'}
+                  {evidence.data.article?.publishedAt
+                    ? formatKst(evidence.data.article.publishedAt)
+                    : '발행 시각 미제공'}
                 </p>
                 <p>
                   관련 설명 · 제공된 인용과 연결 사건 정보입니다. 연결 사건{' '}

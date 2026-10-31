@@ -33,16 +33,16 @@ def test_every_route_is_documented_with_its_enforced_scope():
                   for path, item in spec()["paths"].items() for method, operation in item.items()}
     routes = {(method, route.path) for route in create_app().routes if hasattr(route, "methods") and route.path.startswith("/internal")
               for method in route.methods}
-    assert set(documented) == routes and len(routes) == 28
+    assert set(documented) == routes and len(routes) == 29
     assert set(documented.values()) == {"analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover",
                                         "relation.submit", "relation.read", "relation.cancel", "relation.recover", "relation.review",
                                         "extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover", "graph.read", "handoff.read",
-                                        "handoff.exposure", "chat.invoke", "plan.admit", "plan.read", "plan.policy"}
+                                        "handoff.exposure", "chat.invoke", "plan.admit", "plan.read", "plan.policy", "observation.read"}
 
 
 def test_documented_scopes_are_what_the_service_enforces(start, tmp_path):
     workspace = Workspace(tmp_path / "scope-workspace", replay=document_replay())
-    workspace.credentials.scopes["alpha"] += ["plan.admit", "plan.read"]
+    workspace.credentials.scopes["alpha"] += ["plan.admit", "plan.read", "observation.read"]
     workspace.credentials.tokens["policy-operator"] = "t" + "synthetic-policy-token-" * 3
     workspace.credentials.scopes["policy-operator"] = ["plan.policy"]
     service = start(workspace=workspace)
@@ -147,3 +147,19 @@ def test_models_forbid_unknown_fields_and_never_carry_a_message():
     with pytest.raises(Exception):
         ErrorEnvelope.model_validate({"schemaVersion": "zoop-ai-internal-1", "error": {"code": "x", "retryable": False, "requestId": "r",
                                                                                           "message": "stack"}})
+
+
+def test_observation_export_documents_exact_native_selector_and_response():
+    document = spec()
+    operation = document["paths"]["/internal/v1/observations/export"]["post"]
+    assert operation["security"] == [{"bearerAuth": ["observation.read"]}]
+    schemas = document["components"]["schemas"]
+    selector = schemas["ObservationExportRequest"]
+    assert selector["additionalProperties"] is False
+    assert set(selector["required"]) == {"schemaVersion", "roundId", "sourceId", "page", "ordinal", "documentId", "rawVersion", "documentVersion"}
+    assert set(selector["properties"]) == set(selector["required"])
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/ObservationExport"}
+    assert "text" in schemas["NativeProjection"]["required"]
+    assert "202" not in operation["responses"]
+    assert all(parameter["name"] != "Idempotency-Key" for parameter in operation.get("parameters", []))
+    assert operation["responses"]["200"]["headers"]["Cache-Control"]["schema"]["const"] == "no-store"
