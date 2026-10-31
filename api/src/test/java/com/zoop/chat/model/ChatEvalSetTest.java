@@ -625,6 +625,7 @@ class ChatEvalSetTest {
                             return memberScope;
                         }
                     }), new BriefingReadTool(briefings(set), access),
+                    new com.zoop.chat.tool.BriefingEvidenceTool(new BriefingReadTool(briefings(set), access)),
                     new SelectionRuleReadTool((version, asOf, issue) -> new GraphContextLookup(
                             reader.readPinned(version, asOf, asOf != null).graph()).find(issue)
                             .filter(t -> "issue".equals(t.kind())).map(GraphContextLookup.Target::label),

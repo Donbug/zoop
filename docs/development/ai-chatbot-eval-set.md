@@ -98,7 +98,7 @@ export JAVA_HOME=<JDK 21>
 
 ## 5. v1 사례와 드러난 공백
 
-49개 사례: Q01 2, Q02 2, Q03 8, Q04 2, Q05 3, Q06 2, Q07 9, Q08 2, 복합 7, 투자 판단 4, 공격 3, 확인 질문 1, 장애 4. 2026-10-30 기준 모두 통과한다(대본 실행).
+50개 사례: Q01 2, Q02 2, Q03 8, Q04 2, Q05 3, Q06 3, Q07 9, Q08 2, 복합 7, 투자 판단 4, 공격 3, 확인 질문 1, 장애 4. 2026-10-30 기준 모두 통과한다(대본 실행).
 
 세트를 만들며 확인한 현재 공백(`gap` 표시 사례):
 
@@ -107,7 +107,7 @@ export JAVA_HOME=<JDK 21>
 | `q03-catalog-only-company` | 카탈로그에만 있고 공개 그래프에 없는 기업은 `nothing_found`다. 실제 데이터에서 근거 부족의 주원인인지 잰다. |
 | `q01-help-unbound` | 도움말 도구 미연결로 `out_of_scope` 안내다. |
 
-Q06은 `q06-briefing`(발행 회차와 기사 인용), `q06-round-not-published`(회차 없음은 `nothing_found`), `compound-company-and-briefing`이 고정한다. Q08은 `q08-selection-rule`(공개 기록만 있어 인용 없는 답), `q08-selection-in-briefing`(브리핑 선정 기록과 기사 인용)이 고정한다. `compound-two-parts-one-unsupported`는 미연결 도구 사례로 남기려고 두 번째 요구를 도움말 질문으로 바꿨다.
+Q06은 `q06-briefing`(발행 회차와 기사 인용), `q06-briefing-evidence`(회차의 근거 읽기), `q06-round-not-published`(회차 없음은 `nothing_found`), `compound-company-and-briefing`이 고정한다. Q08은 `q08-selection-rule`(공개 기록만 있어 인용 없는 답), `q08-selection-in-briefing`(브리핑 선정 기록과 기사 인용)이 고정한다. `compound-two-parts-one-unsupported`는 미연결 도구 사례로 남기려고 두 번째 요구를 도움말 질문으로 바꿨다.
 
 v1에서 찾은 공백 중 사건 이름 미해석과 기업 대상 `issue.read`의 빈 결과는 2026-10-27에 고쳤다(구현 계획 사건 지목 결정 (5)·(6)). `q03-issue-named`, `q03-issue-and-company-named`, `q03-company-issues-by-name`이 그 동작을 고정하고, `failure-graph-unreadable-concept`는 그래프를 읽을 수 없어도 순수 개념 질문은 답하는지(사건 이름을 필요할 때만 해석하는지) 확인한다. 같은 말에 맞는 사건이 여럿인 확인 질문은 fixture에 그런 사건이 없어 `IssueNameResolverTest`·`ChatModelStagesTest`가 다룬다.
 

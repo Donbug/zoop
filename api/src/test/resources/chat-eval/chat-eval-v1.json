@@ -338,6 +338,23 @@
       }
     },
     {
+      "id": "q06-briefing-evidence",
+      "group": "Q06",
+      "question": "오늘 출근 브리핑 근거 보여줘",
+      "script": {
+        "router": {"r1": {"types": {"Q06": 0.93}, "capabilities": {"briefing.evidence": 0.9}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "오늘 출근 브리핑 1위 사건의 근거는 차세대 GPU용 HBM 공급 계약 보도입니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch:1"]}]}
+      },
+      "expect": {
+        "stages": ["router", "answer", "verify"],
+        "tools": ["briefing.evidence"],
+        "outcome": "answered",
+        "answerBasis": "evidence_grounded",
+        "citationKinds": ["article"],
+        "limitations": []
+      }
+    },
+    {
       "id": "q06-round-not-published",
       "group": "Q06",
       "question": "어제 퇴근 브리핑 요약해줘",
