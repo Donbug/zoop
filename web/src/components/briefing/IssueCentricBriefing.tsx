@@ -509,7 +509,7 @@ function IssueCard({
         }`}
       >
         <summary
-          className={`cursor-pointer list-none p-5 sm:p-6 ${FOCUS_RING}`}
+          className={`cursor-pointer list-none p-5 transition-transform duration-150 ease-out active:scale-[0.99] motion-reduce:transition-none sm:p-6 ${FOCUS_RING}`}
         >
           <span className="flex justify-between gap-3 text-caption text-zoop-muted">
             <span>핵심 이슈 {rank}</span>

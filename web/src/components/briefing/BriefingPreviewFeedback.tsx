@@ -48,7 +48,9 @@ function Thumb({ down = false }: { down?: boolean }) {
 }
 
 /** D-BRF-01/02: local preview votes never impersonate a member or rate another revision. */
-type Props = Target & { subject: string; showNote?: boolean };
+type Props = Target & {
+  subject: string;
+};
 export default function BriefingPreviewFeedback(props: Props) {
   return (
     <PreviewFeedbackForm
@@ -62,7 +64,7 @@ export default function BriefingPreviewFeedback(props: Props) {
     />
   );
 }
-function PreviewFeedbackForm({ subject, showNote = false, ...target }: Props) {
+function PreviewFeedbackForm({ subject, ...target }: Props) {
   const identity = JSON.stringify(target);
   const [saved, setSaved] = useState<Rating | null>(null);
   const [pending, setPending] = useState(false);
@@ -145,12 +147,6 @@ function PreviewFeedbackForm({ subject, showNote = false, ...target }: Props) {
 
   return (
     <div className="flex flex-col gap-2" aria-label={`${subject} 평가`}>
-      {showNote && (
-        <p className={NOTE}>
-          이 브라우저의 미리보기 평가로 저장됩니다. 같은 버튼을 다시 누르면
-          취소돼요.
-        </p>
-      )}
       <div
         role="group"
         aria-label={`${subject} 평가 선택`}
@@ -180,13 +176,9 @@ function PreviewFeedbackForm({ subject, showNote = false, ...target }: Props) {
       <p role="status" aria-live="polite" className={NOTE}>
         {pending
           ? '평가를 저장하고 있어요.'
-          : saved?.value === 'up'
-            ? '도움이 됐다고 남겼어요.'
-            : saved?.value === 'down'
-              ? '아쉬운 점을 남겼어요.'
-              : !saved && !error
-                ? '내 평가를 확인하고 있어요.'
-                : ''}
+          : !saved && !error
+            ? '내 평가를 확인하고 있어요.'
+            : ''}
       </p>
       {reasonOpen && saved?.value === 'down' && (
         <form onSubmit={submit} className="flex flex-col gap-2">
@@ -214,7 +206,7 @@ function PreviewFeedbackForm({ subject, showNote = false, ...target }: Props) {
               disabled={pending || !saved}
               className={BUTTON}
             >
-              사유 저장
+              확인
             </button>
           </div>
         </form>

@@ -169,10 +169,6 @@ function MemberFeedback({
       >
         {toggle('up', '도움이 됐어요')}
         {toggle('down', '도움이 안 됐어요')}
-        <span role="status" className="text-caption text-zoop-muted">
-          {current === 'up' && '도움이 됐다고 남겼어요'}
-          {current === 'down' && '도움이 안 됐다고 남겼어요'}
-        </span>
       </div>
       {reasonOpen && current === 'down' && (
         <form

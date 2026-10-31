@@ -36,7 +36,6 @@ import {
   FOCUS_RING,
   PRIMARY_BUTTON,
   SECTION,
-  SECTION_TITLE,
   STATUS_PILL,
 } from './briefingStyles';
 
@@ -284,7 +283,6 @@ export default function PublishedBriefing({
     );
   const roundFeedback = result && (
     <section className={SECTION} aria-label="이 브리핑 평가">
-      <h3 className={SECTION_TITLE}>이 브리핑은 어땠나요?</h3>
       {previewAnalysis ? (
         <BriefingPreviewFeedback
           key={`${previewAnalysis.resultVersion}:round`}
@@ -293,7 +291,6 @@ export default function PublishedBriefing({
           feature="briefing_round"
           targetId={result.id}
           subject="이 브리핑 회차"
-          showNote
         />
       ) : result.graphVersion ? (
         <FeedbackButtons
@@ -527,15 +524,6 @@ export default function PublishedBriefing({
               </BriefingReadingSection>
             )}
             {compact && result.status === 'published' && roundFeedback}
-            {compact && (
-              <BriefingReadingSection
-                compact
-                title="발행 정보와 자료 확인 범위"
-              >
-                {publicationInfo}
-                {knownLimits && partialInfo}
-              </BriefingReadingSection>
-            )}
           </>
         )}
         {result?.status === 'published' && (
