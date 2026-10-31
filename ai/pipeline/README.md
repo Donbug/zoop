@@ -1,5 +1,95 @@
 # ai/pipeline — 일회성 문서 수집·S2-1 원문 준비(공개 의존성만)와 S2-2 / S3 오프라인 프로세스, S4 읽기 전용 의존 대상 조회
 
+## 준비된 입력의 사용량 기반 운영
+
+`zoop-ai-operate`는 이미 준비된 ingestion 관측을 native S2→S3로 처리하는 단일 소유자입니다. 패키지에 포함된 `python -m zoop_ai_pipeline.operating`도 같은 명령을 실행합니다. 각 `run`은 `--max-sets`로 지정한 유한 배치만 처리하며, 다음 배치와 재시작은 같은 원장·job·stage·attempt를 이어서 사용합니다. HTTP 서비스의 dispatch와 유료 수집 fallback은 이 운영 경로에 포함되지 않습니다.
+
+### 배포 전 준비할 입력
+
+운영자는 영속 볼륨의 서로 겹치지 않는 전역 `ledgerDirectory`, `stateDirectory`를 정합니다. 모든 set은 `stateDirectory/s2`의 extraction 원장 하나와 `stateDirectory/s3`의 relation 원장 하나에 원래 job ID로 누적됩니다. 각 set의 `ingestionStateDirectory`와 `sources`는 정확한 입력 핀으로 유지하되, 첫 유효 set을 수용할 때 그 두 경로를 작업 전체의 공통 문맥으로 고정합니다. 이후 다른 문맥의 set은 `operating_source_context_changed`로 거절합니다. 이 제약으로 기존 통합 handoff가 같은 두 출력 원장과 공통 ingestion·registry에서 모든 선택된 upstream을 읽을 수 있습니다. 입력의 provenance, 관측·문서 버전, catalogue, snapshot, topic 설정은 그대로 사용합니다. native 읽기·전달은 현재 read·quote-display 권한을 확인하고, 전송 시에는 model-send와 정확한 purpose/recipient도 확인합니다. 공통 경로 핀은 권한을 넓히는 승인이 아니며 저장·게시 권한은 각 소비자의 계약에서 별도로 판단합니다.
+
+아래는 **설정 문법을 보여 주는 합성 예시**입니다. 계정 참조, 경로, 종료 규칙, 요청 간격은 배포 담당자가 승인한 실제 값으로 작성해야 합니다. `accounts`에는 비밀 키 대신 계정 식별 참조를 넣습니다.
+
+```json
+{
+  "schemaVersion": "zoop-operating-runtime-config-1",
+  "policy": {
+    "schemaVersion": "zoop-operating-funding-1",
+    "mode": "operating-metered-v1",
+    "operationId": "synthetic-operation",
+    "accounts": {"openai-compatible": "synthetic-generation-account", "typesafe-native": "synthetic-verifier-account"},
+    "lifecycle": {"kind": "frontier", "setIds": ["set-1"]},
+    "requestTimeoutSeconds": 300,
+    "drainSeconds": 600,
+    "cleanupSeconds": 2,
+    "minIntervalMilliseconds": 1000
+  },
+  "ledgerDirectory": "/tmp/zoop-operating-example/metering",
+  "stateDirectory": "/tmp/zoop-operating-example/native",
+  "runtime": {
+    "model": "gpt-6-luna", "effort": "high", "maxOutputTokens": 24000,
+    "openaiEndpoint": "https://api.openai.com/v1", "verifierEndpoint": "https://api.typesafe.ai/v1",
+    "verifierModel": "jev-1.14.0"
+  }
+}
+```
+
+설정과 policy는 닫힌 객체이며, 시작 후 같은 원장에서는 바꿀 수 없습니다. lifecycle은 위의 유한 `frontier`, `{"kind":"explicit-stop"}`, 또는 `{"kind":"deadline","until":"2026-11-02T09:00:00Z"}` 중 하나를 반드시 지정합니다. 마지막 날짜도 문법 예시이며 운영 종료 시각을 승인한 것이 아닙니다. deadline은 신규 등록을 닫고 `drainSeconds`까지 기존 작업을 허용합니다. frontier는 등록 가능한 set ID를 고정하고 모두 완료되면 종료합니다.
+
+요청 timeout은 10–300초, cleanup은 1–60초, drain은 1–604800초, 보수적 전송 간격은 1–86400000밀리초입니다. 전송 간격은 생성·검증 요청 전체에 적용되므로, 실제 계정의 RPM/TPM과 최대 요청 크기를 감당하도록 정해야 합니다. 각 요청은 입력·출력·응답 크기 제한과 전 구간의 절대 시간 제한을 따릅니다. 여러 요청으로 이루어진 native job에는 별도의 300초 타이머가 없습니다.
+
+실제 HTTP 요청은 DNS 해석까지 포함한 전용 자식 프로세스에서 실행합니다. 부모는 절대 deadline과 현재 control을 확인하며, 시간 초과·취소 시 cleanup 안에서 TERM/KILL 후 회수합니다. 자식은 send lock을 상속하고 부모의 lifeline 종료 시 멈춥니다. 요청 감시 중 원장 잠금 경합은 기다리지 않고 보수적인 unknown으로 처리합니다. 키와 요청은 비공개 임시 fd로 전달하며 프로세스 인자·자식 환경·stderr에 넣지 않습니다.
+
+manifest의 정확한 최상위 모양은 `{"schemaVersion":"zoop-operating-input-manifest-1","sets":[...]}`이며 한 파일에 1–1000개 set을 받습니다. 각 set은 다음 여섯 필드로 구성합니다.
+
+| 필드 | 값 |
+| --- | --- |
+| `setId` | 영속 작업 식별자. frontier 모드에서는 허용 목록의 ID |
+| `extraction` | 기존 `zoop-extraction-s2-2` Submit 객체 전체. `executionMode: live`, `recordingKind: provider`; `sourceKind`는 실제 입력의 provenance |
+| `relationJobId` | 이후 생성할 native S3 job ID. upstream ID와 digest는 완료된 S2 결과에서 고정 |
+| `stageAllowances` | `extract`, `compare`, `topic`, `relation`, `impact`, `verify-relation`, `verify-impact`의 정수 허용 횟수. 각 0–100000, 합계는 양수 |
+| `ingestionStateDirectory` | 승인된 공통 native ingestion 원장의 절대 경로. 모든 incoming·snapshot 관측이 이 원장에서 해석되어야 하며 운영 원장·출력 경로와 겹치면 거절 |
+| `sources` | 공통 ingestion 관측의 현재 source registry 절대 경로. 첫 유효 set의 경로와 다르면 거절하며 현재 scope·grant 검사는 계속 수행 |
+
+### 명령과 환경
+
+설치된 패키지에서 다음 순서로 실행합니다. `ZOOP_OPERATING_CONFIG`와 `ZOOP_OPERATING_MANIFEST`는 운영자가 준비한 파일 경로를 가리키는 셸 변수입니다.
+
+```sh
+zoop-ai-operate init --config "$ZOOP_OPERATING_CONFIG"
+zoop-ai-operate register --config "$ZOOP_OPERATING_CONFIG" --manifest "$ZOOP_OPERATING_MANIFEST"
+zoop-ai-operate run --config "$ZOOP_OPERATING_CONFIG" --max-sets 20
+zoop-ai-operate status --config "$ZOOP_OPERATING_CONFIG"
+zoop-ai-operate pause --config "$ZOOP_OPERATING_CONFIG" --reason maintenance
+zoop-ai-operate resume --config "$ZOOP_OPERATING_CONFIG" --reason maintenance-complete
+zoop-ai-operate stop --config "$ZOOP_OPERATING_CONFIG" --reason operator-stop
+zoop-ai-operate force-stop --config "$ZOOP_OPERATING_CONFIG" --reason emergency-stop
+```
+
+새 전송을 수행하는 프로세스에는 `ZOOP_AI_PIPELINE_LIVE_ENABLED=1`, `ZOOP_AI_API_KEY`, `TYPESAFE_API_KEY`를 환경으로 전달합니다. 키는 설정·manifest·CLI 인자에 기록하지 않습니다. source checkout 밖의 설치에서는 기존 소유권 보호용 `ZOOP_STATE_DIR`, `ZOOP_AI_WORKER_STATE_DIR`도 앱/S1의 실제 예약 경로로 지정합니다. `register`는 원문 권한을 확인하고 S2 job을 등록하는 단계이며 전송하지 않습니다. `run`의 출력 `status`는 `complete`, `batch-complete`, `blocked`이고, blocked와 오류는 종료 코드 2입니다.
+
+등록은 native admission 검증을 먼저 수행한 뒤 공통 입력 경로 문맥, set 핀, 두 job ID의 소유권을 하나의 transaction으로 받아들입니다. 잘못된 첫 관측은 frontier나 공통 문맥을 차지하지 않습니다. 수용 후 native 초기화가 중단되면 같은 입력의 `register` 또는 `run`이 이어서 완료합니다. frontier 모드의 `complete`는 아직 등록하지 않은 ID까지 포함한 전체 frontier가 끝났을 때만 반환합니다.
+
+앞선 set이 terminal 응답 오류로 막혔을 때는 그 set을 보존하고 이미 등록된 독립 set만 선택해 처리할 수 있습니다. 예를 들어 `set-2`, `set-3`이 등록되어 있다면 `zoop-ai-operate run --config "$ZOOP_OPERATING_CONFIG" --max-sets 2 --set-id set-2 --set-id set-3`으로 실행합니다. `--set-id`는 `run`에서 반복 지정할 수 있으며, 생략하면 기존처럼 전체 등록 순서대로 처리합니다.
+
+선택한 모든 ID는 owner lock 안에서 native 작업 전에 확인합니다. 하나라도 미등록 ID이면 `operating_set_unavailable`로 전체 실행을 거절합니다. 입력한 순서와 중복 횟수에 관계없이 등록 순서대로 각 set을 한 번만 대상으로 삼고, 완료된 set은 건너뛰며 나머지에 `--max-sets`를 적용합니다. 선택에서 빠진 실패 set은 그대로 보존합니다. 실패 set을 직접 선택하면 원래 attempt와 판정을 유지한 채 기존 `blocked` 결과를 반환합니다.
+
+선택은 실행 대상만 좁힙니다. pause·stop·미해결 금전 hold에 대한 전역 제약과 전체 lifecycle은 그대로 적용됩니다. 일부 set만 완료되면 `batch-complete`이며, frontier의 `complete`와 종료는 설정된 모든 ID의 완료를 기준으로 판단합니다.
+
+`init`은 존재하지 않는 운영 원장 디렉터리에 **한 번만** 실행합니다. DB와 identity·lock 파일이 하나의 영속 상태입니다. 재시작에서는 바로 `register` 또는 `run`으로 재개합니다. 원장이나 등록된 native DB의 분실·교체는 거절되므로 원장 복구 사건으로 처리해야 합니다. 동시 owner와 동시 물리 요청은 각각 커널 lock으로 차단합니다. pause/resume/stop 이력은 원장에 남고 재시작으로 해제되지 않습니다. `stop`은 신규 등록을 닫고 기존 set을 drain하며, `force-stop`은 이후 전송을 막습니다. pause·강제 종료와 경합한 진행 중 요청은 응답을 확인하지 못하면 unknown hold로 남습니다.
+
+출력 배치는 초기화 시 `shared-native-1`로 고정합니다. 공유 S2/S3 DB의 파일 신원과 각 job의 input·binding digest를 따로 보존하므로, 새 set을 등록할 때도 기존 공유 DB의 분실·교체를 거절합니다. handoff에는 `--extraction-state-dir "$STATE_DIRECTORY/s2"`와 `--relation-state-dir "$STATE_DIRECTORY/s3"`를 주고, 수용된 공통 ingestion·sources 경로 및 기존 operator manifest·파일을 함께 전달합니다. 이전의 분리된 출력 DB를 이 경로로 병합하는 절차는 제공하지 않습니다.
+
+물리 전송 전의 pause와 증명된 SQLite BUSY/LOCKED 대기 초과는 같은 attempt를 `deferred`로 보존합니다. 예약·정산 등 일반 원장 transaction은 잠금을 최대 30초 기다리며, 진행 중 HTTP 요청의 control poll은 0초를 유지합니다. 금전 원장이 잠겨 있어도 native 원장은 attempt·정확한 prepared-request digest·미전송 사유를 불변 metadata에 기록하고 deferred 상태를 같은 transaction으로 저장합니다. 다음 실행은 이 증명과 원래 금전 예약의 신원을 다시 대조하며, 이미 dispatch되었거나 응답이 있는 attempt는 계속 거절합니다. 원장 손상 등 다른 오류는 미전송 증명으로 취급하지 않습니다. 기존 pause 이력은 `operating_deferrals`에도 남습니다. drain 도중 usage·HTTP·검증 기술 오류가 발생하면 즉시 pause하고, resume은 원래 drain 기한과 닫힌 admission을 복원합니다. SIGINT/SIGTERM의 강제 종료 의도는 owner lock을 넘기기 전에 영속화합니다.
+
+이 모드에서는 누적 USD·평생 호출 수 상한이 없고, `maxUsd`, `maxCalls`, `remainingUsd`는 JSON `null`입니다. 기존 `MAX_USD`·`MAX_CALLS` 환경 설정과의 혼용은 거절합니다. nano-USD 예약과 정산은 계속 누적되며 `settledKnownUsageUsd + settledUnknownUsageUsd + outstandingHoldUsd = chargedUsd`입니다. 이는 보수적인 사용량 추정 비용이며 실제 청구서와는 구분합니다. 요청 전 거절은 증명된 미전송 예약만 해제하고, 전송 가능성이 있는 attempt는 새 ID로 재전송하지 않습니다. 잘못된 usage·HTTP 오류·검증 응답의 기술적 decode 실패는 receipt 정산과 같은 transaction에서 pause합니다. semantic HOLD는 기존 native 판정을 보존합니다.
+
+raw receipt와 비용 정산은 같은 운영 원장 transaction에 저장합니다. native receipt 기록 전에 프로세스가 중단되면 다음 `run`이 원래 attempt의 receipt를 복구하고 stage를 이어갑니다. `status`는 owner lock 아래 native 원장을 열어 WAL을 정상 복구한 뒤 native/금전 attempt ID 차이와 receipt 복구 대상을 보고합니다. 원장 자체가 가진 응답 없는 예약은 계속 hold합니다.
+
+직접 runtime을 쓰는 승인된 owner는 `ZOOP_AI_PIPELINE_LIVE_PROFILE=operating-metered-v1`, `ZOOP_AI_PIPELINE_OPERATING_POLICY`(policy만 담긴 JSON 파일), `ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR`, `ZOOP_AI_PIPELINE_OPERATING_SET`, `ZOOP_AI_PIPELINE_OPERATING_OWNER`와 기존 모델 설정을 전달합니다. owner token은 `Budget.owner()`가 발급하며 같은 프로세스의 소유권과 등록된 set binding을 검증합니다. 일반 운영자는 이 내부 token을 만들지 않고 위 CLI를 사용합니다.
+
+합성 loopback 검증은 `python scripts/operating_smoke.py`로 실행합니다. `--faults`는 실제 CLI의 유지보수 pause/resume, 제어 writer와 예약의 경합·대기 초과 후 동일 attempt 재개, drain 중 usage 오류, 검증 기술 오류, 등록 거절·수정 및 미등록 frontier를 검사합니다. `--shared-handoff`는 두 배치의 서로 다른 native 입력·job을 공유 출력에 쓴 뒤 기존 `handoff.current(strict=True)`가 모든 선택된 S3/S2 upstream을 함께 읽는지 확인합니다. 이 검사는 source 소비 경로의 증명이며 공개 게시 승인과는 구분합니다. `--long-job`은 두 요청을 각각 151초 지연시켜 job이 300초를 넘어도 완료하는지 확인합니다. 배포에는 artifact digest, 단일 실행 대상, 영속 경로, 실제 lifecycle, 계정·quota·secret 참조와 stop-before-start 절차가 필요합니다.
+
 | 명령 | 모듈 | wire schema | 상태 파일 |
 | --- | --- | --- | --- |
 | `zoop-ai-collect run` | `zoop_ai_pipeline.collection_cli` | `zoop-collection-1` (policy `zoop-collection-policy-1`) | 상태 DB 없음. source `inputRoot/collections/<collectionId>/`에만 원본 bytes·receipt·manifest를 쓴다 |
@@ -9,12 +99,25 @@
 | `zoop-ai-dependents` (하위 명령 없음, stdin 변경 1건) | `zoop_ai_pipeline.dependency_cli` | `zoop-dependency-s4` | 위 세 원장을 읽기 전용으로만 연다(쓰는 상태 파일 없음) |
 | `zoop-ai-graph {init,freeze,project,recover,inspect,read,focus}` | `zoop_ai_pipeline.graph_projection_cli` | `zoop-graph-projection-1` (plan `zoop-graph-plan-2`) | `graph.sqlite3` + 이 원장 하나에 묶인 별도 Neo4j 5 database의 **비공개** version(공개 아님) |
 | `zoop-ai-issue-summary {submit,run,resume,inspect,export,cancel,live-binding}` | `zoop_ai_pipeline.issue_summary_cli` | `zoop-issue-summary-1` (policy `zoop-issue-summary-policy-1`) | `issue-summary.sqlite3`; 위 세 원장과 운영자 파일을 읽기 전용으로만 열고 handoff·Neo4j·app은 쓰지 않음 |
-| `zoop-ai-handoff {freeze,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `zoop-graph-handoff-bundle-7`, 운영자 decisions `zoop-public-decisions-3`) | `handoff.sqlite3` + `bundles/<sha256>.json`; 위 세 원장을 읽기 전용으로만 열고(요약을 고정한 freeze만 `--issue-summary-state-dir`의 요약 원장도 읽기 전용) Neo4j는 쓰지 않음 |
+| `zoop-ai-handoff {freeze,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `-8`/decisions `-4`/policy `-2` 또는 bundle `-9`/decisions `-5`/policy `-3`) | `handoff.sqlite3` + `bundles/<sha256>.json`; 원천 원장은 읽기 전용 |
 | `zoop-ai-handoff-exposure` | `zoop_ai_pipeline.handoff_exposure_cli` | `zoop-handoff-exposure-1` | handoff 원장·고정 artifact를 읽기만 함. 원천 변경 조회는 ingestion·extraction 원장도 읽으며 relation·Neo4j·앱 원장은 열지 않음 |
+| `zoop-ai-operate {init,register,run,status,pause,resume,stop,force-stop}` | `zoop_ai_pipeline.operating` | `zoop-operating-runtime-config-1` / `zoop-operating-input-manifest-1` | 운영 전용 `live-budget.sqlite3`와 공유 `stateDirectory/s2`, `stateDirectory/s3` 원장 |
 
 세 원장(ingestion/extraction/relation)은 서로의 디렉터리를 `--ingestion-state-dir`/`--extraction-state-dir` 경로로 읽기 전용으로 엽니다(그래서 한 프로젝트입니다). ingestion과 handoff·graph·dependents는 모델·provider 호출이 없고, S2·S3는 기본이 authored replay이며 명시적 live 게이트(`ZOOP_AI_PIPELINE_LIVE_ENABLED`, S1의 `ZOOP_AI_LIVE_ENABLED`와 별개)와 허용된 단계에서만 provider를 한 번씩 호출합니다. live 설정·예산·receipt·실패 코드는 [`docs/development/ai-runtime-setup.md`](../../docs/development/ai-runtime-setup.md)(§10)를 따르고, 모듈은 `live_runtime.py`(전송·binding·예산 gate; 오프라인 `python -m zoop_ai_pipeline.live_runtime binding|check`)·`live_prompts.py`·`live_jev.py`·`live_budget.py`입니다. 공개 route, 앱 문서 등록·게시, S1 DB 쓰기는 하지 않습니다. `zoop-ai-dependents`는 세 원장을 읽기만 하는 S4의 일부(영향 대상 조회)이며 철회·재생성은 하지 않습니다. `zoop-ai-graph`는 이들 위에서 **완료된 S3 job 하나**를 읽기 전용으로만 소비해 `graph.sqlite3`와 원장에 묶인 Neo4j 한 곳에만 쓰며(아래 절), 그 밖의 네트워크·모델·provider 호출은 없습니다. `zoop-ai-ingest export`는 기본으로 `read`·`quote-display`만 요구하며, 앱 문서 import처럼 내보낸 텍스트를 **저장**하는 소비자는 `--require-store`(export 전용)로 현재 grant의 `store`까지 요구합니다. 이 확인도 호출마다 현재 registry로 CLI 안에서 하며 소비자가 registry를 읽지 않습니다.
 
 `zoop-ai-handoff`는 여러 S3 job과 S2 upstream을 운영자 manifest로 고정해 **공개 이슈 중심 handoff bundle**을 만듭니다. 앱 버전·활성화·공개 준비 완료가 아니며, export 직전에 모든 원천과 운영자 파일의 현재 권한·고정 hash를 다시 검사합니다. member 식별은 문서 ID·버전·정확한 관측까지 포함하고, 구조 basis의 유효기간 근거와 동일 문서의 모든 관측도 보존·대조합니다. 원장 소유권은 변경 전에 읽기 전용으로 검사합니다. 현재 CLI와 `ai/service`의 인증된 전체 bundle HTTP는 **frozen manifest 본문과 bundle을 함께** 반환하여 두 digest를 독립 검증할 수 있습니다. 계약·소유·앱 import·공개 수용의 잔여 조건은 [그래프 인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)를 따릅니다.
+
+**현재 공개 투영 계약(2026-10-30, bundle `-8` / policy `-2` / decisions `-4`).** 새 freeze·import는 이 버전 조합을 사용합니다. 아래 bundle `-2`~`-7` 설명은 각 기능을 도입한 당시의 이력이며, 국가·시각·버전 수용 규칙은 이 문단이 우선합니다.
+
+- 원천 국가 `[]`는 미상으로 `geography.basis[].countries`에 그대로 보존합니다. 운영자가 해당 사건의 원문 근거와 함께 비어 있지 않은 국가 집합을 명시하면 공개 국가를 채울 수 있습니다. 원천의 **모든 비어 있지 않은 국가 집합**은 운영자 집합과 정확히 같아야 합니다(기존 집합 정규화 적용). 인용 좌표·해시·문서 버전·매핑·현재 권리는 코드가 확인하고, 그 인용이 해당 사건의 국가를 뒷받침하는지는 운영자가 판단합니다.
+- 원본 mention의 비어 있지 않은 시각이 엄격한 달력 문법 밖이면 receipt에 문자열 그대로, `timePrecision:"unresolved"`, `verification:"none"`으로 남습니다. `10.19일`, `'25.8월`, 불가능한 달력 날짜에 연도·일·시간대를 보충하지 않습니다. 대표가 아닌 mention까지 **각각 정확한 원래 값에 묶인 명시적 non-ALLOW verdict**가 있어야 하며, 없으면 이슈가 `mention_event_time_unreviewed`로 제외됩니다.
+- 형식만 지원하지 않는 값은 `HOLD/unsupported-format`과 자기 문서의 정확한 근거 span 1개 이상으로 검토합니다. 이 조합은 unresolved `eventTime`에만 허용합니다. 기존 `HOLD/ambiguous`, `HOLD/unstated`, `REJECT/contradicted` 규칙은 유지합니다. 선택 기준의 HOLD/REJECT를 적용한 **후** 공개 머리 값을 검사하므로 `eventTime:null`, `timePrecision:"unknown"`이 되고, `sameValueMentions`는 원래 선택 문자열을 기준으로 유지합니다. 공개 `getEvent`는 각 mention의 보류·거절 값을 가립니다. 요약의 `temporal-review-pending` 및 구조 관계의 시간·근거 게이트도 그대로 적용합니다.
+- 기존 `-1`~`-7` 원장 행과 불변 bundle·receipt는 원래 바이트와 버전으로 보존합니다. 생산자의 이력 전용 응답(`handoff_contract_changed`)과 앱에 이미 등록된 `-5`·`-6`·`-7` receipt 읽기는 유지하며, 새 의미를 옛 버전으로 수용하지 않습니다. 새 투영에는 새 명시적 판정과 새 handoff ID를 사용합니다.
+
+합성 검증은 `scripts/public_unknown_fields_smoke.py --root NEW_DIRECTORY --fixtures NEW_FIXTURE_DIRECTORY`로 실행합니다. 설치된 CLI로 동결한 `export-unknown-fields.json`과 `public-unknown-fields-cases.json`을 Python·서비스·Java가 함께 사용하며, 엄격한 달력 분류는 기존 `mention-time-vectors.json`으로 별도 검사합니다.
+
+**live 원천 인용 프로토콜(2026-10-30).** 다섯 생성 단계는 요청 안의 원천 구간 `segmentId`를 선택합니다(`zoop-live-source-segments-1`, prompt revision 2, live S2 adapter 2). 매핑된 구간과 줄바꿈 문맥은 한 번 전달하고, 원시 응답을 영수증에 보존한 뒤 소유 어댑터가 선택을 기존 exact native citation으로 확장합니다. relation의 null scope는 미기재이며 non-null scope를 각각 검증합니다(기존 0.90/0.80 게이트 유지). 추출 프롬프트는 원문에 명시된 국가의 ISO alpha-2 표기, 원문이 뒷받침하는 ISO 시각 정밀도 또는 null을 요구합니다. 합성 loopback 검증 명령은 `PYTHONPATH=ai/pipeline/src <pipeline-python> ai/pipeline/scripts/extraction_smoke.py --live-loopback`입니다.
+
 
 **원본 mention(bundle `-2`부터).** 각 이슈의 `mentions[]`는 그 이슈의 source event가 가리키는 S2 mention을 있는 그대로 담습니다. 신원은 (문서 ID, 문서 버전, 로컬 mention ID)이며(로컬 ID는 문서 버전 안에서만 유일), 앱 article·version은 운영자 binding에서 옵니다. 한 mention을 두 upstream(event candidate와 snapshot member)이 싣더라도 기록은 하나입니다. `title`·`action`·`target`·`eventTime`·`period`·`assertionStatus`·`background`와 참여자의 `sourceCompanyId`·`name`·`role`은 S2 후보/snapshot 값 그대로(순서 포함)이고 `verification`은 항상 `"none"`입니다. `timePrecision`은 형식으로만 계산하며 넓히지 않습니다. 참여자의 `companyId`는 이 mention을 싣는 **모든** upstream이 같은 공개 회사로 매핑하고 그 회사를 bundle이 `companies`로 게시할 때만 채우며, 아니면 null입니다(참여자 자체는 항상 보존; 역할은 확인된 역할도 `INVOLVES`도 아닙니다). mention의 `evidenceIds`는 그 mention 자신의 정확한 인용 근거이고 이슈의 `evidenceIds`는 mention 근거와 geography 근거의 합집합입니다. 같은 신원을 싣는 member들이 값을 다르게 말하면 `mention_values_conflict`, mention 시각을 추측 없이 분류할 수 없으면 `mention_event_time_unsupported`로 **이슈 전체**를 보이게 제외합니다(병합·마지막 값 우선 없음; `-1`이면 공개됐을 수 있는 이슈입니다). field decision·support·approval·publisher·impact 값은 만들지 않으며, source event·counts·digest 공식·`policy`는 `-1`과 같아 운영자 attestation digest가 그대로 유효합니다.
 
@@ -594,7 +697,9 @@ ai/pipeline/.venv/bin/python ai/pipeline/scripts/extraction_smoke.py --live-loop
 
 **종단 검사.** `scripts/round_enqueue_smoke.py`와 이를 포함한 `make pipeline-smoke`가 통과했다. 실제 자식 프로세스 141개에서 230개 참조·3페이지를 읽어 219개 작업과 11개 제외 항목을 확인했다. 최초 등록은 모두 `queued`·호출 0건이고 재접수는 219개 `existing`이었다. 입력 충돌·현재 권한·손상 상태·중단 복구·부분 등록·등록 후 close 실패의 결과 보존을 확인했으며, live 설정도 키·네트워크·예산 파일 생성 없이 3개 작업을 등록했다. 별도 명시적 replay 실행으로 두 작업을 `ready`로 만들고 취소·중단된 작업과 함께 재접수해도 상태·호출 수가 바뀌지 않음을 확인했다. 수집 원장의 바이트·권한·수정 시각은 유지됐고 다음 `tick`은 정상 진행했다. 모델·공급자 호출은 0건이며 실제 모델 품질이나 운영 스케줄 검증은 아니다.
 
-**완료 회차의 서비스 실행 계획 `plan-round`(CLI 전용, 오프라인).** `zoop-ai-extract plan-round --ingestion-state-dir I --sources R --principal P --output DIR [--replay F [--topic-replay T]]`는 완료된 회차를 `enqueue-round`와 같은 계획기로 읽어 새 디렉터리에 계획 파일만 만듭니다. `--state-dir`은 받지 않으며 extraction 원장·작업 등록·모델·네트워크를 사용하지 않습니다. 출력은 `approvals.json`(S2 승인 항목), `relation-upstreams.json`(S3 입력 쌍), `manifest.json`(계획 ID·digest·S2 제출 필드), `receipt.json`(앞 세 파일의 digest)입니다. manifest에는 분석 입력 본문·비밀·원문을 싣지 않습니다. 수동 모드에서는 사람이 계획을 검토해 오프라인 설치하고, 별도 온라인 모드에서는 사람이 미리 정한 정책 안에서 같은 계획을 접수합니다([서비스 안내](../service/README.md)). 계획 생성 자체는 설치·배포·유료 호출을 승인하지 않습니다.
+**완료 회차의 서비스 실행 계획 `plan-round`(CLI 전용, 오프라인).** `zoop-ai-extract plan-round --ingestion-state-dir I --sources R --principal P --output DIR --selection POLICY [--replay F [--topic-replay T]]`는 완료된 회차와 명시한 이월 관측에서 새 계획 디렉터리를 만듭니다. 출력은 `approvals.json`(S2 승인 항목), `relation-upstreams.json`(S3 입력 쌍), `manifest.json`(계획 ID·digest·S2 제출 필드·선택 근거), `receipt.json`(앞 세 파일의 digest)입니다. 수동 모드에서는 사람이 계획을 검토해 오프라인 설치하고, 온라인 모드에서는 사전 정책에 따라 같은 계획을 접수합니다([서비스 안내](../service/README.md)). 계획 생성과 모델 실행 승인은 별개입니다.
+
+`POLICY`는 `zoop-extraction-round-selection-1` JSON으로, 고정한 `asOf`와 양의 정수 `maxAgeSeconds`가 필수입니다. 기본값은 `limit:8`, `cadenceMinutes:30`이며, `carryover`·`inFlight`·`settled`에는 정확한 `ObservationRef` 배열을 전달합니다. 정책이 없으면 `plan_selection_policy_required`입니다. 원래 수집 회차의 `window.through`를 나이 기준으로 사용하며, 오래된 적격 이월분부터 신규 관측보다 먼저 선택합니다. 전체 관측 신원으로 중복·진행 중·처리 완료를 제외하고 현재 권한을 확인한 뒤 한도를 적용합니다. `too_old`·누락/미래 슬롯은 명시적으로 제외하고, 한도 초과 관측은 manifest의 `carryover`에 원래 신원 그대로 남깁니다. native manifest의 `selection`·`selectionReport`는 재검증 근거이며 HTTP 접수 manifest의 닫힌 형식은 유지합니다. 영속 이월 큐와 동시 접수 예약은 서비스가 소유합니다.
 
 작업 ID는 계획 ID와 정확한 관측에서 유도한 `s2p-` 접두를 사용하여 `enqueue-round`의 `s2r-` 작업과 구분합니다. 서비스는 기존 CLI 작업을 HTTP 작업으로 재사용하지 않습니다. replay 계획은 분석 fixture와 필요한 topic fixture의 해시를, live 계획은 런타임 identity를 고정합니다(live에 fixture를 주면 `fixture_not_allowed`). 같은 입력을 같은 출력 경로에 다시 주면 기존 파일을 바꾸지 않고, 다른 입력은 거절합니다. 기존 경로를 덮어쓰지 않는 원자적 이름 변경을 지원하지 않는 플랫폼도 거절합니다. 계획 생성 시에는 구문·현재 원천 권한을 확인하며, snapshot 근거와 실행 문맥은 실제 dispatch에서 검사합니다.
 
@@ -613,6 +718,8 @@ printf '%s\n' '{}' | zoop-ai-extract verify-plan \
 ```
 
 검사는 네 파일의 정확한 바이트·hash·길이·schema를 확인하고 현재 완료 회차와 같은 계획기로 다시 계산해 비교합니다. incoming과 snapshot의 모든 고유 관측도 현재 source-read/export 권한으로 다시 읽습니다. 성공 응답 `zoop-extraction-service-plan-verification-1`은 계획 ID·digest, receipt hash, principal·mode·pins·파일별 hash/크기·counts, 현재 source registry hash와 source binding digest만 반환합니다. 원문·요청 본문·비밀을 응답하지 않으며, 임시 계획·extraction 원장·job·예산을 만들거나 모델·네트워크를 호출하지 않습니다. live 검사는 공개 런타임 설정과 예산 디렉터리 신원만 고정하며 키·호출 상한을 요구하지 않습니다.
+
+새 계획은 manifest에 고정한 선택 정책과 이월 입력으로 다시 계산합니다. 기존 선택 정책 없는 계획은 원래 바이트와 신원으로 검증합니다.
 
 이 검사는 현재 읽기 권한과 계획 일치의 증거이지 model-send·비용·HOLD 최종 승인·앱 공개 허가가 아닙니다. snapshot 언급의 근거 일치와 실제 freeze 가능성은 기존 submit에서, 현재 원천 및 모델 전송 권한은 실제 사용 시 다시 검사합니다. 온라인 접수는 별도의 정책·누적 quota·불변 admission origin을 서비스 SQLite에 함께 기록하며 설치 파일을 실행 중에 교체하지 않습니다. 수동/온라인 권한은 섞이지 않습니다. 정책에 맞는 계획의 접수 구현과 실제 정책 설치·05/35 주기 실행·공개 반영은 구분합니다. 앱/AI의 역할과 10/40 새 조회 목표는 [공개 스케줄 책임](../../api/docs/GRAPH_READ_HANDOFF.md#수집분석-실행과-공개-스케줄의-책임)을 따릅니다.
 
@@ -700,6 +807,38 @@ cd ai/pipeline
 ```
 
 **2026-10-15 최종 실행(로컬 작업 트리·미커밋, Main 실행. 커밋·푸시·원격 CI 없음).** `ai/pipeline` 시험 전체 265개가 통과했다. 실제 Neo4j 5.26 Community(격리된 `--rm` tmpfs 임시 컨테이너, 종료·정리 완료)에서 R1–R4 회귀 11개는 수정 전 11개 모두 RED로 재현됐고 수정 뒤 모두 통과했다. 새 빈 database의 정상 smoke는 다섯 관계 유형 전부, 노드 6·간선 6의 `v1`, 노드를 공유하지 않는 `v2`(`v1` 원본 바이트 불변), 깊이 1·2·3 focus, 반복 `init` 멱등, 권한 철회 withheld, unknown commit·SIGKILL 뒤 rollback·변조 fail-closed를 모두 통과했다. provider·모델 호출은 0이었고 원천 원장은 읽기 전용이었다. 활성 공개 상태는 없다(FS080 일부, FS081 철회 아님). **성능·지연·부하는 측정하지 않았고** 이 검증은 기능에 한정된다. 자세한 기록과 남은 범위는 위 AI 실행 계약의 시험 절을 따른다.
+
+## 여러 운영 원장의 native handoff 읽기
+
+`zoop-ai-handoff freeze/export`와 원천을 읽는 `zoop-ai-issue-summary` 명령은 단일 원천 경로 네 개 대신 `--source-contexts FILE --source-contexts-sha256 SHA256`을 받습니다. 두 방식은 함께 지정할 수 없습니다. 단일 경로 입력도 내부에서는 하나의 context로 처리합니다. canonical·decisions·bindings 및 native manifest 형식은 그대로이며, **manifest가 선택하는 source job은 모든 context를 합쳐 최대 20개**입니다.
+
+운영자 파일은 최대 2,000,000바이트의 닫힌 JSON입니다. 최상위는 `{"schemaVersion":"zoop-handoff-source-contexts-1","contexts":[...]}`이고 각 context는 아래 필드를 모두 가집니다.
+
+| 필드 | 값 |
+|---|---|
+| `contextId` | 파일 안에서 고유한 1~200자 식별자 |
+| `relationStateDirectory`, `extractionStateDirectory`, `ingestionStateDirectory` | 해당 native 원장의 정규화된 절대 경로 |
+| `sources` | 해당 ingestion의 현재 `zoop-ingestion-s2-1` registry 절대 경로 |
+| `sourcePins` | 기존 manifest source pin 전체: `relation{jobId,inputDigest}`, `upstream{jobId,inputDigest,digest}`, `reviewDigest` |
+| `observations` | 실제 S2 binding의 전체 관측 selector: `roundId`, `sourceId`, `page`, `ordinal`, `documentId`, `rawVersion`, `documentVersion` |
+
+inventory에는 다른 handoff가 사용할 경로도 둘 수 있습니다. 게시할 항목은 manifest가 결정합니다. 선택한 모든 pin은 정확히 한 context로 연결되어야 하며, S2에 고정된 관측도 같은 context의 전체 selector와 일치해야 합니다. 중복·충돌·누락·잘못된 연결은 명령 전체를 거절합니다. 각 native job의 저장된 runtime binding을 그대로 읽고, 선택한 S3 shared lock은 마지막 freshness 검사까지 함께 유지합니다. 명령 도중 context 파일이 바뀌면 `source_contexts_changed`로 실패합니다.
+
+파일 SHA-256은 물리적 경로 배정을 고정합니다. `sources`의 내용은 매번 현재 권한으로 읽으므로 해당 grant의 철회가 즉시 다음 권한 검사에 반영됩니다. context 파일은 운영자만 교체할 수 있는 위치에 두고 실제 source pin·관측을 확인한 뒤 해시를 고정합니다.
+
+```sh
+zoop-ai-handoff export --state-dir HANDOFF \
+  --source-contexts CONTEXTS --source-contexts-sha256 SHA256 \
+  --canonical CANONICAL --decisions DECISIONS --bindings BINDINGS < selector.json
+zoop-ai-handoff-exposure --state-dir HANDOFF \
+  --source-contexts CONTEXTS --source-contexts-sha256 SHA256 < change.json
+```
+
+exposure는 선택한 각 upstream을 지정된 ingestion/S2에서 확인하고 shared lock을 출력 완료까지 유지합니다. source 변경은 모든 context의 일치하는 고정 관측을, grant 변경은 해당 grant/revision만 추적합니다. 현재 권한은 평가하지 않으므로 철회 뒤에도 같은 고정 의존 관계를 조회할 수 있습니다. `s3-relation` 질의는 bundle만 사용하며 context 인자도 받지 않습니다.
+
+회귀 시험은 `tests/test_handoff_contexts.py`에 있습니다. 실제 두 운영 원장과 20개 job의 native-8 → Java 재관측 → seal → 별도 root install → 수동 활성화/근거 조회는 `api/scripts/graph_delivery_smoke.py --multicontext --result NEW_FILE`로 실행합니다. 합성 데이터와 loopback provider fixture를 사용하는 로컬 검증이며, 실행 결과 파일을 확인해야 통과 여부를 판단할 수 있습니다.
+
+기존 delivery의 `origin-commands.json`·`handoff-manifest.json`·`export-envelope.json`·`bundle.json`을 유지한 채 새 consumer만 확인하려면 `scripts/graph_handoff_smoke.py --verify-historical-delivery DIRECTORY`를 사용합니다. 원래 export 인자의 원장·권한·운영자 파일을 그대로 읽고 현재 checkout의 모듈로 실행합니다. macOS sandbox가 network·file-write를 거절하며, 실행 전후 원장과 delivery 파일의 hash·mode·mtime 및 현재 registry를 비교합니다. 기존 wrapper와 JAR는 실행하거나 수정하지 않습니다.
 
 ## 공개 영향 대상 조회 (handoff exposure, FS081 일부)
 

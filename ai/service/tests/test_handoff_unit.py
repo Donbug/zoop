@@ -738,3 +738,51 @@ def test_a_blank_or_over_long_reviewer_is_refused_and_the_automatic_verifier_has
     assert BApprovalBasis.model_validate(automatic).reviewer is None and RcApprovalBasis.model_validate(automatic).reviewer is None
     with pytest.raises(ValidationError):
         BApprovalBasis.model_validate({**automatic, "reviewer": "someone"})   # a verifier verdict has no human reviewer
+
+
+GT_RESOURCES = Path(__file__).resolve().parents[3] / "api/src/test/resources/graph-handoff"
+GT_CASES = json.loads((GT_RESOURCES / "public-unknown-fields-cases.json").read_text("utf-8"))
+
+
+@pytest.mark.parametrize("case", GT_CASES["accept"], ids=lambda case: case["name"])
+def test_shared_geography_and_raw_time_fixture_is_relayed_verbatim(case):
+    assert Bundle.model_validate(case["bundle"]).wire() == case["bundle"]
+
+
+@pytest.mark.parametrize("case", GT_CASES["reject"], ids=lambda case: case["name"])
+def test_shared_geography_conflict_or_unreviewed_raw_time_is_refused(case):
+    with pytest.raises(ValidationError):
+        Bundle.model_validate(case["bundle"])
+
+
+def test_service_calendar_classifier_matches_the_shared_strict_vectors():
+    from zoop_ai_service.handoff_wire import event_precision
+    vectors = json.loads((GT_RESOURCES / "mention-time-vectors.json").read_text("utf-8"))
+    for item in vectors["accept"]:
+        assert event_precision(item["value"]) == item["precision"]
+    for item in vectors["reject"]:
+        with pytest.raises(ValueError):
+            event_precision(item["value"])
+
+
+def test_bundle9_unknown_branch_preserves_original_country_declaration():
+    wire = example_bundle()
+    wire["schemaVersion"] = "zoop-graph-handoff-bundle-9"
+    wire["policy"].update(version="zoop-public-projection-policy-3", geography="operator-field-verdict-or-explicit-unknown")
+    for issue in wire["issues"]:
+        issue["geography"].update(value=None, policyVersion="zoop-public-projection-policy-3", countries=[],
+                                  evidenceIds=[], verification="not-established", reasonCode="not-supported")
+    assert Bundle.model_validate(wire).wire() == wire
+    assert wire["issues"][0]["geography"]["basis"][0]["countries"] == ["KR"]
+    for fault in ("known-without-evidence", "old-schema", "old-policy", "missing-basis"):
+        broken = copy.deepcopy(wire)
+        if fault == "known-without-evidence":
+            broken["issues"][0]["geography"].update(value="domestic")
+        elif fault == "old-schema":
+            broken["schemaVersion"] = "zoop-graph-handoff-bundle-8"
+        elif fault == "old-policy":
+            broken["policy"]["version"] = "zoop-public-projection-policy-2"
+        else:
+            broken["issues"][0]["geography"]["basis"] = []
+        with pytest.raises(ValidationError):
+            Bundle.model_validate(broken)

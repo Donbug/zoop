@@ -415,7 +415,6 @@ OBSERVATION_ERRORS = {
 }
 
 
-
 def create_app(service: JobService | None = None, relation: RelationJobs | None = None, extraction: ExtractionJobs | None = None,
                graph: GraphReads | None = None, handoff: HandoffReads | None = None,
                handoff_exposure: HandoffExposureReads | None = None, chat: ChatStages | None = None, *,

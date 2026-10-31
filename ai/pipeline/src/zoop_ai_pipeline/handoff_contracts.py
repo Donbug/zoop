@@ -26,11 +26,14 @@ from .source_support import source_support
 __all__ = ["ExtractionFailure", "canonical", "digest"]
 
 SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-7"
-DECISIONS_SCHEMA = "zoop-public-decisions-3"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-8"
+DECISIONS_SCHEMA = "zoop-public-decisions-4"
 BINDINGS_SCHEMA = "zoop-app-document-bindings-1"
 LEDGER_VERSION = "zoop-handoff-ledger-1"
-POLICY = "zoop-public-projection-policy-1"
+POLICY = "zoop-public-projection-policy-2"
+UNKNOWN_POLICY = "zoop-public-projection-policy-3"
+BUNDLE_POLICIES = {BUNDLE_SCHEMA: POLICY, "zoop-graph-handoff-bundle-9": UNKNOWN_POLICY}
+UNKNOWN_REASONS = ("not-stated", "not-supported", "conflicting")
 EVIDENCE_KIND = "graph-body-span"
 OFFSET_UNIT = "unicode_code_point"
 STRUCTURAL_BASIS_TYPES = ("SUPPLIES",)       # the only S3 type inside the PoC structural basis set (PRODUCES/SUPPLIES/USES/...); others are rejected
@@ -50,7 +53,7 @@ MENTION_IDENTITY = ("documentId", "documentVersion", "mentionId")     # what nam
 ISSUE_FIELDS = (("title", "title"), ("action", "action"), ("target", "target"), ("event_time", "eventTime"), ("period", "period"),
                 ("assertion_status", "assertionStatus"))
 VERDICT_FIELDS = (("event_time", "eventTime"), ("period", "period"))      # the two fields an operator may judge, in canonical order (a subset of ISSUE_FIELDS)
-VERDICT_REASONS = {("ALLOW", "stated"), ("HOLD", "unstated"), ("HOLD", "ambiguous"), ("REJECT", "contradicted")}
+VERDICT_REASONS = {("ALLOW", "stated"), ("HOLD", "unstated"), ("HOLD", "ambiguous"), ("HOLD", "unsupported-format"), ("REJECT", "contradicted")}
 VERDICT_NO_SPAN = ("HOLD", "unstated")       # the only combination that states no text (the field is absent); every other combination needs >= 1 span
 VERDICT_KEYS = ("documentId", "documentVersion", "mentionId", "field", "value", "decision", "reasonCode", "evidenceIds", "verification", "reviewer", "decisionRef",
                 "decisionVersion")
@@ -153,7 +156,7 @@ class Manifest(Wire):
     schema_version: Literal["zoop-ai-handoff-1"]
     handoff_id: str = Field(pattern=ID)
     source_kind: Literal["synthetic", "actual"]
-    policy_version: Literal["zoop-public-projection-policy-1"]
+    policy_version: Literal["zoop-public-projection-policy-2", "zoop-public-projection-policy-3"]
     sources: list[SourcePin] = Field(min_length=1, max_length=MAX_SOURCES)
     files: Files
 
@@ -187,7 +190,7 @@ class FieldVerdict(Wire):
     field: Literal["eventTime", "period"]
     value: str
     decision: Literal["ALLOW", "HOLD", "REJECT"]
-    reason_code: Literal["stated", "unstated", "ambiguous", "contradicted"]
+    reason_code: Literal["stated", "unstated", "ambiguous", "unsupported-format", "contradicted"]
     evidence: list[Span] = Field(max_length=20)
     reviewer: str = Field(pattern=ID)
     decision_ref: str = Field(pattern=ID)
@@ -199,6 +202,8 @@ class FieldVerdict(Wire):
             raise ValueError("decision and reason code do not match")
         if ((self.decision, self.reason_code) == VERDICT_NO_SPAN) != (not self.evidence):
             raise ValueError("evidence count does not match the verdict")
+        if self.reason_code == "unsupported-format" and (self.field != "eventTime" or receipt_time_precision(self.value) != "unresolved"):
+            raise ValueError("unsupported-format requires an unresolved eventTime")
         return self
 
 
@@ -208,6 +213,15 @@ class Geography(Wire):
     classification: Literal["domestic", "international"]
     countries: list[str] = Field(min_length=1, max_length=10)
     evidence: list[Span] = Field(min_length=1, max_length=20)
+    decision_ref: str = Field(pattern=ID)
+    decision_version: str = Field(pattern=ID)
+
+
+class UnknownGeography(Wire):
+    classification: None
+    countries: list[str] = Field(max_length=0)
+    evidence: list[Span] = Field(max_length=0)
+    reason_code: Literal["not-stated", "not-supported", "conflicting"]
     decision_ref: str = Field(pattern=ID)
     decision_version: str = Field(pattern=ID)
 
@@ -232,7 +246,7 @@ class CompanyDecision(Wire):
 class IssueDecision(Wire):
     canonical_id: str = Field(pattern=ID)
     public_id: str = Field(pattern=ID)
-    geography: Geography
+    geography: Geography | UnknownGeography
     representative: Representative | None
     decision_ref: str = Field(pattern=ID)
     field_verdicts: list[FieldVerdict] = Field(max_length=2 * MAX_MENTIONS)
@@ -301,8 +315,8 @@ class Origin(Wire):
 
 
 class Decisions(Wire):
-    schema_version: Literal["zoop-public-decisions-3"]
-    policy_version: Literal["zoop-public-projection-policy-1"]
+    schema_version: Literal["zoop-public-decisions-4", "zoop-public-decisions-5"]
+    policy_version: Literal["zoop-public-projection-policy-2", "zoop-public-projection-policy-3"]
     companies: list[CompanyDecision] = Field(max_length=MAX_DECISIONS)
     issues: list[IssueDecision] = Field(max_length=MAX_DECISIONS)
     structural: list[StructuralDecision] = Field(max_length=MAX_DECISIONS)
@@ -311,6 +325,11 @@ class Decisions(Wire):
 
     @model_validator(mode="after")
     def unique(self):
+        expected = {"zoop-public-decisions-4": POLICY, "zoop-public-decisions-5": UNKNOWN_POLICY}
+        if self.policy_version != expected[self.schema_version]:
+            raise ValueError("decision schema and policy disagree")
+        if self.policy_version == POLICY and any(isinstance(i.geography, UnknownGeography) for i in self.issues):
+            raise ValueError("explicit unknown geography requires decisions5")
         def dup(values: list) -> bool:
             return len(set(values)) != len(values)
 
@@ -376,22 +395,14 @@ def time_precision(value: str | None) -> str:
     raise ValueError("unsupported time form")
 
 
-# The ORIGINAL-mention `eventTime` grammar: what BOTH the producer's classifier (`time_precision`) and the app (`HandoffTime`) already accept, written out by hand
-# so that no library extension decides (the shared vectors `api/src/test/resources/graph-handoff/mention-time-vectors.json` prove both sides). The raw string is
-# always kept verbatim; only the classification is decided here. It is NOT a new tightening of the public contract, except where the two sides already
-# disagreed and the app refuses the whole bundle:
-#   * ISO week (`2026-W40-3`), ordinal and compact forms, a comma fraction, an offset without a colon or with seconds, a 24-hour offset: Python's `fromisoformat`
-#     takes some of them, the app (java.time ISO) never does -> unsupported, so the issue is excluded instead of the bundle being refused whole;
-#   * year `0000` as a month/day/datetime: Python's `date` has no year 0 (the old classifier refused it too); a bare year `0000` is kept;
-#   * offset hours above 18: the app's `ZoneOffset` range;
-#   * lowercase `t`/`z`: the old classifier already required an uppercase `T` and `fromisoformat` only knows an uppercase `Z`.
-# Seconds are optional and a fraction is 1-9 digits (both sides accept them); `-00:00` is not refused (the public contract never refused it).
+# Explicit shared calendar grammar: Python's broader ISO parser also accepts forms the app cannot represent.
+# Calendar years start at 1, except the original bare year 0000; offsets stop at 18 hours.
+# Unsupported nonempty source strings are retained separately by receipt_time_precision.
 _MENTION_TIME = re.compile(r"([0-9]{4})(?:-([0-9]{2})(?:-([0-9]{2})(?:T([0-9]{2}):([0-9]{2})(?::([0-9]{2})(?:\.[0-9]{1,9})?)?(Z|[+-][0-9]{2}:[0-9]{2}))?)?)?")
 
 
 def mention_time_precision(value: str | None) -> str:
-    """Precision of an original mention's event time by FORMAT only (`unknown` for a missing time, never midnight). Anything outside the grammar is a
-    ValueError: the issue is excluded (`mention_event_time_unsupported`), the string is never rewritten, widened or guessed."""
+    """Strict calendar classification of an original mention. Unsupported strings raise ValueError; receipt retention is handled separately."""
     if value is None:
         return "unknown"
     if not isinstance(value, str):
@@ -416,6 +427,16 @@ def mention_time_precision(value: str | None) -> str:
         if minutes > 59 or hours * 60 + minutes > 18 * 60:
             raise ValueError("unsupported time form")
     return "datetime"
+
+
+def receipt_time_precision(value: str | None) -> str:
+    """Preserve an unsupported nonempty source string as unresolved receipt data, without interpreting its calendar."""
+    try:
+        return mention_time_precision(value)
+    except ValueError:
+        if not isinstance(value, str) or not value:
+            raise
+        return "unresolved"
 
 
 def mention_key(document_id: str, document_version: str, mention_id: str) -> str:
@@ -572,6 +593,8 @@ def _field_verdicts(issue: dict, mentions: list, evidence: dict, evidence_ids) -
         _text(v["value"], f"{at}.value")
         _need(v["value"] == mention[v["field"]], f"{at}.value.exact")
         _need((v["decision"], v["reasonCode"]) in VERDICT_REASONS, f"{at}.reasonCode")
+        _need(v["reasonCode"] != "unsupported-format" or (v["field"] == "eventTime" and mention["timePrecision"] == "unresolved"),
+              f"{at}.unsupportedFormat")
         _need(v["verification"] == "operator-field-verdict", f"{at}.verification")
         for name in ("reviewer", "decisionRef", "decisionVersion"):
             _text(v[name], f"{at}.{name}", ID)
@@ -583,6 +606,9 @@ def _field_verdicts(issue: dict, mentions: list, evidence: dict, evidence_ids) -
         position = (key, order[v["field"]])
         _need(previous is None or previous < position, f"{at}.order")
         previous = position
+    reviewed = {mention_key(v["documentId"], v["documentVersion"], v["mentionId"]) for v in verdicts
+                if v["field"] == "eventTime" and v["decision"] != "ALLOW"}
+    _need(all(m["timePrecision"] != "unresolved" or key in reviewed for key, m in by_identity.items()), f"{at}.unresolvedTime")
     return verdicts
 
 
@@ -719,7 +745,9 @@ def validate_bundle(bundle: dict) -> None:
     else is `handoff_bundle_invalid` (a damaged or hand-edited artifact), never a partial read."""
     _keys(bundle, ("schemaVersion", "handoffId", "manifestDigest", "provenance", "policy", "sources", "companies", "pathCompanies", "issues", "relations",
                    "evidence", "articles", "impacts", "exclusions", "counts", "checks", "readiness", "digests"), "bundle")
-    _need(bundle["schemaVersion"] == BUNDLE_SCHEMA, "schemaVersion")
+    _need(bundle["schemaVersion"] in BUNDLE_POLICIES, "schemaVersion")
+    policy_version = BUNDLE_POLICIES[bundle["schemaVersion"]]
+    explicit_unknown = policy_version == UNKNOWN_POLICY
     _text(bundle["handoffId"], "handoffId", ID)
     _text(bundle["manifestDigest"], "manifestDigest", HASH)
     prov = _keys(bundle["provenance"], ("declaredSourceKind", "observedSourceKind", "executionMode", "recordingKind"), "provenance")
@@ -727,8 +755,8 @@ def validate_bundle(bundle: dict) -> None:
     _need((prov["executionMode"], prov["recordingKind"]) in EXECUTION_MODES, "provenance.mode")
     policy = _keys(bundle["policy"], ("version", "files", "evidenceIdKind", "offsetUnit", "geography", "structural", "sequence", "sourceSupport", "impacts",
                                       "issueSummary"), "policy")
-    _need(policy["version"] == POLICY and policy["evidenceIdKind"] == EVIDENCE_KIND and policy["offsetUnit"] == OFFSET_UNIT, "policy")
-    for name, expected in (("geography", "operator-field-verdict"), ("structural", "manual-operator-review"),
+    _need(policy["version"] == policy_version and policy["evidenceIdKind"] == EVIDENCE_KIND and policy["offsetUnit"] == OFFSET_UNIT, "policy")
+    for name, expected in (("geography", "operator-field-verdict-or-explicit-unknown" if explicit_unknown else "operator-field-verdict"), ("structural", "manual-operator-review"),
                            ("sequence", "s2-comparison-with-operator-decision"), ("sourceSupport", SOURCE_SUPPORT_POLICY), ("impacts", IMPACT_POLICY_NAME),
                            ("issueSummary", ISSUE_SUMMARY_POLICY)):
         _need(policy[name] == expected, f"policy.{name}")
@@ -891,7 +919,7 @@ def validate_bundle(bundle: dict) -> None:
         for name in ("target", "eventTime", "period"):
             _text(m[name], f"{at}.{name}", nullable=True)
         try:
-            precision = mention_time_precision(m["eventTime"])
+            precision = receipt_time_precision(m["eventTime"])
         except ValueError:
             precision = None
         _need(precision is not None and m["timePrecision"] == precision, f"{at}.timePrecision")
@@ -920,14 +948,21 @@ def validate_bundle(bundle: dict) -> None:
         for name in ("action", "target", "eventTime", "period", "assertionStatus"):
             _text(i[name], f"issue.{name}", nullable=True)
         _need(i["timePrecision"] in TIME_PRECISIONS, "issue.timePrecision")
-        geo = _keys(i["geography"], ("value", "decisionRef", "decisionVersion", "policyVersion", "countries", "verification", "evidenceIds", "basis"), "issue.geography")
-        _need(geo["value"] in ("domestic", "international") and geo["policyVersion"] == POLICY, "issue.geography")
-        _need(geo["verification"] == "operator-field-verdict", "issue.geography.verification")
+        _need(isinstance(i["geography"], dict), "issue.geography")
+        unknown = explicit_unknown and i["geography"].get("value") is None
+        geo_keys = ("value", "decisionRef", "decisionVersion", "policyVersion", "countries", "verification", "evidenceIds", "basis")
+        geo = _keys(i["geography"], geo_keys + (("reasonCode",) if unknown else ()), "issue.geography")
+        _need(geo["policyVersion"] == policy_version, "issue.geography.policyVersion")
         _text(geo["decisionRef"], "issue.geography", ID)
         _text(geo["decisionVersion"], "issue.geography", ID)
-        _need(countries_class(_strings(geo["countries"], "issue.geography.countries", maximum=10)) == geo["value"], "issue.geography.class")
+        if unknown:
+            _need(geo["countries"] == [] and geo["evidenceIds"] == [] and geo["verification"] == "not-established"
+                  and geo["reasonCode"] in UNKNOWN_REASONS, "issue.geography.unknown")
+        else:
+            _need(geo["value"] in ("domestic", "international") and geo["verification"] == "operator-field-verdict", "issue.geography")
+            _need(countries_class(_strings(geo["countries"], "issue.geography.countries", maximum=10)) == geo["value"], "issue.geography.class")
         evidence_ids(i["evidenceIds"], "issue.evidenceIds")
-        evidence_ids(geo["evidenceIds"], "issue.geography.evidenceIds")
+        evidence_ids(geo["evidenceIds"], "issue.geography.evidenceIds", 0 if unknown else 1)
         _need(set(geo["evidenceIds"]) <= set(i["evidenceIds"]), "issue.geography.evidenceClosure")
         source_events = _list(i["sourceEvents"], "issue.sourceEvents", 1000)
         _need(bool(source_events), "issue.sourceEvents")
@@ -946,8 +981,12 @@ def validate_bundle(bundle: dict) -> None:
             item = _keys(b, ("upstream", "kind", "ref", "mentionId", "documentId", "documentVersion", "observation", "countries"),
                          "issue.geography.basis")
             _source_event({k: v for k, v in item.items() if k != "countries"}, "issue.geography.basis", upstreams)
-            _need(item["countries"] == geo["countries"], "issue.geography.basisCountries")
+            _strings(item["countries"], "issue.geography.basisCountries", maximum=10)
+            _need(unknown or item["countries"] == [] or item["countries"] == geo["countries"], "issue.geography.basisCountries")
         _need([{k: v for k, v in b.items() if k != "countries"} for b in basis] == source_events, "issue.geography.basisClosure")
+        own_documents = {(s["documentId"], s["documentVersion"]) for s in source_events}
+        _need(all((evidence[x]["source"]["documentId"], evidence[x]["source"]["documentVersion"]) in own_documents
+                  for x in geo["evidenceIds"]), "issue.geography.evidenceDocument")
         if i["representative"] is not None:
             rep = _keys(i["representative"], ("upstream", "kind", "ref", "mentionId", "documentId", "documentVersion", "observation"),
                         "issue.representative")
@@ -971,6 +1010,11 @@ def validate_bundle(bundle: dict) -> None:
         _need(support == source_support([{"articleId": a, "textSha256": articles[(a, v)]["textSha256"],
                                           "originId": (articles[(a, v)]["origin"] or {}).get("originId")} for a, v in cited]), "issue.sourceSupport.exact")
         _field_provenance(i, mentions, verdicts)
+        try:
+            headline_precision = mention_time_precision(i["eventTime"])
+        except ValueError:
+            headline_precision = None
+        _need(i["timePrecision"] == headline_precision, "issue.timePrecision.value")
         _issue_summary(i, evidence, articles, (prov["executionMode"], prov["recordingKind"]))
         _need(i["id"] not in issues and i["id"] not in companies and i["id"] not in path_companies, "issues.unique")
         issues[i["id"]] = i
@@ -1018,6 +1062,16 @@ def validate_bundle(bundle: dict) -> None:
             _text(b["validFrom"], "basis.validFrom", nullable=True)
             _text(b["validUntil"], "basis.validUntil", nullable=True)
             _strings(b["countries"], "basis.countries", maximum=10)
+            if explicit_unknown:
+                issue = issues[r["source"]]
+                countries = issue["geography"]["countries"]
+                _need(not b["countries"] or bool(countries) and set(countries) <= set(b["countries"]), "basis_countries_unprovable")
+                if b["validFrom"] is not None or b["validUntil"] is not None:
+                    when = issue["eventTime"]
+                    _need(when is not None and issue["timePrecision"] in ("day", "datetime"), "basis_validity_unprovable")
+                    day = date.fromisoformat(when[:10])
+                    _need((b["validFrom"] is None or day >= date.fromisoformat(b["validFrom"]))
+                          and (b["validUntil"] is None or day <= date.fromisoformat(b["validUntil"])), "basis_validity_outside_event_time")
             for name in ("businessScope", "productScope"):        # S3 text copied exactly (never an entity id), bounded in code points
                 _text(b[name], f"basis.{name}", nullable=True)
                 _need(b[name] is None or len(b[name]) <= MAX_SCOPE, f"basis.{name}.length")

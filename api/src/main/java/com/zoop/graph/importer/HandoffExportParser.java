@@ -112,7 +112,7 @@ public final class HandoffExportParser {
 
         Obj receipt = root.object("receipt").exactly(RECEIPT);
         need(request.handoffId().equals(receipt.string("handoffId")) && manifestDigest.equals(receipt.string("manifestDigest"))
-                && HandoffBundleVerifier.BUNDLE_SCHEMA.equals(receipt.string("bundleSchema"))
+                && Obj.of(bundleNode).string("schemaVersion").equals(receipt.string("bundleSchema"))
                 && bundleDigest.equals(receipt.string("bundleDigest")) && contentDigest.equals(receipt.string("contentDigest"))
                 && receipt.count("bundleBytes") == bundleBytes.length);
         receipt.string("frozenAt");

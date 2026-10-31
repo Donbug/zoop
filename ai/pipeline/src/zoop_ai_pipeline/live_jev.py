@@ -97,9 +97,12 @@ CLAIM_TEMPLATES = {
     "connection": ("Read the quotes {labels} in `state.quotes` together as one passage. Do they connect `state.relation.subject` to "
                    "`state.relation.object` through the chain of steps in `state.relation.path`, as an indirect relationship and not a "
                    "direct one?"),
-    "scope": ("Read the quotes {labels} in `state.quotes` together as one passage. Do they describe the relationship as limited to "
-              "exactly `state.relation.businessScope` (business) and `state.relation.productScope` (product)? A null value asserts no "
-              "restriction and must not be contradicted."),
+    "scope": ("Read the quotes {labels} in `state.quotes` together. Do they support the relationship for each non-null "
+              "`state.relation.businessScope` and `state.relation.productScope` value, for these entities? A null field is "
+              "unspecified and makes no claim of unrestricted applicability. Assess only stated scope values; do not broaden "
+              "a narrower source restriction or require the quotes to prove that the listed scopes exhaust every possible "
+              "restriction. Choose insufficient when a stated scope is not established, and contradicted when the quotes "
+              "conflict with it."),
     "validity": ("Read the quotes {labels} in `state.quotes` together as one passage. Do they state that the relationship holds from "
                  "`state.relation.validity.from` until `state.relation.validity.until`? A null bound is not stated; compare only the "
                  "bounds that are not null."),

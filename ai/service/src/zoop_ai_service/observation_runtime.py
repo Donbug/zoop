@@ -1,9 +1,10 @@
-"""One credential-free installed ingestion export, always requiring store rights."""
+"""Credential-filtered installed ingestion export under a pinned exact route, always requiring store rights."""
 from __future__ import annotations
 
 import json
 
 from .config import ServiceConfig
+from .handoff_contexts import observation_route
 from .handoff_runtime import _duplicate_free, _no_constant, canonical
 from .observation_wire import SCHEMA, ObservationExportRequest
 from .runtime import CODE, Deadlines, Outcome, WorkerProcess
@@ -36,6 +37,21 @@ class ObservationProcess:
 
     def export(self, request: ObservationExportRequest) -> Outcome:
         cfg = self._observation
-        return self._runner.execute([str(cfg.command), "export", "--state-dir", str(cfg.ingestion_state_dir),
-                                     "--sources", str(cfg.sources_path), "--require-store"],
-                                    request.wire(), self._deadlines.read, interpret=interpret)
+        selector = {key: value for key, value in request.wire().items() if key != "schemaVersion"}
+        try:
+            route = observation_route(cfg.source_contexts, cfg.source_contexts_sha256, selector) if cfg.source_contexts else None
+        except (OSError, ValueError, TypeError, KeyError, AttributeError, RecursionError):
+            return Outcome("error", code="source_contexts_changed")
+        if cfg.source_contexts and route is None:
+            return Outcome("error", code="observation_not_found")
+        ingestion, sources = route if route else (cfg.ingestion_state_dir, cfg.sources_path)
+        outcome = self._runner.execute([str(cfg.command), "export", "--state-dir", str(ingestion),
+                                        "--sources", str(sources), "--require-store"],
+                                       request.wire(), self._deadlines.read, interpret=interpret)
+        if cfg.source_contexts:
+            try:
+                if observation_route(cfg.source_contexts, cfg.source_contexts_sha256, selector) != route:
+                    return Outcome("error", code="source_contexts_changed")
+            except (OSError, ValueError, TypeError, KeyError, AttributeError, RecursionError):
+                return Outcome("error", code="source_contexts_changed")
+        return outcome

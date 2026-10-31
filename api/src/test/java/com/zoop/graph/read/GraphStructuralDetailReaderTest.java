@@ -10,6 +10,7 @@ import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.StrictJson;
 import com.zoop.common.json.StrictJson.Obj;
 import com.zoop.document.evidence.service.EvidenceService;
+import com.zoop.graph.publication.GraphPublicationReader.*;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Basis;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Relation;
@@ -19,6 +20,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.node.ObjectNode;
@@ -63,7 +66,7 @@ class GraphStructuralDetailReaderTest {
         rawRelation.set("basis", bases);
         setPath(List.of(HANMI, HYNIX));
         bundle.set("relations", StrictJson.newArray().add(rawRelation));
-        when(evidence.graphImportBundle(VERSION, "r")).thenAnswer(invocation -> Obj.of(bundle));
+        when(evidence.graphPublication(VERSION, "r")).thenAnswer(invocation -> publication(HBM_EQUIP));
         when(evidence.shownNow(anyString(), nullable(String.class), eq(VERSION), nullable(Instant.class), eq("r"))).thenReturn(true);
     }
 
@@ -147,11 +150,11 @@ class GraphStructuralDetailReaderTest {
             bundle.put("schemaVersion", "zoop-graph-handoff-bundle-" + v);
             assertEquals("legacy_data", read().reason());
         }
-        for (int v = 5; v <= 7; v++) {
+        for (int v = 5; v <= 9; v++) {
             bundle.put("schemaVersion", "zoop-graph-handoff-bundle-" + v);
             assertEquals("available", read().status());
         }
-        bundle.put("schemaVersion", "zoop-graph-handoff-bundle-8");
+        bundle.put("schemaVersion", "zoop-graph-handoff-bundle-10");
         assertEquals("details_not_available", read().reason());
         bundle.put("schemaVersion", "zoop-graph-handoff-bundle-7");
         rawRelation.put("target", "wrong");
@@ -183,5 +186,76 @@ class GraphStructuralDetailReaderTest {
         snapshot = new PublicGraphSnapshot(snapshot.snapshotFormat(), snapshot.versionId(), snapshot.sourceBundleId(), snapshot.companies(),
                 snapshot.issues(), relations, snapshot.articles(), snapshot.evidence());
         assertEquals(List.of("rel-fixture-04", "rel-other"), read().paths().stream().map(p -> p.relationId()).toList());
+    }
+
+    @Test void provesOriginalEndpointsBeforeMappingAndNeverUsesTheFirstUnrelatedLeaf() {
+        rawRelation.put("source", "issue:incoming");
+        var nativePublication = publication("issue:incoming");
+        var empty = new PublicGraphSnapshot(4, "legacy-source", "legacy", List.of(), List.of(), List.of(), List.of(), List.of());
+        var legacy = new Contribution("legacy-source", "legacy", "legacy-real", null, null, empty,
+                StrictJson.parseObject("{\"schemaVersion\":\"zoop-legacy-real-bundle-3\"}"));
+        var composed = new Publication(VERSION, "publication", "digest", null, null, null, null, snapshot,
+                List.of(legacy, nativePublication.contributions().getFirst()), StrictJson.parseObject("{\"schemaVersion\":\"zoop-graph-publication-decisions-1\",\"issueMappings\":[],\"fieldSelections\":[],\"relationSelections\":[]}"),
+                nativePublication.issueSources(), nativePublication.relationSources());
+        when(evidence.graphPublication(VERSION, "r")).thenReturn(composed);
+
+        var detail = read();
+        assertEquals("available", detail.status());
+        assertEquals("rel-fixture-04", detail.paths().getFirst().relationId());
+        assertEquals(List.of(HANMI, HYNIX), detail.paths().getFirst().companies().stream().map(c -> c.id()).toList());
+        rawRelation.put("source", HBM_EQUIP);
+        assertEquals("details_not_available", read().reason(), "the mapped id cannot stand in for native receipt membership");
+    }
+
+    @Test void selectedCorrectionKeepsItsPathWhileRetainingTheOtherOriginalScopePrivately() {
+        var current = publication(HBM_EQUIP);
+        var olderBundle = (ObjectNode) bundle.deepCopy();
+        ((ObjectNode) Obj.of(olderBundle).objects("relations").getFirst().objects("basis").getFirst().node())
+                .put("businessScope", "superseded scope");
+        var older = new Contribution("older-source", "older-handoff", "native", null, null,
+                current.contributions().getFirst().projection(), Obj.of(olderBundle));
+        Map<String, IssueOwners> issues = new HashMap<>();
+        current.issueSources().forEach((id, owners) -> issues.put(id,
+                new IssueOwners(id, List.of(older.issueRef(id), owners.members().getFirst()), owners.headlineSources())));
+        Map<String, RelationOwners> relations = new HashMap<>();
+        current.relationSources().forEach((id, owners) -> relations.put(id,
+                new RelationOwners(id, List.of(new RelationRef("older-source", id), owners.sources().getFirst()),
+                        owners.publicSource(), owners.publicTarget())));
+        var selection = StrictJson.newObject().put("relationId", "rel-fixture-04");
+        selection.set("takeFrom", StrictJson.newObject().put("sourceVersionId", VERSION).put("relationId", "rel-fixture-04"));
+        ((ObjectNode) current.effectiveDecisions().node()).set("relationSelections", StrictJson.newArray().add(selection));
+        var publication = new Publication(VERSION, "publication", "digest", null, null, null, null, snapshot,
+                List.of(older, current.contributions().getFirst()), current.effectiveDecisions(), issues, relations);
+        when(evidence.graphPublication(VERSION, "r")).thenReturn(publication);
+        var detail = read();
+        assertEquals("available", detail.status());
+        assertEquals(1, detail.paths().size());
+        assertEquals("서버 사업", detail.paths().getFirst().links().getFirst().businessScope());
+        assertFalse(detail.toString().contains("superseded scope"));
+    }
+
+    private Publication publication(String originalId) {
+        var originalIssues = snapshot.issues().stream().map(i -> !i.issueId().equals(HBM_EQUIP) ? i
+                : new PublicGraphSnapshot.Issue(originalId, i.label(), i.eventTime(), i.timePrecision(), i.period(),
+                        i.assertionStatus(), i.action(), i.target(), i.geography(), i.geographyPolicyVersion(),
+                        i.geographyEvidenceIds(), i.articleIds(), i.evidenceIds(), i.mentions(),
+                        i.representativeMentionId(), i.latestPublishedAt())).toList();
+        var originalRelations = snapshot.relations().stream().map(r -> new Relation(r.relationId(), r.relationType(),
+                r.source().equals(HBM_EQUIP) ? originalId : r.source(), r.target().equals(HBM_EQUIP) ? originalId : r.target(),
+                r.role(), r.assertionStatus(), r.evidenceIds(), r.basis())).toList();
+        var projection = new PublicGraphSnapshot(snapshot.snapshotFormat(), VERSION, "handoff", snapshot.companies(),
+                originalIssues, originalRelations, snapshot.articles(), snapshot.evidence());
+        var contribution = new Contribution(VERSION, "handoff", "native", null, null, projection, Obj.of(bundle));
+        Map<String, IssueOwners> issues = new HashMap<>();
+        for (var issue : snapshot.issues()) {
+            var ref = contribution.issueRef(issue.issueId().equals(HBM_EQUIP) ? originalId : issue.issueId());
+            issues.put(issue.issueId(), new IssueOwners(issue.issueId(), List.of(ref), Map.of()));
+        }
+        Map<String, RelationOwners> relations = new HashMap<>();
+        for (var relation : snapshot.relations()) relations.put(relation.relationId(),
+                new RelationOwners(relation.relationId(), List.of(new RelationRef(VERSION, relation.relationId())),
+                        relation.source(), relation.target()));
+        return new Publication(VERSION, null, null, null, null, null, null, snapshot, List.of(contribution),
+                StrictJson.parseObject("{\"schemaVersion\":\"zoop-graph-publication-decisions-1\",\"issueMappings\":[],\"fieldSelections\":[],\"relationSelections\":[]}"), issues, relations);
     }
 }

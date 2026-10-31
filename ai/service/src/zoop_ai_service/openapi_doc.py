@@ -35,9 +35,9 @@ Internal app-to-AI transport for the S1 analysis family (`zoop-ai-s1-1`): docume
 semantic-verification and briefing-outlook. It is a thin, durable HTTP layer over the installed `zoop-ai` CLI; the runtime ledger
 stays the only source of job state, and every state shown here is read from the runtime during the same request.
 
-**Network.** The service binds `127.0.0.1` only. Production reach is an HTTPS reverse proxy co-located with it (same host or network
-namespace) that terminates TLS, caps bodies at 2,000,000 bytes, never logs `Authorization`, and is reachable only from the app
-backend's security group. That proxy is an assumption: nothing here was deployed or observed.
+**Network.** The service defaults to `127.0.0.1`. `ZOOP_AI_SERVICE_HOST` accepts an explicit literal bind IP for an operator-managed
+container deployment behind approved TLS ingress. The ingress must cap bodies at 2,000,000 bytes, protect Authorization,
+and restrict callers to the app backend. Configuration does not deploy or authorize that ingress.
 
 **Authentication.** `Authorization: Bearer <token>`. Tokens are operator-issued; the service stores only SHA-256 digests. The
 authenticated principal is the owner of every job it registers; there is no end-user identity in v1. A job owned by another
@@ -505,7 +505,7 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     spec["info"] = {"title": "Zoop internal AI analysis transport", "version": "1.0.0",
                     "description": (DESCRIPTION + "\n" + extraction_doc.DESCRIPTION + "\n" + graph_doc.DESCRIPTION + "\n" + handoff_doc.DESCRIPTION + "\n"
                                     + chat_doc.DESCRIPTION).strip()}
-    spec["servers"] = [{"url": "http://127.0.0.1:8797", "description": "Loopback only. Never exposed directly; reach it through a co-located TLS proxy."}]
+    spec["servers"] = [{"url": "http://127.0.0.1:8797", "description": "Default loopback development address; deployment endpoint is operator-owned HTTPS ingress."}]
     spec["tags"] = [{"name": "analysis-jobs", "description": "S1 analysis jobs over the installed zoop-ai runtime."},
                     {"name": "relation-jobs", "description": "S3 relation/impact candidate jobs over an operator-prepared S2 upstream, through the installed zoop-ai-relation pipeline (replay, or live for an operator-pinned upstream)."},
                     {"name": "extraction-jobs", "description": "S2 event/topic candidate jobs over an operator-approved request, through the installed zoop-ai-extract pipeline (replay, or live for an operator-pinned approval)."},
@@ -603,17 +603,20 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     exposure["responses"]["200"]["description"] = "Complete unchanged identity-only report in the handoff envelope; not current delivery authority or import readiness."
     chat_doc.document(spec)
     _document_plans(spec)
-    selector = ObservationExportRequest.model_json_schema(by_alias=True, ref_template="#/components/schemas/{model}")
-    components["schemas"]["ObservationExportRequest"] = selector
+    components["schemas"]["ObservationExportRequest"] = ObservationExportRequest.model_json_schema(
+        by_alias=True, ref_template="#/components/schemas/{model}")
     export = spec["paths"]["/internal/v1/observations/export"]["post"]
     export["requestBody"] = {"required": True, "content": {"application/json": {
         "schema": {"$ref": "#/components/schemas/ObservationExportRequest"}}}}
     export["description"] = (
-        "Requires observation.read, granted only to the configured internal importer principal. This scope permits exact reads across the server's "
-        "ingestion registry; it is not per-observation ownership. One explicit native selector; schemaVersion is required and unknown fields are refused. "
-        "Runs only zoop-ai-ingest export --require-store against server-owned state and sources on every request. "
+        "Requires observation.read, explicitly granted to operator-selected internal importer principals. This scope permits exact reads across the server's "
+        "configured registry or inventory; it is not per-observation ownership. One complete seven-field native selector plus required schemaVersion "
+        "zoop-ingestion-s2-1; unknown fields are refused. "
+        "Every request runs installed zoop-ai-ingest export --require-store with a credential-filtered environment and server-owned paths. "
         "The native CLI checks current read, store and quote-display grants and frozen source configuration. "
         "The service additionally validates selector identity, text sourceHash, document version and locator hashes before returning the unchanged native JSON. "
+        "Single-context mode reads its configured registry; multicontext mode resolves only an exact selector in the pinned handoff inventory, "
+        "checked before and after export. Unknown routes are 404; changed or invalid inventory fails closed. "
         "One request returns one observation synchronously with 200; batch and asynchronous (202) delivery are open design items of issue #407. "
         "Authorized document.text is intentionally present only in a 200 response. No status route, cache, job, ingestion write, retry or recovery. "
         "No query parameters, client paths/CLI arguments, observationId or requireStore option. Idempotency-Key is not required and conveys no authority; "

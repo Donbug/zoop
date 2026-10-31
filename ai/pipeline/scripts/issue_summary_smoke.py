@@ -365,7 +365,7 @@ LIVE_CLAIMS = (("합성기업은 2026년 3분기 공급 계약을 발표했으�
 def stub_manifest() -> dict:
     def h(label: str) -> str:
         return hashlib.sha256(label.encode()).hexdigest()
-    return {"schemaVersion": "zoop-ai-handoff-1", "handoffId": "handoff-live-1", "sourceKind": "synthetic", "policyVersion": "zoop-public-projection-policy-1",
+    return {"schemaVersion": "zoop-ai-handoff-1", "handoffId": "handoff-live-1", "sourceKind": "synthetic", "policyVersion": "zoop-public-projection-policy-2",
             "sources": [{"relation": {"jobId": "rel-live", "inputDigest": h("rel")}, "upstream": {"jobId": "s2-live", "inputDigest": h("s2"), "digest": h("up")},
                          "reviewDigest": h("review")}], "files": {"canonical": h("canonical"), "decisions": h("decisions"), "bindings": h("bindings")}}
 

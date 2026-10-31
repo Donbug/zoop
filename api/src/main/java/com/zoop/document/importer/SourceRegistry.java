@@ -16,6 +16,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +36,8 @@ import tools.jackson.databind.JsonNode;
  * {@code ai/pipeline/.../ingestion_contracts.py} ({@code Registry}, {@code Source}, {@code Scope}, {@code Grant} and
  * {@code Authority.check}, no Python import). It is the authority the S2-1 export checks with {@code --require-store}: the
  * rights an import was made under are frozen provenance, this file is what allows a read <em>now</em>.
+ * The optional {@code zoop-source-authority-set-1} wrapper routes exact source/grant/revision tuples to local S2-1 leaves.
+ * A selected leaf is read fresh for every decision; wrapper bytes remain fixed through the reader's lifetime.
  *
  * <p>The file is read fresh by every caller (nothing is cached), never written, locked or created. Under the operator-only
  * path ownership contract, symlinks and non-regular files are refused and the file is bounded to {@value #MAX_BYTES} bytes.
@@ -56,6 +59,9 @@ public final class SourceRegistry {
     public static final Set<String> OPERATIONS = Set.of("read", "store", "quote-display");
 
     private static final Set<String> TOP = Set.of("schemaVersion", "revision", "sources");
+    public static final String AUTHORITY_SET_SCHEMA = "zoop-source-authority-set-1";
+    private static final Set<String> AUTHORITY_SET = Set.of("schemaVersion", "authorities");
+    private static final Set<String> AUTHORITY_ROUTE = Set.of("sourceId", "grantId", "revision", "sources");
     private static final Set<String> SOURCE = Set.of("sourceId", "adapter", "inputRoot", "allowedHosts", "scopes", "grant");
     private static final Set<String> SCOPE = Set.of("scopeId", "selection", "initialCursor", "articleXPath",
             "timestampLimitations");
@@ -73,9 +79,24 @@ public final class SourceRegistry {
                     + "(?:Z|[+-][0-9]{2}:[0-9]{2}(?::[0-9]{2})?)");
 
     private final Map<String, SourceGrant> grants;
+    private final Map<GrantKey, Path> routes;
+    private final Path routingPath;
+    private final byte[] routingBytes;
+
+    private record GrantKey(String sourceId, String grantId, String revision) {}
 
     private SourceRegistry(Map<String, SourceGrant> grants) {
         this.grants = grants;
+        this.routes = Map.of();
+        this.routingPath = null;
+        this.routingBytes = null;
+    }
+
+    private SourceRegistry(Map<GrantKey, Path> routes, Path path, byte[] bytes) {
+        this.grants = Map.of();
+        this.routes = Map.copyOf(routes);
+        this.routingPath = path;
+        this.routingBytes = bytes;
     }
 
     /**
@@ -97,7 +118,7 @@ public final class SourceRegistry {
 
     /** The grant of one source as the Python {@code Grant} model reads it; recipients and purposes are not part of the rule. */
     private record SourceGrant(String grantId, String revision, boolean enabled, String rights, Set<String> operations,
-            List<String> evidence, Instant expiresAt) {
+            List<String> evidence, Instant expiresAt, Set<String> allowedHosts) {
     }
 
     /**
@@ -105,7 +126,26 @@ public final class SourceRegistry {
      * callers must prevent untrusted local writes to the file and its parent chain. Nothing is created, changed or locked.
      */
     public static SourceRegistry read(Path path) throws Invalid {
-        return parse(readBounded(path));
+        byte[] data = readBounded(path);
+        try {
+            StrictJson.Obj root = StrictJson.parseObject(data);
+            if (!AUTHORITY_SET_SCHEMA.equals(root.string("schemaVersion"))) return parse(data);
+            root.exactly(AUTHORITY_SET);
+            wellFormed(root.node());
+            Map<GrantKey, Path> routes = new HashMap<>();
+            List<StrictJson.Obj> authorities = root.objects("authorities");
+            if (authorities.isEmpty()) throw invalid();
+            for (StrictJson.Obj entry : authorities) {
+                entry.exactly(AUTHORITY_ROUTE);
+                GrantKey key = new GrantKey(nonEmpty(entry.string("sourceId")), nonEmpty(entry.string("grantId")),
+                        nonEmpty(entry.string("revision")));
+                Path leaf = Path.of(entry.string("sources"));
+                if (!leaf.isAbsolute() || !leaf.equals(leaf.normalize()) || routes.put(key, leaf) != null) throw invalid();
+            }
+            return new SourceRegistry(routes, path, data);
+        } catch (StrictJson.Malformed | java.nio.file.InvalidPathException error) {
+            throw invalid();
+        }
     }
 
     static SourceRegistry parse(byte[] data) {
@@ -182,7 +222,7 @@ public final class SourceRegistry {
             throw invalid();
         }
         return new SourceGrant(grantId, revision, enabled, rights, Set.copyOf(operations), List.copyOf(evidence),
-                expiresAt == null ? null : expiry(expiresAt));
+                expiresAt == null ? null : expiry(expiresAt), Set.copyOf(source.strings("allowedHosts")));
     }
 
     private static Instant expiry(String value) {
@@ -239,14 +279,21 @@ public final class SourceRegistry {
     /**
      * Whether the grant now in force for {@code sourceId} lets this app read, store and quote-display what it imported under
      * {@code (grantId, revision)}. Returns {@code null} to allow, otherwise a stable internal denial code for the log only
-     * (never for a client). Pure: it looks only at the registry as read and at {@code now}, never at a frozen receipt, and
-     * {@code now} is the authority clock, never a requested {@code asOf}. Expiry is inclusive of the instant it names.
+     * (never for a client). A routed leaf is read now, and {@code now} is the authority clock, never a requested
+     * {@code asOf}. Expiry is inclusive of the instant it names.
      *
      * <p>Order of the codes: {@code source_unknown}, {@code grant_revision_or_source_changed},
      * {@code source_rights_unknown_or_denied} (disabled, rights other than {@code known}, or no non-blank evidence),
      * {@code source_grant_expired}, {@code source_operation_denied}.
      */
     public String denial(String sourceId, String grantId, String revision, Instant now) {
+        if (routingPath != null) {
+            unchanged();
+            Path leaf = routes.get(new GrantKey(sourceId, grantId, revision));
+            String result = leaf == null ? "source_unknown" : parse(readBounded(leaf)).denial(sourceId, grantId, revision, now);
+            unchanged();
+            return result;
+        }
         SourceGrant grant = sourceId == null ? null : grants.get(sourceId);
         if (grant == null) {
             return "source_unknown";
@@ -264,6 +311,37 @@ public final class SourceRegistry {
             return "source_operation_denied";
         }
         return null;
+    }
+
+    /** Explicit retained-file imports bind an article URL to the same current source's exact host allowlist. */
+    public String denialForUrl(String sourceId, String grantId, String revision, String url, Instant now) {
+        if (routingPath != null) {
+            unchanged();
+            Path leaf = routes.get(new GrantKey(sourceId, grantId, revision));
+            String result = leaf == null ? "source_unknown" : parse(readBounded(leaf)).denialForUrl(sourceId, grantId, revision, url, now);
+            unchanged();
+            return result;
+        }
+        String denial = denial(sourceId, grantId, revision, now);
+        if (denial != null) return denial;
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+            if (!Set.of("http", "https").contains(uri.getScheme()) || uri.getUserInfo() != null || uri.getHost() == null
+                    || !grants.get(sourceId).allowedHosts().contains(uri.getHost().toLowerCase(Locale.ROOT)))
+                return "source_url_outside_grant";
+            return null;
+        } catch (IllegalArgumentException invalid) {
+            return "source_url_invalid";
+        }
+    }
+
+    /** Pins local route ownership through a multi-step operation while leaves remain current authority. */
+    public void checkRoutingUnchanged() {
+        if (routingPath != null) unchanged();
+    }
+
+    private void unchanged() {
+        if (!Arrays.equals(routingBytes, readBounded(routingPath))) throw invalid();
     }
 
     /**

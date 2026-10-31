@@ -5,12 +5,55 @@ Spring 백엔드에서 내부 AI 서비스의 그래프 버전 읽기(`graph.rea
 ## 지금 상태 (사실)
 
 
-> **구현과 공개 운영을 구분합니다.** 현재 생산자 계약은 bundle `zoop-graph-handoff-bundle-7`, 운영자 판정 파일 `zoop-public-decisions-3`이며, 앱 공개 스냅샷은 형식 3입니다. 비활성 스테이징 수입, 일반 graph 근거·structural basis-only·impact-only 근거 읽기, 읽기 전용 exposure CLI·내부 HTTP가 구현되어 있습니다. 요약·영향 행은 비공개 import receipt에 보존되며, 요약의 공개 `getEvent` 소비는 백엔드 소유의 후속 범위입니다. 이 구현은 전체 철회나 AWS 배포 완료를 뜻하지 않습니다. 아래 날짜별 절은 각 변경 당시의 계약·검증 이력이며 현재 생산자 버전을 대신하지 않습니다.
+> **구현과 공개 운영을 구분합니다.** 생산자와 reader는 기존 bundle `zoop-graph-handoff-bundle-8` / 정책 `zoop-public-projection-policy-2` / 판정 파일 `zoop-public-decisions-4`와 새 bundle `-9` / 정책 `-3` / 판정 파일 `-5`를 정확한 조합으로 구분합니다. 기존 앱 공개 스냅샷은 형식 3으로 읽으며, 명시적 미확인 메타데이터는 새 형식 4에 저장합니다. 비활성 스테이징 수입, 일반 graph 근거·structural basis-only·impact-only 근거 읽기, 읽기 전용 exposure CLI·내부 HTTP가 구현되어 있습니다. 요약·영향 행은 비공개 import receipt에 보존되며, 요약의 공개 `getEvent` 소비는 백엔드 소유의 후속 범위입니다. 이 구현은 전체 철회나 AWS 배포 완료를 뜻하지 않습니다. 아래 날짜별 절은 각 변경 당시의 계약·검증 이력이며 현재 지원하는 버전 조합을 대신하지 않습니다.
 - **AI 읽기와 앱 공개 상태는 별개입니다.** 내부 서비스(`127.0.0.1`, 앞단 TLS 프록시는 미배포)에는 활성 버전 포인터가 없습니다. graph 버전 응답의 `publication`은 항상 `not-published`입니다. `delivery.state=current`는 “이번 요청에서 검증됨”이지 “앱이 보여 주는 활성 버전”이 아닙니다. exposure는 별도 `handoff.exposure` scope를 요구하고 기본 비활성화이며, 원문 없이 영향 ID만 반환합니다. 앱의 현재 제외 목록·revision·공개 활성화를 변경하지 않습니다([HTTP 소비 계약](#내부-http-소비-계약)).
 - **Spring 구현 기준.** 공개 `GET /api/v1/graph`, 기업·관계·시점 조회, `graph_versions`·`graph_activations`, 버전 선택기와 `PublicGraphReader`가 있습니다. `AdminGraphVersionController`·서비스와 활성화 사전 검사, 버전별 공개 제외 저장소와 운영자 제외 명령(2026-10-24, [api README](../README.md#공개-제외-명령-fs081))이 구현되어 있습니다. 기본 활성화 게이트는 안전 조건이 충족되지 않으면 차단하며, 명시적인 로컬·운영자 플래그는 운영 준비 완료를 뜻하지 않습니다. 스냅샷 source는 기본 `none`, local/dev용 `fixture`, 수입된 불변 파일을 검증해 읽는 `artifact`로 구분합니다. Spring은 Neo4j에 직접 접속하지 않고 Neo4j 자격을 받지 않습니다.
-- **운영자 스테이징 수입.** `com.zoop.graph.importer`는 설치된 handoff·ingestion CLI의 현재 결과와 앱 DB·본문을 대조해 근거 및 비활성 버전을 등록하며, 활성 포인터를 변경하지 않습니다. 스냅샷 형식 3은 읽기용 투영이고 원본 manifest·bundle 전체는 영수증에 보존됩니다. 앱 mention ID는 문서·버전·원천 ID로 결정해 문서 간 같은 로컬 ID를 구분합니다. 원래 언급 값은 `verification: none`이고, 운영자의 `eventTime`·`period` verdict(`fieldVerdicts`)는 앱 verifier가 독립 재계산해 보류·거절된 머리 값을 snapshot에서 `null`로 만듭니다(영수증에는 원본과 verdict가 그대로 남음). `quote_verified`도 인용 무결성이지 의미 검증·공개 승인 자체가 아닙니다([필드 verdict 계약](#2026-10-21-bundle--4의-운영자-필드-verdict--eventtimeperiod의-보류거절)). `structuralPath`·`pathCompanies`·basis 범위 텍스트·`impacts[]`·`issues[].summary`는 snapshot의 공개 필드가 아닙니다. 근거 읽기는 [graph 본문 근거 계약](#2026-10-20-getevidence의-graph-본문-근거-경로)과 아래 `-5`·`-6` 절을, 수입 명령과 설정은 [API 실행 안내](../README.md#그래프-handoff-스테이징-import)를 따릅니다.
+- **운영자 스테이징 수입.** `com.zoop.graph.importer`는 설치된 handoff·ingestion CLI 또는 설정된 HTTP 읽기 경로의 현재 결과와 앱 DB·본문을 대조해 근거 및 비활성 버전을 등록하며, 활성 포인터를 변경하지 않습니다. 스냅샷 형식 3·4는 읽기용 투영이고 원본 manifest·bundle 전체는 영수증에 보존됩니다. 앱 mention ID는 문서·버전·원천 ID로 결정해 문서 간 같은 로컬 ID를 구분합니다. 원래 언급 값은 `verification: none`이고, 운영자의 `eventTime`·`period` verdict(`fieldVerdicts`)는 앱 verifier가 독립 재계산해 보류·거절된 머리 값을 snapshot에서 `null`로 만듭니다(영수증에는 원본과 verdict가 그대로 남음). `quote_verified`도 인용 무결성이지 의미 검증·공개 승인 자체가 아닙니다([필드 verdict 계약](#2026-10-21-bundle--4의-운영자-필드-verdict--eventtimeperiod의-보류거절)). `structuralPath`·`pathCompanies`·basis 범위 텍스트·`impacts[]`·`issues[].summary`는 snapshot의 공개 필드가 아닙니다. 근거 읽기는 [graph 본문 근거 계약](#2026-10-20-getevidence의-graph-본문-근거-경로)과 아래 `-5`·`-6` 절을, 수입 명령과 설정은 [API 실행 안내](../README.md#그래프-handoff-스테이징-import)를 따릅니다.
 - 운영자가 AI 버전을 만들고 서버 allowlist에 올립니다. 이 AI 읽기 서비스는 버전을 **만들거나 찾거나 나열하지 못합니다**(목록 라우트 없음). 앱의 operator 스테이징 명령은 전달받은 handoff를 별도의 비활성 앱 버전으로 등록합니다.
 - 실제 로컬 HTTP 서버 → 설치된 graph CLI → 격리된 Neo4j 5.26 경로의 smoke를 통과했습니다(2026-10-15 로컬 실행 기록이며 현재 `main`의 재검증이 아닙니다). 1~3홉·권한 분리·digest 불일치·원천 권한 철회·canonical 변경·그래프 변조·원장 잠금·시간 초과를 확인했습니다. 원천 원장 변경과 모델 호출은 없었습니다. 이 서비스 구현은 이후 PR #213에서 `main`에 병합됐지만, 배포·실제 데이터 운영은 하지 않았습니다.
+- **불변 native 전달.** 원본 호스트는 현재 source를 검증한 비활성 수입과 outbox seal을 별도 transaction으로 커밋합니다. package `zoop-graph-delivery-package-2`는 공개 snapshot·전체 receipt·숨겨진 기사까지 포함한 본문·구성 행의 규칙 적용 전 projection을 전달합니다. 설치기는 별도 root에서 같은 PostgreSQL과 현재 registry로 closure와 권리를 독립 검증합니다. 설치 후 공개 JVM은 설치된 앱 artifact와 DB·registry를 읽으며 native 원장이나 Python을 사용하지 않습니다. 초기 설치 동안 operator와 serving 앱의 자동 활성화를 끄고, 완료 후 기존 관리자 route로 명시적으로 활성화합니다. `already_sealed`와 delivery status는 현재 source 권한의 증명이 아닙니다([실행·복구·인프라 전제](../README.md#원본-호스트-seal과-java-전용-artifact-설치)).
+
+## HTTP로 문서와 native handoff 수입
+
+API 이미지의 비웹 operator 프로세스는 문서 등록과 graph 수입 모두에서 AI service를 HTTP로 읽을 수 있습니다. native CLI·원장·source-host 경로는 AI service 쪽에만 둡니다. 수입기는 실제 대상 PostgreSQL과 durable artifact root를 사용하며, 전송 방식이 바뀌어도 본문·문서 binding·정확한 span과 commit 직전 현재 권리 검사는 그대로 적용합니다.
+
+기존 웹 회차의 `GraphRoundImportBridge`도 같은 importer를 사용합니다. handoff는 HTTP 클라이언트로 읽고, 관측의 현재 권리는 `ZOOP_GRAPH_ROUND_IMPORT_SOURCE=cli`에서 설치된 `zoop-ai-ingest export --require-store`로 재확인합니다. 이 회차 profile에는 API 쪽 ingestion CLI·원장·source registry 경로가 필요합니다. 회차 연결은 버전 수입 트랜잭션 안에서 원래 lease token으로 기록하고, 기존 delivery의 root-lock 호출 계약을 유지합니다. 결과는 비활성 incoming 버전이며 누적 composition·활성화와 구분합니다([회차 계약](GRAPH_ROUND.md)).
+
+### TaskDefinition 설정 이름과 profile 조건
+
+| 실행 profile | 설정 |
+|---|---|
+| 문서 등록 RunTask | `ZOOP_DOCUMENT_IMPORT_ENABLED=true`, `ZOOP_DOCUMENT_IMPORT_OBSERVATION_SOURCE=http`, `ZOOP_DOCUMENT_IMPORT_REQUEST`, `ZOOP_DOCUMENT_IMPORT_RESULT`, `ZOOP_ARTIFACT_ROOT`, 대상 `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`와 기존 앱 인증 초기화 설정입니다. |
+| 문서·graph 공통 observation client | `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED=true`, 운영자가 확정한 `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL`, 비밀 저장소에서 주입하는 `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_TOKEN`입니다. 선택 설정은 `_CONNECT_TIMEOUT=3s`, `_REQUEST_TIMEOUT=50s`, `_MAX_RESPONSE_BYTES=16777216`입니다. |
+| graph 수입 RunTask | `ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED=true`, `ZOOP_GRAPH_HANDOFF_IMPORT_HANDOFF_SOURCE=http`, `ZOOP_GRAPH_HANDOFF_IMPORT_OBSERVATION_SOURCE=http`, `ZOOP_GRAPH_HANDOFF_IMPORT_REQUEST`, `ZOOP_GRAPH_HANDOFF_IMPORT_RESULT`, 대상 DB와 artifact root입니다. |
+| graph handoff client | `ZOOP_AI_HANDOFF_READ_CLIENT_ENABLED=true`, 운영자 주소 `ZOOP_AI_HANDOFF_READ_CLIENT_BASE_URL`, 비밀 저장소의 `ZOOP_AI_HANDOFF_READ_CLIENT_TOKEN`입니다. 선택 설정은 `_CONNECT_TIMEOUT=3s`, `_REQUEST_TIMEOUT=60s`, `_MAX_RESPONSE_BYTES=16777216`입니다. |
+| AI 읽기 service | [service 설정 표](../../ai/service/README.md#관측-export와-앱-수입용-읽기-profile)의 필수 base 설정과 native command·source inventory·handoff operator 파일·allowlist를 사용합니다. 두 context 설정 쌍은 같은 파일과 SHA를 가리킵니다. |
+
+각 RunTask는 `--spring.main.web-application-type=none`으로 실행하며 문서 등록과 graph 수입을 한 JVM에서 함께 켜지 않습니다. 문서 HTTP profile에서는 `ZOOP_INGESTION_CLI`·`ZOOP_INGESTION_STATE_DIR`·`ZOOP_INGESTION_SOURCES`를 비웁니다. graph의 양쪽 HTTP profile에서는 이 세 값 외에 handoff CLI·state, relation·extraction state, canonical·decisions·bindings, `ZOOP_GRAPH_HANDOFF_IMPORT_SOURCE_CONTEXTS`와 `_SHA256`도 비웁니다. 혼합 profile은 CLI가 실제로 읽는 경로만 유지합니다.
+
+앱 수입 principal은 `handoff.read`와 `observation.read`를 사용합니다. 기존 online admission principal의 scope·binding은 바꾸지 않습니다. service는 token digest만 설정하고 API task에는 토큰 평문을 비밀 저장소로 주입합니다. 문서 scope는 설정된 전체 inventory의 정확한 관측 조회를 허용합니다. handoff의 principal별 allowlist·canonical digest pin·현재성 검사는 계속 별도로 적용됩니다.
+
+client는 비-loopback 주소에 HTTPS를 요구하고 proxy·redirect·자동 재시도를 사용하지 않습니다. AI service의 `ZOOP_AI_SERVICE_HOST` 기본값은 `127.0.0.1`이며, ECS에서 다른 task가 접근하려면 승인된 TLS ingress 뒤에서 literal IP bind를 명시해야 합니다. 주소·토큰 값, 보안 그룹과 ingress 설정은 배포 책임자가 확정합니다. Docker 기본값은 loopback을 유지하며 서비스 이미지에는 세 native read 명령이 설치됩니다.
+
+### 대상 DB와 동결된 handoff의 연결
+
+1. 전체 selector로 각 문서를 HTTP 등록합니다. 기존 문서 포인터와 CAS 의미는 [문서 import](DOCUMENT_IMPORT.md)를 따릅니다.
+2. 같은 DB에서 [document bindings exporter](DOCUMENT_BINDINGS.md)를 실행하고 `documentId`, `documentVersion`, `articleId`, `articleVersion`, `textSha256`, `offsetUnit`을 frozen binding과 대조합니다. 이미 동결된 manifest의 binding 파일을 덮어쓰지 않습니다. 값이 다르면 해당 handoff의 pin을 그대로 사용한 수입을 중단합니다.
+3. allowlist와 요청에 canonical manifest·bundle digest를 지정하고 graph를 비활성 수입합니다. 입력 native bundle 한도는 source 20개·6 MiB입니다. bundle8/P2/decisions4와 bundle9/P3/decisions5를 각각 검증하며, exact tuple별 `zoop-source-authority-set-1` 읽기는 두 조합에 동일하게 적용합니다.
+4. 앱 공개 reader에는 현재 registry authority set과 대상 artifact root를 제공합니다. 수입 성공과 별도로 기존 활성 포인터·CAS를 확인하고 승인된 활성화 절차를 수행합니다.
+
+### 합성 종단 smoke
+
+이미 설치된 pipeline·service·worker 환경, 최신 API jar와 비어 있는 전용 loopback PostgreSQL을 준비합니다. 아래 변수는 운영자가 해당 로컬 검증 환경에서 지정합니다.
+
+```sh
+ai/pipeline/.venv/bin/python api/scripts/http_native_delivery_smoke.py \
+  --jar "$API_JAR" --java "$JAVA_BIN" --output "$NEW_SMOKE_ROOT" \
+  --psql-container "$LOCAL_POSTGRES_CONTAINER"
+```
+
+DB 연결은 기존 `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`를 사용하며 `.env`를 읽지 않습니다. `--output`은 새 디렉터리여야 합니다. 시나리오는 두 native context를 합성 loopback provider로 만들고 실제 인증 401/403, 전체 selector, 잘못된 route, inventory 변경, 문서 등록·target binding, 최종 재확인 중 권리 철회, 비활성 native 수입, 공개 graph·근거 span과 authority-set 철회를 검사합니다. 공개 읽기 단계의 활성화는 **합성 DB의 SQL 시험 활성화**이며 관리자 HTTP 활성화의 증거가 아닙니다. source·본문·결과와 `report.json`은 지정 디렉터리에 남깁니다. 이 명령의 성공은 실제 기사 package·클라우드 연결을 대신하지 않습니다.
+
 
 ### 관리자 활성화 HTTP의 합성 검증 경계
 
@@ -268,29 +311,41 @@ zoop-ai-handoff inspect --state-dir DIR < {"schemaVersion":"zoop-ai-handoff-1","
 - 재시도 가능: `handoff_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`(writer가 잡음), `handoff_recovery_required`(강제 종료된 writer 뒤 — 운영자가 `recover`/writer 명령으로 정리). 운영 조치: `handoff_artifact_missing|invalid`(저장 bundle 이상 → 새 handoffId), `operator_file_changed`, `*_invalid`. withheld 코드 예: `canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `review_revision_changed`, `upstream_changed`, `source_unauthorized`, `grant_revision_changed`, `handoff_content_changed`, `source_pin_missing`. 모르는 코드는 "withheld(원인 불명)"로 처리하세요.
 - 무결성 검증: `receipt.bundleDigest`는 `canonical(bundle)`(Python `json.dumps(sort_keys=True, separators=(",",":"), ensure_ascii=False)`, 앱 `Canonical.write`와 같은 형식)의 UTF-8 바이트 sha256입니다. 받은 bundle을 다시 canonical화해 같은지 확인할 수 있습니다.
 
-## bundle `zoop-graph-handoff-bundle-7` (닫힌 스키마, 모르는 키 거부 — 최상위 `impacts[]`는 이 문서의 "bundle `-6`" 절, 이슈 `summary`는 맨 끝 "bundle `-7`" 절)
+## bundle `zoop-graph-handoff-bundle-8` (닫힌 스키마)
 
 | 키 | 내용 |
 |---|---|
 | `handoffId`, `manifestDigest`, `provenance` | ID, manifest sha256, `{declaredSourceKind, observedSourceKind, executionMode, recordingKind}` (선언≠관측이면 생산 거부) |
-| `policy` | 정책 버전 `zoop-public-projection-policy-1`, 운영자 파일 3개의 sha256, evidence id 종류 `graph-body-span`, 좌표 단위 `unicode_code_point`, `issueSummary: "zoop-issue-summary-policy-1"`(`-7`) |
+| `policy` | 정책 버전 `zoop-public-projection-policy-2`, 운영자 파일 3개의 sha256, evidence id 종류 `graph-body-span`, 좌표 단위 `unicode_code_point`, `issueSummary: "zoop-issue-summary-policy-1"` |
 | `sources[]` | S3 job·S2 upstream(grant revision 포함 digest)·review digest·닫힌 정책 버전과 감사 개수·**사용한 relation의 review revision** |
 | `companies[]` | `{id=companies.id, canonicalId, label, decisionRef}` — import 시 앱 카탈로그에 존재하고 label이 같아야 함 |
 | `pathCompanies[]` | `companies[]`와 같은 닫힌 `{id, canonicalId, label, decisionRef}`, id 오름차순 유일(최대 20000): 완전한 2홉 경로의 **매핑된 중간 회사 중 공개 `companies[]`에 없는 것**의 정확한 폐포입니다. **비공개 지원 참조**이며 공개 그래프 노드·이슈·mention 참여자가 되지 않고 `companies[]`·이슈 id와 서로소입니다. import 때 카탈로그 존재·label 일치를 `companies[]`와 합쳐 확인합니다. |
 | `issues[]` | `{id, canonicalId, title, action, target, eventTime, timePrecision(year|month|day|datetime|unknown), period, assertionStatus, geography{value domestic|international, decisionRef, decisionVersion, policyVersion, countries, verification:"operator-field-verdict", evidenceIds, basis[]}, evidenceIds, sourceEvents[], mentions[], decisionRef, representative, fieldProvenance, fieldVerdicts}`. `sourceEvents[]`는 각각 `{upstream,kind,ref,mentionId,documentId,documentVersion,observation}`이며 `observation`은 정확한 `{roundId,sourceId,page,ordinal,documentId,rawVersion,documentVersion}`입니다. geography의 `basis[]`에도 동일한 원천 식별자와 국가 집합을 기록합니다. 대표 mention을 선택할 때도 이 전체 식별자를 지정해야 합니다. 이슈의 `evidenceIds`는 모든 `mentions[].evidenceIds`와 `geography.evidenceIds`와 `fieldVerdicts[].evidenceIds`의 합집합과 정확히 같습니다. 운영자 verdict가 `eventTime`·`period`를 보류·거절한 선택 기준(대표 mention, 대표가 없으면 모든 mention)에서는 이슈의 그 머리 필드가 `null`이고(`eventTime`이면 `timePrecision`은 `unknown`) 원본 mention 값은 그대로입니다. |
 | `issues[].fieldProvenance` | 닫힌 객체 `{selection:"unanimous"|"operator-representative", verification:"none", withheld:["eventTime"?,"period"?], sameValueMentions:{title, action, target, eventTime, period, assertionStatus}}`이며 각 값은 비어 있지 않은 `{documentId, documentVersion, mentionId}` 배열입니다: **선택된 원본 값**(대표가 있으면 대표 mention의 값, 없으면 모든 mention이 공유하는 값)과 **JSON으로 정확히 같은** 값을 가진 원본 mention을 mention 순서대로 모두 담습니다. 가려져 `null`이 된 값이 아니라 원본 선택 값으로 비교합니다. `selection`은 `representative`가 있을 때만 `operator-representative`(대표가 모든 목록에 있음)이고 아니면 `unanimous`(모든 목록이 모든 mention). `withheld`는 verdict에서 다시 계산되는 `eventTime`·`period`의 부분 집합(필드 순서, 중복 없음)입니다. 선택의 기록이며 검증·근거 지지·승인·`fieldDecisions`가 아닙니다(아래 2026-10-20 `-3`·2026-10-21 `-4` 절). |
-| `issues[].fieldVerdicts[]` | 닫힌 배열(최대 2000개), 항목은 `{documentId, documentVersion, mentionId, field:"eventTime"|"period", value, decision:"ALLOW"|"HOLD"|"REJECT", reasonCode:"stated"|"unstated"|"ambiguous"|"contradicted", evidenceIds[], verification:"operator-field-verdict", reviewer, decisionRef, decisionVersion}`입니다. **운영자 검토**이며 AI·S2·S3 출력이 아닙니다. `value`는 그 원본 mention이 그 필드에 가진 현재 문자열(null 불가)과 정확히 같아야 하고, 허용 조합은 ALLOW/`stated`(근거 ≥1), HOLD/`unstated`(근거 0), HOLD/`ambiguous`(근거 ≥1), REJECT/`contradicted`(근거 ≥1)뿐입니다. `evidenceIds`는 그 mention 자신의 기사 근거만이며 오름차순 유일(최대 20), 자유 서술 필드는 없습니다. (mention, field)당 하나이고 mention 식별자 정규 JSON 순서 다음 필드 순서(`eventTime`, `period`)로 정렬합니다. verdict가 없으면 현재 값이 그대로이며 "검증됨"이 아닙니다. |
+| `issues[].fieldVerdicts[]` | 닫힌 배열(최대 2000개), 항목은 `{documentId, documentVersion, mentionId, field:"eventTime"|"period", value, decision:"ALLOW"|"HOLD"|"REJECT", reasonCode:"stated"|"unstated"|"ambiguous"|"unsupported-format"|"contradicted", evidenceIds[], verification:"operator-field-verdict", reviewer, decisionRef, decisionVersion}`입니다. 운영자 검토이며 `value`는 그 mention의 정확한 원래 문자열(null 불가)입니다. ALLOW/`stated`, HOLD/`ambiguous`, REJECT/`contradicted`는 근거 ≥1, HOLD/`unstated`는 근거 0입니다. HOLD/`unsupported-format`은 unresolved `eventTime`에만 허용하며 자기 기사 근거 ≥1이 필요합니다. `evidenceIds`는 그 mention 자신의 기사 근거만이며 오름차순 유일(최대 20)입니다. (mention, field)당 하나이고 mention 식별자 정규 JSON 순서 다음 필드 순서(`eventTime`, `period`)로 정렬합니다. unresolved mention은 대표 여부와 관계없이 각각 non-ALLOW verdict가 필수입니다. |
 | `issues[].summary` | 닫힌 객체(`-7`부터, 이슈마다 필수). 이슈 `fieldVerdicts`에 HOLD/REJECT가 하나라도 있으면 정확히 `{"status":"unavailable","code":"temporal-review-pending","source":null}`이고(요약 문장이 bundle 어디에도 없음), 입력 인용이 60개를 넘으면 `input-too-large`, 운영자 decisions가 결과를 고정했으면 그 불변 작업 결과(`available` 또는 `producer-invalid`·`verifier-hold`·`verifier-reject`, `source{jobId,inputDigest,resultDigest,basisDigest}`), 아니면 `not-requested`입니다. 자세한 wire·검증 규칙·앱 사용 주의는 맨 끝 "bundle `-7`" 절. **receipt 전용**이며 snapshot에는 없습니다. |
-| `issues[].mentions[]` | 닫힌 배열(최대 1000개). 각 항목은 S2 원본 mention 하나이며 `{documentId, documentVersion, mentionId, articleId, articleVersion, verification:"none", title, action, target, eventTime, timePrecision, period, assertionStatus(occurred|announced|planned|forecast|cancelled|unknown), background(JSON bool), participants[{sourceCompanyId, companyId, name, role}], evidenceIds[]}`입니다. `(documentId, documentVersion, mentionId)`가 식별자이며 S2 local `mentionId`는 한 문서 버전 안에서만 유일합니다(다른 문서가 같은 값을 써도 별개 mention). 이 식별자 집합은 이슈 `sourceEvents[]`의 식별자 집합과 정확히 같고 정규 JSON 오름차순 유일입니다. 각 mention은 같은 문서 버전을 가진 **정확히 하나의** bundle article(`articleId`/`articleVersion`)에 닫히고, `evidenceIds`는 그 기사의 근거만 담습니다(최소 1개, 오름차순). `verification`은 항상 `none`입니다: 값은 S2 후보/snapshot의 **원본**이며 병합된 이슈 필드에서 만들어지지 않고 검증·결정·승인된 값이 아닙니다. `title`·`action`은 S2 문자열 그대로, `target`·`eventTime`·`period`는 S2 값 그대로(null 가능, 문자열은 다시 쓰지 않음)이며 `timePrecision`은 `eventTime`의 형식에서 넓히지 않고 정해집니다. `eventTime` 문법(생산자 `mention_time_precision`과 앱 `HandoffTime.mentionEventTime`이 손으로 같게 구현, 공유 vector `src/test/resources/graph-handoff/mention-time-vectors.json`): ASCII `YYYY`·`YYYY-MM`·`YYYY-MM-DD`·`YYYY-MM-DDTHH:MM[:SS[.f{1,9}]](Z|±HH:MM)`(대문자 `T`·`Z`, offset 필수). 양쪽이 이미 받던 집합이며, 한쪽(Python stdlib)만 받고 앱이 bundle 전체를 거절하던 형식(ISO 주 날짜 `2026-W40-3`, 서수·압축 형식, 쉼표 소수, 콜론 없는/초 있는 offset)과 라이브러리 범위(offset 시간 18 초과, 달력 날짜의 0000년)만 지원하지 않습니다. 지원하지 않는 형식은 생산자가 freeze 전에 이슈를 `mention_event_time_unsupported`로 제외하고 앱은 `temporal_unsupported`로 거절합니다. `participants[]`는 S2 순서이고 `sourceCompanyId`·`name`·`role`은 S2 텍스트 그대로입니다(`role`은 확인된 역할이 아니며 `INVOLVES`도 아님). `companyId`는 모든 운반 upstream이 같은 공개 회사로 매핑하고 그 회사가 이 bundle `companies[]`에 있을 때만 값이 있고, 아니면 null입니다(null이 아니면 `sourceCompanyId`도 null이 아니어야 함). 같은 식별자를 운반하는 upstream끼리 값이 다르면 생산자는 그 이슈를 `mention_values_conflict`로 제외합니다. |
+| `issues[].mentions[]` | 닫힌 배열(최대 1000개). `{documentId, documentVersion, mentionId, articleId, articleVersion, verification:"none", title, action, target, eventTime, timePrecision, period, assertionStatus(occurred|announced|planned|forecast|cancelled|unknown), background(JSON bool), participants[{sourceCompanyId, companyId, name, role}], evidenceIds[]}`입니다. 식별자 `(documentId, documentVersion, mentionId)` 집합은 `sourceEvents[]`와 정확히 같고 정규 JSON 오름차순 유일입니다. 같은 문서 버전의 정확히 한 article에 닫히며 근거는 그 기사 것만 최소 1개, 오름차순으로 담습니다. S2 후보/snapshot 원본 값과 참여자 순서를 보존하고 `verification`은 `none`입니다. 엄격한 시각 문법은 ASCII `YYYY`, `YYYY-MM`, `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM[:SS[.f{1,9}]](Z|±HH:MM)`이며 대문자 T/Z, offset ≤18시간, 실제 달력 날짜(0000년은 bare year만)를 요구합니다. 공유 `mention-time-vectors.json`이 Python·서비스·Java의 분류를 검사합니다. 문법 밖의 **비어 있지 않은** 문자열은 receipt에서만 `unresolved`로 보존합니다. null은 `unknown`이고, 공개 머리 시각은 지원 문법 또는 null/unknown입니다. 같은 식별자의 운반 upstream 값이 다르면 `mention_values_conflict`로 이슈를 제외합니다. 참가자의 `sourceCompanyId`·`name`·`role`은 원본 텍스트이며, `companyId`는 모든 운반 upstream이 같은 공개 회사로 매핑하고 그 회사가 이 bundle에 게시될 때만 채웁니다. 그 외에는 null이고, 공개 companyId가 있으면 sourceCompanyId도 있어야 합니다. |
 | `relations[]` | `{id, type INVOLVES|STRUCTURALLY_RELATED_TO|FOLLOWS, source, target, role, assertionStatus, evidenceIds, basis[], structuralPath, provenance{…}, decisionRef, sourceRefs[]}` — INVOLVES/STRUCTURAL은 issue→company, FOLLOWS는 뒤 이슈→앞 이슈. 구조 `basis[]`의 각 항목은 `{sourceRelation{jobId,relationCandidateId},relationKey,relationType,businessScope,productScope,validFrom,validUntil,countries,verifiedAt,sourceArticles[],evidenceIds[]}`이며 직접 관계 인용과 별도 유효기간 인용을 모두 포함하고 두 scope는 S3 텍스트 그대로의 문자열 또는 `null`(최대 500 코드 포인트, 엔티티 ID가 아님)입니다. `structuralPath`는 `STRUCTURALLY_RELATED_TO`에서만 객체이고 INVOLVES·FOLLOWS에서는 `null`입니다(아래 bundle `-5` 절). `SHARES_ISSUE`는 **없음**(소비자가 권한·시간 필터 뒤 파생). |
 | `evidence[]` | `{id, kind:"graph-body-span", articleId, articleVersion, start, end, offsetUnit, quoteSha256, rawLocatorIds[], source{documentId, documentVersion, rawVersion, textArtifactId, sourceEvidenceId(S2 ev-…32hex), inputKind:"body"}}` — 인용문·본문 없음 |
 | `articles[]` | `{articleId, articleVersion, documentId, documentVersion, rawVersion, title, url, publishedAt, publicationPrecision(datetime|day|unknown; `day`는 수집 시 날짜만 선언된 문서이며 `publishedAt`이 `YYYY-MM-DD` 날짜이고 자정으로 바꾸지 않는다. 오프셋 없는 선언 시각은 `unknown`), observations[{roundId, sourceId, page, ordinal, observedAt, grant}]}` — 같은 문서 버전의 **모든 서로 다른 관측**을 보존합니다. 관측별 제목·URL·발행 시각이 다르면 freeze를 거부합니다. |
 | `exclusions` | `{counts{code:n}, items[{kind, id, jobId, code[, detail]}]}` — id·코드만(내용 없음), current export에서만 노출 |
 | `counts`, `checks`, `readiness`, `digests.content` | 개수(`pathCompanies`·`impacts` 포함), `producerConfirmed`/`appImportPending`, 위 상태, 내용 digest(`companies`·`pathCompanies`·`issues`·`relations`·`evidence`·`articles`·`impacts`) |
 
-> 2026-10-21 변경 이력: 위 표와 아래 "관계 출처" 문단의 `provenance`·`sources[]`·`articles[]`·`issues[]`·관계 `provenance`에는 아래 "2026-10-21: bundle `-4` 확장" 절의 키·의미가 더해졌습니다(당시 미게시였던 `-4`를 같은 스키마 문자열로 확장한 이력이며, 현재 생산자 계약은 `-7`입니다). 특히 `INVOLVES`가 항상 verifier 지지인 것은 아니며(운영자 최종 승인 가능) 표와 다르면 그 절이 우선합니다.
+> 2026-10-21 변경 이력: `provenance`·`sources[]`·`articles[]`·`issues[]`에는 아래 "2026-10-21: bundle `-4` 확장" 절의 키·의미가 더해졌습니다. `INVOLVES`의 운영자 최종 승인 가능성 등 당시 확장 내용은 현재 `-8` 계약에도 포함됩니다.
 
-**관계 출처 표시를 소비자는 보존해야 합니다.** `STRUCTURALLY_RELATED_TO.provenance`는 `origin:"manual-operator-review"`, `s3SemanticValidation:"none"`, `status:"operator-asserted"`, `reviewer`, `decisionVersion`, `bindingDigest`입니다 — S3가 자동으로 의미를 검증한 것이 **아닙니다**(공개 표기·수용 여부는 미결정). `FOLLOWS`는 S2 replay 비교+운영자 결정(`s3SemanticValidation:"none"`), `INVOLVES`만 S3 독립 verifier가 모든 claim을 지지한 관계입니다. geography도 AI 자동 검증이 아니라 운영자 field verdict이며 모든 source mention의 국가 필드와 같을 때만 나옵니다.
+**관계 출처 표시를 소비자는 보존해야 합니다.** `STRUCTURALLY_RELATED_TO.provenance`는 `origin:"manual-operator-review"`, `s3SemanticValidation:"none"`, `status:"operator-asserted"`, `reviewer`, `decisionVersion`, `bindingDigest`입니다. `FOLLOWS`는 S2 비교와 운영자 결정이며, `INVOLVES`의 실제 승인 근거는 독립 verifier 또는 운영자 최종 승인으로 구분합니다. geography는 명시적 운영자 field verdict입니다. 원천 `[]`는 basis에 그대로 남고, 비어 있지 않은 모든 원천 국가 집합은 공개 결정 집합과 정확히 같아야 합니다. 근거는 해당 이슈의 원천 문서·버전·좌표·해시와 현재 권리에 묶이며, 사건과 국가의 의미적 관련성은 운영자가 판단합니다.
+
+### 2026-10-30: 국가 미상 보완과 원래 시각의 검토
+
+새 freeze·import는 bundle `-8`, policy `-2`, decisions `-4`만 받습니다. 원천 국가가 미상이어도 운영자가 비어 있지 않은 국가 집합과 해당 사건의 정확한 근거를 명시하면 공개 투영할 수 있습니다. 부분집합·상위집합도 비어 있지 않은 원천 선언과 다르면 충돌입니다.
+
+`10.19일`, `'25.8월` 같은 원래 시각은 source와 receipt에 그대로 남습니다. 대표 여부와 관계없이 unresolved인 모든 언급에 각각 non-ALLOW 판정이 있어야 하며, 형식만 지원하지 않는 값은 `HOLD/unsupported-format`과 정확한 자기 문서 근거로 검토합니다. 선택 기준의 HOLD/REJECT를 먼저 적용한 뒤 공개 머리 시각을 검증합니다. `sameValueMentions`는 원래 선택 문자열 기준이고, 공개 상세는 보류·거절된 각 mention 시각을 null/unknown으로 표시합니다. 요약의 `temporal-review-pending`과 기존 구조 관계 게이트는 유지합니다.
+
+이미 동결된 `-1`~`-7` 원장·bundle·receipt는 원래 바이트와 버전으로 보존합니다. 생산자는 기존 이력 전용 경로로 응답하고, 이미 등록된 `-5`·`-6`·`-7`의 사건 상세·구조·영향 읽기는 기존 명시적 버전 분기를 유지합니다. `legacy-real-2` 수입·읽기도 별도 계약 그대로입니다. 새 투영은 새 판정 파일과 handoff ID로 만듭니다.
+
+새 exposure 조회는 생산자의 현재 계약인 `-8`만 선택합니다. 이미 보존한 `-7` exposure report의 적용은 명시적 `-7`·`-8` 파서가 유지하며, 각 report의 스키마와 handoff ID·manifest/bundle/content digest를 해당 불변 import receipt와 정확히 대조합니다. 이 경로는 ID와 pin을 다루므로 과거 원본 국가·시각의 의미를 바꾸지 않습니다.
+
+합성 증거는 `scripts/public_unknown_fields_smoke.py`가 만드는 `export-unknown-fields.json`·`public-unknown-fields-cases.json`을 세 구현이 공유합니다. 엄격한 달력 분류 vector는 기존 의미를 유지합니다.
 
 검증기는 source·감사·정책·source event·대표 선택·관계별 provenance/sourceRefs·구조 basis·제외 상세의 중첩 필드까지 닫힌 형식으로 확인합니다. sourceRefs와 upstream·기사 근거의 참조 관계, 관계 ID(`edge-`+정규 JSON preimage의 SHA-256)도 검증합니다. `STRUCTURALLY_RELATED_TO` ID의 preimage는 `{type,source,target,basis:[relationKey,…]}`이며 다른 두 유형은 `{type,source,target}`입니다. 문서와 앱의 실제 텍스트 일치는 앱이 import 때 별도로 확인해야 합니다.
 
@@ -405,7 +460,7 @@ Java 스테이징 import에 쓰는 법(기존 계약 그대로, 변경 없음): 
 | 요청 | `Authorization: Bearer <토큰>` | 운영자 발급. principal에 scope **`handoff.read`**(다른 scope로는 불가, 반대로 `graph.read`로 이 경로 불가). 서비스는 토큰의 sha256만 `ZOOP_AI_SERVICE_PRINCIPALS`에 보관 |
 | 서버 allowlist | `ZOOP_AI_SERVICE_HANDOFF_EXPORTS` → 예: `handoff-exports.json` | `{"schemaVersion":"zoop-ai-handoff-exports-1","handoffs":[{"principal":"app-backend","handoffId":"…","manifestDigest":"<64hex>","bundleDigest":"<64hex>"}]}`. **두 pin 모두 필수**. 운영자가 새 handoff마다 갱신(요청마다 다시 읽음) |
 | 운영자 파일(매니페스트가 sha256으로 고정) | `ZOOP_AI_SERVICE_HANDOFF_CANONICAL`/`_DECISIONS`/`_BINDINGS` → 예: `canonical.json`·`decisions.json`·`bindings.json` | 호출자가 고를 수 없음. 바뀌면 withheld(`canonical_mapping_changed`·`decisions_changed`·`bindings_changed`) |
-| 원장·원천 | `ZOOP_AI_HANDOFF_STATE_DIR`·`ZOOP_AI_HANDOFF_{RELATION,EXTRACTION,INGESTION}_STATE_DIR`·`ZOOP_AI_SERVICE_HANDOFF_SOURCES`·`ZOOP_AI_SERVICE_HANDOFF_COMMAND` | 10개 모두 있어야 켜짐(일부만 있으면 시작 거부). 없으면 두 route 모두 409 `execution_unavailable` |
+| 원장·원천 | `ZOOP_AI_HANDOFF_STATE_DIR`·`ZOOP_AI_SERVICE_HANDOFF_COMMAND`와 단일 원천 경로 묶음 또는 `ZOOP_AI_SERVICE_HANDOFF_SOURCE_CONTEXTS`·`_SHA256` | 공통 운영자 파일·allowlist까지 완전하게 설정해야 켜짐. [service 설정](../../ai/service/README.md)을 따르며 미설정이면 두 route 모두 409 `execution_unavailable` |
 
 pin을 얻는 방법: 운영자가 `zoop-ai-handoff freeze` 뒤 receipt의 `manifestDigest`·`bundleDigest`를 위 allowlist에 적습니다. 백엔드는 handoff id를 **조회·나열할 수 없습니다**(목록 route 없음): id와 pin은 운영 절차로 전달받습니다.
 
@@ -547,6 +602,8 @@ bundle 스키마만 `zoop-graph-handoff-bundle-3` → `-4`로 한 번에 바꿨�
 
 **설정 규칙.** `http`면 `zoop.ai.handoff-read-client.enabled=true`가 없을 때 기동 거절(`handoff-source`), 그리고 CLI 전용 설정 7개(`handoff-cli`·`handoff-state-dir`·`relation-state-dir`·`extraction-state-dir`·`canonical`·`decisions`·`bindings`)가 설정되어 있으면 그 이름으로 기동 거절(이 프로세스가 읽지 않는 권한을 암시하지 않기 위해). 빈 값은 `cli`이며, `cli`는 켜진 읽기 클라이언트를 무시합니다(같은 환경의 웹 애플리케이션 회차 bridge가 그것을 씁니다). `ingestion-cli`·`ingestion-state-dir`·`ingestion-sources`·`artifact-root`·요청·결과 파일 규칙은 그대로입니다. 시험: `HttpHandoffReadClientTest`(envelope 닫힘·withheld·오류 envelope·id 형식), `HttpHandoffSourceTest`(CLI 파서와 같은 결과, 상태 route 재확인의 핀·withheld 규칙, 핀·verification 불일치·forged bundle·오류 매핑), `GraphHandoffImporterTest`(HTTP 원천으로 같은 스냅샷 바이트 스테이징, bundle 1회·status 1회, receipt `producer.read`, commit 직전 withheld rollback), `GraphHandoffImportConfigurationTest`·`AiHandoffReadClientConfigurationTest`(설정 닫힘). 실제 ai/service와의 종단 실행은 이 변경에 포함되지 않았습니다(합성 회차 smoke는 #387 ①과 함께).
 
+여러 native 원장을 읽을 때는 Java와 서비스가 같은 `zoop-handoff-source-contexts-1` 파일·SHA-256을 사용합니다. 단일 원천 경로 대신 고정 inventory를 지정하는 [API 설정](../README.md#여러-원장-읽기와-현재-권한)은 CLI·HTTP handoff 모두에 적용됩니다. Java의 관측 재확인은 각 전체 selector가 지정한 실제 ingestion 원장에서 수행합니다. 선택한 source job은 전체 20개까지이며, inventory 자체는 공개 provenance나 현재 권한을 대체하지 않습니다.
+
 ## 2026-10-20: `getEvidence`의 graph 본문 근거 경로
 
 공개 `GET /api/v1/evidence/{id}`가 스테이징된 graph 본문 근거를 **기존 경로·기존 응답 스키마 그대로** 읽습니다. 이 절은 graph 근거를 미등록으로 취급하던 이전 구현을 대체한 변경 이력과 현재 읽기 계약을 설명합니다. OpenAPI·DB 스키마·snapshot 형식은 바뀌지 않았고, 이 경로는 활성화·쓰기·잠금·Neo4j·AI CLI 호출을 하지 않습니다.
@@ -560,7 +617,7 @@ bundle 스키마만 `zoop-graph-handoff-bundle-3` → `-4`로 한 번에 바꿨�
 1. 공개 `PublicGraphReader.read(null, graphVersion, asOf)`로 버전을 고정합니다(selector의 409/422, snapshot 저장소의 503은 그대로). staged(한 번도 활성화되지 않은) 버전은 409이고 fallback도 활성화도 없습니다.
 2. 가시성: 필터된 snapshot의 evidence 목록에 있고 **보이는 issue(`evidenceIds`·`geographyEvidenceIds`) 또는 보이는 relation이 인용**해야 합니다. 아니면 404 `EVIDENCE_UNAVAILABLE`. `eventIds`는 그 id를 인용하는 보이는 issue입니다. 예외는 **basis-only span**입니다(아래 2026-10-21 bundle `-5` 절): 어떤 보이는 issue·relation도 직접 인용하지 않지만 보이는 구조 basis가 그 span의 기사 버전을 가리키면, 선택된 버전의 receipt가 정확히 그 relation의 그 basis가 이 id를 인용함을 증명할 때만 서비스하며 `eventIds`는 비어 있습니다.
 3. span `(articleId, articleVersion, start, end)`가 행과 같아야 하고, 현재 article이 `available`이며, 그 버전 행·텍스트 artifact가 행과 맞고, 인용 문자열의 코드 포인트 수가 offset과 맞아야 합니다. 버전은 snapshot이 고정하므로 `current_version`은 요구하지 않습니다.
-4. **선택된 버전의** receipt(`artifact-receipt-<versionId>`, 행 자신의 receipt가 아님: 행을 공유한 뒤의 import는 첫 import의 receipt를 가리킵니다)를 등록된 해시·크기로 검증해 읽습니다. 파일 불일치·등록 없음·종류 오류는 404, artifact root 미설정·I/O 실패는 503입니다. 스키마 `zoop-graph-handoff-import-receipt-1`, `"gv-"+sha256(handoffId)==versionId`, 해당 article 버전이 `bundle.articles[]`에 정확히 하나, 각 observation의 `sourceId`가 `articles.provider`와 같음을 요구하고 `(sourceId, grantId, revision)` pin을 얻습니다. 형식이 맞지 않으면 fail closed(404)입니다. receipt는 pin만 줄 뿐 권한을 주지 않습니다.
+4. **선택된 버전의** receipt(`artifact-receipt-<versionId>`, 행 자신의 receipt가 아님: 행을 공유한 뒤의 import는 첫 import의 receipt를 가리킵니다)를 등록된 해시·크기로 검증해 읽습니다. 공통 `GraphPublicationReader`가 원본·누적 publication의 proof를 검증하므로 파일 불일치·등록 없음·종류 오류·artifact root 미설정·I/O 실패는 `503 SOURCE_UNAVAILABLE`입니다. 원본 native receipt는 스키마 `zoop-graph-handoff-import-receipt-1`과 `"gv-"+sha256(handoffId)==versionId`를 요구하며, 이 식별 계약의 오류도 503입니다. 검증된 receipt에서 해당 article 버전이 `bundle.articles[]`에 정확히 하나이고 각 observation의 `sourceId`가 `articles.provider`와 같아야 `(sourceId, grantId, revision)` pin을 얻습니다. 이 근거별 소속·grant pin 검사가 거절되면 `404 EVIDENCE_UNAVAILABLE`입니다. receipt는 pin만 줄 뿐 권한을 주지 않습니다.
 5. **현재** source registry에서 모든 pin이 통과해야 합니다: source 존재, grant id·revision 일치, enabled, rights=known, 비어 있지 않은 evidence, `read`·`store`·`quote-display` 허용, **지금** 만료되지 않음(`asOf`는 권한 시계를 옮기지 않음). `model-send`는 요구하지 않습니다(인용 표시는 모델에 보내지 않음). registry 미설정·읽기 불가·검증 실패는 503, 거절은 404이며 사유는 로그에만 남습니다.
 6. `companyId`는 증거 판정 뒤 확인합니다(모르는 id 404 `RESOURCE_NOT_FOUND`, 알면 `partial=true`와 sentiment 실패 구역·`sentiment=null`).
 
@@ -568,13 +625,15 @@ bundle 스키마만 `zoop-graph-handoff-bundle-3` → `-4`로 한 번에 바꿨�
 
 **`article.publisher`의 출처.** 응답의 `article`(`title`·`publisher`·`url`·`publishedAt`)은 snapshot·bundle이 아니라 snapshot이 고정한 `(articleId, articleVersion)`의 **저장된 `article_versions` 행**에서 만들어집니다. `publisher`는 handoff bundle(`articles[]`는 닫혀 있고 publisher를 싣지 않음)이나 `sourceId`·`articles.provider` registry가 아니라 문서 import가 쓴 그 버전 행의 `article_versions.publisher`이며, 그 값은 운영자가 수집·원장 단계에서 선언한 발행 매체가 export `observation.publisher`로 흘러온 것입니다([문서 import](DOCUMENT_IMPORT.md)). 선언이 없는 버전(이전 import 포함)은 `null`이고, 같은 문서에 매체를 선언한 새 버전이 생겨도 이전 버전의 `null`은 바뀌지 않습니다(버전이 불변이고 새 선언은 다른 `documentVersion`). BE가 `EventDetail` 등 다른 경로에서 발행 매체가 필요하면 같은 저장 버전 행을 읽어야 하며 bundle에서 찾지 않습니다. 소비자(Java parser)를 먼저 배포해야 매체를 선언한 export를 import할 수 있습니다.
 
-**설정.** `ZOOP_DOCUMENT_READ_INGESTION_SOURCES`(= `zoop.document-read.ingestion-sources`)는 operator가 import와 **같은 파일**(`ZOOP_INGESTION_SOURCES`)로 지정합니다. 기본값·S1 fallback·운영 플래그 의존이 없고 미설정이면 graph 근거 읽기는 503입니다. 정규화된 절대 경로의 기존 파일이 아니면 기동 실패(값은 메시지에 없음). receipt를 읽으려면 `ZOOP_DOCUMENT_READ_ARTIFACT_ROOT`도 필요합니다.
+**설정.** `ZOOP_DOCUMENT_READ_INGESTION_SOURCES`(= `zoop.document-read.ingestion-sources`)는 단일 `zoop-ingestion-s2-1` registry 또는 `zoop-source-authority-set-1` wrapper를 지정합니다. 단일 입력은 import와 같은 현재 권한 파일을 사용하고, wrapper는 receipt의 정확한 `(sourceId, grantId, revision)`을 호스트 로컬 leaf에 연결합니다. 형식과 환경 변수는 [API README의 여러 원장 읽기와 현재 권한](../README.md#여러-원장-읽기와-현재-권한)을 따릅니다. 미설정이면 graph 근거 읽기는 503이며, 정규화된 절대 경로의 기존 파일이 아니면 기동에 실패합니다. receipt 읽기에는 `ZOOP_DOCUMENT_READ_ARTIFACT_ROOT`도 필요합니다.
 
 **source registry 파일 경계.** 운영자만 `ZOOP_DOCUMENT_READ_INGESTION_SOURCES`의 파일과 상위 디렉터리를 바꿀 수 있어야 하고, 웹 프로세스에는 파일 읽기 권한만 부여합니다. 운영자는 쓰기 가능한 전용 디렉터리에서 완성된 일반 파일을 만든 뒤 같은 디렉터리의 `sources.json`으로 원자적으로 교체합니다. 기존 파일을 FIFO·장치로 바꾸거나 symlink를 끼워 넣지 않습니다. reader는 매 요청에 경로의 symlink·파일 종류·크기를 확인하고, POSIX 파일 속성이 있으면 그룹/기타 쓰기 권한도 거절합니다. 지원하는 파일시스템에서는 디렉터리 핸들에 상대적인 `NOFOLLOW_LINKS` 순회를 사용하지만, 현재 macOS JDK는 이를 제공하지 않아 일반 경로 검사 후 다시 엽니다. Java의 이 파일 읽기에는 원자적인 비차단 열기·열린 파일 종류 확인이 없어, 파일이나 상위 디렉터리를 동시에 교체할 수 있는 권한 있는 로컬 공격자까지 막는다고 주장하지 않습니다. POSIX 속성을 제공하지 않는 환경이나 공유 임시 디렉터리 아래에 놓는 경우에도 운영자가 상위 경로의 소유권과 교체 권한을 통제해야 합니다(스티키 디렉터리는 그 아래 운영자 소유 항목을 다른 사용자가 교체할 수 없어야 함). reader는 권한을 수정하지 않고, 읽기·검증 실패는 파일 내용이나 경로를 응답에 담지 않고 503으로 처리합니다.
 
+authority-set의 각 leaf는 기존 S2-1 검증을 그대로 적용합니다. 선택된 leaf가 거절하면 근거는 404, 읽기·형식 검증에 실패하면 503입니다. 중복 tuple과 재귀 set은 거절합니다. wrapper의 실행 중 변경은 실패시키되 leaf 권한은 매 검사에 새로 읽으므로 다른 cohort의 허용 grant가 철회된 grant를 대신하지 않습니다. 설치는 처음 읽은 wrapper의 경로 배정을 마지막 권한 검사까지 대조합니다.
+
 **한계.** source registry의 scope만 제거하는 철회는 이미 노출된 근거를 막지 못합니다(scope pin이 handoff에 없음): grant를 disable하거나 revision을 바꾸거나 operation을 빼야 합니다. 공개 제외 overlay와 관리자 활성화는 이후 구현됐으며 현재 계약은 [지금 상태](#지금-상태-사실)와 [공개 제외 명령](../README.md#공개-제외-명령-fs081)을 따릅니다. 요청마다 registry·snapshot·receipt를 읽고 캐시하지 않습니다.
 
-**검증.** `EvidenceServiceTest`·`GraphEvidenceServiceTest`·`GraphEvidenceSnapshotReaderTest`·`SourceRegistryTest`·`DocumentReadPropertiesTest`(단위), `make api-graph-handoff-import-smoke`(실제 jar·PostgreSQL·HTTP; 기본으로 evidence 읽기 단계 포함, `--no-with-evidence-read`로 끔). 이 smoke는 **시험 harness 전용** psql 활성화 2건(`harnessActivations: 2`: evidence 읽기 단계 1건, bundle `-4` verdict 세계의 공개 그래프 읽기 1건; import의 `importActivationsWritten: 0`과 별개, production 게시 아님)을 격리 DB에서 수행합니다. 앞의 한 건 뒤에는 공유 행·나중 receipt, 권한 변경별 CLI parity(`read`/`store`/`quote-display` 제거, disabled, rights, 빈 evidence, 만료, revision·grant id 변경, `model-send` 대조), 과거 `asOf`+현재 권한, registry 변조·삭제 503, receipt 변조·비공개 article 404, 읽기 전용(표·artifact 트리 불변)을 확인합니다.
+**검증.** `EvidenceServiceTest`·`GraphEvidenceServiceTest`·`GraphEvidenceSnapshotReaderTest`·`SourceRegistryTest`·`DocumentReadPropertiesTest`(단위), `make api-graph-handoff-import-smoke`(실제 jar·PostgreSQL·HTTP; 기본으로 evidence 읽기 단계 포함, `--no-with-evidence-read`로 끔). 이 smoke는 **시험 harness 전용** psql 활성화 2건(`harnessActivations: 2`: evidence 읽기 단계 1건, bundle `-4` verdict 세계의 공개 그래프 읽기 1건; import의 `importActivationsWritten: 0`과 별개, production 게시 아님)을 격리 DB에서 수행합니다. 앞의 한 건 뒤에는 공유 행·나중 receipt, 권한 변경별 CLI parity(`read`/`store`/`quote-display` 제거, disabled, rights, 빈 evidence, 만료, revision·grant id 변경, `model-send` 대조), 과거 `asOf`+현재 권한, registry 변조·삭제 503, receipt 변조 503 `SOURCE_UNAVAILABLE`, 비공개 article 404, 읽기 전용(표·artifact 트리 불변)을 확인합니다.
 
 **발행 매체 검증.** 같은 smoke는 운영자가 실제 수집 매니페스트 항목에 선언한 발행 매체(문서 `a`만 `합성일보 Synthetic Daily`, `a2`·`b`는 선언 없음)가 실제 export → Spring import → `article_versions.publisher` → 공개 `GET /api/v1/evidence/{id}`의 `article.publisher`까지 정확히 같은 문자열로 오고(`a`), 선언이 없는 버전은 DB도 응답도 `null`임을 smoke 안에 손으로 적은 기대값으로 확인합니다. `api/scripts/document_import_smoke.py`는 같은 문서 A의 선언 없는 이전 버전(NULL)이 매체를 선언한 새 버전 import 뒤에도 NULL로 남고, 저장된 NULL과 선언 값이 충돌하면 `version_conflict`임을 확인합니다.
 
@@ -738,3 +797,138 @@ CLI는 현재 bundle `-7`만 처리하며 하나라도 해석할 수 없는 선�
 **재수입(`unchanged`)의 추가 검사.** 구성이 정확히 그 묶음 하나(ordinal 0, 같은 handoffId·receipt)인지, projection이 있으면 그 바이트(snapshot 자체이든 별도 artifact이든)가 이 핀이 만드는 바이트와 같은지. projection이 없는 backfill 버전은 `bundleSnapshot: null`로 답한다. 결과 파일에는 `bundleSnapshot{artifactId, sha256, bytes, file}`과 `composition{sources[], newSource}`가 추가됐다. `newSource`는 `staged`일 때만 값이 있고 `unchanged`면 `null`이다(아무것도 새로 구성하지 않았으므로). PR-3의 조립 소비자는 `bundle_snapshot_artifact_id`가 가리키는 artifact의 kind가 `graph_snapshot`·`graph_bundle_snapshot` 둘 중 무엇이든 형식 3 snapshot으로 읽는다.
 
 **다음 단계(별도 PR).** receipt 해석을 "버전 → 묶음 목록"으로(PR-2), 공개 제외를 묶음 단위로(PR-4), 조립 수입과 `compose` 설정(PR-3). 그 전까지 구성은 언제나 묶음 하나다.
+
+## 완료된 PoC/BFF 실자료 (`legacy-real`)
+
+`zoop.legacy-real-import.enabled=true`는 서버 측 운영자 전용 가져오기 경로다. 완료된 `zoop-legacy-company-issues/1` 결과와 별도 `zoop-legacy-geography-review/1` 검토를 그대로 입력으로 사용한다. 공개 API의 응답 필드와 `graph_versions.kind=snapshot`은 유지하고, 출처는 receipt의 `provenanceKind=legacy-real`, `sourceSystem=investmate-poc-bff`로 구분한다. 기본값은 비활성이며 실행은 nonweb 프로세스로 제한한다.
+
+### 패키지 준비와 현재 권한
+
+입력 폴더의 `LEGACY_SELECTION.json`, `GEOGRAPHY_REVIEW.json`, `SOURCE_PINS.json`, `SOURCE_PROVENANCE.json`은 로컬의 전체 감사 자료로 보존한다. 준비 명령은 지리 검토와 모든 기사 현재 바인딩을 통과한 이슈만 선택한다. 선택된 기사 본문·언급·관계·원본 후보 revision/역할 보류 근거·지리 분류와 실제 인용을 남기고, 출처 메타데이터는 원본 기사 ID/버전·본문 해시·취득/입력 기록 해시로 투영한다. origin은 snapshot ID/해시와 review/rule revision만, 규칙은 ID만, 선택된 후보 감사와 수동 제외는 검증에 필요한 ID/결정 코드만 전송한다. 이슈의 자유 서술 `zoop_approval` 표시 정보는 옮기지 않으며, R1 승인 표시는 전송한 후보 감사와 규칙으로 판정한다. 자유 서술 origin·취득 메타데이터·후보 사유·지리 검토 메모는 로컬에 보관한다. 선택되지 않은 이슈는 `selectionLedger`에 ID와 사유 코드만 남는다.
+
+```sh
+python3 api/scripts/legacy_real_package.py \
+  --source /srv/legacy-retained \
+  --output /srv/legacy-package \
+  --request /srv/legacy-request.json \
+  --bindings /srv/authorized-legacy-bindings.json \
+  --company-bindings /srv/legacy-company-bindings.json \
+  --operator data-operator
+```
+
+바인딩 파일은 객체 배열이며 각 객체의 키는 `originalArticleId`, `originalArticleVersion`, `sourceId`, `grantId`, `revision`, `kind`(`news` 또는 `disclosure`)로 닫혀 있다. source/grant/revision은 운영자가 별도로 확보한 **현재 권한**을 가리킨다. 원문 URL의 호스트도 해당 source의 `allowedHosts`에 있어야 한다. `SourceRegistry`의 enabled·권리 근거·만료·정확한 revision·`read/store/quote-display` 검사를 가져오기, commit 직전, 활성화, 근거 조회에서 적용한다. 기존 `allow_model_send`는 과거 실행 정보다.
+
+바인딩 목록이 없으면 준비 단계에서 거절한다. 빈 바인딩을 이용해 지리 검토에만 맞는 비인가 기사 본문을 임시 패키지로 복사하는 경로는 없다. 현재 권한이 확보된 새 바인딩 목록으로 새 manifest와 새 버전을 준비한다. 바인딩은 가져오기 때의 실시간 source registry 권리 심사를 대체하지 않는다.
+
+기업 바인딩도 필수 JSON 배열이다. 각 항목은 `companyId`, `originalName`, `canonicalName` 세 키만 가지며 이름은 비어 있을 수 없다. 모든 선택 기업과 `INVOLVES` 대상에 정확히 하나씩 대응해야 하고, `originalName`은 보존된 기업 이름과 정확히 같아야 한다. 준비 명령은 `companyId` 순으로 정렬하여 manifest의 `companyBindings`에 넣는다. 예를 들어 `{"companyId":"KRX:018260","originalName":"삼성에스디에스","canonicalName":"삼성SDS"}`는 원본 이름을 보존하면서 서빙 이름을 고정한다.
+
+가져오기는 기존 catalogue-first `SHARE` lock 안에서 같은 ID의 마스터 행을 검사한다. 마스터 이름이 `canonicalName`과 같고, `originalName`이 그 이름 또는 **같은 행의 등록된 별칭**과 정확히 같아야 한다. 다른 기업의 별칭이나 입력 패키지가 주장하는 별칭은 권한 근거가 아니다. 이 검사는 기존 버전을 찾기 전에 재실행되므로, canonical 이름 변경이나 필요한 별칭 삭제 후 재시도하면 `company_mismatch`로 거절하고 저장된 파일을 보존한다. native 가져오기는 계속 이름의 정확한 일치를 요구한다.
+
+legacy 운영자 프로세스는 DB 마스터를 그대로 심사하며 번들 기본 기업 목록의 동기화는 일반 앱 시작에만 적용한다. 패키지 생성 후 바뀐 canonical 이름도 이 검사의 대상이다.
+
+manifest는 `zoop-legacy-real-manifest-2`, 투영 bundle은 `zoop-legacy-real-bundle-2`, 정책은 `legacy-real-projection-2`다. 매핑은 manifest digest에 포함되므로 바꾸면 새 migration ID와 그래프 버전이 생성된다. 트랜잭션 전 투영은 고정된 `canonicalName`만 사용하며, `contentDigest`는 서빙 이름을 포함한다. `catalogueDigest`는 원본 선택 기업 배열의 해시이고, 그 배열은 receipt의 `legacyProvenance.companies`에도 보존한다.
+
+### 명시적 미확인 메타데이터
+
+2026-10-31 사용자 결정에 따라 사건·기업 연결과 현재 `read/store/quote-display` 권한이 입증된 이슈는 지역·날짜·기간을 명시적으로 보류할 수 있다. native `bundle9 / zoop-public-projection-policy-3 / decisions5`는 알려진 지역과 미확인 지역을 서로 다른 닫힌 구조로 검사한다. 알려진 지역은 기존 국가 목록과 정확한 근거를 모두 요구한다. 미확인 결정은 `classification:null,countries:[],evidence:[]`와 `reasonCode`(`not-stated`, `not-supported`, `conflicting`), 실제 `decisionRef/decisionVersion`을 가진다. bundle에서는 `value:null`, `verification:not-established`, 빈 `evidenceIds`, 원본 사건·국가 선언을 모두 담은 `basis`로 보존한다. 원본의 국가가 비어 있지 않아도 명시적으로 보류할 수 있다.
+
+legacy3 패키지는 위 준비 명령에 `--metadata-policy /srv/metadata-policy.json`을 추가해 만든다. 파일은 `schemaVersion:zoop-legacy-metadata-policy-1`, `policyVersion:legacy-real-projection-3`, `issues`로 닫힌다. 선택한 이슈마다 `issueId`, 모든 원본 후보 감사 해시의 정렬 목록 `sourceAuditDigests`, `geography/eventTime/period`, `decisionRef/decisionVersion`이 필요하다. 각 필드는 `{mode:preserve}` 또는 `{mode:unknown,reasonCode:...}`다. `metadata-policy.json`의 정확한 바이트 해시는 manifest3의 `metadataPolicyDigest`와 `sourceInputDigests` 양쪽에 포함되며, 선택·투영·receipt는 각각 legacy3의 정책을 따른다.
+
+`preserve`는 원본 유효 필드 판단과 출처 지리 검토를 따른다. `unknown`은 공개 필드만 null로 만들고 원본 값·판단·구조화된 검증 trace는 receipt에 남긴다. 메타데이터만 실패한 원본 HOLD는 기존 정책 임계값을 만족한 사건·행위·기업별 구조화된 검증과 필드 한정 실패가 모두 있을 때만 투영한다. 역할 보류의 R1@2 증명과 수동 제외는 별도로 검사한다.
+
+새 snapshot4는 같은 이슈 키에 `geography:null`, 빈 지리 근거 목록, P3 또는 legacy3 정책을 기록한다. 핵심 인용 근거는 계속 필수다. 지역 미확인 이슈는 국내·국제 필터에서 제외되며, 국가 제한 구조 근거는 `basis_countries_unprovable`, 날짜가 부족한 기간 제한 근거는 `basis_validity_unprovable`로 보류한다. 제한이 없는 독립 입증 근거는 유지한다. native8/P2·decisions4, legacy2, snapshot3의 기존 바이트와 판정 의미는 각 버전의 reader로 읽는다.
+
+서비스 문서는 모델 변경 후 `PYTHONPATH=ai/service/src python3 ai/service/scripts/export_openapi.py`로 생성한다. 새 native CLI/HTTP 증명은 새 handoff ID와 decisions5/P3 입력을 사용하며 기존 observation HTTP 봉투는 그대로 유지한다.
+
+
+### 닫힌 요청과 비활성 등록
+
+준비 명령이 쓰는 요청 키는 `schemaVersion=zoop-legacy-real-import-1`, `migrationId`, `expectedManifestDigest`, `expectedBundleDigest`, `operator`뿐이다. `migrationId=legacy-real:<manifestDigest>`, 앱 버전은 `gv-<SHA256(migrationId)>`다. manifest의 `bundleDigest`·`geographyDigest`·`sourcePinsDigest`·`provenanceDigest`는 **전송할 파일의 실제 바이트**를 고정하며 importer가 검증한다. 별도 `sourceInputDigests`는 로컬 전체 입력 네 파일의 SHA-256 출처 주장이다. 전송하지 않은 원본 전체 파일이 서버에서 검증됐다는 뜻이 아니다. 전송용 `source-pins.json`의 기존 상위 자료 해시는 경로·본문 없이 보관한다. 패키지 파일과 설정 경로는 운영자 소유의 읽기 전용 입력으로 관리한다.
+
+```sh
+java -jar api/build/libs/zoop-api-0.0.1-SNAPSHOT.jar \
+  --spring.main.web-application-type=none \
+  --zoop.graph.snapshot.source=none \
+  --zoop.legacy-real-import.enabled=true \
+  --zoop.legacy-real-import.package-root=/srv/legacy-package \
+  --zoop.legacy-real-import.sources=/srv/current-sources.json \
+  --zoop.legacy-real-import.artifact-root=/srv/zoop-artifacts \
+  --zoop.legacy-real-import.request=/srv/legacy-request.json \
+  --zoop.legacy-real-import.result=/srv/legacy-result.json
+```
+
+DB 연결은 기존 `DB_*` 설정을 사용한다. 결과 경로는 매번 새 파일이어야 한다. importer는 artifact lock, catalogue-first DB lock, 기존 `DocumentRegistrationService`와 artifact/evidence 저장소를 사용한다. 정확한 재실행은 행·파일을 유지한 채 `unchanged`이며, 달라진 pin은 거절한다. commit 결과가 불명확하면 파일을 보존하고 동일 요청을 새 결과 경로로 실행한다. 기사 current pointer와 활성 버전은 별도 운영 절차에서 관리한다.
+
+### 보존하는 의미와 ID
+
+- issue·relation·catalogue company ID와 원본 기사 버전은 보존한다. 기사 ID는 `doc-<SHA256("legacy-real-article-1\\n"+원본ID)>`로 매핑한다.
+- 기존 evidence 키 `articleId|version|start|end`의 `ev-24hex`를 `ev-<SHA256("legacy-real-evidence-1\\n"+키)>`로 매핑한다. receipt의 `evidenceIdMap`에 기존 ID와 새 ID를 함께 남긴다. offset은 Unicode code point의 `[start,end)`이며 인용과 본문을 직접 대조한다. locator 종류는 `legacy-retained-body`다.
+- 공개 그래프에서 건너뛰는 `REPORTS`·`PROVIDES_BACKGROUND`·비선택 대상 `FOLLOWS`도 선택된 이슈의 article refs에 닫힌 기사 버전과 본문 인용인지 검사한 다음 receipt에 남긴다. 본문이 없거나 다른 기사 버전의 근거이면 준비/가져오기 단계에서 거절한다.
+- ALLOW와 실제 유효 R1@2의 역할 삭제·선후 관계 제외를 구분한다. 기존 거부와 선택된 후보 revision을 검사하며, 사건 응답은 기존 `approval` 구조의 `review-rule`/`R1@2`로 표시한다.
+- 대표 언급과 날짜·기간 선택은 기존 BFF 순서를 따른다. 상대 날짜처럼 형식 3에서 표현할 수 없는 시간은 공개 값에서 `null/unknown`으로 두고 원문 값은 receipt에 보존한다.
+- 지리 검토는 기사에 실제 있는 지명 인용과 명시적인 국가/지역 분류를 요구한다. `legacy-source-geography-review/1`의 제한된 지명 표기로 검사하며, 회사 상장 국가나 출판사 주소를 사건 장소로 쓰지 않는다. 지리 미해결 이슈는 로컬에 남고 전송 장부에는 ID와 사유 코드만 남는다.
+
+receipt는 닫힌 `zoop-legacy-real-import-receipt-2`이며 `manifest`, `bundle`, `legacyProvenance`, `appVerification`을 구분한다. reader는 manifest v2도 함께 확인한다. 검증한 것은 pin·원문 인용·참조·catalogue·유효 검토·지리·현재 권한·형식 3이다. native S2/S3 실행과 새 의미 검증은 수행하지 않은 것으로 기록한다. 영향·구조 경로 평가가 저장되지 않은 경우 기존 unavailable 동작을 사용한다.
+
+`graph_version_sources`에는 ordinal 0으로 migration ID, receipt, 규칙 적용 전 projection을 기록한다. 공개 규칙 적용 후 snapshot과 같으면 동일 artifact를 공유하고, 다르면 `graph_bundle_snapshot`으로 보관한다. 현재 공개 규칙은 추가적인 제외 조건이다.
+
+### 활성화·제외와 후속 자료
+
+활성화는 기존 관리자 세션·CSRF·`Idempotency-Key`·`expectedActiveVersionId`를 사용하는 `POST /api/v1/admin/graph/versions/{versionId}/activate`에서 수행한다. 선택 항목 `mode`는 `forward`가 기본값이며, 실제 활성 이력이 있는 버전으로 되돌릴 때는 `rollback`을 명시한다. 두 모드 모두 현재 proof·권리·제외·읽기 준비 상태를 확인하고 실제 활성 포인터에 CAS를 적용한다. `mode`는 멱등 요청 해시와 감사 기록에 포함한다. **활성화는 전체 snapshot 교체다.** 활성 실데이터가 있으면 `forward`는 그 버전을 기반으로 만든 누적 후보만 허용하며 원본 native/legacy 입력으로 교체할 수 없다. 누적 후보의 불변 expected-active는 요청과 실제 포인터에 일치해야 하고 base도 실제 활성 실데이터 버전이어야 한다. 활성 버전이 없거나 fixture이면 첫 원본 입력 또는 `base=null`인 누적 후보를 수동 활성화할 수 있으며 fixture 데이터는 합치지 않는다. 이미 활성인 대상도 현재 적격성 검사를 통과해야 멱등 성공을 반환한다. fixture 활성화는 기존처럼 스냅샷 소스가 `fixture`인 로컬·개발 구성에 한정한다.
+
+현재 제외는 기존 운영자 명령에 `action=exclude-legacy`를 사용한다. 요청 키는 `schemaVersion=zoop-disclosure-exclusion-1`, `requestId`, `action`, `operator`, `reason`, `graphVersionId`, `receiptSha256`, `targets`다. target은 기존 issue/relation/evidence/article 형식이며 해당 receipt의 실제 구성원이어야 한다. 기존 제외 revision lock·동일 요청 재생·빈 입력의 상태 보존·`lift.expectedRevision`을 그대로 사용한다. native `exclude-query`는 native receipt에만 적용한다.
+
+로컬 행동 검증은 `python3 api/scripts/legacy_real_import_smoke.py --result <새 결과 파일>`로 실행한다. 이미 빌드한 jar와 캐시된 PostgreSQL 이미지를 사용하며, 전용 ephemeral DB와 loopback-only OS 네트워크 sandbox 안에서 수행한다. 실자료 검증은 별도 실행에서 `--actual-package <새 패키지> --actual-request <고정 요청> --actual-sources <현재 권한 registry> --actual-catalogue <24개 마스터 items JSON> --actual-additions <누락된 3개 companies JSON>`을 함께 전달한다. 이 실행은 실제 registry를 수정하지 않고 17개 이슈·10개 기사·5개 기업의 등록, 바이트 동일 재실행, 로컬 활성화와 HTTP 근거 조회를 검증한다. `legacy_real_verify_closure.py --source <보존 입력 폴더> --package <새 패키지> --result <새 결과 파일>`은 모든 전송 파일의 바이트 핀, 기업 매핑, 선택된 참조, 원문 밖 본문·인용 누출을 독립적으로 비교한다.
+
+운영 환경에서는 위 CLI 설정을 `ZOOP_LEGACY_REAL_IMPORT_ENABLED`, `ZOOP_LEGACY_REAL_IMPORT_PACKAGE_ROOT`, `ZOOP_LEGACY_REAL_IMPORT_SOURCES`, `ZOOP_LEGACY_REAL_IMPORT_ARTIFACT_ROOT`, `ZOOP_LEGACY_REAL_IMPORT_REQUEST`, `ZOOP_LEGACY_REAL_IMPORT_RESULT`로 전달할 수 있다. 성공 결과의 `artifacts[]`가 서빙에 필요한 모든 snapshot·receipt·원문 artifact의 ID, 상대 URI, SHA-256, byte 수를 열거한다. 배포 담당자는 이 목록과 패키지 manifest, 실제 importer jar/image digest, 현재 source registry revision을 함께 고정한다. 서빙 프로세스는 동일한 durable artifact root를 `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT`와 `ZOOP_DOCUMENT_READ_ARTIFACT_ROOT`로 읽어야 한다.
+
+Legacy 그래프를 서빙하는 Java API task에는 다음 네 설정이 필요하다. 경로는 인프라에서 실제 mount를 확정한 뒤 넣는다.
+
+| 환경 변수 | 값과 경로 조건 |
+|---|---|
+| `ZOOP_GRAPH_SNAPSHOT_SOURCE` | `artifact` |
+| `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT` | snapshot·receipt·원문 artifact가 설치된 공유 durable 디렉터리의 정규화된 절대 경로 |
+| `ZOOP_DOCUMENT_READ_ARTIFACT_ROOT` | 위와 같은 artifact root의 절대 경로 |
+| `ZOOP_DOCUMENT_READ_INGESTION_SOURCES` | 현재 권한을 담은 `zoop-ingestion-s2-1` registry 또는 `zoop-source-authority-set-1` JSON의 정규화된 절대 경로. 모든 reader가 선택된 로컬 leaf를 읽을 수 있어야 하며 importer가 검증한 grant tuple의 현재 권한을 제공해야 한다 |
+
+Document evidence reader는 항상 등록되므로 별도 `document-read.enabled` 설정은 없다. `ZOOP_DOCUMENT_READ_GRANTS`는 별도 S1 분석 근거용 설정이며 legacy 그래프의 source registry를 대신하지 않는다. 기존 `DB_*`와 CSRF 주입은 유지하고, API task의 `ZOOP_LEGACY_REAL_IMPORT_ENABLED`는 기본값 `false`를 유지한다. 이 서빙 설정과 운영자 importer는 **Java API용 이미지**를 사용하며, 수집용 ECR 이미지와 구분한다.
+
+현재 지리 계약은 `legacy-source-geography-review/1`이다. 별도로 보존된 `/2` 보충 검토는 새 계약을 확정할 때 평가할 입력이며, 이 importer가 자동으로 합치지 않는다.
+
+nonweb 실행도 기존 Spring 시작 설정을 읽으므로 `DB_URL/DB_USERNAME/DB_PASSWORD`와 관리되는 `ZOOP_AUTH_CSRF_ACTIVE_KEY_ID/ZOOP_AUTH_CSRF_KEYS`를 공급해야 한다. 이 값은 패키지·manifest·결과 파일에 넣지 않는다.
+
+`V20261031150000`은 제외 감사 원인 `legacy-operator`를 추가한다. 이 원인의 `report_sha256`은 실제 legacy receipt의 SHA-256이며, native 제외의 exposure report digest와 원인 값으로 구분한다. 기존 제외 이력은 유지한다. 이미 main에 반영된 회차 migration `V20261031100000__create_graph_rounds.sql`과 `V20261031130000__graph_rounds_ingestion_round.sql` 뒤에 실행되도록 새 migration에만 순방향 번호를 부여했다. 이어서 delivery(`V20261031160000`), 누적 발행(`V20261031170000`), 누적 delivery(`V20261031180000`) 순서로 적용한다. 기존 migration의 파일명·내용·체크섬은 유지하며, delivery 명령은 적용이 완료된 schema를 검증한다.
+
+### Legacy 활성화와 호환 이미지 배포 순서
+
+`legacy-real:` 출처 버전과 누적 후보는 자동 활성화 후보에서 제외하고 관리자가 명시적으로 활성화한다. 원본 native 회차의 자동 활성화는 실제 활성 포인터가 없거나 fixture일 때만 허용한다. 실데이터가 활성화된 뒤에는 새 native 입력도 누적 구성과 수동 CAS 활성화를 거쳐야 한다. 자동 후보 조회뿐 아니라 publication lock 안의 실행 단계에서도 같은 조건을 다시 확인하므로, 먼저 선택해 둔 원본 후보가 새 실데이터 포인터를 덮어쓸 수 없다.
+
+공개 규칙과 현재 제외는 표시할 이슈·근거·관계를 정한다. 활성화의 proof·권한 검사는 보이는 근거에 한정하지 않고 모든 원본 기여의 기사 버전을 포함한다. publication lock 다음에 원본 기사 행을 정렬하여 공유 잠금하고, 공유 reader로 현재 제외를 적용한 뒤 활성화 시각에 현재 source registry를 다시 읽어 읽기·저장·인용 표시 권한과 철회 상태를 확인한다. 숨겨진 기여의 권리 거절도 활성화를 막으며, proof·원천 권한 정보를 읽을 수 없으면 `SOURCE_UNAVAILABLE`로 거절한다. Legacy 관계의 `roleUnconfirmed`는 보존된 역할 검토 표시를 따르며, 기업 연결에서는 보이는 기여 관계 중 하나라도 미확정이면 참이다. 표시할 역할 문구는 기존처럼 처음 나타나는 null 아닌 값을 사용한다.
+
+**가져오기 전에 모든 서빙 reader와 scheduler task를 호환 이미지로 교체하고 rollout 완료와 구 task 종료를 확인한다.** 신·구 API가 함께 실행되는 동안에는 legacy import/활성화를 실행하지 않는다. 운영자 CLI만 새 버전으로 바꾸는 것으로는 충분하지 않다.
+
+manifest·bundle·receipt는 legacy2와 legacy3의 정확한 버전 조합으로 읽는다. legacy2는 snapshot 형식 3을 유지하고, 명시적 미확인 메타데이터 정책을 고정한 legacy3는 형식 4를 사용한다. source selection `/1`과 요청 envelope `zoop-legacy-real-import-1`은 공통이다. 배포 전 실제 fleet의 기존 legacy v1 서빙 버전 유무를 조사하고 reader 전환 조건을 확정해야 한다. 새 패키지와 요청은 새 경로에 생성하며 이전 패키지와 receipt는 보존한다.
+
+운영자 task와 API task가 실제로 공유하는 durable artifact root와 읽기 권한을 먼저 확인한다. Fargate task의 로컬 파일은 영속 저장소나 다른 API task에서 보이는 파일로 간주하지 않는다. 배포 image digest, mount, 실행 역할, 호환 fleet 확인은 배포 담당자가 확정한 뒤 운영 명령에 반영한다.
+
+## 누적 발행과 원본별 현재 권한
+
+`GraphPublicationComposer`는 정상 가져오기가 만든 원본 비활성 버전들을 합쳐 새 비활성 버전을 만든다. `baseVersionId`가 있으면 실제 활성 포인터와 같아야 하며, 없으면 실제 포인터가 null 또는 fixture여야 한다. `expectedActiveVersionId`는 실제 fixture ID도 허용한다. fixture 내용은 구성에 포함하지 않는다.
+
+nonweb 실행은 `--zoop.graph-publication-compose.enabled=true`와 정규화된 절대 경로 `request/result/decisions/artifact-root`를 사용한다. `--zoop.document-read.ingestion-sources`는 실제 현재 권한 registry 또는 exact-tuple authority set을 가리킨다. `zoop-graph-publication-compose-1` 요청은 `baseVersionId`, `incomingVersionIds`, `expectedActiveVersionId`, `expectedBaseReceiptSha256`, `incomingReceiptPins`, `expectedRuleRevision`, `expectedReviewRevision`, `decisionsSha256`, `operator`를 모두 요구한다. 원본 버전과 receipt 파일의 실제 SHA-256을 고정하며, 새 입력·pin은 버전 ID순으로 정렬한다.
+
+결정 파일은 `schemaVersion:zoop-graph-publication-decisions-1`, `issueMappings`, `fieldSelections`, `relationSelections`로 닫힌다. 결정이 필요 없는 정확한 합집합은 세 배열이 비어 있다. `IssueRef={sourceVersionId,issueId}`, `EvidenceRef={sourceVersionId,issueId,evidenceId}`, `RelationRef={sourceVersionId,relationId}`는 원본 투영의 실제 구성원을 가리킨다. `same-event` 대응은 양쪽 사건·기업·행위·상태와 각 사건 소유 근거를 요구한다. 공개 ID를 새 이름으로 추측하거나 두 기존 공개 ID를 합치면 거절한다.
+
+필드 선택은 `issueId/field/expectedValueDigest/takeFrom/evidenceRefs/reviewer/decisionRef/decisionVersion`을 기록한다. 대상 필드는 `label/action/target/assertionStatus/eventTime/period/geography`이며, 시간·정밀도와 지리·정책·근거는 각각 하나의 값으로 선택한다. 관계 선택은 `relationId/expectedValueDigest/takeFrom/evidenceRefs/reviewer/decisionRef/decisionVersion`으로 원본의 전체 관계 레코드를 고른다. 후보 전체를 거절하는 충돌을 최근 입력 우선이나 일부 삭제로 바꾸지 않는다.
+
+새 receipt `zoop-graph-publication-receipt-1`은 원본 receipt·규칙 적용 전 projection의 artifact ID/SHA/bytes와 필드·관계별 소유자를 담는다. `graph_version_sources`에는 평탄한 원본 참조만 저장하며 `graph_publications`와 `graph_publication_inputs`는 구성 당시 base·기대 활성 포인터·새 입력을 불변 기록으로 남긴다. 이전 복합 receipt를 다시 참조하지 않으므로 반복 구성의 깊이는 늘지 않는다. 현재 규칙은 합친 원본에 한 번 적용한다.
+
+명령당 새 입력은 최대 20개다. 누적 원본은 21개 이상도 유지하며 실제 artifact·collection·closure 경계에서 후보 전체를 거절한다. artifact당 16 MiB, 전송 closure 1,003개 파일·256 MiB, pending/destination 기본 1 GiB 한도를 사용한다. 과거 원본이나 규칙으로 숨긴 자료를 연령·입력 개수 때문에 지우지 않는다.
+
+모든 공개·고정 버전·과거·asOf 읽기는 같은 `GraphPublicationReader`와 현재 권한 overlay를 거친다. 원본별 최신 제외와 정확한 기사 버전의 철회·권한을 적용한 뒤 표시용 파생 관계를 만든다. 한 원본의 허용으로 다른 적용 대상 원본의 거절을 상쇄할 수 없다. 선택된 제목·핵심 필드 근거가 철회되면 해당 이슈를 숨기며, 읽을 수 없는 proof나 잘못된 현재 권한은 `503 SOURCE_UNAVAILABLE`이다.
+
+`round` 없는 근거 조회에서 현재 권한으로 숨겨진 근거는 `404 EVIDENCE_UNAVAILABLE`이다. `round`를 지정하면 먼저 저장된 브리핑 전체의 원천 binding과 그 발행본이 참조하는 이슈·근거의 현재 공개 가능 여부를 검사한다. 필수 ingestion grant 또는 별도 briefing-purpose grant가 철회되어 저장된 발행본을 제공할 수 없으면 `503 SOURCE_UNAVAILABLE`이다. 이 검사를 통과한 회차 안에서 요청 근거가 범위 밖이거나 구조·영향 소속 증명을 충족하지 못하면 404다. 회차에 고정된 버전·마감 시각은 현재 권한 검사를 대신하지 않는다.
+
+복합 버전을 대상으로 제외하려면 기존 `zoop-disclosure-exclusion-1` 요청에 `action:exclude-publication`을 사용한다. 키는 `requestId/action/operator/reason/graphVersionId/receiptSha256/targets`이며 실제 복합 receipt SHA를 고정한다. 한 요청의 모든 대상을 모든 해당 원본 소유자로 해석하고 같은 publication lock·revision 아래 원본 범위에 원자적으로 기록한다. 소유자가 없는 대상과 표시용 파생 edge ID는 거절한다. 빈 입력이나 작은 결과는 기존 제외를 해제하지 않는다. 해제는 원본 버전과 대상·`expectedRevision`을 명시한 기존 `lift`로 수행한다.
+
+`exclude-query`는 선택한 복합 버전을 원본 native handoff로 먼저 펼친다. 20개를 넘으면 `exposure_batch_required`로 전체 요청을 거절하고 운영자가 원본 버전을 명시적으로 나눠 선택해야 한다. legacy를 포함한 혼합 선택은 native 조회로 전부 확인했다고 처리할 수 없으므로 거절한다. 원본별 제외는 이후 구성본과 과거 구성본에도 그대로 적용된다.

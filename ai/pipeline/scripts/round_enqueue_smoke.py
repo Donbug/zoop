@@ -41,7 +41,7 @@ from zoop_ai_pipeline.ingestion_contracts import canonical, digest  # noqa: E402
 
 SCHEMA = "zoop-extraction-s2-2"
 ENQUEUE_FORMAT = "zoop-round-enqueue-1"
-REPLAY_ADAPTER, LIVE_ADAPTER = "zoop-extraction-native-replay-1", "zoop-extraction-native-live-1"
+REPLAY_ADAPTER, LIVE_ADAPTER = "zoop-extraction-native-replay-1", "zoop-extraction-native-live-2"
 PROMPT_2 = "zoop-extraction-authored-2"
 CATALOGUE_2 = {**CATALOGUE, "revision": "catalogue-2"}
 TOPIC = {"producerVersion": "zoop-topic-replay-producer-1"}

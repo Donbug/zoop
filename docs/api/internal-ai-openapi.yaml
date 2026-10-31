@@ -9,9 +9,9 @@
     semantic-verification and briefing-outlook. It is a thin, durable HTTP layer over the installed `zoop-ai` CLI; the runtime ledger
     stays the only source of job state, and every state shown here is read from the runtime during the same request.
 
-    **Network.** The service binds `127.0.0.1` only. Production reach is an HTTPS reverse proxy co-located with it (same host or network
-    namespace) that terminates TLS, caps bodies at 2,000,000 bytes, never logs `Authorization`, and is reachable only from the app
-    backend's security group. That proxy is an assumption: nothing here was deployed or observed.
+    **Network.** The service defaults to `127.0.0.1`. `ZOOP_AI_SERVICE_HOST` accepts an explicit literal bind IP for an operator-managed
+    container deployment behind approved TLS ingress. The ingress must cap bodies at 2,000,000 bytes, protect Authorization,
+    and restrict callers to the app backend. Configuration does not deploy or authorize that ingress.
 
     **Authentication.** `Authorization: Bearer <token>`. Tokens are operator-issued; the service stores only SHA-256 digests. The
     authenticated principal is the owner of every job it registers; there is no end-user identity in v1. A job owned by another
@@ -141,7 +141,7 @@
 
     **Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only
     family over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle
-    (`zoop-graph-handoff-bundle-7`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
+    (`zoop-graph-handoff-bundle-8` / `zoop-public-projection-policy-2`, or bundle `-9` / policy `-3`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
     writes nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied
     path, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409
     `execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side
@@ -161,7 +161,7 @@
     `issue_summary_pin_mismatch`, `issue_summary_basis_changed`, `issue_summary_issue_not_public`, `issue_summary_temporal_review_pending`,
     `issue_summary_input_too_large`,
     `handoff_contract_changed` ...) and nothing else: no `verification` (so no count, source id or digest) and no `bundle`. `handoff_contract_changed` means the
-    handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1` ... `-6`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
+    handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1` ... `-7`): its immutable receipt remains history, and a new projection requires a new handoff id.
     A withheld answer is not an error and not an empty bundle; do not import it and do not treat it as "no data". The checks are separate reads at separate instants,
     so a revocation that lands between them and the response is not covered and nothing recalls content a caller already received.
 
@@ -172,19 +172,33 @@
     S2 `role` text as is (not a confirmed role, not an `INVOLVES` relation); `companyId` is the public company only where every carrying upstream mapped the source id
     to the same company of this bundle, otherwise null.
 
+    **Unknown source fields (bundle 8).** A nonempty explicit operator geography decision may supplement source countries `[]`, which remain unchanged in the
+    geography basis. Every nonempty source declaration must match that decision exactly. Exact own-event document evidence and current rights remain required;
+    the operator judges semantic country relevance. Unsupported nonempty original times are receipt-only `unresolved` values. Each such mention, including
+    non-representatives, requires its own exact non-ALLOW eventTime verdict. `HOLD/unsupported-format` requires at least one exact own-document span; existing
+    ambiguous/unstated/contradicted dispositions keep their rules. Withholding precedes strict public headline classification: null/unknown remains the public
+    unknown pair, sameValueMentions uses the original selected value, and temporal-review-pending summaries and structural gates remain unchanged.
+
+    **Explicit unknown geography (bundle 9 / P3).** The schema and policy form an exact pair. Known geography retains its nonempty countries and exact evidence.
+    The separate unknown branch has `value:null`, empty countries/evidenceIds, `verification:not-established`, one of `not-stated`, `not-supported`, `conflicting`,
+    and the real decision identity. Its nonempty basis retains every original event identity and country declaration, including nonempty unverified countries.
+    Core event/company evidence and current read/store/quote-display authority remain mandatory. Unknown countries cannot prove a country-constrained structural
+    basis (`basis_countries_unprovable`); unknown or insufficient dates cannot prove a date-constrained basis (`basis_validity_unprovable`). Unrestricted independently
+    supported basis remains eligible. The temporal withholding and summary decision table above applies unchanged.
+
     **Field provenance.** Every issue carries a closed `fieldProvenance` that records how the producer chose the issue's six headline values (`title`, `action`,
     `target`, `eventTime`, `period`, `assertionStatus`): `selection` is `unanimous` (no operator representative; every mention states all six values) or
     `operator-representative` (the operator's single representative decision; it is one choice for all six fields, never a per-field decision). `sameValueMentions`
     lists per field, in the order of `mentions[]`, the identities (`documentId`, `documentVersion`, `mentionId`) of exactly those mentions whose own value equals the
     issue's value (null equals null; no trimming or time normalisation) where "the issue's value" is the SELECTED value, never a redacted null. `verification` is always
     `none`: this is the actual selection, never a fact verification, support or approval. `withheld` lists (`eventTime`, `period` order) the fields whose headline the
-    producer nulled because of an operator HOLD or REJECT on the selected basis. The producer proves list exactness and closure; this service checks only the shapes.
+    producer nulled because of an operator HOLD or REJECT on the selected basis. The producer proves list exactness and closure; the service also recomputes temporal withholding.
 
     **Field verdicts.** `issues[].fieldVerdicts` holds the operator's own per-field decisions on one original mention's `eventTime` or `period` (`field`, the exact
     reviewed `value`, `decision` ALLOW|HOLD|REJECT, a closed `reasonCode`, `evidenceIds` of the mention's own document, `reviewer`, `decisionRef`, `decisionVersion`,
     `verification` always `operator-field-verdict`). They are never AI output, carry no free-text note, and exist only where an operator reviewed; an empty list means
-    "no field verdict exists", not "verified". This service neither derives nor judges them and checks only the shapes (decision/reason/evidence-count combinations:
-    ALLOW+stated needs spans, HOLD+unstated none, HOLD+ambiguous spans, REJECT+contradicted spans). Original `mentions[]` values are never changed.
+    "no field verdict exists", not "verified". The service checks exact mention/value binding, unresolved-time own-article evidence and decision/reason/evidence-count combinations:
+    ALLOW+stated needs spans, HOLD+unstated none, HOLD+ambiguous and HOLD+unsupported-format spans, REJECT+contradicted spans. Original `mentions[]` values stay unchanged.
 
     **Impacts.** `impacts[]` has exactly one closed row per emitted `INVOLVES` source relation `(edgeId, sourceRelation.jobId, sourceRelation.relationCandidateId)`, sorted by
     that tuple. It never aggregates: two source relations of one edge stay two rows. A row says what the S3 independent verifier mapped for the company, or why there is
@@ -6408,9 +6422,9 @@
                       "reason": null
                       "checkedAt": "2026-10-16T03:00:00.123456+00:00"
                     "verification":
-                      "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
-                      "bundleDigest": "9ef1cd772b88195b8e1103c55cb7432f5b42e5bc94ab04ca23672814b625b8a3"
-                      "contentDigest": "180fe3eea73ee5b96a9029fd2290544c9a00cc535f6747ec34ba811e78f219cc"
+                      "manifestDigest": "24b3aa2eff4080115c8ac709d9b1e89915b79662635f30b3cd852012777386e2"
+                      "bundleDigest": "f4a906464286298d4c7553451eedc18ef2fde731521e979c56e01d914eabdf59"
+                      "contentDigest": "332f1be0ceb7246ac3af514b8f34dcb3d3f5fbb379ac9f437359292b7b761b01"
                       "bundleBytes": 12799
                       "counts":
                         "companies": 1
@@ -6707,9 +6721,9 @@
                       "reason": null
                       "checkedAt": "2026-10-16T03:00:00.123456+00:00"
                     "verification":
-                      "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
-                      "bundleDigest": "9ef1cd772b88195b8e1103c55cb7432f5b42e5bc94ab04ca23672814b625b8a3"
-                      "contentDigest": "180fe3eea73ee5b96a9029fd2290544c9a00cc535f6747ec34ba811e78f219cc"
+                      "manifestDigest": "24b3aa2eff4080115c8ac709d9b1e89915b79662635f30b3cd852012777386e2"
+                      "bundleDigest": "f4a906464286298d4c7553451eedc18ef2fde731521e979c56e01d914eabdf59"
+                      "contentDigest": "332f1be0ceb7246ac3af514b8f34dcb3d3f5fbb379ac9f437359292b7b761b01"
                       "bundleBytes": 12799
                       "counts":
                         "companies": 1
@@ -6734,7 +6748,7 @@
                       "schemaVersion": "zoop-ai-handoff-1"
                       "handoffId": "handoff-synthetic-1"
                       "sourceKind": "synthetic"
-                      "policyVersion": "zoop-public-projection-policy-1"
+                      "policyVersion": "zoop-public-projection-policy-2"
                       "sources":
                         - "relation":
                             "jobId": "s3-synthetic-relation"
@@ -6749,16 +6763,16 @@
                         "decisions": "7777777777777777777777777777777777777777777777777777777777777777"
                         "bindings": "8888888888888888888888888888888888888888888888888888888888888888"
                     "bundle":
-                      "schemaVersion": "zoop-graph-handoff-bundle-7"
+                      "schemaVersion": "zoop-graph-handoff-bundle-8"
                       "handoffId": "handoff-synthetic-1"
-                      "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
+                      "manifestDigest": "24b3aa2eff4080115c8ac709d9b1e89915b79662635f30b3cd852012777386e2"
                       "provenance":
                         "declaredSourceKind": "synthetic"
                         "observedSourceKind": "synthetic"
                         "executionMode": "replay"
                         "recordingKind": "authored-test"
                       "policy":
-                        "version": "zoop-public-projection-policy-1"
+                        "version": "zoop-public-projection-policy-2"
                         "files":
                           "canonical": "6666666666666666666666666666666666666666666666666666666666666666"
                           "decisions": "7777777777777777777777777777777777777777777777777777777777777777"
@@ -6831,7 +6845,7 @@
                             "value": "domestic"
                             "decisionRef": "geo-2026-10-16:1"
                             "decisionVersion": "v1"
-                            "policyVersion": "zoop-public-projection-policy-1"
+                            "policyVersion": "zoop-public-projection-policy-2"
                             "countries":
                               - "KR"
                             "verification": "operator-field-verdict"
@@ -7119,7 +7133,7 @@
                         "publicActivation": "none"
                         "graphDb": "none"
                       "digests":
-                        "content": "180fe3eea73ee5b96a9029fd2290544c9a00cc535f6747ec34ba811e78f219cc"
+                        "content": "332f1be0ceb7246ac3af514b8f34dcb3d3f5fbb379ac9f437359292b7b761b01"
                 "currentSummaryHeld":
                   "summary": "A current bundle whose issue has an operator HOLD on its event time: the headline time is null and the summary is `unavailable/temporal-review-pending` (no summary text exists anywhere in the bundle)"
                   "value":
@@ -7133,9 +7147,9 @@
                       "reason": null
                       "checkedAt": "2026-10-16T03:00:00.123456+00:00"
                     "verification":
-                      "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
-                      "bundleDigest": "060e914f53d922d55903ac60f9cba3d81234161e5f184ed7d6fd8469e3f9b927"
-                      "contentDigest": "d36d6faeb206a9815c4e948b8e5b38d3bcc62b1b50012ff1cf355923aa74135e"
+                      "manifestDigest": "24b3aa2eff4080115c8ac709d9b1e89915b79662635f30b3cd852012777386e2"
+                      "bundleDigest": "a06506fba4f2b3f6dcbe5c717b2450f585fa6a5dad7e7b4bda9dc6119460710e"
+                      "contentDigest": "6decaec3b79c33bf679cb5d4be4b33a71228028444d2226b6df67e3429ef5e18"
                       "bundleBytes": 11074
                       "counts":
                         "companies": 1
@@ -7160,7 +7174,7 @@
                       "schemaVersion": "zoop-ai-handoff-1"
                       "handoffId": "handoff-synthetic-1"
                       "sourceKind": "synthetic"
-                      "policyVersion": "zoop-public-projection-policy-1"
+                      "policyVersion": "zoop-public-projection-policy-2"
                       "sources":
                         - "relation":
                             "jobId": "s3-synthetic-relation"
@@ -7175,16 +7189,16 @@
                         "decisions": "7777777777777777777777777777777777777777777777777777777777777777"
                         "bindings": "8888888888888888888888888888888888888888888888888888888888888888"
                     "bundle":
-                      "schemaVersion": "zoop-graph-handoff-bundle-7"
+                      "schemaVersion": "zoop-graph-handoff-bundle-8"
                       "handoffId": "handoff-synthetic-1"
-                      "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
+                      "manifestDigest": "24b3aa2eff4080115c8ac709d9b1e89915b79662635f30b3cd852012777386e2"
                       "provenance":
                         "declaredSourceKind": "synthetic"
                         "observedSourceKind": "synthetic"
                         "executionMode": "replay"
                         "recordingKind": "authored-test"
                       "policy":
-                        "version": "zoop-public-projection-policy-1"
+                        "version": "zoop-public-projection-policy-2"
                         "files":
                           "canonical": "6666666666666666666666666666666666666666666666666666666666666666"
                           "decisions": "7777777777777777777777777777777777777777777777777777777777777777"
@@ -7257,7 +7271,7 @@
                             "value": "domestic"
                             "decisionRef": "geo-2026-10-16:1"
                             "decisionVersion": "v1"
-                            "policyVersion": "zoop-public-projection-policy-1"
+                            "policyVersion": "zoop-public-projection-policy-2"
                             "countries":
                               - "KR"
                             "verification": "operator-field-verdict"
@@ -7509,7 +7523,7 @@
                         "publicActivation": "none"
                         "graphDb": "none"
                       "digests":
-                        "content": "d36d6faeb206a9815c4e948b8e5b38d3bcc62b1b50012ff1cf355923aa74135e"
+                        "content": "6decaec3b79c33bf679cb5d4be4b33a71228028444d2226b6df67e3429ef5e18"
                 "withheld":
                   "summary": "Source rights were revoked: no manifest, no bundle, no counts"
                   "value":
@@ -8033,7 +8047,7 @@
           "application/json":
             "schema":
               "$ref": "#/components/schemas/ObservationExportRequest"
-      "description": "Requires observation.read, granted only to the configured internal importer principal. This scope permits exact reads across the server's ingestion registry; it is not per-observation ownership. One explicit native selector; schemaVersion is required and unknown fields are refused. Runs only zoop-ai-ingest export --require-store against server-owned state and sources on every request. The native CLI checks current read, store and quote-display grants and frozen source configuration. The service additionally validates selector identity, text sourceHash, document version and locator hashes before returning the unchanged native JSON. One request returns one observation synchronously with 200; batch and asynchronous (202) delivery are open design items of issue #407. Authorized document.text is intentionally present only in a 200 response. No status route, cache, job, ingestion write, retry or recovery. No query parameters, client paths/CLI arguments, observationId or requireStore option. Idempotency-Key is not required and conveys no authority; a repeated request rechecks current rights rather than replaying a cached result. Input limit 2,000,000 bytes; stdout/response limit 16 MiB; 45-second child deadline; at most two concurrent exports. Ingestion writer contention is 503 runtime_busy with runtimeCode ingestion_busy. Disabled configuration is 503 execution_unavailable after authentication. Error codes contain no text, path, key or raw diagnostics. All responses use Cache-Control: no-store. This read does not grant model-send, publication, activation or perpetual rights. Rights checks and HTTP delivery are separate observations, not atomic revocation or recall of already delivered text."
+      "description": "Requires observation.read, explicitly granted to operator-selected internal importer principals. This scope permits exact reads across the server's configured registry or inventory; it is not per-observation ownership. One complete seven-field native selector plus required schemaVersion zoop-ingestion-s2-1; unknown fields are refused. Every request runs installed zoop-ai-ingest export --require-store with a credential-filtered environment and server-owned paths. The native CLI checks current read, store and quote-display grants and frozen source configuration. The service additionally validates selector identity, text sourceHash, document version and locator hashes before returning the unchanged native JSON. Single-context mode reads its configured registry; multicontext mode resolves only an exact selector in the pinned handoff inventory, checked before and after export. Unknown routes are 404; changed or invalid inventory fails closed. One request returns one observation synchronously with 200; batch and asynchronous (202) delivery are open design items of issue #407. Authorized document.text is intentionally present only in a 200 response. No status route, cache, job, ingestion write, retry or recovery. No query parameters, client paths/CLI arguments, observationId or requireStore option. Idempotency-Key is not required and conveys no authority; a repeated request rechecks current rights rather than replaying a cached result. Input limit 2,000,000 bytes; stdout/response limit 16 MiB; 45-second child deadline; at most two concurrent exports. Ingestion writer contention is 503 runtime_busy with runtimeCode ingestion_busy. Disabled configuration is 503 execution_unavailable after authentication. Error codes contain no text, path, key or raw diagnostics. All responses use Cache-Control: no-store. This read does not grant model-send, publication, activation or perpetual rights. Rights checks and HTTP delivery are separate observations, not atomic revocation or recall of already delivered text."
   "/internal/v1/chat-stages/{stage}":
     "post":
       "tags":
@@ -9956,6 +9970,7 @@
             - "stated"
             - "unstated"
             - "ambiguous"
+            - "unsupported-format"
             - "contradicted"
           "title": "Reasoncode"
         "evidenceIds":
@@ -10059,7 +10074,9 @@
           "title": "Decisionversion"
         "policyVersion":
           "type": "string"
-          "const": "zoop-public-projection-policy-1"
+          "enum":
+            - "zoop-public-projection-policy-2"
+            - "zoop-public-projection-policy-3"
           "title": "Policyversion"
         "countries":
           "items":
@@ -10412,7 +10429,10 @@
             - "type": "null"
           "title": "Assertionstatus"
         "geography":
-          "$ref": "#/components/schemas/BGeography"
+          "anyOf":
+            - "$ref": "#/components/schemas/BGeography"
+            - "$ref": "#/components/schemas/BUnknownGeography"
+          "title": "Geography"
         "evidenceIds":
           "items":
             "type": "string"
@@ -10543,7 +10563,7 @@
         "eventTime":
           "anyOf":
             - "type": "string"
-              "maxLength": 100
+              "maxLength": 6291456
             - "type": "null"
           "title": "Eventtime"
         "timePrecision":
@@ -10554,6 +10574,7 @@
             - "day"
             - "datetime"
             - "unknown"
+            - "unresolved"
           "title": "Timeprecision"
         "period":
           "anyOf":
@@ -10767,7 +10788,9 @@
       "properties":
         "version":
           "type": "string"
-          "const": "zoop-public-projection-policy-1"
+          "enum":
+            - "zoop-public-projection-policy-2"
+            - "zoop-public-projection-policy-3"
           "title": "Version"
         "files":
           "$ref": "#/components/schemas/BPolicyFiles"
@@ -10781,7 +10804,9 @@
           "title": "Offsetunit"
         "geography":
           "type": "string"
-          "const": "operator-field-verdict"
+          "enum":
+            - "operator-field-verdict"
+            - "operator-field-verdict-or-explicit-unknown"
           "title": "Geography"
         "structural":
           "type": "string"
@@ -11669,6 +11694,66 @@
         - "requestDigest"
       "title": "BSummaryVerifier"
       "description": "Who checked the claims against the quotes. `authored-replay` in a replay bundle (never an independent model's verdict), `independent-verifier` in a live one."
+    "BUnknownGeography":
+      "properties":
+        "value":
+          "type": "null"
+          "title": "Value"
+        "decisionRef":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "title": "Decisionref"
+        "decisionVersion":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "title": "Decisionversion"
+        "policyVersion":
+          "type": "string"
+          "const": "zoop-public-projection-policy-3"
+          "title": "Policyversion"
+        "countries":
+          "items":
+            "type": "string"
+          "type": "array"
+          "maxItems": 0
+          "title": "Countries"
+        "verification":
+          "type": "string"
+          "const": "not-established"
+          "title": "Verification"
+        "reasonCode":
+          "type": "string"
+          "enum":
+            - "not-stated"
+            - "not-supported"
+            - "conflicting"
+          "title": "Reasoncode"
+        "evidenceIds":
+          "items":
+            "type": "string"
+          "type": "array"
+          "maxItems": 0
+          "title": "Evidenceids"
+        "basis":
+          "items":
+            "$ref": "#/components/schemas/BGeographyBasis"
+          "type": "array"
+          "maxItems": 1000
+          "minItems": 1
+          "title": "Basis"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "value"
+        - "decisionRef"
+        - "decisionVersion"
+        - "policyVersion"
+        - "countries"
+        - "verification"
+        - "reasonCode"
+        - "evidenceIds"
+        - "basis"
+      "title": "BUnknownGeography"
     "BUpstream":
       "properties":
         "jobId":
@@ -11711,7 +11796,9 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-graph-handoff-bundle-7"
+          "enum":
+            - "zoop-graph-handoff-bundle-8"
+            - "zoop-graph-handoff-bundle-9"
           "title": "Schemaversion"
         "handoffId":
           "type": "string"
@@ -12776,7 +12863,9 @@
           "title": "Handoffid"
         "bundleSchema":
           "type": "string"
-          "const": "zoop-graph-handoff-bundle-7"
+          "enum":
+            - "zoop-graph-handoff-bundle-8"
+            - "zoop-graph-handoff-bundle-9"
           "title": "Bundleschema"
         "manifestDigest":
           "type": "string"
@@ -13879,7 +13968,9 @@
           "title": "Sourcekind"
         "policyVersion":
           "type": "string"
-          "const": "zoop-public-projection-policy-1"
+          "enum":
+            - "zoop-public-projection-policy-2"
+            - "zoop-public-projection-policy-3"
           "title": "Policyversion"
         "sources":
           "items":
@@ -16560,7 +16651,7 @@
       "description": "Operator-issued token; the service holds only its SHA-256 digest. Roles are the route scopes."
 "servers":
   - "url": "http://127.0.0.1:8797"
-    "description": "Loopback only. Never exposed directly; reach it through a co-located TLS proxy."
+    "description": "Default loopback development address; deployment endpoint is operator-owned HTTPS ingress."
 "tags":
   - "name": "analysis-jobs"
     "description": "S1 analysis jobs over the installed zoop-ai runtime."

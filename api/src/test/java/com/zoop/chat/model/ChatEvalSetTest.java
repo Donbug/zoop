@@ -599,8 +599,7 @@ class ChatEvalSetTest {
             citations = (evidenceId, graphVersion, asOf, traceId) -> Optional.ofNullable(byId.get(evidenceId));
             GraphVersionRepository versions = versions();
             PublicGraphReader reader = new PublicGraphReader(new GraphVersionSelector(versions, Clock.fixed(NOW,
-                    ZoneOffset.UTC)), new FixtureGraphSnapshotStore(ChatEvalSetTest.class.getClassLoader()),
-                    pinned -> DisclosureExclusions.NONE);
+                    ZoneOffset.UTC)), new FixtureGraphSnapshotStore(ChatEvalSetTest.class.getClassLoader()), pinned -> DisclosureExclusions.NONE, null, null);
             issues = new IssueNameResolver(reader);
             ChatEvidenceAccess access = (evidenceId, graphVersion, asOf, requestId) -> true;
             var companyProfiles = new ChatCompanyProfiles(null, null, reader) {

@@ -59,6 +59,20 @@ public final class ExclusionRequestParser {
             String requestId = id(root.string("requestId"));
             String operator = operator(root.string("operator"));
             String reason = reason(root.string("reason"));
+            if ("exclude-legacy".equals(action) || "exclude-publication".equals(action)) {
+                root.exactly(Set.of("schemaVersion", "requestId", "action", "operator", "reason", "graphVersionId",
+                        "receiptSha256", "targets"));
+                List<Target> targets = root.objects("targets").stream().map(ExclusionRequestParser::target).toList();
+                if (targets.size() > MAX_LIFT_TARGETS || new LinkedHashSet<>(targets).size() != targets.size())
+                    throw new StrictJson.Malformed();
+                if ("exclude-publication".equals(action)) return new ExclusionRequest.PublicationExclude(requestId,
+                        Canonical.digest(root.node()), operator, reason,
+                        match(Pattern.compile("gv-[a-f0-9]{64}"), root.string("graphVersionId")),
+                        match(DIGEST, root.string("receiptSha256")), targets);
+                return new ExclusionRequest.LegacyExclude(requestId, Canonical.digest(root.node()), operator, reason,
+                        match(Pattern.compile("gv-[a-f0-9]{64}"), root.string("graphVersionId")),
+                        match(DIGEST, root.string("receiptSha256")), targets);
+            }
             if ("lift".equals(action)) {
                 root.exactly(Set.of("schemaVersion", "requestId", "action", "operator", "reason", "graphVersionId",
                         "expectedRevision", "targets"));
@@ -171,7 +185,9 @@ public final class ExclusionRequestParser {
     private static Handoff handoff(Obj handoff, String cause) {
         handoff.exactly(Set.of("handoffId", "bundleSchema", "manifestDigest", "bundleDigest", "contentDigest", "bound", "exposed",
                 "articles", "issues", "relations", "evidenceIds", "counts"));
-        if (!"zoop-graph-handoff-bundle-7".equals(handoff.string("bundleSchema"))) throw new StrictJson.Malformed();
+        if (!Set.of("zoop-graph-handoff-bundle-7", "zoop-graph-handoff-bundle-8", "zoop-graph-handoff-bundle-9").contains(handoff.string("bundleSchema"))) {
+            throw new StrictJson.Malformed();
+        }
         if (handoff.array("articles").size() > 1000 || handoff.array("issues").size() > 2000
                 || handoff.array("relations").size() > 10_000 || handoff.array("evidenceIds").size() > 20_000) {
             throw new StrictJson.Malformed();
@@ -213,7 +229,7 @@ public final class ExclusionRequestParser {
                 || ("relation-retraction".equals(cause) && (articles != 0 || evidence != 0))) {
             throw new StrictJson.Malformed();
         }
-        return new Handoff(id(handoff.string("handoffId")), match(DIGEST, handoff.string("manifestDigest")),
+        return new Handoff(id(handoff.string("handoffId")), handoff.string("bundleSchema"), match(DIGEST, handoff.string("manifestDigest")),
                 match(DIGEST, handoff.string("bundleDigest")), match(DIGEST, handoff.string("contentDigest")), exposed, targets);
     }
 

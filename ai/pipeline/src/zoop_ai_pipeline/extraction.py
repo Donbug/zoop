@@ -27,7 +27,7 @@ from .extraction_contracts import (ADAPTER_VERSION, CANDIDATE_VERSION, LEDGER_VE
 from .ingestion import Ingestor
 from .ingestion import Store as IngestionStore
 from .ingestion_contracts import Authority, Export, IngestionFailure, Inspect, byte_hash, now, reserved_state_roots
-from .live_runtime import LiveFailure, LiveRuntime
+from .live_runtime import LiveDeferred, LiveFailure, LiveRuntime
 
 
 _SQL = """
@@ -365,6 +365,21 @@ def live_call(binding: dict, call) -> dict:
             "verdict": call["verdict"], "attemptId": call["attempt_id"], "recipient": stage["recipient"], "purpose": stage["purpose"],
             "httpStatus": (receipt.get("http") or {}).get("status"), "model": (receipt.get("model") or {}).get("reported"), "usage": receipt.get("usage"),
             "cost": {k: cost.get(k) for k in ("usageKnown", "estimatedUsd", "chargedUsd")} if isinstance(cost, dict) else None}
+
+
+def save_live_deferral(store, attempt: str, proof: dict) -> None:
+    """Persist causal pre-HTTP evidence independently of a contended monetary ledger, atomically with the native call state."""
+    with store.transaction():
+        row = store.one("SELECT state,response FROM calls WHERE attempt_id=?", (attempt,))
+        if row is None or row["state"] != "started" or row["response"] is not None or proof["attemptId"] != attempt:
+            raise ExtractionFailure("receipt_request_mismatch")
+        store.db.execute("INSERT INTO meta VALUES(?,?)", ("operating-deferral:" + attempt + ":" + uuid.uuid4().hex, canonical(proof)))
+        store.db.execute("UPDATE calls SET state='deferred' WHERE attempt_id=?", (attempt,))
+
+
+def load_live_deferral(store, attempt: str) -> dict | None:
+    row = store.one("SELECT value FROM meta WHERE key LIKE ? ORDER BY rowid DESC LIMIT 1", ("operating-deferral:" + attempt + ":%",))
+    return json.loads(row["value"]) if row else None
 
 
 def open_legacy_history(root: Path, ingestion_root: Path, job_id: str) -> "Store | None":
@@ -762,10 +777,11 @@ class Extractor:
         job_id = row["job_id"]
         live = json.loads(row["binding"])["live"]
         frozen = live["runtime"]
+        payload = {**payload, "citationSources": [live_prompts.source(ctx.docs[k].export, ctx.docs[k].article) for k in sorted(set(keys))]}
         decoder = self.live.frozen(frozen)
         send = (decoder.purpose(stage), decoder.recipient(stage), frozenset(keys))
         call = self.store.one("SELECT * FROM calls WHERE job_id=? AND stage=? AND ref=?", (job_id, stage, ref))
-        if call is None:
+        if call is None or call["state"] == "deferred":
             sender = self.live.sender()
             if not sender.accepts(frozen):
                 raise ExtractionFailure("live_config_changed")
@@ -776,7 +792,15 @@ class Extractor:
             if (prepared["purpose"], prepared["recipient"]) != send[:2]:
                 raise ExtractionFailure("live_prepared_invalid")
             self._verify(ctx, send)
-            attempt = self._reserve(job_id, fence, stage, ref, key, live["bindingDigest"])
+            unsent_proof = None
+            if call is None:
+                attempt = self._reserve(job_id, fence, stage, ref, key, live["bindingDigest"])
+            else:
+                if call["request_digest"] != key or "funding" not in frozen:
+                    raise ExtractionFailure("receipt_request_mismatch")
+                attempt = call["attempt_id"]
+                unsent_proof = load_live_deferral(self.store, attempt)
+                self.db.execute("UPDATE calls SET state='started' WHERE attempt_id=? AND state='deferred'", (attempt,))
 
             def authorize():
                 # Runs inside send(), immediately before the one request: config, fence/cancel and every sent document's current rights.
@@ -786,7 +810,13 @@ class Extractor:
                 self._verify(ctx, send)
 
             try:
-                receipt = sender.send(prepared, attempt_id=attempt, authorize=authorize)
+                if unsent_proof is None:
+                    receipt = sender.send(prepared, attempt_id=attempt, authorize=authorize)
+                else:
+                    receipt = sender.send(prepared, attempt_id=attempt, authorize=authorize, unsent_proof=unsent_proof)
+            except LiveDeferred as exc:
+                save_live_deferral(self.store, attempt, exc.proof)
+                raise ExtractionFailure(exc.code) from exc
             except ExtractionFailure as exc:
                 self._unsent(attempt, exc.code)
                 raise
@@ -818,7 +848,7 @@ class Extractor:
             self._reject(attempt, exc.code)
             raise ReplyInvalid(exc.code) from exc
         try:
-            result = parse(answer)
+            result = parse(live_prompts.expand(stage, payload, answer))
         except ReplyInvalid as exc:
             self._reject(attempt, exc.code)
             raise
@@ -976,12 +1006,8 @@ class Extractor:
             return topics.candidates(request, response, cite)
 
         if is_live(stored):
-            # The model can only quote what it is shown: the LIVE payload adds each sent document's prepared text (the replay request and its digest
-            # stay as they are). Offsets the model leaves null are resolved from a unique literal quote of the cited document, never repaired otherwise.
-            texts = {(d["documentId"], d["documentVersion"]): ctx.by_document(d["documentId"], d["documentVersion"]).export["document"]["text"] for d in documents}
-            payload = {**request, "documents": [{**d, "text": texts[(d["documentId"], d["documentVersion"])]} for d in documents]}
-            found = self._live_receipted(row, ctx, fence, "topic", "topic", key, payload, sorted(doc_keys),
-                                         lambda raw: topics.parse(live_prompts.resolve_citations(raw, texts)), membership)
+            found = self._live_receipted(row, ctx, fence, "topic", "topic", key, request, sorted(doc_keys),
+                                         topics.parse, membership)
         else:
             def lookup():
                 if fixtures.topic_raw is None:

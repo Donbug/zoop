@@ -6,13 +6,13 @@ ONE canonical public issue-centric projection, validates it strictly and stores 
 `recover` settles a `reserved` handoff from the stored artifact only (it never regenerates). `inspect` is ledger + artifact integrity.
 `export` re-validates CURRENT authority, then prints the bundle; any drift is a content-free `withheld` result.
 
-Each issue carries a `summary` (bundle `-7`): `not-requested` unless the operator's decisions (`zoop-public-decisions-3`) pin one immutable ready result of the separate
+Each issue carries a `summary`: `not-requested` unless the operator's decisions (`zoop-public-decisions-4`) pin one immutable ready result of the separate
 `zoop-ai-issue-summary` job ledger, a deterministic `temporal-review-pending` (any HOLD/REJECT field verdict on the issue) or `input-too-large` (more than the quote cap),
 decided before anything else and without any job. `freeze` reads a pinned result from that ledger read-only (the one thing `--issue-summary-state-dir` is for) and
 refuses the whole freeze when the pin, the basis, the execution mode or the issue does not match; `export` takes the summary from the frozen artifact, so it needs no summary
 ledger, runs no job and makes no model call.
 
-A ledger row whose stored receipt names another bundle schema than this build's (every `-1` to `-6` row) is HISTORY: `inspect` shows its stored state, receipt and
+A ledger row whose stored receipt names another bundle schema than this build's (every `-1` to `-7` row) is HISTORY: `inspect` shows its stored state, receipt and
 attempts, `export` is `withheld` (`handoff_contract_changed`), `recover` and a same-id `freeze` are refused with that code. Decided from the ledger alone before
 any operator file, source authority, artifact or writable ledger is touched, and repeated under the lock; the row, its attempts and its artifact are never read
 as a current bundle, resumed, settled or rewritten.
@@ -40,13 +40,14 @@ from .extraction import Extractor, Sources, cite_exact, upstream_digest
 from .extraction import Store as ExtractionStore
 from .extraction_contracts import CitationFailure, ExtractionFailure, Mention, ObservationRef
 from .graph_projection import Paths as SourcePaths
-from .graph_projection import Registry, Source, approval_basis, gate, load_registry, review_state
+from .graph_projection import Registry, approval_basis, gate, load_registry, review_state
 from .graph_projection_contracts import MAX_REGISTRY, Withheld, entry_key
-from .handoff_contracts import (APP_IMPORT_PENDING, BUNDLE_SCHEMA, EVIDENCE_KIND, EXECUTION_MODES, IMPACT_POLICY_NAME, IMPACT_SIDES, ISSUE_FIELDS, LEDGER_VERSION,
+from .handoff_contexts import Contexts
+from .handoff_contracts import (APP_IMPORT_PENDING, BUNDLE_POLICIES, EVIDENCE_KIND, EXECUTION_MODES, IMPACT_POLICY_NAME, IMPACT_SIDES, ISSUE_FIELDS, LEDGER_VERSION,
     MAX_ATTEMPTS, MAX_BUNDLE,
-    MAX_EVIDENCE, MAX_EXCLUSIONS, MAX_ISSUES, MAX_OPERATOR_FILE, MAX_RELATIONS, MENTION_IDENTITY, MENTION_VERIFICATION, OFFSET_UNIT, ORIGIN_VERIFICATION, POLICY,
+    MAX_EVIDENCE, MAX_EXCLUSIONS, MAX_ISSUES, MAX_OPERATOR_FILE, MAX_RELATIONS, MENTION_IDENTITY, MENTION_VERIFICATION, OFFSET_UNIT, ORIGIN_VERIFICATION, UNKNOWN_POLICY,
     PRODUCER_CHECKS, SCHEMA, SOURCE_SUPPORT_POLICY, STRUCTURAL_BASIS_TYPES, STRUCTURAL_PATH_UNAVAILABLE, Bindings, Decisions, Manifest, Selector, VERDICT_FIELDS,
-    app_evidence_id, basis_eligibility, content_digest, countries_class, impact_label, involves_validation, mention_key, mention_time_precision, selected_basis,
+    app_evidence_id, basis_eligibility, content_digest, countries_class, impact_label, involves_validation, mention_key, receipt_time_precision, selected_basis,
     text_sha256, time_precision,
     validate_bundle, withheld_fields)
 from .ingestion_contracts import Authority, IngestionFailure, byte_hash, canonical, copy_bounded, digest, now, read_file, reserved_state_roots
@@ -257,7 +258,7 @@ def contract_current(row) -> bool:
         raise ExtractionFailure("handoff_state_invalid") from None
     if not isinstance(schema, str):
         raise ExtractionFailure("handoff_state_invalid")
-    return schema == BUNDLE_SCHEMA
+    return schema in BUNDLE_POLICIES
 
 
 def copy_ledger_file(source: Path, target: Path) -> None:
@@ -435,17 +436,24 @@ def read_manifest(row, bundle: dict) -> tuple[Manifest, dict]:
 
 @dataclass(frozen=True)
 class HandoffPaths:
-    relation: Path
-    extraction: Path
-    ingestion: Path
-    sources: Path
+    relation: Path | None
+    extraction: Path | None
+    ingestion: Path | None
+    sources: Path | None
     canonical: Path
     decisions: Path
     bindings: Path
     summaries: Path | None = None            # the issue-summary ledger root: given exactly when the decisions pin a summary result (freeze only; export never reads it)
+    source_contexts: Path | None = None
+    source_contexts_sha256: str | None = None
 
-    def source(self) -> SourcePaths:
-        return SourcePaths(self.relation, self.extraction, self.ingestion, self.sources, self.canonical)
+    def contexts(self) -> Contexts:
+        if self.source_contexts is not None:
+            return Contexts.read(self.source_contexts, self.source_contexts_sha256, self.canonical)
+        return Contexts.single(SourcePaths(self.relation, self.extraction, self.ingestion, self.sources, self.canonical))
+
+    def roots(self) -> tuple[Path, ...]:
+        return (*self.contexts().roots(), *((self.summaries,) if self.summaries is not None else ()))
 
 
 @dataclass
@@ -522,9 +530,11 @@ def single_mode(loaded: list) -> tuple:
     return next(iter(modes))
 
 
-def load_source(source: Source, paths: HandoffPaths, manifest: Manifest, pin, *, strict: bool) -> Loaded:
+def load_source(readers: dict, contexts: Contexts, manifest: Manifest, pin, *, strict: bool) -> Loaded:
     """The S3 result only while it is ready, currently delivered and bound to the pinned upstream (grant revision included) and, when `strict`, the exactly
     pinned whole review state. The S2 upstream is re-read through its own owner and must be the exact one S3 consumed (its digest equals the pin)."""
+    route = contexts.for_pin(pin)
+    source, paths = readers[route.context_id], route.paths
     result = gate(source, pin.relation.wire(), pin.upstream.wire())
     if strict and digest(review_state(result)) != pin.review_digest:
         raise ExtractionFailure("review_revision_changed")
@@ -544,19 +554,21 @@ def load_source(source: Source, paths: HandoffPaths, manifest: Manifest, pin, *,
     docs: dict = {}
     for _, bound in sorted(s2["binding"]["documents"].items()):
         ref = ObservationRef.model_validate(bound["observation"])
+        contexts.bound(pin, ref)
         docs.setdefault((ref.document_id, ref.document_version), []).append((ref, sources.export(ref)))
     return Loaded(pin, result, submit, s2, docs, sources, (pin.upstream.job_id, pin.upstream.input_digest),
                   {r["relationCandidateId"]: r for r in result["relations"]})
 
 
-def current(source: Source, paths: HandoffPaths, manifest: Manifest, op: Operator, *, strict: bool) -> list[Loaded]:
+def current(readers: dict, contexts: Contexts, paths: HandoffPaths, manifest: Manifest, op: Operator, *, strict: bool) -> list[Loaded]:
     """Every pinned operator file byte-identical to the manifest, then every constituent source current. `strict` (freeze and its idempotent echo) also
     demands the exact pinned review state and reports mismatches as errors; export (not strict) answers any drift as `withheld`."""
     names = {"canonical": "canonical_mapping_changed", "decisions": "decisions_changed", "bindings": "bindings_changed"}
     for name, value in op.hashes().items():
         if value != getattr(manifest.files, name):
             raise ExtractionFailure("operator_file_pin_mismatch", {"file": name}) if strict else Withheld(names[name])
-    loaded = [load_source(source, paths, manifest, pin, strict=strict) for pin in sorted(manifest.sources, key=lambda p: p.relation.job_id)]
+    contexts.unchanged()
+    loaded = [load_source(readers, contexts, manifest, pin, strict=strict) for pin in sorted(manifest.sources, key=lambda p: p.relation.job_id)]
     single_mode(loaded)
     return loaded
 
@@ -783,6 +795,8 @@ class Planner:
     with a visible code; nothing is guessed, merged by last-wins or inferred from company/ticker/exchange/language."""
 
     def __init__(self, manifest: Manifest, handoff_id: str, input_digest: str, loaded: list[Loaded], op: Operator, summaries: Summaries | None = None):
+        if op.decisions.policy_version != manifest.policy_version:
+            raise ExtractionFailure("decisions_invalid")
         self.manifest, self.handoff_id, self.input_digest, self.op = manifest, handoff_id, input_digest, op
         self.loaded = sorted(loaded, key=lambda item: item.pin.relation.job_id)
         self.by_job = {item.pin.relation.job_id: item for item in self.loaded}
@@ -861,10 +875,15 @@ class Planner:
         return {wire: source.get(key) for key, wire in ISSUE_FIELDS}
 
     def geography(self, decision, members: list[Member]) -> dict:
-        """Source-proven geography: the operator's country-field verdict must be well formed, class-consistent, pinned to exact text spans of this issue's
-        own documents, and EQUAL to every member mention's country field. Disagreement, absent or unverified fields exclude the issue; nothing maps to
-        international by default."""
+        """The operator's explicit nonempty country set supplements unknown source declarations. Every nonempty source set must match exactly.
+        Evidence binds to this issue's own documents; the operator judges its country/event relevance."""
         g = decision.geography
+        if g.classification is None:
+            return {"value": None, "decisionRef": g.decision_ref, "decisionVersion": g.decision_version,
+                    "policyVersion": self.manifest.policy_version, "countries": [], "verification": "not-established",
+                    "reasonCode": g.reason_code, "evidenceIds": [],
+                    "basis": [{**m.source_event(), "countries": sorted(set(m.mention.get("countries") or []))}
+                              for m in sorted(members, key=lambda member: canonical(member.source_event()))]}
         countries = sorted(set(g.countries))
         shape = countries_class(countries)
         if shape == "invalid":
@@ -874,9 +893,7 @@ class Planner:
         basis = []
         for m in members:
             seen = sorted(set(m.mention.get("countries") or []))
-            if not seen:
-                raise Skip("geography_unproven")
-            if seen != countries:
+            if seen and seen != countries:
                 raise Skip("geography_countries_disagree")
             basis.append({**{k: v for k, v in m.source_event().items()}, "countries": seen})
         evidence = []
@@ -889,9 +906,10 @@ class Planner:
                 raise Skip("geography_evidence_mismatch")
             evidence.append(self.cite(member.loaded, {"documentId": span.document_id, "documentVersion": span.document_version, "start": span.start,
                                                       "end": span.end, "quote": text[span.start:span.end]}))
-        return {"value": g.classification, "decisionRef": g.decision_ref, "decisionVersion": g.decision_version, "policyVersion": POLICY, "countries": countries,
+        return {"value": g.classification, "decisionRef": g.decision_ref, "decisionVersion": g.decision_version, "policyVersion": self.manifest.policy_version, "countries": countries,
                 "verification": "operator-field-verdict", "evidenceIds": sorted(set(evidence)),
-                "basis": sorted(basis, key=canonical)}
+                "basis": sorted(basis, key=(lambda item: canonical({key: value for key, value in item.items() if key != "countries"}))
+                                if self.manifest.policy_version == UNKNOWN_POLICY else canonical)}
 
     def field_verdicts(self, decision, members: list[Member], mentions: list[dict]) -> list[dict]:
         """The operator's per-field verdicts, each bound to one original mention of THIS issue and to the exact value that mention states (a null field has nothing
@@ -921,23 +939,26 @@ class Planner:
             out.append({"documentId": v.document_id, "documentVersion": v.document_version, "mentionId": v.mention_id, "field": v.field, "value": v.value,
                         "decision": v.decision, "reasonCode": v.reason_code, "evidenceIds": sorted(set(evidence)), "verification": "operator-field-verdict",
                         "reviewer": v.reviewer, "decisionRef": v.decision_ref, "decisionVersion": v.decision_version})
+        reviewed = {mention_key(v["documentId"], v["documentVersion"], v["mentionId"]) for v in out
+                    if v["field"] == "eventTime" and v["decision"] != "ALLOW"}
+        if any(m["timePrecision"] == "unresolved" and key not in reviewed for key, m in by_identity.items()):
+            raise Skip("mention_event_time_unreviewed")
         return sorted(out, key=lambda v: (mention_key(v["documentId"], v["documentVersion"], v["mentionId"]), order[v["field"]]))
 
     def issue(self, decision, members: list[Member]) -> tuple[dict, dict]:
         selected = self.fields(decision, members)
         if not isinstance(selected["title"], str) or not selected["title"].strip():
             raise Skip("issue_title_missing")
-        try:
-            time_precision(selected["eventTime"])
-        except ValueError:
-            raise Skip("event_time_unsupported") from None
         geography = self.geography(decision, members)
         mentions, carrying = self.mentions(members)
         verdicts = self.field_verdicts(decision, members, mentions)
         representative = decision.representative.wire() if decision.representative else None
         withheld = withheld_fields(verdicts, selected_basis(representative, mentions))
         fields = {wire: None if wire in withheld else value for wire, value in selected.items()}
-        precision = "unknown" if "eventTime" in withheld else time_precision(fields["eventTime"])
+        try:
+            precision = time_precision(fields["eventTime"])
+        except ValueError:
+            raise Skip("event_time_unsupported") from None
         event_evidence = sorted({i for mention in mentions for i in mention["evidenceIds"]})
         verdict_evidence = {i for v in verdicts for i in v["evidenceIds"]}
         evidence = sorted(set(event_evidence) | set(geography["evidenceIds"]) | verdict_evidence)
@@ -1002,7 +1023,7 @@ class Planner:
             carriers = found[identity]
             values = carriers[0][1]
             try:
-                precision = mention_time_precision(values["eventTime"])
+                precision = receipt_time_precision(values["eventTime"])
             except ValueError:
                 raise Skip("mention_event_time_unsupported") from None
             if not values["evidenceIds"]:
@@ -1244,10 +1265,12 @@ class Planner:
                     raise Skip("basis_validity_unprovable")
                 if outside_validity(when, validity):
                     raise Skip("basis_validity_outside_event_time")
+            if self.manifest.policy_version == UNKNOWN_POLICY and r["countries"] and not countries:
+                raise Skip("basis_countries_unprovable")
             if r["countries"] and not countries <= set(r["countries"]):
                 raise Skip("basis_countries_mismatch")
         a = decision.applicability
-        expected = digest({"policy": POLICY, "issue": decision.issue, "company": decision.company, "decisionVersion": a.decision_version,
+        expected = digest({"policy": self.manifest.policy_version, "issue": decision.issue, "company": decision.company, "decisionVersion": a.decision_version,
                            "eventTime": issue["eventTime"], "geography": issue["geography"]["value"], "sourceEvents": issue["sourceEvents"],
                            "basis": [{"jobId": ref.job_id, "relationCandidateId": ref.relation_candidate_id, "relationKey": r["relationKey"], "type": r["type"],
                                       "revision": r["eligibility"]["revision"]} for ref, (_, r, _, _) in zip(decision.basis, rows)]})
@@ -1446,10 +1469,13 @@ class Planner:
                             "audit": {"s3Relations": len(loaded.relations), "eligibility": {k: counts["eligibility"][k] for k in ("eligible", "hold", "reject", "pending")},
                                       "reviewPending": sum(bool(r["eligibility"]["reviewPending"]) for r in loaded.relations.values()),
                                       "impactCandidates": counts["impactCandidates"], "eligibleNotPublicByType": dict(sorted(self.not_public[job].items()))}})
-        bundle = {"schemaVersion": BUNDLE_SCHEMA, "handoffId": self.handoff_id, "manifestDigest": self.input_digest,
+        schema = next(schema for schema, policy in BUNDLE_POLICIES.items() if policy == self.manifest.policy_version)
+        bundle = {"schemaVersion": schema, "handoffId": self.handoff_id, "manifestDigest": self.input_digest,
                   "provenance": {"declaredSourceKind": self.manifest.source_kind, "observedSourceKind": next(iter(observed)) if len(observed) == 1 else "mixed",
                                  "executionMode": execution_mode, "recordingKind": recording_kind},
-                  "policy": {"version": POLICY, "files": self.manifest.files.wire(), "evidenceIdKind": EVIDENCE_KIND, "offsetUnit": OFFSET_UNIT, **POLICIES},
+                  "policy": {"version": self.manifest.policy_version, "files": self.manifest.files.wire(), "evidenceIdKind": EVIDENCE_KIND,
+                             "offsetUnit": OFFSET_UNIT, **POLICIES,
+                             "geography": "operator-field-verdict-or-explicit-unknown" if self.manifest.policy_version == UNKNOWN_POLICY else "operator-field-verdict"},
                   "sources": sources, "companies": companies, "pathCompanies": path_companies, "issues": issues, "relations": relations, "evidence": evidence,
                   "articles": articles, "impacts": self.impacts,
                   "exclusions": {"counts": dict(sorted(tally.items())), "items": items},
@@ -1467,7 +1493,7 @@ class Planner:
 
 def receipt_of(manifest: Manifest, input_digest: str, bundle: dict, bundle_digest: str, size: int) -> dict:
     """Bound to the handoff ID, manifest digest and source revisions; lists only what the producer actually confirmed. No public/graph status."""
-    return {"handoffId": manifest.handoff_id, "manifestDigest": input_digest, "bundleSchema": BUNDLE_SCHEMA, "bundleDigest": bundle_digest,
+    return {"handoffId": manifest.handoff_id, "manifestDigest": input_digest, "bundleSchema": bundle["schemaVersion"], "bundleDigest": bundle_digest,
             "contentDigest": bundle["digests"]["content"], "bundleBytes": size, "provenance": bundle["provenance"],
             "sources": [{"relation": s["relation"], "upstream": s["upstream"], "reviewDigest": s["reviewDigest"]} for s in bundle["sources"]],
             "files": manifest.files.wire(), "counts": bundle["counts"], "exclusionCodes": bundle["exclusions"]["counts"], "checks": bundle["checks"],
@@ -1493,7 +1519,7 @@ class PlannedIssue:
     execution: tuple
     source_kind: str
     documents: dict
-    sources: Sources
+    sources: Contexts
 
 
 def plan_summary_input(paths: HandoffPaths, manifest: Manifest, issue_id: str) -> PlannedIssue:
@@ -1502,8 +1528,9 @@ def plan_summary_input(paths: HandoffPaths, manifest: Manifest, issue_id: str) -
     read) and nothing written, reserved or settled. An issue the Planner did not publish is `issue_not_public`. The caller applies `deterministic_code` to
     `summary_basis(...)`; this seam decides nothing about a summary."""
     op = load_operator(paths)
-    with Source(paths.source()) as source:
-        loaded = current(source, paths, manifest, op, strict=True)
+    contexts = paths.contexts()
+    with contexts.open(manifest.sources) as readers:
+        loaded = current(readers, contexts, paths, manifest, op, strict=True)
         planner = Planner(manifest, manifest.handoff_id, digest(manifest.wire()), loaded, op, IgnoredSummaries())
         bundle = planner.run()
         issue = next((i for i in bundle["issues"] if i["id"] == issue_id), None)
@@ -1513,7 +1540,7 @@ def plan_summary_input(paths: HandoffPaths, manifest: Manifest, issue_id: str) -
         return PlannedIssue(manifest.handoff_id, {key: value for key, value in issue.items() if key != "summary"},
                             {e["id"]: e for e in bundle["evidence"]}, {(a["articleId"], a["articleVersion"]): a for a in bundle["articles"]},
                             (bundle["provenance"]["executionMode"], bundle["provenance"]["recordingKind"]), bundle["provenance"]["observedSourceKind"],
-                            {key: tuple(entries) for key, entries in planner.resolver.docs.items()}, planner.loaded[0].sources)
+                            {key: tuple(entries) for key, entries in planner.resolver.docs.items()}, contexts)
 
 
 class Handoff:
@@ -1541,7 +1568,7 @@ class Handoff:
             raise ExtractionFailure("issue_summary_state_missing" if pinned else "issue_summary_state_unused")
         if not pinned:
             return None
-        return LedgerSummaries(self.paths.summaries, self.paths.relation, self.paths.extraction, self.paths.ingestion, self.store.root)
+        return LedgerSummaries(self.paths.summaries, *self.paths.contexts().roots(), self.store.root)
 
     def result(self, row) -> dict:
         failure = {"code": row["failure"]} if row["failure"] else None
@@ -1563,15 +1590,16 @@ class Handoff:
             raise ExtractionFailure("handoff_contract_changed")            # history: nothing is read or written, the operator freezes a new handoff ID
         op = load_operator(paths)
         summaries = self.summary_source(op)
-        with Source(paths.source()) as source:
+        contexts = paths.contexts()
+        with contexts.open(manifest.sources) as readers:
             row = self.store.handoff(manifest.handoff_id)
             if row is not None:
                 if row["input_digest"] != input_digest:
                     raise ExtractionFailure("handoff_input_conflict")
                 if row["state"] != "failed":
-                    current(source, paths, manifest, op, strict=True)
+                    current(readers, contexts, paths, manifest, op, strict=True)
                 return self.result(row)
-            loaded = current(source, paths, manifest, op, strict=True)
+            loaded = current(readers, contexts, paths, manifest, op, strict=True)
             bundle = Planner(manifest, manifest.handoff_id, input_digest, loaded, op, summaries).run()
             validate_bundle(bundle)
             raw = canonical(bundle).encode("utf-8")
@@ -1581,8 +1609,9 @@ class Handoff:
             receipt = receipt_of(manifest, input_digest, bundle, bundle_digest, len(raw))
 
             def guard() -> None:
-                current(source, paths, manifest, op, strict=True)
+                current(readers, contexts, paths, manifest, op, strict=True)
                 operator_unchanged(op, paths)
+                contexts.unchanged()
 
             with self.store.transaction(guard):
                 self.store.db.execute("INSERT INTO handoffs(handoff_id,input_digest,manifest,bundle_digest,content_digest,bundle_bytes,receipt,state,created_at,updated_at) "
@@ -1640,8 +1669,9 @@ class Handoff:
                 if exc.code in {"canonical_registry_invalid", "decisions_invalid", "bindings_invalid"}:
                     raise Withheld(exc.code) from None
                 raise
-            with Source(paths.source()) as source:
-                loaded = current(source, paths, manifest, op, strict=False)
+            contexts = paths.contexts()
+            with contexts.open(manifest.sources) as readers:
+                loaded = current(readers, contexts, paths, manifest, op, strict=False)
                 self.used_reviews(loaded, bundle)
                 fresh = Planner(manifest, manifest.handoff_id, row["input_digest"], loaded, op, FrozenSummaries(bundle)).run()
                 if fresh["digests"]["content"] != bundle["digests"]["content"]:
@@ -1649,7 +1679,7 @@ class Handoff:
                 review_matches = all(digest(review_state(item.s3)) == item.pin.review_digest for item in loaded)
                 # Recheck every constituent while the S3 lock is held, immediately before assembling output.
                 for pin in sorted(manifest.sources, key=lambda p: p.relation.job_id):
-                    load_source(source, paths, manifest, pin, strict=False)
+                    load_source(readers, contexts, manifest, pin, strict=False)
                 for name, path in (("canonical", paths.canonical), ("decisions", paths.decisions), ("bindings", paths.bindings)):
                     try:
                         actual = byte_hash(read_file(path, MAX_REGISTRY if name == "canonical" else MAX_OPERATOR_FILE))
@@ -1657,6 +1687,7 @@ class Handoff:
                         raise Withheld({"canonical": "canonical_mapping_changed", "decisions": "decisions_changed", "bindings": "bindings_changed"}[name]) from None
                     if actual != getattr(manifest.files, name):
                         raise Withheld({"canonical": "canonical_mapping_changed", "decisions": "decisions_changed", "bindings": "bindings_changed"}[name])
+                contexts.unchanged()
                 out = self.result(row)
                 out["delivery"] = {"status": "current", "checkedAt": now(), "reviewDigestMatches": review_matches,
                                    "checks": ["operator_files_equal_manifest_pins", "s3_authority_and_s2_upstream_pin_current", "used_review_revisions_unchanged",

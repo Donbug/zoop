@@ -146,7 +146,7 @@ def test_the_http_bundle_is_the_real_cli_export_of_a_two_job_world_and_the_produ
             assert expected and provenance["sameValueMentions"][name] == expected, (issue["id"], name)
             assert issue[name] == (None if name in suppressed else selected)
         assert issue["timePrecision"] == ("unknown" if "eventTime" in suppressed else issue["timePrecision"])
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1"
     # no decision of the default world pins a summary and no verdict holds any field: every issue states `not-requested` (never an absent summary, never a guess)
     assert [i["summary"] for i in bundle["issues"]] == [NOT_REQUESTED] * len(bundle["issues"]) and bundle["issues"]
     assert (bundle["readiness"], wire["verification"]["provenance"]) == ({"app": "import-pending", "evidenceRegistration": "not-registered", "publicActivation": "none",
@@ -367,7 +367,7 @@ def test_the_http_bundle_carries_the_operators_real_field_verdicts_with_the_supp
     wire = response.json()
     assert response.status_code == 200 and wire["delivery"]["state"] == "current", response.text[:300]
     bundle = wire["bundle"]
-    assert bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7"
+    assert bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8"
     # the reviewed world holds a REJECT on the supply representative's event time and a HOLD on the factory's period: ANY HOLD/REJECT leaves the issue exactly
     # `temporal-review-pending` (no job, no source, no summary text) - a hand-written expectation, never derived from the bundle or the service
     assert {i["id"]: i["summary"] for i in bundle["issues"]} == {"issue:supply-2026q3": TEMPORAL_PENDING, "issue:factory-2026q4": TEMPORAL_PENDING}
@@ -442,7 +442,7 @@ def test_the_http_bundle_carries_the_pinned_available_summary_the_real_producer_
     wire = response.json()
     assert response.status_code == 200 and wire["delivery"]["state"] == "current", response.text[:300]
     bundle = wire["bundle"]
-    assert bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7"
+    assert bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8"
     assert digest_of(bundle) == pins["bundleDigest"] == wire["verification"]["bundleDigest"] == oracle["receipt"]["bundleDigest"]
     assert bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1" and producer_accepts(response.content)
     assert summary_problems(bundle, world) == []

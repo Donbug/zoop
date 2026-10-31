@@ -1,5 +1,4 @@
-"""Process entry. Always binds 127.0.0.1: bearer tokens must never travel unencrypted, so exposing the service off-host is a
-reviewed code change behind a co-located TLS proxy, not a configuration switch."""
+"""Process entry with loopback default; non-loopback binds require operator-controlled TLS ingress."""
 from __future__ import annotations
 
 import json
@@ -12,7 +11,7 @@ import uvicorn
 from . import extraction_access, plan_install, relation_access
 from .app import create_app
 from .chat_stages import ChatProcess, ChatStages
-from .config import HOST, ConfigError, ServiceConfig, load
+from .config import ConfigError, ServiceConfig, load
 from .dispatch import Dispatcher
 from .jobs import JobService
 from .ledger import ProcessLock, ServiceLedger
@@ -151,9 +150,9 @@ def serve(service: Service) -> None:
     if service.extraction_dispatcher is not None:
         service.extraction_dispatcher.start()
     server = uvicorn.Server(uvicorn.Config(
-        app, host=HOST, port=service.config.port, log_config=None, log_level="warning", access_log=False,
+        app, host=service.config.host, port=service.config.port, log_config=None, log_level="warning", access_log=False,
         proxy_headers=False, server_header=False, limit_concurrency=64, timeout_keep_alive=5,
-        timeout_graceful_shutdown=10, lifespan="off", ws="none"))
+        timeout_graceful_shutdown=60, lifespan="off", ws="none"))
     try:
         server.run()
     finally:

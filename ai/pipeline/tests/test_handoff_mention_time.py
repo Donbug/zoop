@@ -2,9 +2,8 @@
 
 `api/src/test/resources/graph-handoff/mention-time-vectors.json` is read by this test and by the app's `HandoffMentionTimeTest`, so the producer's
 `mention_time_precision` and the app's `HandoffTime.mentionEventTime` accept and refuse exactly the same strings. The vectors are hand-written; nothing is
-derived from the code under test. The grammar is the set both sides already accepted (raw strings are kept verbatim); only forms the app refuses for the whole
-bundle although Python's stdlib takes them (ISO week dates, compact forms, comma fractions, offsets without a colon) are unsupported, so the producer excludes
-the issue (`mention_event_time_unsupported`) instead of freezing a bundle the app can never import.
+derived from the code under test. The strict calendar classifier keeps refusing unsupported forms; the receipt wrapper
+retains nonempty raw strings only with unresolved precision and the bundle requires an explicit non-ALLOW verdict.
 """
 from __future__ import annotations
 
@@ -16,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from zoop_ai_pipeline.extraction_contracts import ExtractionFailure
-from zoop_ai_pipeline.handoff_contracts import content_digest, mention_time_precision, validate_bundle
+from zoop_ai_pipeline.handoff_contracts import content_digest, mention_time_precision, receipt_time_precision, validate_bundle
 
 RESOURCES = Path(__file__).resolve().parents[3] / "api" / "src" / "test" / "resources" / "graph-handoff"
 DOC = json.loads((RESOURCES / "mention-time-vectors.json").read_text("utf-8"))
@@ -92,3 +91,24 @@ def test_a_stated_precision_that_is_not_the_formats_is_refused_without_widening(
     for value, precision in (("2026-09-30", "month"), ("2026-09", "day"), ("2026-09-30", "datetime"), ("2026-09-30", "unknown"), (None, "day")):
         with pytest.raises(ExtractionFailure):
             validate_bundle(sealed(value, precision))
+
+
+@pytest.mark.parametrize("value", ["10.19일", "'25.8월", "2026-02-30"])
+def test_receipt_retention_does_not_change_calendar_classification(value):
+    with pytest.raises(ValueError):
+        mention_time_precision(value)
+    assert receipt_time_precision(value) == "unresolved"
+
+
+CASES = json.loads((RESOURCES / "public-unknown-fields-cases.json").read_text("utf-8"))
+
+
+@pytest.mark.parametrize("case", CASES["accept"], ids=lambda case: case["name"])
+def test_shared_grounded_geography_and_reviewed_raw_time_are_accepted(case):
+    validate_bundle(case["bundle"])
+
+
+@pytest.mark.parametrize("case", CASES["reject"], ids=lambda case: case["name"])
+def test_shared_country_conflicts_and_unreviewed_raw_time_are_refused(case):
+    with pytest.raises(ExtractionFailure):
+        validate_bundle(case["bundle"])

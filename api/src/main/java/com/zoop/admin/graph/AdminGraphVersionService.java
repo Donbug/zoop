@@ -23,6 +23,9 @@ import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
 import com.zoop.document.evidence.graph.GraphEvidence;
 import com.zoop.document.evidence.service.EvidenceService;
+import com.zoop.graph.publication.GraphPublicationAuthority;
+import com.zoop.graph.publication.GraphPublicationReader;
+import com.zoop.graph.publication.PublicationException;
 import com.zoop.graph.read.DisclosureExclusionReader;
 import com.zoop.graph.read.GraphEvidenceSnapshotReader;
 import com.zoop.graph.read.GraphSnapshotFilter;
@@ -61,6 +64,8 @@ public class AdminGraphVersionService {
     private final GraphSnapshotStore snapshots;
     private final DisclosureExclusionReader exclusions;
     private final EvidenceService evidence;
+    private final GraphPublicationReader publications;
+    private final GraphPublicationAuthority authority;
     private final AdminAuditRepository audit;
     private final ObjectMapper mapper;
     private final Clock clock;
@@ -69,6 +74,7 @@ public class AdminGraphVersionService {
 
     public AdminGraphVersionService(JdbcAdminGraphVersionRepository repository, JdbcGraphVersionRepository versions,
             GraphSnapshotStore snapshots, DisclosureExclusionReader exclusions, EvidenceService evidence,
+            GraphPublicationReader publications, GraphPublicationAuthority authority,
             AdminAuditRepository audit, ObjectMapper mapper, Clock clock,
             @Value("${zoop.graph.activation.allow-without-exclusion-store:false}") boolean allowWithoutExclusionStore,
             @Value("${zoop.graph.snapshot.source:none}") String snapshotSource) {
@@ -77,6 +83,8 @@ public class AdminGraphVersionService {
         this.snapshots = snapshots;
         this.exclusions = exclusions;
         this.evidence = evidence;
+        this.publications = publications;
+        this.authority = authority;
         this.audit = audit;
         this.mapper = mapper;
         this.clock = clock;
@@ -125,12 +133,15 @@ public class AdminGraphVersionService {
             AdminPrincipal admin, String requestId) {
         validateKey(idempotencyKey);
         String reason = request.reason().strip();
+        if (!"forward".equals(request.mode()) && !"rollback".equals(request.mode())) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
         if (!AuditReasonPolicy.safeMemberReason(reason)) {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
         String path = "/api/v1/admin/graph/versions/" + versionId + "/activate";
         String expected = request.expectedActiveVersionId();
-        String requestHash = requestHash(versionId, expected, reason);
+        String requestHash = requestHash(versionId, expected, reason, request.mode());
         Instant requestedAt = clock.instant();
         try {
             boolean claimed = repository.claimIdempotency(UUID.randomUUID().toString(), admin.adminId(), path,
@@ -153,9 +164,9 @@ public class AdminGraphVersionService {
             refuseFixtureOutsideFixtureSource(version, requestId);
             PublicGraphSnapshot snapshot = snapshots.load(version);
             var activation = versions.activateByAdmin(versionId, expected, admin.adminId(), admin.email(), reason,
-                    () -> publishableNow(version, snapshot, requestId));
+                    request.mode(), () -> publishableNow(version, snapshot, requestId));
             audit.recordGraphActivation(admin.adminId(), admin.email(), versionId, activation.previousVersionId(),
-                    activation.pointerChanged(), reason, requestId, activation.activatedAt());
+                    activation.pointerChanged(), reason, request.mode(), requestId, activation.activatedAt());
             ActivateResponse result = new ActivateResponse(versionId, activation.previousVersionId(),
                     !activation.pointerChanged());
             repository.completeIdempotency(idempotency.id(), mapper.writeValueAsString(result));
@@ -219,30 +230,50 @@ public class AdminGraphVersionService {
                     version.id(), requestId);
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         }
-        PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot, null, exclusions.current(version.id()));
-        Instant at = clock.instant();
-        Map<String, GraphEvidence> found = new LinkedHashMap<>();
-        Set<String> articles = new TreeSet<>();
-        for (PublicGraphSnapshot.Evidence cited : visible.evidence()) {
-            GraphEvidence located = GraphEvidenceSnapshotReader.locate(visible, version.id(), at, cited.evidenceId());
-            if (located.span() != null) {
-                found.put(cited.evidenceId(), located);
-                articles.add(located.span().articleId());
+        try {
+            var publication = publications.read(version.id());
+            Set<String> articles = new TreeSet<>();
+            for (var contribution : publication.contributions()) {
+                for (var article : contribution.projection().articles()) articles.add(article.articleId());
             }
+            repository.shareLockArticles(articles);
+            PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot, null,
+                    authority.current(publication, requestId));
+            Instant at = clock.instant();
+            Map<String, GraphEvidence> found = new LinkedHashMap<>();
+            for (PublicGraphSnapshot.Evidence cited : visible.evidence()) {
+                GraphEvidence located = GraphEvidenceSnapshotReader.locate(visible, version.id(), at, cited.evidenceId());
+                if (located.span() != null) found.put(cited.evidenceId(), located);
+            }
+            Consumer<Instant> prepared = evidence.prepareGraphActivation(version.id(), found, requestId);
+            return activationAt -> {
+                try {
+                    prepared.accept(activationAt);
+                    authority.requireFullRights(publication, requestId, activationAt);
+                } catch (PublicationException exception) {
+                    throw publicationFailure(exception);
+                }
+            };
+        } catch (PublicationException exception) {
+            throw publicationFailure(exception);
         }
-        repository.shareLockArticles(articles);
-        return evidence.prepareGraphActivation(version.id(), found, requestId);
+    }
+
+    private static CustomException publicationFailure(PublicationException exception) {
+        return new CustomException("rights_denied".equals(exception.code())
+                ? ErrorCode.REVISION_CONFLICT : ErrorCode.SOURCE_UNAVAILABLE, exception);
     }
 
     /**
      * Canonical JSON of what the request asks for, so an explicit null and an empty string stay different bodies (a joined
      * string with a sentinel made them collide: PR #275 follow-up review).
      */
-    static String requestHash(String versionId, String expectedActiveVersionId, String reason) {
+    static String requestHash(String versionId, String expectedActiveVersionId, String reason, String mode) {
         ObjectNode body = StrictJson.newObject();
         body.put("versionId", versionId);
         body.put("expectedActiveVersionId", expectedActiveVersionId);
         body.put("reason", reason);
+        body.put("mode", mode);
         return Canonical.digest(body);
     }
 

@@ -159,4 +159,23 @@ class GraphSnapshotCodecTest {
         PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(json.getBytes(StandardCharsets.UTF_8), "fixture-empty");
         assertTrue(snapshot.relations().isEmpty());
     }
+    @Test
+    void format4ExplicitUnknownRetainsCoreEvidenceWhileFormat3RemainsStrict() throws IOException {
+        var root = (tools.jackson.databind.node.ObjectNode) com.zoop.common.json.StrictJson.parseObject(v1()).node();
+        root.put("snapshotFormat", 4);
+        var issue = (tools.jackson.databind.node.ObjectNode) root.get("issues").get(0);
+        issue.putNull("geography");
+        issue.put("geographyPolicyVersion", "zoop-public-projection-policy-3");
+        issue.putArray("geographyEvidenceIds");
+        var snapshot = GraphSnapshotCodec.read(com.zoop.common.json.Canonical.bytes(root), "fixture-2026-10-01");
+        assertTrue(snapshot.issues().getFirst().hasExplicitUnknownGeography());
+        assertFalse(snapshot.issues().getFirst().evidenceIds().isEmpty());
+        root.put("snapshotFormat", 3);
+        assertThrows(GraphSnapshotUnavailableException.class,
+                () -> GraphSnapshotCodec.read(com.zoop.common.json.Canonical.bytes(root), "fixture-2026-10-01"));
+        root.put("snapshotFormat", 4);
+        issue.put("geography", "domestic");
+        assertThrows(GraphSnapshotUnavailableException.class,
+                () -> GraphSnapshotCodec.read(com.zoop.common.json.Canonical.bytes(root), "fixture-2026-10-01"));
+    }
 }

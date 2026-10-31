@@ -1,5 +1,6 @@
 package com.zoop.briefing.personal;
 
+import com.zoop.briefing.query.BriefingGraphContentAuthority;
 import com.zoop.document.analysis.GrantRegistry;
 import com.zoop.document.evidence.config.DocumentReadProperties;
 import com.zoop.document.evidence.service.DocumentReadGrants;
@@ -9,7 +10,7 @@ import tools.jackson.databind.JsonNode;
 import java.time.Clock;
 import java.util.List;
 
-/** Recheck CURRENT rights, article availability and exact body version; never authorize from the saved boolean. */
+/** Recheck CURRENT document rights and graph-source authority for each candidate, never the saved boolean. */
 @Component
 public class PersonalCandidateAccess {
     private final JdbcTemplate jdbc;
@@ -18,7 +19,8 @@ public class PersonalCandidateAccess {
     public PersonalCandidateAccess(JdbcTemplate jdbc, DocumentReadProperties properties, Clock clock) {
         this.jdbc=jdbc; this.grants=new DocumentReadGrants(properties.grantsPath()); this.clock=clock;
     }
-    public boolean readable(JsonNode candidate, String requestId) {
+    public boolean readable(JsonNode candidate, BriefingGraphContentAuthority.Context graph, String requestId) {
+        if (!graph.allowsCandidate(candidate)) return false;
         var current=grants.registry(requestId);
         if (!candidate.path("sources").isArray() || candidate.path("sources").isEmpty()) return false;
         for (var source : candidate.path("sources")) {

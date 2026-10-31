@@ -35,7 +35,9 @@ jobs:
       - name: Validate Actions syntax against actionlint
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -color
       - name: Validate public configuration, contracts, generated documents and secrets
-        run: make public-check tooling-test
+        run: |
+          make public-check
+          uv run --no-project --with pyyaml make tooling-test
       - name: Validate PR title
         if: github.event_name == 'pull_request'
         env:
@@ -352,6 +354,7 @@ jobs:
       - ai-pipeline
       - ai-worker
       - ai-service
+      - ai-container
       - api-container
       - api-tests
       - api-graph-smoke
@@ -369,6 +372,7 @@ jobs:
           AI_PIPELINE_RESULT: ${{ needs.ai-pipeline.result }}
           AI_RESULT: ${{ needs.ai-worker.result }}
           AI_SERVICE_RESULT: ${{ needs.ai-service.result }}
+          AI_CONTAINER_RESULT: ${{ needs.ai-container.result }}
           API_CONTAINER_RESULT: ${{ needs.api-container.result }}
           API_TESTS_RESULT: ${{ needs.api-tests.result }}
           API_GRAPH_RESULT: ${{ needs.api-graph-smoke.result }}
@@ -382,6 +386,7 @@ jobs:
           test "$AI_PIPELINE_RESULT" = success
           test "$AI_RESULT" = success
           test "$AI_SERVICE_RESULT" = success
+          test "$AI_CONTAINER_RESULT" = success
           test "$API_CONTAINER_RESULT" = success
           test "$API_TESTS_RESULT" = success
           test "$API_GRAPH_RESULT" = success
