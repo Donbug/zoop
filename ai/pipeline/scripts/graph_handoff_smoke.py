@@ -155,7 +155,7 @@ def set_grant(world, source_id: str, enabled: bool) -> None:
 def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a_countries: tuple = ("KR",), a2_countries: tuple = ("KR",), dated: bool = False,
                 valid_from: str | None = "2026-01-01", valid_until: str | None = "2026-12-31", event_time: str | None = "2026-09-30",
                 a2_event_time=SAME, snapshot_differs: bool = False, approve: bool = False, chain: bool = False, impact: str | None = None,
-                uncited_source: bool = False, raw_time_evidence: bool = False) -> SimpleNamespace:
+                uncited_source: bool = False, raw_time_evidence: bool = False, slots: tuple | None = None, defer_b: bool = False) -> SimpleNamespace:
     """The authored world. Variants (each is a REAL ingestion + S2 + S3 world, used by the integrity regressions):
     collide: the two documents of snapshot event-a use the SAME local mention id (S2 scopes member identity by documentVersion + mentionId, so this is legal);
     a2_differs: the second member's title differs (a metadata conflict unless the operator picks a representative); a2_countries: its country field;
@@ -172,7 +172,10 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
     NEGATIVE one on the SAME supply edge; the factory participation: `no-evidence`, plus an off-target company that is never exported) or `rejected` (the verifier contradicts the
     target of rel-a's impact, finds rel-b's `event-a` target insufficient, and the factory impact cites a document outside the relation); default none: every impact stage is complete
     with no candidate (`not-proposed`).
-    uncited_source: document a2 is ingested under its OWN source id and grant (`UNCITED_SOURCE`), so revoking that grant alone removes one article of the supply issue's summary basis."""
+    uncited_source: document a2 is ingested under its OWN source id and grant (`UNCITED_SOURCE`), so revoking that grant alone removes one article of the supply issue's summary basis.
+    slots: (slot of document b's round, slot of the round holding documents a and a2): two timed rounds (`tick` slots, b ingested first) instead of the one untimed round; with
+    `uncited_source` documents a and b share ONE timed round at `slots[1]` (a2 keeps its own untimed round: it is only a snapshot member);
+    defer_b: S3 job rel-b is only registered (`queued`); `world.finish_rel_b()` runs it to `ready` later."""
     kit = HandoffKit(root)
     valid_text = validity_sentence(valid_from, valid_until) if dated else None
     raw_a = (f"계약 날짜 표기는 {event_time}이다.",) if raw_time_evidence else ()
@@ -184,8 +187,11 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
         kit.registry["sources"].append(uncited_source_entry(kit.registry["sources"][0]))
         kit.save_registry()
         # a and b are the SAME article versions the standard world registers (the app keeps one row per documentId+version, URL included): b keeps the URL it has there (`docs/2`).
-        d1, d3 = kit.ingest("docs", [docs[0], {**docs[2], "url": "https://example.invalid/docs/2"}])
+        d1, d3 = kit.ingest("docs", [docs[0], {**docs[2], "url": "https://example.invalid/docs/2"}], slot=slots[1] if slots else None)
         d2 = ingest_in_source(kit, "docs-a2", docs[1], UNCITED_SOURCE)
+    elif slots:
+        d3, = kit.ingest("docs-b", [docs[2]], slot=slots[0])
+        d1, d2 = kit.ingest("docs-a", docs[:2], slot=slots[1])
     else:
         d1, d2, d3 = kit.ingest("docs", docs)
     refs = {"a": d1, "a2": d2, "b": d3}
@@ -217,16 +223,8 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
             "rel-b": lambda r: r["type"] == "PARTICIPATES_IN" and r["subject"]["ref"] == "SYNTH-1" and r["object"]["ref"] == "event-a"} if approve else {}
     verify = {job: (lambda r, match=match: {"type": "insufficient"} if match(r) else None) for job, match in held.items()}
     scripts, effects = impact_scripts(impact, wa, wb, evc, cite)
-    jobs = {
-        "rel-a": converge(wa, "rel-a", [
-            proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["a"]), [cite(wa, "a", EVT_A)]),
-            proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [cite(wa, "a", SUP)], product="배터리 부품"),
-            proposal("INVESTS_IN", co("SYNTH-4"), co("SYNTH-3"), [cite(wa, "a", INV)]),
-            proposal("SHARES_ISSUE", co("SYNTH-1"), co("SYNTH-2"), [cite(wa, "a", SUP)]),
-            *([proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["a"]), [cite(wa, "a", EVT_A)], countries=["KR"])] if impact == "rich" else []),
-            *([proposal("SUPPLIES", co("SYNTH-4"), co("SYNTH-3"), [cite(wa, "a", CHAIN)], business="소재 사업", product="소재")] if chain else [])],
-                        verify=verify.get("rel-a"), impacts=scripts.get("rel-a"), effects=effects),
-        "rel-b": converge(wb, "rel-b", [
+    def rel_b() -> dict:
+        return converge(wb, "rel-b", [
             proposal("PARTICIPATES_IN", co("SYNTH-1"), ev("event-a"), [cite(wb, "a2", EVT_A2)]),
             proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["b"]), [cite(wb, "b", QB)]),
             proposal("PARTICIPATES_IN", co("SYNTH-2"), ev(evc["b"]), [cite(wb, "b", QB)]),
@@ -235,7 +233,23 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
                proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["b"]), [cite(wb, "b", QB)], countries=["US"])] if impact == "rich" else []),
             *([proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [cite(wb, "a", SUP)], product="배터리 부품",
                         validity={"from": valid_from, "until": valid_until, "citations": [cite(wb, "b", valid_text)] if valid_text else []})] if dated else [])],
-                        verify=verify.get("rel-b"), impacts=scripts.get("rel-b"), effects=effects)}
+                        verify=verify.get("rel-b"), impacts=scripts.get("rel-b"), effects=effects)
+
+    assert not (defer_b and approve), "an approved rel-b cannot be deferred"
+    jobs = {
+        "rel-a": converge(wa, "rel-a", [
+            proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["a"]), [cite(wa, "a", EVT_A)]),
+            proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [cite(wa, "a", SUP)], product="배터리 부품"),
+            proposal("INVESTS_IN", co("SYNTH-4"), co("SYNTH-3"), [cite(wa, "a", INV)]),
+            proposal("SHARES_ISSUE", co("SYNTH-1"), co("SYNTH-2"), [cite(wa, "a", SUP)]),
+            *([proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["a"]), [cite(wa, "a", EVT_A)], countries=["KR"])] if impact == "rich" else []),
+            *([proposal("SUPPLIES", co("SYNTH-4"), co("SYNTH-3"), [cite(wa, "a", CHAIN)], business="소재 사업", product="소재")] if chain else [])],
+                        verify=verify.get("rel-a"), impacts=scripts.get("rel-a"), effects=effects)}
+    if defer_b:
+        queued = kit.rel("submit", kit.rsubmit("rel-b", wb.s2))
+        assert queued["state"] == "queued", queued
+    else:
+        jobs["rel-b"] = rel_b()
     for name, out in jobs.items():
         assert out["state"] == "ready", (name, out.get("failure"))
     for job, match in held.items():
@@ -246,6 +260,13 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
         jobs[job] = {**jobs[job], **reviewed}          # the S3 result after the operator's final decision (same job, input digest and binding)
         assert next(r for r in jobs[job]["relations"] if match(r))["eligibility"]["approvalBasis"]["kind"] == "operator-final-approval"
     world.jobs, world.dated, world.valid_text, world.event_time, world.approve, world.chain, world.impact = jobs, dated, valid_text, event_time, approve, chain, impact
+
+    def finish_rel_b() -> dict:
+        jobs["rel-b"] = rel_b()
+        assert jobs["rel-b"]["state"] == "ready", jobs["rel-b"].get("failure")
+        return jobs["rel-b"]
+
+    world.finish_rel_b = finish_rel_b
     return world
 
 

@@ -5,6 +5,10 @@ Exit 0 for a ledger result or a current export; exit 2 for an error or a withhel
 provider call; no source ledger is written (a freeze whose decisions pin an issue-summary result reads that job ledger read-only; export never opens it). No credential,
 path or message is ever printed.
 
+`freeze-round --round-id R [--plan-id P --plan-root DIR] --files-dir DIR` reads no stdin: it recomputes the 20-job S3 window from the ledgers, narrows the master
+`--canonical`/`--decisions` files to it, freezes the result through the same strict path as `freeze` and installs the narrowed files in `--files-dir`
+(the files `export` is then given). It prints the handoff result with the selection report (`handoff_round`).
+
 A handoff stored under an older bundle contract is history: it is recognised from the ledger alone, before any operator file, source ledger, grant, artifact or
 writable ledger is touched, and is answered read-only (`inspect` history, `export` withheld, `recover`/`freeze` refused: `handoff_contract_changed`).
 """
@@ -12,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -19,13 +24,16 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .handoff import Handoff, HandoffPaths, Store, open_legacy_history, require_current_sources
-from .handoff_contracts import MAX_COMMAND, SCHEMA, ExtractionFailure, Manifest, Selector, canonical
+from .handoff_contracts import ID, MAX_COMMAND, SCHEMA, ExtractionFailure, Manifest, Selector, canonical
 from .handoff_contexts import configured, source_flags
+from .handoff_round import RoundPaths, check_files_dir, freeze_round, preflight_round
 from .ingestion_contracts import IngestionFailure
 
-COMMANDS = ("freeze", "recover", "inspect", "export")
+COMMANDS = ("freeze", "freeze-round", "recover", "inspect", "export")
 SOURCED = frozenset({"freeze", "export"})                  # commands that consult the source ledgers, grants and the operator files
 WRITERS = {"freeze": "create", "recover": "write"}          # everything else opens the ledger read-only
+PLAN_ID = re.compile(r"s2plan-[0-9a-f]{64}")
+ROUND_FLAGS = ("round_id", "plan_id", "plan_root", "files_dir", "recovery_attempt_id")
 
 
 def _error(code: str, detail: dict | None = None) -> int:
@@ -46,16 +54,36 @@ def main() -> int:
     parser.add_argument("--decisions", type=Path, help="operator public-projection decisions (decisions4/P2 or decisions5/P3, with fieldVerdicts and summary pin)")
     parser.add_argument("--bindings", type=Path, help="server-owned app document bindings (zoop-app-document-bindings-1)")
     parser.add_argument("--issue-summary-state-dir", type=Path,
-                        help="freeze only, and only when the decisions pin an issue-summary result: the `zoop-ai-issue-summary` ledger it is read from (read-only; export never needs it)")
+                        help="freeze and freeze-round only, and only when the decisions pin an issue-summary result: the `zoop-ai-issue-summary` ledger it is read from (read-only; export never needs it)")
+    parser.add_argument("--round-id", help="freeze-round: the observation round this freeze belongs to (its S3 jobs must all be done)")
+    parser.add_argument("--plan-id", help="freeze-round: the immutable plan (s2plan-...) admitted for that round; omitted for a slot without a new plan")
+    parser.add_argument("--plan-root", type=Path, help="freeze-round: the directory holding the plan directories (with --plan-id)")
+    parser.add_argument("--files-dir", type=Path, help="freeze-round: where the narrowed canonical.json and decisions.json of the handoff are installed (--canonical/--decisions are then the MASTER files)")
+    parser.add_argument("--recovery-attempt-id", help="freeze-round: explicit operator attempt identity after terminal failure; the same inputs and identity reuse the same handoff")
     args = parser.parse_args()
     store = None
     try:
-        sourced = args.command in SOURCED
+        rounded = args.command == "freeze-round"
+        sourced = args.command in SOURCED or rounded
         flags = (args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources, args.canonical, args.decisions, args.bindings)
+        round_args = tuple(getattr(args, name) for name in ROUND_FLAGS)
         if not configured(args, sourced=sourced) or (sourced and any(f is None for f in flags[4:])) \
                 or (not sourced and any(f is not None for f in flags[4:])) \
-                or (args.issue_summary_state_dir is not None and args.command != "freeze"):
+                or (args.issue_summary_state_dir is not None and args.command not in ("freeze", "freeze-round")) \
+                or (any(a is not None for a in round_args) and not rounded) \
+                or (rounded and (any(f is None for f in flags[:4]) or not args.round_id or len(args.round_id) > 200 or args.files_dir is None
+                                 or (args.plan_id is None) != (args.plan_root is None)
+                                 or (args.plan_id is not None and not PLAN_ID.fullmatch(args.plan_id))
+                                 or (args.recovery_attempt_id is not None and not re.fullmatch(ID, args.recovery_attempt_id)))):
             raise ExtractionFailure("input_or_configuration_invalid")
+        if rounded:
+            paths = RoundPaths(*flags, files_dir=args.files_dir, plan_root=args.plan_root, summaries=args.issue_summary_state_dir)
+            check_files_dir(paths.files_dir, args.state_dir, paths.canonical, paths.decisions)
+            roots = (args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, *([args.issue_summary_state_dir] if args.issue_summary_state_dir else []))
+            preflight_round(paths, args.round_id, args.plan_id)
+            store = Store(args.state_dir, *roots, mode="create")
+            print(canonical(freeze_round(store, paths, args.round_id, args.plan_id, args.recovery_attempt_id)))
+            return 0
         raw = sys.stdin.buffer.read(MAX_COMMAND + 1)
         if len(raw) > MAX_COMMAND:
             raise ExtractionFailure("command_input_limit")

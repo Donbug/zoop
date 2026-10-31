@@ -93,13 +93,14 @@ raw receipt와 비용 정산은 같은 운영 원장 transaction에 저장합니
 | 명령 | 모듈 | wire schema | 상태 파일 |
 | --- | --- | --- | --- |
 | `zoop-ai-collect run` | `zoop_ai_pipeline.collection_cli` | `zoop-collection-1` (policy `zoop-collection-policy-1`) | 상태 DB 없음. source `inputRoot/collections/<collectionId>/`에만 원본 bytes·receipt·manifest를 쓴다 |
+| `zoop-ai-collector {run,checkpoint,restore,status}` | `zoop_ai_pipeline.collector_cli` | checkpoint manifest `zoop-collector-checkpoint-1` | 컨테이너 수집 entry. 아래 비공개 뉴스·Korea 코퍼스·official source 수집을 한 controller로 돌리고 `/var/lib/zoop-collector/{private,korea,official}` 상태를 S3 checkpoint로 보존한다. 계약·환경변수·종료 코드·SIGTERM 시간은 [`docs/development/collector-container.md`](../../docs/development/collector-container.md) |
 | `zoop-ai-ingest {run,tick,resume,inspect,export}` | `zoop_ai_pipeline.ingestion_cli` | `zoop-ingestion-s2-1` | `ingestion.sqlite3` |
 | `zoop-ai-extract {run,submit,enqueue-round,plan-round,resume,inspect,cancel}` | `zoop_ai_pipeline.extraction_cli` | `zoop-extraction-s2-2` | `extraction.sqlite3` (`plan-round`는 원장을 열지 않고 새 계획 디렉터리 하나만 씀) |
 | `zoop-ai-relation {run,submit,inspect,resume,review,cancel,live-binding}` | `zoop_ai_pipeline.relation_cli` | `zoop-relation-s3` | `relation.sqlite3` |
 | `zoop-ai-dependents` (하위 명령 없음, stdin 변경 1건) | `zoop_ai_pipeline.dependency_cli` | `zoop-dependency-s4` | 위 세 원장을 읽기 전용으로만 연다(쓰는 상태 파일 없음) |
 | `zoop-ai-graph {init,freeze,project,recover,inspect,read,focus}` | `zoop_ai_pipeline.graph_projection_cli` | `zoop-graph-projection-1` (plan `zoop-graph-plan-2`) | `graph.sqlite3` + 이 원장 하나에 묶인 별도 Neo4j 5 database의 **비공개** version(공개 아님) |
 | `zoop-ai-issue-summary {submit,run,resume,inspect,export,cancel,live-binding}` | `zoop_ai_pipeline.issue_summary_cli` | `zoop-issue-summary-1` (policy `zoop-issue-summary-policy-1`) | `issue-summary.sqlite3`; 위 세 원장과 운영자 파일을 읽기 전용으로만 열고 handoff·Neo4j·app은 쓰지 않음 |
-| `zoop-ai-handoff {freeze,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `-8`/decisions `-4`/policy `-2` 또는 bundle `-9`/decisions `-5`/policy `-3`) | `handoff.sqlite3` + `bundles/<sha256>.json`; 원천 원장은 읽기 전용 |
+| `zoop-ai-handoff {freeze,freeze-round,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `-8`/decisions `-4`/policy `-2` 또는 bundle `-9`/decisions `-5`/policy `-3`) | `handoff.sqlite3` + `bundles/<sha256>.json`; 원천 원장은 읽기 전용. `freeze-round`는 window로 좁힌 운영자 파일 두 개를 `--files-dir`에 설치 |
 | `zoop-ai-handoff-exposure` | `zoop_ai_pipeline.handoff_exposure_cli` | `zoop-handoff-exposure-1` | handoff 원장·고정 artifact를 읽기만 함. 원천 변경 조회는 ingestion·extraction 원장도 읽으며 relation·Neo4j·앱 원장은 열지 않음 |
 | `zoop-ai-operate {init,register,run,status,pause,resume,stop,force-stop}` | `zoop_ai_pipeline.operating` | `zoop-operating-runtime-config-1` / `zoop-operating-input-manifest-1` | 운영 전용 `live-budget.sqlite3`와 공유 `stateDirectory/s2`, `stateDirectory/s3` 원장 |
 
@@ -164,6 +165,41 @@ raw receipt와 비용 정산은 같은 운영 원장 transaction에 저장합니
 판별은 세 갈래입니다. **증명된 없음/현재**(디렉터리·원장 파일이 없거나 행이 없거나 현재 스키마)일 때만 기존 쓰기 경로로 넘어가고, **이력**이면 읽기 전용 보기를 쓰며, **판단 불가**(writer 사용 중 `handoff_busy`, 낯선·손상된 namespace/원장, receipt에 schema 없음 `handoff_state_invalid`, 과대 파일)는 그 오류를 그대로 내고 쓰기 가능한 open으로 넘어가지 않습니다(쓰기 open은 권한 재설정·WAL checkpoint·DDL을 하므로 이력 원장을 바꿀 수 있습니다). writer가 죽어 비어 있지 않은 WAL에만 커밋된 행은 읽기 전용 immutable open에 보이지 않으므로, 소유를 먼저 증명한 뒤 shared lock 아래에서 원장 파일과 WAL을 128 MiB 한도로 임시 0700 디렉터리에 **복사**해 그 복사본만 SQLite로 엽니다(원본 파일·`-shm`·WAL·권한·mtime 불변, 임시 디렉터리는 닫을 때 삭제). 현재 스키마 행의 hot WAL 복구(`recover`)는 그대로 쓰기 경로이고 읽기 명령은 `handoff_recovery_required`를 냅니다.
 
 복사 한도는 파일마다 **128 MiB**이며 원본이 일반 파일이 아니거나(심볼릭 링크 포함) 한도를 넘으면 잘라 읽지 않고 `handoff_state_invalid` 오류로 닫힙니다. 임시 디렉터리는 `mkdtemp`로 만든 0700 비공개 위치이고, 정상·오류 어느 경로에서도 보기를 닫을 때 삭제하며 원장 디렉터리 안에는 아무것도 만들지 않습니다.
+
+**누적 window freeze (`zoop-ai-handoff freeze-round`, #407 A 방향: 번들 하나 = 비활성 앱 버전 하나).** 매 freeze마다 AI 원장에서 **S3 job window를 새로 계산**하고(직전 번들의 `sources[]`를 이어받지 않습니다), 운영자 master 파일을 그 window로 좁힌 뒤 기존 엄격한 `freeze`(재검증 전부 그대로)를 실행합니다. stdin은 읽지 않습니다.
+
+```bash
+zoop-ai-handoff freeze-round --state-dir HANDOFF --relation-state-dir … --extraction-state-dir … --ingestion-state-dir … --sources … \
+  --canonical MASTER_CANONICAL --decisions MASTER_DECISIONS --bindings BINDINGS \
+  --round-id ROUND [--plan-id s2plan-… --plan-root PLAN_ROOT] --files-dir INSTALLED [--issue-summary-state-dir SUMMARY] [--recovery-attempt-id ATTEMPT]
+```
+
+`--canonical`·`--decisions`는 이 명령에서 **운영자 master 파일(읽기 전용)**이고, window로 좁힌 파일은 `--files-dir`의 `canonical.json`·`decisions.json`으로 설치됩니다(이후 `export`에 주는 경로). **handoff가 `ready`일 때만** 각 파일을 원자적으로 교체하며, `reserved`·`failed` 결과나 거절에서는 이전 설치본을 유지합니다. `--files-dir`은 handoff 원장 디렉터리와 분리해야 하고, 두 설치 대상은 어느 master 파일과도 같을 수 없습니다. 경로 충돌과 설치 대상의 심볼릭 링크·일반 파일 여부는 **원장을 쓰기 모드로 열기 전에** 검사합니다. 새 설치본이 놓이면 직전 handoff의 `export`는 `decisions_changed` 등으로 withheld가 되고 새 번들이 그것을 대체합니다. 출력은 JSON 한 줄 `{schemaVersion, roundId, handoffId, freeze(기존 freeze 결과), selection, files, narrowing}`이며 오류 때는 기존 `{error:{code,detail}}`입니다. `--round-id`는 관측 회차(ingestion `roundId`), `--plan-id`/`--plan-root`는 그 회차의 `plan-round` 산출물(불변 plan 디렉터리)입니다. 새 plan이 없는 slot은 둘 다 생략해 **carry-only freeze**로 합니다. 경로 검사를 통과한 첫 호출은 빈 handoff 원장을 만들 수 있습니다. freeze가 예약 뒤 중단되면 `reserved` 행이 남으며 기존 `recover` 명령으로 정리합니다.
+
+*선택 규칙(`handoff_round.py`, 원장 세 개·master registry·현재 전달 권한을 매번 다시 확인).*
+
+| 단계 | 규칙 |
+|---|---|
+| 후보 | 상태 `ready`인 S3 job이면서 그 S2 upstream(`jobId`+`inputDigest`)에 master canonical 항목이 **하나 이상** 있고 round slot이 있는 것. `ready`이나 매핑 항목이 없으면 `awaiting_mapping`(window 자리를 쓰지 않음), 다른 상태는 `not_ready`(코드=상태), `cancelled`는 `cancelled` |
+| 분석 계약 | 현재 S2/S3 분석 계약으로 처리할 수 있는 후보만 새 window에 들어갑니다. 읽기는 가능한 이전 네이티브 job도 `withheld`+`analysis_contract_changed`로 개별 보고하고 제외하며, window 자리를 쓰지 않습니다 |
+| 순서 | 그 S2 incoming 관측의 ingestion round의 slot(`window.through`) **내림차순**, 그다음 `sourceId`·`page`·`ordinal` 오름차순, 그다음 S3 `jobId`. 이 순서로 현재 delivery를 확인해 **전달 가능한 20개**(`MAX_SOURCES`)를 `selected`로 채웁니다. 20개를 채운 뒤 남은 후보는 `out_of_window`(`window_full`) |
+| `neverFrozen` | `out_of_window`로 밀린 job이 이 원장의 어떤 `ready` handoff에도 고정된 적이 없으면 `true` |
+| 자기 회차 gate | `--round-id`에 허용된 모든 S3 job(그 회차에서 관측한 S2 upstream을 쓴 job + plan의 모든 unit)이 `ready` 또는 `cancelled`일 때만 진행합니다. 아니면 `analysis_incomplete`(`detail.jobs[]`에 `{jobId, upstreamJobId, code}`; S3 job이 아직 없는 unit은 `relation_job_missing`)이고 아무것도 쓰지 않습니다. 이전 회차의 미완료 job은 기다리지 않고 `not_ready`로 보고하며, 완료된 뒤의 첫 freeze에서 window 안이면 들어옵니다 |
+| slot 없음 | 매핑된 `ready` job의 round에 `window`가 없으면 그 job을 `unavailable`+`round_slot_unavailable`로 보고하고 제외합니다. 해당 job은 window 자리를 쓰지 않으며 나머지 후보를 계속 선택합니다 |
+| `withheld` | 선택을 위해 확인한 job의 현재 delivery가 withheld(예: grant revision 변경)이면 그 job을 `withheld`와 원래 사유 코드로 보고하고 제외합니다. 해당 job은 window 자리를 쓰지 않으며, 다음 후보에서 전달 가능한 job을 채웁니다 |
+| 그 밖의 거절 | 제외 후 전달 가능한 job이 0개면 `window_empty`(`detail.selection`에 job별 상태·사유 포함, 이전 번들·설치본 유지), plan이 다른 회차의 것이면 `plan_round_mismatch` |
+
+CLI는 handoff writer를 열기 전에 이 선택과 현재 전달 권한 검사를 읽기 전용으로 수행합니다. `freeze_round`도 staging 전에 같은 선택 규칙을 적용합니다. 모든 후보가 이전 분석 계약이면 `window_empty`로 끝나며 원장과 설치 파일을 그대로 유지합니다. 새 manifest는 master decisions에 명시된 policy를 유지하므로 decisions-4/P2는 bundle-8, decisions-5/P3는 bundle-9로 생성됩니다.
+
+`selection` 보고서(`zoop-ai-handoff-selection-1`)는 고려한 **모든** S3 job을 `{jobId, status(selected|not_ready|awaiting_mapping|withheld|unavailable|out_of_window|cancelled), code, roundId, sourceId, slot, page, ordinal, upstreamJobId[, neverFrozen]}`로 나열합니다(조용히 빠지는 job 없음). 기본 `handoffId`는 정렬한 manifest 내용(`sources`·좁힌 파일 hash·bindings hash)의 digest(`hr-<sha256>`)라서, window와 운영자 파일이 같으면 새 slot이어도 **같은 handoffId**이고 이미 있는 행을 그대로 돌려줍니다(window 밖의 미매핑 job이 늘어도 같음). 공개 ID(이슈 ID·`INVOLVES` 간선 ID·`ev-` ID)는 운영자 결정·앱 article binding·span에서만 나오므로 번들마다 같은 항목은 같은 ID입니다.
+
+예약 뒤 중단된 handoff는 먼저 `zoop-ai-handoff recover --state-dir HANDOFF`의 stdin에 `{"schemaVersion":"zoop-ai-handoff-1","handoffId":"…"}`를 전달해 정리합니다. artifact가 없어 `failed`로 확정되면 운영자가 `freeze-round`에 **`--recovery-attempt-id ATTEMPT`를 명시**해 같은 입력으로 새 handoff를 만들 수 있습니다. 값은 `[A-Za-z0-9._:-]`의 1~200자이며, manifest 내용과 이 값을 함께 hash하여 새 ID를 정합니다. 같은 입력·같은 값으로 반복하면 회차가 바뀌어도 같은 행을 돌려줍니다. 옵션을 생략하면 원래 ID와 그 상태를 돌려주며, 기존 실패 행과 시도 기록은 그대로 보존합니다.
+
+*운영자 파일 좁히기(기계적 선택만).* master의 항목을 **원문 그대로** 고릅니다(항목을 만들거나 고치지 않고, 선택된 항목의 바이트·공백·escape가 master 그대로입니다). registry는 window upstream의 항목만 남깁니다. decisions는 회사 결정 전부, window 안에 member가 하나라도 있는 이슈 결정(없는 이슈는 뺌), 그 이슈의 구조·FOLLOWS 결정(FOLLOWS는 두 이슈가 모두 남을 때), window 안 문서의 origin만 남깁니다. 남은 이슈의 `fieldVerdicts`에서는 window 밖 mention의 verdict를 빼고(안 그러면 그 이슈가 `field_verdict_unbound`로 제외됩니다), 다음 중 하나에 해당하는 이슈의 요약 고정(`summary`)은 `null`로 바꿉니다: 이슈가 이번 window에서 공개되지 않음(`issue_not_public`), 결정적 규칙(`temporal-review-pending`·`input-too-large`)이 요약을 정함, 요약의 basis가 바뀜(`issue_summary_basis_changed`). basis가 그대로인 고정은 얼려진 결과 그대로 유지합니다. 요약 고정이 모두 사라지면 `--issue-summary-state-dir`는 쓰이지 않고(`issue_summary_state_unused` 없이), 남아 있으면 기존대로 필요합니다. 그 밖의 불일치(잘못된 고정, 다른 mode 등)는 좁히지 않고 엄격한 freeze가 거절합니다. 요약 상태는 번들 `-7` 규칙 그대로입니다: 고정이 빠진 이슈는 `not-requested`, 결정적 규칙이 정하는 이슈는 `unavailable`+`temporal-review-pending`/`input-too-large`(스키마·verifier 변경 없음). 결과의 `narrowing`은 남긴 registry 항목 수, 남은·뺀 이슈, 뺀 verdict 수, 뺀 요약 고정(`{issueId, code}`)을 보고합니다. window가 바뀐 뒤 사람이 다시 확인해야 하는 것(대표 mention 재고정 `issue_representative_invalid`, 지리 근거 `geography_evidence_unbound`, 구조 적용성 `applicability_binding_mismatch`, FOLLOWS 근거 `follows_source_unpinned`)은 기존 규칙대로 번들 `exclusions`에 코드로 보이며 자동으로 고치지 않습니다. 새 job의 canonical 항목·이슈 결정은 운영자가 master에 넣어야 하고, 항목이 없는 job은 공개되지 않습니다.
+
+*손실 없이 건너뛸 수 있는 조건.* 더 새 slot이 먼저 import된 뒤 옛 slot의 번들을 건너뛰어도 최종 공개 상태를 잃지 않는 것은 **세 조건이 모두 성립할 때만**입니다. **C1** 선택은 매 freeze마다 위 규칙으로 원장·master registry·현재 전달 권한을 다시 확인합니다(직전 번들에서 잇지 않음: 이어 받으면 새 slot이 먼저 얼 때 옛 job이 영영 빠집니다). **C2** 앱이 slot마다, 계획할 단위가 없는 slot에도 freeze를 요청합니다(늦게 끝난 job과 매핑·결정 변경이 한 slot 안에 반영되도록). **C3** 아직 어떤 `ready` handoff에도 들어가지 못한 job이 있는 가장 오래된 회차부터 지금까지의 **slot이 있고 매핑·현재 전달 권한을 충족하는 job이 20개 이하**입니다. 넘으면 가장 오래된 job이 공개된 적 없이 밀려나며 `out_of_window`+`neverFrozen`으로 **보고**됩니다(조용한 손실 없음). slot이 없거나 현재 전달이 withheld인 job은 각 사유가 해소된 뒤의 freeze에서 다시 선택 대상이 됩니다. 세 조건 밖에서는 중간 버전을 건너뛴 결과가 최종 공개 상태에서 달라질 수 있습니다.
+
+이 명령은 HTTP `round-handoffs` 조정(#387: 앱이 roundId·planId만 넘기고, 자기 회차 gate·설치 순서·권한 allowlist를 서버가 수행)을 구현하지 않고 그 아래의 라이브러리·CLI 계층입니다. 모델·provider·네트워크 호출은 없습니다. 검증은 `tests/test_handoff_round.py`(실제 ingestion→S2→S3 authored-replay 원장).
 
 **의존성.** 전체 패키지(`zoop-ai-pipeline`)는 공개 패키지(pydantic 2.13.5·httpx 0.28.1·lxml 6.1.3·pypdf 6.19.0·neo4j 6.3.1)만 쓰며 collect·ingest·extract·relation·dependents·graph·issue-summary·handoff 명령 모두 **private PoC·git 인증·토큰 없이** 설치·실행됩니다. 원본 PoC(`investmate`)는 이 프로젝트의 어떤 소스·스크립트·시험에서도 import하지 않고 manifest·lock에도 없습니다(옛 `poc` extra, `poc_guard`, `pinned_poc_unavailable` 코드 제거). `prototype/bff`만 별도로 private PoC를 고정해 쓰며, CI에서 그 token을 쓰는 job은 `bff` 하나뿐입니다.
 
@@ -287,7 +323,7 @@ Only provably untouched plans are rebound to the successor namespace. New FN pla
 
 ### Private finite-batch experiment setup
 
-`scripts/overnight_run.py`, `overnight_collect.py`, and `collection_revision.py` are **operator-run local experiment orchestration**, not cloud deployment entry points. They call the production `zoop_ai_pipeline.*_cli` modules. The analysis controller owns a private local Neo4j container through the existing `orbstack` Docker context; `--check` needs the already installed image `neo4j:5.26.32` and an unused loopback port. It does not install dependencies, pull an image, load credentials, or call a model.
+`scripts/overnight_run.py`, `overnight_collect.py`, and `collection_revision.py` are **operator-run local experiment orchestration**, not cloud deployment entry points; the container entry is `zoop-ai-collector` ([`docs/development/collector-container.md`](../../docs/development/collector-container.md)). They call the production `zoop_ai_pipeline.*_cli` modules. The analysis controller owns a private local Neo4j container through the existing `orbstack` Docker context; `--check` needs the already installed image `neo4j:5.26.32` and an unused loopback port. It does not install dependencies, pull an image, load credentials, or call a model.
 
 Create a new private root and a new `runId` for each separately approved window. Keep previous roots, acquisition receipts, unknown requests, and closed money ledgers unchanged. The shared run configuration is a closed `zoop-private-run-4` object; old v2/v3 configurations are historical, not execution-compatible:
 
@@ -759,6 +795,10 @@ EOF
 **이전 네이티브 계약의 읽기와 실행.** `native_read_contracts.py`는 저장된 버전으로 S2 `zoop-extraction-native-replay-1`·`zoop-extraction-native-live-2`와 S3 `zoop-relation-policy-1`의 읽기 계약을 선택한다. `ready` 결과의 `inspect`와 기존 frozen handoff의 `export`는 현재 원천 권한과 정확한 관측·binding·upstream·review·운영자 파일·manifest digest를 검증한 뒤 저장된 후보와 bundle을 그대로 전달한다. policy-1의 `versions`는 `countryContext`가 없는 정확한 일곱 키여야 한다. 기사 언어 `ko`, snapshot member, fingerprint는 당시 preimage 규칙을 적용하고 live runtime은 저장된 메타데이터와 identity로 검증한다. 현재 분석 계약은 S2 `native-replay-3`·`native-live-3`와 S3 policy-2로 유지한다. 이전 네이티브 job의 실행·접수·재개·검토·취소와 이를 입력으로 삼는 새 분석·handoff freeze·graph 변경은 writer를 열기 전에 거부한다. PoC 이전 기록의 metadata-only 조회와 기존 취소 동작은 유지한다. 합성 회귀 자료는 봉인된 이전 소스에서 생성한 `tests/fixtures/native_historical/golden.json`이며, `tests/test_native_historical_reads.py`가 원래 digest와 읽기 전용 경계를 검사한다.
 
 S2/S3 변경 명령의 hot WAL 사전 검사는 공유 lock을 잡은 상태에서 main DB와 WAL을 각각 열린 일반 파일의 관측 크기만큼 최대 1 MiB 청크로 임시 복사한다. 복사 전후 파일 identity·크기·수정 시간을 비교하고, 사본에서 현재 분석 계약임을 확인한 뒤 원본 writer가 복구를 수행한다.
+
+S2/S3 CLI의 `inspect`는 namespace 경로 검증을 통과한 미생성·빈 상태 디렉터리를 `job_not_found`로 응답한다. 서비스의 첫 제출은 이 응답으로 job 부재를 확인한 뒤 `submit`에서 원장을 생성한다. 일부 원장 파일만 남았거나 원장이 손상된 경우에는 기존 상태 오류를 유지하며, 조회는 파일과 권한을 그대로 보존한다.
+
+현재 job의 `inspect`는 중단된 writer가 남긴 hot WAL도 위의 비공개 사본에서 읽는다. 원본의 비차단 공유 lock을 조회가 끝날 때까지 유지하고, 사본에서 요청한 job의 현재 adapter/policy를 확인한 뒤 기존 원천 권한·binding 검증을 거쳐 상태와 영수증을 반환한다. 활성 writer가 있으면 `*_busy`, 이전 계약이나 지원하지 않는 계약의 job이면 `*_recovery_required`로 거부한다. 원본 DB·WAL·SHM의 바이트와 권한은 보존된다. 명시적 `resume`은 원본 writer로 복구한 뒤 저장된 영수증을 재사용하고, 영수증 없는 호출은 재전송하지 않는다. downstream의 일반 `Store(existing=True)`는 계속 checkpoint된 원장만 읽는다.
 
 **기업 표기 → 마스터 ID 검증(FS077, WBS 6.6.16).** AI가 선택한 `participant.company_id`는 고정 catalogue의 `name` 또는 명시 `aliases`에 표기가 유일하게 대응할 때만 통과한다. 비교는 `casefold`와 공백 축약만 하며 문장부호·법인 접미사는 유지한다. ticker·유사 문자열·외부 지식으로 별칭을 만들지 않는다. 원래 표기는 바꾸지 않고 `null`은 유일한 별칭이 있어도 채우지 않는다. 알 수 없는 ID, 다른 기업 ID, 중복 이름·별칭에 대한 nonnull 선택은 raw 응답을 먼저 저장한 뒤 `extraction_reply_invalid`로 중단한다(후보 저장·자동 재전송 없음). 이것은 **동일성/응답 계약 실패**이지 의미 판단의 `REJECT`가 아니다. snapshot member도 같은 규칙으로 접수하며 위반하면 호출 전에 `snapshot_member_invalid`다. live 추출 프롬프트도 이 규칙을 명시하고 prompt digest가 새 runtime identity에 반영된다.
 

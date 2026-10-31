@@ -238,6 +238,8 @@ def validate_s3_historical_read(row, request, upstream_request, upstream_result,
         _require(upstream_request.job_id == request.upstream.job_id and upstream_result["inputDigest"] == request.upstream.input_digest,
                  "upstream_input_mismatch")
         _require(upstream_request.provenance == request.provenance, "provenance_conflict")
+        expected_adapter = S2_LIVE if request.provenance.execution_mode == "live" else S2_REPLAY
+        _require(upstream_result["binding"]["adapter"]["version"] == expected_adapter)
         _require(len(upstream_result["binding"]["documents"]) <= 50, "document_limit_exceeded")
         fresh = {"schema": "zoop-relation-s3", "candidate": "zoop-relation-candidate-1", "impactCandidate": "zoop-impact-candidate-1",
                  "versions": S3_VERSIONS, "upstream": {"jobId": request.upstream.job_id, "inputDigest": request.upstream.input_digest,

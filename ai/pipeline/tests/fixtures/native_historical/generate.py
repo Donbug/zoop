@@ -1,7 +1,7 @@
 """Generate synthetic golden archives with the sealed historical source, never with current builders.
 
 Run with the historical pipeline virtualenv under env -i, PYTHONDONTWRITEBYTECODE=1.
-The source root and seal are positional arguments; output is golden.json beside this file.
+The source root and seal are positional arguments. Output is golden.json; --timed-round writes only timed-round.json.
 """
 from __future__ import annotations
 
@@ -56,6 +56,31 @@ def main():
                 paths.extend(p for p in directory.rglob("*") if p.is_file())
         return {str(p.relative_to(root)): {"base64": base64.b64encode(p.read_bytes()).decode(), "mode": p.stat().st_mode & 0o777}
                 for p in paths if p.exists()}
+
+    if sys.argv[3:]:
+        if sys.argv[3:] != ["--timed-round"]:
+            raise SystemExit("Expected --timed-round")
+        from scripts.relation_smoke import RelKit, converge
+        from scripts.extraction_smoke import page
+
+        with tempfile.TemporaryDirectory(prefix="zoop-historical-timed-") as temporary:
+            kit = RelKit(Path(temporary).resolve() / "owned")
+            text = "합성기업은 역사 계약을 발표했다."
+            ref, = kit.ingest("historical", [{"supplier": "historical-supplier", "html": page(text)}],
+                              slot="2026-10-29T09:05:00+09:00")
+            article = kit.article(ref)
+            mention = kit.mention(article, "m-historical", [kit.evidence(article, text)])
+            request = kit.submit("s2-historical", ref)
+            result = kit.job("run", request, replay=kit.replay("historical").extract(article, [mention]).write())
+            relation = converge(SimpleNamespace(kit=kit, s2=result), "rel-a-historical", [])
+            output = {"schemaVersion": "zoop-historical-native-synthetic-1", "sourcePins": pins,
+                      "sourceSeal": {"sha256": hashlib.sha256(seal.read_bytes()).hexdigest(), "archive": manifest["archive"]},
+                      "files": archive(kit.root), "request": request, "result": result,
+                      "relation": {k: v for k, v in relation.items() if k != "fixtures"}}
+            destination = Path(__file__).with_name("timed-round.json")
+            destination.write_text(json.dumps(output, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
+            print(json.dumps({"path": str(destination), "sha256": hashlib.sha256(destination.read_bytes()).hexdigest(), "sourcePins": pins}))
+        return
 
     with tempfile.TemporaryDirectory(prefix="zoop-historical-authored-") as temporary:
         root = Path(temporary).resolve()

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .extraction import Extractor, Sources, mutation_job
+from .extraction import Extractor, Sources, mutation_job, open_job_inspection
 from .extraction import Store as ExtractionStore
 from .extraction_contracts import MAX_REPLAY
 from .ingestion_contracts import IngestionFailure, read_file
@@ -71,7 +71,8 @@ def main() -> int:
         fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None,
                             read_file(args.verifier_replay, MAX_REPLAY) if args.verifier_replay else None)
         authority = select_authority(args.sources, args.private_processing)
-        store = Store(args.state_dir, args.extraction_state_dir, args.ingestion_state_dir, existing=args.command == "inspect")
+        store = (open_job_inspection(Store, args.state_dir, args.extraction_state_dir, args.ingestion_state_dir, job_id=request.job_id, ledger="relation")
+                 if args.command == "inspect" else Store(args.state_dir, args.extraction_state_dir, args.ingestion_state_dir))
         factory = runtime_factory(authority) if args.command in {"run", "submit", "resume"} else None
         engine = Engine(store, Sources(args.ingestion_state_dir, authority), args.extraction_state_dir, args.ingestion_state_dir, factory)
         if args.command == "run":

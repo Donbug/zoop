@@ -54,7 +54,8 @@ class Kit(OfflineFixture):
     def ingest(self, name: str, documents: list[dict], *, slot: str | None = None) -> list[dict]:
         """documents: [{"supplier": str|None, "html": bytes, "published": iso|None, "url": str, "publisher": str|None}] -> exact observation refs.
 
-        `publisher` is the operator-declared outlet written into the real fixture item (absent or None: unspecified, no key)."""
+        `publisher` is the operator-declared outlet written into the real fixture item (absent or None: unspecified, no key). `slot` makes the round a timed one: its checked
+        window ends at that instant (`window.through`) and the manifest covers exactly it, like a `tick` round."""
         items, bodies = [], {}
         for index, document in enumerate(documents):
             ref = f"d{index}"

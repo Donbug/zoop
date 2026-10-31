@@ -94,7 +94,7 @@ def test_country_context_legacy_binding_withholds_without_rewriting_receipts(tmp
     w = build_world(tmp_path / "owned", ("Saudi Arabia",))
     out = converge(w, "current", [proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [world_cite(w, "main", SUP)], countries=["SA"])],
                    verify=lambda _: {"context": "insufficient"})
-    # As with tests/legacy_ledger.py, INSERT an isolated historical binding; do not disable immutable triggers or UPDATE receipts.
+    # Deliberately impossible mixed tuple: policy-1 could not consume current S2 adapter-3. Preserve copied receipts as a negative fixture.
     path = w.kit.root / "relation" / "relation.sqlite3"
     with sqlite3.connect(path) as db:
         db.row_factory = sqlite3.Row
@@ -123,7 +123,7 @@ def test_country_context_legacy_binding_withholds_without_rewriting_receipts(tmp
         assert historical["delivery"] == {"status": "withheld", "code": "job_binding_changed"}
         assert historical["calls"] == out["calls"] and "relations" not in historical
         held = out["relations"][0]
-        with pytest.raises(ExtractionFailure, match="job_binding_changed"):
+        with pytest.raises(ExtractionFailure, match="analysis_contract_changed"):
             engine.review(Review.model_validate({**w.kit.rsel("historical"), "relationCandidateId": held["relationCandidateId"],
                 "expectedRevision": held["eligibility"]["revision"], "decision": "allow", "reviewer": "authored", "note": "must not reinterpret"}))
     finally:

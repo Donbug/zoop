@@ -88,14 +88,14 @@ def inspect(root, ledger, job):
         store.close()
 
 
-def cli(root, ledger, command, request, *, initial=False):
+def cli(root, ledger, command, request, *, initial=False, state_dir=None):
     module = {"extraction": "extraction_cli", "relation": "relation_cli", "handoff": "handoff_cli", "graph": "graph_projection_cli"}[ledger]
     guard = ("import sys,runpy\n"
              "def deny(event,args):\n"
              " if event in {'socket.connect','socket.getaddrinfo','socket.gethostbyname','socket.bind'}: raise RuntimeError('network forbidden')\n"
              "sys.addaudithook(deny)\n"
              f"runpy.run_module('zoop_ai_pipeline.{module}',run_name='__main__')\n")
-    argv = [sys.executable, "-c", guard, command, "--state-dir", str(root / ledger)]
+    argv = [sys.executable, "-c", guard, command, "--state-dir", str(root / ledger if state_dir is None else state_dir)]
     if command != "recover":
         argv += ["--ingestion-state-dir", str(root / "ingestion"), "--sources", str(root / "sources.json")]
         if ledger in {"relation", "handoff", "graph"}:
@@ -421,7 +421,7 @@ def test_current_hot_wal_recovery_has_no_lifetime_copy_cap_and_history_stays_imm
     import io
     from scripts.relation_smoke import build_world
     from zoop_ai_pipeline import extraction_cli, ingestion_contracts, relation_cli
-    from zoop_ai_pipeline.extraction import mutation_job
+    from zoop_ai_pipeline.extraction import mutation_job, open_job_inspection
 
     world = build_world(tmp_path / "current")
     root, job = world.kit.root, "wal-only-target"
@@ -432,6 +432,14 @@ def test_current_hot_wal_recovery_has_no_lifetime_copy_cap_and_history_stays_imm
         RelationStore(root / ledger, *upstreams).close()
     request = (world.kit.submit(job, world.refs["main"], [world.snapshot]) if ledger == "extraction"
                else world.kit.rsubmit(job, world.s2))
+    historical = row(archive, ledger, "s2-a" if ledger == "extraction" else "rel-a")
+    unsupported = {**historical, "job_id": "unsupported-target"}
+    binding = json.loads(unsupported["binding"])
+    if ledger == "extraction":
+        binding["adapter"]["version"] = "zoop-extraction-native-replay-unknown"
+    else:
+        binding["versions"]["policy"] = "zoop-relation-policy-unknown"
+    unsupported["binding"] = canonical(binding)
     freeze_and_crash = """
 import json, os, sys
 from pathlib import Path
@@ -442,17 +450,21 @@ from zoop_ai_pipeline.relation import Engine, Store as RelationStore
 from zoop_ai_pipeline.relation_contracts import Submit as RelationSubmit
 root, ledger, replay = Path(sys.argv[1]), sys.argv[2], Path(sys.argv[3])
 source = Sources(root / "ingestion", Authority(root / "sources.json"))
-request = json.load(sys.stdin)
+payload = json.load(sys.stdin)
+request = payload["request"]
 if ledger == "extraction":
     store = Store(root / ledger, root / "ingestion")
     Extractor(store, source).freeze(Submit.model_validate(request), Fixtures(replay.read_bytes(), None))
 else:
     store = RelationStore(root / ledger, root / "extraction", root / "ingestion")
     Engine(store, source, root / "extraction", root / "ingestion").freeze(RelationSubmit.model_validate(request))
+for row in payload["otherRows"]:
+    store.db.execute("INSERT INTO jobs(" + ",".join(row) + ") VALUES(" + ",".join("?" for _ in row) + ")", tuple(row.values()))
 os._exit(0)
 """
     child = subprocess.run([sys.executable, "-c", freeze_and_crash, str(root), ledger, str(world.s2_replay)],
-                           input=canonical(request).encode(), capture_output=True, cwd=PIPELINE, timeout=60,
+                           input=canonical({"request": request, "otherRows": [historical, unsupported]}).encode(),
+                           capture_output=True, cwd=PIPELINE, timeout=60,
                            env={"PATH": "/usr/bin:/bin", "PYTHONDONTWRITEBYTECODE": "1"})
     assert child.returncode == 0 and child.stderr == b"", child.stderr
     database = root / ledger / (ledger + ".sqlite3")
@@ -469,6 +481,24 @@ os._exit(0)
     before = inventory(root)
     recovered = mutation_job(store_type, root / ledger, *upstreams, job_id=job, ledger=ledger)
     assert recovered["job_id"] == job and recovered["state"] == "queued"
+    assert inventory(root) == before
+    selector = {"schemaVersion": schema, "jobId": job}
+    code, inspected = cli(root, ledger, "inspect", selector)
+    assert code == 0 and inspected["state"] == "queued" and inspected["calls"] == []
+    assert inventory(root) == before
+    for target in (historical["job_id"], unsupported["job_id"]):
+        code, refused = cli(root, ledger, "inspect", {**selector, "jobId": target})
+        assert (code, refused["error"]["code"]) == (2, ledger + "_recovery_required")
+        assert inventory(root) == before
+    reader = open_job_inspection(store_type, root / ledger, *upstreams, job_id=job, ledger=ledger)
+    try:
+        with (root / ledger / (ledger + ".lock")).open("rb") as lock:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with pytest.raises(sqlite3.OperationalError, match="readonly"):
+            reader.db.execute("UPDATE jobs SET state='cancelled' WHERE job_id=?", (job,))
+    finally:
+        reader.close()
     assert inventory(root) == before
 
     def invoke(directory, target, command, replay=None):
@@ -504,7 +534,112 @@ os._exit(0)
                            env={"PATH": "/usr/bin:/bin", "PYTHONDONTWRITEBYTECODE": "1"})
     assert child.returncode == 0 and child.stderr == b"", child.stderr
     assert historical_db.with_name(historical_db.name + "-wal").stat().st_size > 0
+    for path in (archive / ledger).iterdir():
+        path.chmod(0o440)
+    (archive / ledger).chmod(0o550)
     before = inventory(archive)
-    code, result = invoke(archive, historical_job, command)
-    assert (code, result["error"]["code"]) == (2, "analysis_contract_changed")
-    assert inventory(archive) == before
+    try:
+        code, result = invoke(archive, historical_job, "inspect")
+        assert (code, result["error"]["code"]) == (2, ledger + "_recovery_required")
+        code, result = invoke(archive, historical_job, command)
+        assert (code, result["error"]["code"]) == (2, "analysis_contract_changed")
+        assert inventory(archive) == before
+    finally:
+        (archive / ledger).chmod(0o700)
+        for path in (archive / ledger).iterdir():
+            path.chmod(0o600)
+
+
+@pytest.mark.parametrize("ledger,schema", [("extraction", "zoop-extraction-s2-2"), ("relation", "zoop-relation-s3")])
+def test_cli_inspection_distinguishes_pristine_job_absence_from_partial_state(archive, tmp_path, ledger, schema):
+    state_dir = tmp_path / "fresh-native-state"
+    selector = {"schemaVersion": schema, "jobId": "first-service-job"}
+
+    def probe(expected):
+        before = inventory(tmp_path)
+        code, result = cli(archive, ledger, "inspect", selector, state_dir=state_dir)
+        assert (code, result) == (2, {"schemaVersion": schema, "error": {"code": expected}})
+        assert inventory(tmp_path) == before
+
+    probe("job_not_found")
+    state_dir.mkdir(mode=0o750)
+    probe("job_not_found")
+    (state_dir / (ledger + ".lock")).touch(mode=0o640)
+    probe(ledger + "_state_missing")
+    (state_dir / (ledger + ".sqlite3")).write_bytes(b"authored corrupt ledger")
+    probe(ledger + "_state_invalid")
+
+
+@pytest.mark.parametrize("ledger", ["extraction", "relation"])
+@pytest.mark.parametrize("boundary", ["unknown", "receipt", "stage"])
+def test_current_crash_inspection_preserves_wal_and_explicit_resume_receipts(tmp_path, ledger, boundary):
+    from scripts.relation_smoke import build_world, relation_reply
+
+    world = build_world(tmp_path / "current")
+    kit, job = world.kit, "interrupted-job"
+    root = kit.root
+    if ledger == "extraction":
+        selector = kit.job_selector(job)
+        runner, stage, content = kit.run, "extract", "eventCandidates"
+        runner("submit", kit.submit(job, world.refs["main"]), replay=world.s2_replay)
+        replay = world.s2_replay
+    else:
+        selector = kit.rsel(job)
+        runner, stage, content = kit.rel, "relation", "relations"
+        pending = runner("run", kit.rsubmit(job, world.s2))
+        assert pending["failure"]["code"] == "producer_replay_required"
+        replay = kit.fixture("producer", "empty-relations", [
+            ("relation", pending["failure"]["detail"]["requestDigest"], relation_reply([]))])
+    crash = "stage:" + stage if boundary == "stage" else boundary
+    runner("resume", selector, replay=replay, crash=crash, expected=75)
+    directory = root / ledger
+    assert (directory / (ledger + ".sqlite3-wal")).stat().st_size > 0
+    modes = {path: path.stat().st_mode & 0o777 for path in [directory, *directory.iterdir()]}
+    for path in modes:
+        path.chmod(0o550 if path.is_dir() else 0o440)
+    before = inventory(root)
+    try:
+        with pytest.raises(ExtractionFailure, match=ledger + "_recovery_required"):
+            if ledger == "extraction":
+                Store(directory, root / "ingestion", existing=True)
+            else:
+                RelationStore(directory, root / "extraction", root / "ingestion", existing=True)
+        with (directory / (ledger + ".lock")).open("rb") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            code, busy = cli(root, ledger, "inspect", selector)
+            assert (code, busy["error"]["code"]) == (2, ledger + "_busy")
+        code, interrupted = cli(root, ledger, "inspect", selector)
+        assert code == 0 and interrupted["state"] == "running"
+        assert interrupted["stages"][stage]["state"] == ("complete" if boundary == "stage" else "pending")
+        assert interrupted["usage"]["replayCalls"] == int(boundary != "unknown")
+        assert interrupted["usage"]["startedWithoutReceipt"] == int(boundary == "unknown")
+        assert len(interrupted["calls"]) == 1
+        assert cli(root, ledger, "inspect", selector) == (code, interrupted)
+        assert inventory(root) == before
+
+        registry = kit.registry_path.read_bytes()
+        authority = json.loads(registry)
+        authority["sources"][0]["grant"]["enabled"] = False
+        kit.registry_path.write_text(canonical(authority))
+        try:
+            revoked_before = inventory(root)
+            code, revoked = cli(root, ledger, "inspect", selector)
+            assert code == 2 and revoked["delivery"] == {"status": "withheld", "code": "source_unauthorized"}
+            assert content not in revoked and revoked["calls"] == interrupted["calls"]
+            assert inventory(root) == revoked_before
+        finally:
+            kit.registry_path.write_bytes(registry)
+        assert inventory(root) == before
+    finally:
+        for path, mode in modes.items():
+            path.chmod(mode)
+
+    settled = runner("resume", selector)
+    assert settled["state"] == ("reconciling" if boundary == "unknown" else "ready")
+    assert settled["usage"] == interrupted["usage"]
+    assert len(settled["calls"]) == 1
+    assert settled["calls"][0]["responseDigest"] == interrupted["calls"][0]["responseDigest"]
+    if boundary == "unknown":
+        assert settled["failure"]["code"] == "replay_response_unknown"
+        assert settled["resumeMode"] == "reconcile_only"
+    assert runner("resume", selector) == settled

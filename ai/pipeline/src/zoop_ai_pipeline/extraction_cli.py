@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .extraction import Extractor, Fixtures, LiveAccess, Sources, Store, current, mutation_job, open_legacy_history
+from .extraction import Extractor, Fixtures, LiveAccess, Sources, Store, current, mutation_job, open_job_inspection, open_legacy_history
 from .extraction_contracts import MAX_COMMAND, MAX_REPLAY, SCHEMA, EnqueueRound, ExtractionFailure, Selector, Submit, canonical
 from .extraction_enqueue import enqueue_round
 from .extraction_plan import plan_round, strict_json, verify_plan
@@ -144,7 +144,8 @@ def main() -> int:
             fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None,
                                 read_file(args.topic_replay, MAX_REPLAY) if args.topic_replay else None)
             authority = select_authority(args.sources, args.private_processing)
-            store = Store(args.state_dir, args.ingestion_state_dir, existing=args.command == "inspect")
+            store = (open_job_inspection(Store, args.state_dir, args.ingestion_state_dir, job_id=request.job_id, ledger="extraction")
+                     if args.command == "inspect" else Store(args.state_dir, args.ingestion_state_dir))
             extractor = Extractor(store, Sources(args.ingestion_state_dir, authority),
                                   LiveAccess(from_env=runtime_factory(authority)))
         if args.command == "run":

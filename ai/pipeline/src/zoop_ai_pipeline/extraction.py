@@ -15,7 +15,7 @@ import sqlite3
 import stat
 import uuid
 import tempfile
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -61,7 +61,7 @@ _RELATIONS = ("SAME", "DIFFERENT", "FOLLOWS", "CONFLICT", "HOLD")
 
 
 class Store:
-    def __init__(self, root: Path, ingestion_root: Path, *, existing: bool = False):
+    def __init__(self, root: Path, ingestion_root: Path, *, existing: bool = False, inspection_job: str | None = None):
         root, ingestion_root = Path(os.path.abspath(root)), Path(os.path.abspath(ingestion_root))
         forbidden = [*reserved_state_roots(), ingestion_root]
         if any(root == p or root.is_relative_to(p) or p.is_relative_to(root) for p in forbidden):
@@ -70,7 +70,7 @@ class Store:
             if parent.exists() and parent.is_symlink():
                 raise ExtractionFailure("state_namespace_invalid")
         if existing:
-            self._open_existing(root)
+            self._open_existing(root, inspection_job)
             return
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
         if any(p.name not in _FILES or p.is_symlink() for p in root.iterdir()):
@@ -113,10 +113,9 @@ class Store:
             self.close()
             raise
 
-    def _open_existing(self, root: Path):
-        """Read-only downstream access (same policy as the ingestion consumer): shared non-blocking flock on the existing lock, no
-        mkdir/chmod/create/PRAGMA/schema/WAL write, immutable read-only SQLite. A non-empty -wal is committed data a reader must not
-        ignore or recover, so the operator runs the extraction writer (resume) first. An active writer makes the reader fail busy."""
+    def _open_existing(self, root: Path, inspection_job: str | None = None):
+        """Shared, non-blocking read access. Downstream reads require a checkpointed original; targeted current-job inspection
+        may recover a private copy while retaining the original shared lock through projection."""
         database, lock = root / "extraction.sqlite3", root / "extraction.lock"
         if not root.is_dir() or not database.is_file() or not lock.is_file():
             raise ExtractionFailure("extraction_state_missing")
@@ -131,8 +130,12 @@ class Store:
         try:
             wal = root / "extraction.sqlite3-wal"
             if wal.exists() and wal.stat().st_size > 0:
-                raise ExtractionFailure("extraction_recovery_required")
-            self.db = sqlite3.connect(database.as_uri() + "?mode=ro&immutable=1", uri=True, isolation_level=None)
+                if inspection_job is None:
+                    raise ExtractionFailure("extraction_recovery_required")
+                self._snapshot = ExitStack()
+                self.db = self._snapshot.enter_context(_current_job_snapshot(root, "extraction", inspection_job, current))
+            else:
+                self.db = sqlite3.connect(database.as_uri() + "?mode=ro&immutable=1", uri=True, isolation_level=None)
             self.db.row_factory = sqlite3.Row
             self.db.execute("PRAGMA query_only=ON")
             self.db.execute("SELECT 1 FROM jobs LIMIT 1")
@@ -147,7 +150,9 @@ class Store:
             raise
 
     def close(self):
-        if hasattr(self, "db"):
+        if hasattr(self, "_snapshot"):
+            self._snapshot.close()
+        elif hasattr(self, "db"):
             self.db.close()
         if hasattr(self, "lock"):
             os.close(self.lock)
@@ -414,6 +419,18 @@ def load_live_deferral(store, attempt: str) -> dict | None:
     return json.loads(row["value"]) if row else None
 
 
+def open_job_inspection(store_type, root: Path, *upstream_roots: Path, job_id: str, ledger: str):
+    """Inspect one current crash target from a private copy; validated absent/empty namespaces prove job absence."""
+    try:
+        return store_type(root, *upstream_roots, existing=True, inspection_job=job_id)
+    except ExtractionFailure as exc:
+        if exc.code != f"{ledger}_state_missing":
+            raise
+        if not os.path.lexists(root) or (root.is_dir() and not any(root.iterdir())):
+            raise ExtractionFailure("job_not_found") from exc
+        raise
+
+
 def open_legacy_history(root: Path, ingestion_root: Path, job_id: str) -> "Store | None":
     """Ledger-only, read-only preflight. Returns an open read-only Store when the ledger holds `job_id` under a non-current adapter, else None.
 
@@ -473,6 +490,39 @@ def _copy_ledger_snapshot(source: Path, target: Path) -> None:
         os.close(fd)
 
 
+@contextmanager
+def _ledger_snapshot(root: Path, ledger: str):
+    """Recover DB+WAL only in a private directory; the caller holds the original shared lock until this view closes."""
+    with tempfile.TemporaryDirectory(prefix=f"zoop-{ledger}-snapshot-") as scratch:
+        directory = Path(scratch)
+        try:
+            for suffix in (".sqlite3", ".sqlite3-wal"):
+                _copy_ledger_snapshot(root / (ledger + suffix), directory / (ledger + suffix))
+        except ValueError as exc:
+            raise ExtractionFailure(f"{ledger}_state_invalid") from exc
+        db = sqlite3.connect(directory / f"{ledger}.sqlite3", isolation_level=None)
+        try:
+            db.row_factory = sqlite3.Row
+            db.execute("PRAGMA query_only=ON")
+            yield db
+        finally:
+            db.close()
+
+
+@contextmanager
+def _current_job_snapshot(root: Path, ledger: str, job_id: str, is_current):
+    with _ledger_snapshot(root, ledger) as db:
+        row = db.execute("SELECT binding FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+        try:
+            binding = json.loads(row["binding"]) if row is not None else None
+            supported = isinstance(binding, dict) and is_current(binding)
+        except (ValueError, TypeError):
+            supported = False
+        if not supported:
+            raise ExtractionFailure(f"{ledger}_recovery_required")
+        yield db
+
+
 def mutation_job(store_type, root: Path, *upstream_roots: Path, job_id: str, ledger: str):
     """Read a mutation target before opening its writer. Hot WALs are read only in a private copy.
 
@@ -498,21 +548,9 @@ def mutation_job(store_type, root: Path, *upstream_roots: Path, job_id: str, led
             fcntl.flock(lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise ExtractionFailure(f"{ledger}_busy") from exc
-        with tempfile.TemporaryDirectory(prefix=f"zoop-{ledger}-preflight-") as scratch:
-            directory = Path(scratch)
-            try:
-                for suffix in (".sqlite3", ".sqlite3-wal"):
-                    _copy_ledger_snapshot(root / (ledger + suffix), directory / (ledger + suffix))
-            except ValueError as exc:
-                raise ExtractionFailure(f"{ledger}_state_invalid") from exc
-            db = sqlite3.connect(directory / f"{ledger}.sqlite3")
-            try:
-                db.row_factory = sqlite3.Row
-                db.execute("PRAGMA query_only=ON")
-                row = db.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
-                return dict(row) if row is not None else None
-            finally:
-                db.close()
+        with _ledger_snapshot(root, ledger) as db:
+            row = db.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+            return dict(row) if row is not None else None
     finally:
         os.close(lock)
 

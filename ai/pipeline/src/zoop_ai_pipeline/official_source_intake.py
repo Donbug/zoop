@@ -20,6 +20,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from . import official_source_adapters as adapters
+from .collector_control import NO_CONTROL
 from .ingestion_contracts import IngestionFailure, Wire, byte_hash, canonical, digest, now, reserved_state_roots
 from .private_intake import _directory, _json, _publish, _read
 
@@ -375,7 +376,7 @@ def summary(config, state):
         "artifactBytes": artifacts, "discoveredCorpusExhausted": not (pending or unknown or refused or data["prerequisites"]), **USE}
 
 
-def run(config, command="run", *, runtime_key=None):
+def run(config, command="run", *, runtime_key=None, control=NO_CONTROL):
     if command not in {"run", "resume", "status"}:
         raise IngestionFailure("official_command_invalid")
     state = State(config, command)
@@ -400,6 +401,8 @@ def run(config, command="run", *, runtime_key=None):
             return summary(config, state)
         client = TrackedFetcher(config, state)
         while True:
+            if control.boundary():
+                break
             selected = next(((key, item) for key, item in state.data["tasks"].items() if item["status"] == "pending"), None)
             if selected is None:
                 break

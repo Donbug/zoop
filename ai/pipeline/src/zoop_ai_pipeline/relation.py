@@ -13,7 +13,7 @@ import os
 import sqlite3
 import uuid
 from collections.abc import Callable
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,7 +22,7 @@ from . import relation_rules as rules
 from . import country_context
 from .dependency_contracts import array, cites, invalid
 from .native_read_contracts import s3_historical, validate_s3_historical_read
-from .extraction import Extractor, Sources, cite_exact, live_physical_calls, live_usage, load_live_deferral, save_live_deferral, upstream_digest
+from .extraction import Extractor, Sources, _current_job_snapshot, cite_exact, live_physical_calls, live_usage, load_live_deferral, save_live_deferral, upstream_digest
 from .extraction import Store as ExtractionStore
 from .extraction_contracts import ObservationRef, ProviderResponseUnknown
 from .ingestion_contracts import byte_hash, now, reserved_state_roots
@@ -59,7 +59,7 @@ _STAGES = ("relation", "verify-relation", "impact", "verify-impact")
 
 
 class Store:
-    def __init__(self, root: Path, *upstream_roots: Path, existing: bool = False):
+    def __init__(self, root: Path, *upstream_roots: Path, existing: bool = False, inspection_job: str | None = None):
         root = Path(os.path.abspath(root))
         forbidden = [*reserved_state_roots(),
                      *(Path(os.path.abspath(p)) for p in upstream_roots)]
@@ -69,7 +69,7 @@ class Store:
             if parent.exists() and parent.is_symlink():
                 raise ExtractionFailure("state_namespace_invalid")
         if existing:
-            self._open_existing(root)
+            self._open_existing(root, inspection_job)
             return
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
         if any(p.name not in _FILES or p.is_symlink() for p in root.iterdir()):
@@ -111,10 +111,9 @@ class Store:
             self.close()
             raise
 
-    def _open_existing(self, root: Path):
-        """Read-only access for the S4 dependents report (same policy as the extraction and ingestion readers): shared non-blocking flock
-        on the existing lock, no mkdir/chmod/create/PRAGMA/schema/WAL write, immutable read-only SQLite. A non-empty -wal is committed data a
-        reader must not ignore or recover, so the operator runs the relation writer (resume) first. An active writer makes the reader fail busy."""
+    def _open_existing(self, root: Path, inspection_job: str | None = None):
+        """Shared, non-blocking read access. Downstream reads require a checkpointed original; targeted current-job inspection
+        may recover a private copy while retaining the original shared lock through projection."""
         database, lock = root / "relation.sqlite3", root / "relation.lock"
         if not root.is_dir() or not database.is_file() or not lock.is_file():
             raise ExtractionFailure("relation_state_missing")
@@ -129,8 +128,12 @@ class Store:
         try:
             wal = root / "relation.sqlite3-wal"
             if wal.exists() and wal.stat().st_size > 0:
-                raise ExtractionFailure("relation_recovery_required")
-            self.db = sqlite3.connect(database.as_uri() + "?mode=ro&immutable=1", uri=True, isolation_level=None)
+                if inspection_job is None:
+                    raise ExtractionFailure("relation_recovery_required")
+                self._snapshot = ExitStack()
+                self.db = self._snapshot.enter_context(_current_job_snapshot(root, "relation", inspection_job, current))
+            else:
+                self.db = sqlite3.connect(database.as_uri() + "?mode=ro&immutable=1", uri=True, isolation_level=None)
             self.db.row_factory = sqlite3.Row
             self.db.execute("PRAGMA query_only=ON")
             self.db.execute("SELECT 1 FROM jobs LIMIT 1")
@@ -145,7 +148,9 @@ class Store:
             raise
 
     def close(self):
-        if hasattr(self, "db"):
+        if hasattr(self, "_snapshot"):
+            self._snapshot.close()
+        elif hasattr(self, "db"):
             self.db.close()
         if hasattr(self, "lock"):
             os.close(self.lock)
