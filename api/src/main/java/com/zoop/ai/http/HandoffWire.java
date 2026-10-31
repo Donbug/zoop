@@ -14,7 +14,7 @@ import tools.jackson.databind.JsonNode;
  * alphabet and the {@code HdErrorEnvelope} decoder.
  */
 public final class HandoffWire {
-    static final String ENVELOPE_SCHEMA = "zoop-ai-internal-handoff-1";
+    public static final String ENVELOPE_SCHEMA = "zoop-ai-internal-handoff-1";
     /** The contract's handoff id ({@code HANDOFF_ID_PATTERN} on the AI side): the operator request and every route share it. */
     public static final Pattern HANDOFF_ID = Pattern.compile("[A-Za-z0-9._:-]{1,200}");
     /**

@@ -34,7 +34,7 @@ import tools.jackson.databind.node.ObjectNode;
  */
 public final class HandoffReadParser {
     static final String TRANSPORT = "internal-http";
-    static final String SCHEMA_VERSION = "zoop-ai-internal-handoff-1";
+    static final String SCHEMA_VERSION = com.zoop.ai.http.HandoffWire.ENVELOPE_SCHEMA;
 
     public VerifiedHandoff parse(HandoffRead read, GraphHandoffRequest request) {
         try {

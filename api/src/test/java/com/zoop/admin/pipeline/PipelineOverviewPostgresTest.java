@@ -176,6 +176,13 @@ class PipelineOverviewPostgresTest {
         assertEquals("job-runner", runs.get(0).get("source").stringValue());
         assertEquals(reported, runs.get(1).get("runId").stringValue(), "always the job id, so a run links to its job");
         assertEquals(4, runs.get(1).get("processed").intValue());
+
+        JsonNode rounds = after.get("rounds");
+        assertFalse(rounds.get("enabled").booleanValue(), "no round scheduler in this application");
+        assertTrue(rounds.get("nextSlotAt").isNull());
+        assertTrue(rounds.get("lastTickAt").isNull());
+        assertTrue(rounds.get("openRounds").longValue() >= 0);
+        assertTrue(rounds.get("recent").isArray());
         assertEquals(3, runs.get(1).get("usage").get("calls").intValue());
         assertEquals(failed, runs.get(2).get("runId").stringValue());
         assertTrue(runs.get(2).get("processed").isNull(), "no report: unknown, not zero");

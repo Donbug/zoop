@@ -34,16 +34,8 @@
 
 [A-ADM-03](screen-A-ADM-03.md)
 
-| 작업 | 메서드·목표 경로 | WBS | 권한 |
-| --- | --- | --- | --- |
-| [getPipelineOverview](../../api/out/zoop-api-spec.md#getpipelineoverview) | GET /api/v1/admin/pipeline/overview | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
-| [listAnalysisCandidates](../../api/out/zoop-api-spec.md#listanalysiscandidates) | GET /api/v1/admin/pipeline/candidates | 6.1.2, 6.11.1, 6.10.6, 6.10.7, 6.10.16 | 관리자(작업별 권한) |
-| [getAnalysisCandidate](../../api/out/zoop-api-spec.md#getanalysiscandidate) | GET /api/v1/admin/pipeline/candidates/{candidate_id} | 6.1.2, 6.11.1, 6.10.6, 6.10.7, 6.10.16 | 관리자(작업별 권한) |
-| [decideAnalysisCandidate](../../api/out/zoop-api-spec.md#decideanalysiscandidate) | POST /api/v1/admin/pipeline/candidates/{candidate_id}/decision | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 | 관리자(작업별 권한) |
-| [listPublicationRules](../../api/out/zoop-api-spec.md#listpublicationrules) | GET /api/v1/admin/pipeline/rules | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.5 | 관리자(작업별 권한) |
-| [setPublicationRule](../../api/out/zoop-api-spec.md#setpublicationrule) | PUT /api/v1/admin/pipeline/rules/{rule_id} | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 | 관리자(작업별 권한) |
-| [listAnalysisJobs](../../api/out/zoop-api-spec.md#listanalysisjobs) | GET /api/v1/admin/jobs | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4 | 관리자(작업별 권한) |
-| [createAnalysisJob](../../api/out/zoop-api-spec.md#createanalysisjob) | POST /api/v1/admin/jobs | 6.1.2, 6.11.1, 6.5.4, 6.5.5, 6.5.6, 6.5.7 | 관리자(작업별 권한) |
-| [getAnalysisJob](../../api/out/zoop-api-spec.md#getanalysisjob) | GET /api/v1/admin/jobs/{job_id} | 6.1.2, 6.11.1, 6.10.6, 6.10.16 | 관리자(작업별 권한) |
-| [retryAnalysisJob](../../api/out/zoop-api-spec.md#retryanalysisjob) | POST /api/v1/admin/jobs/{job_id}/retry | 6.1.2, 6.11.1, 6.10.7, 6.10.16 | 관리자(작업별 권한) |
-| [cancelAnalysisJob](../../api/out/zoop-api-spec.md#cancelanalysisjob) | POST /api/v1/admin/jobs/{job_id}/cancel | 6.1.2, 6.11.1, 6.10.7, 6.10.16 | 관리자(작업별 권한) |
+| 도메인 | 연결 작업 수 | 작업 목록 |
+| --- | --- | --- |
+| admin | 15 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
+
+작업별 FS/NFS 역링크와 전체 연결은 API 명세서 및 xlsx 추적표에 보존한다.

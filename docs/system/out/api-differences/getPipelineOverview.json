@@ -13,6 +13,192 @@
     "response:200:application/json.jobs.ingest.unresolvedFailures<anyOf:1>": {
       "type": "null"
     },
+    "response:200:application/json.rounds": {
+      "type": "object"
+    },
+    "response:200:application/json.rounds.enabled": {
+      "type": "boolean"
+    },
+    "response:200:application/json.rounds.enabled:required": true,
+    "response:200:application/json.rounds.lastTickAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "response:200:application/json.rounds.lastTickAt:required": false,
+    "response:200:application/json.rounds.nextSlotAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "response:200:application/json.rounds.nextSlotAt:required": false,
+    "response:200:application/json.rounds.openRounds": {
+      "type": "integer"
+    },
+    "response:200:application/json.rounds.openRounds:required": true,
+    "response:200:application/json.rounds.recent": {
+      "type": "array"
+    },
+    "response:200:application/json.rounds.recent:required": true,
+    "response:200:application/json.rounds.recent[]": {
+      "type": "object"
+    },
+    "response:200:application/json.rounds.recent[].activatedVersionId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.rounds.recent[].activatedVersionId:required": false,
+    "response:200:application/json.rounds.recent[].activationNote": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.rounds.recent[].activationNote:required": false,
+    "response:200:application/json.rounds.recent[].analysisJobId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.rounds.recent[].analysisJobId:required": false,
+    "response:200:application/json.rounds.recent[].attempts": {
+      "type": "integer"
+    },
+    "response:200:application/json.rounds.recent[].attempts:required": true,
+    "response:200:application/json.rounds.recent[].createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.rounds.recent[].createdAt:required": true,
+    "response:200:application/json.rounds.recent[].failureCode": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.rounds.recent[].failureCode:required": false,
+    "response:200:application/json.rounds.recent[].graphVersionId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.rounds.recent[].graphVersionId:required": false,
+    "response:200:application/json.rounds.recent[].handoff:required": false,
+    "response:200:application/json.rounds.recent[].handoff<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.rounds.recent[].handoff<anyOf:0>.bundleDigest": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.rounds.recent[].handoff<anyOf:0>.bundleDigest:required": false,
+    "response:200:application/json.rounds.recent[].handoff<anyOf:0>.handoffId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.rounds.recent[].handoff<anyOf:0>.handoffId:required": false,
+    "response:200:application/json.rounds.recent[].handoff<anyOf:0>.manifestDigest": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.rounds.recent[].handoff<anyOf:0>.manifestDigest:required": false,
+    "response:200:application/json.rounds.recent[].handoff<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.rounds.recent[].lease:required": false,
+    "response:200:application/json.rounds.recent[].lease<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.rounds.recent[].lease<anyOf:0>.owner": {
+      "type": "string"
+    },
+    "response:200:application/json.rounds.recent[].lease<anyOf:0>.owner:required": true,
+    "response:200:application/json.rounds.recent[].lease<anyOf:0>.until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.rounds.recent[].lease<anyOf:0>.until:required": true,
+    "response:200:application/json.rounds.recent[].lease<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.rounds.recent[].nextAttemptAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "response:200:application/json.rounds.recent[].nextAttemptAt:required": false,
+    "response:200:application/json.rounds.recent[].plan:required": false,
+    "response:200:application/json.rounds.recent[].plan<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.rounds.recent[].plan<anyOf:0>.planDigest": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.rounds.recent[].plan<anyOf:0>.planDigest:required": false,
+    "response:200:application/json.rounds.recent[].plan<anyOf:0>.planId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.rounds.recent[].plan<anyOf:0>.planId:required": false,
+    "response:200:application/json.rounds.recent[].plan<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.rounds.recent[].roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.rounds.recent[].roundId:required": true,
+    "response:200:application/json.rounds.recent[].slotAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.rounds.recent[].slotAt:required": true,
+    "response:200:application/json.rounds.recent[].stage": {
+      "type": "string",
+      "enum": [
+        "scheduled",
+        "run_requested",
+        "plan_ready",
+        "analysis_queued",
+        "analysis_done",
+        "freeze_requested",
+        "handoff_ready",
+        "imported",
+        "skipped",
+        "failed"
+      ]
+    },
+    "response:200:application/json.rounds.recent[].stage:required": true,
+    "response:200:application/json.rounds.recent[].startedBy": {
+      "type": "string"
+    },
+    "response:200:application/json.rounds.recent[].startedBy:required": true,
+    "response:200:application/json.rounds.recent[].updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.rounds.recent[].updatedAt:required": true,
+    "response:200:application/json.rounds:required": false,
     "response:200:application/json.runs[].usage<anyOf:0>": {
       "type": "object"
     },

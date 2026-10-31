@@ -78,9 +78,9 @@ public class GraphHandoffImportConfiguration {
     }
 
     /**
-     * The CLI export, or the read-only handoff HTTP client that {@code zoop.ai.handoff-read-client} registers. The two are
-     * exclusive in both directions: {@code http} needs the client, and {@code cli} must not have one (a {@code handoff.read}
-     * token nobody uses would only suggest an authority this run does not have, the rule the CLI-only settings follow).
+     * The CLI export, or the read-only handoff HTTP client that {@code zoop.ai.handoff-read-client} registers. {@code http} needs
+     * the client; {@code cli} ignores one that is enabled (the same environment serves the web application's round bridge, which
+     * needs it), unlike the CLI-only settings, which belong to this import alone.
      */
     static HandoffSource handoffSource(GraphHandoffImportSettings settings, ObjectProvider<HandoffReadClient> handoffReads) {
         HandoffReadClient client = handoffReads.getIfAvailable();
@@ -90,10 +90,6 @@ public class GraphHandoffImportConfiguration {
                         "http requires zoop.ai.handoff-read-client.enabled=true");
             }
             return new HttpHandoffSource(client);
-        }
-        if (client != null) {
-            throw new GraphHandoffImportConfigurationException("handoff-source",
-                    "cli must not be combined with zoop.ai.handoff-read-client.enabled=true");
         }
         return new CliHandoffSource(ProcessHandoffExporter.forSettings(settings));
     }
