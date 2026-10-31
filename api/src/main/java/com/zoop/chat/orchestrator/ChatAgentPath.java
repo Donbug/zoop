@@ -5,6 +5,7 @@ import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolResult;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -47,19 +48,23 @@ public interface ChatAgentPath {
     }
 
     /**
-     * The final answer, the results of the calls that ran (as the model received them), and what the run decided: steps,
-     * approved and denied calls. {@code notices} are the codes of web faults the answer went on without (web search design
-     * 4: {@code web_unavailable}, {@code web_no_results}, {@code web_budget_exhausted}).
+     * The final answer, the results of the calls that ran (as the model received them), the requirements each was approved
+     * for ({@code served}, by tool call id), and what the run decided: steps, approved and denied calls. {@code notices} are
+     * the codes of web faults the answer went on without (web search design 4: {@code web_unavailable},
+     * {@code web_no_results}, {@code web_budget_exhausted}).
      */
-    record Outcome(ChatGeneratedAnswer answer, List<ChatToolResult> results, int steps, int approved, int denied,
-            List<String> notices) {
+    record Outcome(ChatGeneratedAnswer answer, List<ChatToolResult> results, Map<String, List<String>> served, int steps,
+            int approved, int denied, List<String> notices) {
         public Outcome {
             results = List.copyOf(results);
+            served = Map.copyOf(served);
             notices = List.copyOf(notices);
         }
 
-        public Outcome(ChatGeneratedAnswer answer, List<ChatToolResult> results, int steps, int approved, int denied) {
-            this(answer, results, steps, approved, denied, List.of());
+        /** The results of the calls approved for this requirement. */
+        public List<ChatToolResult> resultsOf(String requirementId) {
+            return results.stream().filter(r -> served.getOrDefault(r.toolCallId(), List.of()).contains(requirementId))
+                    .toList();
         }
     }
 }

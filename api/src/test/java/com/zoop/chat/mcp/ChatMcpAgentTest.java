@@ -127,7 +127,10 @@ class ChatMcpAgentTest {
             for (ChatModels.Decision decision : input.decisions()) {
                 if (!decision.approve()) continue;
                 var request = asked.get(decision.approvalRequestId());
-                made.add(tools.call(context, new McpSchema.CallToolRequest(request.toolName(), request.arguments())));
+                // The provider calls with the arguments the model wrote, the requirements still among them.
+                Map<String, Object> called = new HashMap<>(request.arguments());
+                called.put(ChatMcpTools.REQUIREMENT_IDS, request.requirementIds());
+                made.add(tools.call(context, new McpSchema.CallToolRequest(request.toolName(), called)));
             }
             ChatModels.AgentStep next = script.get(Math.min(step, script.size()) - 1).apply(step);
             next.approvals().forEach(a -> asked.put(a.id(), a));
@@ -135,8 +138,13 @@ class ChatMcpAgentTest {
         }
     }
 
+    /** A call serving the run's one requirement, as most scripts ask it. */
+    private static ChatModels.ApprovalRequest ask(String id, String tool, Map<String, Object> arguments) {
+        return new ChatModels.ApprovalRequest(id, tool, arguments, List.of("r1"));
+    }
+
     private static ChatModels.AgentStep held(String id, String tool, Map<String, Object> arguments) {
-        return new ChatModels.AgentStep("resp_" + id, List.of(new ChatModels.ApprovalRequest(id, tool, arguments)), null);
+        return new ChatModels.AgentStep("resp_" + id, List.of(ask(id, tool, arguments)), null);
     }
 
     private static ChatModels.AgentStep done() {
@@ -144,7 +152,7 @@ class ChatMcpAgentTest {
     }
 
     private static ChatModels.AgentStep heldAt(long inputTokens) {
-        return new ChatModels.AgentStep("resp_a", List.of(new ChatModels.ApprovalRequest("a", "company_read",
+        return new ChatModels.AgentStep("resp_a", List.of(ask("a", "company_read",
                 Map.of("targets", List.of("KRX:000660")))), null, inputTokens);
     }
 
@@ -243,11 +251,11 @@ class ChatMcpAgentTest {
     }
 
     private static ChatModels.ApprovalRequest search(String id, String query) {
-        return new ChatModels.ApprovalRequest(id, "web_search", Map.of("targets", List.of(query)));
+        return ask(id, "web_search", Map.of("targets", List.of(query)));
     }
 
     private static ChatModels.ApprovalRequest read(String id, String company) {
-        return new ChatModels.ApprovalRequest(id, "company_read", Map.of("targets", List.of(company)));
+        return ask(id, "company_read", Map.of("targets", List.of(company)));
     }
 
     private static ChatModels.AgentStep round(long inputTokens, ChatModels.ApprovalRequest... requests) {
@@ -319,7 +327,7 @@ class ChatMcpAgentTest {
         assertTrue(tools.exposed().contains(ChatCapability.WEB_SEARCH), "the web search is an MCP tool when registered");
         // Round 1: the web first is refused; the company read runs and finds nothing.
         luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(search("w0", "HBM"),
-                new ChatModels.ApprovalRequest("c1", "company_read", Map.of("targets", List.of("KRX:000660")))), null));
+                ask("c1", "company_read", Map.of("targets", List.of("KRX:000660")))), null));
         // Round 2: a query about the member is refused, a public one runs.
         luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(search("w1", "SK하이닉스 보유 수량"),
                 search("w2", "HBM")), null));
@@ -360,11 +368,98 @@ class ChatMcpAgentTest {
         assertEquals(2, outcome.results().getFirst().webResults().size());
     }
 
+    private static ChatModels.ApprovalRequest serving(String id, String company, String... requirements) {
+        return new ChatModels.ApprovalRequest(id, "company_read", Map.of("targets", List.of(company)), List.of(requirements));
+    }
+
+    private ChatAgentPath.Outcome runFor(ChatModels.AgentRequirement... requirements) {
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit());
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        return agent.run(attached.run(), attached.control(), List.of(requirements), List.of(ChatCapability.COMPANY_READ), 20,
+                steps(false));
+    }
+
+    private static final ChatModels.AgentRequirement HYNIX_PART =
+            new ChatModels.AgentRequirement("r1", "SK하이닉스", false, List.of("KRX:000660"));
+    private static final ChatModels.AgentRequirement SAMSUNG_PART =
+            new ChatModels.AgentRequirement("r2", "삼성전자", false, List.of("KRX:005930"));
+
+    @Test
+    void aCallNamingNoRequirementOfTheRunIsDeniedAndNeverRuns() {
+        luna.script.add(n -> round(1_000, serving("a", "KRX:000660"), serving("b", "KRX:000660", "r9"),
+                serving("c", "KRX:000660", "r1", "r9")));
+        luna.script.add(n -> done());
+
+        var outcome = runFor(HYNIX_PART);
+
+        assertEquals(0, outcome.approved());
+        assertEquals(3, outcome.denied());
+        assertTrue(luna.made.isEmpty());
+    }
+
+    @Test
+    void aResultServesOnlyTheRequirementsItsCallNamedAndTheLedgerSaysSo() {
+        luna.script.add(n -> round(1_000, serving("a", "KRX:000660", "r1"), serving("b", "KRX:005930", "r2")));
+        luna.script.add(n -> done());
+
+        var outcome = runFor(HYNIX_PART, SAMSUNG_PART);
+
+        assertEquals(2, outcome.results().size());
+        assertEquals(List.of("KRX:000660"), outcome.resultsOf("r1").getFirst().items().stream().map(i -> i.id()).toList());
+        assertEquals(1, outcome.resultsOf("r1").size());
+        assertEquals(List.of("KRX:005930"), outcome.resultsOf("r2").getFirst().items().stream().map(i -> i.id()).toList());
+        assertEquals(1, outcome.resultsOf("r2").size());
+        var kept = store.keptToolResults(JOB, 1);
+        assertTrue(kept.get(0).requestMeta().contains("\"requirementIds\":[\"r1\"]"), kept.get(0).requestMeta());
+        assertTrue(kept.get(1).requestMeta().contains("\"requirementIds\":[\"r2\"]"), kept.get(1).requestMeta());
+    }
+
+    @Test
+    void aTargetIsReachableOnlyForTheRequirementsThatResolvedOrReturnedIt() {
+        luna.script.add(n -> round(1_000, serving("a", "KRX:005930", "r1"), serving("b", "KRX:005930", "r1", "r2")));
+        luna.script.add(n -> done());
+
+        var outcome = runFor(HYNIX_PART, SAMSUNG_PART);
+
+        assertEquals(List.of(new ChatModels.Decision("a", false), new ChatModels.Decision("b", true)),
+                luna.inputs.get(1).decisions(), "r2's company is out of r1's reach until a call names r2 too");
+        assertEquals(1, outcome.resultsOf("r1").size());
+        assertEquals(1, outcome.resultsOf("r2").size());
+    }
+
+    @Test
+    void aReadServingOnlyAConceptIsDenied() {
+        luna.script.add(n -> round(1_000, serving("a", "KRX:000660", "r1"), serving("b", "KRX:000660", "r1", "r2")));
+        luna.script.add(n -> done());
+
+        var outcome = runFor(new ChatModels.AgentRequirement("r1", "HBM이 뭐야", true, List.of()),
+                new ChatModels.AgentRequirement("r2", "SK하이닉스", false, List.of("KRX:000660")));
+
+        assertEquals(List.of(new ChatModels.Decision("a", false), new ChatModels.Decision("b", true)),
+                luna.inputs.get(1).decisions());
+        assertEquals(1, outcome.approved());
+    }
+
+    @Test
+    void theSameReadForAnotherRequirementIsReadOnceAndServesBoth() {
+        luna.script.add(n -> round(1_000, serving("a", "KRX:000660", "r1")));
+        luna.script.add(n -> round(1_000, serving("b", "KRX:000660", "r2")));
+        luna.script.add(n -> done());
+
+        var outcome = runFor(HYNIX_PART, new ChatModels.AgentRequirement("r2", "SK하이닉스 공급망", false, List.of("KRX:000660")));
+
+        assertEquals(2, outcome.approved());
+        assertTrue(luna.made.get(1).structuredContent() instanceof Map<?, ?> second && second.containsKey("cachedFrom"),
+                "the requirements are no part of the request, so the second call reuses the first read");
+        assertEquals(1, outcome.resultsOf("r1").size());
+        assertEquals(1, outcome.resultsOf("r2").size());
+    }
+
     @Test
     void aMixedConceptAndFactRunCannotUseTheConceptExceptionForAFactQuery() {
         useWeb();
         luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(search("w0", "SK하이닉스 최신 소식"),
-                new ChatModels.ApprovalRequest("c1", "company_read", Map.of("targets", List.of("KRX:000660")))), null));
+                serving("c1", "KRX:000660", "r2")), null));
         luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(search("w1", "SK하이닉스 최신 소식")), null));
         luna.script.add(n -> done());
         var circuit = new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
@@ -474,7 +569,7 @@ class ChatMcpAgentTest {
     void atMostFourCallsAreApprovedInARoundSoAtMostFourRunAtOnce() {
         // Five reachable calls asked at once (the resolved company at five result limits): the fifth waits a round.
         luna.script.add(n -> new ChatModels.AgentStep("resp_1", java.util.stream.IntStream.rangeClosed(1, 5)
-                .mapToObj(i -> new ChatModels.ApprovalRequest("mcpr_" + i, "company_read",
+                .mapToObj(i -> ask("mcpr_" + i, "company_read",
                         Map.of("targets", List.of("KRX:000660"), "limit", i)))
                 .toList(), null));
         luna.script.add(n -> done());
@@ -492,15 +587,15 @@ class ChatMcpAgentTest {
     void aTargetTheServerNeverResolvedAndNoApprovedCallReturnedIsDenied() {
         // Round 1: an id nobody resolved is denied; the resolved company is approved.
         luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(
-                new ChatModels.ApprovalRequest("mcpr_guess", "company_read", Map.of("targets", List.of("KRX:999999"))),
-                new ChatModels.ApprovalRequest("mcpr_known", "company_read", Map.of("targets", List.of("KRX:000660")))),
+                ask("mcpr_guess", "company_read", Map.of("targets", List.of("KRX:999999"))),
+                ask("mcpr_known", "company_read", Map.of("targets", List.of("KRX:000660")))),
                 null));
         // Round 2: a company the approved call returned is now reachable; one mixed with a guess is not.
         luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(
-                new ChatModels.ApprovalRequest("mcpr_related", "company_read", Map.of("targets", List.of("KRX:005930"))),
-                new ChatModels.ApprovalRequest("mcpr_mixed", "company_read",
+                ask("mcpr_related", "company_read", Map.of("targets", List.of("KRX:005930"))),
+                ask("mcpr_mixed", "company_read",
                         Map.of("targets", List.of("KRX:005930", "KRX:999999"))),
-                new ChatModels.ApprovalRequest("mcpr_shape", "company_read", Map.of("targets", "KRX:005930"))),
+                ask("mcpr_shape", "company_read", Map.of("targets", "KRX:005930"))),
                 null));
         luna.script.add(n -> done());
 

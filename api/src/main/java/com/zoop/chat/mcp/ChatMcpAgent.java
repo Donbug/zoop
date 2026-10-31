@@ -14,6 +14,7 @@ import com.zoop.chat.tool.ChatToolPath;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.chat.tool.ChatToolRunner;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -25,12 +26,13 @@ import tools.jackson.databind.json.JsonMapper;
  * steps, and every tool call Luna proposes is decided here and only here.
  *
  * <ul>
- * <li>A proposed call is approved exactly when it names one of the run's allowed tools, every target it names is reachable,
- * fewer than {@link #MAX_ROUND_CALLS} calls were approved in its round and {@link ChatMcpTools#approve} reserves it (valid
- * arguments, within the attempt's call limit); otherwise it is denied.
- * Reachable are the ids the server resolved for the requirements and, from the next round on, the ids the calls it
- * approved returned (items, their companies, path endpoints and steps, evidence). Nothing is approved without being
- * reserved, and a denied call never runs.</li>
+ * <li>A proposed call is approved exactly when it names one of the run's allowed tools and the run's requirements it serves,
+ * every target it names is reachable, fewer than {@link #MAX_ROUND_CALLS} calls were approved in its round and
+ * {@link ChatMcpTools#approve} reserves it (valid arguments, within the attempt's call limit); otherwise it is denied.
+ * Reachable for a requirement are the ids the server resolved for it and, from the next round on, the ids returned by the
+ * approved calls that serve it (items, their companies, path endpoints and steps, evidence); a call may use those of the
+ * requirements it names. Nothing is approved without being reserved, and a denied call never runs.</li>
+ * <li>A read serves at least one requirement that is no general concept: a concept part never rests on internal reads.</li>
  * <li>At most {@link #MAX_ROUNDS} rounds of approvals (the dependency rounds of ZOOP-AIG-001 6.3.3). The step after the last
  * round denies whatever is still asked, so Luna answers from what it has; a run that still asks after that is a failed
  * model step, never an endless loop.</li>
@@ -41,7 +43,8 @@ import tools.jackson.databind.json.JsonMapper;
  * job's and the day's web budgets when it is reserved; a spent budget denies it and is reported as
  * {@code web_budget_exhausted}.</li>
  * <li>The final answer is returned with the results of the calls that ran, read back from {@code chat_tool_calls.result}:
- * exactly what the model received, whichever instance served the call. Results are never synthesized for a denied
+ * exactly what the model received, whichever instance served the call, with the requirements each one was approved for:
+ * a section may cite only the results of its own requirements. Results are never synthesized for a denied
  * call. Beside it go the web faults the answer went on without: an approved search that left no result
  * ({@code web_unavailable}), one that found nothing ({@code web_no_results}), a spent budget.</li>
  * </ul>
@@ -93,9 +96,13 @@ public final class ChatMcpAgent implements ChatAgentPath {
         String token = grants.issue(run, allowed);
         List<String> names = allowed.stream().map(ChatMcpTools::name).toList();
         var attached = new ChatJobExecutor.Attached(run, control);
-        // The ids a call may target: what the server resolved for the requirements, then what approved calls returned.
-        Set<String> reachable = new LinkedHashSet<>();
-        requirements.forEach(r -> reachable.addAll(r.targets()));
+        // The ids a call may target, by requirement: what the server resolved for it, then what the calls serving it returned.
+        Map<String, Set<String>> reachable = new LinkedHashMap<>();
+        requirements.forEach(r -> reachable.put(r.id(), new LinkedHashSet<>(r.targets())));
+        Set<String> concepts = new LinkedHashSet<>();
+        requirements.stream().filter(ChatModels.AgentRequirement::general).forEach(r -> concepts.add(r.id()));
+        // The requirements each approved call serves, by its id on the ledger.
+        Map<String, List<String>> served = new LinkedHashMap<>();
         String previous = null;
         List<ChatModels.Decision> decisions = List.of();
         int approved = 0;
@@ -104,8 +111,8 @@ public final class ChatMcpAgent implements ChatAgentPath {
         long inputTokens = 0;
         Set<String> notices = new LinkedHashSet<>();
         String web = ChatMcpTools.name(ChatCapability.WEB_SEARCH);
-        // Approval requests do not identify the requirement they serve. In a mixed run, a first-round query could be for a
-        // fact requirement and bypass its internal-first rule, so only a concept-only run gets the early search.
+        // The web's gate is still decided for the run, not by the requirements a search names, so in a mixed run a first-round
+        // query could bypass a fact requirement's internal-first rule: only a concept-only run gets the early search.
         boolean conceptOnly = !requirements.isEmpty()
                 && requirements.stream().allMatch(ChatModels.AgentRequirement::general);
         for (int step = 1, rounds = 0; ; step++) {
@@ -122,7 +129,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
             }
             if (outcome.completed()) {
                 List<ChatToolResult> results = kept(run);
-                return new Outcome(outcome.answer(), results, step, approved, denied,
+                return new Outcome(outcome.answer(), results, served, step, approved, denied,
                         webNotices(results, webApproved, notices, withheldWeb(run)));
             }
             if (rounds > MAX_ROUNDS) {
@@ -141,23 +148,28 @@ public final class ChatMcpAgent implements ChatAgentPath {
             boolean closing = rounds > MAX_ROUNDS || steps.closing() || inputTokens + 2 * last > ChatModels.MAX_INPUT_TOKENS;
             if (closing) rounds = MAX_ROUNDS + 1;
             List<ChatToolResult> done = closing ? List.of() : kept(run);
-            done.forEach(result -> reachable.addAll(reached(result)));
+            done.forEach(result -> served.getOrDefault(result.toolCallId(), List.of())
+                    .forEach(id -> reachable.get(id).addAll(reached(result))));
             boolean webOpen = unmet(done);
             List<ChatModels.Decision> next = new ArrayList<>();
             int round = 0;
             for (ChatModels.ApprovalRequest request : outcome.approvals()) {
                 boolean approve = false;
                 boolean search = web.equals(request.toolName());
-                // Only the run's own tools on ids the server resolved or a call it approved returned: neither the
-                // provider's allowed_tools nor the prompt's "never guess an id" is a server-side check. Past four in a
-                // round the rest are denied; Luna may ask for them again in the next round.
+                // Only the run's own tools, for its requirements, on ids the server resolved for them or a call serving them
+                // returned: neither the provider's allowed_tools nor the prompt's "never guess an id" is a server-side
+                // check. Past four in a round the rest are denied; Luna may ask for them again in the next round.
+                List<String> serves = request.requirementIds();
                 if (!closing && round < MAX_ROUND_CALLS && names.contains(request.toolName())
+                        && !serves.isEmpty() && reachable.keySet().containsAll(serves)
                         && (search ? webOpen || conceptOnly && webApproved == 0
-                                : targetsReachable(request.arguments(), reachable))) {
-                    ChatMcpTools.Approval approval = tools.approve(attached, request.toolName(), request.arguments());
+                                : !concepts.containsAll(serves)
+                                        && targetsReachable(request.arguments(), reachableFor(serves, reachable)))) {
+                    ChatMcpTools.Approval approval = tools.approve(attached, request.toolName(), request.arguments(), serves);
                     if (ChatMcpTools.RUN_NOT_ACTIVE.equals(approval.refused())) throw new ChatRunSuperseded();
                     if (ChatMcpTools.WEB_BUDGET_EXHAUSTED.equals(approval.refused())) notices.add(WEB_BUDGET_EXHAUSTED);
                     approve = approval.approved();
+                    if (approve) served.put(approval.toolCallId(), serves);
                     if (approve && search) webApproved++;
                 }
                 next.add(new ChatModels.Decision(request.id(), approve));
@@ -179,7 +191,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
 
     /**
      * Whether ZOOP's own reads left something for the web: an approved internal read that found nothing within its scope
-     * or was cut by a limit. Approval requests carry no requirement, so this is decided for the run (api/docs/chat-mcp.md 5, item 4).
+     * or was cut by a limit. Decided for the run, whichever requirement the read served.
      */
     static boolean unmet(List<ChatToolResult> done) {
         return done.stream().anyMatch(r -> !ChatCapability.WEB_SEARCH.id().equals(r.capabilityId())
@@ -224,6 +236,12 @@ public final class ChatMcpAgent implements ChatAgentPath {
         if (!arguments.containsKey("targets")) return true;
         if (!(arguments.get("targets") instanceof List<?> targets)) return false;
         return targets.stream().allMatch(target -> target instanceof String id && reachable.contains(id));
+    }
+
+    private static Set<String> reachableFor(List<String> requirementIds, Map<String, Set<String>> reachable) {
+        Set<String> ids = new LinkedHashSet<>();
+        requirementIds.forEach(id -> ids.addAll(reachable.get(id)));
+        return ids;
     }
 
     /** The ids a result made known: its items and their companies, path endpoints and steps, and its evidence. */

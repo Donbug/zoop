@@ -132,12 +132,13 @@ class ChatModelStagesTest {
                 List.of("KRX:000660"));
         answer = call -> succeeded(call, """
                 {"responseId":"resp_1","status":"approval_required","mcpCalls":[],"answer":null,
-                 "approvalRequests":[{"approvalRequestId":"mcpr_1","toolName":"company_read","arguments":{"targets":["KRX:000660"],"limit":null}}]}""");
+                 "approvalRequests":[{"approvalRequestId":"mcpr_1","toolName":"company_read","arguments":{"targets":["KRX:000660"],"limit":null},"requirementIds":["r1"]}]}""");
         var held = stages.step(run(root("SK하이닉스 최근 사건")), 1, new com.zoop.chat.orchestrator.ChatModels.AgentInput(
                 List.of(requirement), "zmcp1.k1.payload.mac-synthetic", List.of("company_read"), "authored-replay", 20, null,
                 List.of()));
         assertFalse(held.completed());
         assertEquals("company_read", held.approvals().getFirst().toolName());
+        assertEquals(List.of("r1"), held.approvals().getFirst().requirementIds());
         assertTrue(held.approvals().getFirst().arguments().containsKey("limit"), "an explicit null is kept for the server check");
 
         var first = calls.getFirst();
