@@ -267,6 +267,35 @@ class GraphHandoffImportConfigurationTest {
     }
 
     @Test
+    void sealReusesHttpSourceWithNullCliPathsAndOwnsTheOnlyResult() {
+        var dataSource = org.mockito.Mockito.mock(javax.sql.DataSource.class);
+        runner().withUserConfiguration(AiHandoffReadClientConfiguration.class,
+                        com.zoop.graph.delivery.seal.GraphDeliverySealConfiguration.class)
+                .withBean(javax.sql.DataSource.class, () -> dataSource)
+                .withBean(org.springframework.jdbc.core.JdbcTemplate.class, () -> new org.springframework.jdbc.core.JdbcTemplate(dataSource))
+                .withBean(org.springframework.transaction.PlatformTransactionManager.class,
+                        () -> org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class))
+                .withBean(com.zoop.graph.version.GraphVersionRepository.class,
+                        () -> org.mockito.Mockito.mock(com.zoop.graph.version.GraphVersionRepository.class))
+                .withPropertyValues(httpValues("ZOOP_GRAPH_HANDOFF_IMPORT_RESULT", "",
+                        "ZOOP_GRAPH_DELIVERY_SEAL_ENABLED", "true", "ZOOP_GRAPH_DELIVERY_SEAL_DESTINATION_ID", "serving-http",
+                        "ZOOP_GRAPH_DELIVERY_SEAL_RESULT", base.resolve("seal.json").toString(),
+                        "ZOOP_GRAPH_AUTO_ACTIVATION_ENABLED", "false"))
+                .withPropertyValues("spring.flyway.enabled=false")
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertNotNull(context.getBean(com.zoop.graph.delivery.seal.GraphDeliverySealer.class));
+                    assertNotNull(context.getBean(GraphHandoffImporter.class));
+                    assertTrue(context.getBeansOfType(GraphHandoffRunner.class).isEmpty());
+                    var settings = context.getBean(GraphHandoffImportSettings.class);
+                    assertEquals(GraphHandoffImportSettings.HandoffSourceKind.HTTP, settings.handoffSource());
+                    assertNull(settings.handoffState());
+                    assertEquals(base.resolve("seal.json"), settings.result());
+                    org.mockito.Mockito.verifyNoInteractions(dataSource);
+                });
+    }
+
+    @Test
     void aBlankHandoffSourceIsTheCliDefaultAndAnEnabledReadClientDoesNotDisturbTheCli() {
         runner().withPropertyValues(with("ZOOP_GRAPH_HANDOFF_IMPORT_HANDOFF_SOURCE", "")).run(context -> {
             assertNull(context.getStartupFailure());

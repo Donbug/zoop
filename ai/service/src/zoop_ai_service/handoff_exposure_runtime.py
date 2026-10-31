@@ -41,5 +41,8 @@ class HandoffExposureProcess:
         cfg = self._exposure
         argv = [str(cfg.command), "--state-dir", str(cfg.state_dir)]
         if query.changed.kind != "s3-relation":
-            argv += ["--ingestion-state-dir", str(cfg.ingestion_state_dir), "--extraction-state-dir", str(cfg.extraction_state_dir)]
+            if cfg.source_contexts:
+                argv += ["--source-contexts", str(cfg.source_contexts), "--source-contexts-sha256", cfg.source_contexts_sha256]
+            else:
+                argv += ["--ingestion-state-dir", str(cfg.ingestion_state_dir), "--extraction-state-dir", str(cfg.extraction_state_dir)]
         return self._runner.execute(argv, query.wire(), self._deadlines.handoff, interpret=interpret)

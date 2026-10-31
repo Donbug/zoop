@@ -39,7 +39,7 @@ def test_the_hand_authored_review_is_a_valid_decisions_file_in_every_decision_an
     world = shared
     for decision, reason, quotes in (("ALLOW", "stated", [hs.PERIOD_A]), ("HOLD", "ambiguous", [hs.PERIOD_A]), ("REJECT", "contradicted", [hs.PERIOD_A]), ("HOLD", "unstated", [])):
         doc = hs.decisions_doc(world, verdicts={"issue:supply": [hs.field_verdict(world, "a", "m-a", "period", "2026Q3", decision, reason, quotes)]})
-        assert doc["schemaVersion"] == "zoop-public-decisions-3"
+        assert doc["schemaVersion"] == "zoop-public-decisions-4"
         Decisions.model_validate(doc)
 
 
@@ -91,7 +91,7 @@ def test_a_decisions_file_without_the_verdict_list_or_of_the_earlier_schema_is_r
 
 def test_the_review_is_exported_as_hand_written_and_withholds_exactly_what_the_selection_basis_rejects(verdict_bundle, shared):
     bundle = verdict_bundle
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8"
     assert {i["id"]: i["fieldVerdicts"] for i in bundle["issues"]} == hs.expected_verdicts(shared, hs.verdict_cases(shared))
     assert {i["id"]: i["fieldProvenance"] for i in bundle["issues"]} == hs.expected_field_provenance(shared, hs.VERDICT_WITHHELD)
     assert {i["id"]: (i["eventTime"], i["timePrecision"], i["period"]) for i in bundle["issues"]} == hs.expected_headlines(shared, hs.VERDICT_WITHHELD)

@@ -209,7 +209,7 @@ class Layout:
         self.requests.mkdir(mode=0o700)
         self.artifacts.mkdir(mode=0o700)
         self.root = self.work                       # the names base.Jar expects from its "world"
-        self.state = world.root / "ingestion"
+        self.state = world.native_contexts[0].paths.ingestion if hasattr(world, "native_contexts") else world.root / "ingestion"
         self.registry_path = world.kit.registry_path
 
     def ownership_env(self) -> dict:
@@ -217,6 +217,11 @@ class Layout:
 
     @property
     def ledgers(self) -> dict:
+        if hasattr(self.world, "native_contexts"):
+            return {**{f"{i}-{name}": path for i, context in enumerate(self.world.native_contexts)
+                       for name, path in (("ingestion", context.paths.ingestion), ("extraction", context.paths.extraction),
+                                          ("relation", context.paths.relation), ("metering", context.metering))},
+                    "handoff": self.world.root / "handoff"}
         return {name: self.world.root / name for name in ("ingestion", "extraction", "relation", "handoff")}
 
 
@@ -230,14 +235,21 @@ class Smoke:
     # ---------------------------------------------------------------------------------------------------- jar runs ----
     def graph_env(self, request: Path, result: Path, cli: Path | None = None) -> dict:
         root = self.world.root
-        return {**self.jar.base_env(), "ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED": "true",
-                "ZOOP_GRAPH_HANDOFF_IMPORT_REQUEST": str(request), "ZOOP_GRAPH_HANDOFF_IMPORT_RESULT": str(result),
-                "ZOOP_HANDOFF_CLI": str(cli or self.args.handoff_cli), "ZOOP_HANDOFF_STATE_DIR": str(root / "handoff"),
-                "ZOOP_RELATION_STATE_DIR": str(root / "relation"), "ZOOP_EXTRACTION_STATE_DIR": str(root / "extraction"),
-                "ZOOP_INGESTION_CLI": str(self.args.ingest_cli), "ZOOP_INGESTION_STATE_DIR": str(root / "ingestion"),
-                "ZOOP_INGESTION_SOURCES": str(self.layout.registry_path), "ZOOP_HANDOFF_CANONICAL": str(root / "canonical.json"),
-                "ZOOP_HANDOFF_DECISIONS": str(root / "decisions.json"), "ZOOP_HANDOFF_BINDINGS": str(root / "bindings.json"),
-                "ZOOP_ARTIFACT_ROOT": str(self.layout.artifacts), **hs.ownership_env()}
+        env = {**self.jar.base_env(), "ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED": "true",
+               "ZOOP_GRAPH_HANDOFF_IMPORT_REQUEST": str(request), "ZOOP_GRAPH_HANDOFF_IMPORT_RESULT": str(result),
+               "ZOOP_HANDOFF_CLI": str(cli or self.args.handoff_cli), "ZOOP_HANDOFF_STATE_DIR": str(root / "handoff"),
+               "ZOOP_INGESTION_CLI": str(self.args.ingest_cli), "ZOOP_HANDOFF_CANONICAL": str(root / "canonical.json"),
+               "ZOOP_HANDOFF_DECISIONS": str(root / "decisions.json"), "ZOOP_HANDOFF_BINDINGS": str(root / "bindings.json"),
+               "ZOOP_ARTIFACT_ROOT": str(self.layout.artifacts), **hs.ownership_env()}
+        if hasattr(self.world, "context_file"):
+            for key in ("ZOOP_RELATION_STATE_DIR", "ZOOP_EXTRACTION_STATE_DIR", "ZOOP_INGESTION_STATE_DIR", "ZOOP_INGESTION_SOURCES"):
+                env.pop(key, None)
+            env.update(ZOOP_GRAPH_HANDOFF_IMPORT_SOURCE_CONTEXTS=str(self.world.context_file),
+                       ZOOP_GRAPH_HANDOFF_IMPORT_SOURCE_CONTEXTS_SHA256=self.world.context_sha)
+        else:
+            env.update(ZOOP_RELATION_STATE_DIR=str(root / "relation"), ZOOP_EXTRACTION_STATE_DIR=str(root / "extraction"),
+                       ZOOP_INGESTION_STATE_DIR=str(root / "ingestion"), ZOOP_INGESTION_SOURCES=str(self.layout.registry_path))
+        return env
 
     def graph_import(self, label: str, request: dict | bytes, *, cli: Path | None = None) -> tuple[int, dict | None, str]:
         """One operator run of the graph handoff import; returns (exit status, parsed result file, process output). `cli`: a stand-in for the installed handoff command."""
@@ -733,7 +745,7 @@ def approved_world_phase(args, db, layout, scratch: Path) -> dict:
           and result["provenance"]["recordingKind"] == "authored-test" and result["provenance"]["approvalBases"] == kinds
           and result["provenance"]["structuralRelationOrigin"] == "manual-operator-review", f"provenance: {result['provenance']}")
     receipt = json.loads((layout.artifacts / "verification_receipt" / f"{vid}.json").read_text("utf-8"))
-    check(receipt["bundle"] == bundle and receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-7", "the approved receipt does not retain the producer's bundle")
+    check(receipt["bundle"] == bundle and receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-8", "the approved receipt does not retain the producer's bundle")
     check(receipt["appVerification"]["approvalBasis"] == "audit-metadata-not-a-verifier-verdict", "the receipt overclaims what an approval basis is")
     used = {(source["relation"]["jobId"], use["relationCandidateId"]): use for source in bundle["sources"] for use in source["reviewUsed"]}
     check(set(used) == set(approvals), f"the used reviews differ from the hand-written approvals: {sorted(used)} vs {sorted(approvals)}")
@@ -893,7 +905,7 @@ def path_world_phase(args, db, layout, scratch: Path) -> dict:
         decision_docs[middle] = decisions
         exports[middle] = hs.freeze_export(operator, world, f"path-{middle}-1", decisions)
         want, bundle = hs.expected_chain(middle, PATH_IDS), exports[middle]["bundle"]
-        check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7", f"{middle}: the producer's bundle is not schema 7")
+        check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8", f"{middle}: the producer's bundle is not schema 7")
         check([c["id"] for c in bundle["companies"]] == want["companies"] and bundle["pathCompanies"] == want["pathCompanies"],
               f"{middle}: companies {[c['id'] for c in bundle['companies']]} / path companies {bundle['pathCompanies']} are not the hand-written ones")
         paths = {r["target"]: r["structuralPath"] for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO"}
@@ -1162,7 +1174,7 @@ def impact_world_phase(args, db, layout, scratch: Path) -> dict:
     manifest_digest, bundle_digest = hs.digest(env["manifest"]), sha256(hs.canonical(env["bundle"]).encode("utf-8"))
     bundle = env["bundle"]
     rows = hs.expected_impacts(world, PUBLIC_IDS)
-    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["impacts"] == rows and len(rows) == 6 == bundle["counts"]["impacts"]
+    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and bundle["impacts"] == rows and len(rows) == 6 == bundle["counts"]["impacts"]
           and bundle["policy"]["impacts"] == "s3-independent-verifier-quote-effect", "the producer's impacts are not the hand-written rows")
     check(sorted([(r["status"], r["code"]) for r in rows], key=repr) == sorted(hs.RICH_STATUSES, key=repr), f"the authored world does not hold every status: {rows}")
     inv = hs.evidence_id(world, "a", hs.INV)
@@ -1256,7 +1268,7 @@ def summary_world_phase(args, db, layout, scratch: Path) -> dict:
     manifest_digest, bundle_digest = hs.digest(env["manifest"]), sha256(hs.canonical(env["bundle"]).encode("utf-8"))
     bundle = env["bundle"]
     want = hs.expected_summaries_of(world, "available")
-    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1", "the producer's summary bundle is not -7")
+    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1", "the producer's summary bundle is not -7")
     for issue in bundle["issues"]:
         hs.check_summary_part(issue["summary"], want[issue["id"]])
     available = next(i for i in bundle["issues"] if i["id"] == hs.SUPPLY)["summary"]
@@ -1722,7 +1734,7 @@ def main() -> int:
     check(len(row) == 1, f"graph_versions rows for {vid}: {row}")
     row = row[0]
     check(row["kind"] == "snapshot" and row["active"] is False and row["review_revision"] == 0 and row["unpublished"] is True
-          and row["created_by"] == "operator:smoke-operator" and row["policy_version"] == "zoop-public-projection-policy-1"
+          and row["created_by"] == "operator:smoke-operator" and row["policy_version"] == "zoop-public-projection-policy-2"
           and row["source_label"] == f"graph-handoff:{hid}" and (row["issue_count"], row["relation_count"], row["article_count"]) == (2, 4, 3)
           and row["snapshot_artifact_id"] == f"artifact-{vid}" and row["rule_revision"] == 0 and row["candidate_count"] is None,
           f"version row: {row}")
@@ -1815,7 +1827,7 @@ def main() -> int:
     check(receipt_issues["issue:factory-2026q4"]["mentions"] == expected_mentions(
         world, ("b", "m-b", hs.QB, "합성 공장 착공", "공장 착공 알림", "2026-11-15", "2026Q4", DOC_B)),
           f"factory mentions: {receipt_issues['issue:factory-2026q4']['mentions']}")
-    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-7", "the retained bundle is not schema 7")
+    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-8", "the retained bundle is not schema 7")
     # The selection facts the receipt retains, hand-written from the authored world: the supply issue's operator-chosen representative (document a) states every
     # headline value, while a2 states the same value in every field but its title; the factory issue's only mention is unanimous. Which mentions state the issue's
     # value is a selection fact, never a verification (`verification` stays `none`).
@@ -2017,7 +2029,7 @@ def main() -> int:
           "a rejected or held value, or a verdict, reached the public snapshot")
     receipt4 = json.loads(receipt_file4.read_text("utf-8"))
     check(receipt4["bundle"] == verdict_env["bundle"] and receipt4["manifest"] == verdict_env["manifest"], "the verdict receipt does not retain the original")
-    check(receipt4["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-7" and receipt4["bundle"]["handoffId"] == hid4, "the verdict receipt is not bundle -7")
+    check(receipt4["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-8" and receipt4["bundle"]["handoffId"] == hid4, "the verdict receipt is not bundle -7")
     receipt_issues4 = {i["id"]: i for i in receipt4["bundle"]["issues"]}
     # The ORIGINAL mentions are untouched by every verdict: the withheld supply time and the held factory period are still stated by their mentions.
     check(receipt_issues4[supply_id]["mentions"] == expected_mentions(

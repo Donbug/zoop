@@ -252,6 +252,23 @@ class IngestionExportParserTest {
     }
 
     @Test
+    void nativeLanguageIsOptionalAndBoundedWithoutChangingDocumentText() {
+        for (String language : List.of("ko", "en-US", "und", "x".repeat(35))) {
+            ObjectNode value = export(observation, PLAIN_TEXT, PLAIN_HASH);
+            observationOf(value).put("language", language);
+            assertEquals(PLAIN_TEXT, parser.parse(ExportFixtures.bytes(value), observation).text());
+        }
+        ObjectNode value = export(observation, PLAIN_TEXT, PLAIN_HASH);
+        observationOf(value).putNull("language");
+        assertEquals(PLAIN_TEXT, parser.parse(ExportFixtures.bytes(value), observation).text());
+        for (String language : List.of("", "k", "x".repeat(36), "a b", "a\nb")) {
+            assertEquals(DocumentImportFailure.METADATA_UNSUPPORTED,
+                    failureOf(e -> observationOf(e).put("language", language)));
+        }
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).put("language", 7)));
+    }
+
+    @Test
     void aPublisherIsOptionalAndAbsentOrExplicitNullBothMeanNoneDeclared() {
         ObjectNode absent = export(observation, PLAIN_TEXT, PLAIN_HASH);
         assertTrue(!observationOf(absent).has("publisher"), "the fixture of an older export must not carry the key");

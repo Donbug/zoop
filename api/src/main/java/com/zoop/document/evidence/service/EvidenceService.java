@@ -81,6 +81,7 @@ public class EvidenceService {
     private final DocumentRegistryRepository registry;
     private final DocumentReadGrants grants;
     private final DocumentReadSources sources;
+    private final com.zoop.graph.publication.GraphPublicationReader publications;
     private final GraphEvidenceReader graph;
     private final EvidenceArtifactReader artifacts;
     private final Clock clock;
@@ -88,7 +89,7 @@ public class EvidenceService {
 
     public EvidenceService(EvidenceReadRepository evidence, DocumentRegistryRepository registry, DocumentReadGrants grants,
             DocumentReadSources sources, GraphEvidenceReader graph, EvidenceArtifactReader artifacts, Clock clock,
-            TransactionOperations transaction) {
+            TransactionOperations transaction, com.zoop.graph.publication.GraphPublicationReader publications) {
         this.evidence = evidence;
         this.registry = registry;
         this.grants = grants;
@@ -97,6 +98,7 @@ public class EvidenceService {
         this.artifacts = artifacts;
         this.clock = clock;
         this.transaction = transaction;
+        this.publications = publications;
     }
 
     /** A gate said no: the reason is a short token for the log, never for the client. */
@@ -405,10 +407,8 @@ public class EvidenceService {
             Readable readable = readableCitation(row, found.span());
             article = readable.article();
             version = readable.version();
-            // The receipt of the SELECTED version, not the row's own: a row shared by several imports points at the first one. Its
-            // bytes are read and parsed once for the grant pins and, for a span no visible issue or relation cites, for the membership.
-            StrictJson.Obj receiptBundle = GraphReceiptGrants.bundle(receipt(found.graphVersion(), requestId), found.graphVersion());
-            requireAllowed(pinnedGrants(receiptBundle, row, found, article), sources.registry(requestId), now);
+            var publication = graphPublication(found.graphVersion(), requestId);
+            requireAllowed(pinnedGrants(publication, row, found, article), sources.registry(requestId), now);
         } catch (GraphReceiptGrants.Malformed malformed) {
             log.info("Graph evidence withheld (evidenceId={}, reason={}, requestId={})", row.id(), malformed.getMessage(), requestId);
             throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
@@ -430,19 +430,13 @@ public class EvidenceService {
                 row.articleVersion(), null, null, null, null);
     }
 
-    /**
-     * getEvent (#64): the bundle an imported graph version was staged from, read from its {@code verification_receipt} exactly as
-     * {@link #read} reads it (registry hash and size, version binding). The bundle is retained producer data for display (original
-     * mentions, operator field verdicts, source support), never authority. A missing, mismatched or unreadable receipt is
-     * SOURCE_UNAVAILABLE: the version cannot be described, which is not the same as an event without details.
-     */
-    public StrictJson.Obj graphImportBundle(String versionId, String requestId) {
+    /** Flat verified original contributions and explicit public field/relation ownership. */
+    public com.zoop.graph.publication.GraphPublicationReader.Publication graphPublication(String versionId, String requestId) {
         try {
-            return GraphReceiptGrants.bundle(receipt(versionId, requestId), versionId);
-        } catch (Denied | GraphReceiptGrants.Malformed unusable) {
-            log.warn("Graph receipt cannot describe the version (graphVersion={}, reason={}, requestId={})", versionId,
-                    unusable.getMessage(), requestId);
-            // The receipt is pinned immutable input: its absence or invalid shape will not heal by retrying this read.
+            return publications.read(versionId);
+        } catch (com.zoop.graph.publication.PublicationException unusable) {
+            log.warn("Graph publication cannot describe version (graphVersion={}, reason={}, requestId={})",
+                    versionId, unusable.code(), requestId);
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
         }
     }
@@ -461,8 +455,12 @@ public class EvidenceService {
         String id = null;
         Set<GraphReceiptGrants.Pin> pins = new LinkedHashSet<>();
         try {
-            StrictJson.Obj receiptBundle = GraphReceiptGrants.bundle(receipt(versionId, requestId), versionId);
+            var publication = graphPublication(versionId, requestId);
             for (Map.Entry<String, GraphEvidence> entry : visible.entrySet()) {
+                var span = entry.getValue().span();
+                if (span != null && (!entry.getValue().basisRefs().isEmpty() || !entry.getValue().impactRefs().isEmpty())
+                        && publication.articleSources(span.articleId(), span.articleVersion()).stream()
+                                .noneMatch(c -> "native".equals(c.sourceKind()))) continue;
                 id = entry.getKey();
                 EvidenceView row = evidence.findEvidence(id).orElseThrow(() -> new Denied("evidence_row_missing"));
                 ArtifactRow verification = row.verificationArtifactId() == null ? null
@@ -471,7 +469,7 @@ public class EvidenceService {
                     throw new Denied("not_graph_citation");
                 }
                 Readable readable = readableCitation(row, entry.getValue().span());
-                pins.addAll(pinnedGrants(receiptBundle, row, entry.getValue(), readable.article()));
+                pins.addAll(pinnedGrants(publication, row, entry.getValue(), readable.article()));
             }
         } catch (GraphReceiptGrants.Malformed | Denied withheld) {
             throw activationRefused(versionId, id, withheld, requestId);
@@ -521,60 +519,72 @@ public class EvidenceService {
         return new Readable(article, version);
     }
 
-    /** The grants the selected version's receipt pins for this article version (basis/impact membership and provider checked). */
-    private static Set<GraphReceiptGrants.Pin> pinnedGrants(StrictJson.Obj receiptBundle, EvidenceView row,
+    private static Set<GraphReceiptGrants.Pin> pinnedGrants(
+            com.zoop.graph.publication.GraphPublicationReader.Publication publication, EvidenceView row,
             GraphEvidence found, ArticleRow article) {
-        Set<GraphReceiptGrants.Pin> pins = GraphReceiptGrants.pins(receiptBundle, row.articleId(), row.articleVersion());
-        if (!found.basisRefs().isEmpty() || !found.impactRefs().isEmpty()) {
-            // Evaluate both seams before combining them: malformed membership must not hide behind a valid other seam.
-            boolean basisProven = GraphReceiptBasis.proves(receiptBundle, row.id(), found.basisRefs());
-            boolean impactProven = GraphReceiptImpact.proves(receiptBundle, row.id(), found.impactRefs());
-            if (!basisProven && !impactProven) {
-                throw new GraphReceiptGrants.Malformed("receipt_membership_missing");
+        Set<GraphReceiptGrants.Pin> pins = new LinkedHashSet<>();
+        boolean indirect = !found.basisRefs().isEmpty() || !found.impactRefs().isEmpty();
+        boolean proven = !indirect;
+        var owners = publication.articleSources(row.articleId(), row.articleVersion());
+        if (owners.isEmpty()) throw new GraphReceiptGrants.Malformed("receipt_article_missing");
+        for (var owner : owners) {
+            pins.addAll(GraphReceiptGrants.pins(owner.bundle(), row.articleId(), row.articleVersion()));
+            if (!indirect) continue;
+            List<GraphEvidence.BasisRef> bases = new ArrayList<>();
+            List<GraphEvidence.ImpactRef> impacts = new ArrayList<>();
+            for (var ref : found.basisRefs()) {
+                var relationOwners = publication.relationSources().get(ref.relationId());
+                if (relationOwners == null) throw new GraphReceiptGrants.Malformed("receipt_relation_missing");
+                if (!relationOwners.publicSource().equals(ref.source()) || !relationOwners.publicTarget().equals(ref.target()))
+                    throw new GraphReceiptGrants.Malformed("receipt_relation_mismatch");
+                for (var original : publication.selectedRelationSources(ref.relationId())) if (original.sourceVersionId().equals(owner.sourceVersionId())) {
+                    var relation = owner.projection().relations().stream().filter(r -> r.relationId().equals(original.relationId()))
+                            .findFirst().orElseThrow(() -> new GraphReceiptGrants.Malformed("receipt_relation_missing"));
+                    if (!relation.relationType().equals(ref.relationType())) throw new GraphReceiptGrants.Malformed("receipt_relation_mismatch");
+                    bases.add(new GraphEvidence.BasisRef(relation.relationId(), relation.relationType(), relation.source(), relation.target(), ref.basisId()));
+                }
             }
+            for (var ref : found.impactRefs()) {
+                var relationOwners = publication.relationSources().get(ref.relationId());
+                if (relationOwners == null) throw new GraphReceiptGrants.Malformed("receipt_relation_missing");
+                if (!relationOwners.publicSource().equals(ref.source()) || !relationOwners.publicTarget().equals(ref.target()))
+                    throw new GraphReceiptGrants.Malformed("receipt_relation_mismatch");
+                for (var original : publication.selectedRelationSources(ref.relationId())) if (original.sourceVersionId().equals(owner.sourceVersionId())) {
+                    var relation = owner.projection().relations().stream().filter(r -> r.relationId().equals(original.relationId()))
+                            .findFirst().orElseThrow(() -> new GraphReceiptGrants.Malformed("receipt_relation_missing"));
+                    if (!relation.relationType().equals(ref.relationType())) throw new GraphReceiptGrants.Malformed("receipt_relation_mismatch");
+                    impacts.add(new GraphEvidence.ImpactRef(relation.relationId(), relation.relationType(), relation.source(), relation.target()));
+                }
+            }
+            boolean basisProven = GraphReceiptBasis.proves(owner.bundle(), row.id(), bases);
+            boolean impactProven = GraphReceiptImpact.proves(owner.bundle(), row.id(), impacts);
+            proven |= basisProven || impactProven;
         }
+        if (!proven) throw new GraphReceiptGrants.Malformed("receipt_membership_missing");
         for (GraphReceiptGrants.Pin pin : pins) {
-            if (!pin.sourceId().equals(article.provider())) {
-                throw new Denied("pin_source_differs_from_article_provider");
-            }
+            if (!pin.sourceId().equals(article.provider())) throw new Denied("pin_source_differs_from_article_provider");
         }
         return pins;
     }
 
     /** The CURRENT S2-1 registry still allows every pinned grant at {@code at} (expiry included). */
     private static void requireAllowed(Set<GraphReceiptGrants.Pin> pins, SourceRegistry current, Instant at) {
-        for (GraphReceiptGrants.Pin pin : pins) {
-            String denial = current.denial(pin.sourceId(), pin.grantId(), pin.revision(), at);
-            if (denial != null) {
-                throw new Denied("source_" + denial);
+        try {
+            for (GraphReceiptGrants.Pin pin : pins) {
+                String denial = pin.legacyArticleUrl() == null ? current.denial(pin.sourceId(), pin.grantId(), pin.revision(), at)
+                        : current.denialForUrl(pin.sourceId(), pin.grantId(), pin.revision(), pin.legacyArticleUrl(), at);
+                if (denial != null) {
+                    throw new Denied("source_" + denial);
+                }
             }
+        } catch (SourceRegistry.Invalid error) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         }
     }
 
     private record Readable(ArticleRow article, VersionRow version) {
     }
 
-    /**
-     * The verified bytes of the selected version's import receipt. A registry mismatch (missing, wrong kind, changed file) is a
-     * denial; an unset artifact root or an unreadable store is {@code SOURCE_UNAVAILABLE}, never a denial that reads like absence.
-     */
-    private byte[] receipt(String versionId, String requestId) {
-        ArtifactRow receipt = registry.findArtifact("artifact-receipt-" + versionId)
-                .orElseThrow(() -> new Denied("receipt_unregistered"));
-        if (!GRAPH_RECEIPT.equals(receipt.kind()) || !JSON_MEDIA_TYPE.equals(receipt.mediaType())) {
-            throw new Denied("receipt_kind_invalid");
-        }
-        try {
-            return artifacts.read(receipt);
-        } catch (ArtifactStoreException error) {
-            if (error.reason() == ArtifactStoreException.Reason.CONFLICT) {
-                throw new Denied("receipt_file_" + error.detail());
-            }
-            log.warn("Graph receipt cannot be read (artifactId={}, reason={}, detail={}, requestId={})", receipt.id(),
-                    error.reason(), error.detail(), requestId);
-            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
-        }
-    }
 
     // ---- current authority ------------------------------------------------------------------------------------------------
 

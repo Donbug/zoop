@@ -31,7 +31,7 @@ from pydantic import ValidationError
 from . import handoff_access
 from .config import ServiceConfig
 from .handoff_runtime import HandoffProcess, canonical
-from .handoff_wire import (BUNDLE_SCHEMA, RETRYABLE, STATES, Bundle, Export, HandoffManifest, HdBundle, HdDelivery, HdErrorEnvelope, HdStatus, HdVerification)
+from .handoff_wire import (RETRYABLE, STATES, Bundle, Export, HandoffManifest, HdBundle, HdDelivery, HdErrorEnvelope, HdStatus, HdVerification)
 from .jobs import ApiError, Observation, Reply
 from .relation_jobs import is_config_code
 from .relation_runtime import GateBusy, RelationGate
@@ -47,6 +47,8 @@ BUSY_CODES = frozenset({"handoff_busy", "relation_busy", "extraction_busy", "ing
 CONFIG_CODES = frozenset({"handoff_artifact_missing", "handoff_artifact_invalid", "handoff_artifact_conflict", "operator_file_changed", "operator_file_pin_mismatch",
                           "decisions_invalid", "bindings_invalid", "canonical_registry_invalid", "handoff_internal_failure", "handoff_limit_exceeded",
                           "input_or_configuration_invalid", "persistence_failed", "ledger_version_unknown", "state_ownership_unconfigured",
+                          "source_contexts_invalid", "source_contexts_changed", "source_context_route_duplicate", "source_context_pin_missing",
+                          "source_context_observation_missing", "source_context_observation_misrouted",
                           "state_namespace_conflict", "state_namespace_invalid", "analysis_contract_changed",
                           # the producer could not rebuild the bundle from the sources it is pinned to: an operator must look, the bundle is not deliverable
                           "article_metadata_conflict", "evidence_document_unbound", "evidence_input_kind_unsupported", "evidence_source_mismatch",
@@ -206,7 +208,7 @@ class HandoffReads:
             used = sorted(canonical({"relation": s["relation"], "upstream": s["upstream"], "reviewDigest": s["reviewDigest"]}) for s in received["sources"])
         except (KeyError, TypeError, UnicodeEncodeError):
             raise _contract() from None
-        if internal != (entry.handoff_id, receipt.manifest_digest, content, BUNDLE_SCHEMA) or receipt.handoff_id != entry.handoff_id \
+        if internal != (entry.handoff_id, receipt.manifest_digest, content, receipt.bundle_schema) or receipt.handoff_id != entry.handoff_id \
                 or receipt.bundle_digest != actual or receipt.content_digest != content or receipt.bundle_bytes != len(raw) \
                 or frozen_digest != receipt.manifest_digest or declared != carried or pins != used:
             raise _binding()

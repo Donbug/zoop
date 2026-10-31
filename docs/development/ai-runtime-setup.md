@@ -194,7 +194,9 @@ ai/worker/.venv/bin/python ai/worker/scripts/native_jev_smoke.py
 | `relation`, `impact` | S3 | 위와 같음 | 위와 같음 |
 | `verify-relation`, `verify-impact` | S3 | 네이티브 TypeSafe Jev `POST {TYPESAFE_BASE_URL}/systemone`, 모델 정확히 `jev-1.14.0` | 인용문 텍스트와 고정 사실만 보내는 Choice 질문(문서 본문·내부 id는 보내지 않는다) |
 
-provider는 stage가 정한다. endpoint나 모델 이름에서 권한을 추론하지 않는다. 생성 JSON schema는 기존 Pydantic 계약에서 만들되 OpenAI strict 제약에 맞게(모든 속성 required, 추가 속성 금지, 검증 키워드 제거, 인용 `start`/`end`는 null 허용) 변환한다. 검증 키워드를 뺀 만큼 **디코딩 뒤 기존 native 계약 검증이 그대로 소유**하고 응답은 보정하지 않는다. 모델이 문자 위치를 세지 않도록 인용 offset은 null로 받고, 소유자가 `live_prompts.resolve_citations`(유일한 literal quote에서만 offset 채움)로 채운 뒤 기존 정확 인용 검사를 한다.
+provider는 stage가 정한다. 다섯 생성 stage의 live 인용 형식은 `zoop-live-source-segments-1`이다. 소유자가 정확한 문서 버전의 mapped run과 줄바꿈 경계에서 최대 20,000자(Unicode code point) 구간을 만들고 요청별 `segmentId`를 부여한다. 본문은 `sources[].segments`에 한 번만 보내며, 매핑되지 않은 문맥의 ID는 null이다. 모델은 인용 위치에 `{"segmentId":"…"}`만 반환한다. 소유자는 raw receipt를 저장한 뒤 참조를 정확한 원문·문서 식별자·좌표로 확장하고 기존 native parser와 source mapping 검사를 실행한다. 미지·다른 요청의 ID, 추가 필드, 구형 인용 형식은 해당 단계를 실패시킨다. prompt revision은 `zoop-live-prompts-2`, S2 live adapter는 `zoop-extraction-native-live-2`로 고정되며 이전 runtime binding과 섞을 수 없다. 과거 replay는 기존 native 계약을 따른다.
+
+관계 검증에서 null scope는 미지정이다. `businessScope`와 `productScope` 중 명시된 값만 검증하며, 둘 다 null이면 scope claim을 만들지 않는다. 판단 임계치(확률 ≥ 0.90, confidence ≥ 0.80)는 그대로다. topic 관계는 기업 역할·주제 연결·scope·확장 주장에 필요한 최소한의 완전한 근거 구간을 선택하도록 지시한다. 향후 추출은 원문에 명시된 국가만 ISO alpha-2로, 사건 시점은 근거가 있는 ISO 정밀도 또는 null로 반환하도록 지시한다. 오프라인 검증은 정확한 참조 확장을 증명하며, 모델의 선택 품질이나 실제 수율·비용 개선은 별도 측정이 필요하다.
 
 ### 10.2 환경변수 (프로세스 환경만, dotenv 없음)
 

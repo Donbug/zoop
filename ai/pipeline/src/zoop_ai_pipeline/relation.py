@@ -20,11 +20,11 @@ from pathlib import Path
 from . import live_prompts
 from . import relation_rules as rules
 from .dependency_contracts import array, cites, invalid
-from .extraction import Extractor, Sources, cite_exact, upstream_digest
+from .extraction import Extractor, Sources, cite_exact, load_live_deferral, save_live_deferral, upstream_digest
 from .extraction import Store as ExtractionStore
 from .extraction_contracts import ObservationRef, ProviderResponseUnknown
 from .ingestion_contracts import byte_hash, now, reserved_state_roots
-from .live_runtime import LiveFailure, LiveRuntime
+from .live_runtime import LiveDeferred, LiveFailure, LiveRuntime
 from .relation_contracts import (BASIS_AUTOMATIC, BASIS_OPERATOR, CANDIDATE_VERSION, EFFECT_APPROVED, EFFECT_EXCLUDED, EFFECT_LEGACY_REVALIDATION,
     EFFECT_OF, IMPACT_CANDIDATE_VERSION, IMPACT_POLICY, IMPACT_PRODUCER, IMPACT_VERIFIER, LABEL_NOTE, LABELS, LEDGER_VERSION, MAX_DOCUMENTS, POLICY,
     PRODUCER, REQUEST, REVALIDATION_POLICY, SCHEMA, VERIFIER, VOCABULARY, CitationFailure, ExtractionFailure, Replay, ReplyInvalid, Review, Submit,
@@ -642,15 +642,22 @@ class Engine:
         """
         job_id = row["job_id"]
         key = digest(payload)
+        if ctx.live and stage in {"relation", "impact"}:
+            provider_payload = {**payload, "citationSources": [live_prompts.source(ctx.docs[k].export) for k in sorted(documents)]}
+        else:
+            provider_payload = payload
         unknown = "live_response_unknown" if ctx.live else "replay_response_unknown"
         call = self.store.one("SELECT * FROM calls WHERE job_id=? AND stage=? AND ref=?", (job_id, stage, ref))
         if call is not None and ctx.live and call["state"] == "started" and call["response"] is None and self.store.one(
                 "SELECT 1 FROM stages WHERE job_id=? AND stage='refusal' AND ref=?", (job_id, call["attempt_id"])):
             call = None  # definitively never sent: `_reserve` re-arms the same row under a new attempt id
-        if call is None:
+        if call is None or (ctx.live and call["state"] == "deferred"):
             if ctx.live:
-                attempt, receipt = self._send(row, ctx, fence, stage, ref, key, payload, documents)
-                result = self._answer(row, ctx, stage, attempt, receipt, parse, documents)
+                if call is not None and call["request_digest"] != key:
+                    raise ExtractionFailure("receipt_request_mismatch")
+                attempt, receipt = self._send(row, ctx, fence, stage, ref, key, provider_payload, documents,
+                                              attempt=call["attempt_id"] if call is not None else None)
+                result = self._answer(row, ctx, stage, attempt, receipt, parse, provider_payload)
             else:
                 raw, fixture_hash = fixtures.find(role, stage, key, ctx.synthetic)
                 self._verify(ctx)
@@ -676,7 +683,7 @@ class Engine:
             if ctx.live:
                 if not isinstance(raw, dict) or raw.get("attemptId") != attempt:
                     raise ExtractionFailure("receipt_integrity_failed")
-                result = self._answer(row, ctx, stage, attempt, raw, parse, documents)
+                result = self._answer(row, ctx, stage, attempt, raw, parse, provider_payload)
             else:
                 try:
                     result = parse(raw)
@@ -694,7 +701,7 @@ class Engine:
                 raise
         return result
 
-    def _send(self, row, ctx: Context, fence: int, stage: str, ref: str, key: str, payload: dict, documents):
+    def _send(self, row, ctx: Context, fence: int, stage: str, ref: str, key: str, payload: dict, documents, *, attempt: str | None = None):
         """Live transmission. Ordering: pure prepare -> current rights for every sent document -> durable reservation -> the runtime reserves
         budget, calls `authorize` immediately before sending and sends once -> the raw receipt is persisted before anything parses it.
         A transport failure leaves the reservation `started` (unknown, never resent); a refusal before sending is recorded as such."""
@@ -706,7 +713,14 @@ class Engine:
             raise ExtractionFailure(exc.code) from exc
         self._authorize_send(ctx, runtime, stage, documents)
         self._verify(ctx)
-        attempt = self._reserve(job_id, fence, stage, ref, key, digest(json.loads(row["binding"])["runtime"]))
+        unsent_proof = None
+        if attempt is None:
+            attempt = self._reserve(job_id, fence, stage, ref, key, digest(json.loads(row["binding"])["runtime"]))
+        else:
+            if "funding" not in json.loads(row["binding"])["runtime"]:
+                raise ExtractionFailure("receipt_request_mismatch")
+            unsent_proof = load_live_deferral(self.store, attempt)
+            self.db.execute("UPDATE calls SET state='started' WHERE attempt_id=? AND state='deferred'", (attempt,))
 
         def authorize() -> None:
             self._guard(job_id, fence)
@@ -714,7 +728,13 @@ class Engine:
             self._authorize_send(ctx, runtime, stage, documents)
 
         try:
-            receipt = runtime.send(prepared, attempt_id=attempt, authorize=authorize)
+            if unsent_proof is None:
+                receipt = runtime.send(prepared, attempt_id=attempt, authorize=authorize)
+            else:
+                receipt = runtime.send(prepared, attempt_id=attempt, authorize=authorize, unsent_proof=unsent_proof)
+        except LiveDeferred as exc:
+            save_live_deferral(self.store, attempt, exc.proof)
+            raise ExtractionFailure(exc.code) from exc
         except LiveFailure as exc:
             if exc.uncertain:
                 raise ProviderResponseUnknown(exc.code) from exc
@@ -726,20 +746,17 @@ class Engine:
         self._receive(attempt, receipt)
         return attempt, receipt
 
-    def _answer(self, row, ctx: Context, stage: str, attempt: str, receipt: dict, parse, documents):
-        """Strict decode of a PERSISTED receipt into the native response and its pure parser. Any fault marks the receipt permanently.
-
-        A producer model cannot count code points, so its citations may carry no offsets: `resolve_citations` fills them ONLY from a unique literal
-        quote in the exact prepared text of a document that was sent (identity is never repaired); everything else still faces the exact check."""
+    def _answer(self, row, ctx: Context, stage: str, attempt: str, receipt: dict, parse, payload):
+        """Decode a persisted raw receipt, expand request-local producer references, then apply the native parser."""
         runtime = self._runtime(row, send=False)
         try:
             raw = runtime.answer(stage, receipt)
-            if stage in {"relation", "impact"}:
-                raw = live_prompts.resolve_citations(raw, {key: ctx.docs[key].export["document"]["text"] for key in documents})
         except LiveFailure as exc:
             self._mark(attempt, exc.code)
             raise ReplyInvalid(exc.code) from exc
         try:
+            if stage in {"relation", "impact"}:
+                raw = live_prompts.expand(stage, payload, raw)
             return parse(raw)
         except ReplyInvalid as exc:
             self._mark(attempt, exc.code)

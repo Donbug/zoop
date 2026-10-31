@@ -94,7 +94,7 @@ class HandoffExportParserTest {
         assertInvalidEnvelope("manifest file pin", e -> ((ObjectNode) e.get("manifest").get("files")).put("canonical", "0".repeat(64)));
         assertInvalidEnvelope("manifest source pin", e -> ((ObjectNode) e.get("manifest").get("sources").get(0)).put("reviewDigest", "0".repeat(64)));
         assertInvalidEnvelope("manifest unknown field", e -> ((ObjectNode) e.get("manifest")).put("operatorPath", "/private/x"));
-        assertInvalidEnvelope("manifest policy", e -> ((ObjectNode) e.get("manifest")).put("policyVersion", "zoop-public-projection-policy-2"));
+        assertInvalidEnvelope("manifest policy", e -> ((ObjectNode) e.get("manifest")).put("policyVersion", "zoop-public-projection-policy-1"));
     }
 
     @Test

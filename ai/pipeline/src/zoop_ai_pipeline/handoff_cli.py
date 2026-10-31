@@ -20,6 +20,7 @@ from pydantic import ValidationError
 
 from .handoff import Handoff, HandoffPaths, Store, open_legacy_history
 from .handoff_contracts import MAX_COMMAND, SCHEMA, ExtractionFailure, Manifest, Selector, canonical
+from .handoff_contexts import configured, source_flags
 from .ingestion_contracts import IngestionFailure
 
 COMMANDS = ("freeze", "recover", "inspect", "export")
@@ -40,8 +41,9 @@ def main() -> int:
     parser.add_argument("--extraction-state-dir", type=Path)
     parser.add_argument("--ingestion-state-dir", type=Path)
     parser.add_argument("--sources", type=Path, help="S1/S2 source and grant registry, consumed only through the owner seams")
+    source_flags(parser)
     parser.add_argument("--canonical", type=Path, help="server-owned canonical decision registry (zoop-graph-canonical-1)")
-    parser.add_argument("--decisions", type=Path, help="operator public-projection decisions (zoop-public-decisions-3, with per-issue fieldVerdicts and summary pin)")
+    parser.add_argument("--decisions", type=Path, help="operator public-projection decisions (decisions4/P2 or decisions5/P3, with fieldVerdicts and summary pin)")
     parser.add_argument("--bindings", type=Path, help="server-owned app document bindings (zoop-app-document-bindings-1)")
     parser.add_argument("--issue-summary-state-dir", type=Path,
                         help="freeze only, and only when the decisions pin an issue-summary result: the `zoop-ai-issue-summary` ledger it is read from (read-only; export never needs it)")
@@ -50,7 +52,8 @@ def main() -> int:
     try:
         sourced = args.command in SOURCED
         flags = (args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources, args.canonical, args.decisions, args.bindings)
-        if (any(f is not None for f in flags) and not sourced) or (sourced and any(f is None for f in flags)) \
+        if not configured(args, sourced=sourced) or (sourced and any(f is None for f in flags[4:])) \
+                or (not sourced and any(f is not None for f in flags[4:])) \
                 or (args.issue_summary_state_dir is not None and args.command != "freeze"):
             raise ExtractionFailure("input_or_configuration_invalid")
         raw = sys.stdin.buffer.read(MAX_COMMAND + 1)
@@ -58,10 +61,12 @@ def main() -> int:
             raise ExtractionFailure("command_input_limit")
         # Every hostile or malformed input is refused here, before any ledger is opened or any state is touched.
         request = (Manifest if args.command == "freeze" else Selector).model_validate(json.loads(raw))
-        paths = HandoffPaths(*flags, summaries=args.issue_summary_state_dir) if sourced else None
-        roots = (paths.relation, paths.extraction, paths.ingestion, *([paths.summaries] if paths.summaries is not None else [])) if paths else ()
+        paths = HandoffPaths(*flags, summaries=args.issue_summary_state_dir, source_contexts=args.source_contexts,
+                             source_contexts_sha256=args.source_contexts_sha256) if sourced else None
+        roots = ((paths.relation, paths.extraction, paths.ingestion, *((paths.summaries,) if paths.summaries is not None else ()))
+                 if paths and paths.source_contexts is None else ())
         legacy = open_legacy_history(args.state_dir, *roots, handoff_id=request.handoff_id)
-        store = legacy if legacy is not None else Store(args.state_dir, *roots, mode=WRITERS.get(args.command, "read"))
+        store = legacy if legacy is not None else Store(args.state_dir, *(paths.roots() if paths else ()), mode=WRITERS.get(args.command, "read"))
         handoff = Handoff(store, paths)
         if args.command == "export":
             result, line = handoff.export(request, serialized=True)

@@ -29,7 +29,9 @@ public record GraphHandoffImportProperties(
         String canonical,
         String decisions,
         String bindings,
-        String artifactRoot) {
+        String artifactRoot,
+        String sourceContexts,
+        String sourceContextsSha256) {
 
     public GraphHandoffImportSettings toSettings() {
         return GraphHandoffImportSettings.of(this);

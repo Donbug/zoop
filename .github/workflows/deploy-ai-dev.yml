@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Build/reuse the image only, or deploy it to ECS
+        description: Build a new image only, or build and deploy it to ECS
         required: true
         default: stage-image
         type: choice
@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   id-token: write
 
 concurrency:
@@ -36,10 +37,26 @@ jobs:
     environment: dev
 
     steps:
+      - name: Restrict image publication to main
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: test "$RELEASE_REF" = refs/heads/main
+
       - name: Checkout repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Require successful CI and every required job on this exact commit
+        id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/require_ci.py
 
       - name: Validate deployment variables
         shell: bash
@@ -142,16 +159,26 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd
 
-      - name: Reuse or build AI image
+      - name: Build AI image from the CI-verified commit
         id: build-image
         shell: bash
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE_COMMIT: ${{ github.sha }}
+          # Each publication builds a run-specific immutable tag; a SHA tag alone is not build provenance.
+          IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           set -euo pipefail
 
           tagged_image="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker build \
+            --file ai/Dockerfile \
+            --label "org.opencontainers.image.revision=$IMAGE_COMMIT" \
+            --tag "$tagged_image" \
+            ai
+
+          docker push "$tagged_image"
+
           lookup_error="$(mktemp)"
 
           trap 'rm -f "$lookup_error"' EXIT
@@ -167,62 +194,34 @@ jobs:
               2>"$lookup_error"
           }
 
-          set +e
-          image_digest="$(lookup_image_digest)"
-          lookup_status=$?
-          set -e
+          image_digest=""
 
-          if [ "$lookup_status" -eq 0 ]; then
-            if [[ "$image_digest" != sha256:* ]]; then
-              cat "$lookup_error" >&2
-              echo "::error::ECR lookup succeeded but returned an invalid image digest."
-              exit 1
+          for attempt in $(seq 1 10); do
+            set +e
+            candidate_digest="$(lookup_image_digest)"
+            lookup_status=$?
+            set -e
+
+            if [ "$lookup_status" -eq 0 ]; then
+              if [[ "$candidate_digest" != sha256:* ]]; then
+                cat "$lookup_error" >&2
+                echo "::error::ECR lookup succeeded but returned an invalid image digest."
+                exit 1
+              fi
+
+              image_digest="$candidate_digest"
+              break
             fi
 
-            echo "Reusing existing immutable image: $tagged_image"
-          elif grep -q "ImageNotFoundException" "$lookup_error"; then
-            echo "No existing image found. Building: $tagged_image"
+            if ! grep -q "ImageNotFoundException" "$lookup_error"; then
+              cat "$lookup_error" >&2
+              echo "::error::ECR image lookup failed after the image push."
+              exit "$lookup_status"
+            fi
 
-            docker build \
-              --file ai/Dockerfile \
-              --tag "$tagged_image" \
-              ai
-
-            docker push "$tagged_image"
-
-            image_digest=""
-
-            for attempt in $(seq 1 10); do
-              set +e
-              candidate_digest="$(lookup_image_digest)"
-              lookup_status=$?
-              set -e
-
-              if [ "$lookup_status" -eq 0 ]; then
-                if [[ "$candidate_digest" != sha256:* ]]; then
-                  cat "$lookup_error" >&2
-                  echo "::error::ECR lookup succeeded but returned an invalid image digest."
-                  exit 1
-                fi
-
-                image_digest="$candidate_digest"
-                break
-              fi
-
-              if ! grep -q "ImageNotFoundException" "$lookup_error"; then
-                cat "$lookup_error" >&2
-                echo "::error::ECR image lookup failed after the image push."
-                exit "$lookup_status"
-              fi
-
-              echo "Waiting for the pushed image digest: attempt $attempt/10"
-              sleep 2
-            done
-          else
-            cat "$lookup_error" >&2
-            echo "::error::ECR image lookup failed. The image will not be built or pushed."
-            exit "$lookup_status"
-          fi
+            echo "Waiting for the pushed image digest: attempt $attempt/10"
+            sleep 2
+          done
 
           if [[ "$image_digest" != sha256:* ]]; then
             echo "::error::Could not resolve the ECR image digest."
@@ -234,6 +233,7 @@ jobs:
           echo "Resolved image: $digest_image"
           echo "image=$digest_image" >> "$GITHUB_OUTPUT"
           echo "tagged-image=$tagged_image" >> "$GITHUB_OUTPUT"
+          echo "commit=$IMAGE_COMMIT" >> "$GITHUB_OUTPUT"
 
       - name: Download current task definition
         if: ${{ inputs.operation == 'deploy' }}
@@ -269,10 +269,18 @@ jobs:
         env:
           DEPLOY_OPERATION: ${{ inputs.operation }}
           RESOLVED_IMAGE: ${{ steps.build-image.outputs.image }}
+          IMAGE_COMMIT: ${{ steps.build-image.outputs.commit }}
+          TAGGED_IMAGE: ${{ steps.build-image.outputs.tagged-image }}
+          CI_RUN_ID: ${{ steps.ci.outputs.ci-run-id }}
+          CI_RUN_ATTEMPT: ${{ steps.ci.outputs.ci-run-attempt }}
         run: |
           {
             echo "## AI Dev workflow result"
             echo
             echo "- Operation: \`$DEPLOY_OPERATION\`"
+            echo "- Main commit: \`$IMAGE_COMMIT\`"
+            echo "- CI run / attempt: \`$CI_RUN_ID\` / \`$CI_RUN_ATTEMPT\`"
+            echo "- Image workflow run / attempt: \`$GITHUB_RUN_ID\` / \`$GITHUB_RUN_ATTEMPT\`"
+            echo "- Immutable tag: \`$TAGGED_IMAGE\`"
             echo "- Image: \`$RESOLVED_IMAGE\`"
           } >> "$GITHUB_STEP_SUMMARY"

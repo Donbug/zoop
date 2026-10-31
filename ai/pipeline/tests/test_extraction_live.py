@@ -46,7 +46,7 @@ class Provider:
         reply = simulate(body)
         if self.mode == "ungrounded":
             answer = json.loads(reply["choices"][0]["message"]["content"])
-            answer["mentions"][0]["evidence"][0]["quote"] = "원문에 없는 문장이다."
+            answer["mentions"][0]["evidence"][0]["segmentId"] = "q-unknown"
             reply = chat_reply(json.dumps(answer, ensure_ascii=False))
         if self.after is not None:
             self.after()
@@ -231,7 +231,7 @@ def test_live_job_extracts_compares_and_groups_through_the_runtime_with_per_docu
         assert texts[(citation["documentId"], citation["documentVersion"])][citation["start"]:citation["end"]] == citation["quote"]
     live = out["binding"]["live"]
     assert "replay" not in out["binding"] and live["runtime"] == runtime.binding() and live["bindingDigest"] == runtime.binding()["identity"]
-    assert out["binding"]["adapter"]["version"] == "zoop-extraction-native-live-1"
+    assert out["binding"]["adapter"]["version"] == "zoop-extraction-native-live-2"
     usage = out["usage"]
     assert (usage["executionMode"], usage["providerCalls"], usage["receivedCalls"], usage["startedWithoutReceipt"], usage["unsentCalls"], usage["replayCalls"]) == ("live", 3, 3, 0, 0, 0)
     assert (usage["inputTokens"], usage["outputTokens"], usage["reasoningTokens"], usage["paidModelCalls"]) == (3600, 900, 360, 3)
@@ -382,7 +382,7 @@ def test_provider_silence_is_reconciling_never_resent_and_its_usage_is_unknown(l
     assert cancelled["state"] == "cancelled" and len(p.requests) == 1
 
 
-@pytest.mark.parametrize("mode,code", [("garbage", "live_reply_not_json"), ("http500", "live_http_500"), ("ungrounded", "extraction_reply_invalid")])
+@pytest.mark.parametrize("mode,code", [("garbage", "live_reply_not_json"), ("http500", "live_http_500"), ("ungrounded", "live_citation_reference_unknown")])
 def test_an_unusable_reply_stays_a_durable_failed_receipt_and_is_never_repaired(lw, mode, code):
     w, p = lw, lw.provider
     p.mode = mode
@@ -478,4 +478,5 @@ def test_a_replay_job_never_reads_the_live_runtime_or_environment(lw):
 
 def test_the_loopback_cli_smoke_exercises_the_live_path_through_real_processes(tmp_path):
     report = loopback_smoke(tmp_path)
-    assert report["status"] == "passed" and report["paidModelCalls"] == 0 and len(report["checks"]) == 6
+    assert report["status"] == "passed" and report["paidModelCalls"] == 0
+    assert report["s2"]["state"] == "ready" and report["s3"]["state"] == "ready" and report["s3"]["delivery"] == "current"

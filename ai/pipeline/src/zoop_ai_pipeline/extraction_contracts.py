@@ -19,7 +19,7 @@ LEDGER_VERSION = "zoop-extraction-ledger-1"
 ADAPTER_VERSION = "zoop-extraction-native-replay-1"  # article projection, request preimages, quote resolution, strict parse/grounding and effective/disposition rules: any change MUST bump it
 # The live adapter shares every rule above with replay (same projection, preimages, grounding, SAME/disposition). It only adds the provider call path, so a
 # change to a shared rule MUST bump BOTH versions, and a change to the live call/decode/persistence path bumps this one.
-LIVE_ADAPTER_VERSION = "zoop-extraction-native-live-1"
+LIVE_ADAPTER_VERSION = "zoop-extraction-native-live-2"
 REPLAY_FORMAT = "zoop-analysis-replay-1"
 ARTICLE_PROJECTION = "zoop-article-projection-1"
 CANDIDATE_VERSION = "zoop-event-candidate-1"

@@ -42,7 +42,7 @@ from scripts.relation_smoke import find  # noqa: E402
 from zoop_ai_pipeline.extraction import Store as ExtractionStore  # noqa: E402
 
 SCHEMA = "zoop-handoff-exposure-1"
-BUNDLE = "zoop-graph-handoff-bundle-7"
+BUNDLE = "zoop-graph-handoff-bundle-8"
 CLI = "zoop-ai-handoff-exposure"
 SUPPLY, FACTORY = hs.SUPPLY, hs.FACTORY
 FULL, LEAN = "exposure-full-1", "exposure-lean-1"      # same S2/S3 sources; LEAN's operator decisions publish neither a structural nor a FOLLOWS edge

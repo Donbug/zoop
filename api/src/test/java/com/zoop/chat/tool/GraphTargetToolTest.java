@@ -270,8 +270,7 @@ class GraphTargetToolTest {
 
     private PublicGraphReader reader() {
         var selector = new GraphVersionSelector(repository(), Clock.fixed(NOW, ZoneOffset.UTC));
-        return new PublicGraphReader(selector, new FixtureGraphSnapshotStore(GraphTargetToolTest.class.getClassLoader()),
-                pinned -> exclusions);
+        return new PublicGraphReader(selector, new FixtureGraphSnapshotStore(GraphTargetToolTest.class.getClassLoader()), pinned -> exclusions, null, null);
     }
 
     private PublicGraphReader failingReader(RuntimeException failure) {
@@ -282,8 +281,7 @@ class GraphTargetToolTest {
             public boolean everActivated(String id) { throw failure; }
             public Optional<Instant> firstActivatedAt(String id) { throw failure; }
         };
-        return new PublicGraphReader(new GraphVersionSelector(failing, Clock.fixed(NOW, ZoneOffset.UTC)),
-                new FixtureGraphSnapshotStore(GraphTargetToolTest.class.getClassLoader()), pinned -> exclusions);
+        return new PublicGraphReader(new GraphVersionSelector(failing, Clock.fixed(NOW, ZoneOffset.UTC)), new FixtureGraphSnapshotStore(GraphTargetToolTest.class.getClassLoader()), pinned -> exclusions, null, null);
     }
 
     private ChatEvidenceAccess access() {

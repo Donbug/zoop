@@ -118,19 +118,27 @@ def bootstrap_session(db):
 def scenario(args, db, scratch, evidence, layouts):
     hs, base, check = handoff.hs, handoff.base, handoff.check
     evidence["phase"] = "synthetic-cli-world"
-    world = hs.build_world(scratch / "world")
-    decisions = hs.decisions_doc(world)
-    for company in decisions["companies"]:
-        company["publicId"] = handoff.PUBLIC_IDS[company["publicId"]]
-    hs.write_operator(world, decisions=decisions)
-    operator = hs.Operator(world)
-    hid = "handoff-http-activation-1"
-    manifest = hs.manifest_doc(world, hid, hs.file_hashes(world.root))
-    frozen = operator.cli("freeze", manifest)
-    check(frozen["state"] == "ready", "synthetic CLI freeze failed")
-    exported = operator.cli("export", operator.sel(hid))
-    check(exported["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-7", "expected bundle7")
-    evidence["steps"].append({"step": "cli-handoff", "status": "passed", "bundle": "zoop-graph-handoff-bundle-7"})
+    if args.unknown_fields:
+        from scripts.public_unknown_fields_smoke import build
+        world, exported = build(scratch / "world", handoff.PUBLIC_IDS)
+        manifest = exported["manifest"]
+        hid = exported["handoffId"]
+        evidence["fieldRefusals"] = world.unknown_refusals
+        evidence["receiptPins"] = {k: exported["receipt"][k] for k in ("manifestDigest", "bundleDigest", "contentDigest")}
+    else:
+        world = hs.build_world(scratch / "world")
+        decisions = hs.decisions_doc(world)
+        for company in decisions["companies"]:
+            company["publicId"] = handoff.PUBLIC_IDS[company["publicId"]]
+        hs.write_operator(world, decisions=decisions)
+        operator = hs.Operator(world)
+        hid = "handoff-http-activation-1"
+        manifest = hs.manifest_doc(world, hid, hs.file_hashes(world.root))
+        frozen = operator.cli("freeze", manifest)
+        check(frozen["state"] == "ready", "synthetic CLI freeze failed")
+        exported = operator.cli("export", operator.sel(hid))
+    check(exported["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-8", "expected bundle8")
+    evidence["steps"].append({"step": "cli-handoff", "status": "passed", "bundle": "zoop-graph-handoff-bundle-8"})
     layout = handoff.Layout(world, args.ingest_cli)
     layouts.append(layout.work)
     smoke = handoff.Smoke(args, db, layout)
@@ -286,6 +294,19 @@ def scenario(args, db, scratch, evidence, layouts):
                 }]
             raise
         check(event["metadata"]["graphVersion"] == vid and event["id"] == issue, "event version/content mismatch")
+        if args.unknown_fields:
+            check(event["eventTime"] is None and event["timePrecision"] == "unknown", "unresolved headline was exposed")
+            check(len(event["mentions"]) == 2 and all(m["eventTime"] is None and m["timePrecision"] == "unknown"
+                                                     for m in event["mentions"]), "unresolved mention was exposed")
+            check("10.19일" not in json.dumps(event, ensure_ascii=False) and "'25.8월" not in json.dumps(event, ensure_ascii=False),
+                  "raw receipt time leaked through public event detail")
+            receipt_path = layout.artifacts / "verification_receipt" / f"{vid}.json"
+            receipt = json.loads(receipt_path.read_bytes())
+            check(receipt["bundle"] == exported["bundle"], "import receipt changed original source values")
+            evidence["unknownFields"] = {"sourceCountries": "preserved-empty", "publicCountries": ["KR"],
+                                         "rawTimes": ["10.19일", "'25.8월"], "receiptPrecision": "unresolved",
+                                         "publicHeadline": [None, "unknown"], "publicMentions": "null/unknown",
+                                         "summary": "temporal-review-pending", "structural": "basis_validity_unprovable"}
         for label, change in (
             ("disabled", lambda g: g.update({"enabled": False})),
             ("quote-display-revoked", lambda g: g.update({"allowedOperations": [op for op in g["allowedOperations"] if op != "quote-display"]})),
@@ -309,6 +330,7 @@ def main():
     parser.add_argument("--jar", type=Path, default=local.DEFAULT_JAR)
     parser.add_argument("--java")
     parser.add_argument("--result", type=Path, help="new JSON evidence file; existing files are never overwritten")
+    parser.add_argument("--unknown-fields", action="store_true", help="exercise grounded unknown geography and explicitly held raw times")
     args = parser.parse_args()
     args.jar = args.jar.resolve()
     args.result = args.result.resolve() if args.result else None

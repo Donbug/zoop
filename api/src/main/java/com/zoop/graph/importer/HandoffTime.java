@@ -117,6 +117,23 @@ final class HandoffTime {
         }
     }
 
+    /** Receipt-only retention of a nonempty unsupported source value. Calendar classification itself stays strict. */
+    static void receiptEventTime(String value, String precision) {
+        if (!"unresolved".equals(precision)) {
+            mentionEventTime(value, precision);
+            return;
+        }
+        if (value == null || value.isEmpty()) throw unsupported();
+        Matcher found = MENTION_TIME.matcher(value);
+        if (!found.matches()) return;
+        try {
+            mentionPrecision(found);
+        } catch (GraphHandoffException unsupportedCalendar) {
+            return;
+        }
+        throw unsupported();
+    }
+
     private static String mentionPrecision(Matcher found) {
         String year = found.group(1);
         if (found.group(2) == null) {

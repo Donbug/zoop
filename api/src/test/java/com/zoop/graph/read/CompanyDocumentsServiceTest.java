@@ -404,8 +404,7 @@ class CompanyDocumentsServiceTest {
         var basis = new com.zoop.graph.version.BriefingGraphLookup.Basis("round", "fixture-2026-10-08", NOW,
                 java.util.Map.of(GraphReadFixtures.HBM_SUPPLY, List.of(COMPANY), GraphReadFixtures.HBM_EQUIP, List.of(HANMI)));
         var reader = new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
-                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC), (id, request) -> basis),
-                new com.zoop.graph.snapshot.FixtureGraphSnapshotStore(getClass().getClassLoader()), pinned -> DisclosureExclusions.NONE);
+                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC), (id, request) -> basis), new com.zoop.graph.snapshot.FixtureGraphSnapshotStore(getClass().getClassLoader()), pinned -> DisclosureExclusions.NONE, null, null);
         service = new CompanyDocumentsService(reader, jdbc, registry, evidence, analyses, JsonMapper.builder().build());
         var first = service.list(COMPANY, null, null, null, "round", null, null, null, 1, "req-1");
         assertNotNull(first.nextCursor());

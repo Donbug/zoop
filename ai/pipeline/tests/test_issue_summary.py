@@ -38,7 +38,7 @@ def h(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-MANIFEST = {"schemaVersion": "zoop-ai-handoff-1", "handoffId": "handoff-test-1", "sourceKind": "synthetic", "policyVersion": "zoop-public-projection-policy-1",
+MANIFEST = {"schemaVersion": "zoop-ai-handoff-1", "handoffId": "handoff-test-1", "sourceKind": "synthetic", "policyVersion": "zoop-public-projection-policy-2",
             "sources": [{"relation": {"jobId": "rel-a", "inputDigest": h("rel")}, "upstream": {"jobId": "s2-a", "inputDigest": h("s2"), "digest": h("up")},
                          "reviewDigest": h("review")}],
             "files": {"canonical": h("canonical"), "decisions": h("decisions"), "bindings": h("bindings")}}

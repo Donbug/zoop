@@ -311,7 +311,8 @@ SUMMARY_NOT_BASIS = {
     "article-published-at": lambda b: b["articles"][0].update(publishedAt="2026-09-29T01:00:00+00:00"),
     "mention-values": lambda b: b["issues"][0]["mentions"][0].update(title="다른 멘션 제목", action="다른 행위", participants=[]),
     "company-label": lambda b: b["companies"][0].update(label="다른 라벨"),
-    "geography-countries": lambda b: b["issues"][0]["geography"].update(countries=["KR", "US"]),
+    "geography-countries": lambda b: (b["issues"][0]["geography"].update(countries=["KR", "US"], value="international"),
+                                      [row.update(countries=["KR", "US"]) for row in b["issues"][0]["geography"]["basis"]]),
     "verdict-removed": lambda b: b["issues"][0].update(fieldVerdicts=[]),
     "impact-proposal": lambda b: b["impacts"][0]["proposal"].update(reason="다른 제안"),
 }

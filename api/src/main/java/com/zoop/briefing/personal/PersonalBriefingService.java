@@ -1,6 +1,7 @@
 package com.zoop.briefing.personal;
 
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
+import com.zoop.briefing.query.BriefingGraphContentAuthority;
 import com.zoop.briefing.query.BriefingQueryService;
 import com.zoop.briefing.storage.BriefingRound;
 import com.zoop.briefing.storage.BriefingRoundRepository;
@@ -26,10 +27,13 @@ public class PersonalBriefingService {
     private final BriefingQueryService publicReads;
     private final PersonalCompanies companies;
     private final PersonalCandidateAccess access;
+    private final BriefingGraphContentAuthority graph;
     private final JsonMapper json=JsonMapper.builder().build();
     public PersonalBriefingService(PersonalBriefingRepository pools, BriefingRoundRepository rounds,
-            BriefingQueryService publicReads, PersonalCompanies companies, PersonalCandidateAccess access) {
+            BriefingQueryService publicReads, PersonalCompanies companies, PersonalCandidateAccess access,
+            BriefingGraphContentAuthority graph) {
         this.pools=pools; this.rounds=rounds; this.publicReads=publicReads; this.companies=companies; this.access=access;
+        this.graph=graph;
     }
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=10)
     public ObjectNode get(String roundId, MemberPrincipal member, String requestId) {
@@ -56,11 +60,12 @@ public class PersonalBriefingService {
             out.put("poolVersion",pool.path("inputSha256").asString()).put("scope",pool.path("scope").asString());
             if (rounds.changes(roundId).stream().anyMatch(c->"correction".equals(c.kind())))
                 return state(out,"pool_unavailable","정정된 회차입니다. 후보 저장본의 재검증이 필요합니다.");
+            var graphContext=graph.context(round.graphVersion(),requestId);
             var eligible=eligible(pool,round); out.put("eligibleCount",eligible.size());
             var matches=new ArrayList<JsonNode>(); int blocked=0;
             for (var c:eligible) {
                 if (matched(c,scope).isEmpty()) continue;
-                if (!access.readable(c,requestId)) {blocked++;continue;}
+                if (!access.readable(c,graphContext,requestId)) {blocked++;continue;}
                 matches.add(c);
             }
             var selected=select(matches,scope);
@@ -77,7 +82,7 @@ public class PersonalBriefingService {
                 }
                 out.withArray("items").add(item);
             }
-            track(out,round,scope,requestId,pool);
+            track(out,round,scope,requestId,pool,graphContext);
             return state(out,selected.isEmpty()?(blocked>0?"sources_unavailable":"no_matching_issues"):"available",
                     selected.isEmpty()?"이번 회차에서 현재 제공 가능한 적격 관련 이슈가 없습니다.":null);
         } catch (DataAccessException | IllegalArgumentException | com.zoop.common.json.StrictJson.Malformed error) {
@@ -145,7 +150,8 @@ public class PersonalBriefingService {
         }
         return selected;
     }
-    private void track(ObjectNode out,BriefingRound round,Set<String> scope,String requestId,JsonNode pool) {
+    private void track(ObjectNode out,BriefingRound round,Set<String> scope,String requestId,JsonNode pool,
+            BriefingGraphContentAuthority.Context graphContext) {
         // Fixed predecessor; never substitute the latest successful round or match by company alone.
         String priorId=pool.path("previousRoundId").asString("");
         if(priorId.isBlank()) {out.put("trackingStatus","previous_not_recorded");return;}
@@ -163,14 +169,15 @@ public class PersonalBriefingService {
         JsonNode priorPool=pools.pool(priorId).orElse(null);
         if(priorPool==null) {out.put("trackingStatus","previous_pool_unavailable");return;}
         validatePool(priorPool,previous);
+        var priorGraph=graph.context(previous.graphVersion(),requestId);
         var allowed=new ArrayList<JsonNode>();
-        for(var c:eligible(priorPool,previous))if(!matched(c,scope).isEmpty() && access.readable(c,requestId))allowed.add(c);
+        for(var c:eligible(priorPool,previous))if(!matched(c,scope).isEmpty() && access.readable(c,priorGraph,requestId))allowed.add(c);
         out.put("previousRoundId",priorId).put("trackingStatus","available");
         for(var old:select(allowed,scope))for(var relation:matched(old,scope)) {
             String company=relation.path("companyId").asString();
             var now=pool.path("candidates").valueStream().filter(c->c.path("eventKey").equals(old.path("eventKey"))
                     && eligible(pool,round).contains(c) && !matched(c,Set.of(company)).isEmpty()).findFirst().orElse(null);
-            if(now!=null && !access.readable(now,requestId))now=null;
+            if(now!=null && !access.readable(now,graphContext,requestId))now=null;
             var row=out.withArray("tracking").addObject().put("issueId",old.path("issueId").asString())
                     .put("title",old.path("title").asString()).put("companyId",company).put("companyName",relation.path("name").asString())
                     .put("status",now==null?"not_observed":"follow_up_available")

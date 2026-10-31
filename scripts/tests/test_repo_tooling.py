@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -24,6 +24,11 @@ import require_ci
 
 SHA = "a" * 40
 REPO = "example/zoop"
+CI_JOBS = {
+    "public-config", "web", "app-web", "ai-worker", "ai-pipeline-tests", "ai-pipeline-smoke",
+    "ai-pipeline", "ai-service", "ai-container", "api-container", "api-tests", "api-graph-smoke",
+    "api", "required-ci",
+}
 
 
 def fixture(root: Path) -> None:
@@ -129,7 +134,7 @@ class CiGateTests(unittest.TestCase):
     def test_same_commit_push_passes(self):
         run = self.run_record()
         self.assertEqual(require_ci.select_run({"workflow_runs": [run]}, SHA, REPO), run)
-        require_ci.require_jobs([{"name": name, "conclusion": "success"} for name in require_ci.REQUIRED_JOBS])
+        require_ci.require_jobs([{"name": name, "conclusion": "success"} for name in CI_JOBS])
 
     def test_other_commit_pr_branch_repo_and_workflow_do_not_pass(self):
         for changes in ({"head_sha": "b" * 40}, {"event": "pull_request"}, {"head_branch": "feature"},
@@ -141,28 +146,213 @@ class CiGateTests(unittest.TestCase):
         for status, conclusion in (("completed", "failure"), ("in_progress", None), ("completed", "skipped")):
             with self.subTest(status=status, conclusion=conclusion), self.assertRaisesRegex(ValueError, "Latest CI"):
                 require_ci.select_run({"workflow_runs": [self.run_record(), self.run_record(id=8, status=status, conclusion=conclusion)]}, SHA, REPO)
+            with self.subTest(attempt=2, status=status), self.assertRaisesRegex(ValueError, "Latest CI"):
+                require_ci.select_run({"workflow_runs": [self.run_record(),
+                    self.run_record(run_attempt=2, status=status, conclusion=conclusion)]}, SHA, REPO)
 
-    def test_missing_or_skipped_job_fails_for_every_required_job(self):
-        self.assertIn("ai-pipeline", require_ci.REQUIRED_JOBS)
-        self.assertIn("ai-pipeline-tests", require_ci.REQUIRED_JOBS)
-        self.assertIn("ai-pipeline-smoke", require_ci.REQUIRED_JOBS)
-        self.assertNotIn("ai-pipeline-public", require_ci.REQUIRED_JOBS)
-        self.assertIn("ai-worker", require_ci.REQUIRED_JOBS)
-        self.assertIn("ai-service", require_ci.REQUIRED_JOBS)
-        self.assertIn("api", require_ci.REQUIRED_JOBS)
-        self.assertIn("api-tests", require_ci.REQUIRED_JOBS)
-        self.assertIn("api-graph-smoke", require_ci.REQUIRED_JOBS)
-        self.assertIn("api-container", require_ci.REQUIRED_JOBS)
-        self.assertIn("app-web", require_ci.REQUIRED_JOBS)
-        self.assertEqual(len(require_ci.REQUIRED_JOBS), 14)
-        for skipped in sorted(require_ci.REQUIRED_JOBS):
-            with self.subTest(skipped=skipped), self.assertRaisesRegex(ValueError, "CI job evidence"):
-                require_ci.require_jobs([{"name": name, "conclusion": "skipped" if name == skipped else "success"}
-                                         for name in require_ci.REQUIRED_JOBS])
-            with self.subTest(missing=skipped), self.assertRaisesRegex(ValueError, "CI job evidence"):
-                require_ci.require_jobs([{"name": name, "conclusion": "success"} for name in require_ci.REQUIRED_JOBS - {skipped}])
+    def test_missing_or_unsuccessful_job_fails_for_every_required_job(self):
+        self.assertEqual(require_ci.REQUIRED_JOBS, CI_JOBS)
+        for required in sorted(CI_JOBS):
+            for conclusion in ("skipped", "failure", "cancelled", None):
+                with self.subTest(job=required, conclusion=conclusion), self.assertRaisesRegex(ValueError, "CI job evidence"):
+                    require_ci.require_jobs([{"name": name, "conclusion": conclusion if name == required else "success"}
+                                             for name in CI_JOBS])
+            with self.subTest(missing=required), self.assertRaisesRegex(ValueError, "CI job evidence"):
+                require_ci.require_jobs([{"name": name, "conclusion": "success"} for name in CI_JOBS - {required}])
         with self.assertRaisesRegex(ValueError, "CI job evidence"):
             require_ci.require_jobs([])
+
+    def invoke_gate(self, responses, **environment):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "output"
+            output.touch()
+            env = {"GITHUB_REF": "refs/heads/main", "GITHUB_SHA": SHA, "GITHUB_REPOSITORY": REPO,
+                   "GH_TOKEN": "synthetic-fixture", "GITHUB_OUTPUT": str(output), **environment}
+            with patch.dict(os.environ, env, clear=True), \
+                    patch.object(require_ci.urllib.request, "build_opener") as opener, \
+                    redirect_stdout(io.StringIO()):
+                opener.return_value.open.side_effect = [io.StringIO(json.dumps(response)) for response in responses]
+                error = None
+                try:
+                    require_ci.main()
+                except SystemExit as failure:
+                    error = str(failure)
+                urls = [call.args[0].full_url for call in opener.return_value.open.call_args_list]
+            return error, output.read_text(), urls
+
+    def test_entrypoint_reads_exact_commit_and_attempt_paginated_jobs(self):
+        jobs = [{"name": name, "conclusion": "success"} for name in sorted(CI_JOBS)]
+        error, output, urls = self.invoke_gate([
+            {"workflow_runs": [self.run_record(run_attempt=3)]},
+            {"jobs": jobs[:7], "total_count": 14},
+            {"jobs": jobs[7:], "total_count": 14},
+        ])
+        self.assertIsNone(error)
+        self.assertEqual(output, "ci-run-id=7\nci-run-attempt=3\n")
+        self.assertEqual(urls, [
+            f"https://api.github.com/repos/{REPO}/actions/workflows/ci.yml/runs?head_sha={SHA}&event=push&per_page=100",
+            f"https://api.github.com/repos/{REPO}/actions/runs/7/attempts/3/jobs?per_page=100&page=1",
+            f"https://api.github.com/repos/{REPO}/actions/runs/7/attempts/3/jobs?per_page=100&page=2",
+        ])
+
+    def test_entrypoint_rejects_wrong_ref_before_reading_ci(self):
+        for ref in ("refs/heads/feature", "refs/tags/main", "refs/pull/7/merge", ""):
+            with self.subTest(ref=ref):
+                error, output, urls = self.invoke_gate([], GITHUB_REF=ref)
+                self.assertEqual(error, "Artifact workflow is restricted to main.")
+                self.assertEqual(output, "")
+                self.assertEqual(urls, [])
+
+    def test_entrypoint_refuses_wrong_sha_missing_runs_and_failed_latest_attempt(self):
+        for runs, message in (
+            ([], "No CI push run"),
+            ([self.run_record(head_sha="b" * 40)], "No CI push run"),
+            ([self.run_record(), self.run_record(run_attempt=2, conclusion="failure")], "Latest CI"),
+        ):
+            with self.subTest(runs=runs):
+                error, output, urls = self.invoke_gate([{"workflow_runs": runs}])
+                self.assertIn(message, error)
+                self.assertEqual(output, "")
+                self.assertEqual(len(urls), 1)
+
+    def test_entrypoint_refuses_missing_skipped_or_failed_ai_container(self):
+        for conclusion in ("missing", "skipped", "failure"):
+            jobs = [{"name": name, "conclusion": conclusion if name == "ai-container" else "success"}
+                    for name in CI_JOBS if name != "ai-container" or conclusion != "missing"]
+            with self.subTest(conclusion=conclusion):
+                error, output, _ = self.invoke_gate([
+                    {"workflow_runs": [self.run_record()]}, {"jobs": jobs, "total_count": len(jobs)},
+                ])
+                self.assertIn("CI job evidence", error)
+                self.assertEqual(output, "")
+
+
+class ImagePublicationWorkflowTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.workflows = {
+            kind: repo_checks.yaml_load(SCRIPTS.parent / f".github/workflows/deploy-{kind}-dev.yml")
+            for kind in ("api", "ai")
+        }
+
+    def run_shell(self, script, env):
+        return subprocess.run(["bash", "-e", "-o", "pipefail", "-c", script],
+                              env={"PATH": os.defpath, **env}, capture_output=True, text=True)
+
+    def test_required_ci_executes_every_prerequisite_result(self):
+        workflow = repo_checks.yaml_load(SCRIPTS.parent / ".github/workflows/ci.yml")
+        required = workflow["jobs"]["required-ci"]
+        self.assertEqual(set(workflow["jobs"]), CI_JOBS)
+        self.assertEqual(set(required["needs"]), CI_JOBS - {"required-ci"})
+        self.assertEqual(required["if"], "always()")
+        step = required["steps"][0]
+        results = {}
+        for variable, expression in step["env"].items():
+            match = re.fullmatch(r"\$\{\{ needs\.([a-z-]+)\.result \}\}", expression)
+            self.assertIsNotNone(match)
+            results[match[1]] = variable
+        self.assertEqual(set(results), CI_JOBS - {"required-ci"})
+        env = {variable: "success" for variable in results.values()}
+        self.assertEqual(self.run_shell(step["run"], env).returncode, 0)
+        for job, variable in results.items():
+            for conclusion in ("failure", "skipped", "cancelled", ""):
+                with self.subTest(job=job, conclusion=conclusion):
+                    result = self.run_shell(step["run"], {**env, variable: conclusion})
+                    self.assertNotEqual(result.returncode, 0)
+
+    def test_main_and_exact_commit_ci_gate_precede_both_aws_roles(self):
+        for kind, workflow in self.workflows.items():
+            with self.subTest(kind=kind):
+                self.assertEqual(workflow["permissions"], {"contents": "read", "actions": "read", "id-token": "write"})
+                operation = workflow["on"]["workflow_dispatch"]["inputs"]["operation"]
+                self.assertEqual(operation["default"], "stage-image")
+                self.assertEqual(operation["options"], ["stage-image", "deploy"])
+                steps = workflow["jobs"]["deploy"]["steps"]
+                ref_gate = steps[0]
+                self.assertEqual(ref_gate["env"], {"RELEASE_REF": "${{ github.ref }}"})
+                for ref in ("refs/heads/main", "refs/heads/feature", "refs/tags/main"):
+                    result = self.run_shell(ref_gate["run"], {"RELEASE_REF": ref})
+                    self.assertEqual(result.returncode == 0, ref == "refs/heads/main", result.stderr)
+                checkout = next(step for step in steps if step.get("uses", "").startswith("actions/checkout@"))
+                self.assertEqual(checkout["with"]["ref"], "${{ github.sha }}")
+                gate = next(step for step in steps if step.get("id") == "ci")
+                self.assertEqual(gate["run"], "python scripts/require_ci.py")
+                self.assertEqual(gate["env"], {"GH_TOKEN": "${{ github.token }}"})
+                for guard in (ref_gate, gate):
+                    self.assertIsNone(guard.get("if"))
+                    self.assertEqual(guard.get("continue-on-error", "false"), "false")
+                self.assertLess(steps.index(checkout), steps.index(gate))
+                credentials = [step for step in steps if step.get("uses", "").startswith("aws-actions/configure-aws-credentials@")]
+                self.assertEqual(len(credentials), 2)
+                for step, operation_name, role in zip(credentials, ("stage-image", "deploy"),
+                                                     ("AWS_IMAGE_STAGE_ROLE_ARN", "AWS_DEPLOY_ROLE_ARN")):
+                    self.assertLess(steps.index(gate), steps.index(step))
+                    self.assertEqual(step["if"], "${{ inputs.operation == '" + operation_name + "' }}")
+                    self.assertEqual(step["with"]["role-to-assume"], "${{ vars." + role + " }}")
+                for step in steps:
+                    if "task-definition" in step.get("uses", "") or step.get("name") == "Download current task definition":
+                        self.assertEqual(step["if"], "${{ inputs.operation == 'deploy' }}")
+
+    def test_image_build_publishes_run_specific_tag_digest_and_commit_receipt(self):
+        for kind, workflow in self.workflows.items():
+            steps = workflow["jobs"]["deploy"]["steps"]
+            build = next(step for step in steps if step.get("id") == "build-image")
+            self.assertEqual(build["env"]["IMAGE_COMMIT"], "${{ github.sha }}")
+            self.assertEqual(build["env"]["IMAGE_TAG"], "${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}")
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                output, calls, summary = root / "output", root / "calls", root / "summary"
+                output.touch()
+                digest = "sha256:" + "d" * 64
+                tag = SHA + "-91-2"
+                image = f"registry.example/zoop-{kind}"
+                env = {"ECR_REGISTRY": "registry.example", "ECR_REPOSITORY": f"zoop-{kind}",
+                       "IMAGE_COMMIT": SHA, "IMAGE_TAG": tag, "GITHUB_OUTPUT": str(output),
+                       "CALLS": str(calls), "DIGEST": digest}
+                commands = """
+                docker() { printf 'docker %s\\n' "$*" >> "$CALLS"; }
+                aws() { printf 'aws %s\\n' "$*" >> "$CALLS"; printf '%s\\n' "$DIGEST"; }
+                """
+                result = self.run_shell(commands + build["run"], env)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(calls.read_text().splitlines(), [
+                    f"docker build --file {kind}/Dockerfile --label org.opencontainers.image.revision={SHA} --tag {image}:{tag} {kind}",
+                    f"docker push {image}:{tag}",
+                    f"aws ecr describe-images --repository-name zoop-{kind} --image-ids imageTag={tag} --query imageDetails[0].imageDigest --output text",
+                ])
+                self.assertEqual(output.read_text(), f"image={image}@{digest}\ntagged-image={image}:{tag}\ncommit={SHA}\n")
+                receipt = next(step for step in steps if step.get("name") == "Write workflow summary")
+                values = {
+                    "inputs.operation": "stage-image", "steps.build-image.outputs.image": f"{image}@{digest}",
+                    "steps.build-image.outputs.tagged-image": f"{image}:{tag}", "steps.build-image.outputs.commit": SHA,
+                    "steps.ci.outputs.ci-run-id": "7", "steps.ci.outputs.ci-run-attempt": "3",
+                }
+                receipt_env = {name: values[expression.removeprefix("${{ ").removesuffix(" }}")]
+                               for name, expression in receipt["env"].items()}
+                result = self.run_shell(receipt["run"], {**receipt_env, "GITHUB_RUN_ID": "91",
+                    "GITHUB_RUN_ATTEMPT": "2", "GITHUB_STEP_SUMMARY": str(summary)})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                for line in (f"- Main commit: `{SHA}`", "- CI run / attempt: `7` / `3`",
+                             "- Image workflow run / attempt: `91` / `2`", f"- Image: `{image}@{digest}`"):
+                    self.assertIn(line, summary.read_text())
+
+    def test_image_build_failure_does_not_publish_a_digest(self):
+        for kind, workflow in self.workflows.items():
+            build = next(step for step in workflow["jobs"]["deploy"]["steps"] if step.get("id") == "build-image")
+            for failing_command in ("build", "push"):
+                with self.subTest(kind=kind, failing_command=failing_command), tempfile.TemporaryDirectory() as folder:
+                    output = Path(folder) / "output"
+                    output.touch()
+                    result = self.run_shell("""
+                        docker() { if [ "$1" = "$FAIL_COMMAND" ]; then return 17; fi; }
+                        aws() { exit 99; }
+                        """ + build["run"], {
+                        "ECR_REGISTRY": "registry.example", "ECR_REPOSITORY": f"zoop-{kind}",
+                        "IMAGE_TAG": SHA + "-91-2", "IMAGE_COMMIT": SHA,
+                        "GITHUB_OUTPUT": str(output), "FAIL_COMMAND": failing_command,
+                    })
+                    self.assertEqual(result.returncode, 17, result.stderr)
+                    self.assertEqual(output.read_text(), "")
 
 
 class EvaluationVerificationGateTests(unittest.TestCase):

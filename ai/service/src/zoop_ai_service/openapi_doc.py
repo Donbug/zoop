@@ -14,6 +14,7 @@ from typing import Any
 
 from . import chat_doc, extraction_doc, graph_doc, handoff_doc
 from .handoff_exposure_wire import ExposureQuery
+from .observation_wire import ObservationExportRequest
 from .relation_ledger import OperationRow
 from .relation_review import operation_status
 from .relation_wire import (SCHEMA as RELATION_SCHEMA, RelationErrorEnvelope, RelationJobContent, RelationJobStatus, RelationOperationStatus,
@@ -34,9 +35,9 @@ Internal app-to-AI transport for the S1 analysis family (`zoop-ai-s1-1`): docume
 semantic-verification and briefing-outlook. It is a thin, durable HTTP layer over the installed `zoop-ai` CLI; the runtime ledger
 stays the only source of job state, and every state shown here is read from the runtime during the same request.
 
-**Network.** The service binds `127.0.0.1` only. Production reach is an HTTPS reverse proxy co-located with it (same host or network
-namespace) that terminates TLS, caps bodies at 2,000,000 bytes, never logs `Authorization`, and is reachable only from the app
-backend's security group. That proxy is an assumption: nothing here was deployed or observed.
+**Network.** The service defaults to `127.0.0.1`. `ZOOP_AI_SERVICE_HOST` accepts an explicit literal bind IP for an operator-managed
+container deployment behind approved TLS ingress. The ingress must cap bodies at 2,000,000 bytes, protect Authorization,
+and restrict callers to the app backend. Configuration does not deploy or authorize that ingress.
 
 **Authentication.** `Authorization: Bearer <token>`. Tokens are operator-issued; the service stores only SHA-256 digests. The
 authenticated principal is the owner of every job it registers; there is no end-user identity in v1. A job owned by another
@@ -504,7 +505,7 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     spec["info"] = {"title": "Zoop internal AI analysis transport", "version": "1.0.0",
                     "description": (DESCRIPTION + "\n" + extraction_doc.DESCRIPTION + "\n" + graph_doc.DESCRIPTION + "\n" + handoff_doc.DESCRIPTION + "\n"
                                     + chat_doc.DESCRIPTION).strip()}
-    spec["servers"] = [{"url": "http://127.0.0.1:8797", "description": "Loopback only. Never exposed directly; reach it through a co-located TLS proxy."}]
+    spec["servers"] = [{"url": "http://127.0.0.1:8797", "description": "Default loopback development address; deployment endpoint is operator-owned HTTPS ingress."}]
     spec["tags"] = [{"name": "analysis-jobs", "description": "S1 analysis jobs over the installed zoop-ai runtime."},
                     {"name": "relation-jobs", "description": "S3 relation/impact candidate jobs over an operator-prepared S2 upstream, through the installed zoop-ai-relation pipeline (replay, or live for an operator-pinned upstream)."},
                     {"name": "extraction-jobs", "description": "S2 event/topic candidate jobs over an operator-approved request, through the installed zoop-ai-extract pipeline (replay, or live for an operator-pinned approval)."},
@@ -512,6 +513,7 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
                     {"name": "graph-handoffs", "description": "Read-only, nonpublic AI handoff status and whole-bundle delivery over operator-pinned handoffs, through the installed zoop-ai-handoff export command (no write, no model, no network)."},
                     {"name": "chat-stages", "description": "One chatbot model stage (router, answer or verification) per request, synchronously, through the installed zoop-ai-chat runtime (replay, or live behind the chat gate)."},
                     {"name": "plan-admissions", "description": "Bounded exact plan admission and immutable reference reads; no dispatch."},
+                    {"name": "observations", "description": "Synchronous native observation export under current read/store/quote-display rights."},
                     {"name": "plan-admission-policy", "description": "Separate operator-only policy CAS control; never application authority."}]
     components = spec["components"]
     components["securitySchemes"] = {"bearerAuth": {"type": "http", "scheme": "bearer",
@@ -529,7 +531,7 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
               "getGraphVersionStatus": "graph.read", "getGraphVersionFocus": "graph.read",
               "getGraphHandoffStatus": "handoff.read", "getGraphHandoffBundle": "handoff.read", "queryGraphHandoffExposure": "handoff.exposure",
               "invokeChatStage": "chat.invoke", "probeChatMcp": "chat.invoke", "admitPlan": "plan.admit", "getPlanAdmission": "plan.read",
-              "getPlanAdmissionPolicy": "plan.policy", "setPlanAdmissionPolicy": "plan.policy"}
+              "getPlanAdmissionPolicy": "plan.policy", "setPlanAdmissionPolicy": "plan.policy", "exportObservation": "observation.read"}
     for path in spec["paths"].values():
         for operation in path.values():
             operation["security"] = [{"bearerAuth": [scopes[operation["operationId"]]]}]
@@ -601,4 +603,20 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     exposure["responses"]["200"]["description"] = "Complete unchanged identity-only report in the handoff envelope; not current delivery authority or import readiness."
     chat_doc.document(spec)
     _document_plans(spec)
+    components["schemas"]["ObservationExportRequest"] = ObservationExportRequest.model_json_schema(
+        by_alias=True, ref_template="#/components/schemas/{model}")
+    export = spec["paths"]["/internal/v1/observations/export"]["post"]
+    export["requestBody"] = {"required": True, "content": {"application/json": {
+        "schema": {"$ref": "#/components/schemas/ObservationExportRequest"}}}}
+    export["description"] = (
+        "Requires observation.read. One complete seven-field native selector plus schemaVersion zoop-ingestion-s2-1. "
+        "Every request runs installed zoop-ai-ingest export --require-store with credential-filtered environment and server-owned paths. "
+        "Current read/store/quote-display rights, frozen source configuration, selector, text and locator hashes are checked. "
+        "Single-context mode reads its configured registry; multicontext mode resolves only an exact selector in the pinned handoff inventory, "
+        "checked before and after export. Unknown routes are 404; changed or invalid inventory fails closed. "
+        "Scope covers the configured inventory, not per-observation ownership. No query parameters or caller-supplied paths. "
+        "One synchronous 200 includes document.text and preserves native optional fields. Child deadline 45 seconds, at most two exports, "
+        "input limit 2,000,000 bytes and response limit 16 MiB. Repeated requests recheck rights; delivered text cannot be recalled atomically.")
+    for response in export["responses"].values():
+        response.setdefault("headers", {})["Cache-Control"] = {"schema": {"type": "string", "const": "no-store"}}
     return spec

@@ -19,6 +19,7 @@ public enum ExclusionFailure {
     REVISION_STALE("revision_stale"),
     /** An {@code exclude-query} found no version to ask about, or more than one query can select. Nothing was asked or written. */
     VERSIONS_INVALID("versions_invalid"),
+    EXPOSURE_BATCH_REQUIRED("exposure_batch_required"),
     /** The exposure client is not configured, or the AI service could not answer (transport, 5xx). Nothing was written. */
     EXPOSURE_UNAVAILABLE("exposure_unavailable"),
     /** The AI service refused the query with a definite error (e.g. handoff_not_allowed, handoff_pin_mismatch). Nothing written. */

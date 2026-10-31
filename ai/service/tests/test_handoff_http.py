@@ -627,7 +627,7 @@ def test_a_supplier_customer_direction_is_relayed_as_the_producer_states_it_and_
 
 
 def test_a_current_answer_in_an_earlier_bundle_schema_is_refused_and_a_legacy_handoff_is_withheld_without_any_old_content(tmp_path, start):
-    """The service knows only `zoop-graph-handoff-bundle-7`: a bundle-1 shaped export (no mentions), a bundle-2 shaped export (mentions, no `fieldProvenance`), a
+    """The service knows only `zoop-graph-handoff-bundle-8`: a bundle-1 shaped export (no mentions), a bundle-2 shaped export (mentions, no `fieldProvenance`), a
     bundle-3 shaped export (provenance, no `fieldVerdicts`/`withheld`), a bundle-4 shaped export (no `pathCompanies`/`structuralPath`/basis scopes), a bundle-5 shaped
     export (no `impacts`) or a bundle-6 shaped export (no issue `summary`, no `policy.issueSummary`) is never relayed, and the producer's own withheld answer for a handoff
     frozen under any of them reaches the caller as a 200 with that reason and nothing of the old receipt."""
@@ -673,7 +673,7 @@ def test_a_current_answer_in_an_earlier_bundle_schema_is_refused_and_a_legacy_ha
                mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-2"), [(issue.pop("fieldProvenance"), issue.pop("fieldVerdicts")) for issue in b["issues"]])),
                mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-3"), [(issue.pop("fieldVerdicts"), issue["fieldProvenance"].pop("withheld"))
                                                                                        for issue in b["issues"]])),
-               four(), five(), six())
+               four(), five(), six(), mutated(lambda b: b.update(schemaVersion="zoop-graph-handoff-bundle-7")))
     for legacy in earlier:
         serve(ws, legacy)
         for url in (bundle_url(), status_url()):
@@ -1087,7 +1087,7 @@ def test_every_summary_outcome_is_relayed_exactly_and_the_relay_neither_asks_for
     response = get(service, bundle_url())
     wire = response.json()
     assert response.status_code == 200 and wire["delivery"]["state"] == "current" and wire["bundle"] == bundle and sha(wire["bundle"]) == wire["verification"]["bundleDigest"]
-    assert wire["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-7" and wire["bundle"]["policy"]["issueSummary"] == "zoop-issue-summary-policy-1"
+    assert wire["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-8" and wire["bundle"]["policy"]["issueSummary"] == "zoop-issue-summary-policy-1"
     delivered = wire["bundle"]["issues"][0]["summary"]
     assert delivered == bundle["issues"][0]["summary"] and (SUMMARY_SENTENCE in json.dumps(wire, ensure_ascii=False)) == (outcome == "available")
     assert (delivered["status"], delivered.get("code")) == (("available", None) if outcome == "available" else ("unavailable", outcome))

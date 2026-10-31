@@ -10,7 +10,7 @@ import urllib.request
 
 
 REQUIRED_JOBS = {
-    "public-config", "web", "app-web", "bff", "ai-worker", "ai-pipeline-tests", "ai-pipeline-smoke",
+    "public-config", "web", "app-web", "ai-container", "ai-worker", "ai-pipeline-tests", "ai-pipeline-smoke",
     "ai-pipeline", "ai-service", "api-container", "api-tests", "api-graph-smoke", "api", "required-ci",
 }
 
@@ -76,6 +76,7 @@ def main() -> None:
         raise SystemExit(str(error)) from None
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as stream:
         stream.write(f"ci-run-id={run['id']}\n")
+        stream.write(f"ci-run-attempt={run.get('run_attempt', 1)}\n")
     print(f"Exact-commit CI gate passed: run {run['id']} / {sha}")
 
 

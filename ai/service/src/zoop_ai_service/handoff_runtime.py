@@ -76,10 +76,12 @@ class HandoffProcess:
 
     def _argv(self) -> list[str]:
         handoff = self._handoff
-        return [str(handoff.command), "export", "--state-dir", str(handoff.state_dir), "--relation-state-dir", str(handoff.relation_state_dir),
-                "--extraction-state-dir", str(handoff.extraction_state_dir), "--ingestion-state-dir", str(handoff.ingestion_state_dir),
-                "--sources", str(handoff.sources_path), "--canonical", str(handoff.canonical_path), "--decisions", str(handoff.decisions_path),
-                "--bindings", str(handoff.bindings_path)]
+        source_args = (["--source-contexts", str(handoff.source_contexts), "--source-contexts-sha256", handoff.source_contexts_sha256]
+                       if handoff.source_contexts else
+                       ["--relation-state-dir", str(handoff.relation_state_dir), "--extraction-state-dir", str(handoff.extraction_state_dir),
+                        "--ingestion-state-dir", str(handoff.ingestion_state_dir), "--sources", str(handoff.sources_path)])
+        return [str(handoff.command), "export", "--state-dir", str(handoff.state_dir), *source_args,
+                "--canonical", str(handoff.canonical_path), "--decisions", str(handoff.decisions_path), "--bindings", str(handoff.bindings_path)]
 
     def export(self, handoff_id: str) -> Outcome:
         """One child, one attempt, never retried: the full gate chain over one handoff. The service keeps the pins, the digests and, for the bundle route,

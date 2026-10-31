@@ -62,7 +62,7 @@ class GraphRelationServiceTest {
                 java.util.Map.of(HBM_SUPPLY, List.of(HYNIX, NVDA)));
         var selector = new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
                 java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC), (id, request) -> basis);
-        return new GraphRelationService(new PublicGraphReader(selector, ignored -> snapshot, pinned -> DisclosureExclusions.NONE), jdbc, new GraphStructuralDetailReader(org.mockito.Mockito.mock(com.zoop.document.evidence.service.EvidenceService.class)));
+        return new GraphRelationService(new PublicGraphReader(selector, ignored -> snapshot, pinned -> DisclosureExclusions.NONE, null, null), jdbc, new GraphStructuralDetailReader(org.mockito.Mockito.mock(com.zoop.document.evidence.service.EvidenceService.class)));
     }
 
     @Test

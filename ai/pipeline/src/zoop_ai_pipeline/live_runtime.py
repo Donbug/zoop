@@ -25,6 +25,7 @@ keys and with a drifted environment; `accepts(binding)` is the separate "may a N
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import os
@@ -37,8 +38,9 @@ from typing import Any
 import httpx
 
 from . import issue_summary_jev, issue_summary_prompts, live_jev, live_prompts
-from .live_budget import Budget, BudgetError, nano_from_usd, usd
+from .live_budget import Budget, BudgetBusy, BudgetError, nano_from_usd, usd
 from .live_family import Family, Verifier
+from .live_funding import MODE, operating_policy
 from .relation_contracts import canonical, digest
 
 VERSION = "zoop-live-runtime-1"
@@ -67,6 +69,10 @@ TIMEOUT_VAR = "ZOOP_AI_PIPELINE_LIVE_TIMEOUT_SECONDS"
 BUDGET_DIR_VAR = "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"
 MAX_USD_VAR = "ZOOP_AI_PIPELINE_LIVE_MAX_USD"
 MAX_CALLS_VAR = "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS"
+PROFILE_VAR = "ZOOP_AI_PIPELINE_LIVE_PROFILE"
+POLICY_VAR = "ZOOP_AI_PIPELINE_OPERATING_POLICY"
+SET_VAR = "ZOOP_AI_PIPELINE_OPERATING_SET"
+OWNER_VAR = "ZOOP_AI_PIPELINE_OPERATING_OWNER"
 OPENAI_URL_VAR, OPENAI_KEY_VAR = "ZOOP_AI_BASE_URL", "ZOOP_AI_API_KEY"
 JEV_URL_VAR, JEV_KEY_VAR, JEV_MODEL_VAR = "TYPESAFE_BASE_URL", "TYPESAFE_API_KEY", "TYPESAFE_VALIDATION_MODEL"
 
@@ -111,6 +117,15 @@ class LiveFailure(Exception):
         self.kind = ("unavailable" if code.startswith("live_http_") else
                      next((kind for kind, codes in _KINDS.items() if code in codes), "config"))
         super().__init__(code)
+
+
+class LiveDeferred(LiveFailure):
+    """This invocation stopped before HTTP. Its owner persists exact-request proof before allowing same-attempt continuation."""
+
+    def __init__(self, code: str, attempt_id: str, prepared_digest: str):
+        super().__init__(code)
+        self.proof = {"format": "zoop-live-unsent-proof-1", "phase": "before-dispatch", "attemptId": attempt_id,
+                      "preparedDigest": prepared_digest, "reason": code}
 
 
 # ---------------------------------------------------------------- configuration helpers --------------------------------
@@ -197,7 +212,8 @@ class LiveRuntime:
     (decode/prepare only)."""
 
     def __init__(self, *, model: str, effort: str, max_output: int, timeout: int, openai_url: str, jev_url: str, jev_model: str,
-                 budget_identity: str, send: dict[str, Any] | None, send_code: str, family: Family = PIPELINE):
+                 budget_identity: str, send: dict[str, Any] | None, send_code: str, family: Family = PIPELINE,
+                 funding: dict | None = None):
         if model != MODEL:
             raise LiveFailure("live_model_unsupported")
         if effort not in EFFORTS:
@@ -212,6 +228,10 @@ class LiveRuntime:
         self._model, self._effort, self._max_output, self._timeout = model, effort, max_output, timeout
         self._openai_url, self._jev_url = _base_url(openai_url), _base_url(jev_url)
         self._send, self._send_code, self._budget_identity_value = send, send_code, budget_identity
+        self._funding = operating_policy(funding) if funding is not None else None
+        if self._funding is not None:
+            if family is not PIPELINE or timeout != self._funding["requestTimeoutSeconds"]:
+                raise LiveFailure("operating_config_invalid")
         self._binding = self._build_binding()
         self._identity = self._binding["identity"]
 
@@ -233,15 +253,29 @@ class LiveRuntime:
             raise LiveFailure("live_not_enabled")
         directory = env.get(BUDGET_DIR_VAR, "")
         identity = cls._budget_identity(directory)  # the budget directory is pinned at freeze time; it is never created here
-        send = cls._env_send(env, transport, directory)
+        profile = env.get(PROFILE_VAR, "")
+        funding = None
+        if profile:
+            if profile != MODE:
+                raise LiveFailure("live_profile_invalid")
+            if any(env.get(name) for name in (MAX_USD_VAR, MAX_CALLS_VAR, TIMEOUT_VAR,
+                                              "ZOOP_AI_PIPELINE_LIVE_SHARED_MAX_USD", "ZOOP_AI_PIPELINE_LIVE_PERSONAL_MAX_USD")):
+                raise LiveFailure("operating_caps_forbidden")
+            try:
+                funding = operating_policy(json.loads(Path(env[POLICY_VAR]).read_text()))
+            except (OSError, KeyError, ValueError, TypeError):
+                raise LiveFailure("operating_policy_invalid") from None
+        send = cls._env_send(env, transport, directory, funding)
         if need_send and any(send["problems"].values()):
             raise LiveFailure(next(code for code in send["problems"].values() if code))
         return cls(model=env.get(MODEL_VAR, "").strip(), effort=env.get(EFFORT_VAR, "").strip(),
                    max_output=_positive_int(env.get(MAX_OUTPUT_VAR) or str(DEFAULT_MAX_OUTPUT), 0, 10**9, "live_limit_invalid"),
-                   timeout=_positive_int(env.get(TIMEOUT_VAR) or str(DEFAULT_TIMEOUT), 0, 10**9, "live_limit_invalid"),
+                   timeout=funding["requestTimeoutSeconds"] if funding else
+                   _positive_int(env.get(TIMEOUT_VAR) or str(DEFAULT_TIMEOUT), 0, 10**9, "live_limit_invalid"),
                    openai_url=env.get(OPENAI_URL_VAR, "").strip() or DEFAULT_OPENAI_URL,
                    jev_url=env.get(JEV_URL_VAR, "").strip() or DEFAULT_JEV_URL, jev_model=env.get(JEV_MODEL_VAR, "").strip(),
-                   budget_identity=identity, send={**send, "directory": directory}, send_code="live_send_unavailable", family=family)
+                   budget_identity=identity, send={**send, "directory": directory}, send_code="live_send_unavailable", family=family,
+                   funding=funding)
 
     @staticmethod
     def _budget_identity(directory: str) -> str:
@@ -251,19 +285,22 @@ class LiveRuntime:
         return digest({"realpath": os.path.realpath(directory)})
 
     @staticmethod
-    def _env_send(env: Any, transport: httpx.BaseTransport | None, directory: str) -> dict[str, Any]:
+    def _env_send(env: Any, transport: httpx.BaseTransport | None, directory: str, funding: dict | None = None) -> dict[str, Any]:
         """Send-time settings: the budget ceilings and the two keys, each with the code `send` raises when it is missing or malformed.
         The directory itself is pinned by the binding; only its ceilings are send-time."""
         problems: dict[str, str | None] = {"budget": None, "openai": None, "typesafe": None}
         budget = None
         try:
-            try:
-                max_nano = nano_from_usd(env.get(MAX_USD_VAR, ""))
-            except ValueError:
-                raise LiveFailure("live_budget_config_invalid") from None
-            budget = Budget(Path(os.path.realpath(directory)), max_nano,
-                            _positive_int(env.get(MAX_CALLS_VAR, ""), 1, 100_000, "live_budget_config_invalid"))
-        except LiveFailure as exc:
+            if funding is not None:
+                budget = Budget(Path(os.path.realpath(directory)), None, None, policy=funding)
+            else:
+                try:
+                    max_nano = nano_from_usd(env.get(MAX_USD_VAR, ""))
+                except ValueError:
+                    raise LiveFailure("live_budget_config_invalid") from None
+                budget = Budget(Path(os.path.realpath(directory)), max_nano,
+                                _positive_int(env.get(MAX_CALLS_VAR, ""), 1, 100_000, "live_budget_config_invalid"))
+        except (LiveFailure, BudgetError) as exc:
             problems["budget"] = exc.code
         keys: dict[str, str | None] = {}
         for name, var, code in (("openai", OPENAI_KEY_VAR, "live_api_key_required"), ("typesafe", JEV_KEY_VAR, "live_typesafe_key_required")):
@@ -271,7 +308,8 @@ class LiveRuntime:
                 keys[name] = _token(env.get(var), code)
             except LiveFailure as exc:
                 keys[name], problems[name] = None, exc.code
-        return {"budget": budget, "transport": transport, "openaiKey": keys["openai"], "jevKey": keys["typesafe"], "problems": problems}
+        return {"budget": budget, "transport": transport, "openaiKey": keys["openai"], "jevKey": keys["typesafe"], "problems": problems,
+                "set": env.get(SET_VAR), "owner": env.get(OWNER_VAR)}
 
     @classmethod
     def from_binding(cls, binding: dict) -> LiveRuntime:
@@ -281,11 +319,13 @@ class LiveRuntime:
         try:
             family = FAMILIES[binding["version"]]
             generation, verifier = binding["generation"], binding["verifier"]
+            funding = binding.get("funding")
             runtime = cls(model=generation["model"], effort=generation["reasoningEffort"], max_output=generation["maxOutputTokens"],
-                          timeout=DEFAULT_TIMEOUT, openai_url=generation["endpoint"], jev_url=verifier["endpoint"],
+                          timeout=funding["requestTimeoutSeconds"] if funding else DEFAULT_TIMEOUT,
+                          openai_url=generation["endpoint"], jev_url=verifier["endpoint"],
                           jev_model=verifier["model"], budget_identity=binding["budget"]["directoryIdentity"], send=None,
-                          send_code="live_send_unavailable", family=family)
-        except (KeyError, TypeError, LiveFailure):
+                          send_code="live_send_unavailable", family=family, funding=funding)
+        except (KeyError, TypeError, ValueError, LiveFailure):
             raise LiveFailure("live_binding_mismatch") from None
         if runtime.binding() != binding:
             raise LiveFailure("live_binding_mismatch")
@@ -323,6 +363,8 @@ class LiveRuntime:
                 "budget": {"scope": "directory", "directoryIdentity": self._budget_identity_value, "unit": "nanoUsd"},
                 "limits": {"maxRequestBytes": MAX_REQUEST_BYTES, "maxVerifierRequestBytes": MAX_VERIFIER_REQUEST_BYTES,
                            "maxResponseBytes": MAX_RESPONSE_BYTES, "inputOverheadTokens": INPUT_OVERHEAD_TOKENS}}
+        if self._funding is not None:
+            body["funding"] = self._funding
         return {**body, "identity": digest(body)}
 
     def binding(self) -> dict[str, Any]:
@@ -408,7 +450,20 @@ class LiveRuntime:
 
     # ------------------------------------------------------------ send (one request) ------------------------------------
 
-    def send(self, prepared: dict, *, attempt_id: str, authorize: Callable[[], None]) -> dict[str, Any]:
+    def send(self, prepared: dict, *, attempt_id: str, authorize: Callable[[], None], unsent_proof: dict | None = None) -> dict[str, Any]:
+        if self._funding is not None and self._send is not None and self._send["budget"] is not None:
+            budget = self._send["budget"]
+            try:
+                with budget.lock("send.lock") as send_lock:
+                    if not self._send["owner"] or not self._send["set"]:
+                        raise BudgetError("operating_owner_required")
+                    self._send["sendLockFd"] = send_lock
+                    return self._send_once(prepared, attempt_id=attempt_id, authorize=authorize, unsent_proof=unsent_proof)
+            except BudgetError as exc:
+                raise LiveFailure(exc.code) from None
+        return self._send_once(prepared, attempt_id=attempt_id, authorize=authorize, unsent_proof=unsent_proof)
+
+    def _send_once(self, prepared: dict, *, attempt_id: str, authorize: Callable[[], None], unsent_proof: dict | None = None) -> dict[str, Any]:
         """Reserve the shared budget, authorize, send ONCE, settle reported usage and return the receipt envelope.
 
         The owner has already reserved `attempt_id` durably in its own ledger. A refusal before the socket (budget, `authorize`)
@@ -421,6 +476,12 @@ class LiveRuntime:
             raise LiveFailure("live_config_changed")
         if not isinstance(attempt_id, str) or not 1 <= len(attempt_id) <= 200:
             raise LiveFailure("live_prepared_invalid")
+        if unsent_proof is not None:
+            if (self._funding is None or not isinstance(unsent_proof, dict)
+                    or unsent_proof.get("reason") not in {"operating_paused", "operating_ledger_busy"}
+                    or unsent_proof != {"format": "zoop-live-unsent-proof-1", "phase": "before-dispatch", "attemptId": attempt_id,
+                                        "preparedDigest": prepared["digest"], "reason": unsent_proof["reason"]}):
+                raise LiveFailure("operating_unsent_proof_invalid")
         stage, provider = prepared["stage"], prepared["provider"]
         problems = self._send["problems"]
         missing = problems["budget"] or problems["openai" if provider == "openai-compatible" else "typesafe"]
@@ -428,16 +489,37 @@ class LiveRuntime:
             raise LiveFailure(missing)
         budget: Budget = self._send["budget"]
         try:
-            budget.reserve(attempt_id, stage, prepared["recipient"], prepared["requestDigest"], prepared["reservation"]["worstCaseNanoUsd"])
+            budget.reserve(attempt_id, stage, prepared["recipient"], prepared["requestDigest"], prepared["reservation"]["worstCaseNanoUsd"],
+                           set_id=self._send["set"], owner=self._send["owner"], binding_identity=self._identity,
+                           allow_defer=self._funding is not None, resume_unsent=unsent_proof is not None)
         except BudgetError as exc:
+            if self._funding is not None and isinstance(exc, BudgetBusy):
+                raise LiveDeferred(exc.code, attempt_id, prepared["digest"]) from None
             raise LiveFailure(exc.code) from None
         try:
+            if self._funding is not None:
+                budget.check_active(self._send["owner"])
+                while (delay := budget.pacing_delay()) > 0:
+                    time.sleep(min(delay, 0.05))
+                    budget.check_active(self._send["owner"])
             authorize()
-        except BaseException:
+            if self._funding is not None:
+                budget.begin_send(attempt_id, self._send["owner"])
+        except BaseException as exc:
+            if self._funding is not None and isinstance(exc, BudgetBusy):
+                raise LiveDeferred(exc.code, attempt_id, prepared["digest"]) from None
+            if self._funding is not None and isinstance(exc, BudgetError) and exc.code == "operating_paused":
+                try:
+                    budget.defer(attempt_id, exc.code)
+                except BudgetBusy as busy:
+                    raise LiveDeferred(busy.code, attempt_id, prepared["digest"]) from None
+                raise LiveDeferred(exc.code, attempt_id, prepared["digest"]) from None
             try:
                 budget.release(attempt_id)
             except BudgetError:
                 pass  # the reservation stays charged: conservative, and nothing was sent
+            if isinstance(exc, BudgetError):
+                raise LiveFailure(exc.code) from None
             raise
         base = self._openai_url if provider == "openai-compatible" else self._jev_url
         key = self._send["openaiKey"] if provider == "openai-compatible" else self._send["jevKey"]
@@ -460,13 +542,16 @@ class LiveRuntime:
             if rejected is None:
                 rate_in, rate_out = _rates(provider)
                 actual = reported["inputTokens"] * rate_in + reported["outputTokens"] * rate_out
-        try:
-            charged, settled = budget.settle(attempt_id, actual), True
-        except Exception:  # incl. an overflow or a database failure: the worst-case charge simply stays and the receipt says so
-            charged, settled = reserved, False
+        if self._funding is not None:
+            charged, settled = actual if actual is not None else reserved, True
+        else:
+            try:
+                charged, settled = budget.settle(attempt_id, actual), True
+            except Exception:  # conservative charge stays when settlement fails; receipt still belongs to the native owner
+                charged, settled = reserved, False
         model = raw["model"][:200] if isinstance(raw, dict) and isinstance(raw.get("model"), str) else None
         # `usage` keeps what the provider reported, even when it is rejected as implausible (`cost.usageRejected`), so nothing is hidden.
-        return {"format": RECEIPT, "stage": stage, "attemptId": attempt_id, "recipient": prepared["recipient"], "purpose": prepared["purpose"],
+        receipt = {"format": RECEIPT, "stage": stage, "attemptId": attempt_id, "recipient": prepared["recipient"], "purpose": prepared["purpose"],
                 "bindingIdentity": self._identity, "requestDigest": prepared["requestDigest"],
                 "http": {"status": status, "contentType": content_type[:200] if content_type else None,
                          "bodySha256": hashlib.sha256(raw_bytes).hexdigest(), "bodyText": text, "truncated": truncated},
@@ -475,8 +560,27 @@ class LiveRuntime:
                          "settled": settled, "estimatedUsd": usd(actual) if actual is not None else None, "chargedUsd": usd(charged),
                          "reservedUsd": usd(reserved)},
                 "expect": prepared["expect"]}
+        if self._funding is not None:
+            fault = None
+            if stage in self._family.verify_stages:
+                try:
+                    self.answer(stage, receipt)
+                except LiveFailure as exc:
+                    fault = "verifier-" + exc.code
+            try:
+                budget.record_response(attempt_id, receipt, actual, fault=fault)
+            except BudgetError:
+                receipt["cost"].update(settled=False, chargedUsd=usd(reserved))
+        return receipt
 
     def _post(self, base: str, path: str, key: str, body: bytes) -> tuple[int, str | None, bytes, bool]:
+        if self._funding is not None:
+            if self._send["transport"] is not None:
+                return asyncio.run(self._operating_post(base, path, key, body))
+            from .operating_transport import post
+            return post(base, path, key, body, timeout=self._timeout, cleanup=self._funding["cleanupSeconds"],
+                        max_response=MAX_RESPONSE_BYTES, send_lock=self._send["sendLockFd"],
+                        check=lambda: self._send["budget"].check_active(self._send["owner"]))
         deadline = time.monotonic() + self._timeout
         headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json", "Accept": "application/json"}
         with httpx.Client(base_url=base + "/", timeout=httpx.Timeout(self._timeout), headers=headers, follow_redirects=False,
@@ -494,6 +598,41 @@ class LiveRuntime:
                     chunks.append(chunk)
                     size += len(chunk)
                 return response.status_code, response.headers.get("content-type"), b"".join(chunks), truncated
+
+    async def _operating_post(self, base: str, path: str, key: str, body: bytes) -> tuple[int, str | None, bytes, bool]:
+        """An absolute all-phase deadline; cancellation closes the owned HTTP exchange before releasing the send gate."""
+        headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json", "Accept": "application/json"}
+
+        async def request():
+            async with httpx.AsyncClient(base_url=base + "/", timeout=self._timeout, headers=headers, follow_redirects=False,
+                                         trust_env=False, transport=self._send["transport"]) as client:
+                async with client.stream("POST", path, content=body) as response:
+                    chunks, size = [], 0
+                    async for chunk in response.aiter_bytes():
+                        if size + len(chunk) > MAX_RESPONSE_BYTES:
+                            chunks.append(chunk[:MAX_RESPONSE_BYTES - size])
+                            return response.status_code, response.headers.get("content-type"), b"".join(chunks), True
+                        chunks.append(chunk)
+                        size += len(chunk)
+                    return response.status_code, response.headers.get("content-type"), b"".join(chunks), False
+
+        task = asyncio.create_task(request())
+        deadline = time.monotonic() + self._timeout
+        try:
+            while not task.done():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("request_deadline")
+                self._send["budget"].check_active(self._send["owner"])
+                await asyncio.wait({task}, timeout=min(remaining, 0.05))
+            return task.result()
+        finally:
+            if not task.done():
+                task.cancel()
+                try:
+                    await asyncio.wait_for(task, timeout=self._funding["cleanupSeconds"])
+                except asyncio.CancelledError:
+                    pass
 
     # ------------------------------------------------------------ decode (pure, receipt only) ---------------------------
 
