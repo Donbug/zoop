@@ -271,7 +271,10 @@
       "enum": [
         "open_company",
         "focus_path",
-        "open_briefing"
+        "open_briefing",
+        "focus_relation",
+        "open_evidence",
+        "open_watchlist"
       ]
     },
     "response:200:application/json.jobs[].result<anyOf:0>.uiActions[].kind:required": true,
@@ -313,6 +316,13 @@
     "response:200:application/json.jobs[].result<anyOf:0>.uiActions[].target.date<anyOf:1>": {
       "type": "null"
     },
+    "response:200:application/json.jobs[].result<anyOf:0>.uiActions[].target.edgeId:required": true,
+    "response:200:application/json.jobs[].result<anyOf:0>.uiActions[].target.edgeId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs[].result<anyOf:0>.uiActions[].target.edgeId<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.jobs[].result<anyOf:0>.uiActions[].target.edition:required": true,
     "response:200:application/json.jobs[].result<anyOf:0>.uiActions[].target.edition<anyOf:0>": {
       "type": "string",
@@ -322,6 +332,17 @@
       ]
     },
     "response:200:application/json.jobs[].result<anyOf:0>.uiActions[].target.edition<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs[].result<anyOf:0>.uiActions[].target.evidenceIds:required": true,
+    "response:200:application/json.jobs[].result<anyOf:0>.uiActions[].target.evidenceIds<anyOf:0>": {
+      "type": "array",
+      "maxItems": 20
+    },
+    "response:200:application/json.jobs[].result<anyOf:0>.uiActions[].target.evidenceIds<anyOf:0>[]": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs[].result<anyOf:0>.uiActions[].target.evidenceIds<anyOf:1>": {
       "type": "null"
     },
     "response:200:application/json.jobs[].result<anyOf:0>.uiActions[].target.fromId:required": true,

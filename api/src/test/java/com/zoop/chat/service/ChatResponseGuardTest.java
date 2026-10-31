@@ -172,6 +172,12 @@ class ChatResponseGuardTest {
         var result = answered("ev-1");
         var open = new ChatUiAction("action-1", ChatUiAction.OPEN_COMPANY, "기업 상세 · 숨은 기업", List.of("r1"),
                 ChatUiAction.Target.company("KRX:hidden"));
+        var relation = new ChatUiAction("action-4", ChatUiAction.FOCUS_RELATION, "관계 보기", List.of("r1"),
+                ChatUiAction.Target.relation("edge-hidden", "gv-1", null));
+        var evidence = new ChatUiAction("action-5", ChatUiAction.OPEN_EVIDENCE, "근거 보기", List.of("r1"),
+                ChatUiAction.Target.evidence(List.of("ev-1"), "gv-1", null));
+        var mine = new ChatUiAction("action-6", ChatUiAction.OPEN_WATCHLIST, "내 종목 보기", List.of("r1"),
+                ChatUiAction.Target.watchlist());
         var path = new ChatUiAction("action-2", ChatUiAction.FOCUS_PATH, "경로 보기", List.of("r1"),
                 ChatUiAction.Target.path("KRX:000660", "KRX:hidden", "gv-1", null));
         var round = new ChatUiAction("action-3", ChatUiAction.OPEN_BRIEFING, "브리핑 열기", List.of("r1"),
@@ -179,10 +185,10 @@ class ChatResponseGuardTest {
         var offered = new ChatResult(result.outcome(), result.messageId(), result.answer(), result.sections(),
                 result.answerBasis(), result.reason(), result.sources(), result.citations(), result.graphTargets(),
                 result.applied(), result.choices(), result.action(), result.limitations(), result.metadata(),
-                result.answerStatus(), result.notices(), List.of(open, path, round));
+                result.answerStatus(), result.notices(), List.of(open, path, round, relation, evidence, mine));
 
         var shown = guard(Set.of("ev-1"), Optional.of(Set.of("KRX:000660"))).job(job(List.of(), offered), "req-1").result();
-        assertEquals(List.of(round), shown.uiActions());
+        assertEquals(List.of(round, evidence, mine), shown.uiActions());
 
         var withheld = guard(Set.of()).job(job(List.of(), offered), "req-2").result();
         assertTrue(withheld.uiActions().isEmpty(), "a withheld answer offers nothing");
