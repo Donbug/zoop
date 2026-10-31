@@ -1,6 +1,8 @@
 package com.zoop.chat.mcp;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zoop.chat.executor.ChatEngine;
@@ -78,11 +80,15 @@ class ChatMcpDirectParityTest {
     }
 
     private void running(String job, String selection) {
+        running(job, selection, GRAPH);
+    }
+
+    private void running(String job, String selection, String graph) {
         String attempts = "[{\"n\":1,\"mode\":\"run\",\"requestKey\":\"" + job + "\",\"status\":\"running\","
                 + "\"ownerToken\":\"owner-1\"}]";
-        String context = "{\"items\":[],\"evidenceCount\":0,\"period\":null,\"asOf\":null,\"graphVersion\":\"" + GRAPH + "\"}";
+        String context = "{\"items\":[],\"evidenceCount\":0,\"period\":null,\"asOf\":null,\"graphVersion\":\"" + graph + "\"}";
         store.add(new ChatJobRow(job, "conv-" + job, "member-a", 1, "질문", "a".repeat(64), NOW, context, selection, List.of(),
-                GRAPH, "queued", null, null, null, null, 0, null, null, 0, attempts, NOW, NOW, null));
+                graph, "queued", null, null, null, null, 0, null, null, 0, attempts, NOW, NOW, null));
         assertTrue(store.start(job, "owner-1", NOW.plusSeconds(60), NOW.plusSeconds(60), attempts, NOW));
     }
 
@@ -146,6 +152,52 @@ class ChatMcpDirectParityTest {
 
         assertSameRead(direct("job-direct1", new ChatToolRequest(diff.id(), diff.untargeted(), LIMIT)),
                 viaMcp("job-mcp0001", diff, Map.of()));
+    }
+
+    @Test
+    void aPathStepNamesAnEdgeTheMapHas() {
+        running("job-mcp0001", NO_SELECTION);
+
+        var read = viaMcp("job-mcp0001", ChatCapability.GRAPH_PATH_READ, Map.of("targets", List.of(NVIDIA, HYNIX)));
+
+        var edges = read.items().stream().filter(i -> "edge".equals(i.kind())).map(i -> i.id()).toList();
+        var steps = read.paths().stream().flatMap(p -> p.steps().stream()).map(s -> s.edgeId()).toList();
+        assertFalse(steps.isEmpty());
+        assertTrue(edges.containsAll(steps), "a focus_relation action opens these ids on the map: " + steps + " in " + edges);
+    }
+
+    private String digest(String job, ChatToolRequest request) {
+        return runner.reservation(executor.attach(job, 1).orElseThrow().run(), request, ChatMcpTools.VIA).inputDigest();
+    }
+
+    @Test
+    void requestsOfAnotherScopeVersionOrPeriodAreNeverTheSameCall() {
+        running("job-mcp0001", NO_SELECTION);
+        running("job-mcp0002", NO_SELECTION, "fixture-2026-10-01");
+        var company = ChatCapability.COMPANY_READ.id();
+        var plain = new ChatToolRequest(company, List.of(HYNIX), LIMIT);
+        String read = digest("job-mcp0001", plain);
+
+        assertEquals(read, digest("job-mcp0001", new ChatToolRequest(company, List.of(HYNIX), LIMIT)), "the same call");
+        assertNotEquals(read, digest("job-mcp0002", plain), "another graph version");
+        assertNotEquals(read, digest("job-mcp0001", new ChatToolRequest(company, List.of(HYNIX), LIMIT, List.of(EVIDENCE))),
+                "another evidence scope");
+        assertNotEquals(read, digest("job-mcp0001", new ChatToolRequest(company, List.of(HYNIX), LIMIT, null, NOW)),
+                "another period");
+        assertNotEquals(read, digest("job-mcp0001", new ChatToolRequest(company, List.of(HYNIX), 5)), "another limit");
+    }
+
+    @Test
+    void aKeptResultIsNeverReusedAcrossJobs() {
+        running("job-mcp0001", NO_SELECTION);
+        running("job-mcp0002", NO_SELECTION);
+        var company = ChatCapability.COMPANY_READ;
+
+        viaMcp("job-mcp0001", company, Map.of("targets", List.of(HYNIX)));
+        viaMcp("job-mcp0002", company, Map.of("targets", List.of(HYNIX)));
+
+        assertEquals(1, store.toolCalls("job-mcp0002").size(), "the second job made and recorded its own read");
+        assertEquals(1, store.keptToolResults("job-mcp0002", 1).size());
     }
 
     @Test

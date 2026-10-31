@@ -97,14 +97,19 @@ def preflight(client: Client, env: dict[str, str], mcp_url: str, opener: Callabl
     else:
         labels = {n.get("label") for n in graph.get("nodes", []) if n.get("kind") == "company"}
         issues = sum(1 for n in graph.get("nodes", []) if n.get("kind") == "issue")
-        print(f"graph {graph.get('metadata', {}).get('graphVersion')}: {len(labels)} companies, {issues} issues")
+        metadata = graph.get("metadata", {})
+        truncated = bool(metadata.get("truncated"))
+        print(f"graph {metadata.get('graphVersion')}: {len(labels)} companies, {issues} issues, truncated={truncated}")
         for name, scenario in scenarios(path).items():
             for company in scenario.get("inGraph", []):
                 if company not in labels:
-                    problems.append(f"{name}: {company} is not in the graph")
+                    cut = " (or cut by the node limit)" if truncated else ""
+                    problems.append(f"{name}: {company} is not in the graph{cut}")
             for company in scenario.get("notInGraph", []):
                 if company in labels:
                     problems.append(f"{name}: {company} is in the graph, so its empty read cannot open the web")
+                elif truncated:
+                    problems.append(f"{name}: the graph is cut by the node limit, so check by hand that {company} is absent")
     if not mcp_answers_bearer(mcp_url, opener):
         problems.append("/mcp did not answer 401 Bearer")
     try:

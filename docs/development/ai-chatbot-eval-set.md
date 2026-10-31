@@ -160,7 +160,7 @@ Q07에서 질문이 기업을 지목하는 경우(구현 계획 결정 (11))는 
 | 검색 0건 / timeout / unavailable | 전체 답변 유지, web_unavailable notice와 실제 미충족 limitation 분리 | 세트: `agent-concept-web-down`, `agent-concept-no-web-results` |
 | 배치 검색·재시도·기한 초과 | 총 8·내부 6·웹 2, job 45초, Luna 잔여 기한·마지막 10초 작성 예약 준수 | 단위: `ChatMcpAgentTest.sixInternalAndTwoWebCallsInThreeRoundsFitWhenAnInternalReadCameBackEmpty`, `ChatAgentPathEngineTest.anAgentStepThatCannotGetTheTimeAnAnswerNeedsEndsAsDeadlineGuard` |
 | 동일 logical call 동시·순차 중복 | single-flight 1회, 성공 0건 포함 요청 cache hit, 권한·grant 재검사 | 단위: `ChatMcpEndpointTest.aRepeatOfACallReusesWhatTheFirstReadAndStillCountsAsACall`, `identicalRequestsArrivingTogetherAreReadOnce`, `aReuseIsCheckedAgainstTheSendGrantsAsTheyAreNow` |
-| cache key의 scope·version·asOf 차이 | 서로 합치지 않음, job 종료 뒤 재사용 없음 | 일부: 재사용은 시도 범위의 원장에서만 찾음. 키 차이를 직접 겨냥한 시험은 없음 |
+| cache key의 scope·version·asOf 차이 | 서로 합치지 않음, job 종료 뒤 재사용 없음 | 단위: `ChatMcpDirectParityTest.requestsOfAnotherScopeVersionOrPeriodAreNeverTheSameCall`, `aKeptResultIsNeverReusedAcrossJobs` |
 | MCP/direct 동일 fixture | 같은 Tool Service의 결과·권한·버전·evidence 정규화 동등 | 단위: `ChatMcpDirectParityTest`, `ChatAgentPathEngineTest.aPeriodInTheQuestionStaysOnTheDirectPathWhereItIsRead`. 합성 그래프에서만 비교 |
 | Responses 시작 전 preflight 실패·circuit open | MCP 미노출, 처음부터 direct adapter·BranchContext 경로, 같은 예산·grant | 단위: `ChatAgentPathEngineTest.anUnavailablePreflightStartsDirectBeforeAnyAgentStep` |
 | Responses 실행 중 MCP transport 실패 | direct 결과 끼워 넣기 0회, 성공 결과 유지·notice/limitation, 다음 job circuit 반영 | 일부: 개별 호출 실패는 `agent-read-fails-in-part`. Luna 단계 자체가 실패하면 답변 후보가 없어 실패로 끝남 |
@@ -170,13 +170,13 @@ Q07에서 질문이 기업을 지목하는 경우(구현 계획 결정 (11))는 
 | mcp_approval_request 1·3라운드 | ai/service 독자 승인 0회, Java의 예산·요구·scope·grant 결정만 continuation에 사용 | 단위: `ChatMcpAgentTest.afterThreeRoundsWhatIsStillAskedIsDeniedAndAnEndlessAgentFails`, worker `test_chat_agent.py` |
 | approval 거부 | 위조 MCP/function 결과·direct 대체 메시지 0회, 다른 정상 근거 또는 limitation/guidance | 세트: `agent-call-names-no-requirement`, `agent-unreachable-target-denied` |
 | Q07 portfolio scope | portfolio.scope.read MCP catalog 미등록, 전체 목록·수량·보유 표시 모델 전송 0건, 일치 공개 결과 최대 5개 | 세트: `q07-*`. 단위: `ChatMcpEndpointTest.toolsListShowsOnlyTheGrantedToolsAndNeverTheMemberScopeRead`, `ChatMcpGrantsTest.theMemberScopeReadIsNeverGranted` |
-| /mcp 외부 경계 | 64 KiB request·256 KiB call result·1 MiB job·분당 30·동시 4 위반 거부 | 일부: 1 MiB는 `ChatMcpEndpointTest.resultsPastTheJobsOneMebibyteAreRecordedAsThatFailureNotDelivered`. 나머지는 이 표에서 확인하지 않음 |
+| /mcp 외부 경계 | 64 KiB request·256 KiB call result·1 MiB job·분당 30·동시 4 위반 거부 | 단위: `ChatMcpEndpointTest`의 `aRequestOverSixtyFourKibibytesIsRefused`, `aResultOverTheLimitIsRecordedAsThatFailureNotAsDelivered`, `resultsPastTheJobsOneMebibyteAreRecordedAsThatFailureNotDelivered`, 분당 30회 시험. 동시 4회는 라운드당 승인 4건으로 제한(`ChatMcpAgent.MAX_ROUND_CALLS`) |
 | 도구 1·4·8회 latency | server-only client, 합성 Responses replay, 승인된 소량 live를 분리 기록; terminal DB commit까지 45초 | 없음. live spike 대기 |
 | 인용 위조·snippet 미지지·프롬프트 주입 | 출처·요구 매핑 및 의미 검사, 외부 지시 무시 | 일부: 세트의 `attack` 사례, `agent-forged-evidence`, `agent-cites-another-requirement`. 의미 판정은 대본 값이라 실제 모델로 재지 않음 |
 | MCP 미등록 도구·위조 subject·스키마 변경 | 차단, allowlist 자동 확장 없음 | 단위: `ChatMcpEndpointTest.aGrantForAnotherAttemptSubjectOrAnEndedRunReadsNothing`, `ChatMcpGrantsTest.aTamperedTruncatedOrForeignTokenIsNoGrant` |
 | Luna allowed_tools·연속 호출 | 허용 도구만 선택, 새 정보 이득 없는 반복 거부, 명시 요구별 서버 coverage | 일부: 세트의 `coverage` 기대값, `ChatMcpAgentTest.theGrantListsOnlyTheRunsToolsAndExpiresWithTheRun`. 같은 조회 반복은 거부하지 않고 재사용 |
 | 부분 결과 | answerStatus complete/partial/guidance, notices와 limitations 중복 없음 | 세트: `failure-one-read-of-a-requirement`, `failure-one-requirement-of-two`, `failure-every-read-down` |
-| UI 대상 철회·버전 변경·외부 보도 ID 위조 | 클릭 시 재검사·안내, 임의 경로 실행 없음 | 단위: `ChatResponseGuardTest.anActionOnASinceHiddenCompanyIsLeftOutWhileARoundStaysForItsScreenToCheck` |
+| UI 대상 철회·버전 변경·외부 보도 ID 위조 | 클릭 시 재검사·안내, 임의 경로 실행 없음 | 단위: `ChatResponseGuardTest.anActionOnASinceHiddenCompanyIsLeftOutWhileARoundStaysForItsScreenToCheck`, `web/tests/graph/MapPage.answer-targets.test.tsx` |
 | snapshot 만료·grant 부재 | 재현 불가 구간 가림·모델 전송 차단, 거짓 최신성 표시 없음 | 일부: `ChatMcpSendGateTest`, `ChatResponseGuardTest`. 실제 공급자의 snapshot은 없음 |
 
 상세 기준: [보조 웹 검색](../design/ai-chatbot-web-search.md), [Luna MCP 실행·화면 동작](../design/ai-chatbot-mcp-actions.md).

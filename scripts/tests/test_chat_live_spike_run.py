@@ -157,12 +157,12 @@ class PreflightTest(unittest.TestCase):
         headers["WWW-Authenticate"] = "Bearer"
         raise urllib.error.HTTPError(request.full_url, 401, "no", headers, io.BytesIO())
 
-    def client(self, companies: list[str], completed: bool = True) -> spike.Client:
+    def client(self, companies: list[str], completed: bool = True, truncated: bool = False) -> spike.Client:
         nodes = [{"kind": "company", "label": c} for c in companies] + [{"kind": "issue", "label": "사건"}]
 
         def call(method, path, body=None, headers=None):
             if method == "GET":
-                return 200, {"nodes": nodes, "metadata": {"graphVersion": "gv"}}
+                return 200, {"nodes": nodes, "metadata": {"graphVersion": "gv", "truncated": truncated}}
             return 200, {"csrfToken": "c", "setup": {"completed": completed}}
 
         client = spike.Client("https://server.example", "https://web.example")
@@ -192,6 +192,11 @@ class PreflightTest(unittest.TestCase):
 
         problems = self.problems(self.client(["삼성전자"], completed=False), open_answer)
         self.assertEqual(2, len(problems), problems)
+
+    def test_a_cut_graph_cannot_prove_a_company_absent(self) -> None:
+        problems = self.problems(self.client(["삼성전자"], truncated=True))
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("카카오", problems[0])
 
     def test_nothing_prints_a_credential(self) -> None:
         out = io.StringIO()
