@@ -262,6 +262,93 @@ ai/pipeline/.venv/bin/python ai/pipeline/scripts/korea_corpus_smoke.py
 - **실행 수명:** runner는 현재 터미널에서만 동작합니다. 노트북 절전·재부팅·네트워크 단절로 중단될 수 있으며 숨은 예약 작업은 없습니다. 실행 전체 시간 상한은 최초 시작부터의 벽시계 시간으로 고정되므로 절전/재부팅 시간도 소모합니다. 시간이 만료된 plan은 예산을 초기화하지 않습니다. 다음 날 수집은 날짜·planId·stateDir·제외 manifest를 새로 정한 **새 daily plan**이고, 같은 plan의 재실행은 이미 정한 날짜와 예산 안의 복구일 뿐입니다.
 
 
+### 권리 미확인 뉴스의 비공개 로컬 수집 (`zoop-ai-private-news`)
+
+이 명령은 운영자가 승인한 실험용으로만 공개 접근이 가능하고 robots가 허용한 정적 HTML 본문을 보관합니다. **운영자 승인은 발행자의 재이용 허락이 아닙니다.** 모든 기록에 `rights: unconfirmed`, `modelSend: false`, `publicUse: false`가 고정됩니다. 실제 공개 웹 관측은 `provenance: private-public-web`인 별도 artifact family로 보관합니다. native grant·manifest·receipt·export를 생성하거나 native 입력으로 승격하지 않으며, 앱 게시·재배포·외부 모델 전송도 하지 않습니다. 기존 정책브리핑 corpus와 별도의 새 외부 디렉터리를 사용합니다.
+
+```sh
+# 저장소 루트에서 frozen lock으로 의존성과 현재 console entry를 설치합니다.
+uv sync --project ai/pipeline --frozen --group dev
+ai/pipeline/.venv/bin/zoop-ai-private-news run --config /absolute/operator/private-news.json
+# 같은 설정과 누적 예산으로 미시도 작업만 이어갑니다. 실패·거부·unknown은 재요청하지 않습니다.
+ai/pipeline/.venv/bin/zoop-ai-private-news resume --config /absolute/operator/private-news.json
+# 네트워크와 상태 변경 없이 해시·본문 매핑을 검사하고 집계만 출력합니다.
+ai/pipeline/.venv/bin/zoop-ai-private-news status --config /absolute/operator/private-news.json
+# 작성한 합성 자료와 실제 loopback HTTP, 설치된 console entry를 사용하는 검사입니다.
+ai/pipeline/.venv/bin/python ai/pipeline/scripts/private_intake_smoke.py
+```
+
+닫힌 설정 스키마는 `zoop-private-news-config-1`입니다. 다음 예는 실행 승인이 아니며 운영자가 승인 참조, 실제 기사 호스트, 날짜, 유한한 상한을 직접 정해야 합니다. 모든 예산은 필수입니다.
+
+```json
+{
+  "schemaVersion": "zoop-private-news-config-1",
+  "planId": "private-news-20260725-20261025",
+  "stateDir": "/absolute/operator/private-news-20260725-20261025",
+  "fromDay": "2026-07-25",
+  "throughDay": "2026-10-25",
+  "operatorApprovalRef": "operator-reviewed-private-local-retention-decision",
+  "sources": [
+    {"name": "hankyung-daily", "sourceType": "editorial", "reliability": "operator-declared publisher label, not verified truth", "queries": []},
+    {"name": "gdelt-doc", "sourceType": "discovery", "reliability": "discovery metadata only", "queries": ["\"NVIDIA\"", "\"삼성전자\""]}
+  ],
+  "exactArticleHosts": ["www.hankyung.com"],
+  "maxListingPages": 280,
+  "maxCandidates": 1000,
+  "maxArticleAttempts": 500,
+  "maxDocuments": 150,
+  "perDayCap": 3,
+  "companyAliases": ["NVIDIA", "삼성전자"],
+  "policy": {
+    "schemaVersion": "zoop-collection-policy-1",
+    "userAgent": "ZoopPrivateNews/1.0",
+    "timeoutSeconds": 30,
+    "maxTotalSeconds": 7200,
+    "maxRedirects": 2,
+    "maxRequests": 2000,
+    "maxResponseBytes": 2000000,
+    "maxTotalBytes": 150000000,
+    "minIntervalSeconds": 2,
+    "allowedMediaTypes": ["text/html"],
+    "syntheticLoopback": false
+  }
+}
+```
+
+Apple Newsroom의 Atom feed는 `rel`이 없으면 `alternate`로 해석하고, `type`은 생략하거나 `text/html`일 때만 기사 링크로 검토합니다. enclosure·비HTML 링크와 같은 호스트의 기사 경로 밖 링크는 제외합니다. 기존의 정확한 기사 호스트 검사는 유지하며, 항목마다 검증된 기사 alternate가 하나여야 합니다. 이미지 enclosure와 `updated`는 각각 기사 대상·발행 시각으로 사용하지 않습니다.
+
+#### 추가 편집 매체의 비공개 discovery
+
+다음 두 adapter도 같은 비공개 intake와 기존 예산을 사용합니다. `sources`에 필요한 항목을 넣고 `exactArticleHosts`에는 각각 `www.etnews.com`, `www.fnnews.com`을 명시합니다. 발행자별 신뢰도는 검증하지 않으므로 `reliability`에 그 한계를 적습니다. 다음 설정 조각은 실행 승인이나 완전한 수집 설정이 아닙니다.
+
+```json
+[
+  {"name": "etnews-ai", "sourceType": "editorial", "reliability": "website identity only; reliability unassessed", "queries": []},
+  {"name": "fnnews-sitemaps", "sourceType": "editorial", "reliability": "website identity only; original syndication lineage unverified", "queries": ["202608-1"]}
+]
+```
+
+- **`etnews-ai`:** `https://www.etnews.com/news/category_list.html?id=2958&page=1`에서 시작합니다. `main` 아래 class token이 `news_list`인 단일 `ul`의 직계 `li`만 읽고, 같은 기사의 썸네일·제목 링크는 하나로 합칩니다. 실제 HTML에 있는 같은 호스트·같은 category `id=2958`의 바로 다음 `page=N+1` 링크만 이어갑니다. 검색어·다른 category·임의 page URL을 설정으로 받지 않습니다. 목록 날짜는 discovery hint이며, 오래된 날짜를 보았다고 탐색을 조기 종료하지 않습니다. 다음 링크가 없으면 불완전한 탐색으로 표시합니다. 이 경로는 AI category에 한정되며 전자신문 전체나 요청 기간 전체의 보도를 대표하지 않습니다.
+- **`fnnews-sitemaps`:** 요청 기간에 걸친 각 연도의 `https://www.fnnews.com/resource/view_xml/sitemap_index/news-sitemap-index-YYYY.xml`을 먼저 읽습니다. 그 index가 실제 광고한 정확한 `/resource/view_xml/sitemap_v3/sitemap-YYYYMM-N.xml`만 후속 작업으로 만듭니다. `queries: []`이면 요청 기간과 겹치는 모든 월의 광고된 partition을 선택합니다. `queries: ["202608-1"]` 또는 `["202607-2", "202609-1"]`처럼 정확한 partition token을 지정하면 해당 partition만 선택합니다. 요청 월 밖의 token, URL, 검색어, 선행 0이 붙은 partition 번호는 거부하며, index에 없는 token도 거부합니다.
+- **partition별 실행:** 큰 월별 XML이 다른 월의 후보 예산을 먼저 차지하지 않도록 운영자가 partition별로 별도의 유한한 plan을 만들 수 있습니다. 예를 들어 같은 요청 기간에 `queries: ["202607-1"]`, `["202608-1"]`, `["202609-1"]`을 각각 쓰되 **새 `planId`와 새 `stateDir`**를 지정합니다. 이 분할은 권한·호스트 차단·실패·429·예산 소진을 우회하거나 종료된 요청을 재시도하는 수단이 아닙니다. GDELT의 429도 종료된 거부로 유지하며 재시도하지 않습니다.
+- **날짜와 원문:** 두 adapter 모두 본문의 단일 `article:published_time`에 선언된 시간대 포함 ISO 시각만 발행 시각으로 사용하고 원래 문자열을 보존합니다. 누락은 unknown이며, 날짜만 있거나 시간대가 없거나 중복 선언이 있으면 추정하지 않습니다. ETnews는 `//*[@id='articleBody']`, Fnnews는 class token `article-view`인 `article` 아래 class token `article-view__body`인 단일 `div`로 본문을 제한합니다. Fnnews URL의 숫자 날짜와 sitemap `lastmod`, ETnews 목록 날짜는 발행 증거가 아닙니다. Fnnews의 기간 밖 hint도 원래 날짜 버킷에 남기며 기간 안 날짜로 바꾸거나 후보를 버리지 않습니다. 전체 URL metadata를 파싱했다는 사실은 해당 기사의 발행일·본문 확보를 입증하지 않습니다.
+- **제한과 권리:** XML은 DTD·entity·외부 참조를 허용하지 않으며 기존 `MAX_RAW` 10 MB와 sitemap의 원시 항목 50,000개 상한을 적용합니다. 정확히 항목 상한에 닿아도 포화로 표시하고, 초과 응답은 거부합니다. 실제 응답 허용량은 운영자가 정한 `policy.maxResponseBytes` 등 더 작은 예산에도 제한됩니다. 페이지·후보·본문 시도는 기존 `maxListingPages`·`maxCandidates`·`maxArticleAttempts`로 제한하며, cap·실패·pending은 완전 수집으로 표시하지 않습니다. canonical URL은 관측만 하고 요청하지 않습니다. Fnnews의 `publisher`는 웹사이트 식별값이지 연합뉴스 등 원발행자나 독립적인 취재 계보의 증거가 아닙니다. 두 출처 모두 권리는 미확인이고 모델 전송·공개 사용은 계속 금지됩니다. 접근 거부 우회·브라우저 fallback·임의 호스트 탐색은 없습니다.
+
+이 절의 adapter 변경을 통합한 뒤에는 저장소 루트에서 다음 합성 검사를 실행합니다. 실제 기사 수집이나 외부 네트워크 접근을 승인하는 명령이 아닙니다.
+
+```sh
+ai/pipeline/.venv/bin/python -m pytest ai/pipeline/tests/test_news_archives.py ai/pipeline/tests/test_private_intake.py
+ai/pipeline/.venv/bin/python ai/pipeline/scripts/private_intake_smoke.py
+```
+
+- **선택과 출처:** 날짜별 discovery를 먼저 수행하고 날짜 버킷을 기간 양 끝·중간으로 분산한 다음, 각 날짜 안에서 source/domain을 번갈아 선택합니다. 모든 source에 동일한 할당량을 보장하지는 않습니다. 같은 URL에 GDELT와 설정된 출처별 discovery 참조가 함께 있으면 출처별 adapter를 결정적으로 우선하고 모든 참조를 보존합니다. `maxCandidates`는 본문 선택 대상의 누적 상한입니다. 관측한 초과 후보도 삭제하지 않고 pending으로 남깁니다. `maxArticleAttempts`는 실패까지 포함한 본문 시도 상한이고 `maxDocuments`와 `perDayCap`은 실제 발행일이 확인된 보관 본문 수의 상한입니다. sitemap 날짜·lastmod·GDELT seendate는 기사 발행일이 아닙니다. 별칭은 리터럴 검색 신호일 뿐 회사 식별이나 사실 검증 결과가 아닙니다.
+- **정확한 본문:** 변경하지 않은 `Fetcher`와 `profile`/`prepare`를 재사용합니다. 기사 본문에서 확인한 원래 발행 시각과 정밀도를 보존하며 날짜 누락·충돌·시간대 미확정은 날짜별 보관 집계에 넣지 않습니다. 요청·최종·canonical URL은 별도로 기록하고 canonical 대상은 추가로 요청하지 않습니다. HK는 검증한 `//div[@id='articletxt']`를 사용합니다. 일반 기사는 native parser가 단일 의미적 article scope를 확인해야 합니다. 로그인·paywall·CAPTCHA를 우회하지 않으며 첨부·이미지·PDF·JavaScript는 가져오지 않습니다.
+- **날짜 표기:** 비공개 runner는 ISO 날짜·시각 외에 정확한 `YYYY.MM.DD`와 영어 전체 월 이름을 쓴 `Month D, YYYY`를 날짜 단위로 해석합니다. 선택한 원래 표기는 `publication.raw`에 그대로 두고 `publication.day`만 `YYYY-MM-DD`로 정규화합니다. 영어 월은 고정 매핑으로 처리하며 locale·자정·시간대를 추정하지 않습니다. 잘못된 달력 날짜, 축약 월 이름, 앞뒤 공백, 날짜에만 붙은 `Z`는 거부합니다. native 날짜 계약은 변경하지 않습니다.
+- **비공개 상태:** 소유자가 현재 사용자이고 권한이 `0700`인 전용 디렉터리, `0600`인 파일만 사용합니다. 불변 `PLAN.json`, 체크섬을 포함한 `STATE.json`, byte-exact `listing-*.raw`/`private-news-*.raw`, 별도 `zoop-private-news-*` JSON만 생성합니다. private ID는 `private-news-`로 시작합니다. 파일은 descriptor 기준으로 열고 symlink·외부 hardlink·외부 파일명을 거부합니다. 초기화 시 stateDir의 부모 디렉터리도 fsync하고, 실패하면 요청을 시작하지 않습니다. 기존의 빈 디렉터리를 받아들일 때도 같습니다. lock과 fsync 후 no-clobber 게시는 덮어쓰기를 막으며, 중단된 staging은 임의로 채택하거나 삭제하지 않습니다. 이 절차와 실패 주입 검사는 실제 전원 손실을 재현했다는 증거가 아닙니다.
+- **누적 예산과 복구:** robots와 redirect까지 실제 GET 시도·수신한 body bytes를 누적합니다. 헤더·TLS 등을 포함한 wire byte 수는 아닙니다. 최초 시작부터의 벽시계 제한에는 중단 시간도 포함합니다. 개별 요청의 timeout이나 해당 요청 시간 안에 pacing을 지킬 수 없는 `rate_limit`은 그 작업의 종료된 거부로 남기고 재시도하지 않으며, 예산이 남은 다른 미시도 작업은 계속합니다. 누적 요청·byte 예산이나 전체 시간 제한이 소진되면 plan 전체를 중단하고 resume에서도 초기화하지 않습니다. 401·403·429는 해당 호스트를 차단하지만 다른 허용 호스트까지 중단하지는 않습니다. 실제 GET 직전 intent가 남은 채 종료되면 요청 한 건과 남은 전체 byte 예산을 별도의 unknown 상한으로 예약하고 호스트를 차단합니다. 이는 실제 관측 수치가 아닙니다. record 게시가 끝난 항목은 원문·해시·동일 parser 매핑을 대조해 로컬 복구하며, 선택된 source도 record에서 복원해 source별 집계를 유지합니다. record가 없는 중단 항목은 unknown으로 남겨 재요청하지 않습니다. 설정이나 예산을 바꾸려면 새 planId와 새 stateDir가 필요합니다.
+- **집계와 종료 코드:** stdout에는 본문·제목·후보 URL이 아닌 집계만 출력합니다. 일·주·source/domain별 보관 수, partition 포화/미처리/거부, 후보 pending/거부/unknown, 정확한 텍스트 중복 그룹 수를 제공합니다. 중복은 독립 출처나 같은 사건의 판정이 아닙니다. `coverage: all`도 **설정한 discovery partition과 후보의 처리 범위**만 뜻합니다. 전체 뉴스나 3개월의 완전 수집을 뜻하지 않습니다. 포화·cap·실패가 있으면 `some`/`unknown`으로 남습니다. 완료는 종료 코드 0, 부분 결과와 거부는 2입니다.
+- **합성 모드:** `policy.syntheticLoopback: true`와 정확한 `syntheticBaseUrl: http://127.0.0.1:<port>`, `exactArticleHosts: ["127.0.0.1"]`를 함께 지정해야 합니다. 모든 합성 산출물은 `provenance: synthetic-loopback`으로 표시하며 실제 관측 URL을 바꾸어 표시하지 않습니다. 기본 production adapter 검사는 그대로 유지됩니다.
+
 ### 로컬 사람 검토용 휴대 패키지 (`corpus_review_cli`)
 
 기존 native export **전체를 현재 권한으로 다시 확인해** 저장소 밖의 새 전용 디렉터리에 복사하고, 그중 유한한 사람 검토 배치와 빈 주석 템플릿을 분리합니다. 모델·채점기·수집기가 아니며 네트워크, 모델 전송, 업로드, 공개 게시를 하지 않습니다. 정책브리핑 자료는 DART 공시나 사람 합의 gold가 아닙니다.
