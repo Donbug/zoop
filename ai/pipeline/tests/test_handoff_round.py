@@ -52,11 +52,11 @@ class Units:
         self.s2: dict = {}
         self.view: dict = {}
 
-    def round(self, name: str, at: int, units: list[str], *, run: tuple | None = None) -> None:
-        """One timed round holding `units` (page 0, ordinals in the given order) with their S2 jobs; S3 jobs run to `ready` unless the unit is in `defer` (queued)."""
+    def round(self, name: str, at: int | None, units: list[str], *, run: tuple | None = None) -> None:
+        """One round holding `units` (page 0, ordinals in the given order) with their S2 jobs; `at=None` authors a legacy round without a declared slot."""
         kit = self.kit
         docs = [{"supplier": f"supplier-{u}", "html": page(f"합성기업은 {u} 공급 계약을 발표했다.")} for u in units]
-        refs = kit.ingest(name, docs, slot=slot(at))
+        refs = kit.ingest(name, docs, slot=slot(at) if at is not None else None)
         for unit, ref in zip(units, refs):
             art = kit.article(ref)
             text = f"합성기업은 {unit} 공급 계약을 발표했다."
@@ -262,26 +262,44 @@ def test_own_round_gate_blocks_only_the_requested_round(units, tmp_path):
     assert rig.freeze_round("round-r3", other, expected=2)["error"]["code"] == "plan_round_mismatch"
 
 
-def test_the_window_holds_the_newest_20_mapped_jobs_and_unmapped_jobs_take_no_slot(units, tmp_path):
-    """21 mapped jobs: the bundle holds the newest 20 and the oldest is reported `out_of_window` + `neverFrozen`. 20 further READY jobs nobody mapped yet take no slot: the same
-    handoff id. Mapping one of them shifts the window; the job it pushes out had been frozen, the first one still never was."""
+def test_window_holds_newest_20_deliverable_jobs_and_skips_unavailable_withheld_and_unmapped_jobs(units, tmp_path):
+    """An old slotless job and newer withheld jobs leave room for the newest 20 deliverable mapped jobs. Unmapped jobs also take no slot; mapping one shifts the window."""
     names = [f"u{n:02d}" for n in range(21)]
+    units.round("legacy", None, ["legacy"])
+    units.relate("legacy")
     units.round("r1", 1, names[:1])
     units.round("r2", 2, names[1:11])
     units.round("r3", 3, names[11:])
     for name in names:
         units.relate(name)
-    rig = light_rig(tmp_path, units, names)
+    withheld = ["held-a", "held-b"]
+    grant = units.kit.registry["sources"][0]["grant"]
+    grant["revision"] = "rights-2"
+    units.kit.save_registry()
+    units.round("withheld", 4, withheld)
+    for name in withheld:
+        units.relate(name)
+    grant["revision"] = "rights-1"
+    units.kit.save_registry()
+    mapped = ["legacy", *names, *withheld]
+    rig = light_rig(tmp_path, units, mapped)
 
-    first = rig.freeze_round("round-r3")
+    first = rig.freeze_round("round-withheld")
     assert sorted(jobs_of(first)) == sorted(f"rel-{n}" for n in names[1:])
     evicted = [item for item in first["selection"]["jobs"] if item["status"] == "out_of_window"]
     assert [(item["jobId"], item["code"], item["neverFrozen"], item["roundId"]) for item in evicted] == [("rel-u00", "window_full", True, "round-r1")]
     assert first["selection"]["limit"] == 20 and len([i for i in first["selection"]["jobs"] if i["status"] == "selected"]) == 20
+    skipped = {item["jobId"]: (item["status"], item["code"]) for item in first["selection"]["jobs"]
+               if item["status"] in ("unavailable", "withheld")}
+    assert skipped == {"rel-legacy": ("unavailable", "round_slot_unavailable"),
+                       "rel-held-a": ("withheld", "grant_revision_changed"), "rel-held-b": ("withheld", "grant_revision_changed")}
+    assert len(first["selection"]["jobs"]) == 24
+    legacy = next(item for item in first["selection"]["jobs"] if item["jobId"] == "rel-legacy")
+    assert (legacy["roundId"], legacy["slot"]) == ("round-legacy", None)
 
     extra = [f"x{n:02d}" for n in range(20)]
-    units.round("r4", 4, extra[:10])
-    units.round("r5", 5, extra[10:])
+    units.round("r4", 5, extra[:10])
+    units.round("r5", 6, extra[10:])
     for name in extra:
         units.relate(name)
     again = rig.freeze_round("round-r5")
@@ -290,7 +308,7 @@ def test_the_window_holds_the_newest_20_mapped_jobs_and_unmapped_jobs_take_no_sl
     assert [i["jobId"] for i in again["selection"]["jobs"] if i["status"] == "out_of_window"] == ["rel-u00"]
     assert len(rig.snapshot()["handoffs"]) == 1
 
-    rig.write(canonical_doc={"schemaVersion": "zoop-graph-canonical-1", "entries": units.entries([*names, "x19"])})      # x19: the newest observation (round r5, last ordinal)
+    rig.write(canonical_doc={"schemaVersion": "zoop-graph-canonical-1", "entries": units.entries([*mapped, "x19"])})     # newest deliverable observation (round r5, last ordinal)
     shifted = rig.freeze_round("round-r5")
     assert shifted["handoffId"] != first["handoffId"] and "rel-x19" in jobs_of(shifted)
     out = {i["jobId"]: i for i in shifted["selection"]["jobs"] if i["status"] == "out_of_window"}
@@ -298,7 +316,7 @@ def test_the_window_holds_the_newest_20_mapped_jobs_and_unmapped_jobs_take_no_sl
     assert {job: item["neverFrozen"] for job, item in out.items()} == {"rel-u00": True, "rel-u10": False}
 
 
-def test_a_grant_revision_change_withholds_the_selected_job_and_freezes_nothing(units, tmp_path):
+def test_withheld_only_window_preserves_the_previous_freeze(units, tmp_path):
     units.round("r1", 1, ["a", "b"])
     units.relate("a")
     units.relate("b")
@@ -311,19 +329,20 @@ def test_a_grant_revision_change_withholds_the_selected_job_and_freezes_nothing(
     registry["sources"][0]["grant"]["revision"] = "rights-2"
     units.kit.registry_path.write_bytes(json_bytes(registry))
     refused = rig.freeze_round("round-r1", expected=2)
-    assert refused["error"]["code"] == "selected_job_withheld"
-    assert refused["error"]["detail"]["jobIds"] == ["rel-a", "rel-b"]
-    assert {i["jobId"]: (i["status"], i["code"]) for i in refused["error"]["detail"]["selection"]["jobs"]}.keys() == {"rel-a", "rel-b"}
-    assert all(i["status"] == "withheld" for i in refused["error"]["detail"]["selection"]["jobs"])
+    assert refused["error"]["code"] == "window_empty"
+    assert {i["jobId"]: (i["status"], i["code"]) for i in refused["error"]["detail"]["selection"]["jobs"]} == {
+        "rel-a": ("withheld", "grant_revision_changed"), "rel-b": ("withheld", "grant_revision_changed")}
     assert rig.snapshot() == before, "a refused freeze changed the ledger, a bundle or an installed file"
 
 
-def test_freeze_round_refuses_without_a_declared_slot_or_any_mapped_job(tmp_path_factory, tmp_path):
-    """An untimed round has no slot to order by; a window with no mapped job is not frozen as an empty graph."""
+def test_freeze_round_refuses_an_empty_window_after_slot_or_mapping_exclusions(tmp_path_factory, tmp_path):
+    """Slotless and unmapped jobs report individual exclusions; neither can produce an empty graph."""
     world = hs.build_world(tmp_path_factory.mktemp("zoop-round-untimed") / "owned")
     rig = RoundRig(tmp_path, world.kit, hs.canonical_doc(world), hs.decisions_doc(world), hs.bindings_doc(world))
     refused = rig.freeze_round("round-docs", expected=2)
-    assert refused["error"] == {"code": "round_slot_unavailable", "detail": {"jobId": "rel-a", "roundId": "round-docs"}}
+    assert refused["error"]["code"] == "window_empty"
+    assert {(i["status"], i["code"], i["slot"]) for i in refused["error"]["detail"]["selection"]["jobs"]} == {
+        ("unavailable", "round_slot_unavailable", None)}
     rig.write(canonical_doc={"schemaVersion": "zoop-graph-canonical-1", "entries": []})
     empty = rig.freeze_round("round-docs", expected=2)
     assert empty["error"]["code"] == "window_empty" and {i["status"] for i in empty["error"]["detail"]["selection"]["jobs"]} == {"awaiting_mapping"}

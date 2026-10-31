@@ -1,14 +1,15 @@
 """Cumulative round freeze (`zoop-ai-handoff freeze-round`): one explicit command that recomputes the S3 job window from the AI ledgers, narrows the operator's master
 files to it and runs the ordinary strict `Handoff.freeze` over the result. One bundle is one inactive app version; its sources are the window, never the previous bundle.
 
-Selection (a pure function of the three ledgers plus the master canonical registry, recomputed at every freeze):
-  * candidates: S3 jobs in state `ready` whose S2 upstream (jobId + inputDigest) has at least one master canonical entry. A `ready` job without one is `awaiting_mapping`
-    and takes no window slot; a job in any other state is `not_ready` (`cancelled` is reported as such);
-  * order: the slot (`window.through`) of the S2 incoming observation's ingestion round, newest first, then sourceId, page, ordinal, then the S3 jobId; the first `WINDOW`
-    (= MAX_SOURCES) are `selected`, the rest `out_of_window` (`neverFrozen` while no `ready` handoff ever pinned them);
+Selection (recomputed at every freeze from the three ledgers, master canonical registry and current delivery authority):
+  * candidates: S3 jobs in state `ready` whose S2 upstream (jobId + inputDigest) has at least one master canonical entry and a declared round slot. A `ready` job without
+    a mapping is `awaiting_mapping`; a mapped job without a slot is `unavailable` (`round_slot_unavailable`). Neither takes a window slot.
+    A job in any other state is `not_ready` (`cancelled` is reported as such);
+  * order: the slot (`window.through`) of the S2 incoming observation's ingestion round, newest first, then sourceId, page, ordinal, then the S3 jobId. Check delivery in
+    this order until `WINDOW` (= MAX_SOURCES) jobs are `selected`; withheld jobs report their reason and take no slot. Remaining candidates are `out_of_window`
+    (`neverFrozen` while no `ready` handoff ever pinned them). An empty deliverable window fails with `window_empty`;
   * own-round gate: every S3 job admitted for the requested round (the jobs whose S2 upstream was observed in that round, plus every unit of the optional plan) must be
-    `ready` or `cancelled`, else `analysis_incomplete` and nothing is written. Earlier rounds are never waited for;
-  * a selected job whose current delivery is withheld fails the whole freeze (`selected_job_withheld`), nothing is written.
+    `ready` or `cancelled`, else `analysis_incomplete` and nothing is written. Earlier rounds are never waited for.
 
 Narrowing (mechanical): the handoff's canonical registry and decisions are the master's entries selected byte-for-byte (no entry is created, merged or reworded). The only
 text that differs from the master is a shorter `fieldVerdicts` array or a `null` `summary` of an issue entry, each made of unchanged elements. The files are staged privately,
@@ -42,7 +43,7 @@ from .relation_contracts import Submit as RelationSubmit
 
 WINDOW = MAX_SOURCES
 SELECTION_SCHEMA = "zoop-ai-handoff-selection-1"
-STATUS_ORDER = ("selected", "withheld", "out_of_window", "awaiting_mapping", "not_ready", "cancelled")
+STATUS_ORDER = ("selected", "withheld", "unavailable", "out_of_window", "awaiting_mapping", "not_ready", "cancelled")
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 _SPACE = " \t\n\r"
 _JSON = json.JSONDecoder()
@@ -145,8 +146,8 @@ def own_round_gate(jobs: list[Job], round_id: str, units: set) -> list[dict]:
     return blocking
 
 
-def classify(jobs: list[Job], mapped: set, never: set, limit: int) -> tuple[list[Job], list[dict]]:
-    """(the window, one report entry per job). Pure: the ledgers' jobs, the upstreams the master registry maps and the jobs no ready handoff ever pinned."""
+def classify(jobs: list[Job], mapped: set) -> tuple[list[Job], list[dict]]:
+    """Ordered candidates for delivery checks, plus one report entry for each job excluded by state, mapping or missing slot."""
     report, candidates = [], []
     for job in jobs:
         if job.state == "cancelled":
@@ -156,14 +157,11 @@ def classify(jobs: list[Job], mapped: set, never: set, limit: int) -> tuple[list
         elif job.upstream not in mapped:
             report.append(entry(job, "awaiting_mapping", "canonical_mapping_missing"))
         elif job.slot is None:
-            raise ExtractionFailure("round_slot_unavailable", {"roundId": job.round_id, "jobId": job.job_id})
+            report.append(entry(job, "unavailable", "round_slot_unavailable"))
         else:
             candidates.append(job)
     candidates.sort(key=Job.order)
-    window = candidates[:limit]
-    report.extend(entry(job, "out_of_window", "window_full", neverFrozen=job.job_id not in never) for job in candidates[limit:])
-    report.extend(entry(job, "selected") for job in window)
-    return window, report
+    return candidates, report
 
 
 def report_order(report: list[dict]) -> list[dict]:
@@ -438,22 +436,25 @@ def freeze_round(store: Store, paths: RoundPaths, round_id: str, plan_id: str | 
         blocking = own_round_gate(jobs, round_id, units)
         if blocking:
             raise ExtractionFailure("analysis_incomplete", {"roundId": round_id, "jobs": blocking})
-        window, report = classify(jobs, mapped, frozen_jobs(store), WINDOW)
+        candidates, report = classify(jobs, mapped)
+        previously_frozen = frozen_jobs(store)
         selection = {"schemaVersion": SELECTION_SCHEMA, "roundId": round_id, "planId": plan_id, "limit": WINDOW}
-        pins, withheld, kinds = [], [], []
-        for job in window:
+        window, pins, kinds = [], [], []
+        for job in candidates:
+            if len(window) == WINDOW:
+                report.append(entry(job, "out_of_window", "window_full", neverFrozen=job.job_id not in previously_frozen))
+                continue
             relation = {"jobId": job.job_id, "inputDigest": job.input_digest}
             try:
                 result = gate(source, relation, None)
             except Withheld as exc:
-                withheld.append(job.job_id)
-                report = [{**item, "status": "withheld", "code": exc.code} if item["jobId"] == job.job_id else item for item in report]
+                report.append(entry(job, "withheld", exc.code))
                 continue
+            window.append(job)
+            report.append(entry(job, "selected"))
             kinds.append(result["provenance"]["sourceKind"])
             pins.append({"relation": relation, "upstream": result["binding"]["upstream"], "reviewDigest": digest(review_state(result))})
         selection["jobs"] = report_order(report)
-        if withheld:
-            raise ExtractionFailure("selected_job_withheld", {"selection": selection, "jobIds": sorted(withheld)})
         if not window:
             raise ExtractionFailure("window_empty", {"selection": selection})
 
