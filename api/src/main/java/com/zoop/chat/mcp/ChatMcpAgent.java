@@ -36,12 +36,13 @@ import tools.jackson.databind.json.JsonMapper;
  * <li>At most {@link #MAX_ROUNDS} rounds of approvals (the dependency rounds of ZOOP-AIG-001 6.3.3). The step after the last
  * round denies whatever is still asked, so Luna answers from what it has; a run that still asks after that is a failed
  * model step, never an endless loop.</li>
- * <li>A web search (web search design 1 and 2) names a query, not ids, so reachability does not apply. A concept-only run
- * (one or more general requirements, Q02) may make one search from the first round: the web is a concept's first support. Any
- * other search is approved only from a round after an approved internal read came back empty or cut: the web is the last
- * resort of what ZOOP's own data left unmet, never the first look. Its query must pass {@link com.zoop.chat.tool.ChatWebQueryPolicy} and it takes the
- * job's and the day's web budgets when it is reserved; a spent budget denies it and is reported as
- * {@code web_budget_exhausted}.</li>
+ * <li>A web search (web search design 1 and 2) names a query, not ids, so reachability does not apply. It is approved when
+ * the web is open for every requirement it names. A requirement the web may not serve (a service rule, Q01) never opens it. A
+ * general requirement (Q02) has one search from the first round: the web is a concept's first support. Any other requirement
+ * has it from a round after an approved internal read serving it came back empty or cut: the web is the last resort of what
+ * ZOOP's own data left unmet, never the first look, and another requirement's gap opens nothing. Its query must pass
+ * {@link com.zoop.chat.tool.ChatWebQueryPolicy} and it takes the job's and the day's web budgets when it is reserved; a spent
+ * budget denies it and is reported as {@code web_budget_exhausted}.</li>
  * <li>The final answer is returned with the results of the calls that ran, read back from {@code chat_tool_calls.result}:
  * exactly what the model received, whichever instance served the call, with the requirements each one was approved for:
  * a section may cite only the results of its own requirements. Results are never synthesized for a denied
@@ -111,10 +112,10 @@ public final class ChatMcpAgent implements ChatAgentPath {
         long inputTokens = 0;
         Set<String> notices = new LinkedHashSet<>();
         String web = ChatMcpTools.name(ChatCapability.WEB_SEARCH);
-        // The web's gate is still decided for the run, not by the requirements a search names, so in a mixed run a first-round
-        // query could bypass a fact requirement's internal-first rule: only a concept-only run gets the early search.
-        boolean conceptOnly = !requirements.isEmpty()
-                && requirements.stream().allMatch(ChatModels.AgentRequirement::general);
+        Set<String> searchable = new LinkedHashSet<>();
+        requirements.stream().filter(ChatModels.AgentRequirement::web).forEach(r -> searchable.add(r.id()));
+        // The concepts that had their search: a search binds to the requirements it names, so it spends only theirs.
+        Set<String> searched = new LinkedHashSet<>();
         for (int step = 1, rounds = 0; ; step++) {
             var input = new ChatModels.AgentInput(requirements, token, names, recipient, maxCitations, previous,
                     decisions);
@@ -150,7 +151,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
             List<ChatToolResult> done = closing ? List.of() : kept(run);
             done.forEach(result -> served.getOrDefault(result.toolCallId(), List.of())
                     .forEach(id -> reachable.get(id).addAll(reached(result))));
-            boolean webOpen = unmet(done);
+            Set<String> webOpen = webOpen(unmet(done, served), concepts, searched, searchable);
             List<ChatModels.Decision> next = new ArrayList<>();
             int round = 0;
             for (ChatModels.ApprovalRequest request : outcome.approvals()) {
@@ -162,7 +163,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
                 List<String> serves = request.requirementIds();
                 if (!closing && round < MAX_ROUND_CALLS && names.contains(request.toolName())
                         && !serves.isEmpty() && reachable.keySet().containsAll(serves)
-                        && (search ? webOpen || conceptOnly && webApproved == 0
+                        && (search ? webOpen.containsAll(serves)
                                 : !concepts.containsAll(serves)
                                         && targetsReachable(request.arguments(), reachableFor(serves, reachable)))) {
                     ChatMcpTools.Approval approval = tools.approve(attached, request.toolName(), request.arguments(), serves);
@@ -170,7 +171,12 @@ public final class ChatMcpAgent implements ChatAgentPath {
                     if (ChatMcpTools.WEB_BUDGET_EXHAUSTED.equals(approval.refused())) notices.add(WEB_BUDGET_EXHAUSTED);
                     approve = approval.approved();
                     if (approve) served.put(approval.toolCallId(), serves);
-                    if (approve && search) webApproved++;
+                    if (approve && search) {
+                        webApproved++;
+                        searched.addAll(serves);
+                        searched.retainAll(concepts);
+                        webOpen.removeAll(searched);
+                    }
                 }
                 next.add(new ChatModels.Decision(request.id(), approve));
                 if (approve) {
@@ -190,12 +196,24 @@ public final class ChatMcpAgent implements ChatAgentPath {
     static final String WEB_BUDGET_EXHAUSTED = "web_budget_exhausted";
 
     /**
-     * Whether ZOOP's own reads left something for the web: an approved internal read that found nothing within its scope
-     * or was cut by a limit. Decided for the run, whichever requirement the read served.
+     * The requirements ZOOP's own reads left something for: those served by an approved internal read that found nothing
+     * within its scope or was cut by a limit.
      */
-    static boolean unmet(List<ChatToolResult> done) {
-        return done.stream().anyMatch(r -> !ChatCapability.WEB_SEARCH.id().equals(r.capabilityId())
-                && (r.items().isEmpty() || Boolean.TRUE.equals(r.truncated())));
+    static Set<String> unmet(List<ChatToolResult> done, Map<String, List<String>> served) {
+        Set<String> unmet = new LinkedHashSet<>();
+        done.stream().filter(r -> !ChatCapability.WEB_SEARCH.id().equals(r.capabilityId())
+                        && (r.items().isEmpty() || Boolean.TRUE.equals(r.truncated())))
+                .forEach(r -> unmet.addAll(served.getOrDefault(r.toolCallId(), List.of())));
+        return unmet;
+    }
+
+    /** The requirements a search may name now: facts with a gap, concepts yet to search, of those the web may serve. */
+    private static Set<String> webOpen(Set<String> unmet, Set<String> concepts, Set<String> searched, Set<String> searchable) {
+        Set<String> open = new LinkedHashSet<>(unmet);
+        open.addAll(concepts);
+        open.removeAll(searched);
+        open.retainAll(searchable);
+        return open;
     }
 
     /** The web faults of a finished run, in a fixed order. */

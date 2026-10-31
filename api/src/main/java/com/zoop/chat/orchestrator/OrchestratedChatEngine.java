@@ -571,14 +571,11 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             tools.addAll(p.capabilities());
         }
         // The web (web search design 1) is the first support of a concept (Q02: one search, tried by default) and the last
-        // resort of a fact question (Q03~Q08: approved only once the internal reads left something unmet). A question
-        // with a service-rule part (Q01) is never offered it: its answer may not rest on the web, and a search cannot yet
-        // be tied to the part it serves.
-        boolean concept = plan.requirements().stream().anyMatch(p -> p.mode() == Mode.GENERAL);
-        boolean fact = plan.requirements().stream().anyMatch(p -> p.mode() == Mode.TOOLS
-                && p.types().stream().anyMatch(WEB_TYPES::contains));
-        boolean rules = plan.requirements().stream().anyMatch(p -> p.types().contains(ChatQueryType.Q01));
-        if ((concept || fact) && !rules && exposed.contains(ChatCapability.WEB_SEARCH)) {
+        // resort of a fact part (Q03~Q08: approved only once the internal reads serving it left something unmet). A
+        // service-rule part (Q01) may not rest on it; the other parts of its question still may, each search bound to the
+        // parts it names.
+        if (plan.requirements().stream().anyMatch(OrchestratedChatEngine::webMayServe)
+                && exposed.contains(ChatCapability.WEB_SEARCH)) {
             // A concept question with no read of its own goes to the agent for its search alone.
             tools.add(ChatCapability.WEB_SEARCH);
         }
@@ -612,11 +609,17 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     private static final Set<ChatQueryType> WEB_TYPES = Set.of(ChatQueryType.Q03, ChatQueryType.Q04, ChatQueryType.Q05,
             ChatQueryType.Q06, ChatQueryType.Q07, ChatQueryType.Q08);
 
+    /** Whether a search may serve this requirement at all: a concept or a fact part, and no service rule. */
+    private static boolean webMayServe(Planned p) {
+        return !p.types().contains(ChatQueryType.Q01) && (p.mode() == Mode.GENERAL
+                || p.mode() == Mode.TOOLS && p.types().stream().anyMatch(WEB_TYPES::contains));
+    }
+
     /** The answerable requirements of the plan as the agent sees them: reads with their resolved targets, general parts. */
     private static List<ChatModels.AgentRequirement> agentRequirements(ChatPlan.Run plan) {
         return plan.requirements().stream().filter(p -> p.mode() == Mode.TOOLS || p.mode() == Mode.GENERAL)
                 .map(p -> new ChatModels.AgentRequirement(p.id(), p.label(), p.mode() == Mode.GENERAL,
-                        p.mode() == Mode.TOOLS ? p.targets() : List.of()))
+                        p.mode() == Mode.TOOLS ? p.targets() : List.of(), webMayServe(p)))
                 .toList();
     }
 
