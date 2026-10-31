@@ -3,6 +3,7 @@
 | 명령 | 모듈 | wire schema | 상태 파일 |
 | --- | --- | --- | --- |
 | `zoop-ai-collect run` | `zoop_ai_pipeline.collection_cli` | `zoop-collection-1` (policy `zoop-collection-policy-1`) | 상태 DB 없음. source `inputRoot/collections/<collectionId>/`에만 원본 bytes·receipt·manifest를 쓴다 |
+| `zoop-ai-collector {run,checkpoint,restore,status}` | `zoop_ai_pipeline.collector_cli` | checkpoint manifest `zoop-collector-checkpoint-1` | 컨테이너 수집 entry. 아래 비공개 뉴스·Korea 코퍼스·official source 수집을 한 controller로 돌리고 `/var/lib/zoop-collector/{private,korea,official}` 상태를 S3 checkpoint로 보존한다. 계약·환경변수·종료 코드·SIGTERM 시간은 [`docs/development/collector-container.md`](../../docs/development/collector-container.md) |
 | `zoop-ai-ingest {run,tick,resume,inspect,export}` | `zoop_ai_pipeline.ingestion_cli` | `zoop-ingestion-s2-1` | `ingestion.sqlite3` |
 | `zoop-ai-extract {run,submit,enqueue-round,plan-round,resume,inspect,cancel}` | `zoop_ai_pipeline.extraction_cli` | `zoop-extraction-s2-2` | `extraction.sqlite3` (`plan-round`는 원장을 열지 않고 새 계획 디렉터리 하나만 씀) |
 | `zoop-ai-relation {run,submit,inspect,resume,review,cancel,live-binding}` | `zoop_ai_pipeline.relation_cli` | `zoop-relation-s3` | `relation.sqlite3` |
@@ -184,7 +185,7 @@ Only provably untouched plans are rebound to the successor namespace. New FN pla
 
 ### Private finite-batch experiment setup
 
-`scripts/overnight_run.py`, `overnight_collect.py`, and `collection_revision.py` are **operator-run local experiment orchestration**, not cloud deployment entry points. They call the production `zoop_ai_pipeline.*_cli` modules. The analysis controller owns a private local Neo4j container through the existing `orbstack` Docker context; `--check` needs the already installed image `neo4j:5.26.32` and an unused loopback port. It does not install dependencies, pull an image, load credentials, or call a model.
+`scripts/overnight_run.py`, `overnight_collect.py`, and `collection_revision.py` are **operator-run local experiment orchestration**, not cloud deployment entry points; the container entry is `zoop-ai-collector` ([`docs/development/collector-container.md`](../../docs/development/collector-container.md)). They call the production `zoop_ai_pipeline.*_cli` modules. The analysis controller owns a private local Neo4j container through the existing `orbstack` Docker context; `--check` needs the already installed image `neo4j:5.26.32` and an unused loopback port. It does not install dependencies, pull an image, load credentials, or call a model.
 
 Create a new private root and a new `runId` for each separately approved window. Keep previous roots, acquisition receipts, unknown requests, and closed money ledgers unchanged. The shared run configuration is a closed `zoop-private-run-4` object; old v2/v3 configurations are historical, not execution-compatible:
 

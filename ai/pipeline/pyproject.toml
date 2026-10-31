@@ -22,10 +22,13 @@ zoop-ai-handoff = "zoop_ai_pipeline.handoff_cli:main"
 zoop-ai-handoff-exposure = "zoop_ai_pipeline.handoff_exposure_cli:main"
 zoop-ai-issue-summary = "zoop_ai_pipeline.issue_summary_cli:main"
 zoop-ai-private-news = "zoop_ai_pipeline.private_intake_cli:main"
+zoop-ai-collector = "zoop_ai_pipeline.collector_cli:main"
 
 [dependency-groups]
 # The S1 worker is only a test dependency: citation parity checks compare against its public exact() rule.
-dev = ["pytest==9.1.1", "pytest-xdist==3.8.0", "zoop-ai-worker"]
+dev = ["pytest==9.1.1", "pytest-xdist==3.8.0", "zoop-ai-worker", {include-group = "container"}]
+# The collector image and dev tests share the pinned S3 SDK.
+container = ["boto3==1.43.121"]
 
 [tool.uv]
 package = true
