@@ -554,6 +554,18 @@ class ChatPlannerTest {
         assertEquals(reason, stop.reason());
     }
 
+    @Test
+    void anIssueABriefingQuestionNamesReadsItsEvidenceAndARoundAloneDoesNot() {
+        Set<String> bound = Set.of("briefing.read", "briefing.evidence");
+        var named = run(new ChatPlanner().plan(run(0, "v1"), decision(req("r1", Map.of(ChatQueryType.Q06, 0.9),
+                Map.of("briefing.read", 0.9), List.of("iss-1"))), bound)).requirements().getFirst();
+        assertEquals(List.of(ChatCapability.BRIEFING_EVIDENCE, ChatCapability.BRIEFING_READ), named.capabilities());
+
+        var round = run(new ChatPlanner().plan(run(0, "v1"), decision(req("r1", Map.of(ChatQueryType.Q06, 0.9),
+                Map.of("briefing.read", 0.9))), bound)).requirements().getFirst();
+        assertEquals(List.of(ChatCapability.BRIEFING_READ), round.capabilities());
+    }
+
     static Req req(String id, Map<ChatQueryType, Double> types, Map<String, Double> capabilities) {
         return req(id, types, capabilities, List.of());
     }

@@ -136,7 +136,7 @@ public final class ChatMcpTools {
                 // A briefing read's round comes from the requirement's words, which the agent's arguments cannot carry.
                 // A selection read's round comes from those words too, and its records are not sent to the agent.
                 .filter(c -> c != ChatCapability.PORTFOLIO_SCOPE_READ && c != ChatCapability.BRIEFING_READ
-                        && c != ChatCapability.SELECTION_RULE_READ
+                        && c != ChatCapability.BRIEFING_EVIDENCE && c != ChatCapability.SELECTION_RULE_READ
                         && bound.contains(c.id())
                         || c == ChatCapability.WEB_SEARCH && web).toList();
     }

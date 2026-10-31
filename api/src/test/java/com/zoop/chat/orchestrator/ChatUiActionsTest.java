@@ -66,7 +66,8 @@ class ChatUiActionsTest {
     void aBriefingReadOffersTheRoundItReallyFound() {
         var item = new ChatToolItem("iss-1", "briefing_item", "[1위] 제목", List.of(), List.of());
         var actions = ChatUiActions.of(List.of(branch("r1",
-                read("briefing.read", "briefing:2026-10-30:evening:br-1", List.of(item), List.of()))),
+                read("briefing.read", "briefing:2026-10-30:evening:br-1", List.of(item), List.of()),
+                read("briefing.evidence", "briefing:2026-10-30:evening:br-1", List.of(item), List.of()))),
                 Set.of("r1"), List.of(), "gv-1", null);
         assertEquals(Target.briefing("2026-10-30", "evening"), actions.getFirst().target());
         assertEquals("브리핑 열기 · 2026-10-30 퇴근", actions.getFirst().label());

@@ -5,7 +5,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * Which published briefing round a {@code briefing.read} reads, as its first target: {@code briefing:latest} (the latest
+ * Which published briefing round a {@code briefing.read} or {@code briefing.evidence} reads, as its first target: {@code briefing:latest} (the latest
  * published round), {@code briefing:<date>} (that KST day's latest round) or {@code briefing:<date>:<edition>}
  * ({@code morning} or {@code evening}). The server writes it from the requirement's own words; a model never does.
  */

@@ -156,6 +156,7 @@ final class ChatRetrieval {
                     boolean fixed = !capability.documents().isEmpty();
                     var read = fixed ? capability.documents()
                             : capability == ChatCapability.BRIEFING_READ ? briefingTargets(run, p, targets)
+                            : capability == ChatCapability.BRIEFING_EVIDENCE ? briefingEvidenceTargets(run, p, targets)
                             : capability == ChatCapability.SELECTION_RULE_READ ? selectionTargets(run, p, targets) : targets;
                     List<String> scope = fixed ? null : p.evidenceScope();
                     Instant since = capability == ChatCapability.GRAPH_VERSION_DIFF ? since(run, p).orElse(null) : null;
@@ -249,6 +250,12 @@ final class ChatRetrieval {
         targets.stream().filter(t -> !ChatBriefingRound.isRef(t) && !ChatPlanner.companyId(t))
                 .limit(ChatToolRequest.MAX_TARGETS - 1).forEach(read::add);
         return List.copyOf(read);
+    }
+
+    /** A briefing evidence read's targets: as a selection read's, without the evidence the member selected in their place. */
+    static List<String> briefingEvidenceTargets(ChatRun run, Planned p, List<String> targets) {
+        return selectionTargets(run, p, p.evidenceScope() == null ? targets
+                : targets.stream().filter(t -> !p.evidenceScope().contains(t)).toList());
     }
 
     private static Optional<Instant> since(ChatRun run, Planned p) {

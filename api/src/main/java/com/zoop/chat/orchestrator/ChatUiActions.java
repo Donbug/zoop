@@ -66,13 +66,15 @@ final class ChatUiActions {
         drafts.computeIfAbsent(draft.target(), t -> draft).requirements().add(requirement);
     }
 
-    /** The round a briefing read found issues in; its {@code dataVersion} names it ({@code briefing:<date>:<edition>:<id>}). */
+    /** The round a briefing read or a briefing evidence read found issues in; its {@code dataVersion} names it ({@code briefing:<date>:<edition>:<id>}). */
     private static java.util.Optional<Draft> briefing(ChatToolResult result) {
-        if (!ChatCapability.BRIEFING_READ.id().equals(result.capabilityId()) || result.items().isEmpty()) {
+        boolean round = ChatCapability.BRIEFING_READ.id().equals(result.capabilityId())
+                || ChatCapability.BRIEFING_EVIDENCE.id().equals(result.capabilityId());
+        if (!round || result.items().isEmpty()) {
             return java.util.Optional.empty();
         }
-        return ChatBriefingRound.ofDataVersion(result.dataVersion()).map(round -> new Draft(ChatUiAction.OPEN_BRIEFING,
-                "브리핑 열기 · " + round.date() + ("morning".equals(round.edition()) ? " 출근" : " 퇴근"),
-                Target.briefing(round.date().toString(), round.edition()), new LinkedHashSet<>()));
+        return ChatBriefingRound.ofDataVersion(result.dataVersion()).map(found -> new Draft(ChatUiAction.OPEN_BRIEFING,
+                "브리핑 열기 · " + found.date() + ("morning".equals(found.edition()) ? " 출근" : " 퇴근"),
+                Target.briefing(found.date().toString(), found.edition()), new LinkedHashSet<>()));
     }
 }
