@@ -63,7 +63,7 @@ import tools.jackson.databind.json.JsonMapper;
  * Real Java adapters -> ai/service (uvicorn) -> installed {@code zoop-ai-chat}, replay only. The inputs are built by the
  * production {@link ChatModelStages} from the same synthetic scenario the gate authored its replay fixture from
  * ({@code api/scripts/ai_chat_gate.py}); the replay answers only an input identical in every field, so a passing stage proves
- * the two sides agree on {@code zoop-ai-chat-3}. Not runnable on its own: {@code make api-ai-chat-smoke} starts the service and
+ * the two sides agree on {@code zoop-ai-chat-4}. Not runnable on its own: {@code make api-ai-chat-smoke} starts the service and
  * exports {@code ZOOP_AI_CHAT_CONTRACT_MANIFEST}. Without it every test fails; none skips.
  */
 @Tag("ai-chat-contract")

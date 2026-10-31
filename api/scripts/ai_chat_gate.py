@@ -4,7 +4,7 @@
 Authors the exact stage inputs the Java adapters (`com.zoop.chat.model.ChatModelStages`) must build for a fixed synthetic
 scenario, and an authored replay answer for each, keyed by the worker's own request identity. A Java input that differs in
 any field has no replay entry and is refused (`replay_input_mismatch`), so the gate proves the two sides agree on the
-`zoop-ai-chat-3` inputs and answers, not only on the envelope. Before any process starts, the fixture is replayed in-process
+`zoop-ai-chat-4` inputs and answers, not only on the envelope. Before any process starts, the fixture is replayed in-process
 through the worker runtime so an authoring mistake fails here and not as a Java mismatch.
 
 Then starts one real `ai/service` (127.0.0.1, fresh temp state, replay only, live gate closed: a supported Jev model name so
@@ -44,7 +44,7 @@ from support import PGREP, ServiceProcess, Workspace, remove_tree, terminate_run
 API = ROOT / "api"
 RESULTS = API / "build" / "test-results" / "aiChatContractTest"
 GRADLE_TIMEOUT_SECONDS = 900
-SCHEMA = "zoop-ai-chat-3"
+SCHEMA = "zoop-ai-chat-4"
 # Not a secret: the one Jev model the worker supports. Set so a live request passes the stage configuration and is refused
 # by the closed live gate itself; live enable, budget and provider keys stay unset.
 LIVE_JEV_MODEL = "jev-1.14.0"

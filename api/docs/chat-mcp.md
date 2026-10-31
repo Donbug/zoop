@@ -41,12 +41,13 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 
 노출: 레지스트리에 바인딩된 기능 중 `portfolio.scope.read`, `briefing.read`, `selectionRule.read`를 뺀 전부(서버가 회원 범위·요구 문구로 입력을 정하는 도구). MCP 이름은 기능 ID의 `.`을 `_`로 바꾼 것(`company.read` → `company_read`)이며 `tools/list`는 grant가 허용한 도구만 보여 준다. 모든 도구는 `readOnlyHint=true`다.
 
-모델이 정하는 인자는 둘뿐이고 나머지는 서버가 job의 고정 문맥에서 넣는다.
+모델이 정하는 인자는 조회 인자 둘과 요구 지목(`requirementIds`)뿐이고 나머지는 서버가 job의 고정 문맥에서 넣는다.
 
 | 인자 | 규칙 |
 | --- | --- |
 | `targets` | 1~5개 서로 다른 ID 문자열(각 128자 이하). 고정 문서 읽기(`zoopPolicy_read`)에는 없음, `graph_version_diff`는 생략 시 공개 그래프 전체 |
 | `limit` | 정수 1~20, 기본 20 |
+| `requirementIds` | 이 호출이 답하는 요구 ID 1개 이상(모든 도구 필수). 승인에서만 쓰고 읽기 요청에 들어가지 않는다(4장 흐름 2) |
 | 그 밖의 키 | 거부(`additionalProperties: false`, 서버 재검사) |
 
 서버 주입: graphVersion·asOf(job 고정), 회원이 좁힌 근거 선택 범위(`evidenceIds`가 있으면 `evidencePool`), `graph.version.diff`의 비교 시작 시각(job의 선택 기간), 고정 ZOOP 문서.
@@ -121,9 +122,9 @@ agent 단계가 하나라도 시작된 뒤의 `mcp_unreachable`는 **같은 run�
 
 **흐름.**
 1. Java가 run의 grant 토큰을 발급하고 `chat-agent` 1단계를 부른다. 요구마다 planner가 해석한 대상 ID(`targets`)를 넘기고, 허용 도구는 계획의 기능만이다.
-2. 단계가 `approval_required`로 멈추면 Java가 요청마다 결정한다. **run의 허용 도구이고, `targets`의 모든 ID가 도달 가능하며, `ChatMcpTools.approve`가 예약에 성공한 호출만 승인**하고 나머지는 거부한다. 도달 가능한 ID는 첫 라운드엔 요구의 해석된 `targets`, 다음 라운드부터는 거기에 이전에 승인·실행된 결과의 항목·기업·경로 양끝·단계·근거 ID를 더한 서버 소유 목록이다. `targets`가 없는 호출(고정 문서, 버전 비교 전체 그래프)은 인자 검사만 거친다. 웹 검색(`web_search`)은 ID 대신 검색어를 받으므로 도달 가능 ID 대신 "앞 라운드의 내부 조회가 0건이거나 잘렸을 때만"과 검색어 검사·웹 예산으로 판단한다([챗봇 보조 웹 검색 도구](chat-web-search.md) 5장). 프롬프트의 "ID를 추측하지 않는다"와 공급자의 `allowed_tools`는 서버 검사를 대신하지 않는다. 결정을 continuation(`previous_response_id`)으로 보내면 공급자가 승인된 호출만 `/mcp`로 실행한다.
+2. 단계가 `approval_required`로 멈추면 Java가 요청마다 결정한다. **run의 허용 도구이고, 지목한 요구가 모두 이 run의 요구이며, `targets`의 모든 ID가 도달 가능하고, `ChatMcpTools.approve`가 예약에 성공한 호출만 승인**하고 나머지는 거부한다. 요구를 지목하지 않았거나 일반 개념 요구만 지목한 내부 조회도 거부한다(worker는 잘못된 `requirementIds`를 빈 목록으로 넘기고 판단하지 않는다). 도달 가능한 ID는 **지목한 요구별** 서버 소유 목록이다. 첫 라운드엔 그 요구의 해석된 `targets`, 다음 라운드부터는 거기에 그 요구를 지목해 승인·실행된 결과의 항목·기업·경로 양끝·단계·근거 ID를 더한다. `targets`가 없는 호출(고정 문서, 버전 비교 전체 그래프)은 인자 검사만 거친다. 웹 검색(`web_search`)은 ID 대신 검색어를 받으므로 도달 가능 ID 대신 "앞 라운드의 내부 조회가 0건이거나 잘렸을 때만"과 검색어 검사·웹 예산으로 판단한다([챗봇 보조 웹 검색 도구](chat-web-search.md) 5장). 프롬프트의 "ID를 추측하지 않는다"와 공급자의 `allowed_tools`는 서버 검사를 대신하지 않는다. 결정을 continuation(`previous_response_id`)으로 보내면 공급자가 승인된 호출만 `/mcp`로 실행한다.
 3. 승인 라운드는 최대 3회이고, 한 라운드에 최대 4건만 승인한다(나머지는 거부, Luna는 다음 라운드에 다시 요청 가능). 공급자는 라운드의 승인 호출을 마친 뒤 단계를 답하므로 job의 동시 실행이 4개를 넘지 않는다. 다음 단계 하나만 할 시간이 남거나 라운드를 다 쓰면 남은 요청을 모두 거부해 그 단계가 답을 쓰게 한다. 그 뒤에도 묻는 run은 실패한 모델 단계다.
-4. 최종 답은 **실행된 호출의 결과로** 검사한다. `/mcp`는 성공 호출의 결과 봉투를 모델에 보낸 것과 같은 JSON으로 `chat_tool_calls.result`(jsonb, 256 KiB 이하, migration `V20261028140000`)에 남기고, Java는 그 결과로 branch를 만들어 기존 결정론 검사·인용·Jev 검증·결과 생성을 그대로 거친다. 어느 인스턴스가 `/mcp` 호출을 받았든 같은 PostgreSQL에서 읽는다. 읽은 결과는 `ChatToolRunner.restore`가 job·회원·시도·tool call·capability·고정 버전·asOf·입력 digest를 예약 기록과 대조한 뒤에만 이 run의 조회로 되살리고(다르면 run은 `internal`로 끝난다), 모델 전송 gate가 항목을 뺀 결과는 잘린 결과로 되살린다. 같은 결과가 Jev 검증의 서버 사실(`graph_comparison`)이 된다([AI 연동](AI_INTEGRATION.md#챗봇-모델-단계-클라이언트)). 결과는 run의 요구들이 공유한다(승인 요청에 요구 ID가 아직 없다).
+4. 최종 답은 **실행된 호출의 결과로** 검사한다. `/mcp`는 성공 호출의 결과 봉투를 모델에 보낸 것과 같은 JSON으로 `chat_tool_calls.result`(jsonb, 256 KiB 이하, migration `V20261028140000`)에 남기고, Java는 그 결과로 branch를 만들어 기존 결정론 검사·인용·Jev 검증·결과 생성을 그대로 거친다. 어느 인스턴스가 `/mcp` 호출을 받았든 같은 PostgreSQL에서 읽는다. 읽은 결과는 `ChatToolRunner.restore`가 job·회원·시도·tool call·capability·고정 버전·asOf·입력 digest를 예약 기록과 대조한 뒤에만 이 run의 조회로 되살리고(다르면 run은 `internal`로 끝난다), 모델 전송 gate가 항목을 뺀 결과는 잘린 결과로 되살린다. 같은 결과가 Jev 검증의 서버 사실(`graph_comparison`)이 된다([AI 연동](AI_INTEGRATION.md#챗봇-모델-단계-클라이언트)). 결과는 승인 때 지목한 요구에만 속한다. 구간은 자기 요구의 결과만 인용할 수 있어, 다른 요구용 호출의 근거를 인용하면 기존 `evidence_section`/`web_section` 검사로 `validation_failed`다. 일반 개념 요구는 자기 요구를 지목한 웹 결과만 받는다. 지목은 `chat_tool_calls.request_meta.requirementIds`에 남지만 digest에는 들어가지 않으므로, 같은 조회를 다른 요구로 다시 승인받으면 호출 한 건으로 세고 결과를 재사용한다(`cachedFrom`).
 
 **시간.** agent run은 job 시작부터 **45초** 안에 검증·저장까지 끝낸다. agent 경로가 시작되면 run의 기한 자체를 시작 + 45초로 앞당긴다(`ChatRunControl.shortenDeadline`, DB `deadline_at`도 owner fence로 함께, 늦추지는 않음). 그래서 남은 시간 계산, 기록 대기, `/mcp`로 붙는 요청, 최종 저장의 지연 판정이 모두 45초를 따르며, 45초를 넘긴 결과는 60초 안이어도 완료로 저장하지 않는다(`deadline_guard`, 모델을 부른 뒤면 `response_unknown`). Luna 단계 전체(MCP 왕복·승인 continuation·도구·최종 답)는 `min(35초, 45초 중 남은 시간 − 검증·서버 예약 14초)`이고, 각 단계는 그 남은 예산까지만 기다린다. 예산이 답 작성용 10초보다 작으면 시작하지 않고 `deadline_guard`, 남은 예산이 20초 미만이면 마지막 단계로 보고 새 도구를 승인하지 않는다(마지막 10초 신규 도구 금지). direct 경로는 router·도구·답 작성·검증 단계 한도(합 63초)가 45초에 들어가지 않아, 실측으로 다시 정할 때까지 job 기한 60초를 그대로 쓴다.
 
@@ -136,7 +137,7 @@ agent 단계가 하나라도 시작된 뒤의 `mcp_unreachable`는 **같은 run�
 1. ~~**model-send grant 검사.**~~ 구현(3장 "모델 전송 gate"). 켜기 전에 운영자가 레지스트리에 `chat-agent` 목적·agent 수신자 grant와 `zoop-graph` source를 등록하고, OpenAI 보유 조건을 거버넌스 10장에 기록해야 한다.
 2. **예산**(단계 2): job 단위 호출 상한 6회(내부 몫, 웹 2회는 따로 센다. rerun은 남은 호출만 쓰고, 계획에 모자라면 `budget_exceeded`로 재실행 불가), agent 라운드당 승인 4건(동시 4개), fan-out 5, agent run 45초(검증·저장까지)·Luna 35초는 구현했다. 요청 캐시·single-flight(인스턴스 안)·재사용 시 gate 재검사·job당 결과 1 MiB도 구현했다(3장). 도구별 시간은 일반 읽기 3초·그래프 계산(`zoop-graph-read`: `graph.path.read`·`graph.version.diff`) 5초로 구현했다(단계 10초와 run 기한으로 줄어듦). 웹 검색 도구의 호출당 7초, job당 웹 2회(내부 6회와 별도), 회원 하루 20회·프로젝트 하루 500회 원자 예약도 구현했다([챗봇 보조 웹 검색 도구](chat-web-search.md)). 남은 것: direct 경로 45초(단계 한도 실측 후), 인스턴스를 넘는 single-flight(필요하면). rate limit은 인스턴스별이다.
 3. ~~**preflight·circuit breaker.**~~ 구현. AI runtime의 무과금 health probe와 Java의 5회/3실패·30초·단일 half-open probe, 시작 전 direct 선택, 실행 중 무대체를 적용했다.
-4. **승인 요청의 요구 매핑**: 지금은 결과를 run의 요구들이 공유한다. 요구별 인용 결속이 필요하면 승인 요청에 requirementIds를 받도록 계약을 넓힌다.
+4. ~~**승인 요청의 요구 매핑.**~~ 구현(`zoop-ai-chat-4`, 4장 흐름 2·4). 웹 검색 gate는 아직 run 단위다([챗봇 보조 웹 검색 도구](chat-web-search.md) 1장).
 5. **네트워크·운영**: HTTPS 인바운드 노출 범위, 공급자 출발지 제한 여부(IP allowlist만으로 인증하지 않음), 승인된 소량 live latency spike(실제 Responses·MCP 응답 형태 확인 포함). Spike의 승인·합성 데이터·무내용 증거·통과 gate는 [챗봇 MCP live latency spike](../../docs/development/chat-live-spike.md)에 고정했다. HTTPS·출발지 제한 선택, model-send grant, `store=true` 보유 조건·외부 처리 고지, 키 회전, 사고·증거 보존 책임은 [운영 readiness gate](../../docs/development/chat-operations-readiness.md)가 같은 후보 commit의 통과한 spike와 함께 검사한다. 이 검사는 배포나 플래그 변경을 하지 않는다. 총 8회 시나리오(내부 6 + 웹 2)는 상한으로는 가능하지만 실행해 확인하지 않았고, 실제 웹 공급자가 없어 합성 공급자로만 측정할 수 있다(조건은 spike 문서). 그 시나리오가 통과하기 전에는 gate를 통과로 기록하지 않는다.
 
 ## 6. 시험

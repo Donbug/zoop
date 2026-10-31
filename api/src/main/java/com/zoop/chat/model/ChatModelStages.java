@@ -40,7 +40,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-3}). The server decides what is
+ * The orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-4}). The server decides what is
  * sent: the router gets the question chain, the requirements split by {@link ChatRequirementSplitter} and the descriptions of
  * the bound capabilities; company and issue names are resolved here, never by the model. Company names
  * ({@link CompanyNameResolver}) are resolved before the router, so a name that fits several companies becomes a clarification
@@ -485,7 +485,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
                 JsonNode arguments = request.get("arguments");
                 if (arguments == null || !arguments.isObject()) throw new IllegalArgumentException("arguments");
                 approvals.add(new ChatModels.ApprovalRequest(text(request, "approvalRequestId"), text(request, "toolName"),
-                        ARGUMENTS.convertValue(arguments, ARGUMENT_MAP)));
+                        ARGUMENTS.convertValue(arguments, ARGUMENT_MAP), strings(request, "requirementIds")));
             }
             JsonNode written = answer.get("answer");
             ChatGeneratedAnswer generated = null;

@@ -282,11 +282,15 @@ public final class ChatModels {
         }
     }
 
-    /** A tool call Luna proposed, held by the provider until the server decides. */
-    public record ApprovalRequest(String id, String toolName, Map<String, Object> arguments) {
+    /**
+     * A tool call Luna proposed, held by the provider until the server decides. {@code requirementIds} are the requirements
+     * Luna says it serves, apart from the arguments; none when it named none validly.
+     */
+    public record ApprovalRequest(String id, String toolName, Map<String, Object> arguments, List<String> requirementIds) {
         public ApprovalRequest {
             // A model may write an explicit null; the server's argument check refuses it, so it is kept as written.
             arguments = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(arguments));
+            requirementIds = List.copyOf(requirementIds);
         }
     }
 

@@ -49,7 +49,7 @@ def verification_input(invocation: str = "job-1:a1:stage") -> dict[str, Any]:
 
 
 def request(stage: str, payload: dict[str, Any], *, mode: str = "live", invocation: str = "job-1:a1:stage") -> StageRequest:
-    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-3", "invocationId": invocation, "stage": stage,
+    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-4", "invocationId": invocation, "stage": stage,
                                         "mode": mode, "input": payload})
 
 
@@ -660,7 +660,7 @@ def test_the_live_ceiling_is_shared_by_all_chat_stages(tmp_path):
 def replay_file(tmp: Path, req: StageRequest, response: Any) -> Path:
     path = tmp / "replay.json"
     entry = {"stage": req.stage, "inputDigest": request_identity(req, stage_config(req.stage, "replay")), "response": response}
-    path.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-3", "recordingKind": "authored-test", "responses": [entry]}),
+    path.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-4", "recordingKind": "authored-test", "responses": [entry]}),
                     encoding="utf-8")
     return path
 
@@ -689,7 +689,7 @@ def test_cli_prints_the_result_and_exits_by_outcome(tmp_path, monkeypatch, capsy
     printed = json.loads(capsys.readouterr().out)
     assert printed["status"] == "succeeded" and printed["invocationId"] == req.invocation_id
 
-    monkeypatch.setattr("sys.stdin", io.StringIO('{"schemaVersion":"zoop-ai-chat-3"}'))
+    monkeypatch.setattr("sys.stdin", io.StringIO('{"schemaVersion":"zoop-ai-chat-4"}'))
     assert chat_cli.main(["invoke", "--state-dir", str(state)]) == 64
     assert json.loads(capsys.readouterr().out) == {"error": "request_invalid"}
 

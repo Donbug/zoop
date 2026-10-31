@@ -222,7 +222,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         }
         if (agentTools != null) {
             // The agent path: Luna chooses and chains the allowed reads, the server decides each one, and the answer is
-            // checked below against exactly the results of the calls that ran (shared by the requirements they serve).
+            // checked below against exactly the results of the calls that ran, each requirement against its own.
             control.phase("retrieving");
             if (control.toolCallsLeft() < 1) throw new Stop(TOOL_BUDGET_SPENT);
             // The run's deadline becomes 45 s from the job's start: verification and the final store keep to it too.
@@ -251,13 +251,12 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                     });
             Map<String, List<ChatToolResult>> results = new LinkedHashMap<>();
             confirmed.requirements().stream().filter(p -> p.mode() == Mode.TOOLS)
-                    .forEach(p -> results.put(p.id(), ran.results()));
-            // A concept part may rest on the run's web hits (Q02's first support), never on its internal reads.
-            List<ChatToolResult> web = ran.results().stream().filter(r -> !r.webResults().isEmpty()).toList();
-            if (!web.isEmpty()) {
-                confirmed.requirements().stream().filter(p -> p.mode() == Mode.GENERAL)
-                        .forEach(p -> results.put(p.id(), web));
-            }
+                    .forEach(p -> results.put(p.id(), ran.resultsOf(p.id())));
+            // A concept part may rest on its web hits (Q02's first support), never on internal reads.
+            confirmed.requirements().stream().filter(p -> p.mode() == Mode.GENERAL).forEach(p -> {
+                List<ChatToolResult> web = ran.resultsOf(p.id()).stream().filter(r -> !r.webResults().isEmpty()).toList();
+                if (!web.isEmpty()) results.put(p.id(), web);
+            });
             retrieved = new ChatRetrieval.Outcome(results, Map.of(), Set.of(), null, null);
             agentAnswer = ran.answer();
             agentNotices = ran.notices();

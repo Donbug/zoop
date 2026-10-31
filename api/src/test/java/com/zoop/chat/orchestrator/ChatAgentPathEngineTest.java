@@ -80,6 +80,8 @@ class ChatAgentPathEngineTest {
         List<String> notices = List.of();
         boolean available = true;
         ChatModels.Failure failure;
+        /** The requirements each call served, by call id; null when every call served every requirement. */
+        Map<String, List<String>> served;
 
         Agent(Set<ChatCapability> exposed) {
             this.exposed = exposed;
@@ -104,7 +106,14 @@ class ChatAgentPathEngineTest {
             // One step through the engine's guard and limit, like the real path.
             closing.add(steps.closing());
             steps.run(() -> new ChatModels.AgentStep("resp_1", List.of(), answer));
-            return new Outcome(answer, results, 1, 1, 0, notices);
+            Map<String, List<String>> calls = served;
+            if (calls == null) {
+                calls = new java.util.HashMap<>();
+                for (ChatToolResult result : results) {
+                    calls.put(result.toolCallId(), given.stream().map(ChatModels.AgentRequirement::id).toList());
+                }
+            }
+            return new Outcome(answer, results, calls, 1, 1, 0, notices);
         }
     }
 
@@ -246,6 +255,28 @@ class ChatAgentPathEngineTest {
             assertEquals(new ChatEngineOutcome.Failed("validation_failed", null, false),
                     engine(agent).answer(run(), new Control(Duration.ofSeconds(60))), mixed.basis());
         }
+    }
+
+    @Test
+    void aSectionCitesOnlyTheResultsOfCallsThatServedItsRequirement() {
+        // D-AI-02: the evidence of a read approved for r2 cannot back a section answering r1.
+        decision = ChatPlannerTest.decision(
+                req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ));
+        agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of("r2"),
+                List.of());
+        agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
+
+        agent.served = Map.of("tc-0", List.of("r2"));
+        assertEquals(new ChatEngineOutcome.Failed("validation_failed", null, false),
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+
+        agent.served = Map.of("tc-0", List.of("r1"));
+        ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertEquals("answered", result.outcome());
+        assertEquals(List.of(EV_HYNIX), result.citations().stream().map(Citation::evidenceId).toList());
     }
 
     @Test
