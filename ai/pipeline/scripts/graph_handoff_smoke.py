@@ -155,7 +155,8 @@ def set_grant(world, source_id: str, enabled: bool) -> None:
 def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a_countries: tuple = ("KR",), a2_countries: tuple = ("KR",), dated: bool = False,
                 valid_from: str | None = "2026-01-01", valid_until: str | None = "2026-12-31", event_time: str | None = "2026-09-30",
                 a2_event_time=SAME, snapshot_differs: bool = False, approve: bool = False, chain: bool = False, impact: str | None = None,
-                uncited_source: bool = False, raw_time_evidence: bool = False, slots: tuple | None = None, defer_b: bool = False) -> SimpleNamespace:
+                uncited_source: bool = False, raw_time_evidence: bool = False, slots: tuple | None = None, defer_b: bool = False,
+                b_published_at: str | None = None) -> SimpleNamespace:
     """The authored world. Variants (each is a REAL ingestion + S2 + S3 world, used by the integrity regressions):
     collide: the two documents of snapshot event-a use the SAME local mention id (S2 scopes member identity by documentVersion + mentionId, so this is legal);
     a2_differs: the second member's title differs (a metadata conflict unless the operator picks a representative); a2_countries: its country field;
@@ -175,6 +176,7 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
     uncited_source: document a2 is ingested under its OWN source id and grant (`UNCITED_SOURCE`), so revoking that grant alone removes one article of the supply issue's summary basis.
     slots: (slot of document b's round, slot of the round holding documents a and a2): two timed rounds (`tick` slots, b ingested first) instead of the one untimed round; with
     `uncited_source` documents a and b share ONE timed round at `slots[1]` (a2 keeps its own untimed round: it is only a snapshot member);
+    b_published_at: the authored publication timestamp of document b; None retains its unknown publication time;
     defer_b: S3 job rel-b is only registered (`queued`); `world.finish_rel_b()` runs it to `ready` later."""
     kit = HandoffKit(root)
     valid_text = validity_sentence(valid_from, valid_until) if dated else None
@@ -182,7 +184,7 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
     raw_a2 = (f"계약 날짜 표기는 {event_time if a2_event_time is SAME else a2_event_time}이다.",) if raw_time_evidence else ()
     docs = [{"supplier": "supplier-a", "html": page(SUP, INV, EVT_A, GEO_A, *raw_a, *((CHAIN,) if chain else ())), "publisher": PUBLISHERS["a"]},
             {"supplier": "supplier-a2", "html": page(EVT_A2, *raw_a2)},
-            {"supplier": "supplier-b", "html": page(QB, GEO_B, QB3, *((valid_text,) if valid_text else ())), "published": None}]
+            {"supplier": "supplier-b", "html": page(QB, GEO_B, QB3, *((valid_text,) if valid_text else ())), "published": b_published_at}]
     if uncited_source:
         kit.registry["sources"].append(uncited_source_entry(kit.registry["sources"][0]))
         kit.save_registry()
