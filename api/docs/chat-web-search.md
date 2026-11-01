@@ -8,7 +8,7 @@
 | --- | --- |
 | `web.search` 도구(`ChatWebSearchTool`), 공급자 포트(`ChatWebSearchProvider`), 합성 공급자 | 실제 공급자(미선정), 공급자 키·약관·처리 국가 결정 |
 | 검색어 검사(`ChatWebQueryPolicy`), 요구별 웹 gate(개념 요구의 기본 1회 검색, 사실 요구의 내부 미충족 뒤 검색, Q01 요구 제외. 2026-10-31) | 질문 기간·세부 사실 기준의 "질문이 요구한 범위" 미충족(조회 결과에 날짜·필드 판단이 없어, 내부 0건·잘림과 외부 출처 명시만 미충족으로 봄) |
-| agent 경로의 MCP 도구 노출과 Java 승인 gate(5장), `web-search:<공급자>` 전송 grant 검사, 웹 장애·예산 → notice | direct 경로의 웹 검색(agent 경로에서만 동작) |
+| agent 경로의 MCP 도구 노출과 Java 승인 gate(5장), `web-search:<공급자>` 전송 grant 검사, 웹 장애·예산 → notice | direct 경로의 Q07 2개 초과 기업 선택 확인(design 3장) |
 | 호출당 7초, job당 웹 2회(내부 6회와 별도), 회원 하루 20회·프로젝트 하루 500회 원자 예약 | 실제 공급자의 재열람 권리(저장·보유 기간): 정해지기 전에는 합성 공급자 인용만 다시 보여 줌 |
 | `web_*` notice 문구(`ChatResults`), 답변 인용 계약(6장: `web_reported` basis, `Citation.sourceKind=web_result`, AI 단계 계약, 화면) | snapshot 저장 |
 
@@ -53,6 +53,17 @@ ZOOP_CHAT_WEB_ENABLED=true ZOOP_CHAT_WEB_PROVIDER=synthetic
 4. **예산**: 승인 = 예약이며, job당 웹 2회와 회원·프로젝트의 그날 한도를 그때 차감한다. 모자라면 `web_budget_exhausted`로 거부하고 notice로 남긴다.
 5. **전송**: 결과의 웹 hit은 `web-search:<공급자>` grant가 `chat-agent` 수신자에 허용될 때만 모델에 보낸다. 아니면 hit과 그 항목을 통째로 빼고 `withheld.webResults`에 개수만 적는다.
 6. **notice**: 승인됐는데 호출이 실패했거나 전송 grant 때문에 hit이 모두 빠진 검색은 `web_unavailable`, 공급자가 성공적으로 0건을 돌려준 검색은 `web_no_results`, 예산 거부는 `web_budget_exhausted`다. 답변을 막지 않으며 answered 결과의 `notices`에 붙는다(요구 표현 없음).
+
+### direct 계획의 내부 조회 뒤 검색
+
+agent가 읽을 수 없어 서버가 읽은 계획(기간이 있는 Q05, Q06, Q07, Q08, 의존 단계)은 조회가 끝난 뒤 `OrchestratedChatEngine.webAfterReads`가 Luna에 `web_search`만 허용한 agent 실행을 한 번 시작한다. 승인 gate·검색어 검사·예산·전송 grant·notice는 위와 같다. 검색어를 고르려고 부르는 것이며, Luna가 마무리로 쓴 답은 버리고 결과의 웹 hit만 받아 생성 단계(`chat-answer`)가 내부 자료와 함께 쓴다.
+
+- **대상**(`webGaps`): 자기 조회가 모두 성공했고 회원이 고른 근거로 좁히지 않은 요구. Q03·Q04·Q07은 0건·잘림이면, Q05·Q06·Q08은 외부 출처를 명시했을 때만 대상이다. 비교 결과·발행 회차·선정 기록은 웹으로 대신하지 않기 때문이다.
+- **회원 범위**: 이 실행의 요구에는 서버가 해석한 대상 ID를 넣지 않는다(`searchOnly`). 보유·관심 종목이 대상 ID로 나가지 않으며, 검색어는 요구 문구에서만 나온다. "내 종목" 같은 말은 검색어 검사가 거절하므로 기업을 적지 않은 Q07은 검색되지 않는다.
+- **시간**: `min(20초, 남은 시간 − 생성·검증·서버 44초)`이며 10초가 안 되면 시작하지 않고 `web_budget_exhausted`다. job 기한은 60초 그대로다.
+- **실패**: 단계 실패·시간 부족은 `web_unavailable` notice이고 내부 결과로 답을 계속한다. preflight가 막아도 같다.
+- **전송 grant**: 웹 snippet이 생성 단계로 가므로 `web-search:<공급자>` grant에 `chat-answer` 목적이 있어야 한다. 없으면 AI runtime이 `source_grant_denied`로 생성 단계를 거절해 job이 실패한다. 켜기 전에 등록한다.
+- **기록**: route 요약의 `webAfterReads`(`searched`, `no_time`, `unavailable`, `failed`)와 `webSteps`, `webApproved`, `webDenied`.
 
 ## 6. 답변 인용 (`web_reported`·`web_result`)
 
