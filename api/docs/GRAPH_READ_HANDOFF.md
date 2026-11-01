@@ -33,7 +33,7 @@ API 이미지의 비웹 operator 프로세스는 문서 등록과 graph 수입 �
 
 앱 수입 principal은 `handoff.read`와 `observation.read`를 사용합니다. 기존 online admission principal의 scope·binding은 바꾸지 않습니다. service는 token digest만 설정하고 API task에는 토큰 평문을 비밀 저장소로 주입합니다. 문서 scope는 설정된 전체 inventory의 정확한 관측 조회를 허용합니다. handoff의 principal별 allowlist·canonical digest pin·현재성 검사는 계속 별도로 적용됩니다.
 
-client는 비-loopback 주소에 HTTPS를 요구하고 proxy·redirect·자동 재시도를 사용하지 않습니다. AI service의 `ZOOP_AI_SERVICE_HOST` 기본값은 `127.0.0.1`이며, ECS에서 다른 task가 접근하려면 승인된 TLS ingress 뒤에서 literal IP bind를 명시해야 합니다. 주소·토큰 값, 보안 그룹과 ingress 설정은 배포 책임자가 확정합니다. Docker 기본값은 loopback을 유지하며 서비스 이미지에는 세 native read 명령이 설치됩니다.
+client는 비-loopback 주소에 HTTPS를 요구하고 proxy·redirect·자동 재시도를 사용하지 않습니다. 예외는 `ZOOP_AI_PLAINTEXT_HTTP_HOSTS`에 적은 host뿐입니다(dev의 VPC 내부 Service Connect 이름 `ai`. 토큰과 응답 본문이 VPC 안에서 평문으로 오가므로 운영에는 넣지 않음, [AI 연동](AI_INTEGRATION.md#설정)). AI service의 `ZOOP_AI_SERVICE_HOST` 기본값은 `127.0.0.1`이며, ECS에서 다른 task가 접근하려면 승인된 TLS ingress 뒤에서, 또는 dev에서 위 예외를 쓸 때는 Service Connect 뒤에서 literal IP bind를 명시해야 합니다. 주소·토큰 값, 보안 그룹과 ingress 설정은 배포 책임자가 확정합니다. Docker 기본값은 loopback을 유지하며 서비스 이미지에는 세 native read 명령이 설치됩니다.
 
 ### 대상 DB와 동결된 handoff의 연결
 

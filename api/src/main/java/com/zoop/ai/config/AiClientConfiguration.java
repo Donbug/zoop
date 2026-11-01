@@ -14,11 +14,11 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "zoop.ai.client", name = "enabled", havingValue = "true")
-@EnableConfigurationProperties(AiClientProperties.class)
+@EnableConfigurationProperties({AiClientProperties.class, AiTransportProperties.class})
 public class AiClientConfiguration {
 
     @Bean
-    HttpAiAnalysisClient aiAnalysisClient(AiClientProperties properties) {
-        return new HttpAiAnalysisClient(properties.toSettings());
+    HttpAiAnalysisClient aiAnalysisClient(AiClientProperties properties, AiTransportProperties transport) {
+        return new HttpAiAnalysisClient(properties.toSettings(transport));
     }
 }

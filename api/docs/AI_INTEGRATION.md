@@ -33,11 +33,12 @@
 | 환경 변수 | 기본값 | 규칙 |
 |---|---|---|
 | `ZOOP_AI_CLIENT_ENABLED` | `false` | `true`일 때만 bean 생성. 이때만 아래를 검증 |
-| `ZOOP_AI_CLIENT_BASE_URL` | 없음 | 필수. 비-loopback은 `https`. `http`는 `localhost`/`127.0.0.1`/`[::1]`만. user info·query·fragment 불가. 역프록시 경로 prefix는 평범한 세그먼트만 |
+| `ZOOP_AI_CLIENT_BASE_URL` | 없음 | 필수. 비-loopback은 `https`. `http`는 `localhost`/`127.0.0.1`/`[::1]`와 `ZOOP_AI_PLAINTEXT_HTTP_HOSTS`에 적은 host만. user info·query·fragment 불가. 역프록시 경로 prefix는 평범한 세그먼트만 |
 | `ZOOP_AI_CLIENT_TOKEN` | 없음 | 필수. 운영자가 발급한 서비스 bearer 토큰(`[A-Za-z0-9._~+/-]{32,512}=*`). 서버는 SHA-256 digest만 저장 |
 | `ZOOP_AI_CLIENT_CONNECT_TIMEOUT` | `3s` | 100ms–30s |
 | `ZOOP_AI_CLIENT_REQUEST_TIMEOUT` | `30s` | 100ms–120s, 한 호출의 **전체** 마감 |
 | `ZOOP_AI_CLIENT_MAX_RESPONSE_BYTES` | `8388608` | 65536–33554432 |
+| `ZOOP_AI_PLAINTEXT_HTTP_HOSTS` | 없음 | 모든 AI 클라이언트(S1·S2·S3·plan admission·chat·handoff 읽기·관측 export·handoff exposure·round)에 함께 적용. loopback 밖에서 `http`를 허용할 정확한 host 이름 목록(쉼표 구분, 소문자 DNS 이름만. wildcard·port·scheme·IP 주소는 활성 클라이언트가 설정을 만들 때 기동 거절). dev는 인증서가 없는 VPC 내부 Service Connect 이름 `ai`만 넣는다. 이때 bearer 토큰과 응답 본문이 VPC 안에서 암호화 없이 오가므로 운영에는 넣지 않는다 |
 
 활성인데 URL·토큰·시간 값이 잘못되면 기동이 실패합니다. 메시지는 설정 이름만 말하고 값은 말하지 않으며(`AiClientSettings`, `AiClientProperties.toString()`은 토큰을 가림), 토큰은 예외·로그·`toString`에 나오지 않습니다. 요청 본문 상한은 서비스와 같은 2,000,000바이트로 고정입니다. 서버 쪽 principal·scope·토큰 digest 설정은 [서비스 README](../../ai/service/README.md#설정환경-변수-시작-때-한-번-읽고-실패-시-닫힘)에 있고 운영자가 서비스 밖에서 만듭니다. 이 저장소와 에이전트는 토큰을 만들지 않습니다.
 

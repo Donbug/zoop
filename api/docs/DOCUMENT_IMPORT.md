@@ -49,7 +49,7 @@ env -i PATH=/usr/bin:/bin HOME="$HOME" \
 
 ### HTTP 관측 원천
 
-`ZOOP_DOCUMENT_IMPORT_OBSERVATION_SOURCE=http`와 `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED=true`를 함께 설정합니다. `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL`은 운영자가 확정한 서비스 주소이고, `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_TOKEN`은 `observation.read` scope가 있는 앱 수입 principal의 토큰입니다. 주소와 토큰 값은 저장소 예시에서 정하지 않습니다. 비-loopback 주소는 HTTPS만 허용하며 proxy·redirect·자동 재시도는 사용하지 않습니다.
+`ZOOP_DOCUMENT_IMPORT_OBSERVATION_SOURCE=http`와 `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED=true`를 함께 설정합니다. `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL`은 운영자가 확정한 서비스 주소이고, `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_TOKEN`은 `observation.read` scope가 있는 앱 수입 principal의 토큰입니다. 주소와 토큰 값은 저장소 예시에서 정하지 않습니다. 비-loopback 주소는 HTTPS만 허용합니다. 예외는 `ZOOP_AI_PLAINTEXT_HTTP_HOSTS`에 적은 host뿐이며(dev의 VPC 내부 Service Connect 이름 `ai`, 토큰이 평문으로 전송되므로 운영에는 넣지 않음, [AI 연동](AI_INTEGRATION.md#설정)), proxy·redirect·자동 재시도는 사용하지 않습니다.
 
 선택 설정은 `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_CONNECT_TIMEOUT`(기본 `3s`), `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_REQUEST_TIMEOUT`(`50s`), `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_MAX_RESPONSE_BYTES`(`16777216`)입니다. 요청은 관측마다 직렬로 보냅니다. 응답 파서는 native 선택 키 `language`도 검증하며 본문·저장 메타데이터는 바꾸지 않습니다.
 

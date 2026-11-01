@@ -45,7 +45,7 @@ class AiPlanAdmissionClientConfigurationTest {
                     assertInstanceOf(HttpPlanAdmissionClient.class, context.getBean(PlanAdmissionClient.class));
                     var properties = context.getBean(AiPlanAdmissionClientProperties.class);
                     assertEquals(16_000_000, properties.maxResponseBytes());
-                    assertEquals("/ai", properties.toSettings().baseUri().getPath());
+                    assertEquals("/ai", properties.toSettings(context.getBean(AiTransportProperties.class)).baseUri().getPath());
                     assertFalse(properties.toString().contains(TOKEN));
                     assertTrue(context.getBeansOfType(ExtractionClient.class).isEmpty());
                     assertTrue(context.getBeansOfType(RelationClient.class).isEmpty());
