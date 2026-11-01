@@ -512,6 +512,7 @@ describe('D-AI-01b · clarification', () => {
     outcome: 'clarification',
     result: result({
       outcome: 'clarification',
+      answerStatus: 'guidance',
       reason: '어느 기업인지 골라 주세요.',
       choices: [
         { id: 'c-opaque-1', label: '삼성전자', kind: 'company' },
@@ -539,7 +540,13 @@ describe('D-AI-01b · clarification', () => {
       );
     });
     const { user } = await open();
-    await screen.findByText('어느 기업인지 골라 주세요.');
+    const card = await screen.findByRole('article', {
+      name: '그 기업은 언제?',
+    });
+    expect(within(card).getByLabelText('답변 상태: 안내').textContent).toBe(
+      '안내',
+    );
+    await within(card).findByText('어느 기업인지 골라 주세요.');
     await user.click(screen.getByRole('button', { name: 'SK하이닉스' }));
     await screen.findByText('확인 질문 “그 기업은 언제?”에 대한 답');
     const body = server.calls('POST', JOBS)[0].body as Record<string, unknown>;
@@ -635,6 +642,9 @@ describe('D-AI-02 · job states and stored results', () => {
     const card = await screen.findByRole('article', {
       name: 'HBM이 뭐고 SK하이닉스 최근 HBM 뉴스는?',
     });
+    expect(
+      within(card).getByLabelText('답변 상태: 일부 답변').textContent,
+    ).toBe('일부 답변');
     expect(within(card).getByText('일반 개념 + 근거 확인됨')).toBeTruthy();
     expect(
       within(card).getByRole('region', { name: '일반 개념 구간' }),
@@ -989,6 +999,9 @@ describe('D-AI-02 · job states and stored results', () => {
     const card = await screen.findByRole('article', {
       name: '내 종목 중에 NVIDIA와 연결된 게 있어?',
     });
+    expect(
+      within(card).getByLabelText('답변 상태: 답변 완료').textContent,
+    ).toBe('답변 완료');
     const notices = within(card).getByRole('region', { name: '안내' });
     expect(notices.textContent).toContain('기본 조회 방식으로 답했어요');
     expect(notices.textContent).toContain('NVIDIA 최근 소식: 웹 검색을');
