@@ -311,9 +311,101 @@ zoop-ai-ingest run --state-dir STATE --sources registry.json --fixture-manifest 
 - **지원/미지원**: 지원은 명시된 `text/html`·`application/pdf` URL의 단발 수집뿐입니다(`text/plain` 등은 없음). 검색·RSS·DART/OpenDART 같은 API·인증·스케줄링·주기 갱신·시간 창 coverage 주장은 구현하지 않았으며 수집은 `coverageThrough`를 비웁니다. 실제 사이트에 대한 수집은 이 변경에서 실행하지 않았습니다.
 - **HTTPS 인증서 검증**은 끌 수 없고, 연결 IP가 아니라 원래 요청 호스트를 Host·SNI·인증서 이름으로 사용합니다. 공개 회귀 시험의 HTTP 루프백만으로 TLS의 신뢰 체인과 이름 검증까지 증명할 수 없으므로, TLS 변경 시 별도 신뢰된 로컬 테스트 CA/잘못된 이름/신뢰되지 않은 CA 검증이 필요합니다.
 
-**별도 비공개 뉴스 수집 경로(`zoop-ai-private-news`).** 이 경로는 위의 네이티브 수집과 달리 기사에 명시된 게시 메타데이터를 읽습니다. 날짜만 있으면 `day`, 시간대가 없으면 `unresolved`, 게시일이 없으면 `unknown`으로 보존하며 URL 날짜나 수정 시각으로 대신하지 않습니다. `±HH:MM`뿐 아니라 CNBC가 사용하는 `±HHMM` 오프셋도 해석하되 원래 표기와 정밀도를 유지합니다. Amazon 뉴스룸은 같은 기사의 `parsely-pub-date`를 먼저 읽고 OG 게시 시각과 schema `datePublished`를 대조합니다. 서로 모순되면 `article_date_conflict`로 거부하며, 날짜나 시간대를 추정해 채우지 않습니다.
+### 비공개 뉴스 단독 수집 (`zoop-ai-private-news`)
+
+운영자가 승인한 출처와 날짜 범위에서 링크를 발견하고 기사 원문을 비공개 상태 디렉터리에 보관합니다. 모든 기록은 `rights: "unconfirmed"`, `modelSend: false`, `publicUse: false`입니다. 공개 URL·robots 허용·수집 성공은 이용 권한의 증거가 아니며, 이 명령은 native grant나 ingestion 입력으로 자동 승격하지 않습니다.
+
+**설치와 상태 경로.** 저장소에서는 `make pipeline-install`로 설치한 `ai/pipeline/.venv/bin/zoop-ai-private-news`를 사용합니다. checkout 밖의 설치본은 위의 **설치된 패키지(wheel)의 소유권 설정**에 따라 `ZOOP_STATE_DIR`와 `ZOOP_AI_WORKER_STATE_DIR`를 모두 지정합니다. `stateDir`는 저장소·앱·S1 상태와 겹치지 않는 정규화된 절대 경로여야 하며, 부모 디렉터리는 미리 있어야 합니다. 전용 디렉터리는 `0700`, 파일은 `0600`으로 보관합니다.
+
+**새 계획에는 v2를 권장합니다.** 아래 JSON은 형식 설명용 합성 예시입니다. 날짜·경로·승인 참조·예산은 운영 기본값이 아닙니다. `127.0.0.1:8765`의 직접 작성한 시험 서버를 전제로 하며, 설정만으로 서버나 실제 수집 승인이 생기지 않습니다.
+
+```json
+{
+  "schemaVersion": "zoop-private-news-config-2",
+  "planId": "documentation-synthetic-news",
+  "stateDir": "/absolute/documentation-example/private-news",
+  "fromDay": "2026-07-25",
+  "throughDay": "2026-07-27",
+  "operatorApprovalRef": "documentation-example-authored-loopback-only",
+  "sources": [
+    {"name": "hankyung-daily", "sourceType": "editorial",
+     "reliability": "synthetic-not-real-news", "queries": []}
+  ],
+  "exactArticleHosts": ["127.0.0.1"],
+  "selectionMode": "fresh-first",
+  "companyAliases": ["SyntheticCo"],
+  "syntheticBaseUrl": "http://127.0.0.1:8765",
+  "policy": {
+    "schemaVersion": "zoop-collection-policy-1",
+    "userAgent": "ZoopDocumentationExample/1.0",
+    "timeoutSeconds": 10,
+    "maxTotalSeconds": 120,
+    "maxRedirects": 2,
+    "maxRequests": 30,
+    "maxResponseBytes": 100000,
+    "maxTotalBytes": 1000000,
+    "minIntervalSeconds": 2,
+    "allowedMediaTypes": ["text/html"],
+    "syntheticLoopback": true
+  }
+}
+```
+
+실제 공개 출처에는 별도 승인을 받은 설정을 작성합니다. `syntheticLoopback`은 false, `syntheticBaseUrl`은 생략하고 `exactArticleHosts`에 정확한 소문자 호스트를 지정합니다. 공개 출처의 요청 간격은 최소 2초이며 robots의 더 긴 지연도 적용합니다. 기간은 양 끝을 포함해 최대 366일이고 기사 형식은 `text/html`입니다. 출처 분류·신뢰도는 운영자의 선언이며 `companyAliases`는 제목·본문의 문자열 일치 집계입니다.
+
+v2는 `maxRequests`·`maxTotalBytes`·`maxTotalSeconds`를 필수 유한 자원 예산으로 사용합니다. v1(`zoop-private-news-config-1`)도 기존 건수 상한 방식의 새 계획 생성·`run`·`resume`을 계속 지원합니다. v1의 `maxListingPages`·`maxCandidates`·`maxDocuments`·`maxArticleAttempts`·`perDayCap`은 v2에 수치로 넣으면 거부합니다. 이미 고정된 계획은 해당 버전의 원래 설정으로 조회·재개하며, 기존 `PLAN.json`을 v2로 고쳐 쓰지 않습니다.
+
+**명령과 출력.** 아래 `PRIVATE_NEWS_CONFIG`는 운영자가 검토한 설정 파일의 절대 경로를 담는 셸 변수입니다. 설치된 console script의 디렉터리를 `PATH`에 둡니다. `run`·`resume`은 허용된 네트워크 요청을 실행할 수 있으므로 승인된 실행에서만 사용합니다.
+
+```sh
+zoop-ai-private-news sources
+zoop-ai-private-news run --config "$PRIVATE_NEWS_CONFIG"
+zoop-ai-private-news resume --config "$PRIVATE_NEWS_CONFIG"
+zoop-ai-private-news status --config "$PRIVATE_NEWS_CONFIG"
+zoop-ai-private-news records --config "$PRIVATE_NEWS_CONFIG"
+```
+
+| 명령 | stdout과 종료 코드 |
+|---|---|
+| `sources` | 설정 없이 출처 목록 JSON(`zoop-private-news-sources-1`)을 출력하고 0으로 종료합니다. 호스트·발견 경로·지원/차단 상태를 보여 주며 실시간 접근 검사는 하지 않습니다. |
+| `run` | 새 계획을 고정하고 수집한 뒤 요약 JSON(`zoop-private-news-summary-1`)을 출력합니다. `state: "completed"`만 0, `partial`은 2입니다. |
+| `resume` | 같은 설정·상태에서 복구와 남은 작업을 진행합니다. 출력·종료 규칙은 `run`과 같습니다. |
+| `status` | HTTP 요청 없이 저장된 계획과 상태를 검사하고 같은 요약을 출력합니다. 조회에 성공해도 `partial`이면 2입니다. |
+| `records` | HTTP 요청 없이 현재 계획의 `retained` 기록마다 JSON 한 줄을 출력합니다. 필드는 `sourceId`, `stateDir`, `recordPath`, `recordSha256`, `privateId`, `planId`이며 정상 종료는 0입니다. 이전 계획에서 상속한 기록은 원래 계획에서 조회합니다. |
+
+처리 중 거부는 stdout에 `{"state":"refused","error":{"code":"…"}}`와 종료 코드 2로 반환합니다. 입력·상태의 일반 오류 코드는 `private_input_or_state_invalid`입니다. CLI 인자 오류는 argparse의 stderr 안내와 종료 코드 2로 구분합니다. `records`는 스트리밍하므로 일부 줄 뒤에 오류가 날 수 있습니다. 소비자는 마지막 종료 코드까지 확인해야 합니다. 정상 출력에는 기사 제목·본문·인용문이 없지만 `records`의 로컬 경로도 비공개 정보로 취급합니다.
+
+**복구와 예산.** 네트워크 요청 전에 `PLAN.json`을 고정하며 설정·파서·엔진 결합이 달라지면 `private_plan_conflict`로 거부합니다. `STATE.json`과 v2의 `QUEUE.sqlite3`가 진행 상태를 보관하고, 원문·준비된 텍스트와 hash는 `private-news-*` 기록에 남습니다. 시도 이력이 생긴 계획에 다시 `run`을 호출하면 `private_explicit_resume_required`이므로 `resume`을 사용합니다.
+
+재개해도 요청 수·수신 바이트·최초 시작 이후 경과 시간은 초기화되지 않습니다. robots와 리다이렉트도 요청 예산에 포함합니다. 전송 결과가 불명확하면 unknown과 보수적인 바이트 상한을 남기고 다시 보내지 않습니다. 이미 확정된 기록은 로컬에서 복구하고, 거부된 요청은 자동 재시도하지 않습니다. provider 결과가 불명확하면 `provider_unknown_no_retry`로 중단합니다.
+
+요약의 `coverage`(`all`/`some`/`unknown`)는 **설정된 발견 구간과 발견된 후보에만** 해당합니다. `sourceStates`, `pendingPartitions`, `pendingCandidates`, `stopCode`, unknown 집계를 함께 확인합니다. `retainedInWindow`는 현재 계획의 보관 건수이고 상속분은 `inheritedRetainedInWindow`로 따로 셉니다. `exactTextDuplicateGroups`는 정확히 같은 텍스트의 묶음일 뿐 같은 사건이나 독립 출처 수가 아닙니다. 바이트 예산은 HTTP 응답 본문 기준이며 `artifactBytes`는 측정한 파일 크기 합계이지 디스크 사용량 상한이 아닙니다.
+
+**출처별 발견 범위.** 전체 목록과 현재 지원 상태는 `sources`에서 확인합니다. `configured-not-live-verified`는 실제 접근 성공을 뜻하지 않습니다.
+
+| 출처 | 발견 범위와 한계 |
+|---|---|
+| `hankyung-daily` | 요청한 날짜별 사이트맵을 읽습니다. |
+| `etnews-ai` | AI 카테고리(`id=2958`)에서 관측한 연속 다음 페이지 링크만 따릅니다. 목록 날짜로 탐색을 중단하지 않으며 다음 링크가 없다는 사실도 전체 기간의 완전성을 증명하지 않습니다. |
+| `fnnews-sitemaps` | 연도별 index가 실제로 광고한 월별 partition만 읽습니다. `queries`가 비어 있으면 기간에 해당하는 월을 선택하고, 지정한 partition이 광고되지 않았으면 거부합니다. |
+| `nvidia-newsroom`, `amd-newsroom`, `apple-newsroom` | 고정된 사이트맵·RSS를 읽습니다. rolling feed는 과거 전체를 보장하지 않습니다. |
+| `naver-press` | 기간에 해당하는 월별 보도자료 목록을 읽습니다. 기업 보도자료와 편집 기사의 분류를 구분합니다. |
+| descriptor 기반 출처 | 계획에 고정된 RSS·Atom·사이트맵·목록 경로와 기사 호스트/경로만 사용합니다. PDF 본문이 필요한 출처는 별도 native PDF intake 대상으로 표시됩니다. |
+| `gdelt-doc` | 날짜·query별 링크 발견용이며 목록의 현재 상태는 `blocked-provider-429`입니다. 자동 재시도나 다른 identity로 우회하지 않습니다. |
+
+발견 시각·목록 날짜·사이트맵 `lastmod`·feed `updated`·URL 날짜는 기사 게시일을 대신하지 않습니다. 보관 여부는 기사 자체의 게시 근거가 기간 안에 있는지로 판단하며, `unknown`·`unresolved` 또는 발견된 게시일과 충돌하는 기사는 거부합니다. canonical URL은 관측값으로 보관할 뿐 그 주소를 추가로 요청하지 않습니다.
+
+이 경로는 위의 네이티브 수집과 달리 기사에 명시된 게시 메타데이터를 읽습니다. 날짜만 있으면 `day`, 시간대가 없으면 `unresolved`, 게시일이 없으면 `unknown`으로 보존하며 URL 날짜나 수정 시각으로 대신하지 않습니다. `±HH:MM`뿐 아니라 CNBC가 사용하는 `±HHMM` 오프셋도 해석하되 원래 표기와 정밀도를 유지합니다. Amazon 뉴스룸은 같은 기사의 `parsely-pub-date`를 먼저 읽고 OG 게시 시각과 schema `datePublished`를 대조합니다. 서로 모순되면 `article_date_conflict`로 거부하며, 날짜나 시간대를 추정해 채우지 않습니다.
 
 비공개 뉴스 정책의 선택 항목 `maxDiscoveryResponseBytes`는 발견 목록 응답에만 적용되며, `1`부터 기존 파서 한도인 `10,000,000` bytes까지 지정할 수 있습니다. `maxTotalBytes`보다 클 수 없고, 생략하거나 `null`이면 기존 `maxResponseBytes`를 그대로 쓰며 저장 정책에도 새 키를 넣지 않습니다. 큰 사이트맵이 필요한 **새 계획**에서만 명시하고, 고정된 과거 계획은 수정하지 않습니다. 기사와 robots 응답 한도, 누적 바이트·요청·시간 예산, 호스트·경로·robots 검사는 그대로 유지합니다. 한도를 넘긴 마지막 수신 chunk도 실제 사용량에 포함하며, 목록 한도를 높인 사실을 전체 출처 수집 완료나 수집 권한으로 간주하지 않습니다.
+
+**선택적 fallback과 새 계획으로의 이어받기.** 단독 v2 CLI는 다음 입력을 명시한 경우에만 확장 경로를 사용합니다.
+
+- `fallback`: 공개 단일 출처, 동일한 정확한 기사 호스트, 승인 참조, hash로 고정한 예산 설정·set proof, 유한 `maxCalls`가 필요합니다. 실행 환경의 set ID·별도 provider 자격과 기존 금전 원장도 검증합니다. native 응답을 먼저 사용하고 허용된 공개 페이지에서만 로컬 추출·DeepSeek fetch 경로로 넘어갑니다. 인증·robots·정책 차단이나 401/410/429를 우회하는 권한이 아닙니다. 결과의 비공개·권리 미확인 상태는 유지됩니다.
+- `predecessor`: 요청·바이트·시간·set 작업 예산으로 멈추고 pending 작업이 남은 v2 계획을, 새 `planId`와 별도 `stateDir`로 이어받습니다. 이전 `PLAN.json`·`STATE.json`·`QUEUE.sqlite3`의 SHA-256과 동일 수집 범위를 검증하며 진행 중 요청·attempt나 SQLite sidecar가 있으면 거부합니다. pending만 작업 대상으로 옮기고 완료·거부·unknown 및 호스트 차단은 상속해 보존합니다. 새 자원 예산은 새 계획에 명시하며 과거 원장과 금전 예약을 초기화하는 수단으로 쓰지 않습니다.
+- `knownUnsent`: 일반 재시도가 아니라, 과거 Actor 검증에서 `fallback_admission_mismatch`로 거부된 특정 후보의 proof-bound 이어받기입니다. 고정된 증거가 해당 URL의 provider 시도·예약이 없었음을 증명해야 하며 다른 set의 예약도 확인합니다. 기존 native 관측을 재사용하므로 해당 기사 GET을 반복하지 않습니다.
+
+`continuationEligible`은 요약상의 후보 표시이며 실제 이어받기 시 핀·범위를 다시 검증합니다. provider 비용 집계는 관측한 receipt만 반영하므로 미확정 예약을 포함한 금전 원장과 대조해야 합니다. 별도 [수집 컨테이너 계약](../../docs/development/collector-container.md)은 고정 상태 경로와 checkpoint를 사용하며 `fallback`·`predecessor`·`knownUnsent`를 `config_unsupported`(종료 2)로 거부합니다. 단독 CLI의 지원 범위를 컨테이너 지원 범위로 해석하지 않습니다.
 
 **Versioned collection cutover (`scripts/collection_revision.py`).** `prepare` accepts the original `<day>/collection` or a drained, pinned predecessor under `<day>/collection-revisions/<id>`. Every revision must lead back to the same original collection; the new manifest preserves each ancestor's PLAN/LEDGER/INDEX pins, the same funding configuration and unresolved reservations, and the original `<day>/collection/fetch-pacing` directory. `check` validates new child configurations offline. `run` still requires explicit operator approval, a successful matching check, no shared admission stop, and time before the original admission cutoff. It does not extend the window, reset funding, promote the consumer index, or resume previously attempted plans.
 
