@@ -77,6 +77,8 @@ manifest의 정확한 최상위 모양은 `{"schemaVersion":"zoop-operating-inpu
 
 공개 read·store·quote-display 권한은 incoming과 모든 snapshot 관측에 필요하며 기존 job 재등록과 최종 응답 직전에도 확인합니다. 최초 import는 receipt의 acquisition grant ID/revision을 현재 grant와 대조하므로 바뀐 경우 `collection_receipt_invalid`를 그대로 처리해야 합니다. 현재 읽기 권한이 유효해도 이미 동결된 job의 이전 grant binding이 향후 전송을 허용한다는 뜻은 아닙니다. 등록에는 model-send·키·live-send gate가 필요하지 않으며 실제 전송 승인은 기존 정확한 purpose/recipient 검사와 별도로 받아야 합니다. 등록은 기존 metered funding을 사용하므로 누적 USD 상한이 필요한 작업에는 이 모드를 그대로 적용할 수 없습니다.
 
+등록 결과의 원래 set ID를 `run --set-id`로 선택해 따로 실행한 뒤, 운영자가 그 set의 S3/S2 핀과 canonical·decisions·bindings 파일을 담은 manifest로 기존 `zoop-ai-handoff freeze`와 `export`를 호출합니다. 완료 여부는 원래 unit과 영속 `complete` 상태, 선택한 모든 S3 job의 `ready`·현재 delivery를 함께 확인해야 합니다. 완료된 set은 다음 `run` 응답에서 빠지므로 빈 `sets`만으로 판단하면 안 됩니다. handoff는 명시한 source 집합을 검증하며 수집 배치 전체와의 일치는 운영자가 책임집니다. 한 manifest에는 S3 source를 최대 20개까지 넣을 수 있으므로 21–50개를 모두 전달할 때는 원래 집합을 중복과 누락 없이 나눈 여러 manifest가 필요합니다. export 결과는 앱 import와 공개 활성화 전의 `publication: not-published`입니다.
+
 
 ### 명령과 환경
 
@@ -115,7 +117,11 @@ raw receipt와 비용 정산은 같은 운영 원장 transaction에 저장합니
 
 직접 runtime을 쓰는 승인된 owner는 `ZOOP_AI_PIPELINE_LIVE_PROFILE=operating-metered-v1`, `ZOOP_AI_PIPELINE_OPERATING_POLICY`(policy만 담긴 JSON 파일), `ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR`, `ZOOP_AI_PIPELINE_OPERATING_SET`, `ZOOP_AI_PIPELINE_OPERATING_OWNER`와 기존 모델 설정을 전달합니다. owner token은 `Budget.owner()`가 발급하며 같은 프로세스의 소유권과 등록된 set binding을 검증합니다. 일반 운영자는 이 내부 token을 만들지 않고 위 CLI를 사용합니다.
 
-합성 loopback 검증은 `python scripts/operating_smoke.py`로 실행합니다. `--faults`는 실제 CLI의 유지보수 pause/resume, 제어 writer와 예약의 경합·대기 초과 후 동일 attempt 재개, drain 중 usage 오류, 검증 기술 오류, 등록 거절·수정 및 미등록 frontier를 검사합니다. `--shared-handoff`는 두 배치의 서로 다른 native 입력·job을 공유 출력에 쓴 뒤 기존 `handoff.current(strict=True)`가 모든 선택된 S3/S2 upstream을 함께 읽는지 확인합니다. 이 검사는 source 소비 경로의 증명이며 공개 게시 승인과는 구분합니다. `--long-job`은 두 요청을 각각 151초 지연시켜 job이 300초를 넘어도 완료하는지 확인합니다. 배포에는 artifact digest, 단일 실행 대상, 영속 경로, 실제 lifecycle, 계정·quota·secret 참조와 stop-before-start 절차가 필요합니다.
+합성 검증은 `python scripts/operating_smoke.py`로 실행합니다. `--faults`는 실제 CLI의 유지보수 pause/resume, 제어 writer와 예약의 경합·대기 초과 후 동일 attempt 재개, drain 중 usage 오류, 검증 기술 오류, 등록 거절·수정 및 미등록 frontier를 검사합니다. `--long-job`은 loopback 요청 두 건을 각각 151초 지연시켜 job이 300초를 넘어도 완료하는지 확인합니다.
+
+`--shared-handoff`는 직접 작성한 서로 다른 합성 문서 두 건을 실제 `register-collection` CLI로 등록하고, 원래 set ID를 선택해 한 건씩 실행한 뒤 실제 handoff CLI로 동결·export합니다. 실행 transport는 `httpx.MockTransport`이며 소켓·하위 프로세스 접근을 차단합니다. `window`·`coverageThrough`의 null, 날짜 정밀도, 영속 완료 상태, 원래 S2/S3 membership, 금전 receipt 이후 중단 시 같은 attempt 복구를 확인합니다. 명시적으로 작성한 canonical·공개 결정·문서 binding으로 이슈 2개와 `INVOLVES` 2개가 나오는지, 원래 관측·정확한 인용 해시·manifest/bundle/content digest가 맞는지 검사합니다. 같은 등록·실행·동결 요청의 재사용은 추가 호출 없이 처리되고, 같은 handoff ID의 핀 변경은 충돌하며 quote-display 권한 회수 후 export는 본문을 보류해야 합니다. 이 증명은 운영자가 지정한 유한 집합의 handoff까지이며, 실제 수집·클라우드 실행·앱 공개는 별도 검증 대상입니다.
+
+배포에는 artifact digest, 단일 실행 대상, 영속 경로, 실제 lifecycle, 계정·quota·secret 참조와 stop-before-start 절차가 필요합니다.
 
 | 명령 | 모듈 | wire schema | 상태 파일 |
 | --- | --- | --- | --- |

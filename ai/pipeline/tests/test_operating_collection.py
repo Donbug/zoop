@@ -13,75 +13,14 @@ from subprocess import Popen
 import pytest
 
 from scripts.collection_smoke import CollectionKit, NEWS
-from scripts.extraction_smoke import CATALOGUE, Kit, LIVE_PROMPT
+from scripts.extraction_smoke import Kit
 from scripts.ingestion_smoke import PIPELINE, json_bytes, ownership_env, sha
-from scripts.operating_smoke import policy
+from scripts.operating_smoke import authored_collection, policy
 from zoop_ai_pipeline import extraction, extraction_replay, ingestion, live_budget, operating, operating_collection
-from zoop_ai_pipeline.collection_contracts import declared_published
 from zoop_ai_pipeline.extraction_contracts import ExtractionFailure
 from zoop_ai_pipeline.ingestion_contracts import Authority, Export, IngestionFailure, digest
 from zoop_ai_pipeline.live_budget import Budget
 from zoop_ai_pipeline.live_funding import STAGES
-
-
-STAMP = "2026-10-14T09:00:00+00:00"
-
-
-def authored_collection(kit, name="batch", *, bodies=(NEWS, NEWS, NEWS), source_id="synthetic-source"):
-    """Write synthetic receipt/body bytes directly; this fixture performs no acquisition."""
-    base = kit.inputs / "collections" / name
-    (base / "bodies").mkdir(parents=True)
-    (base / "receipts").mkdir()
-    source = next(source for source in kit.registry["sources"] if source["sourceId"] == source_id)
-    grant = source["grant"]
-    items, targets, documents = [], [], {}
-    published = [None, "2026-10-14", "2026-10-14T09:30:00"]
-    for index, body in enumerate(bodies):
-        candidate, url = f"c-{index}", f"http://127.0.0.1/news/{index}"
-        body_hash = sha(body)
-        (base / "bodies" / f"{body_hash}.bin").write_bytes(body)
-        receipt = {"schemaVersion": "zoop-collection-receipt-1", "collectionId": name, "sourceId": source_id,
-            "scopeId": "body", "candidateId": candidate, "grantId": grant["grantId"], "grantRevision": grant["revision"],
-            "requestedUrl": url, "finalUrl": url, "redirects": [], "httpStatus": 200, "contentType": "text/html",
-            "mediaType": "text/html", "contentLength": str(len(body)), "etag": None, "lastModified": None, "serverDate": None,
-            "bodySha256": body_hash, "bodyBytes": len(body), "fetchedAt": STAMP, "userAgent": "AuthoredSynthetic/1.0",
-            "network": "synthetic_loopback", "robots": [], "requestCount": 1}
-        receipt_raw = json_bytes(receipt)
-        receipt_hash = sha(receipt_raw)
-        (base / "receipts" / f"{receipt_hash}.json").write_bytes(receipt_raw)
-        acquired = {"provenance": "collected_http", "collectionId": name,
-            "receipt": {"file": f"collections/{name}/receipts/{receipt_hash}.json", "sha256": receipt_hash},
-            "fetchedAt": STAMP, "finalUrl": url, "httpStatus": 200, "contentType": "text/html", "bodySha256": body_hash,
-            "documentKind": "news", "network": "synthetic_loopback", "published": declared_published(published[index % 3]).wire()}
-        items.append({"candidateId": candidate, "supplierDocumentId": f"{name}-{index}", "url": url,
-            "bodyRef": body_hash, "mediaType": "text/html", "title": "Authored synthetic article", "publishedAt": None,
-            "modifiedAt": None, "sourceRevision": None, "publisher": "Authored Synthetic Publisher", "collection": acquired})
-        targets.append({"candidateId": candidate, "url": url, "outcome": "collected", "code": None,
-                        "bodySha256": body_hash, "receiptSha256": receipt_hash})
-        documents[body_hash] = {"file": f"collections/{name}/bodies/{body_hash}.bin", "sha256": body_hash}
-    page_raw = json_bytes({"items": items, "more": False, "nextCursor": None})
-    (base / "page-0.json").write_bytes(page_raw)
-    manifest = {"schemaVersion": "zoop-ingestion-s2-1", "sourceId": source_id, "scopeId": "body",
-        "pages": [{"pageId": f"collection-{name}", "cursor": None,
-            "response": {"file": f"collections/{name}/page-0.json", "sha256": sha(page_raw)},
-            "status": "ok", "nextCursor": None, "terminal": True, "coverageThrough": None}], "documents": documents}
-    manifest_raw = json_bytes(manifest)
-    (base / "manifest.json").write_bytes(manifest_raw)
-    result = {"schemaVersion": "zoop-collection-1", "collectionId": name, "requestDigest": digest(["authored", name]),
-        "sourceId": source_id, "scopeId": "body", "provenance": "collected_http", "state": "complete",
-        "startedAt": STAMP, "completedAt": STAMP, "grant": {"grantId": grant["grantId"], "revision": grant["revision"]},
-        "manifest": {"file": f"collections/{name}/manifest.json", "sha256": sha(manifest_raw)}, "targets": targets,
-        "usage": {"requests": len(items), "bytes": sum(map(len, bodies)), "targets": len(items), "collected": len(items)}}
-    raw = json_bytes(result)
-    (base / "collection.json").write_bytes(raw)
-    return {"schemaVersion": operating_collection.REQUEST, "sources": str(kit.registry_path),
-        "ingestionStateDirectory": str(kit.root / "ingestion"), "sourceId": source_id, "scopeId": "body",
-        "collection": {"file": f"collections/{name}/collection.json", "sha256": sha(raw)}, "roundId": name,
-        "checkpointRevision": 0, "provenance": {"sourceKind": "synthetic", "executionMode": "live", "recordingKind": "provider"},
-        "promptVersion": LIVE_PROMPT, "catalogue": deepcopy(CATALOGUE), "snapshot": {"revision": "empty-history", "events": []},
-        "topic": None, "sets": [{"candidateId": f"c-{index}", "setId": f"{name}-set-{index}",
-            "extractionJobId": f"{name}-s2-{index}", "relationJobId": f"{name}-s3-{index}",
-            "stageAllowances": {stage: 10 for stage in STAGES}} for index in range(len(items))]}
 
 
 @pytest.fixture
