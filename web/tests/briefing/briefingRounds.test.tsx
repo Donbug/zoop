@@ -312,7 +312,7 @@ describe('D-BRF-01/02 available edition selection', () => {
     expect(currentQuery().get('date')).toBe('2026-10-21');
     expect(currentQuery().get('reading')).toBe('compact');
     expect(currentQuery().get('view')).toBe('personal');
-    await screen.findByRole('heading', { name: '퇴근 브리핑' });
+    await screen.findByRole('link', { name: '로그인 후 개인화 브리핑 설정' });
     expect(
       (
         screen.getByRole('button', {

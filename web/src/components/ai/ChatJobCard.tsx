@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import SavedResultFeedback from '@/components/common/SavedResultFeedback';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import { LoadingSpinner } from '@/components/common/LoadingIndicator';
 import { PHASES } from '@/components/ai/chat-phases';
@@ -105,6 +106,16 @@ export default function ChatJobCard(props: Props) {
       </p>
       <div className="mt-3">
         <JobState {...props} />
+        {job.status === 'completed' &&
+          job.result?.outcome === 'answered' &&
+          job.feedbackVersion && (
+            <SavedResultFeedback
+              feature="chatbot_answer"
+              targetId={job.result.messageId}
+              targetVersion={job.feedbackVersion}
+              subject="이 AI 답변"
+            />
+          )}
       </div>
     </article>
   );

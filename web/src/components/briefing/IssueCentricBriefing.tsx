@@ -6,6 +6,7 @@ import { validEditionReview } from '@/util/editionReview';
 import type {
   BriefingDocumentSentiment,
   BriefingItem,
+  BriefingItemDetail,
   BriefingResponse,
 } from '@/types/briefing';
 import {
@@ -441,6 +442,7 @@ function IssueCard({
   comparisonState,
   result,
   renderExtra,
+  selectionDetails,
   corrections,
 }: {
   corrections: Correction[];
@@ -450,6 +452,7 @@ function IssueCard({
   compact: boolean;
   result: BriefingResponse;
   renderExtra?: (item: BriefingItem) => ReactNode;
+  selectionDetails?: Record<string, BriefingItemDetail>;
 }) {
   const [open, setOpen] = useState(false);
   const item = group.members[0].item;
@@ -626,18 +629,24 @@ function IssueCard({
                         result={result}
                         comparisonState={comparisonState}
                       />
-                      <details>
+                      <details hidden={Boolean(selectionDetails)}>
                         <summary
                           className={`min-h-11 cursor-pointer content-center text-caption ${FOCUS_RING}`}
                         >
                           기업별 독립 검증·추가 근거
                         </summary>
-                        <BriefingS3Impacts round={result} item={member.item} />
+                        {!selectionDetails && (
+                          <BriefingS3Impacts
+                            round={result}
+                            item={member.item}
+                          />
+                        )}
                       </details>
                       <BriefingItemDetails
                         roundId={result.id}
                         graphVersion={result.graphVersion}
                         item={member.item}
+                        initialDetail={selectionDetails?.[member.item.eventId]}
                         evidenceOnly
                       />
                       {renderExtra?.(member.item)}
@@ -647,22 +656,25 @@ function IssueCard({
               </details>
             ) : (
               <>
-                <details>
+                <details hidden={Boolean(selectionDetails)}>
                   <summary
                     className={`min-h-11 cursor-pointer content-center text-body font-semibold ${FOCUS_RING}`}
                   >
                     기업별 독립 검증·추가 근거
                   </summary>
-                  <BriefingS3Impacts
-                    key={`${result.id}:${item.eventId}:${result.graphVersion}`}
-                    round={result}
-                    item={item}
-                  />
+                  {!selectionDetails && (
+                    <BriefingS3Impacts
+                      key={`${result.id}:${item.eventId}:${result.graphVersion}`}
+                      round={result}
+                      item={item}
+                    />
+                  )}
                 </details>
                 <BriefingItemDetails
                   roundId={result.id}
                   graphVersion={result.graphVersion}
                   item={displayedItem}
+                  initialDetail={selectionDetails?.[item.eventId]}
                   evidenceOnly
                 />
                 <details>
@@ -720,6 +732,7 @@ export default function IssueCentricBriefing({
   result,
   items = result.items,
   renderExtra,
+  selectionDetails,
   compact = true,
   issueCorrections,
   beforeIssues,
@@ -731,6 +744,7 @@ export default function IssueCentricBriefing({
   issueCorrections?: Map<string, Correction[]>;
   compact?: boolean;
   renderExtra?: (item: BriefingItem) => ReactNode;
+  selectionDetails?: Record<string, BriefingItemDetail>;
 }) {
   const [history, setHistory] = useState<{
     key: string;
@@ -792,7 +806,8 @@ export default function IssueCentricBriefing({
       {result.items.length === 0 &&
         result.emptyReason === 'no_issues_in_window' &&
         !result.issueIntelligence &&
-        !result.continuity && (
+        !result.continuity &&
+        !selectionDetails && (
           <BriefingRecap
             key={`${result.id}:${result.graphVersion}:${result.dataAsOf}`}
             round={result}
@@ -825,7 +840,7 @@ export default function IssueCentricBriefing({
           <h3 className={SECTION_TITLE}>
             {beforeIssues ? '공통 핵심 이슈' : '핵심 이슈'}
           </h3>
-          {!result.issueIntelligence && (
+          {!result.issueIntelligence && !selectionDetails && (
             <Link
               to={`/?round=${encodeURIComponent(result.id)}`}
               className={`text-caption underline ${FOCUS_RING}`}
@@ -855,6 +870,7 @@ export default function IssueCentricBriefing({
                 compact={compact}
                 result={result}
                 renderExtra={renderExtra}
+                selectionDetails={selectionDetails}
                 corrections={group.members.flatMap(
                   (m) => issueCorrections?.get(m.item.eventId) ?? [],
                 )}
@@ -863,8 +879,9 @@ export default function IssueCentricBriefing({
           </ol>
         ) : (
           <p className={EMPTY}>
-            이 회차에 새로 선정된 핵심 이슈가 없습니다. 복기·수집 상태는 위
-            안내를 확인하세요.
+            {selectionDetails
+              ? '선택한 종목에서 현재 제공 가능한 적격 핵심 이슈가 없습니다. 이전 확인사항은 아래에서 볼 수 있어요.'
+              : '이 회차에 새로 선정된 핵심 이슈가 없습니다. 복기·수집 상태는 위 안내를 확인하세요.'}
           </p>
         )}
       </section>

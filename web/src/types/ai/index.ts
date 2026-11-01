@@ -207,6 +207,7 @@ export type ChatFailure = {
 };
 
 export type ChatJob = {
+  feedbackVersion?: string | null;
   id: string;
   sessionId: string;
   seq: number;

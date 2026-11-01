@@ -29,12 +29,14 @@ import com.zoop.chat.orchestrator.ChatPlanner;
 import com.zoop.chat.orchestrator.ChatQueryType;
 import com.zoop.chat.orchestrator.ChatRouteDecision;
 import com.zoop.chat.orchestrator.ChatSemanticVerdicts;
+import com.zoop.chat.orchestrator.OrchestratedChatEngine;
 import com.zoop.chat.service.ChatCompanyProfiles;
 import com.zoop.chat.service.ChatZoopDocs;
 import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolPath;
 import com.zoop.chat.tool.ChatToolResult;
+import com.zoop.chat.tool.ChatWebResult;
 import com.zoop.common.json.StrictJson;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -297,6 +299,19 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
                 branchEvidence.addAll(result.evidenceIds());
             }
             Set<String> sent = new HashSet<>();
+            // A web hit is quoted as the search returned it, under its provider's grant; it has no evidence record to read.
+            for (ChatToolResult result : branch.results()) {
+                for (ChatWebResult hit : result.webResults()) {
+                    if (evidence.size() >= MAX_QUOTES
+                            || !quoted.contains(hit.id()) && quoted.size() >= Math.min(MAX_QUOTES, context.maxCitations())) {
+                        break;
+                    }
+                    quote(OrchestratedChatEngine.webCitation(hit)).ifPresent(quote -> {
+                        quoted.add(hit.id());
+                        evidence.add(quote);
+                    });
+                }
+            }
             for (String id : branchEvidence) {
                 if (evidence.size() >= MAX_QUOTES) break;
                 if (!quoted.contains(id) && quoted.size() >= Math.min(MAX_QUOTES, context.maxCitations())) continue;

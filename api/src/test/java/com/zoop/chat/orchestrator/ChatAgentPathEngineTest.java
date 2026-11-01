@@ -63,6 +63,8 @@ class ChatAgentPathEngineTest {
     /** The engine's clock; the router moves it on by {@link #routerTakes}, as a router call spends time. */
     private Instant now = NOW;
     private Duration routerTakes = Duration.ZERO;
+    /** How far the direct company read moves the engine's clock. */
+    private Duration readTakes = Duration.ZERO;
     private final Clock clock = new Clock() {
         @Override public ZoneOffset getZone() { return ZoneOffset.UTC; }
         @Override public Clock withZone(java.time.ZoneId zone) { return this; }
@@ -382,6 +384,75 @@ class ChatAgentPathEngineTest {
         assertEquals(List.of("web_result"), result.citations().stream().map(Citation::sourceKind).toList());
     }
 
+    /** A plan the agent cannot read: its dependent reads stay direct, so the web comes after them. */
+    private static final Map<ChatQueryType, Double> Q03 = Map.of(ChatQueryType.Q03, 0.9);
+
+    @Test
+    void anUnmetDirectReadGetsASearchOnlyRunWhoseHitsTheGeneratorWrites() {
+        // D-AI-02: exposed without company.read, the plan reads direct; its empty read opens the search-only run.
+        decision = ChatPlannerTest.decision(req("r1", Q03, Map.of("company.read", 0.9), List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.WEB_SEARCH));
+        agent.answer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
+        agent.results = List.of(webResult());
+        directAnswer = new ChatGeneratedAnswer(List.of(new Section("web_reported", "SK하이닉스가 증설한다고 보도됐어요.",
+                List.of("r1"), List.of(HIT))), List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+
+        assertEquals(List.of(List.of(ChatCapability.WEB_SEARCH)), agent.allowed);
+        var asked = agent.requirements.getFirst().getFirst();
+        assertTrue(asked.readByServer(), "the server's own read left it unmet");
+        assertEquals(List.of(), asked.targets(), "no resolved target leaves with the search");
+        assertEquals("web_reported", outcome.result().answerBasis());
+        assertEquals("searched", outcome.routeSummary().path("webAfterReads").asString());
+        assertEquals("direct", outcome.routeSummary().path("path").asString());
+        assertEquals(1, generated.size(), "the generator writes; the agent's answer is dropped");
+    }
+
+    @Test
+    void aRecordOnlyQuestionNeverSearchesOnAnEmptyReadUnlessItAsksForAnOutsideSource() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9, ChatQueryType.Q05, 0.9),
+                Map.of("company.read", 0.9), List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.WEB_SEARCH));
+        directAnswer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
+
+        engine(agent).answer(run(), new Control(Duration.ofSeconds(60)));
+
+        assertEquals(1, generated.size(), "the read ran and was answered");
+        assertEquals(List.of(), agent.requirements, "the web does not stand in for ZOOP's own record");
+    }
+
+    @Test
+    void aFaultOfTheSearchOnlyRunIsANoticeAndTheAnswerGoesOn() {
+        decision = ChatPlannerTest.decision(req("r1", Q03, Map.of("company.read", 0.9), List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.WEB_SEARCH));
+        agent.failure = new ChatModels.Failure(ChatModels.Failure.Fate.UNKNOWN, "step lost");
+        verdicts = new ChatSemanticVerdicts(List.of());
+        directAnswer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+
+        assertEquals("failed", outcome.routeSummary().path("webAfterReads").asString());
+    }
+
+    @Test
+    void noTimeForTheSearchSkipsItBeforeAnyModelCall() {
+        decision = ChatPlannerTest.decision(req("r1", Q03, Map.of("company.read", 0.9), List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.WEB_SEARCH));
+        directAnswer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
+        readTakes = Duration.ofSeconds(8);
+        verdicts = new ChatSemanticVerdicts(List.of());
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+
+        assertEquals(List.of(), agent.requirements);
+        assertEquals("no_time", outcome.routeSummary().path("webAfterReads").asString());
+    }
+
     @Test
     void aRelationOnlyTheWebReportsGetsNoMapTargetOrAction() {
         // D-AI-02: the web reports a relation; only reads of the map may point at the map.
@@ -589,6 +660,7 @@ class ChatAgentPathEngineTest {
         ChatTool company = new ChatTool() {
             public ChatCapability capability() { return ChatCapability.COMPANY_READ; }
             public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
+                now = now.plus(readTakes);
                 if (directEvidence.isEmpty()) return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
                 return new ChatToolOutput(scope.graphVersionId(), List.of(new ChatToolItem(HYNIX, "company", "기업",
                         List.of(HYNIX), directEvidence)), directEvidence, false, false);
