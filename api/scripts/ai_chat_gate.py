@@ -4,7 +4,7 @@
 Authors the exact stage inputs the Java adapters (`com.zoop.chat.model.ChatModelStages`) must build for a fixed synthetic
 scenario, and an authored replay answer for each, keyed by the worker's own request identity. A Java input that differs in
 any field has no replay entry and is refused (`replay_input_mismatch`), so the gate proves the two sides agree on the
-`zoop-ai-chat-4` inputs and answers, not only on the envelope. Before any process starts, the fixture is replayed in-process
+`zoop-ai-chat-5` inputs and answers, not only on the envelope. Before any process starts, the fixture is replayed in-process
 through the worker runtime so an authoring mistake fails here and not as a Java mismatch.
 
 Then starts one real `ai/service` (127.0.0.1, fresh temp state, replay only, live gate closed: a supported Jev model name so
@@ -44,7 +44,7 @@ from support import PGREP, ServiceProcess, Workspace, remove_tree, terminate_run
 API = ROOT / "api"
 RESULTS = API / "build" / "test-results" / "aiChatContractTest"
 GRADLE_TIMEOUT_SECONDS = 900
-SCHEMA = "zoop-ai-chat-4"
+SCHEMA = "zoop-ai-chat-5"
 # Not a secret: the one Jev model the worker supports. Set so a live request passes the stage configuration and is refused
 # by the closed live gate itself; live enable, budget and provider keys stay unset.
 LIVE_JEV_MODEL = "jev-1.14.0"
@@ -99,16 +99,18 @@ VERIFICATION_INPUT = {
     "requestBinding": {"invocationId": "chat-verify-gate.1.verify", "graphVersionId": "gv-synthetic",
                        "asOf": "2026-10-21T00:00:00Z"},
     "sections": [{"sectionId": "s0", "requirementIds": ["r1"], "serverFacts": [],
-                  "basis": "evidence_grounded", "text": EVIDENCE_TEXT, "evidenceIds": [EVIDENCE]},
+                  "basis": "evidence_grounded", "claims": [{"claimId": "s0c0", "text": EVIDENCE_TEXT}],
+                  "evidenceIds": [EVIDENCE]},
                  {"sectionId": "s1", "requirementIds": ["r2"], "serverFacts": [],
-                  "basis": "general_knowledge", "text": GENERAL_TEXT, "evidenceIds": []}],
+                  "basis": "general_knowledge", "claims": [{"claimId": "s1c0", "text": GENERAL_TEXT}],
+                  "evidenceIds": []}],
     "citations": [QUOTE],
 }
 FACT_VERIFICATION_INPUT = {
     "requestBinding": {"invocationId": "chat-facts-gate.1.verify", "graphVersionId": "gv-synthetic",
                        "asOf": "2026-10-21T00:00:00Z"},
     "sections": [{"sectionId": "s0", "requirementIds": ["r1"], "basis": "evidence_grounded",
-                  "text": "보유 종목 삼성전자와 관심 종목 NVIDIA의 조회된 지도 변경입니다.",
+                  "claims": [{"claimId": "s0c0", "text": "보유 종목 삼성전자와 관심 종목 NVIDIA의 조회된 지도 변경입니다."}],
                   "evidenceIds": [EVIDENCE], "serverFacts": [
         {"kind": "portfolio_scope", "requirementId": "r1", "timing": "current_request_read",
          "queryScope": "current_member", "companyIds": [], "companyLimit": 5, "truncated": True,
@@ -198,10 +200,13 @@ def author_replay() -> dict[str, Any]:
     supported = {"type": "choice", "choice": "supported", "confidence": 0.93,
                  "probabilities": {"supported": 0.97, "contradicted": 0.015, "insufficient": 0.015}}
     entry("chat-verification", VERIFICATION_INPUT, {"model": "authored-synthetic-chat-verification",
-                                                    "answers": {"s0-support": supported, "s0-advice": _noul(0.02),
+                                                    "answers": {"s0c0-support": supported, "s0c0-causality": _noul(0.02),
+                                                                "s0-advice": _noul(0.02), "s1c0-causality": _noul(0.02),
                                                                 "s1-advice": _noul(0.02)}})
     entry("chat-verification", FACT_VERIFICATION_INPUT, {"model": "authored-synthetic-chat-verification",
-                                                        "answers": {"s0-support": supported, "s0-advice": _noul(0.02)}})
+                                                        "answers": {"s0c0-support": supported,
+                                                                    "s0c0-causality": _noul(0.02),
+                                                                    "s0-advice": _noul(0.02)}})
     return {"schemaVersion": SCHEMA, "recordingKind": "authored-test", "responses": entries}
 
 
@@ -350,7 +355,9 @@ def check_native_http(root: Path, command: Path) -> None:
 
         response = send(body)
         assert response.status_code == 200, response.text
-        assert response.json()["answer"]["sections"] == [{"support": "supported", "prohibitedAdvice": "no"}]
+        assert response.json()["answer"]["sections"] == [{
+            "claims": [{"claimId": "s0c0", "support": "supported", "unsupportedCausality": "no"}],
+            "prohibitedAdvice": "no"}]
         assert len(provider.requests) == 1
         observed = provider.requests[0]
         assert observed["path"] == "/v1/systemone"
@@ -358,7 +365,7 @@ def check_native_http(root: Path, command: Path) -> None:
         assert state_sent["requestBinding"] == FACT_VERIFICATION_INPUT["requestBinding"]
         assert state_sent["sections"][0]["serverFacts"] == FACT_VERIFICATION_INPUT["sections"][0]["serverFacts"]
         assert state_sent["sections"][0]["citedQuotes"] == [{"quote": QUOTE["quote"]}]
-        assert set(observed["body"]["questions"]) == {"s0-support", "s0-advice"}
+        assert set(observed["body"]["questions"]) == {"s0c0-support", "s0c0-causality", "s0-advice"}
 
         for change in (
                 lambda v: v.update(invocationId="foreign-job.1.verify"),
@@ -377,7 +384,9 @@ def check_native_http(root: Path, command: Path) -> None:
         absent["input"]["citations"] = []
         response = send(absent)
         assert response.status_code == 200, response.text
-        assert response.json()["answer"]["sections"] == [{"support": "hold", "prohibitedAdvice": "no"}]
+        assert response.json()["answer"]["sections"] == [{
+            "claims": [{"claimId": "s0c0", "support": "hold", "unsupportedCausality": "no"}],
+            "prohibitedAdvice": "no"}]
         assert len(provider.requests) == 2
         assert provider.requests[1]["body"]["state"]["sections"][0]["serverFacts"] == []
         print("chat-native-loopback: context=bound, forgeryRejections=5, absentContext=hold, localProviderCalls=2, externalCalls=0")

@@ -53,7 +53,7 @@
 | 데이터 기반 | 기업·문서·evidence·공개 그래프 버전과 현재 권리 재검사 경로가 있고 `company.read`·`issue.read`·`evidence.resolve`·`graph.path.read`·`graph.version.diff`·`portfolio.scope.read`·`briefing.read`·`briefing.evidence`·`selectionRule.read`·`zoopPolicy.read`·`document.search`와 합성 공급자 `web.search`가 연결됨(`company.read`는 기업 카탈로그 개요를 `company_profile` 인용으로, `zoopPolicy.read`는 승인 약관을 `zoop_doc` 인용으로 전달) | Q01은 정책 문서만, Q02~Q08 도구 구현. Q01 도움말·화면 명세, 실제 웹 공급자와 종단 공개 시험은 추가 필요 |
 | 와이어프레임 | 네 정적 화면은 질문·되묻기·회수·조회 오류의 시각 기준을 제공하지만 동작 상태를 증명하지 않음 | 별도 상태 계약으로 로딩·오류·근거 수준·복구를 고정함 |
 
-결론적으로 백엔드의 저장·공개 API·작업 실행기·라우터·오케스트레이터·도구 레지스트리·Luna 생성·Jev 검증과 웹 D-AI-01~02b 연결은 구현돼 있다. Luna Responses MCP agent 경로도 기본 꺼진 상태로 구현돼 있다. 다만 claim 단위 `unsupportedCausality`, 미연결 도구, live spike, 평가 보정과 출시 증명은 남아 있다. 기능 플래그와 live gate는 기본적으로 꺼져 있으므로 “코드가 있음”은 “출시됨”이나 “실제 모델 호출 승인됨”을 뜻하지 않는다.
+결론적으로 백엔드의 저장·공개 API·작업 실행기·라우터·오케스트레이터·도구 레지스트리·Luna 생성·claim 단위 Jev 검증과 웹 D-AI-01~02b 연결은 구현돼 있다. Luna Responses MCP agent 경로도 기본 꺼진 상태로 구현돼 있다. 다만 미연결 도구, live spike, 평가 보정과 출시 증명은 남아 있다. 기능 플래그와 live gate는 기본적으로 꺼져 있으므로 “코드가 있음”은 “출시됨”이나 “실제 모델 호출 승인됨”을 뜻하지 않는다.
 
 ### 구현된 도구 결정 기록 (현재 코드 기준)
 
@@ -102,7 +102,7 @@ flowchart LR
 | 2 오케스트레이터 | 부분 구현 | direct 경로 45초(단계 한도 실측 후). 서버 requirement coverage는 구현(2026-10-31, `route_summary.coverage`) |
 | 3 router·Luna agent | 부분 구현 | Jev router·Luna Responses MCP·Java 승인 루프는 구현(합성 replay로만 확인). 라우터 wire `dependsOn`도 구현(2026-10-30, `zoop-ai-chat-3`, 확신이 낮거나 요구가 대상을 지목하면 의존 없음). 승인 요청의 요구 매핑도 구현(2026-10-30, `zoop-ai-chat-4`). live 확인 |
 | 4 읽기 도구 | 부분 구현 | Q03(`document.search`는 기업별 문서 읽기, 2026-10-31. 본문 검색 색인은 없음), Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`·`briefing.evidence`, 2026-10-31), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 공급자) 구현, Q01 도움말·화면 명세 미연결, 실제 웹 공급자 미정 |
-| 5 생성·출력 검증 | 부분 구현 | 구간 단위 생성·검증과 입력 24k·답변 2k는 구현, claim 단위 검증 미구현 |
+| 5 생성·출력 검증 | 구현(합성 회귀) | 서버 claim 분할과 claim별 support·`unsupportedCausality`, 입력 24k·답변 2k 구현. 실제 모델 보정은 단계 7 |
 | 6 웹 | 구현 | 관계·근거·내 종목 `uiActions[]`, OpenAPI 타입 생성 seam, 실제 백엔드와의 종단 확인 |
 | 7 평가·출시 | 부분 구현 | 고정 평가 세트 v1(대본 실행)만 있음. 실제 모델·데이터 평가와 임계값 보정, 보안·종단·배포 증명 |
 
@@ -168,12 +168,14 @@ Q07의 `portfolio.scope.read`는 Java server-only precondition으로 실행하�
 
 ### 단계 5 — 답변 생성·부분 결과·검증
 
-1. Luna Responses 출력은 requirement별 section·claim·citation·limitation·uiAction 후보를 typed schema로 반환한다.
+1. Luna Responses 출력은 requirement별 section·citation 후보를 typed schema로 반환하고, 서버가 각 section의 문장을 순서가 고정된 claim으로 나눈다.
 2. 서버가 schema, requirement coverage, citation 접근성, 수치·인과·금지 표현, 웹/내부 근거 분리를 결정론적으로 검사한다.
-3. 별도 Jev semantic-verification은 근거 claim의 supported/hold/contradicted와 일반 구간 prohibitedAdvice를 검사한다.
+3. 별도 Jev semantic-verification은 근거 claim의 supported/hold/contradicted, 모든 claim의 unsupportedCausality와 구간별 prohibitedAdvice를 검사한다.
 4. 검증된 요구가 일부면 `answered + answerStatus=partial`, 전부면 complete, 답할 것이 없으면 기존 guidance/insufficient_evidence를 사용한다.
 5. 웹 장애는 `notices.web_unavailable`로 남기고 외부 확인이 필요한 미충족 요구만 limitation으로 둔다.
 6. 검증 실패·권한 거부·저장 실패는 기존 ChatFailure를 유지한다. 미검증 사실을 “항상 답변” 원칙으로 공개하지 않는다.
+
+현재 상태(2026-11-01, `zoop-ai-chat-5`): Java가 검사를 통과한 section을 최대 20개 claim으로 결정론적으로 나누고, Jev는 일반 지식이 아닌 claim별 `supported|contradicted|hold`와 모든 claim의 `unsupportedCausality=no|yes|hold`, section별 `prohibitedAdvice`를 반환한다. 지원되지 않거나 인과가 확인되지 않은 claim만 제외하고 같은 section의 안전한 claim은 유지한다. 안전한 claim이 하나도 없을 때만 그 section의 요구를 근거 부족으로 돌리며, 투자 조언이 확정되면 기존처럼 답변 전체를 거부한다. 실제 Jev 품질·임계값은 아직 live 평가로 보정하지 않았다.
 
 ### 단계 6 — 공개 계약·웹 UI
 

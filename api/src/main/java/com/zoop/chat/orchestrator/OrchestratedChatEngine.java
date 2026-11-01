@@ -29,6 +29,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -363,12 +364,13 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         ChatModels.ServerFacts facts = ChatModels.ServerFacts.capture(run, passed.sections(), branches);
         ChatSemanticVerdicts verdicts = model(control, limits.verify(), limits.server(),
                 () -> verifier.verify(run, passed.sections(), allCited, facts));
-        Set<String> held = held(passed.sections(), verdicts);
-        if (held == null) return validationFailed();
+        Verified verified = verified(passed.sections(), verdicts);
+        if (verified == null) return validationFailed();
+        Set<String> held = verified.heldRequirements();
         route.putArray("heldRequirements").addAll(strings(held));
+        route.putArray("droppedClaims").addAll(strings(verified.droppedClaims()));
 
-        List<ChatGeneratedAnswer.Section> kept = passed.sections().stream()
-                .filter(s -> s.requirementIds().stream().noneMatch(held::contains)).toList();
+        List<ChatGeneratedAnswer.Section> kept = verified.sections();
         Set<String> insufficient = new LinkedHashSet<>(passed.insufficient());
         passed.sections().stream().filter(s -> !kept.contains(s)).forEach(s -> insufficient.addAll(s.requirementIds()));
         // A requirement still answered by a kept section of its own is answered; a joining section goes with any held part.
@@ -511,27 +513,56 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                         && !selected.containsAll(p.targets()));
     }
 
+    private record Verified(List<ChatGeneratedAnswer.Section> sections, Set<String> heldRequirements,
+            List<String> droppedClaims) { }
+
     /**
-     * The requirements the verdicts hold back, or null when a section is contradicted or gives prohibited advice. A verdict
-     * list that does not match the sections is a malformed answer.
+     * Keeps only claims that are supported (where support applies) and have no unsupported causal assertion. A held,
+     * contradicted or causally unsupported claim is omitted without discarding its section's safe claims. A section with no
+     * safe claim holds back all of its requirements. Definite prohibited advice still invalidates the whole generated answer.
      */
-    private static Set<String> held(List<ChatGeneratedAnswer.Section> sections, ChatSemanticVerdicts verdicts) {
+    private static Verified verified(List<ChatGeneratedAnswer.Section> sections, ChatSemanticVerdicts verdicts) {
         if (verdicts.sections().size() != sections.size()) throw malformedVerdicts();
+        List<ChatGeneratedAnswer.Section> keptSections = new ArrayList<>();
         Set<String> held = new LinkedHashSet<>();
+        List<String> dropped = new ArrayList<>();
         for (int i = 0; i < sections.size(); i++) {
             var section = sections.get(i);
             var verdict = verdicts.sections().get(i);
             boolean general = "general_knowledge".equals(section.basis());
+            List<ChatClaims.Claim> claims = ChatClaims.split(i, section.text());
+            boolean scriptedSectionVerdict = verdict.claims().size() == 1 && verdict.claims().getFirst().claimId() == null;
             if (!ADVICE.contains(verdict.prohibitedAdvice())
-                    || (general ? verdict.support() != null : !SUPPORT.contains(verdict.support()))) {
+                    || (!scriptedSectionVerdict && verdict.claims().size() != claims.size())) {
                 throw malformedVerdicts();
             }
-            if ("yes".equals(verdict.prohibitedAdvice()) || "contradicted".equals(verdict.support())) return null;
-            if ("hold".equals(verdict.prohibitedAdvice()) || "hold".equals(verdict.support())) {
+            if ("yes".equals(verdict.prohibitedAdvice())) return null;
+            List<ChatClaims.Claim> kept = new ArrayList<>();
+            for (int claimIndex = 0; claimIndex < claims.size(); claimIndex++) {
+                ChatClaims.Claim claim = claims.get(claimIndex);
+                ChatSemanticVerdicts.ClaimVerdict decision = scriptedSectionVerdict
+                        ? verdict.claims().getFirst() : verdict.claims().get(claimIndex);
+                if ((!scriptedSectionVerdict && !claim.id().equals(decision.claimId()))
+                        || !ADVICE.contains(decision.unsupportedCausality())
+                        || (general ? decision.support() != null : !SUPPORT.contains(decision.support()))) {
+                    throw malformedVerdicts();
+                }
+                boolean safe = "no".equals(verdict.prohibitedAdvice())
+                        && (general || "supported".equals(decision.support()))
+                        && "no".equals(decision.unsupportedCausality());
+                if (safe) kept.add(claim);
+                else dropped.add(claim.id());
+            }
+            if (kept.isEmpty()) {
                 held.addAll(section.requirementIds());
+            } else {
+                keptSections.add(new ChatGeneratedAnswer.Section(section.basis(),
+                        String.join(" ", kept.stream().map(ChatClaims.Claim::text).toList()), section.requirementIds(),
+                        section.evidenceIds()));
             }
         }
-        return held;
+        return new Verified(List.copyOf(keptSections), Collections.unmodifiableSet(new LinkedHashSet<>(held)),
+                List.copyOf(dropped));
     }
 
     private static ChatModels.Failure malformedVerdicts() {

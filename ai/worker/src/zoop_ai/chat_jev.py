@@ -7,22 +7,23 @@ threshold feed `identity()`, so a change re-versions the stage instead of silent
 Router: per requirement, one Noul per Q type, one per bound capability and one for prohibited advice. Probabilities are returned
 as reported; the application applies its own thresholds (0.70 take, 0.35 review, advice > 0.10) and allowlist.
 
-Verification: per section, a support Choice for evidence sections (`supported` / `contradicted` / `insufficient`) and a
-prohibited-advice Noul for every section. The policy reuses the PROVISIONAL S1 numbers (Choice >= 0.90 and confidence >= 0.80,
-Noul >= 0.90 / <= 0.10); anything uncertain is `hold`. They are not calibrated against chatbot data.
+Verification: per claim, a support Choice for grounded sections (`supported` / `contradicted` / `insufficient`) and an
+unsupported-causality Noul, plus a prohibited-advice Noul for every section. The policy reuses the PROVISIONAL S1 numbers
+(Choice >= 0.90 and confidence >= 0.80, Noul >= 0.90 / <= 0.10); anything uncertain is `hold`. They are not calibrated
+against chatbot data.
 """
 from __future__ import annotations
 
 from typing import Any
 
 from . import native_jev
-from .chat_contracts import (RoutedRequirement, RouterAnswer, RouterDependency, RouterInput, SectionVerdict,
+from .chat_contracts import (ClaimVerdict, RoutedRequirement, RouterAnswer, RouterDependency, RouterInput, SectionVerdict,
                              VerificationAnswer, VerificationInput)
 from .contracts import digest
 
 API = "systemone"
 MODEL = native_jev.MODEL
-ADAPTER_REVISION = "zoop-jev-chat-3"
+ADAPTER_REVISION = "zoop-jev-chat-4"
 QUERY_TYPES = ("Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08")
 
 ROUTER_TASK = ("You classify one requirement of a member's question to ZOOP, a service that maps how listed companies and "
@@ -80,8 +81,8 @@ VERIFY_TASK = ("You independently verify sections of a machine-generated answer.
                "or outside knowledge supplies a selection reason that is not recorded. A web_reported section rests on "
                "its cited web snippets only: they show what that page reported, not a fact ZOOP verified; a claim beyond "
                "the snippet, or stated as confirmed, is not supported.")
-SUPPORT_QUESTION = ("Do the citedQuotes and applicable serverFacts of `sections.{index}` support every factual claim in its "
-                    "text about the same company, membership category, direction, numbers, scope and period? Distinguish "
+SUPPORT_QUESTION = ("Do the citedQuotes and applicable serverFacts of `sections.{section}.claims.{claim}` support this factual "
+                    "claim about the same company, membership category, direction, numbers, scope and period? Distinguish "
                     "server canonical observations from article assertions; neither fills gaps in the other's domain.")
 SUPPORT_CRITERIA = {
     "supported": "Every factual claim is stated by or directly implied by the applicable quotes or explicit server facts, "
@@ -94,6 +95,9 @@ SUPPORT_CRITERIA = {
 SECTION_ADVICE_QUESTION = ("Does the `text` of `sections.{index}` give investment advice: recommend buying, selling or holding a "
                            "security, state a price target, forecast a future price, return or index level, or promise a "
                            "profit?")
+CAUSALITY_QUESTION = ("Does `sections.{section}.claims.{claim}` assert or imply a causal relationship that is not explicitly "
+                      "stated by its citedQuotes or applicable serverFacts? Sequence, correlation, a graph connection, a "
+                      "publication decision or a briefing rank alone never establishes causality.")
 
 
 def _type_key(index: int, query_type: str) -> str:
@@ -196,18 +200,22 @@ def _router_choice(answer: Any, expected: set[str]) -> str | None:
 
 def build_verification_request(payload: VerificationInput, model: str) -> dict[str, Any]:
     quotes = {c.evidence_id: c for c in payload.citations}
-    sections = [{"sectionId": s.section_id, "requirementIds": s.requirement_ids, "basis": s.basis, "text": s.text,
+    sections = [{"sectionId": s.section_id, "requirementIds": s.requirement_ids, "basis": s.basis,
+                 "claims": [claim.wire() for claim in s.claims],
                  "citedQuotes": [{"quote": quotes[e].quote} for e in s.evidence_ids],
                  "serverFacts": [f.wire() for f in s.server_facts]}
                 for s in payload.sections]
     questions: dict[str, Any] = {}
     for index, section in enumerate(payload.sections):
         # Canonical observations supplement, never replace or bypass, quote and advice verification.
-        if section.basis != "general_knowledge":
-            questions[f"s{index}-support"] = {"type": "choice",
-                                              "instructions": {"task": VERIFY_TASK,
-                                                               "question": SUPPORT_QUESTION.format(index=index)},
-                                              "criteria": dict(SUPPORT_CRITERIA)}
+        for claim_index, _claim in enumerate(section.claims):
+            if section.basis != "general_knowledge":
+                questions[f"s{index}c{claim_index}-support"] = {
+                    "type": "choice", "instructions": {"task": VERIFY_TASK,
+                    "question": SUPPORT_QUESTION.format(section=index, claim=claim_index)},
+                    "criteria": dict(SUPPORT_CRITERIA)}
+            questions[f"s{index}c{claim_index}-causality"] = _noul_question(
+                VERIFY_TASK, CAUSALITY_QUESTION.format(section=index, claim=claim_index))
         questions[f"s{index}-advice"] = _noul_question(VERIFY_TASK, SECTION_ADVICE_QUESTION.format(index=index))
     return {"model": model, "state": {"requestBinding": payload.request_binding.wire(), "sections": sections},
             "questions": questions}
@@ -219,16 +227,22 @@ def interpret_verification(raw: Any, payload: VerificationInput, model: str) -> 
         raise ValueError("native_answers_invalid")
     verdicts = []
     for index, section in enumerate(payload.sections):
-        support = None
-        if section.basis != "general_knowledge":
-            choice, probabilities, confidence = native_jev._choice(answers[f"s{index}-support"])
-            accepted = (choice != "insufficient" and probabilities[choice] >= native_jev.CHOICE_PROBABILITY
-                        and confidence >= native_jev.CHOICE_CONFIDENCE
-                        and (choice != "supported" or bool(section.evidence_ids or section.server_facts)))
-            support = choice if accepted else "hold"
+        claims = []
+        for claim_index, claim in enumerate(section.claims):
+            support = None
+            if section.basis != "general_knowledge":
+                choice, probabilities, confidence = native_jev._choice(answers[f"s{index}c{claim_index}-support"])
+                accepted = (choice != "insufficient" and probabilities[choice] >= native_jev.CHOICE_PROBABILITY
+                            and confidence >= native_jev.CHOICE_CONFIDENCE
+                            and (choice != "supported" or bool(section.evidence_ids or section.server_facts)))
+                support = choice if accepted else "hold"
+            causality = _noul(answers[f"s{index}c{claim_index}-causality"])
+            claims.append(ClaimVerdict(
+                claim_id=claim.claim_id, support=support,
+                unsupported_causality="yes" if causality >= native_jev.NOUL_TRUE else
+                "no" if causality <= native_jev.NOUL_FALSE else "hold"))
         advice = _noul(answers[f"s{index}-advice"])
-        verdicts.append(SectionVerdict(
-            support=support,
+        verdicts.append(SectionVerdict(claims=claims,
             prohibited_advice="yes" if advice >= native_jev.NOUL_TRUE else "no" if advice <= native_jev.NOUL_FALSE else "hold"))
     return VerificationAnswer(sections=verdicts)
 
@@ -250,9 +264,10 @@ _ROUTER_SAMPLE = RouterInput(turns=[{"text": "q"}], requirements=[{"requirementI
 _VERIFY_SAMPLE = VerificationInput(
     requestBinding={"invocationId": "sample.1.verify", "graphVersionId": None, "asOf": None},
     sections=[{"sectionId": "s0", "requirementIds": ["r1"], "serverFacts": [],
-               "basis": "evidence_grounded", "text": "t", "evidenceIds": ["ev-" + "0" * 64]},
+               "basis": "evidence_grounded", "claims": [{"claimId": "s0c0", "text": "t"}],
+               "evidenceIds": ["ev-" + "0" * 64]},
               {"sectionId": "s1", "requirementIds": ["r2"], "serverFacts": [],
-               "basis": "general_knowledge", "text": "g", "evidenceIds": []}],
+               "basis": "general_knowledge", "claims": [{"claimId": "s1c0", "text": "g"}], "evidenceIds": []}],
     citations=[{"evidenceId": "ev-" + "0" * 64, "sourceId": "s", "quote": "q"}])
 
 

@@ -371,21 +371,30 @@ class ChatModelStagesTest {
     @Test
     void theVerifierReadsOneVerdictPerSection() {
         answer = call -> succeeded(call, """
-                {"sections":[{"support":null,"prohibitedAdvice":"no"},{"support":"supported","prohibitedAdvice":"hold"}]}""");
+                {"sections":[
+                  {"claims":[{"claimId":"s0c0","support":null,"unsupportedCausality":"no"}],"prohibitedAdvice":"no"},
+                  {"claims":[{"claimId":"s1c0","support":"supported","unsupportedCausality":"no"}],"prohibitedAdvice":"hold"}]}""");
         var sections = List.of(new ChatGeneratedAnswer.Section("general_knowledge", "PER은…", List.of("r1"), List.of()),
                 new ChatGeneratedAnswer.Section("evidence_grounded", "공급합니다.", List.of("r2"), List.of(EV_A)));
         ChatRun run = run(root("q"));
         ChatSemanticVerdicts verdicts = stages.verify(run, sections, List.of(citation(EV_A, "인용")),
                 ChatModels.ServerFacts.withoutTools(run, sections));
-        assertEquals(new ChatSemanticVerdicts.Verdict(null, "no"), verdicts.sections().get(0));
-        assertEquals(new ChatSemanticVerdicts.Verdict("supported", "hold"), verdicts.sections().get(1));
+        assertEquals(new ChatSemanticVerdicts.Verdict("no", List.of(
+                new ChatSemanticVerdicts.ClaimVerdict("s0c0", null, "no"))), verdicts.sections().get(0));
+        assertEquals(new ChatSemanticVerdicts.Verdict("hold", List.of(
+                new ChatSemanticVerdicts.ClaimVerdict("s1c0", "supported", "no"))), verdicts.sections().get(1));
+        JsonNode sentSections = calls.getFirst().input().get("sections");
+        assertEquals("s0c0", sentSections.get(0).get("claims").get(0).get("claimId").stringValue());
+        assertEquals("PER은…", sentSections.get(0).get("claims").get(0).get("text").stringValue());
+        assertEquals("s1c0", sentSections.get(1).get("claims").get(0).get("claimId").stringValue());
         assertEquals("news-provider-1", calls.getFirst().input().get("citations").get(0).get("sourceId").stringValue());
     }
 
     @Test
     void aWebHitIsSentUnderItsProvidersGrant() {
         answer = call -> succeeded(call, """
-                {"sections":[{"support":"supported","prohibitedAdvice":"no"}]}""");
+                {"sections":[{"claims":[{"claimId":"s0c0","support":"supported","unsupportedCausality":"no"}],
+                  "prohibitedAdvice":"no"}]}""");
         String hit = "web-" + "c".repeat(32);
         var web = new Citation("web_result", hit, "[합성 자료] HBM은 D램을 쌓은 메모리다.", null, null, "synthetic", null, 0, 20,
                 "[합성] HBM이란", "news.example.com", null, "https://news.example.com/hbm");
@@ -402,7 +411,8 @@ class ChatModelStagesTest {
     @Test
     void aZoopDocumentQuoteIsSentUnderTheZoopDocumentGrant() {
         answer = call -> succeeded(call, """
-                {"sections":[{"support":"supported","prohibitedAdvice":"no"}]}""");
+                {"sections":[{"claims":[{"claimId":"s0c0","support":"supported","unsupportedCausality":"no"}],
+                  "prohibitedAdvice":"no"}]}""");
         var doc = new Citation("zoop_doc", EV_B, "## 2. 보유 기간\n\n탈퇴하면 지웁니다.", null, null, "policy.privacy",
                 "2026-10-13.1", 10, 30, "개인정보 처리방침 · 2. 보유 기간", null, null, null);
         ChatRun run = run(root("q"));

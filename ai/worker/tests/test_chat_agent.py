@@ -41,7 +41,7 @@ def continuation(*decisions: tuple[str, bool], previous: str = "resp_1") -> dict
 
 
 def request(payload: dict[str, Any], *, mode: str = "live", invocation: str = "job-1:a1:agent-1") -> StageRequest:
-    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-4", "invocationId": invocation, "stage": "chat-agent",
+    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-5", "invocationId": invocation, "stage": "chat-agent",
                                         "mode": mode, "input": payload})
 
 
@@ -312,7 +312,7 @@ def test_the_agent_configuration_pins_luna_at_medium():
 def test_an_authored_replay_step_matches_its_input_whatever_the_token(tmp_path):
     config = stage_config("chat-agent", "replay")
     fixture = tmp_path / "replay.json"
-    fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-4", "recordingKind": "authored-test", "responses": [
+    fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-5", "recordingKind": "authored-test", "responses": [
         {"stage": "chat-agent", "inputDigest": request_identity(request(agent_input(mcp={**agent_input()["mcp"], "recipient": "authored-replay"}),
                                                 mode="replay"), config),
          "response": {**approval_response(("mcpr_1", "company_read", {"targets": ["KRX:000660"]})),
@@ -338,7 +338,7 @@ def test_a_step_for_another_recipient_than_the_stages_own_is_never_sent(tmp_path
         result = run(request(payload), tmp_path, endpoint)
     else:
         fixture = tmp_path / "replay.json"
-        fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-4", "recordingKind": "authored-test",
+        fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-5", "recordingKind": "authored-test",
                                        "responses": []}), encoding="utf-8")
         result = invoke(request(payload, mode="replay"), state_dir=tmp_path, registry=None, sender=ReplaySender(fixture))
     assert result.status == "failed" and result.failure.code == "mcp_recipient_mismatch"
