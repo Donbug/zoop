@@ -45,6 +45,7 @@ class ChatAgentPathEngineTest {
     private static final Instant NOW = Instant.parse("2026-10-21T03:00:00Z");
     private static final String HYNIX = "KRX:000660";
     private static final String NVDA = "NASDAQ:NVDA";
+    private static final String AMD = "NASDAQ:AMD";
     private static final String EV_HYNIX = "ev-krx-000660";
     private static final String EV_NVDA = "ev-nasdaq-nvda";
 
@@ -57,6 +58,8 @@ class ChatAgentPathEngineTest {
     private ChatGeneratedAnswer directAnswer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
     /** Evidence the direct company read returns for {@link #HYNIX}; none by default. */
     private List<String> directEvidence = List.of();
+    /** Companies returned by the direct member-scope read for Q07. */
+    private List<String> scopeCompanies = List.of();
     private ChatSemanticVerdicts verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
     private int verifierCalls;
     private List<Citation> verifiedCitations = List.of();
@@ -412,6 +415,44 @@ class ChatAgentPathEngineTest {
     }
 
     @Test
+    void aDirectReadThatMissesTheWrittenPeriodOrFieldGetsBackgroundSearch() {
+        decision = ChatPlannerTest.decision(new ChatRouteDecision.Requirement("r1", "지난달 SK하이닉스 매출", true,
+                Q03, Map.of("company.read", 0.9), List.of(HYNIX), 0, null));
+        directEvidence = List.of(EV_HYNIX);
+        var agent = new Agent(Set.of(ChatCapability.WEB_SEARCH));
+        agent.answer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
+        directAnswer = new ChatGeneratedAnswer(List.of(grounded("내부 기업 자료입니다.", EV_HYNIX)), List.of(), List.of());
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+
+        assertEquals(1, agent.requirements.size(), "an item count alone does not close the web gate");
+        assertTrue(agent.requirements.getFirst().getFirst().readByServer());
+        assertEquals("searched", outcome.routeSummary().path("webAfterReads").asString());
+    }
+
+    @Test
+    void q07AsksWhichTwoCompaniesToSearchWhenMoreThanTwoNeedTheWeb() {
+        scopeCompanies = List.of(HYNIX, NVDA, AMD);
+        decision = ChatPlannerTest.decision(new ChatRouteDecision.Requirement("r1",
+                "내 종목의 최근 소식을 외부 기사로 확인해줘", true,
+                Map.of(ChatQueryType.Q07, 0.9, ChatQueryType.Q03, 0.8), Map.of("company.read", 0.9), List.of(), 0, null));
+        var agent = new Agent(Set.of(ChatCapability.WEB_SEARCH));
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = outcome.result();
+
+        assertEquals("clarification", result.outcome());
+        assertEquals(ChatResults.reason("web_company_selection"), result.reason());
+        assertEquals(List.of("SK하이닉스 · NVIDIA", "SK하이닉스 · AMD", "NVIDIA · AMD"),
+                result.choices().stream().map(c -> c.label()).toList());
+        assertTrue(result.choices().stream().allMatch(c -> "scope".equals(c.kind())));
+        assertTrue(agent.requirements.isEmpty(), "no search starts before the member selects a pair");
+        assertTrue(generated.isEmpty(), "final generation also waits for the selection");
+    }
+
+    @Test
     void aRecordOnlyQuestionNeverSearchesOnAnEmptyReadUnlessItAsksForAnOutsideSource() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9, ChatQueryType.Q05, 0.9),
                 Map.of("company.read", 0.9), List.of(HYNIX)));
@@ -684,7 +725,15 @@ class ChatAgentPathEngineTest {
                 return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
             }
         };
-        var registry = new ChatToolRegistry(List.of(company, issue, policy, documents));
+        ChatTool scope = new ChatTool() {
+            public ChatCapability capability() { return ChatCapability.PORTFOLIO_SCOPE_READ; }
+            public ChatToolOutput read(ChatToolScope requestScope, ChatToolRequest request) {
+                List<ChatToolItem> items = scopeCompanies.stream().map(id -> new ChatToolItem(id, "company",
+                        Map.of(HYNIX, "SK하이닉스", NVDA, "NVIDIA", AMD, "AMD").get(id), List.of(id), List.of())).toList();
+                return new ChatToolOutput("member-scope", items, List.of(), false, false);
+            }
+        };
+        var registry = new ChatToolRegistry(List.of(company, issue, policy, documents, scope));
         var runner = new ChatToolRunner(registry);
         runners.add(runner);
         ChatModels.Router router = (run, bound) -> {
