@@ -39,8 +39,10 @@ import tools.jackson.databind.json.JsonMapper;
  * <li>A web search (web search design 1 and 2) names a query, not ids, so reachability does not apply. It is approved when
  * the web is open for every requirement it names. A requirement the web may not serve (a service rule, Q01) never opens it. A
  * general requirement (Q02) has one search from the first round: the web is a concept's first support. Any other requirement
- * has it from a round after an approved internal read serving it came back empty or cut: the web is the last resort of what
- * ZOOP's own data left unmet, never the first look, and another requirement's gap opens nothing. Its query must pass
+ * has it from a round after an approved internal read serving it came back empty or cut, or after any such read when its own
+ * words ask for a source outside ZOOP: the web is the last resort of what ZOOP's own data left unmet, never the first look,
+ * and another requirement's gap opens nothing. A read cut by the send grant is no gap: no search stands in for what was
+ * refused. Its query must pass
  * {@link com.zoop.chat.tool.ChatWebQueryPolicy} and it takes the job's and the day's web budgets when it is reserved; a spent
  * budget denies it and is reported as {@code web_budget_exhausted}.</li>
  * <li>The final answer is returned with the results of the calls that ran, read back from {@code chat_tool_calls.result}:
@@ -118,6 +120,8 @@ public final class ChatMcpAgent implements ChatAgentPath {
         // The concepts that had their search: a search binds to the requirements it names, so it spends only theirs.
         Set<String> searched = new LinkedHashSet<>();
         Set<String> searches = new LinkedHashSet<>();
+        Set<String> external = new LinkedHashSet<>();
+        requirements.stream().filter(ChatModels.AgentRequirement::externalSource).forEach(r -> external.add(r.id()));
         for (int step = 1, rounds = 0; ; step++) {
             var input = new ChatModels.AgentInput(requirements, token, names, recipient, maxCitations, previous,
                     decisions);
@@ -154,7 +158,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
             List<ChatToolResult> done = closing ? List.of() : kept(run);
             done.forEach(result -> served.getOrDefault(result.toolCallId(), List.of())
                     .forEach(id -> reachable.get(id).addAll(reached(result))));
-            Set<String> webOpen = webOpen(unmet(done, served), concepts, searched, searchable);
+            Set<String> webOpen = webOpen(unmet(done, served, withheldReads(run), external), concepts, searched, searchable);
             List<ChatModels.Decision> next = new ArrayList<>();
             int round = 0;
             for (ChatModels.ApprovalRequest request : outcome.approvals()) {
@@ -201,13 +205,28 @@ public final class ChatMcpAgent implements ChatAgentPath {
 
     /**
      * The requirements ZOOP's own reads left something for: those served by an approved internal read that found nothing
-     * within its scope or was cut by a limit.
+     * within its scope or was cut by a limit, and those asking for a source outside ZOOP once such a read ran. A read the send
+     * grant cut opens nothing, and a requirement with one does not reach past it by asking for an outside source: no search
+     * stands in for refused data (web search design 2).
      */
-    static Set<String> unmet(List<ChatToolResult> done, Map<String, List<String>> served) {
+    static Set<String> unmet(List<ChatToolResult> done, Map<String, List<String>> served, Set<String> withheld,
+            Set<String> external) {
         Set<String> unmet = new LinkedHashSet<>();
-        done.stream().filter(r -> !ChatCapability.WEB_SEARCH.id().equals(r.capabilityId())
-                        && (r.items().isEmpty() || Boolean.TRUE.equals(r.truncated())))
-                .forEach(r -> unmet.addAll(served.getOrDefault(r.toolCallId(), List.of())));
+        Set<String> looked = new LinkedHashSet<>();
+        Set<String> refused = new LinkedHashSet<>();
+        for (ChatToolResult read : done) {
+            if (ChatCapability.WEB_SEARCH.id().equals(read.capabilityId())) continue;
+            List<String> requirements = served.getOrDefault(read.toolCallId(), List.of());
+            if (withheld.contains(read.toolCallId())) {
+                refused.addAll(requirements);
+                continue;
+            }
+            looked.addAll(requirements);
+            if (read.items().isEmpty() || Boolean.TRUE.equals(read.truncated())) unmet.addAll(requirements);
+        }
+        looked.retainAll(external);
+        looked.removeAll(refused);
+        unmet.addAll(looked);
         return unmet;
     }
 
@@ -248,6 +267,16 @@ public final class ChatMcpAgent implements ChatAgentPath {
         }
         notices.addAll(refused);
         return List.copyOf(notices);
+    }
+
+    /** Internal reads the model-send grant cut. */
+    private Set<String> withheldReads(ChatRun run) {
+        Set<String> withheld = new LinkedHashSet<>();
+        for (ChatKeptToolResult kept : runs.keptToolResults(run.jobId(), run.attemptNo())) {
+            if (ChatCapability.WEB_SEARCH.id().equals(kept.capabilityId())) continue;
+            if (JSON.readTree(kept.result()).has("withheld")) withheld.add(kept.toolCallId());
+        }
+        return withheld;
     }
 
     /** Web calls whose provider returned hits but the model-send grant withheld them all. */
