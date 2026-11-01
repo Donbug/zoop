@@ -42,14 +42,17 @@ def answer_input() -> dict[str, Any]:
 def verification_input(invocation: str = "job-1:a1:stage") -> dict[str, Any]:
     return {"requestBinding": {"invocationId": invocation, "graphVersionId": "gv-new", "asOf": "2026-10-21T00:00:00Z"},
             "sections": [{"sectionId": "s0", "requirementIds": ["r1"], "serverFacts": [],
-                          "basis": "evidence_grounded", "text": "SK하이닉스는 HBM을 공급한다.", "evidenceIds": [EV1]},
+                          "basis": "evidence_grounded",
+                          "claims": [{"claimId": "s0c0", "text": "SK하이닉스는 HBM을 공급한다."}],
+                          "evidenceIds": [EV1]},
                          {"sectionId": "s1", "requirementIds": ["r2"], "serverFacts": [],
-                          "basis": "general_knowledge", "text": "HBM은 메모리다.", "evidenceIds": []}],
+                          "basis": "general_knowledge", "claims": [{"claimId": "s1c0", "text": "HBM은 메모리다."}],
+                          "evidenceIds": []}],
             "citations": [{"evidenceId": EV1, "sourceId": "src-news", "quote": "HBM 공급 계약을 맺었다"}]}
 
 
 def request(stage: str, payload: dict[str, Any], *, mode: str = "live", invocation: str = "job-1:a1:stage") -> StageRequest:
-    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-4", "invocationId": invocation, "stage": stage,
+    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-5", "invocationId": invocation, "stage": stage,
                                         "mode": mode, "input": payload})
 
 
@@ -166,18 +169,24 @@ def test_router_emits_only_a_confident_dependency_on_an_earlier_requirement():
 def test_verification_policy_holds_whatever_is_uncertain():
     payload = VerificationInput.model_validate(verification_input())
     body = chat_jev.build_verification_request(payload, chat_jev.MODEL)
-    assert set(body["questions"]) == {"s0-support", "s0-advice", "s1-advice"}
+    assert set(body["questions"]) == {"s0c0-support", "s0c0-causality", "s0-advice", "s1c0-causality", "s1-advice"}
     assert body["state"]["sections"][0]["citedQuotes"] == [{"quote": "HBM 공급 계약을 맺었다"}]
 
-    def verdicts(support, advice):
-        raw = {"model": chat_jev.MODEL, "answers": {"s0-support": support, "s0-advice": noul(advice), "s1-advice": noul(0.02)}}
+    def verdicts(support, advice, causality=0.02):
+        raw = {"model": chat_jev.MODEL, "answers": {"s0c0-support": support, "s0c0-causality": noul(causality),
+               "s0-advice": noul(advice), "s1c0-causality": noul(0.02), "s1-advice": noul(0.02)}}
         return [v.wire() for v in chat_jev.interpret_verification(raw, payload, chat_jev.MODEL).sections]
 
-    assert verdicts(choice("supported"), 0.02) == [{"support": "supported", "prohibitedAdvice": "no"},
-                                                   {"support": None, "prohibitedAdvice": "no"}]
-    assert verdicts(choice("supported", confidence=0.5), 0.02)[0]["support"] == "hold"
-    assert verdicts(choice("contradicted"), 0.02)[0]["support"] == "contradicted"
-    assert verdicts(choice("insufficient"), 0.02)[0]["support"] == "hold"
+    assert verdicts(choice("supported"), 0.02) == [
+        {"claims": [{"claimId": "s0c0", "support": "supported", "unsupportedCausality": "no"}],
+         "prohibitedAdvice": "no"},
+        {"claims": [{"claimId": "s1c0", "support": None, "unsupportedCausality": "no"}],
+         "prohibitedAdvice": "no"}]
+    assert verdicts(choice("supported", confidence=0.5), 0.02)[0]["claims"][0]["support"] == "hold"
+    assert verdicts(choice("contradicted"), 0.02)[0]["claims"][0]["support"] == "contradicted"
+    assert verdicts(choice("insufficient"), 0.02)[0]["claims"][0]["support"] == "hold"
+    assert verdicts(choice("supported"), 0.02, 0.95)[0]["claims"][0]["unsupportedCausality"] == "yes"
+    assert verdicts(choice("supported"), 0.02, 0.5)[0]["claims"][0]["unsupportedCausality"] == "hold"
     assert verdicts(choice("supported"), 0.95)[0]["prohibitedAdvice"] == "yes"
     assert verdicts(choice("supported"), 0.5)[0]["prohibitedAdvice"] == "hold"
 
@@ -186,13 +195,17 @@ def test_a_zoop_document_section_is_checked_against_its_quotes_like_evidence():
     payload = VerificationInput.model_validate({
         "requestBinding": verification_input()["requestBinding"],
         "sections": [{"sectionId": "s0", "requirementIds": ["r1"], "serverFacts": [],
-                      "basis": "zoop_documented", "text": "탈퇴하면 대화 기록이 지워집니다.", "evidenceIds": [EV2]}],
+                      "basis": "zoop_documented",
+                      "claims": [{"claimId": "s0c0", "text": "탈퇴하면 대화 기록이 지워집니다."}],
+                      "evidenceIds": [EV2]}],
         "citations": [{"evidenceId": EV2, "sourceId": "zoop-docs", "quote": "## 2. 보유 기간\n\n탈퇴하면 지웁니다."}]})
     body = chat_jev.build_verification_request(payload, chat_jev.MODEL)
-    assert set(body["questions"]) == {"s0-support", "s0-advice"}
-    raw = {"model": chat_jev.MODEL, "answers": {"s0-support": choice("insufficient"), "s0-advice": noul(0.02)}}
+    assert set(body["questions"]) == {"s0c0-support", "s0c0-causality", "s0-advice"}
+    raw = {"model": chat_jev.MODEL, "answers": {"s0c0-support": choice("insufficient"),
+           "s0c0-causality": noul(0.02), "s0-advice": noul(0.02)}}
     assert [v.wire() for v in chat_jev.interpret_verification(raw, payload, chat_jev.MODEL).sections] == [
-        {"support": "hold", "prohibitedAdvice": "no"}]
+        {"claims": [{"claimId": "s0c0", "support": "hold", "unsupportedCausality": "no"}],
+         "prohibitedAdvice": "no"}]
 
 
 def test_stage_identities_are_separate_from_s1_and_from_each_other():
@@ -226,16 +239,18 @@ def test_server_facts_reach_the_real_jev_http_builder_without_becoming_quotes(tm
         assert first["serverFacts"] == payload["sections"][0]["serverFacts"]
         assert second["serverFacts"] == []
         assert first["citedQuotes"] == [{"quote": "HBM 공급 계약을 맺었다"}]
-        assert set(body["questions"]) == {"s0-support", "s0-advice", "s1-advice"}
+        assert set(body["questions"]) == {"s0c0-support", "s0c0-causality", "s0-advice",
+                                          "s1c0-causality", "s1-advice"}
         # A scripted insufficient answer tests HOLD plumbing, never semantic accuracy.
         return httpx.Response(200, json={"model": chat_jev.MODEL, "answers": {
-            "s0-support": choice("insufficient"), "s0-advice": noul(0.02), "s1-advice": noul(0.02)}})
+            "s0c0-support": choice("insufficient"), "s0c0-causality": noul(0.02), "s0-advice": noul(0.02),
+            "s1c0-causality": noul(0.02), "s1-advice": noul(0.02)}})
 
     endpoint = Endpoint(respond)
     recipient = f"typesafe-native:{stage_config('chat-verification', 'live', LIVE).provider_revision}"
     req = request("chat-verification", payload)
     result = run(req, tmp_path, endpoint, registry=grants(recipient))
-    assert result.status == "succeeded" and result.answer["sections"][0]["support"] == "hold"
+    assert result.status == "succeeded" and result.answer["sections"][0]["claims"][0]["support"] == "hold"
     assert run(req, tmp_path, endpoint, registry=grants(recipient)).wire() == result.wire()
     assert len(endpoint.calls) == 1
     outbound = json.dumps(endpoint.calls[0][1]["state"])
@@ -324,7 +339,8 @@ WEB_HIT = "web-" + "a" * 32
 def web_input() -> dict[str, Any]:
     payload = verification_input()
     payload["sections"] = [{"sectionId": "s0", "requirementIds": ["r1"], "serverFacts": [], "basis": "web_reported",
-                            "text": "웹 검색 결과에 따르면 HBM은 D램을 쌓은 메모리다.", "evidenceIds": [WEB_HIT]}]
+                            "claims": [{"claimId": "s0c0", "text": "웹 검색 결과에 따르면 HBM은 D램을 쌓은 메모리다."}],
+                            "evidenceIds": [WEB_HIT]}]
     payload["citations"] = [{"evidenceId": WEB_HIT, "sourceId": "web-search:synthetic",
                              "quote": "[합성 자료] HBM은 D램을 쌓은 메모리다.", "articleTitle": "[합성] HBM이란"}]
     return payload
@@ -334,7 +350,7 @@ def test_a_web_section_is_checked_against_its_snippets_under_the_providers_grant
     # D-AI-02: what the web reported is verified against the snippet, never taken as ZOOP's own fact.
     payload = VerificationInput.model_validate(web_input())
     body = chat_jev.build_verification_request(payload, chat_jev.MODEL)
-    assert set(body["questions"]) == {"s0-support", "s0-advice"}
+    assert set(body["questions"]) == {"s0c0-support", "s0c0-causality", "s0-advice"}
     assert "web_reported" in chat_jev.VERIFY_TASK
     from zoop_ai import chat_agent
     assert "web_reported" in chat_agent.PROMPT
@@ -375,9 +391,10 @@ def test_missing_quotes_and_server_facts_cannot_be_auto_supported():
     payload["citations"] = []
     parsed = VerificationInput.model_validate(payload)
     raw = {"model": chat_jev.MODEL, "answers": {
-        "s0-support": choice("supported"), "s0-advice": noul(0.02), "s1-advice": noul(0.02)}}
+        "s0c0-support": choice("supported"), "s0c0-causality": noul(0.02), "s0-advice": noul(0.02),
+        "s1c0-causality": noul(0.02), "s1-advice": noul(0.02)}}
     assert chat_jev.build_verification_request(parsed, chat_jev.MODEL)["state"]["sections"][0]["serverFacts"] == []
-    assert chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL).sections[0].support == "hold"
+    assert chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL).sections[0].claims[0].support == "hold"
 
 
 # ---- live gate, keys, grants -----------------------------------------------------------------------------------------------
@@ -660,7 +677,7 @@ def test_the_live_ceiling_is_shared_by_all_chat_stages(tmp_path):
 def replay_file(tmp: Path, req: StageRequest, response: Any) -> Path:
     path = tmp / "replay.json"
     entry = {"stage": req.stage, "inputDigest": request_identity(req, stage_config(req.stage, "replay")), "response": response}
-    path.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-4", "recordingKind": "authored-test", "responses": [entry]}),
+    path.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-5", "recordingKind": "authored-test", "responses": [entry]}),
                     encoding="utf-8")
     return path
 

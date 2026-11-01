@@ -55,7 +55,7 @@ public class ChatPlanner {
     static final int MAX_REQUIREMENTS = 6;
     static final int MAX_STAGES = 3;
     static final int MAX_CHOICES = 6;
-    /** Branches the answer stage takes at most, and the longest requirement id it accepts (zoop-ai-chat-4). */
+    /** Branches the answer stage takes at most, and the longest requirement id it accepts (zoop-ai-chat-5). */
     static final int MAX_BRANCHES = 6;
     static final int MAX_ID = 32;
     /** Words pointing back at a company or an event; the lookbehind keeps a particle out ("삼성이 기업을"). */

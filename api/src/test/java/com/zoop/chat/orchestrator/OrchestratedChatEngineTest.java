@@ -687,7 +687,7 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
-    void verdictsBlockContradictionsAndDropHeldRequirements() {
+    void verdictsDropContradictedOrHeldRequirementsAndBlockAdvice() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()),
                 req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)),
                 req("r3", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(NVDA)));
@@ -699,12 +699,15 @@ class OrchestratedChatEngineTest {
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no"), new Verdict("contradicted", "no"), supported,
                 supported));
-        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult contradicted = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertEquals(List.of("개념", "엔비디아", "둘을 잇는 문장"), contradicted.sections().stream()
+                .map(s -> s.text().replace(ChatAnswerCheck.GENERAL_NOTICE + " ", "")).toList());
+        assertTrue(contradicted.limitations().isEmpty(), "a separately verified joining claim still answers r2");
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "yes"), supported, supported, supported));
         assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no"), new Verdict("hold", "no"), supported,
-                supported));
+                new Verdict("hold", "no")));
         ChatResult held = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
         assertEquals("answered", held.outcome());
         assertEquals(List.of("개념", "엔비디아"), held.sections().stream()
@@ -720,7 +723,7 @@ class OrchestratedChatEngineTest {
                 "the kind stays, the message says why");
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "hold"), new Verdict("hold", "no"),
-                new Verdict("hold", "no"), supported));
+                new Verdict("hold", "no"), new Verdict("hold", "no")));
         ChatResult none = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
         assertEquals("insufficient_evidence", none.outcome());
         assertEquals("none", none.answerBasis());
@@ -729,6 +732,26 @@ class OrchestratedChatEngineTest {
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
         assertFailed("transient", "provider_error", true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+    }
+
+    @Test
+    void unsupportedCausalClaimIsRemovedWhileItsSupportedClaimRemains() {
+        decision = ChatPlannerTest.decision(req("r2", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of(HYNIX)));
+        answer = new ChatGeneratedAnswer(List.of(grounded(
+                "공급 계약이 확인됐습니다. 그래서 주가가 오릅니다.", List.of("r2"), evidence(HYNIX))),
+                List.of(), List.of(HYNIX));
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("no", List.of(
+                new ChatSemanticVerdicts.ClaimVerdict("s0c0", "supported", "no"),
+                new ChatSemanticVerdicts.ClaimVerdict("s0c1", "supported", "yes")))));
+
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        assertEquals("answered", result.outcome());
+        assertEquals("공급 계약이 확인됐습니다.", result.answer());
+        assertEquals("complete", result.answerStatus());
+        assertTrue(result.limitations().isEmpty());
+        assertEquals(List.of(evidence(HYNIX)), result.citations().stream().map(Citation::evidenceId).toList());
     }
 
     @Test

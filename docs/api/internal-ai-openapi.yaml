@@ -260,9 +260,9 @@
     `runtime_unavailable`. All carry `Retry-After`; there is exactly one child per request and no automatic retry. A child answer that is not the contract this service
     knows is 500 `runtime_contract_mismatch` or `runtime_binding_mismatch` (not retryable). A 503 or 500 is never an empty bundle.
 
-    **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-4`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
+    **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-5`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
     stage synchronously through the installed `zoop-ai-chat invoke`: `chat-router` (native Jev, typed probabilities per requirement), `chat-answer` (Luna, a strict
-    JSON answer by sections), `chat-verification` (native Jev, per-section support and prohibited-advice verdicts) or `chat-agent` (one step of a Luna Responses run
+    JSON answer by sections), `chat-verification` (native Jev, per-claim support and unsupported-causality verdicts plus per-section prohibited-advice) or `chat-agent` (one step of a Luna Responses run
     that calls the ZOOP MCP tools). It is off unless its all-or-nothing server configuration group is set (otherwise 409 `execution_unavailable` after
     authentication). The application decides everything a stage only proposes.
 
@@ -280,8 +280,8 @@
     `failure.code`, whether a request was `sent` and whether its fate is `unknown`. A **502/504 `stage_outcome_unknown`** means the runtime may have sent the
     request: never resend that invocation. A **503** means nothing was sent.
 
-    **Verification server facts.** The v2 verification input has `requestBinding` (`invocationId`, pinned `graphVersionId`, `asOf`)
-    and ordered sections (`sectionId`, `requirementIds`, `basis`, `text`, `evidenceIds`, `serverFacts`). The application alone
+    **Verification server facts.** The v5 verification input has `requestBinding` (`invocationId`, pinned `graphVersionId`, `asOf`)
+    and ordered sections (`sectionId`, `requirementIds`, `basis`, ordered `claims`, `evidenceIds`, `serverFacts`). The application alone
     derives bounded typed `portfolio_scope`, `graph_comparison`, `publication_record` and `briefing_selection` facts from
     successful reads in that request, never from answer text. A publication record is an issue's last review decision (kind,
     time and path, never the decider or their note) up to the pinned version's review revision and the rules that version was
@@ -7729,13 +7729,13 @@
                 "reachable":
                   "summary": "The configured endpoint answered its Bearer challenge"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-4"
+                    "schemaVersion": "zoop-ai-chat-5"
                     "mcp": "reachable"
                     "reason": null
                 "unreachable":
                   "summary": "No answer before the content-free probe deadline"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-4"
+                    "schemaVersion": "zoop-ai-chat-5"
                     "mcp": "unreachable"
                     "reason": "mcp_timeout"
         "401":
@@ -8095,7 +8095,7 @@
                 "succeeded":
                   "summary": "Router probabilities"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-4"
+                    "schemaVersion": "zoop-ai-chat-5"
                     "invocationId": "job-00000001:1:chat-router"
                     "stage": "chat-router"
                     "status": "succeeded"
@@ -8131,7 +8131,7 @@
                 "notSent":
                   "summary": "A quote without a matching chat grant: nothing was sent"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-4"
+                    "schemaVersion": "zoop-ai-chat-5"
                     "invocationId": "job-00000001:1:chat-answer"
                     "stage": "chat-answer"
                     "status": "failed"
@@ -8144,7 +8144,7 @@
                 "agentHeld":
                   "summary": "chat-agent step held at an approval request"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-4"
+                    "schemaVersion": "zoop-ai-chat-5"
                     "invocationId": "job-00000001:1:chat-agent:1"
                     "stage": "chat-agent"
                     "status": "succeeded"
@@ -8294,7 +8294,7 @@
               "router":
                 "summary": "chat-router replay request (synthetic question)"
                 "value":
-                  "schemaVersion": "zoop-ai-chat-4"
+                  "schemaVersion": "zoop-ai-chat-5"
                   "invocationId": "job-00000001:1:chat-router"
                   "stage": "chat-router"
                   "mode": "replay"
@@ -8309,7 +8309,7 @@
               "agentContinuation":
                 "summary": "chat-agent continuation step with the application's decision (synthetic token)"
                 "value":
-                  "schemaVersion": "zoop-ai-chat-4"
+                  "schemaVersion": "zoop-ai-chat-5"
                   "invocationId": "job-00000001:1:chat-agent:2"
                   "stage": "chat-agent"
                   "mode": "replay"
@@ -12117,7 +12117,7 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-ai-chat-4"
+          "const": "zoop-ai-chat-5"
           "title": "Schemaversion"
         "mcp":
           "type": "string"
@@ -12209,7 +12209,7 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-ai-chat-4"
+          "const": "zoop-ai-chat-5"
           "title": "Schemaversion"
         "invocationId":
           "type": "string"
@@ -12289,6 +12289,34 @@
         - "cachedTokens"
         - "reasoningTokens"
       "title": "ChatUsage"
+    "ClaimVerdict":
+      "properties":
+        "claimId":
+          "type": "string"
+          "title": "Claimid"
+        "support":
+          "anyOf":
+            - "type": "string"
+              "enum":
+                - "supported"
+                - "contradicted"
+                - "hold"
+            - "type": "null"
+          "title": "Support"
+        "unsupportedCausality":
+          "type": "string"
+          "enum":
+            - "no"
+            - "yes"
+            - "hold"
+          "title": "Unsupportedcausality"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "claimId"
+        - "support"
+        - "unsupportedCausality"
+      "title": "ClaimVerdict"
     "Delivery":
       "properties":
         "state":
@@ -16434,15 +16462,11 @@
       "title": "RouterDependency"
     "SectionVerdict":
       "properties":
-        "support":
-          "anyOf":
-            - "type": "string"
-              "enum":
-                - "supported"
-                - "contradicted"
-                - "hold"
-            - "type": "null"
-          "title": "Support"
+        "claims":
+          "items":
+            "$ref": "#/components/schemas/ClaimVerdict"
+          "type": "array"
+          "title": "Claims"
         "prohibitedAdvice":
           "type": "string"
           "enum":
@@ -16453,7 +16477,7 @@
       "additionalProperties": false
       "type": "object"
       "required":
-        - "support"
+        - "claims"
         - "prohibitedAdvice"
       "title": "SectionVerdict"
     "SourceChange":
@@ -16601,7 +16625,7 @@
       "additionalProperties": false
       "properties":
         "schemaVersion":
-          "const": "zoop-ai-chat-4"
+          "const": "zoop-ai-chat-5"
           "title": "Schemaversion"
           "type": "string"
         "invocationId":
@@ -16625,7 +16649,7 @@
           "type": "string"
         "input":
           "additionalProperties": true
-          "description": "The closed zoop-ai-chat-4 stage input (RouterInput, AnswerInput, VerificationInput or AgentInput)."
+          "description": "The closed zoop-ai-chat-5 stage input (RouterInput, AnswerInput, VerificationInput or AgentInput)."
           "title": "Input"
           "type": "object"
       "required":

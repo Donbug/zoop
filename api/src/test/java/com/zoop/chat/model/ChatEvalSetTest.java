@@ -300,16 +300,21 @@ public class ChatEvalSetTest {
                 JsonNode verify = script.get("verify");
                 ObjectNode out = StrictJson.newObject();
                 ArrayNode sections = out.putArray("sections");
-                if (verify != null) {
-                    verify.forEach(sections::add);
-                } else {
-                    // Unscripted: every section passes, as a verifier that finds nothing wrong would say.
-                    for (JsonNode s : call.input().get("sections")) {
-                        ObjectNode v = sections.addObject();
-                        if ("general_knowledge".equals(s.get("basis").stringValue())) v.putNull("support");
-                        else v.put("support", "supported");
-                        v.put("prohibitedAdvice", "no");
+                int sectionIndex = 0;
+                for (JsonNode s : call.input().get("sections")) {
+                    JsonNode scripted = verify == null ? null : verify.get(sectionIndex);
+                    ObjectNode v = sections.addObject().put("prohibitedAdvice",
+                            scripted == null ? "no" : scripted.path("prohibitedAdvice").asText("no"));
+                    ArrayNode claims = v.putArray("claims");
+                    for (JsonNode claim : s.get("claims")) {
+                        ObjectNode decision = claims.addObject().put("claimId", claim.get("claimId").stringValue())
+                                .put("unsupportedCausality", scripted == null ? "no"
+                                        : scripted.path("unsupportedCausality").asText("no"));
+                        if ("general_knowledge".equals(s.get("basis").stringValue())) decision.putNull("support");
+                        else decision.put("support", scripted == null ? "supported"
+                                : scripted.path("support").asText("hold"));
                     }
+                    sectionIndex++;
                 }
                 answer = out;
             }

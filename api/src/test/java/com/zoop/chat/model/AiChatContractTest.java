@@ -63,7 +63,7 @@ import tools.jackson.databind.json.JsonMapper;
  * Real Java adapters -> ai/service (uvicorn) -> installed {@code zoop-ai-chat}, replay only. The inputs are built by the
  * production {@link ChatModelStages} from the same synthetic scenario the gate authored its replay fixture from
  * ({@code api/scripts/ai_chat_gate.py}); the replay answers only an input identical in every field, so a passing stage proves
- * the two sides agree on {@code zoop-ai-chat-4}. Not runnable on its own: {@code make api-ai-chat-smoke} starts the service and
+ * the two sides agree on {@code zoop-ai-chat-5}. Not runnable on its own: {@code make api-ai-chat-smoke} starts the service and
  * exports {@code ZOOP_AI_CHAT_CONTRACT_MANIFEST}. Without it every test fails; none skips.
  */
 @Tag("ai-chat-contract")
@@ -212,7 +212,11 @@ class AiChatContractTest {
         ChatRun run = run(ANSWER_QUESTION, "chat-verify-gate");
         ChatSemanticVerdicts verdicts = stages().verify(run, sections, List.of(citation(EVIDENCE, "art-synthetic")),
                 ChatModels.ServerFacts.withoutTools(run, sections));
-        assertEquals(List.of(new ChatSemanticVerdicts.Verdict("supported", "no"), new ChatSemanticVerdicts.Verdict(null, "no")),
+        assertEquals(List.of(
+                new ChatSemanticVerdicts.Verdict("no", List.of(
+                        new ChatSemanticVerdicts.ClaimVerdict("s0c0", "supported", "no"))),
+                new ChatSemanticVerdicts.Verdict("no", List.of(
+                        new ChatSemanticVerdicts.ClaimVerdict("s1c0", null, "no")))),
                 verdicts.sections());
     }
 

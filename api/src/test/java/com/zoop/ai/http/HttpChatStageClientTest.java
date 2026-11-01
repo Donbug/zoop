@@ -51,7 +51,7 @@ class HttpChatStageClientTest {
 
     private static String result(String invocation, String stage, String status, String answer, String failure, String receipt) {
         return """
-                {"schemaVersion":"zoop-ai-chat-4","invocationId":"%s","stage":"%s","status":"%s","answer":%s,"failure":%s,\
+                {"schemaVersion":"zoop-ai-chat-5","invocationId":"%s","stage":"%s","status":"%s","answer":%s,"failure":%s,\
                 "receipt":%s}""".formatted(invocation, stage, status, answer, failure, receipt);
     }
 
@@ -78,13 +78,13 @@ class HttpChatStageClientTest {
         assertEquals("/internal/v1/chat-stages/chat-router", seen.path());
         assertEquals(INVOCATION, seen.header("Idempotency-Key"));
         assertEquals("Bearer " + TOKEN, seen.header("Authorization"));
-        assertEquals("{\"schemaVersion\":\"zoop-ai-chat-4\",\"invocationId\":\"" + INVOCATION + "\",\"stage\":\"chat-router\","
+        assertEquals("{\"schemaVersion\":\"zoop-ai-chat-5\",\"invocationId\":\"" + INVOCATION + "\",\"stage\":\"chat-router\","
                 + "\"mode\":\"replay\",\"input\":{\"probe\":true}}", seen.body());
     }
 
     @Test
     void getsTheContentFreeMcpHealthWithoutAnIdempotencyKey() {
-        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-4\",\"mcp\":\"reachable\",\"reason\":null}"));
+        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-5\",\"mcp\":\"reachable\",\"reason\":null}"));
 
         ChatMcpHealth health = client.probeMcp();
 
@@ -99,14 +99,14 @@ class HttpChatStageClientTest {
 
     @Test
     void decodesOnlyTheClosedMcpHealthReasons() {
-        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-4\",\"mcp\":\"unreachable\"," +
+        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-5\",\"mcp\":\"unreachable\"," +
                 "\"reason\":\"mcp_timeout\"}"));
         assertEquals(ChatMcpHealth.Reason.TIMEOUT, client.probeMcp().reason());
 
         for (String body : new String[] {
-                "{\"schemaVersion\":\"zoop-ai-chat-4\",\"mcp\":\"reachable\",\"reason\":\"mcp_timeout\"}",
-                "{\"schemaVersion\":\"zoop-ai-chat-4\",\"mcp\":\"unreachable\",\"reason\":null}",
-                "{\"schemaVersion\":\"zoop-ai-chat-4\",\"mcp\":\"unreachable\",\"reason\":\"other\"}"}) {
+                "{\"schemaVersion\":\"zoop-ai-chat-5\",\"mcp\":\"reachable\",\"reason\":\"mcp_timeout\"}",
+                "{\"schemaVersion\":\"zoop-ai-chat-5\",\"mcp\":\"unreachable\",\"reason\":null}",
+                "{\"schemaVersion\":\"zoop-ai-chat-5\",\"mcp\":\"unreachable\",\"reason\":\"other\"}"}) {
             server.respond(Reply.json(200, body));
             AiTransportException malformed = assertThrows(AiTransportException.class, client::probeMcp);
             assertEquals(Failure.RESPONSE_MALFORMED, malformed.failure());

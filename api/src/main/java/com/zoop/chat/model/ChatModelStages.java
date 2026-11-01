@@ -20,6 +20,7 @@ import com.zoop.ai.chat.ChatStageReply;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.orchestrator.ChatBranchContext;
+import com.zoop.chat.orchestrator.ChatClaims;
 import com.zoop.chat.orchestrator.ChatCitationSource;
 import com.zoop.chat.orchestrator.ChatGeneratedAnswer;
 import com.zoop.chat.orchestrator.ChatModels;
@@ -40,7 +41,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-4}). The server decides what is
+ * The orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-5}). The server decides what is
  * sent: the router gets the question chain, the requirements split by {@link ChatRequirementSplitter} and the descriptions of
  * the bound capabilities; company and issue names are resolved here, never by the model. Company names
  * ({@link CompanyNameResolver}) are resolved before the router, so a name that fits several companies becomes a clarification
@@ -371,7 +372,10 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         for (int index = 0; index < sections.size(); index++) {
             var section = sections.get(index);
             ObjectNode wire = wireSections.addObject().put("sectionId", "s" + index)
-                    .put("basis", section.basis()).put("text", section.text());
+                    .put("basis", section.basis());
+            ArrayNode claims = wire.putArray("claims");
+            ChatClaims.split(index, section.text()).forEach(claim -> claims.addObject()
+                    .put("claimId", claim.id()).put("text", claim.text()));
             section.requirementIds().forEach(wire.putArray("requirementIds")::add);
             section.evidenceIds().forEach(wire.putArray("evidenceIds")::add);
             ArrayNode serverFacts = wire.putArray("serverFacts");
@@ -387,9 +391,14 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         return decode(() -> {
             List<ChatSemanticVerdicts.Verdict> verdicts = new ArrayList<>();
             for (JsonNode v : array(answer, "sections")) {
-                JsonNode support = v.get("support");
-                verdicts.add(new ChatSemanticVerdicts.Verdict(support == null || support.isNull() ? null : text(v, "support"),
-                        text(v, "prohibitedAdvice")));
+                List<ChatSemanticVerdicts.ClaimVerdict> claims = new ArrayList<>();
+                for (JsonNode claim : array(v, "claims")) {
+                    JsonNode support = claim.get("support");
+                    claims.add(new ChatSemanticVerdicts.ClaimVerdict(text(claim, "claimId"),
+                            support == null || support.isNull() ? null : text(claim, "support"),
+                            text(claim, "unsupportedCausality")));
+                }
+                verdicts.add(new ChatSemanticVerdicts.Verdict(text(v, "prohibitedAdvice"), claims));
             }
             return new ChatSemanticVerdicts(verdicts);
         });
