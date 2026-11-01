@@ -63,6 +63,17 @@ final class ChatRetrieval {
                 ChatPlan.Stop stop, ChatToolResult failed) {
             this(results, limitations, noneFound, stop, failed, Set.of(), Map.of(), null, Set.of());
         }
+
+        /** The same reads with further results of some requirements after their own. */
+        Outcome withResults(Map<String, List<ChatToolResult>> further) {
+            Map<String, List<ChatToolResult>> all = new LinkedHashMap<>(results);
+            further.forEach((id, more) -> {
+                List<ChatToolResult> joined = new ArrayList<>(all.getOrDefault(id, List.of()));
+                joined.addAll(more);
+                all.put(id, List.copyOf(joined));
+            });
+            return new Outcome(all, limitations, noneFound, stop, failed, cut, outside, faulted, partial);
+        }
     }
 
     /**
