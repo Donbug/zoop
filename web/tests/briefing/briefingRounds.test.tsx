@@ -744,7 +744,7 @@ it('D-BRF-01/02 theme keeps surface roles and reading query/keyboard behavior', 
   expect(screen.getByLabelText('발행일').classList.contains('rounded-md')).toBe(
     true,
   );
-  const compact = screen.getByRole('button', { name: '간단히', exact: true });
+  const compact = screen.getByRole('button', { name: /^간단히$/ });
   compact.focus();
   await view.user.keyboard('{Enter}');
   expect(currentQuery().get('reading')).toBe('compact');
