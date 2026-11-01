@@ -78,7 +78,7 @@ export function BriefingCorrectionNote({
   correction: Correction;
 }) {
   return (
-    <li className="flex flex-col gap-1 rounded-[3px] bg-zoop-wash p-3">
+    <li className="flex flex-col gap-1 rounded-md bg-zoop-card p-3">
       <p className={NOTE}>정정 시각 {briefingTime(correction.createdAt)}</p>
       {correction.original && (
         <p className="text-caption text-zoop-faint line-through">

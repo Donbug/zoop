@@ -106,8 +106,8 @@ export default function MarketIndicators({
               key={id}
               className={
                 compact
-                  ? 'min-w-0 rounded-panel border border-panel-line p-3'
-                  : 'min-h-[86px] min-w-0 border-r-[0.667px] border-zoop-line px-[18px] py-1 first:pl-0 last:border-r-0 last:pr-0 max-sm:border-r-0 max-sm:border-b-[0.667px] max-sm:px-0 max-sm:pb-4 max-sm:last:border-b-0'
+                  ? 'min-w-0 rounded-panel border border-zoop-border p-3'
+                  : 'min-h-[86px] min-w-0 border-r-[0.667px] border-zoop-border px-[18px] py-1 first:pl-0 last:border-r-0 last:pr-0 max-sm:border-r-0 max-sm:border-b max-sm:px-0 max-sm:pb-4 max-sm:last:border-b-0'
               }
             >
               <p className="flex items-center gap-2">

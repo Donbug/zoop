@@ -90,7 +90,7 @@ export default function PersonalBasisNotice({
   return (
     <p
       role="status"
-      className="mt-4 rounded-[3px] border-[0.667px] border-zoop-ink bg-zoop-paper px-3 py-2 text-caption leading-relaxed"
+      className="mt-4 rounded-md border border-zoop-ink bg-zoop-surface px-3 py-2 text-caption leading-relaxed"
     >
       <strong className="font-semibold">
         {basis.kind === 'holdings'

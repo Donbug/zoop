@@ -43,7 +43,7 @@ export default function BriefingContinuity({
         {value.references.map((item) => (
           <article
             key={item.issueId}
-            className="rounded border border-zoop-line p-3"
+            className="rounded border border-zoop-border p-3"
           >
             <h4 className="text-body font-semibold">{item.title}</h4>
             <p className={NOTE}>
@@ -69,7 +69,7 @@ export default function BriefingContinuity({
               {item.sources.map((source) => (
                 <figure
                   key={source.evidenceId}
-                  className="mt-3 border-l-2 border-zoop-line pl-3"
+                  className="mt-3 border-l-2 border-zoop-border pl-3"
                 >
                   <blockquote className={`${BODY} whitespace-pre-wrap`}>
                     {source.quote}

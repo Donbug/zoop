@@ -7,8 +7,8 @@ import type { BriefingEdition } from '@/types/briefing';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import { useScreenView } from '@/util/track';
 
-const FILTER_BUTTON = `min-h-10 min-w-[88px] whitespace-nowrap rounded-full border border-zoop-line bg-zoop-paper px-4 text-caption font-semibold text-zoop-ink transition-colors aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper max-sm:flex-1 ${FOCUS_RING}`;
-const READING_BUTTON = `min-w-[76px] whitespace-nowrap rounded-[2px] text-caption font-semibold text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:text-zoop-ink aria-pressed:shadow-[0_0_0_0.5px_#1a1a1a14] max-sm:flex-1 ${FOCUS_RING}`;
+const FILTER_BUTTON = `min-h-10 min-w-[88px] whitespace-nowrap rounded-md border border-zoop-border bg-zoop-surface px-4 text-caption font-semibold text-zoop-ink transition-colors aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-on-ink max-sm:flex-1 ${FOCUS_RING}`;
+const READING_BUTTON = `min-w-[76px] whitespace-nowrap rounded-md text-caption font-semibold text-zoop-muted aria-pressed:bg-zoop-surface aria-pressed:text-zoop-ink aria-pressed:shadow-sm max-sm:flex-1 ${FOCUS_RING}`;
 
 // D-BRF-01 출근 · D-BRF-02 퇴근 브리핑 (/briefing). 날짜·회차는 주소(?date=&edition=)에 남는다.
 export default function BriefingPage() {
@@ -26,7 +26,7 @@ export default function BriefingPage() {
   const personal = params.get('view') === 'personal';
   return (
     <section
-      className="mx-auto w-full max-w-[1040px] text-zoop-ink"
+      className="mx-auto w-full max-w-[1040px] text-zoop-ink [&_input:not([type=checkbox])]:rounded-md [&_input:not([type=checkbox])]:border-zoop-border [&_input:not([type=checkbox])]:bg-zoop-surface [&_input]:placeholder:text-zoop-muted [&_select]:rounded-md [&_select]:border-zoop-border [&_select]:bg-zoop-control"
       data-screen-id={edition === 'morning' ? 'D-BRF-01' : 'D-BRF-02'}
     >
       <h1 className="text-display font-[750] tracking-[-0.045em]">
@@ -85,7 +85,7 @@ export default function BriefingPage() {
         <button
           type="button"
           aria-pressed={compact}
-          className={`min-h-11 border border-zoop-line px-3 ${READING_BUTTON}`}
+          className={`min-h-11 border border-zoop-border px-3 ${READING_BUTTON}`}
           onClick={() => updateQuery({ reading: 'compact' })}
         >
           간단히
@@ -93,7 +93,7 @@ export default function BriefingPage() {
         <button
           type="button"
           aria-pressed={!compact}
-          className={`min-h-11 border border-zoop-line px-3 ${READING_BUTTON}`}
+          className={`min-h-11 border border-zoop-border px-3 ${READING_BUTTON}`}
           onClick={() => updateQuery({ reading: 'full' })}
         >
           전체 보기

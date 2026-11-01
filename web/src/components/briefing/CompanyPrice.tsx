@@ -48,7 +48,7 @@ export default function CompanyPrice({
   const { latest, baseline } = price;
   return (
     <div
-      className="mt-3 rounded-panel border border-panel-line bg-white p-3"
+      className="mt-3 rounded-panel border border-zoop-border bg-zoop-card p-3"
       aria-label={`${company.companyName} 회차 기준 시세`}
     >
       <p className="text-caption text-zoop-muted">

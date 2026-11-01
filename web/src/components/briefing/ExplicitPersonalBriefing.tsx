@@ -318,7 +318,7 @@ export default function ExplicitPersonalBriefing({
           <label className="block text-sm">
             종목 검색
             <input
-              className={`mt-1 w-full rounded border border-zoop-line p-2 ${FOCUS_RING}`}
+              className={`mt-1 w-full rounded-md border border-zoop-border p-2 ${FOCUS_RING}`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="기업명 또는 종목 코드"
@@ -326,7 +326,7 @@ export default function ExplicitPersonalBriefing({
           </label>
           <fieldset
             disabled={busy}
-            className="max-h-64 overflow-y-auto rounded border border-zoop-line p-3"
+            className="max-h-64 overflow-y-auto rounded-md border border-zoop-border p-3"
           >
             <legend className="text-xs">종목 선택 · 최대 20개</legend>
             {!options && <p role="status">종목 목록을 확인하고 있어요.</p>}
@@ -471,7 +471,7 @@ export default function ExplicitPersonalBriefing({
       )}
       {result && !editing && (
         <>
-          <div className="rounded border border-zoop-line p-3">
+          <div className="rounded border border-zoop-border p-3">
             <p className="font-semibold">
               선택한 종목: {names(result.choice.companyIds)}
             </p>
@@ -521,7 +521,7 @@ export default function ExplicitPersonalBriefing({
               .map((item) => (
                 <article
                   key={item.eventId}
-                  className="rounded border border-zoop-line p-4"
+                  className="rounded border border-zoop-border p-4"
                 >
                   <h3 className="font-semibold">
                     분석 대기·보류: {item.title}
@@ -547,7 +547,7 @@ export default function ExplicitPersonalBriefing({
             </summary>
             {result.tracking.map((t) => (
               <div
-                className="mt-3 border-t border-zoop-line pt-3 text-sm"
+                className="mt-3 border-t border-zoop-border pt-3 text-sm"
                 key={t.issueId}
               >
                 <strong>{t.title}</strong>

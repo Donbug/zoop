@@ -17,7 +17,7 @@ export default function CompanyPriceContext({
   return (
     <section
       aria-label={`${c.companyName} 주가 흐름 분석`}
-      className="rounded-lg border border-zoop-line p-3"
+      className="rounded-lg border border-zoop-border p-3"
     >
       <h4 className="text-body font-semibold">실제 주가 흐름과 함께 읽기</h4>
       <p className={`${BODY} mt-2`}>{c.summary}</p>
@@ -40,7 +40,10 @@ export default function CompanyPriceContext({
       <div className="mt-4 space-y-3">
         <h5 className="text-body font-semibold">기사 발표 시각과 가격 관측</h5>
         {c.news.map((n) => (
-          <div key={n.evidenceId} className="border-l-2 border-zoop-line pl-3">
+          <div
+            key={n.evidenceId}
+            className="border-l-2 border-zoop-border pl-3"
+          >
             <p className={NOTE}>
               기사 {briefingTime(n.publishedAt)} ·{' '}
               {n.timing === 'after_session'

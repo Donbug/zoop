@@ -40,7 +40,7 @@ function Statement({
           근거 인용 {refs.length}개 · 원문{' '}
           {new Set(refs.map((s) => s.documentId)).size}건
         </summary>
-        <ul className="space-y-3 border-l-2 border-panel-line pl-3">
+        <ul className="space-y-3 border-l-2 border-zoop-border pl-3">
           {refs.map((source) => (
             <li key={source.evidenceId}>
               <a
@@ -208,7 +208,7 @@ function CompanyAnalysis({
       {company.risks.map((s, i) => (
         <Statement key={i} value={s} company={company} />
       ))}
-      <div className="mt-3 border-t border-panel-line pt-3">
+      <div className="mt-3 border-t border-zoop-border pt-3">
         <h5 className="text-body font-semibold">
           {edition === 'morning'
             ? '이전 기업 전망에서 달라진 점'
@@ -216,7 +216,7 @@ function CompanyAnalysis({
         </h5>
         <Statement value={company.comparison} company={company} />
         {company.previous?.status === 'available' ? (
-          <div className="mt-2 border-l-2 border-panel-line pl-3">
+          <div className="mt-2 border-l-2 border-zoop-border pl-3">
             <p className={NOTE}>
               기존 판단 · {briefingTime(company.previous.cutoff!)}
             </p>
@@ -263,7 +263,7 @@ function CompanyAtAGlance({
   const card = verifiedCard(company);
   return (
     <details
-      className="group rounded-panel border border-panel-line bg-zoop-paper"
+      className="group rounded-panel border border-zoop-border bg-zoop-surface"
       aria-label={`${company.companyName} 한눈 요약`}
     >
       <summary
@@ -274,7 +274,7 @@ function CompanyAtAGlance({
             {company.companyName}
           </h4>
           {card?.topic && (
-            <span className="border-l border-panel-line pl-2 text-caption text-zoop-muted">
+            <span className="border-l border-zoop-border pl-2 text-caption text-zoop-muted">
               {card.topic.text}
             </span>
           )}
@@ -302,7 +302,7 @@ function CompanyAtAGlance({
         )}
         <span className="sr-only">시세·전체 분석·근거 보기</span>
       </summary>
-      <div className="border-t border-panel-line px-4 pb-4">
+      <div className="border-t border-zoop-border px-4 pb-4">
         <p className={`${NOTE} mt-3`}>{assessments[company.assessment]}</p>
         <CompanyPrice company={company} cutoff={cutoff} />
         {company.reading?.schemaVersion === 'zoop-company-reading-v2' && (
@@ -398,7 +398,7 @@ export default function CompanyOutlooks({
             ) : (
               <article
                 key={company.companyId}
-                className="rounded-panel border border-panel-line bg-panel-soft p-4"
+                className="rounded-panel border border-zoop-border bg-panel-soft p-4"
               >
                 <h4 className="text-title-sm font-bold">
                   {company.companyName}
