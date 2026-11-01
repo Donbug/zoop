@@ -216,9 +216,7 @@ describe('D-STK-01 종목 목록·검색 (FS037)', () => {
     expect(
       await within(await rowOf('삼성SDI')).findByText('▲ +7.18%'),
     ).toBeTruthy();
-    expect(
-      await within(await rowOf('NVIDIA')).findByText('시세 없음'),
-    ).toBeTruthy();
+    expect(await within(await rowOf('NVIDIA')).findByText('-')).toBeTruthy();
   });
 
   test('검색은 [검색]·Enter로만 하고, 검색어를 주소에 남긴다', async () => {

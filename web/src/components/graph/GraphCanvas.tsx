@@ -1232,9 +1232,13 @@ export default function GraphCanvas({
         if (moving) renderMinimap?.();
         if (defaultZoomPending.current) {
           defaultZoomPending.current = false;
-          const initialZoom = Math.min(
-            DEFAULT_GRAPH_ZOOM,
-            graph.getZoomRange()?.[0] ?? MIN_GRAPH_ZOOM,
+          const [minimumZoom, maximumZoom] = graph.getZoomRange?.() ?? [
+            MIN_GRAPH_ZOOM,
+            MAX_GRAPH_ZOOM,
+          ];
+          const initialZoom = Math.max(
+            minimumZoom,
+            Math.min(DEFAULT_GRAPH_ZOOM, maximumZoom),
           );
           await graph.zoomTo(initialZoom, false);
           followFit.current = false;
