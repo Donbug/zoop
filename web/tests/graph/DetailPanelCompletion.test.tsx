@@ -108,7 +108,11 @@ function renderEvidence(evidence: EvidenceResponse) {
     evidenceIds: [evidence.id],
     mapContext: { ...context, url: '/' },
   });
-  render(<EvidenceDrawer />);
+  render(
+    <MemoryRouter>
+      <EvidenceDrawer />
+    </MemoryRouter>,
+  );
   return server;
 }
 
