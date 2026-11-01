@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import { LoadingSpinner } from '@/components/common/LoadingIndicator';
 import { PHASES } from '@/components/ai/chat-phases';
 import {
   formatPublishedAt,
@@ -124,9 +125,17 @@ function JobState({
     return (
       <div className={ui.state}>
         <p className="mt-0!">
-          {job.status === 'queued'
-            ? '질문을 접수했어요.'
-            : '답변을 준비하고 있어요. 검증을 마친 답변만 보여 드려요.'}
+          {job.status === 'queued' ? (
+            '질문을 접수했어요.'
+          ) : (
+            <>
+              <LoadingSpinner size="sm" />
+              <span>
+                {' '}
+                답변을 준비하고 있어요. 검증을 마친 답변만 보여 드려요.
+              </span>
+            </>
+          )}
         </p>
         {job.status === 'running' && (
           <ol className="m-0 flex list-none flex-wrap gap-1.5 p-0">

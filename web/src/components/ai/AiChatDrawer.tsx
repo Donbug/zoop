@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import ChatHistoryList from '@/components/ai/ChatHistoryList';
 import ChatJobCard, { type AnswerMapTarget } from '@/components/ai/ChatJobCard';
 import { PHASE_LABEL } from '@/components/ai/chat-phases';
@@ -50,9 +51,10 @@ export default function AiChatDrawer({ onViewOnMap, returnFocusTo }: Props) {
   return (
     <DrawerShell onClose={close} returnFocusTo={returnFocusTo}>
       {checking ? (
-        <p className={ui.state} role="status">
-          로그인 상태를 확인하고 있어요.
-        </p>
+        <LoadingIndicator
+          label="로그인 상태를 확인하고 있어요."
+          className={`${ui.state} flex min-h-12 w-full`}
+        />
       ) : isAuthenticated && member ? (
         <ChatPanel
           key={member.id}
@@ -314,9 +316,10 @@ function ChatPanel({
             </div>
 
             {chat.load.kind === 'loading' && (
-              <p className={ui.state} role="status">
-                이전 대화를 불러오고 있어요.
-              </p>
+              <LoadingIndicator
+                label="이전 대화를 불러오고 있어요."
+                className={`${ui.state} flex min-h-12 w-full`}
+              />
             )}
             {chat.load.kind === 'error' && (
               <LoadError

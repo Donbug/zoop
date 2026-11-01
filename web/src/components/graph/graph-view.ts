@@ -1,5 +1,6 @@
 import type { GraphResponse } from '@/types/map/graph';
 import type { MapMode } from '@/types/map';
+import { MAX_GRAPH_ZOOM, MIN_GRAPH_ZOOM } from './graph-zoom-range';
 
 export type LegendKey =
   'company' | 'issue' | GraphResponse['edges'][number]['relationType'];
@@ -56,8 +57,8 @@ export function readModeEntry(owner: string, mode: MapMode): ModeEntry | null {
         ),
         ...(camera &&
         Number.isFinite(camera.zoom) &&
-        camera.zoom >= 0.01 &&
-        camera.zoom <= 4 &&
+        camera.zoom >= MIN_GRAPH_ZOOM &&
+        camera.zoom <= MAX_GRAPH_ZOOM &&
         Array.isArray(camera.position) &&
         camera.position.length === 2 &&
         camera.position.every(Number.isFinite) &&

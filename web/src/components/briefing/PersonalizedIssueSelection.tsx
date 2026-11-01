@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { Link } from 'react-router-dom';
 import { getPersonalizedBriefingIssues } from '@/apis/briefing/briefing';
 import { useAsyncData } from '@/hooks/useAsyncData';
@@ -35,9 +36,10 @@ export default function PersonalizedIssueSelection({
   const link = `font-semibold underline underline-offset-4 ${FOCUS_RING}`;
   if (checking)
     return (
-      <p role="status" className={NOTE}>
-        로그인 상태를 확인하고 있어요.
-      </p>
+      <LoadingIndicator
+        label="로그인 상태를 확인하고 있어요."
+        className={`${NOTE} flex min-h-8 w-full`}
+      />
     );
   if (!memberId)
     return (
@@ -50,9 +52,10 @@ export default function PersonalizedIssueSelection({
     );
   if (query.status === 'loading')
     return (
-      <p role="status" className={NOTE}>
-        보유·관심 종목의 관련 이슈를 찾고 있어요.
-      </p>
+      <LoadingIndicator
+        label="보유·관심 종목의 관련 이슈를 찾고 있어요."
+        className={`${NOTE} flex min-h-8 w-full`}
+      />
     );
   if (query.status === 'error')
     return (

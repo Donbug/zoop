@@ -55,6 +55,11 @@ import {
   freeViewport,
   type Rect,
 } from './graph-geometry';
+import {
+  DEFAULT_GRAPH_ZOOM,
+  MAX_GRAPH_ZOOM,
+  MIN_GRAPH_ZOOM,
+} from './graph-zoom-range';
 
 const noHighlightedEdges: string[] = [];
 
@@ -186,7 +191,6 @@ export default function GraphCanvas({
     null,
   );
   const instance = useRef<Graph | null>(null);
-  const [zoom, setZoom] = useState(1);
   const [dragAnchor, setDragAnchor] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -642,6 +646,7 @@ export default function GraphCanvas({
     maxZoom = 1.5,
     // 사용자가 맞춤을 누르거나 배치를 바꾼 경우만 움직인다. 처음 그릴 때·크기가 바뀔 때는 바로 맞춘다.
     animate: false | Extract<CameraMove, 'fit' | 'layout'> = false,
+    rangeOnly = false,
   ) {
     const host = container.current;
     if (!host || graph.destroyed || !host.clientWidth || !host.clientHeight)
@@ -708,14 +713,27 @@ export default function GraphCanvas({
       });
     const safe = freeViewport(host.clientWidth, host.clientHeight, obstacles);
     if (safe.width < 40 || safe.height < 40) return;
-    const footprints = graph
+    const visibleNodes = graph
       .getNodeData()
-      .filter(
-        (node) =>
-          node.style?.visibility !== 'hidden' &&
-          (!ids || ids.has(String(node.id))),
-      )
-      .map(fitFootprint);
+      .filter((node) => node.style?.visibility !== 'hidden');
+    const allFootprints = visibleNodes.map(fitFootprint);
+    if (!allFootprints.length) return;
+    // The zoom-out floor is the scale that keeps the full visible graph inside
+    // the unobstructed viewport, with 0.53 as the floor for naturally small maps.
+    // Recompute after data, layout and viewport changes.
+    const wholeGraphFit = fitZoom(allFootprints, safe, MAX_GRAPH_ZOOM);
+    const zoomOutFloor = Math.max(
+      MIN_GRAPH_ZOOM,
+      Math.min(DEFAULT_GRAPH_ZOOM, wholeGraphFit.zoom),
+    );
+    graph.setZoomRange([zoomOutFloor, MAX_GRAPH_ZOOM]);
+    if (graph.getZoom() < zoomOutFloor) await graph.zoomTo(zoomOutFloor, false);
+    if (rangeOnly) return;
+    const footprints = ids
+      ? visibleNodes
+          .filter((node) => ids.has(String(node.id)))
+          .map(fitFootprint)
+      : allFootprints;
     if (!footprints.length) return;
     const fit = fitZoom(footprints, safe, maxZoom);
     const motion = animate ? cameraMotion(animate) : false;
@@ -1160,6 +1178,8 @@ export default function GraphCanvas({
             : [],
         );
         if (graph.destroyed) return;
+        await fitVisibleGraph(graph, undefined, MAX_GRAPH_ZOOM, false, true);
+        if (graph.destroyed) return;
         const renderMinimap = minimapOnDataChange(graph);
         renderedData.current = rendered;
         await syncVisualStates(graph, rendered);
@@ -1212,8 +1232,11 @@ export default function GraphCanvas({
         if (moving) renderMinimap?.();
         if (defaultZoomPending.current) {
           defaultZoomPending.current = false;
-          await graph.zoomTo(0.53, false);
-          setZoom(0.53);
+          const initialZoom = Math.min(
+            DEFAULT_GRAPH_ZOOM,
+            graph.getZoomRange()?.[0] ?? MIN_GRAPH_ZOOM,
+          );
+          await graph.zoomTo(initialZoom, false);
           followFit.current = false;
         }
         if (
@@ -1418,7 +1441,6 @@ export default function GraphCanvas({
       await document.fonts.ready;
       if (disposed || !host) return;
       setRenderError(false);
-      setZoom(1);
       lastFocused.current = null;
       graph = new Graph({
         container: host,
@@ -1440,7 +1462,7 @@ export default function GraphCanvas({
             enable: () => pinchEnabled(),
           },
         ],
-        zoomRange: [0.01, 4],
+        zoomRange: [MIN_GRAPH_ZOOM, MAX_GRAPH_ZOOM],
         ...stateStyles(),
       });
       graph.on('node:dblclick', (event: IElementEvent) =>
@@ -1483,7 +1505,6 @@ export default function GraphCanvas({
         if (!graph || disposed) return;
         try {
           const nextZoom = graph.getZoom();
-          setZoom(nextZoom);
           // 이름표 크기와 겹침은 배율에만 달려 있어서, 끌어서 옮기기만 하면 다시 재지 않는다.
           if (Math.abs(nextZoom - previousZoom) > 0.0001) scheduleReading();
           if (
@@ -1617,8 +1638,11 @@ export default function GraphCanvas({
         followFit.current = false;
         await graph.zoomTo(
           Math.max(
-            0.01,
-            Math.min(4, graph.getZoom() * (action === 'in' ? 1.2 : 1 / 1.2)),
+            MIN_GRAPH_ZOOM,
+            Math.min(
+              MAX_GRAPH_ZOOM,
+              graph.getZoom() * (action === 'in' ? 1.2 : 1 / 1.2),
+            ),
           ),
           cameraMotion('zoom'),
         );
@@ -1855,9 +1879,6 @@ export default function GraphCanvas({
             focusActive={focusLayout && Boolean(focusId)}
           />
         )}
-        <output className="max-md:sr-only text-body!">
-          {Math.round(zoom * 100)}% · 드래그로 이동 · 휠로 확대
-        </output>
       </div>
       {selectedNode && (
         // 선택 안내는 화면에 띄우지 않고 보조 기술에만 알린다(선택 내용은 상세 패널이 보여 준다).

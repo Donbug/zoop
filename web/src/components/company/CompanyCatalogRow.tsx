@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import CompanyLogo from '@/components/common/CompanyLogo';
+import { LoadingSpinner } from '@/components/common/LoadingIndicator';
 import { useCompanyResource } from '@/hooks/useCompanyResource';
 import StockQuote from '@/components/stocks/StockQuote';
 import type { Company } from '@/types/company/detail';
@@ -49,7 +50,15 @@ export default function CompanyCatalogRow({
           </span>
         ) : (
           <small className="block text-caption text-zoop-muted">
-            {row?.ticker ?? (detail.loading ? '확인 중…' : '코드 미제공')}
+            {row?.ticker ??
+              (detail.loading ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span className="sr-only">종목 코드 확인 중</span>
+                </>
+              ) : (
+                '코드 미제공'
+              ))}
           </small>
         )}
         {detail.error && (

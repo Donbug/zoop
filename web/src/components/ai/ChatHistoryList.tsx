@@ -5,6 +5,9 @@ import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import { useCursorPages } from '@/hooks/useCursorPages';
 import { formatKst } from '@/util/format';
 import type { ChatConversationSummary } from '@/types/ai';
+import LoadingIndicator, {
+  LoadingSpinner,
+} from '@/components/common/LoadingIndicator';
 
 // D-AI-02 대화 기록(와이어프레임 없음, 임시 설계): AI 질문 창 안에서 지난 대화를 고르거나 삭제한다.
 // 목록은 저장된 대화만 읽고 모델을 부르지 않는다. 삭제는 서버가 deleteEnabled로 연 경우에만 보여 준다
@@ -61,9 +64,10 @@ export default function ChatHistoryList({
       <section className={ui.section} aria-labelledby="ai-chat-history">
         <h3 id="ai-chat-history">대화 기록</h3>
         {history.status === 'loading' && (
-          <p className={ui.muted} role="status">
-            대화 기록을 불러오고 있어요.
-          </p>
+          <LoadingIndicator
+            label="대화 기록을 불러오고 있어요."
+            className={`${ui.muted} flex min-h-10 w-full`}
+          />
         )}
         {history.status === 'error' && (
           <div role="alert">
@@ -158,7 +162,14 @@ export default function ChatHistoryList({
             disabled={history.loadingMore}
             onClick={history.loadMore}
           >
-            {history.loadingMore ? '불러오는 중' : '더 보기'}
+            {history.loadingMore ? (
+              <>
+                <LoadingSpinner size="sm" />
+                <span className="sr-only">불러오는 중</span>
+              </>
+            ) : (
+              '더 보기'
+            )}
           </button>
         )}
         {history.moreError && (

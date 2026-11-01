@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { Link } from 'react-router-dom';
 import type { BriefingItem, BriefingResponse } from '@/types/briefing';
 import { issueAnchor } from '@/util/briefingIssueView';
@@ -63,11 +64,16 @@ export default function BriefingIssueList({
         )}
       </div>
       {!items || items.length === 0 ? (
-        <p className={EMPTY}>
-          {items
-            ? '이 회차의 선정 기준을 충족한 핵심 이슈가 없어요.'
-            : '이 회차의 핵심 이슈를 준비하고 있어요.'}
-        </p>
+        !items ? (
+          <LoadingIndicator
+            label="이 회차의 핵심 이슈를 준비하고 있어요."
+            className={`${EMPTY} flex min-h-12 w-full`}
+          />
+        ) : (
+          <p className={EMPTY}>
+            이 회차의 선정 기준을 충족한 핵심 이슈가 없어요.
+          </p>
+        )
       ) : (
         <ol>
           {[...items]

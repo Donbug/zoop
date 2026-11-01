@@ -7,6 +7,7 @@ import { getMyFeedback } from '@/apis/feedback/feedback';
 import FeedbackButtons from '@/components/common/FeedbackButtons';
 import BriefingPreviewFeedback from './BriefingPreviewFeedback';
 import { validIssueIntelligence } from '@/util/issueIntelligence';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import type { FeedbackValue } from '@/types/feedback';
@@ -331,9 +332,10 @@ export default function PublishedBriefing({
         aria-busy={loading}
       >
         {loading && (
-          <p role="status" className="text-caption text-zoop-muted">
-            브리핑을 불러오고 있어요.
-          </p>
+          <LoadingIndicator
+            label="브리핑을 불러오고 있어요."
+            className="flex min-h-16 w-full text-caption text-zoop-muted"
+          />
         )}
         {error && (
           <p role="alert" className={EMPTY}>

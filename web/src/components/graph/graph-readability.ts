@@ -1,6 +1,7 @@
 import type { Graph, GraphData } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import { intersects, screenLabelSize, type Rect } from './graph-geometry';
+import { MIN_GRAPH_ZOOM } from './graph-zoom-range';
 
 export type ReadingContext = {
   zoom: number;
@@ -76,7 +77,7 @@ export function readingStyles(
   data: GraphResponse,
   context: ReadingContext,
 ): GraphData {
-  const zoom = Math.max(0.01, context.zoom);
+  const zoom = Math.max(MIN_GRAPH_ZOOM, context.zoom);
   const byId = new Map(data.nodes.map((n) => [n.id, n]));
   const related = new Set(context.anchor ? [context.anchor] : []);
   for (const e of base.edges ?? [])

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import ErrorNotice from '@/components/common/ErrorNotice';
-import GraphIcon from '@/components/graph/GraphIcon';
+import LoadingIndicator, {
+  LoadingSpinner,
+} from '@/components/common/LoadingIndicator';
 import StockList from '@/components/stocks/StockList';
 import StockSearchForm from '@/components/stocks/StockSearchForm';
 import { getCompanyBrief, searchCompanies } from '@/apis/companies/companies';
@@ -308,13 +310,10 @@ function StocksSession() {
 
   return (
     <section
-      className="mx-auto w-full max-w-[800px] text-zoop-ink"
+      className="mx-auto w-full max-w-[672px] text-zoop-ink"
       data-screen-id="D-STK-01"
     >
-      <h1 className="flex items-center gap-2.5 text-display font-[750] tracking-[-0.045em]">
-        <GraphIcon name="search" size={24} />
-        종목
-      </h1>
+      <h1 className="text-display font-[750] tracking-[-0.045em]">종목</h1>
       <StockSearchForm
         draft={draft}
         onDraftChange={setDraft}
@@ -324,7 +323,7 @@ function StocksSession() {
       <div
         role="group"
         aria-label="종목 범위"
-        className="mt-4 inline-flex h-[38px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-soft p-[3px]"
+        className="mt-4 flex flex-wrap gap-2"
       >
         {(
           [
@@ -337,7 +336,7 @@ function StocksSession() {
             type="button"
             aria-pressed={scope === value}
             onClick={() => changeScope(value)}
-            className="min-w-[76px] rounded-[2px] text-caption font-semibold text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:text-zoop-ink aria-pressed:shadow-[0_0_0_0.5px_#1a1a1a14]"
+            className="h-10 min-w-[112px] rounded-full border border-zoop-line bg-zoop-paper px-4 text-caption font-semibold text-zoop-ink transition-colors aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper"
           >
             {label}
           </button>
@@ -428,9 +427,10 @@ function StocksSession() {
           </Link>
         </p>
       ) : listLoading ? (
-        <p role="status" className="mt-5 text-caption text-zoop-muted">
-          종목을 불러오고 있어요
-        </p>
+        <LoadingIndicator
+          label="종목을 불러오고 있어요"
+          className="mt-5 flex min-h-10 w-full"
+        />
       ) : scope === 'all' && first.status === 'error' ? (
         <div className="mt-5 text-caption text-zoop-muted">
           <ErrorNotice
@@ -484,7 +484,14 @@ function StocksSession() {
               disabled={moreState === 'loading'}
               onClick={() => void loadMore()}
             >
-              {moreState === 'loading' ? '불러오고 있어요' : '더 보기'}
+              {moreState === 'loading' ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span className="sr-only">불러오고 있어요</span>
+                </>
+              ) : (
+                '더 보기'
+              )}
             </button>
           )}
           {scope === 'all' && moreState === 'error' && (

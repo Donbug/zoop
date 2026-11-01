@@ -6,6 +6,7 @@ import { safeArticleUrl } from '@/components/graph/event-format';
 import { briefingTime } from '@/util/briefingTime';
 import { BODY, NOTE, FOCUS_RING } from './briefingStyles';
 import ImpactCue from '@/components/common/ImpactCue';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 const labels = {
   positive: '긍정',
   negative: '부정',
@@ -90,9 +91,10 @@ export default function BriefingS3Impacts({
           </button>
         </p>
       ) : !value ? (
-        <p role="status" className={NOTE}>
-          기업별 영향을 불러오고 있습니다.
-        </p>
+        <LoadingIndicator
+          label="기업별 영향을 불러오고 있습니다."
+          className={`${NOTE} flex min-h-10 w-full`}
+        />
       ) : value.companies.length === 0 ? (
         <p className={NOTE}>이 이슈에는 저장된 기업 영향 평가가 없습니다.</p>
       ) : (

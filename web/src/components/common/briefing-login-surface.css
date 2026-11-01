@@ -31,3 +31,18 @@
 .briefing-login-surface .service-page-main {
   color: var(--zoop-ink);
 }
+
+/* D-STK-01 adopts D-AUT-01's quiet paper surface while retaining the service navigation. */
+.service-surface.stocks-login-surface {
+  background: var(--color-zoop-paper);
+}
+
+.stocks-login-surface .relationship-header,
+.stocks-login-surface .service-page-main,
+.stocks-login-surface .service-bottom-nav {
+  background-color: var(--color-zoop-paper);
+}
+
+.stocks-login-surface .service-page-main {
+  color: var(--zoop-ink);
+}

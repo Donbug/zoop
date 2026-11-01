@@ -2,6 +2,7 @@ import { useCallback, type ReactNode } from 'react';
 import { getCompanyQuote } from '@/apis/companies/companies';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { formatMoney } from '@/util/format';
+import { LoadingSpinner } from '@/components/common/LoadingIndicator';
 
 /** 등락률(비율)을 화살표와 부호가 붙은 백분율로. 오르면 빨강, 내리면 파랑(국내 관례) */
 export function ChangeRate({
@@ -65,7 +66,7 @@ export default function StockQuote({ companyId }: { companyId: string }) {
   if (quote.status === 'loading') {
     return (
       <Frame label="시세 불러오는 중">
-        <span className={muted}>…</span>
+        <LoadingSpinner size="sm" />
       </Frame>
     );
   }
@@ -79,7 +80,7 @@ export default function StockQuote({ companyId }: { companyId: string }) {
   if (quote.data.status === 'unavailable') {
     return (
       <Frame>
-        <span className={muted}>시세 없음</span>
+        <span className={muted}>-</span>
       </Frame>
     );
   }

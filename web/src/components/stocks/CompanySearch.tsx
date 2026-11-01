@@ -1,5 +1,6 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import ErrorNotice from '@/components/common/ErrorNotice';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import CompanyMark from '@/components/stocks/CompanyMark';
 import HeldBadge from '@/components/stocks/HeldBadge';
 import { searchCompanies } from '@/apis/companies/companies';
@@ -77,9 +78,10 @@ export default function CompanySearch({
       {query && (
         <div aria-live="polite" aria-busy={search.status === 'loading'}>
           {search.status === 'loading' && (
-            <p role="status" className="text-body text-zoop-ink">
-              ‘{query}’ 종목을 찾고 있어요
-            </p>
+            <LoadingIndicator
+              label={`‘${query}’ 종목을 찾고 있어요`}
+              className="flex min-h-10 w-full text-body"
+            />
           )}
           {search.status === 'error' && (
             <ErrorNotice
