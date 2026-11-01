@@ -383,6 +383,29 @@ class ChatAgentPathEngineTest {
     }
 
     @Test
+    void aRelationOnlyTheWebReportsGetsNoMapTargetOrAction() {
+        // D-AI-02: the web reports a relation; only reads of the map may point at the map.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH));
+        var section = new Section("web_reported", "두 회사가 협력한다고 보도됐어요.", List.of("r1"), List.of(HIT));
+        agent.results = List.of(webResult());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+
+        agent.answer = new ChatGeneratedAnswer(List.of(section), List.of(), List.of(HIT));
+        assertEquals(new ChatEngineOutcome.Failed("validation_failed", null, false),
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))), "a web hit is no map target");
+
+        agent.answer = new ChatGeneratedAnswer(List.of(section), List.of(), List.of());
+        ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+
+        assertEquals("web_reported", result.answerBasis());
+        assertEquals(List.of(), result.graphTargets());
+        assertEquals(List.of(), result.uiActions());
+    }
+
+    @Test
     void anAgentAnswerCitingWhatNoCallReturnedFailsValidation() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
                 List.of(HYNIX)));
