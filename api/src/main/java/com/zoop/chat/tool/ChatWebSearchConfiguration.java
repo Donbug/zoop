@@ -1,6 +1,7 @@
 package com.zoop.chat.tool;
 
 import java.time.Clock;
+import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -24,7 +25,9 @@ public class ChatWebSearchConfiguration {
     }
 
     @Bean
-    ChatWebSearchTool chatWebSearchTool(ChatWebSearchProvider provider, Clock clock) {
-        return new ChatWebSearchTool(provider, clock);
+    ChatWebSearchTool chatWebSearchTool(ChatWebSearchProvider provider, Clock clock,
+            @Value("${zoop.chat.web.cache-ttl:PT5M}") String cacheTtl,
+            @Value("${zoop.chat.web.cache-max-entries:256}") int cacheEntries) {
+        return new ChatWebSearchTool(provider, clock, Duration.parse(cacheTtl), cacheEntries);
     }
 }

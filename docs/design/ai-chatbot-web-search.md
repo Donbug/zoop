@@ -1,6 +1,6 @@
 # ZOOP AI 챗봇 보조 웹 검색 설계
 
-문서 상태: 2026-10-28 팀 결정 · 서버 도구·예산, agent 경로 승인 gate, Q02 기본 검색과 요구별 gate 구현(2026-10-31), 대상·기간·필수 필드·인용 coverage와 Q07 2개 초과 선택 확인 구현(2026-11-02, [api/docs/chat-web-search.md](../../api/docs/chat-web-search.md)), 답변 인용 계약(`web_reported`·`web_result`, 2026-10-30) · 공급자/출시 확인 별도
+문서 상태: 2026-10-28 팀 결정 · 서버 도구·예산, agent 경로 승인 gate, Q02 기본 검색과 요구별 gate 구현(2026-10-31), 대상·기간·필수 필드·인용 coverage와 Q07 2개 초과 선택 확인 및 인스턴스 로컬 공급자 요청 캐시·single-flight 구현(2026-11-02, [api/docs/chat-web-search.md](../../api/docs/chat-web-search.md)), 답변 인용 계약(`web_reported`·`web_result`, 2026-10-30) · 공급자/출시 확인 별도
 
 기준 정책: [ZOOP-AIG-001 v0.11](../ZOOP_AI_거버넌스_정책.md) / [설계 요약](ai-chatbot-design-summary.md) / [Luna MCP 실행 계약](ai-chatbot-mcp-actions.md)
 

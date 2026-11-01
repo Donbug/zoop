@@ -7,9 +7,10 @@
 | 있음 (2026-11-02) | 아직 없음 |
 | --- | --- |
 | `web.search` 도구(`ChatWebSearchTool`), 공급자 포트(`ChatWebSearchProvider`), 합성 공급자 | 실제 공급자(미선정), 공급자 키·약관·처리 국가 결정 |
-| 검색어 검사(`ChatWebQueryPolicy`), 요구별 웹 gate(개념 요구의 기본 1회 검색, 사실 요구의 내부 미충족 뒤 검색, Q01 요구 제외), 대상·기간·필수 필드·인용 coverage | 같은 정규화 검색어·기간·필터의 공급자 요청 캐시 |
+| 검색어 검사(`ChatWebQueryPolicy`), 요구별 웹 gate(개념 요구의 기본 1회 검색, 사실 요구의 내부 미충족 뒤 검색, Q01 요구 제외), 대상·기간·필수 필드·인용 coverage | 실제 공급자의 언어·기간·필터 계약(현재 검색 계약에는 정규화 검색어와 limit만 있음) |
 | agent 경로의 MCP 도구 노출과 Java 승인 gate(5장), direct Q07 웹 대상 3개 이상일 때 두 기업 선택 clarification, `web-search:<공급자>` 전송 grant 검사 | 실제 공급자의 재열람 권리(저장·보유 기간): 정해지기 전에는 합성 공급자 인용만 다시 보여 줌 |
 | 호출당 7초, job당 웹 2회(내부 6회와 별도), 회원 하루 20회·프로젝트 하루 500회 원자 예약 | 공급자 단가 기반 금액 상한·경보 |
+| 같은 정규화 공급자 요청의 인스턴스 로컬 TTL/LRU 캐시·single-flight | 여러 API 인스턴스가 공유하는 캐시와 실제 공급자 호출·비용 집계 |
 | `web_*` notice 문구(`ChatResults`), 답변 인용 계약(6장: `web_reported` basis, `Citation.sourceKind=web_result`, AI 단계 계약, 화면) | snapshot 저장 |
 
 라우터·서버 계획은 이 도구를 고르지 않는다(`ChatToolRegistry.bound()`에서 빠짐). 등록되면 MCP 도구로 노출되고, agent 경로에서만 Luna가 요청하고 서버가 승인한다(5장). 웹 결과는 `web_reported` 구간에서 `web_result`로 인용되고 Jev가 snippet과 대조하므로(6장), 웹 도구와 agent 경로를 함께 켤 수 있다(2026-10-30). 실제 공급자가 없어 합성 공급자로만 동작한다.
@@ -23,6 +24,7 @@ ZOOP_CHAT_WEB_ENABLED=true ZOOP_CHAT_WEB_PROVIDER=synthetic
 - 기본은 꺼짐이다. 켜고 공급자가 `synthetic`이 아니면 기동을 거절한다(실제 공급자가 없다).
 - 합성 공급자는 `api/src/main/resources/chat-web-fixtures/synthetic-v1.json`의 고정 결과만 돌려준다. 모든 주소는 예약 도메인(`example.com`·`example.org`·`example.net`) 아래여야 하고, 아니면 기동을 거절한다. 외부로 나가는 호출은 없다.
 - fixture에서 `unavailable`에 적힌 검색어는 공급자 장애(`tool_unavailable`)처럼 동작하고, 없는 검색어는 0건이다.
+- 공급자 요청 캐시는 기본 5분·인스턴스당 256개다. `ZOOP_CHAT_WEB_CACHE_TTL`(ISO-8601 duration, 최대 1시간)과 `ZOOP_CHAT_WEB_CACHE_MAX_ENTRIES`(1~10000)로 줄이거나 조정할 수 있다.
 
 ## 3. 도구 규칙
 
@@ -31,6 +33,13 @@ ZOOP_CHAT_WEB_ENABLED=true ZOOP_CHAT_WEB_PROVIDER=synthetic
 - **결과**: 검색어당 최대 5건. http(s)이고 계정 정보가 없는 주소, 비어 있지 않은 제목만 남긴다. 제목 300자, snippet 500자로 자른다. 같은 주소는 하나로 합친다. 결과 ID는 서버가 공급자와 주소로 만든 `web-<hash>`이다. 본문은 가져오지 않는다.
 - 웹 결과는 ZOOP 근거가 아니다. `evidenceIds`가 없고 항목 종류는 `web_result`다. 데이터 버전은 `web:<공급자>`다.
 - 공급자 장애는 `ChatToolUnavailable`이며 빈 결과로 바꾸지 않는다.
+
+### 공급자 요청 캐시
+
+- 키는 현재 공급자 요청 전체인 `provider + NFKC/단일 공백 검색어 + limit`다. 같은 키가 실행 중이면 한 provider 호출에 합류한다. 기간은 현재 검색어에 포함되며, 실제 공급자 계약에 별도 언어·기간·필터가 생기면 캐시 키에도 반드시 추가한다.
+- 성공 결과와 성공한 0건은 원래 `searchedAt`과 함께 TTL 동안 재사용한다. timeout·장애·잘못된 provider 응답은 저장하지 않아 다음 승인 호출이 다시 시도할 수 있다.
+- TTL과 LRU 상한을 함께 적용해 무한히 보관하지 않는다. 현재 캐시는 API 인스턴스 로컬이므로 인스턴스를 넘는 중복 호출은 합치지 않는다.
+- 캐시 hit도 검색 승인·원장 예약 뒤에 발생하므로 job 2회와 회원·프로젝트 일일 시도 한도에는 그대로 포함된다. MCP의 같은 attempt 결과 재사용(`cachedFrom`)과 별개이며, 두 경로 모두 현재 model-send grant를 다시 검사한다.
 
 ## 4. 예산
 
@@ -78,7 +87,7 @@ agent가 읽을 수 없어 서버가 읽은 계획(기간이 있는 Q05, Q06, Q0
 ./api/gradlew -p api test --tests 'com.zoop.chat.tool.ChatWebSearch*' --tests 'com.zoop.chat.executor.ChatJobExecutorTest'
 ```
 
-- `ChatWebSearchToolTest`: 검색어 허용·거절, 합성 결과의 형태, 0건·장애, 공급자에 닿지 않는 거절, 쓸 수 없는 결과 제거·자르기·중복 합치기, 예약 도메인 밖 fixture 거절, 레지스트리가 실행은 하되 계획에 내놓지 않음.
+- `ChatWebSearchToolTest`: 검색어 허용·거절, 합성 결과의 형태, 0건·장애, 공급자에 닿지 않는 거절, 쓸 수 없는 결과 제거·자르기·중복 합치기, 예약 도메인 밖 fixture 거절, 정규화 키 재사용, TTL 만료, LRU 상한, 동시 single-flight, provider 실패 미캐시, 설정 상한, 레지스트리가 실행은 하되 계획에 내놓지 않음.
 - `ChatWebSearchConfigurationTest`: 기본 꺼짐, 공급자 없이 켜면 기동 거절, 합성 공급자로 켜면 등록.
 - `ChatJobExecutorTest`: job당 웹 2회와 내부 6회 분리, 회원·프로젝트 일일 한도의 전부 아니면 전무.
 - `ChatExecutorPostgresTest`(PostgreSQL): 한도 행의 원자 증가, 회원 거절 시 프로젝트 몫 미차감, 회원 탈퇴 시 회원 행 삭제.
