@@ -114,4 +114,28 @@ class AiPipelineClientConfigurationTest {
             }
         }
     }
+
+    @Test
+    void oneSharedPlaintextHostListReachesTheS1S2AndS3Clients() {
+        String[] clients = {"ZOOP_AI_CLIENT_ENABLED=true", "ZOOP_AI_CLIENT_BASE_URL=http://ai:8000", "ZOOP_AI_CLIENT_TOKEN=" + TOKEN,
+                "ZOOP_AI_EXTRACTION_CLIENT_ENABLED=true", "ZOOP_AI_EXTRACTION_CLIENT_BASE_URL=http://ai:8000",
+                "ZOOP_AI_EXTRACTION_CLIENT_TOKEN=" + TOKEN, "ZOOP_AI_RELATION_CLIENT_ENABLED=true",
+                "ZOOP_AI_RELATION_CLIENT_BASE_URL=http://ai:8000", "ZOOP_AI_RELATION_CLIENT_TOKEN=" + TOKEN};
+        runner.withPropertyValues(clients).withPropertyValues("ZOOP_AI_PLAINTEXT_HTTP_HOSTS=ai").run(context -> {
+            assertNull(context.getStartupFailure());
+            assertInstanceOf(HttpExtractionClient.class, context.getBean(ExtractionClient.class));
+            assertInstanceOf(HttpRelationClient.class, context.getBean(RelationClient.class));
+            assertNotNull(context.getBean(AiAnalysisClient.class));
+        });
+        runner.withPropertyValues(clients).run(context -> {
+            Throwable cause = context.getStartupFailure();
+            assertNotNull(cause, "plain http to a non-loopback host needs the list");
+            while (cause != null && !(cause instanceof AiClientConfigurationException)) {
+                cause = cause.getCause();
+            }
+            assertNotNull(cause);
+            assertTrue(cause.getMessage().endsWith(".base-url must use https unless the host is loopback or listed in "
+                    + "zoop.ai.plaintext-http-hosts"), cause.getMessage());
+        });
+    }
 }

@@ -2,6 +2,8 @@ package com.zoop.ai;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -10,14 +12,16 @@ import java.util.regex.Pattern;
  *
  * <ul>
  *   <li>{@code baseUri}: {@code https} for any non-loopback host; plain {@code http} only for the literal hosts
- *       {@code localhost}, {@code 127.0.0.1} and {@code [::1]}. No user info, query or fragment. A path prefix of plain
- *       segments is allowed for a reverse proxy mount.</li>
+ *       {@code localhost}, {@code 127.0.0.1} and {@code [::1]}, and for the exact hosts in {@code plaintextHttpHosts}
+ *       ({@code zoop.ai.plaintext-http-hosts}, empty by default; dev lists its in-VPC service name). No user info, query or
+ *       fragment. A path prefix of plain segments is allowed for a reverse proxy mount.</li>
  *   <li>{@code token}: the operator-issued bearer token of the app's principal, 32-512 characters of the service token alphabet.</li>
  *   <li>{@code connectTimeout} 100ms-30s, {@code requestTimeout} 100ms-120s (total deadline of one call),
  *       {@code maxResponseBytes} 64 KiB-32 MiB.</li>
  * </ul>
  */
-public record AiClientSettings(URI baseUri, String token, Duration connectTimeout, Duration requestTimeout, int maxResponseBytes) {
+public record AiClientSettings(URI baseUri, String token, Duration connectTimeout, Duration requestTimeout, int maxResponseBytes,
+                               Set<String> plaintextHttpHosts) {
     public static final int MAX_REQUEST_BYTES = 2_000_000;
     public static final Pattern TOKEN = Pattern.compile("[A-Za-z0-9._~+/-]{32,512}=*");
     private static final Pattern BASE_PATH = Pattern.compile("(/[A-Za-z0-9._~-]+)*/?");
@@ -27,7 +31,8 @@ public record AiClientSettings(URI baseUri, String token, Duration connectTimeou
         if (baseUri == null) {
             throw new AiClientConfigurationException("base-url", "is required");
         }
-        validateBase(baseUri);
+        plaintextHttpHosts = plaintextHttpHosts == null ? Set.of() : Set.copyOf(plaintextHttpHosts);
+        validateBase(baseUri, plaintextHttpHosts);
         if (token == null || !TOKEN.matcher(token).matches()) {
             throw new AiClientConfigurationException("token", "is missing or not a service bearer token");
         }
@@ -38,9 +43,15 @@ public record AiClientSettings(URI baseUri, String token, Duration connectTimeou
         }
     }
 
-    /** Parses a base URL string; the message never echoes the value. */
+    /** Parses a base URL string with no plaintext host beyond loopback; the message never echoes the value. */
     public static AiClientSettings of(String baseUrl, String token, Duration connectTimeout, Duration requestTimeout,
                                       int maxResponseBytes) {
+        return of(baseUrl, token, connectTimeout, requestTimeout, maxResponseBytes, Set.of());
+    }
+
+    /** Parses a base URL string; {@code plaintextHttpHosts} are lower-case host names also allowed over {@code http}. */
+    public static AiClientSettings of(String baseUrl, String token, Duration connectTimeout, Duration requestTimeout,
+                                      int maxResponseBytes, Set<String> plaintextHttpHosts) {
         if (baseUrl == null || baseUrl.isBlank()) {
             throw new AiClientConfigurationException("base-url", "is required");
         }
@@ -50,11 +61,11 @@ public record AiClientSettings(URI baseUri, String token, Duration connectTimeou
         } catch (java.net.URISyntaxException error) {
             throw new AiClientConfigurationException("base-url", "is not a valid URL");
         }
-        return new AiClientSettings(uri, token, connectTimeout, requestTimeout, maxResponseBytes);
+        return new AiClientSettings(uri, token, connectTimeout, requestTimeout, maxResponseBytes, plaintextHttpHosts);
     }
 
-    private static void validateBase(URI uri) {
-        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(java.util.Locale.ROOT);
+    private static void validateBase(URI uri, Set<String> plaintextHttpHosts) {
+        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
         String host = uri.getHost();
         if (!(scheme.equals("http") || scheme.equals("https")) || host == null) {
             throw new AiClientConfigurationException("base-url", "must be an absolute http(s) URL with a host");
@@ -68,8 +79,10 @@ public record AiClientSettings(URI baseUri, String token, Duration connectTimeou
                 || path.endsWith("/.")) {
             throw new AiClientConfigurationException("base-url", "path must be plain segments");
         }
-        if (scheme.equals("http") && !isLoopback(host)) {
-            throw new AiClientConfigurationException("base-url", "must use https unless the host is loopback");
+        String name = host.toLowerCase(Locale.ROOT);
+        if (scheme.equals("http") && !isLoopback(name) && !plaintextHttpHosts.contains(name)) {
+            throw new AiClientConfigurationException("base-url",
+                    "must use https unless the host is loopback or listed in zoop.ai.plaintext-http-hosts");
         }
     }
 

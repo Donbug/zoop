@@ -9,10 +9,11 @@ import org.springframework.context.annotation.Configuration;
 /** Off by default and independent of the other AI clients: the graph handoff import and the document import read observations over HTTP ({@code observation-source=http}). */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = AiObservationExportClientProperties.PREFIX, name = "enabled", havingValue = "true")
-@EnableConfigurationProperties(AiObservationExportClientProperties.class)
+@EnableConfigurationProperties({AiObservationExportClientProperties.class, AiTransportProperties.class})
 public class AiObservationExportClientConfiguration {
     @Bean
-    HttpObservationExportClient aiObservationExportClient(AiObservationExportClientProperties properties) {
-        return new HttpObservationExportClient(properties.toSettings());
+    HttpObservationExportClient aiObservationExportClient(AiObservationExportClientProperties properties,
+            AiTransportProperties transport) {
+        return new HttpObservationExportClient(properties.toSettings(transport));
     }
 }

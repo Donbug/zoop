@@ -15,6 +15,7 @@ import com.zoop.ai.AiClientSettings;
 import com.zoop.ai.config.AiExtractionClientProperties;
 import com.zoop.ai.config.AiPlanAdmissionClientProperties;
 import com.zoop.ai.config.AiRelationClientProperties;
+import com.zoop.ai.config.AiTransportProperties;
 import com.zoop.ai.http.HttpExtractionClient;
 import com.zoop.ai.http.HttpPlanAdmissionClient;
 import com.zoop.ai.http.HttpRelationClient;
@@ -30,17 +31,18 @@ public class AnalyzePlanConfiguration {
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnProperty(prefix = "zoop.analysis.analyze-plan", name = "enabled", havingValue = "true")
     @EnableConfigurationProperties({AiPlanAdmissionClientProperties.class, AiExtractionClientProperties.class,
-            AiRelationClientProperties.class, ReviewSyncProperties.class})
+            AiRelationClientProperties.class, ReviewSyncProperties.class, AiTransportProperties.class})
     static class Enabled {
         @Bean
         ServiceBinding analyzePlanServiceBinding(AnalyzePlanProperties properties,
                 AiPlanAdmissionClientProperties admission, AiExtractionClientProperties extraction,
-                AiRelationClientProperties relation, HttpPlanAdmissionClient admissionClient,
+                AiRelationClientProperties relation, AiTransportProperties transport, HttpPlanAdmissionClient admissionClient,
                 HttpExtractionClient extractionClient, HttpRelationClient relationClient) {
             if (!admission.enabled() || !extraction.enabled() || !relation.enabled()) {
                 throw new IllegalArgumentException("analyze-plan requires all three enabled production AI clients");
             }
-            return validateBinding(properties, admission.toSettings(), extraction.toSettings(), relation.toSettings());
+            return validateBinding(properties, admission.toSettings(transport), extraction.toSettings(transport),
+                    relation.toSettings(transport));
         }
 
         @Bean

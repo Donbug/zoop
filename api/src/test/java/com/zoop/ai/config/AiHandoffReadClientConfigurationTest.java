@@ -50,7 +50,7 @@ class AiHandoffReadClientConfigurationTest {
                     var properties = context.getBean(AiHandoffReadClientProperties.class);
                     assertEquals(16 * 1024 * 1024, properties.maxResponseBytes());
                     assertEquals(java.time.Duration.ofSeconds(60), properties.requestTimeout());
-                    assertEquals("/ai", properties.toSettings().baseUri().getPath());
+                    assertEquals("/ai", properties.toSettings(context.getBean(AiTransportProperties.class)).baseUri().getPath());
                     assertFalse(properties.toString().contains(TOKEN));
                     assertTrue(context.getBeansOfType(HandoffExposureClient.class).isEmpty());
                 });
@@ -75,5 +75,39 @@ class AiHandoffReadClientConfigurationTest {
                         assertFalse(cause.getMessage().contains("outside.example"), cause.getMessage());
                     });
         }
+    }
+
+    @Test
+    void plainHttpReachesOnlyTheListedInVpcHost() {
+        String[] client = {"ZOOP_AI_HANDOFF_READ_CLIENT_ENABLED=true", "ZOOP_AI_HANDOFF_READ_CLIENT_TOKEN=" + TOKEN};
+        runner.withPropertyValues(client).withPropertyValues("ZOOP_AI_HANDOFF_READ_CLIENT_BASE_URL=http://ai:8000")
+                .run(context -> assertEquals("zoop.ai.handoff-read-client.base-url must use https unless the host is loopback or "
+                        + "listed in zoop.ai.plaintext-http-hosts", configurationFailure(context.getStartupFailure()).getMessage()));
+        runner.withPropertyValues(client).withPropertyValues("ZOOP_AI_HANDOFF_READ_CLIENT_BASE_URL=http://ai:8000",
+                "ZOOP_AI_PLAINTEXT_HTTP_HOSTS=ai").run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertEquals(java.util.Set.of("ai"), context.getBean(AiTransportProperties.class).hosts());
+                    var settings = context.getBean(AiHandoffReadClientProperties.class)
+                            .toSettings(context.getBean(AiTransportProperties.class));
+                    assertEquals("http://ai:8000", settings.baseUri().toString());
+                });
+        runner.withPropertyValues(client).withPropertyValues("ZOOP_AI_HANDOFF_READ_CLIENT_BASE_URL=http://outside.example:8000",
+                "ZOOP_AI_PLAINTEXT_HTTP_HOSTS=ai").run(context -> assertTrue(configurationFailure(context.getStartupFailure())
+                        .getMessage().startsWith("zoop.ai.handoff-read-client.base-url ")));
+        runner.withPropertyValues(client).withPropertyValues("ZOOP_AI_HANDOFF_READ_CLIENT_BASE_URL=http://ai:8000",
+                "ZOOP_AI_PLAINTEXT_HTTP_HOSTS=*.internal").run(context -> {
+                    AiClientConfigurationException failure = configurationFailure(context.getStartupFailure());
+                    assertEquals("zoop.ai.plaintext-http-hosts must list lower-case host names only", failure.getMessage());
+                });
+    }
+
+    private static AiClientConfigurationException configurationFailure(Throwable failure) {
+        assertNotNull(failure);
+        Throwable cause = failure;
+        while (cause != null && !(cause instanceof AiClientConfigurationException)) {
+            cause = cause.getCause();
+        }
+        assertNotNull(cause, String.valueOf(failure));
+        return (AiClientConfigurationException) cause;
     }
 }

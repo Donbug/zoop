@@ -155,6 +155,10 @@ zoop:
       interval: ${ZOOP_ANALYSIS_REVIEW_SYNC_INTERVAL:60s}
       batch: ${ZOOP_ANALYSIS_REVIEW_SYNC_BATCH:20}
   ai:
+    # Exact host names (comma separated) every AI client below may also reach over plain http besides loopback. Empty by
+    # default: every other host needs https. Dev lists its in-VPC Service Connect name (ai) because it has no certificate;
+    # the bearer token and response bodies then travel unencrypted inside the VPC. Never set in production.
+    plaintext-http-hosts: ${ZOOP_AI_PLAINTEXT_HTTP_HOSTS:}
     client:
       # Internal S1 AI transport client. Disabled by default; the application starts without any AI setting.
       # When enabled, every value below is validated at startup and an invalid one fails startup (see api/docs/AI_INTEGRATION.md).
