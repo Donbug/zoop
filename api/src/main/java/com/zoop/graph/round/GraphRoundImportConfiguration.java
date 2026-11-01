@@ -8,9 +8,13 @@ import java.time.Clock;
 import javax.sql.DataSource;
 
 import com.zoop.ai.handoff.HandoffReadClient;
+import com.zoop.ai.observation.ObservationExportClient;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.artifact.storage.ArtifactStoreException;
 import com.zoop.document.importer.IngestionExportParser;
+import com.zoop.document.importer.IngestionExporter;
+import com.zoop.document.importer.IngestionExporters;
+import com.zoop.document.importer.ObservationSource;
 import com.zoop.document.importer.ProcessIngestionExporter;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.graph.importer.GraphHandoffImporter;
@@ -35,9 +39,11 @@ import org.springframework.transaction.support.TransactionOperations;
  *     (the auto-activation loads them), so the bridge writes into {@code zoop.graph.snapshot.artifact-root} and nowhere else;
  *     {@code fixture} is refused because its seeder activates versions;</li>
  * <li>{@code zoop.ai.handoff-read-client} is not enabled: there is no other way to read a handoff here;</li>
- * <li>{@code import-source=cli} and the S2-1 CLI, ledger directory or source registry is missing: the observation re-check still
- *     runs the installed {@code zoop-ai-ingest export --require-store} (local, single-instance operation); {@code http} is
- *     refused until the AI side's observation export route exists (#387 ③).</li>
+ * <li>{@code import-source=cli} and the S2-1 CLI, ledger directory or source registry is missing: the observation re-check
+ *     runs the installed {@code zoop-ai-ingest export --require-store} (local, single-instance operation);</li>
+ * <li>{@code import-source=http} without {@code zoop.ai.observation-export-client.enabled=true}, or with any of the three CLI
+ *     settings: the re-check asks ai/service's observation export route (scope {@code observation.read}), the path of an API
+ *     task without the AI CLI (ECS), and a CLI value nobody reads is refused like in the operator import.</li>
  * </ul>
  */
 @Configuration(proxyBeanMethods = false)
@@ -48,14 +54,15 @@ public class GraphRoundImportConfiguration {
 
     @Bean
     GraphRoundImportBridge graphRoundImportBridge(GraphRoundProperties properties, Environment environment,
-            ObjectProvider<HandoffReadClient> handoffReads, DocumentRegistryRepository registry, GraphHandoffRepository graph,
+            ObjectProvider<HandoffReadClient> handoffReads, ObjectProvider<ObservationExportClient> observationExports,
+            DocumentRegistryRepository registry, GraphHandoffRepository graph,
             GraphRoundRepository rounds, TransactionOperations transaction, DataSource dataSource, Clock clock) {
         Path root = artifactRoot(environment);
         HandoffReadClient client = handoffReads.getIfAvailable();
         if (client == null) {
             throw new GraphRoundConfigurationException("enabled", "requires zoop.ai.handoff-read-client.enabled=true");
         }
-        ProcessIngestionExporter ingestion = ingestionExporter(properties);
+        IngestionExporter ingestion = ingestionExporter(properties, observationExports);
         ArtifactFileStore store;
         try {
             store = ArtifactFileStore.at(root);
@@ -87,14 +94,21 @@ public class GraphRoundImportConfiguration {
         }
     }
 
-    private static ProcessIngestionExporter ingestionExporter(GraphRoundProperties properties) {
-        if ("http".equalsIgnoreCase(properties.importSource())) {
-            throw new GraphRoundConfigurationException("import-source",
-                    "http is not available yet (the AI side's observation export route is pending); use cli");
+    private static IngestionExporter ingestionExporter(GraphRoundProperties properties,
+            ObjectProvider<ObservationExportClient> observationExports) {
+        ObservationSource source = ObservationSource.parse(properties.importSource())
+                .orElseThrow(() -> new GraphRoundConfigurationException("import-source", "must be cli or http"));
+        if (source == ObservationSource.HTTP) {
+            unset("ingestion-cli", properties.ingestionCli());
+            unset("ingestion-state-dir", properties.ingestionStateDir());
+            unset("ingestion-sources", properties.ingestionSources());
         }
-        if (!"cli".equalsIgnoreCase(properties.importSource())) {
-            throw new GraphRoundConfigurationException("import-source", "must be cli or http");
-        }
+        return IngestionExporters.forSource(source, () -> cliExporter(properties), observationExports,
+                () -> new GraphRoundConfigurationException("import-source",
+                        "http requires zoop.ai.observation-export-client.enabled=true"));
+    }
+
+    private static ProcessIngestionExporter cliExporter(GraphRoundProperties properties) {
         Path cli = absolute("ingestion-cli", properties.ingestionCli());
         Path state = absolute("ingestion-state-dir", properties.ingestionStateDir());
         Path sources = absolute("ingestion-sources", properties.ingestionSources());
@@ -102,6 +116,10 @@ public class GraphRoundImportConfiguration {
         require(Files.isDirectory(state), "ingestion-state-dir", "must be an existing directory");
         require(Files.isRegularFile(sources), "ingestion-sources", "must be an existing file");
         return ProcessIngestionExporter.forPaths(cli, state, sources);
+    }
+
+    private static void unset(String setting, String value) {
+        require(value == null || value.isBlank(), setting, "must not be set with import-source=http");
     }
 
     private static Path absolute(String setting, String value) {

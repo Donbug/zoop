@@ -75,7 +75,8 @@ zoop:
       # command, read over the handoff-read client, written into zoop.graph.snapshot.artifact-root, which must be an artifact
       # source here). Needs zoop.ai.round-client, zoop.ai.handoff-read-client and zoop.analysis.analyze-plan enabled.
       # import-source cli runs the installed zoop-ai-ingest export --require-store for the observation re-check (local,
-      # single-instance operation); the round bridge rejects http until it is wired to the observation-export client.
+      # single-instance operation); http asks ai/service's observation export through zoop.ai.observation-export-client, which
+      # must then be enabled, and the three ingestion-* settings must be left unset (the API image has no AI CLI).
       enabled: ${ZOOP_GRAPH_ROUND_ENABLED:false}
       interval: ${ZOOP_GRAPH_ROUND_INTERVAL:PT15S}
       lease: ${ZOOP_GRAPH_ROUND_LEASE:PT2M}
@@ -216,7 +217,8 @@ zoop:
     observation-export-client:
       # Observation export route (scope observation.read): POST /internal/v1/observations/export runs the installed
       # zoop-ai-ingest export --require-store on the AI side for ONE observation and answers the CLI's JSON (document.text
-      # included). Used by the graph handoff import and the document import with observation-source=http. The AI child runs at most 45 s and the
+      # included). Used by the graph handoff import and the document import with observation-source=http, and by the web
+      # application's round bridge with zoop.graph.round.import-source=http. The AI child runs at most 45 s and the
       # answer is at most 16 MiB, so the request deadline stays above 45 s. One request = one observation; no batch, no job.
       enabled: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED:false}
       base-url: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL:}
