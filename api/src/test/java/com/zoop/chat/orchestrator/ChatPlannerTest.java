@@ -437,6 +437,19 @@ class ChatPlannerTest {
     }
 
     @Test
+    void approvedHelpAndScreenGuidesAreSeparateFixedReadsWithoutAGraph() {
+        Set<String> bound = Set.of("help.search", "screenSpec.read");
+        var plan = run(planner.plan(run(0, null, List.of("iss-selected")), decision(req("r1",
+                Map.of(ChatQueryType.Q01, 0.9), Map.of("help.search", 0.9, "screenSpec.read", 0.8))), bound));
+        var r1 = plan.requirements().getFirst();
+
+        assertEquals(List.of(ChatCapability.HELP_SEARCH, ChatCapability.SCREEN_SPEC_READ), r1.capabilities());
+        assertEquals(ChatPlan.TargetSource.SERVER, r1.targetSource());
+        assertTrue(r1.targets().isEmpty());
+        assertEquals(2, ChatPlanner.worstCaseCalls(plan), "each approved guide is one fixed-document read");
+    }
+
+    @Test
     void aPolicyReadAlongsideAGraphLookupStillNeedsTheGraph() {
         Set<String> bound = Set.of("company.read", "zoopPolicy.read");
         assertStop("guidance", "graph_unavailable", planner.plan(run(0, null), decision(

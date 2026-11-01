@@ -112,11 +112,23 @@ class ChatZoopDocsTest {
     }
 
     @Test
+    void anApprovedHelpGuideUsesTheSameImmutableQuoteAndCurrentVersionRules() {
+        var docs = new ChatZoopDocs(guideRegistry(), Clock.fixed(NOW, ZoneOffset.UTC));
+        var guide = docs.inEffect(ChatZoopDocs.HELP_GUIDE, null).orElseThrow();
+
+        assertEquals("guide-v1", guide.version());
+        assertEquals(ChatZoopDocs.HELP_GUIDE, guide.quotes().getFirst().docId());
+        assertEquals(guide.quotes().getFirst(), docs.byId(guide.quotes().getFirst().evidenceId()).orElseThrow());
+        assertEquals(Readability.READABLE, docs.check(guide.quotes().getFirst().evidenceId(), null).orElseThrow());
+        assertTrue(docs.inEffect(ChatZoopDocs.SCREEN_GUIDE, null).isEmpty());
+    }
+
+    @Test
     void anotherIdIsNotAZoopDocumentAndAnOutageIsUnavailable() {
         var docs = new ChatZoopDocs(registry(new AtomicReference<>("v1")), Clock.fixed(NOW, ZoneOffset.UTC));
         assertTrue(docs.check("ev-" + "f".repeat(64), null).isEmpty());
         assertTrue(docs.check("chat-tool-1", null).isEmpty());
-        assertTrue(docs.inEffect("help.map", null).isEmpty(), "only policies are registered");
+        assertTrue(docs.inEffect("help.map", null).isEmpty(), "only fixed approved document ids are accepted");
 
         var jdbc = mock(NamedParameterJdbcTemplate.class);
         when(jdbc.query(anyString(), any(SqlParameterSource.class), any(RowMapper.class)))
@@ -138,6 +150,7 @@ class ChatZoopDocsTest {
             String sql = i.getArgument(0);
             var mapper = (RowMapper<String[]>) i.getArgument(2);
             List<String[]> rows = new ArrayList<>();
+            if (sql.contains("chat_document_versions")) return rows;
             var rs = mock(java.sql.ResultSet.class);
             if (sql.contains("effective_at")) {
                 var params = (MapSqlParameterSource) i.getArgument(1);
@@ -156,6 +169,34 @@ class ChatZoopDocsTest {
                 when(row.getString("title_snapshot")).thenReturn("개인정보 처리방침");
                 rows.add(mapper.mapRow(row, rows.size()));
             }
+            return rows;
+        });
+        when(jdbc.queryForObject(anyString(), any(SqlParameterSource.class), eq(String.class))).thenReturn(BODY);
+        return jdbc;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static NamedParameterJdbcTemplate guideRegistry() {
+        var jdbc = mock(NamedParameterJdbcTemplate.class);
+        when(jdbc.query(anyString(), any(SqlParameterSource.class), any(RowMapper.class))).thenAnswer(i -> {
+            String sql = i.getArgument(0);
+            var mapper = (RowMapper<String[]>) i.getArgument(2);
+            List<String[]> rows = new ArrayList<>();
+            if (sql.contains("term_versions")) return rows;
+            var params = (MapSqlParameterSource) i.getArgument(1);
+            if (sql.contains("effective_at")) {
+                if (!ChatZoopDocs.HELP_GUIDE.equals(params.getValue("doc"))) return rows;
+                var row = mock(java.sql.ResultSet.class);
+                when(row.getString("version")).thenReturn("guide-v1");
+                when(row.getString("title")).thenReturn("서비스 이용 안내");
+                rows.add(mapper.mapRow(row, 0));
+                return rows;
+            }
+            var row = mock(java.sql.ResultSet.class);
+            when(row.getString("doc_id")).thenReturn(ChatZoopDocs.HELP_GUIDE);
+            when(row.getString("version")).thenReturn("guide-v1");
+            when(row.getString("title")).thenReturn("서비스 이용 안내");
+            rows.add(mapper.mapRow(row, 0));
             return rows;
         });
         when(jdbc.queryForObject(anyString(), any(SqlParameterSource.class), eq(String.class))).thenReturn(BODY);

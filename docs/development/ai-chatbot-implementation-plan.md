@@ -1,6 +1,6 @@
 # ZOOP AI 챗봇 구현 준비·개발 계획
 
-최초 기준일: 2026년 10월 21일 / 구현 상태 갱신: 2026년 10월 30일
+최초 기준일: 2026년 10월 21일 / 구현 상태 갱신: 2026년 11월 1일
 
 기준 정책: `ZOOP-AIG-001 v0.11` / 목표 설계 갱신: 2026-10-28 (날짜별 구현 기록과 구분)
 
@@ -50,7 +50,7 @@
 | 루트 웹 | `web/src/apis/chat`, `use-chat-conversation`, `AiChatDrawer`·`ChatJobCard`가 대화 생성·복원, 질문 접수·polling·취소·재시도와 답변·인용·확인 질문·실패 렌더링을 구현함(Vitest) | 구현됨. 타입은 손으로 쓴 `web/src/types/ai`이고 실제 백엔드·모델 종단 시험은 없음 |
 | AI worker | `zoop-ai-chat`이 `chat-router`(Jev), `chat-answer`(Luna), `chat-agent`(Luna Responses MCP), `chat-verification`(Jev)을 별도 계약·원장·grant·live gate로 실행함 | 구현됨, 기본 비활성. 임계값 보정과 실제 승인 호출은 별도 |
 | AI 내부 서비스 | `/internal/v1/chat-stages/{stage}`가 인증된 synchronous stage door로 구현되고 생성 OpenAPI에 포함됨 | 구현됨. 앱은 `HttpChatStageClient`로만 호출 |
-| 데이터 기반 | 기업·문서·evidence·공개 그래프 버전과 현재 권리 재검사 경로가 있고 `company.read`·`issue.read`·`evidence.resolve`·`graph.path.read`·`graph.version.diff`·`portfolio.scope.read`·`briefing.read`·`briefing.evidence`·`selectionRule.read`·`zoopPolicy.read`·`document.search`와 합성 공급자 `web.search`가 연결됨(`company.read`는 기업 카탈로그 개요를 `company_profile` 인용으로, `zoopPolicy.read`는 승인 약관을 `zoop_doc` 인용으로 전달) | Q01은 정책 문서만, Q02~Q08 도구 구현. Q01 도움말·화면 명세, 실제 웹 공급자와 종단 공개 시험은 추가 필요 |
+| 데이터 기반 | 기업·문서·evidence·공개 그래프 버전과 현재 권리 재검사 경로가 있고 `company.read`·`issue.read`·`evidence.resolve`·`graph.path.read`·`graph.version.diff`·`portfolio.scope.read`·`briefing.read`·`briefing.evidence`·`selectionRule.read`·`zoopPolicy.read`·`document.search`와 합성 공급자 `web.search`가 연결됨. Q01 승인 문서 저장소와 `help.search`·`screenSpec.read` 어댑터도 기본 비활성 gate로 구현됨 | Q01 실제 승인본 등록·활성화, 실제 웹 공급자와 종단 공개 시험은 추가 필요 |
 | 와이어프레임 | 네 정적 화면은 질문·되묻기·회수·조회 오류의 시각 기준을 제공하지만 동작 상태를 증명하지 않음 | 별도 상태 계약으로 로딩·오류·근거 수준·복구를 고정함 |
 
 결론적으로 백엔드의 저장·공개 API·작업 실행기·라우터·오케스트레이터·도구 레지스트리·Luna 생성·claim 단위 Jev 검증과 웹 D-AI-01~02b 연결은 구현돼 있다. Luna Responses MCP agent 경로도 기본 꺼진 상태로 구현돼 있다. 다만 미연결 도구, live spike, 평가 보정과 출시 증명은 남아 있다. 기능 플래그와 live gate는 기본적으로 꺼져 있으므로 “코드가 있음”은 “출시됨”이나 “실제 모델 호출 승인됨”을 뜻하지 않는다.
@@ -60,6 +60,8 @@
 Q06 `briefing.read`(2026-10-30, `chat-tools/v7`): 요구 문구의 날짜(오늘·어제·날짜)와 회차(아침·출근 → 출근, 저녁·퇴근 → 퇴근)로 발행 회차를 서버가 정하고(`briefing:<date>[:<edition>]`, 둘 다 없으면 최신 발행 회차), 질문이 기업을 지목하면 그 기업이 관련된 이슈만 남긴다. 공개 브리핑 조회(`GET /api/v1/briefings`)를 그대로 거쳐 권리·정정·제공 중단이 같게 적용되고, 발행되지 않았거나 중단된 회차, 질문 시점(asOf) 뒤에 발행된 회차는 읽을 이슈가 없다. 이슈의 근거는 실행의 고정 그래프 버전·asOf에서 지금 인용할 수 있는 것만 넘긴다. 회차를 요구 문구에서 정하므로 agent 경로(MCP)에는 노출하지 않는다.
 
 Q08 `selectionRule.read`(2026-10-30, `chat-tools/v8`, 사용자 결정): 질문이 지목한 이슈마다, 실행의 고정 그래프 버전에서 보이는 이슈만 (1) 지도 공개 기록(버전의 `review_revision` 이하 마지막 검수 결정의 종류·시점·경로와 `graph_version_rules`의 공개 규칙 제목·요약)과 (2) 요구 문구가 가리키는 발행 회차(없으면 최신)가 그 이슈를 골랐다면 순위·기록된 선정 이유·지금 인용 가능한 근거를 읽는다. 결정한 관리자와 관리자가 적은 사유 문장은 내보내지 않는다. AI 판정 사유 코드는 선정 이유가 아니라 보류·거절·오류 사유뿐이라 쓰지 않는다. 기록은 기사 근거가 아니므로 인용 없이 답할 수 있고(`recordsOnly`), Jev는 같은 기록을 `publication_record`·`briefing_selection` 서버 사실로 받아 검증한다. 검수 결정이 없으면 '기록 없음'이지 자동 승인으로 말하지 않는다. MCP에는 노출하지 않는다.
+
+Q01 `help.search`·`screenSpec.read`(2026-11-01, `chat-tools/v11`): `chat_document_versions`에 승인 근거·승인/시행 시각과 함께 등록한 불변 도움말(`help.service-guide`)·화면 설명(`screen.guide`)만 읽는다. 각 `##` 절은 결정적 `zoop_doc` 인용이며 과거 시점 조회도 현재 같은 버전이 시행 중일 때만 허용한다. 현재 migration은 저장소만 만들고 미승인 초안을 넣지 않는다. 두 어댑터는 `ZOOP_CHAT_APPROVED_DOCS_ENABLED=false`로 기본 비활성이며, 켤 때 두 현재 문서가 모두 존재하고 20절·절당 2,000자 계약을 지키지 않으면 기동을 거절한다. 따라서 구현 완료는 승인·출시 완료를 뜻하지 않는다.
 
 아래는 이미 구현된 direct 경로(`chat-tools/v5`)의 사용자 승인 결정이다. MCP 전환 뒤에도 같은 Tool Service의 동작 기준으로 유지하며, 목표 변경(예: Q07 `portfolio.scope.read`의 Java server-only 실행)은 2026-10-28 절을 따른다.
 
@@ -101,7 +103,7 @@ flowchart LR
 | 1 저장·job 수명주기 | 구현 | 복구본을 DB에 두므로 DB 장애 자체는 복구 대상이 아님 |
 | 2 오케스트레이터 | 부분 구현 | direct 경로 45초(단계 한도 실측 후). 서버 requirement coverage는 구현(2026-10-31, `route_summary.coverage`) |
 | 3 router·Luna agent | 부분 구현 | Jev router·Luna Responses MCP·Java 승인 루프는 구현(합성 replay로만 확인). 라우터 wire `dependsOn`도 구현(2026-10-30, `zoop-ai-chat-3`, 확신이 낮거나 요구가 대상을 지목하면 의존 없음). 승인 요청의 요구 매핑도 구현(2026-10-30, `zoop-ai-chat-4`). live 확인 |
-| 4 읽기 도구 | 부분 구현 | Q03(`document.search`는 기업별 문서 읽기, 2026-10-31. 본문 검색 색인은 없음), Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`·`briefing.evidence`, 2026-10-31), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 공급자) 구현, Q01 도움말·화면 명세 미연결, 실제 웹 공급자 미정 |
+| 4 읽기 도구 | 부분 구현 | Q03(`document.search`는 기업별 문서 읽기, 2026-10-31. 본문 검색 색인은 없음), Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`·`briefing.evidence`, 2026-10-31), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 공급자), Q01 승인 저장소·기본 비활성 어댑터 구현. Q01 승인본·활성화와 실제 웹 공급자 미정 |
 | 5 생성·출력 검증 | 구현(합성 회귀) | 서버 claim 분할과 claim별 support·`unsupportedCausality`, 입력 24k·답변 2k 구현. 실제 모델 보정은 단계 7 |
 | 6 웹 | 구현 | 관계·근거·내 종목 `uiActions[]`, OpenAPI 타입 생성 seam, 실제 백엔드와의 종단 확인 |
 | 7 평가·출시 | 부분 구현 | 고정 평가 세트 v1(대본 실행)만 있음. 실제 모델·데이터 평가와 임계값 보정, 보안·종단·배포 증명 |
@@ -220,7 +222,7 @@ Q07의 `portfolio.scope.read`는 Java server-only precondition으로 실행하�
 3. ~~Java Tool Service 추출, 원격 MCP endpoint·서비스 인증·크기/rate limit·grant, preflight direct 시작·circuit breaker~~ 구현
 4. ~~ai/service Luna Responses 전환, allowed_tools·Java 승인 continuation·usage/deadline~~ 구현(`chat-agent` 단계, direct의 `chat-answer`는 유지)
 5. ~~answerStatus/notices·부분 결과·재열람 guard의 DTO·migration·OpenAPI·웹 동시 변경~~ 구현(migration 없음)
-6. Q02~Q08 수직 도구와 웹 일일 한도는 구현. Q01 도움말·화면 명세와 웹 공급자·권리·개인정보는 남음
+6. Q02~Q08 수직 도구와 웹 일일 한도, Q01 승인 문서 저장소·기본 비활성 어댑터는 구현. Q01 실제 승인본·활성화와 웹 공급자·권리·개인정보는 남음
 7. 고정 fixture·live eval·부하·장애 시험과 기능 플래그 단계 활성화
 
 각 PR은 현재 저장·멱등·권한·호출 원장을 유지한다. MCP 서버와 Responses 연결만 먼저 합쳐 공개 계약을 앞서 내보내지 않는다.
