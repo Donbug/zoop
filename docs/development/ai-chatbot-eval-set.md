@@ -150,13 +150,13 @@ Q07에서 질문이 기업을 지목하는 경우(구현 계획 결정 (11))는 
 | Q02+Q03+Q04 복합 요구 | 필요한 조회 조합·중복 제거, 명시 요구 누락 없음, 최종 생성 1회 | 세트: `compound-concept-fact-and-path` |
 | 네 유형 이상 필수 요구 | top-3로 자르지 않음, 예산 초과 시 clarification | 세트: `compound-four-types`, `compound-too-many-requirements` |
 | Q01 단독 / Q01+Q03 | Q01 검색·웹 근거 차용 없음, 복합 질문의 Q03에만 필요 검색 | 세트: `compound-rule-and-fact`, `agent-rule-and-fact-web`, `agent-rule-never-searches` |
-| Q02~Q08 각각 검색 필요/불필요 쌍 | 필요한 경우만 검색, 내부 0건이 아니어도 외부 보완 가능 | 일부: `agent-fact-enough-no-web`, `agent-fact-gap-then-web`. "내부 0건이 아니어도" 판단은 구현이 없음 |
-| 웹에만 있고 내부 그래프에 없는 관계 | 외부 보도와 내부 경로 구분, 간선·포커스 대상 생성 금지 | 일부: 웹 구간 인용 분리는 `ChatAgentPathEngineTest`. 대상 생성 금지 시나리오는 없음 |
+| Q02~Q08 각각 검색 필요/불필요 쌍 | 필요한 경우만 검색, 내부 0건이 아니어도 외부 보완 가능 | 일부: `agent-fact-enough-no-web`, `agent-fact-gap-then-web`, `ChatMcpAgentTest.aRequirementAskingForAnOutsideSourceSearchesAfterItsOwnReadFoundSomething`. 내부 0건이 아닌 경우는 외부 출처 명시만 구현. 기간·세부 사실 판단은 구현이 없음 |
+| 웹에만 있고 내부 그래프에 없는 관계 | 외부 보도와 내부 경로 구분, 간선·포커스 대상 생성 금지 | 단위: `ChatAgentPathEngineTest.aRelationOnlyTheWebReportsGetsNoMapTargetOrAction` |
 | Q05/Q06/Q08 외부 정보 불일치 | 실제 차이·발행 회차·기록된 선정 이유를 웹으로 덮지 않음 | 없음. Q06·Q08은 agent 경로가 아니라 지금은 웹을 쓰지 않음 |
 | Q07 보조 검색 | 본인 범위 먼저 확인, 원문·식별자·수량·전체 포트폴리오 전송 없음 | 없음. Q07은 direct 경로라 지금은 웹을 쓰지 않음 |
 | 다음 턴 Q04→Q02 / 그 회사·최신 | 재분류, 검증된 문맥 승계, 명시 조건 우선·모호성 확인 | 일부: `ChatPlannerTest`의 턴 문맥 시험. 세트는 단일 턴만 다룸 |
 | polling·재열람 | 새 분류·검색·모델 호출·UI 동작 실행 없음 | 일부: `ChatResponseGuardTest`의 재열람 검사 |
-| Q03~Q08 내부 근거 충분/부족 쌍 | 충분하면 웹 0회, 부족·최신성·출처 요청이면 마지막 라운드에서만 웹 | 일부: `ChatMcpAgentTest.aWebSearchIsApprovedOnlyAfterAnInternalReadLeftSomethingUnmetAndOnlyForAQueryThatMayLeave`, `anotherRequirementsGapOpensNoSearch`. 최신성·출처 요청 판단은 없음 |
+| Q03~Q08 내부 근거 충분/부족 쌍 | 충분하면 웹 0회, 부족·최신성·출처 요청이면 마지막 라운드에서만 웹 | 일부: `ChatMcpAgentTest.aWebSearchIsApprovedOnlyAfterAnInternalReadLeftSomethingUnmetAndOnlyForAQueryThatMayLeave`, `anotherRequirementsGapOpensNoSearch`. 출처 요청은 `anOutsideSourceRequestStillWaitsForTheInternalReadInTheLoop`, `aReadCutByTheSendGrantOpensNoSearchEvenWhenItsRequirementAsksForAnOutsideSource`. 최신성 판단은 없음 |
 | 검색 0건 / timeout / unavailable | 전체 답변 유지, web_unavailable notice와 실제 미충족 limitation 분리 | 세트: `agent-concept-web-down`, `agent-concept-no-web-results` |
 | 배치 검색·재시도·기한 초과 | 총 8·내부 6·웹 2, job 45초, Luna 잔여 기한·마지막 10초 작성 예약 준수 | 단위: `ChatMcpAgentTest.sixInternalAndTwoWebCallsInThreeRoundsFitWhenAnInternalReadCameBackEmpty`, `ChatAgentPathEngineTest.anAgentStepThatCannotGetTheTimeAnAnswerNeedsEndsAsDeadlineGuard` |
 | 동일 logical call 동시·순차 중복 | single-flight 1회, 성공 0건 포함 요청 cache hit, 권한·grant 재검사 | 단위: `ChatMcpEndpointTest.aRepeatOfACallReusesWhatTheFirstReadAndStillCountsAsACall`, `identicalRequestsArrivingTogetherAreReadOnce`, `aReuseIsCheckedAgainstTheSendGrantsAsTheyAreNow` |
