@@ -30,8 +30,11 @@ def digest(value):
 def main():
     kit = RelKit(ROOT)
     PLAN_ROOT.mkdir(mode=0o700)
-    observations = [kit.ingest(f"online-{index}", [{"supplier": f"online-supplier-{index}", "html": page(EVT, SUP)}])[0]
+    slot = "2026-10-31T09:00:00+09:00"
+    observations = [kit.ingest(f"online-{index}", [{"supplier": f"online-supplier-{index}", "html": page(EVT, SUP)}], slot=slot)[0]
                     for index in range(3)]
+    selection = ROOT / "selection.json"
+    selection.write_text(canonical({"schemaVersion": "zoop-extraction-round-selection-1", "asOf": slot, "maxAgeSeconds": 3600}))
     replay = kit.replay("online-s2")
     for index, ref in enumerate(observations):
         article = kit.article(ref)
@@ -45,8 +48,8 @@ def main():
         descriptor.update(enqueueId=f"online-round-{index}", roundId=ref["roundId"], sourceId=ref["sourceId"])
         staging = ROOT / f"plan-{index}"
         done = subprocess.run([str(Path(sys.executable).parent / "zoop-ai-extract"), "plan-round", "--ingestion-state-dir", str(ROOT / "ingestion"),
-                               "--sources", str(kit.registry_path), "--replay", str(s2_replay), "--principal", "alpha", "--output", str(staging)],
-                              input=canonical(descriptor).encode(), capture_output=True, timeout=120)
+                               "--sources", str(kit.registry_path), "--replay", str(s2_replay), "--principal", "alpha", "--output", str(staging),
+                               "--selection", str(selection)], input=canonical(descriptor).encode(), capture_output=True, timeout=120)
         assert done.returncode == 0 and not done.stderr, "installed plan-round refused synthetic round"
         receipt = json.loads((staging / "receipt.json").read_bytes())
         target = PLAN_ROOT / receipt["planId"]

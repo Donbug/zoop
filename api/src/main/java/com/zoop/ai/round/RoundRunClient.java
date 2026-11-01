@@ -9,8 +9,8 @@ import java.util.Optional;
  */
 public interface RoundRunClient {
 
-    /** {@code POST /internal/v1/round-runs}: idempotent on the round id; a second request with the same id is the same run. */
-    RoundRun request(String roundId);
+    /** Send the immutable journal's original POST bytes with the same round identity. */
+    RoundRun requestRun(String roundId, byte[] body);
 
     /** {@code GET /internal/v1/round-runs/{roundId}}. */
     RoundRun runStatus(String roundId);

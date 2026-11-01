@@ -35,6 +35,7 @@ from .relation_runtime import RelationGate, RelationProcess
 from .runtime import Deadlines, WorkerProcess
 from .plan_authority import PlanAuthority, startup_mode, lock_creation_allowed
 from .plan_admission import PlanAdmissionService
+from .round_service import HandoffRouter, RoundService
 
 CONFIG_EXIT = 78
 
@@ -59,6 +60,7 @@ class Service:
     chat: ChatStages | None = None
     plans: PlanAdmissionService | None = None
     observation: ObservationReads | None = None
+    rounds: RoundService | None = None
 
 
 def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) -> Service:
@@ -119,6 +121,10 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
     exposure = (HandoffExposureReads(config, HandoffExposureProcess(config, deadlines), gate if config.handoff_exposure.shared_gate else None)
                 if config.handoff_exposure is not None else None)
     observation = ObservationReads(ObservationProcess(config, deadlines)) if config.observation is not None else None
+    rounds = (RoundService(config, gate, online_authority=online, relation_ledger=relation_ledger, log=emit, deadlines=deadlines)
+              if config.rounds is not None else None)
+    if rounds is not None:
+        handoff = HandoffRouter(handoff, rounds)
     starting: dict[str, object] = {"event": "service_starting", "principals": len(config.principals), "live": config.live_available,
                                    "replay": config.replay_path is not None, "requeuedInFlight": requeued}
     if config.relation is not None:  # a disabled feature leaves the S1 startup line exactly as it was
@@ -138,17 +144,19 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
         starting["chatLive"] = config.chat.live_available
     emit(starting)
     return Service(config, lock, ledger, worker, dispatcher, jobs, relation, relation_dispatcher, relation_ledger, extraction, extraction_dispatcher,
-                   extraction_ledger, graph, handoff, handoff_exposure=exposure, chat=chat, plans=plans, observation=observation)
+                   extraction_ledger, graph, handoff, handoff_exposure=exposure, chat=chat, plans=plans, observation=observation, rounds=rounds)
 
 
 def serve(service: Service) -> None:
     app = create_app(service.jobs, service.relation, service.extraction, service.graph, service.handoff,
-                     handoff_exposure=service.handoff_exposure, chat=service.chat, plans=service.plans, observation=service.observation)
+                     handoff_exposure=service.handoff_exposure, chat=service.chat, plans=service.plans, observation=service.observation, rounds=service.rounds)
     service.dispatcher.start()
     if service.relation_dispatcher is not None:
         service.relation_dispatcher.start()
     if service.extraction_dispatcher is not None:
         service.extraction_dispatcher.start()
+    if service.rounds is not None:
+        service.rounds.start()
     server = uvicorn.Server(uvicorn.Config(
         app, host=service.config.host, port=service.config.port, log_config=None, log_level="warning", access_log=False,
         proxy_headers=False, server_header=False, limit_concurrency=64, timeout_keep_alive=5,
@@ -161,6 +169,8 @@ def serve(service: Service) -> None:
             service.relation_dispatcher.stop()
         if service.extraction_dispatcher is not None:
             service.extraction_dispatcher.stop()
+        if service.rounds is not None:
+            service.rounds.stop()
 
 
 def refuse(error: ConfigError) -> int:

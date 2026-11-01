@@ -21,6 +21,7 @@ import tools.jackson.databind.JsonNode;
 public final class InMemoryGraphRoundRepository implements GraphRoundRepository {
     private final Map<String, GraphRound> rows = new LinkedHashMap<>();
     private final List<GraphRoundEvent> events = new ArrayList<>();
+    private final Map<String, SavedRequest> requests = new LinkedHashMap<>();
     private long tokens;
 
     @Override
@@ -67,6 +68,7 @@ public final class InMemoryGraphRoundRepository implements GraphRoundRepository 
     @Override
     public List<GraphRound> due(Instant now, int limit) {
         return rows.values().stream().filter(GraphRound::open)
+                .filter(r -> !r.slotAt().isAfter(now))
                 .filter(r -> r.nextAttemptAt().map(at -> !at.isAfter(now)).orElse(true))
                 .sorted(Comparator.comparing(GraphRound::slotAt)).limit(limit).toList();
     }
@@ -100,6 +102,18 @@ public final class InMemoryGraphRoundRepository implements GraphRoundRepository 
                 round.graphVersionId().orElse(null), round.versionCommittedAt(), now);
         rows.put(held.roundId(), extended);
         return Optional.of(extended);
+    }
+
+    @Override
+    public Optional<SavedRequest> request(String roundId, String kind) {
+        return Optional.ofNullable(requests.get(roundId + ":" + kind));
+    }
+
+    @Override
+    public boolean saveRequest(GraphRound expected, String kind, byte[] body, RoundServiceBinding binding, Instant at) {
+        GraphRound current = current(expected);
+        if (current == null || !current.lease().orElseThrow().owner().equals(expected.lease().orElseThrow().owner())) return false;
+        return requests.putIfAbsent(expected.roundId() + ":" + kind, new SavedRequest(body.clone(), Optional.of(binding))) == null;
     }
 
     @Override

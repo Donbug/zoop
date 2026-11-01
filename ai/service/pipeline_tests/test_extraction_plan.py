@@ -30,8 +30,11 @@ def descriptor(world) -> dict:
 
 
 def plan(workspace, world, output: Path, *, principal: str = "alpha") -> tuple[int, dict]:
+    selection = output.with_suffix(".selection.json")
+    selection.write_text(json.dumps({"schemaVersion": "zoop-extraction-round-selection-1", "asOf": "2026-10-31T09:00:00+09:00",
+                                     "maxAgeSeconds": 3600}), encoding="utf-8")
     argv = [str(EXTRACT_CLI), "plan-round", "--ingestion-state-dir", str(world.ingestion), "--sources", str(workspace.sources), "--replay", str(workspace.s2_replay), "--topic-replay", str(workspace.s2_topic),
-            "--principal", principal, "--output", str(output)]
+            "--principal", principal, "--output", str(output), "--selection", str(selection)]
     done = subprocess.run(argv, input=json.dumps(descriptor(world)).encode(), capture_output=True, env=pipeline_env(workspace), timeout=300)
     assert done.stderr == b""
     return done.returncode, json.loads(done.stdout.decode())

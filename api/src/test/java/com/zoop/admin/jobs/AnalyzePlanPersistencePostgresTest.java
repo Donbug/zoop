@@ -173,6 +173,13 @@ class AnalyzePlanPersistencePostgresTest {
         assertTrue(third.deduplicated());
         assertEquals(second.job().id(),third.job().id());
         assertEquals(3,jdbc.queryForObject("SELECT count(*) FROM analysis_jobs WHERE plan_id=?",Integer.class,reference.planId()));
+        var finalClaim=plans.claimNext().orElseThrow();
+        assertEquals(second.job().id(),finalClaim.appJobId());
+        assertTrue(plans.finish(finalClaim,new AnalyzePlanTerminal("failed","outcome_unknown","outcome_unknown")));
+        var refused=assertThrows(CustomException.class,()->tx.execute(s->service.createForSystem(
+                reference,"정기 회차 round-20261030T1135","round-20261030T1135")));
+        assertEquals(com.zoop.common.exception.ErrorCode.JOB_NOT_RETRYABLE,refused.getErrorCode());
+        assertEquals(3,jdbc.queryForObject("SELECT count(*) FROM analysis_jobs WHERE plan_id=?",Integer.class,reference.planId()));
     }
 
     @Test void queuedCancelFreezesSummaryAndRetryContinuesOneRegisteredExecution() throws Exception {

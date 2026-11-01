@@ -21,9 +21,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param busyRetryAfter    delay after the artifact store or the AI round was busy (another import, operator command or run held it)
  * @param maxAttemptsPerStage attempts at one stage before the round fails with {@code <stage>_timeout} (the analysis wait has its
  *                          own bound, {@code analysisWaitDeadline})
- * @param importSource      the observation re-check of the import: {@code cli} runs the installed {@code zoop-ai-ingest export}
- *                          (local, single-instance operation only), {@code http} is reserved for the AI side's observation
- *                          export route (#387 ③) and is refused until it exists
+ * @param importSource      observation re-check: {@code cli} runs the local installed export; {@code http} uses the configured
+ *                          observation-export client and the same importer verification
  * @param ingestionCli      {@code zoop-ai-ingest} executable (import-source cli)
  * @param ingestionStateDir the S2-1 ledger directory (import-source cli)
  * @param ingestionSources  the operator source registry (import-source cli)

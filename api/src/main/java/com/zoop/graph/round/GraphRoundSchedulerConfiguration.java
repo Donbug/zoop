@@ -8,6 +8,8 @@ import java.util.UUID;
 import com.zoop.admin.jobs.AnalysisJobRoundQueue;
 import com.zoop.admin.jobs.AnalysisJobService;
 import com.zoop.admin.jobs.JdbcAnalysisJobRepository;
+import com.zoop.ai.config.AiRoundClientProperties;
+import com.zoop.ai.config.AiTransportProperties;
 import com.zoop.ai.round.RoundHandoffClient;
 import com.zoop.ai.round.RoundRunClient;
 import com.zoop.document.bindings.DocumentBindingsExporter;
@@ -58,13 +60,18 @@ public class GraphRoundSchedulerConfiguration {
     @Bean
     GraphRoundWorker graphRoundWorker(GraphRoundRepository rounds, GraphRoundClock calendar, ObjectProvider<RoundRunClient> runs,
             ObjectProvider<RoundHandoffClient> handoffs, RoundAnalysisQueue analysis, RoundBindingsSource bindings,
-            GraphRoundImportBridge bridge, GraphRoundProperties properties, Clock clock) {
+            GraphRoundImportBridge bridge, GraphRoundProperties properties, ObjectProvider<AiRoundClientProperties> settings,
+            ObjectProvider<AiTransportProperties> transport, Clock clock) {
         RoundRunClient runClient = runs.getIfAvailable();
         RoundHandoffClient handoffClient = handoffs.getIfAvailable();
-        if (runClient == null || handoffClient == null) {
+        AiRoundClientProperties clientProperties = settings.getIfAvailable();
+        if (runClient == null || handoffClient == null || clientProperties == null) {
             throw new GraphRoundConfigurationException("enabled", "requires zoop.ai.round-client.enabled=true (R1·R2·R5·R6 call the AI side)");
         }
-        return new GraphRoundWorker(rounds, calendar, runClient, handoffClient, analysis, bindings, bridge, properties, clock, owner());
+        RoundServiceBinding binding = RoundServiceBinding.of(clientProperties.toSettings(transport.getObject()),
+                clientProperties.expectedPrincipal());
+        return new GraphRoundWorker(rounds, calendar, runClient, handoffClient, analysis, bindings, bridge, properties,
+                binding, clock, owner());
     }
 
     @Bean

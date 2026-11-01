@@ -94,13 +94,13 @@ raw receipt와 비용 정산은 같은 운영 원장 transaction에 저장합니
 | --- | --- | --- | --- |
 | `zoop-ai-collect run` | `zoop_ai_pipeline.collection_cli` | `zoop-collection-1` (policy `zoop-collection-policy-1`) | 상태 DB 없음. source `inputRoot/collections/<collectionId>/`에만 원본 bytes·receipt·manifest를 쓴다 |
 | `zoop-ai-collector {run,checkpoint,restore,status}` | `zoop_ai_pipeline.collector_cli` | checkpoint manifest `zoop-collector-checkpoint-1` | 컨테이너 수집 entry. 아래 비공개 뉴스·Korea 코퍼스·official source 수집을 한 controller로 돌리고 `/var/lib/zoop-collector/{private,korea,official}` 상태를 S3 checkpoint로 보존한다. 계약·환경변수·종료 코드·SIGTERM 시간은 [`docs/development/collector-container.md`](../../docs/development/collector-container.md) |
-| `zoop-ai-ingest {run,tick,resume,inspect,export}` | `zoop_ai_pipeline.ingestion_cli` | `zoop-ingestion-s2-1` | `ingestion.sqlite3` |
+| `zoop-ai-ingest {run,tick,resume,inspect,export,round-inventory}` | `zoop_ai_pipeline.ingestion_cli` | `zoop-ingestion-s2-1`; 내부 metadata 읽기는 `zoop-ingestion-round-inventory-1` | `ingestion.sqlite3`; `round-inventory`는 읽기 전용 |
 | `zoop-ai-extract {run,submit,enqueue-round,plan-round,resume,inspect,cancel}` | `zoop_ai_pipeline.extraction_cli` | `zoop-extraction-s2-2` | `extraction.sqlite3` (`plan-round`는 원장을 열지 않고 새 계획 디렉터리 하나만 씀) |
 | `zoop-ai-relation {run,submit,inspect,resume,review,cancel,live-binding}` | `zoop_ai_pipeline.relation_cli` | `zoop-relation-s3` | `relation.sqlite3` |
 | `zoop-ai-dependents` (하위 명령 없음, stdin 변경 1건) | `zoop_ai_pipeline.dependency_cli` | `zoop-dependency-s4` | 위 세 원장을 읽기 전용으로만 연다(쓰는 상태 파일 없음) |
 | `zoop-ai-graph {init,freeze,project,recover,inspect,read,focus}` | `zoop_ai_pipeline.graph_projection_cli` | `zoop-graph-projection-1` (plan `zoop-graph-plan-2`) | `graph.sqlite3` + 이 원장 하나에 묶인 별도 Neo4j 5 database의 **비공개** version(공개 아님) |
 | `zoop-ai-issue-summary {submit,run,resume,inspect,export,cancel,live-binding}` | `zoop_ai_pipeline.issue_summary_cli` | `zoop-issue-summary-1` (policy `zoop-issue-summary-policy-1`) | `issue-summary.sqlite3`; 위 세 원장과 운영자 파일을 읽기 전용으로만 열고 handoff·Neo4j·app은 쓰지 않음 |
-| `zoop-ai-handoff {freeze,freeze-round,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `-8`/decisions `-4`/policy `-2` 또는 bundle `-9`/decisions `-5`/policy `-3`) | `handoff.sqlite3` + `bundles/<sha256>.json`; 원천 원장은 읽기 전용. `freeze-round`는 window로 좁힌 운영자 파일 두 개를 `--files-dir`에 설치 |
+| `zoop-ai-handoff {freeze,freeze-round,check-round,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `-8`/decisions `-4`/policy `-2` 또는 bundle `-9`/decisions `-5`/policy `-3`) | `handoff.sqlite3` + `bundles/<sha256>.json`; `check-round`는 원천 완료 상태만 읽고, `freeze-round`는 window로 좁힌 운영자 파일을 `--files-dir`에 설치 |
 | `zoop-ai-handoff-exposure` | `zoop_ai_pipeline.handoff_exposure_cli` | `zoop-handoff-exposure-1` | handoff 원장·고정 artifact를 읽기만 함. 원천 변경 조회는 ingestion·extraction 원장도 읽으며 relation·Neo4j·앱 원장은 열지 않음 |
 | `zoop-ai-operate {init,register,run,status,pause,resume,stop,force-stop}` | `zoop_ai_pipeline.operating` | `zoop-operating-runtime-config-1` / `zoop-operating-input-manifest-1` | 운영 전용 `live-budget.sqlite3`와 공유 `stateDirectory/s2`, `stateDirectory/s3` 원장 |
 
@@ -191,7 +191,9 @@ zoop-ai-handoff freeze-round --state-dir HANDOFF --relation-state-dir … --extr
 
 CLI는 handoff writer를 열기 전에 이 선택과 현재 전달 권한 검사를 읽기 전용으로 수행합니다. `freeze_round`도 staging 전에 같은 선택 규칙을 적용합니다. 모든 후보가 이전 분석 계약이면 `window_empty`로 끝나며 원장과 설치 파일을 그대로 유지합니다. 새 manifest는 master decisions에 명시된 policy를 유지하므로 decisions-4/P2는 bundle-8, decisions-5/P3는 bundle-9로 생성됩니다.
 
-`selection` 보고서(`zoop-ai-handoff-selection-1`)는 고려한 **모든** S3 job을 `{jobId, status(selected|not_ready|awaiting_mapping|withheld|unavailable|out_of_window|cancelled), code, roundId, sourceId, slot, page, ordinal, upstreamJobId[, neverFrozen]}`로 나열합니다(조용히 빠지는 job 없음). 기본 `handoffId`는 정렬한 manifest 내용(`sources`·좁힌 파일 hash·bindings hash)의 digest(`hr-<sha256>`)라서, window와 운영자 파일이 같으면 새 slot이어도 **같은 handoffId**이고 이미 있는 행을 그대로 돌려줍니다(window 밖의 미매핑 job이 늘어도 같음). 공개 ID(이슈 ID·`INVOLVES` 간선 ID·`ev-` ID)는 운영자 결정·앱 article binding·span에서만 나오므로 번들마다 같은 항목은 같은 ID입니다.
+회차 HTTP의 최초 접수는 `zoop-ai-handoff check-round --state-dir HANDOFF --relation-state-dir S3 --extraction-state-dir S2 --ingestion-state-dir I --sources R --canonical C --round-id ROUND [--plan-id PLAN --plan-root ROOT]`를 사용합니다. 정확한 계획 단위와 자기 회차에 접수된 native S3 작업이 모두 ready 또는 cancelled여야 `state:complete`를 반환합니다. 그 밖에는 `analysis_incomplete`이며 handoff 원장·private bindings·설치 디렉터리를 만들지 않습니다. 이 검사는 완료 여부만 증명하고, 실제 freeze는 기존 pre-writer 선택·현재 권한 검사를 다시 수행합니다.
+
+`selection` 보고서(`zoop-ai-handoff-selection-1`)는 고려한 모든 S3 job의 `jobId`·`inputDigest`, `status`·`code`, `roundId`·`sourceId`·`slot`·`page`·`ordinal`, `upstreamJobId`·`upstreamInputDigest`를 보존합니다. 성공한 freeze는 기존 ready handoff에 같은 `(jobId,inputDigest)`가 있는지 `neverFrozen`으로 표시합니다. 기본 `handoffId`는 정렬한 manifest 내용과 파일 hash의 digest(`hr-<sha256>`)이므로 같은 window·운영자 파일·bindings는 같은 ID를 가집니다. 공개 ID는 운영자 결정·앱 article binding·span에서 유도합니다.
 
 예약 뒤 중단된 handoff는 먼저 `zoop-ai-handoff recover --state-dir HANDOFF`의 stdin에 `{"schemaVersion":"zoop-ai-handoff-1","handoffId":"…"}`를 전달해 정리합니다. artifact가 없어 `failed`로 확정되면 운영자가 `freeze-round`에 **`--recovery-attempt-id ATTEMPT`를 명시**해 같은 입력으로 새 handoff를 만들 수 있습니다. 값은 `[A-Za-z0-9._:-]`의 1~200자이며, manifest 내용과 이 값을 함께 hash하여 새 ID를 정합니다. 같은 입력·같은 값으로 반복하면 회차가 바뀌어도 같은 행을 돌려줍니다. 옵션을 생략하면 원래 ID와 그 상태를 돌려주며, 기존 실패 행과 시도 기록은 그대로 보존합니다.
 
@@ -843,11 +845,15 @@ ai/pipeline/.venv/bin/python ai/pipeline/scripts/extraction_smoke.py --live-loop
 
 **완료 회차의 서비스 실행 계획 `plan-round`(CLI 전용, 오프라인).** `zoop-ai-extract plan-round --ingestion-state-dir I --sources R --principal P --output DIR --selection POLICY [--replay F [--topic-replay T]]`는 완료된 회차와 명시한 이월 관측에서 새 계획 디렉터리를 만듭니다. 출력은 `approvals.json`(S2 승인 항목), `relation-upstreams.json`(S3 입력 쌍), `manifest.json`(계획 ID·digest·S2 제출 필드·선택 근거), `receipt.json`(앞 세 파일의 digest)입니다. 수동 모드에서는 사람이 계획을 검토해 오프라인 설치하고, 온라인 모드에서는 사전 정책에 따라 같은 계획을 접수합니다([서비스 안내](../service/README.md)). 계획 생성과 모델 실행 승인은 별개입니다.
 
-`POLICY`는 `zoop-extraction-round-selection-1` JSON으로, 고정한 `asOf`와 양의 정수 `maxAgeSeconds`가 필수입니다. 기본값은 `limit:8`, `cadenceMinutes:30`이며, `carryover`·`inFlight`·`settled`에는 정확한 `ObservationRef` 배열을 전달합니다. 정책이 없으면 `plan_selection_policy_required`입니다. 원래 수집 회차의 `window.through`를 나이 기준으로 사용하며, 오래된 적격 이월분부터 신규 관측보다 먼저 선택합니다. 전체 관측 신원으로 중복·진행 중·처리 완료를 제외하고 현재 권한을 확인한 뒤 한도를 적용합니다. `too_old`·누락/미래 슬롯은 명시적으로 제외하고, 한도 초과 관측은 manifest의 `carryover`에 원래 신원 그대로 남깁니다. native manifest의 `selection`·`selectionReport`는 재검증 근거이며 HTTP 접수 manifest의 닫힌 형식은 유지합니다. 영속 이월 큐와 동시 접수 예약은 서비스가 소유합니다.
+`POLICY`는 `zoop-extraction-round-selection-1` JSON으로, 고정한 `asOf`와 양의 정수 `maxAgeSeconds`가 필수입니다. `limit`은 1~8(기본 8), `cadenceMinutes`는 30이며, `carryover`·`inFlight`·`settled`에는 정확한 `ObservationRef` 배열을 전달합니다. 정책이 없으면 `plan_selection_policy_required`입니다. 원래 수집 회차의 `window.through`를 나이 기준으로 사용하며, 오래된 적격 이월분부터 신규 관측보다 먼저 선택합니다. 정확한 관측 신원으로 중복·진행 중·완료를 제외하고 현재 권한을 확인한 뒤 한도를 적용합니다. `too_old`는 종결 제외이며 `round_limit`만 원래 신원 그대로 이월합니다. native manifest의 `selection`·`selectionReport`는 재검증 근거이고 HTTP admission manifest의 닫힌 형식은 유지합니다. 이전 정책 없는 계획은 원래 신원으로 읽기 검증합니다. 운영용 나이 한도는 사람이 별도로 정해야 합니다.
+
+연속 HTTP producer의 내부 선택은 `zoop-extraction-round-selection-2`를 사용합니다. `asOf`·`maxAgeSeconds`·`limit`·`cadenceMinutes`와 최대 8개의 정확한 `observations`를 고정하며, 명시하지 않은 관측을 현재 회차에서 암묵적으로 더하지 않습니다. 같은 관측의 원래 슬롯·현재 권한을 다시 검사해 계획을 재구성합니다. 기존 selection-v1과 정책 없는 계획은 각자의 원래 바이트 규칙으로 계속 검증합니다.
+
+내부 읽기 명령 `zoop-ai-ingest round-inventory --state-dir I --sources R`은 `zoop-ingestion-round-inventory-1` 요청의 `sourceId`·`scopeId`·`asOf`·`maxAgeSeconds`를 받습니다. `limit:0`은 checkpoint만 읽고, 기본 64건(최대 100)의 페이지는 완료·준비된 관측의 식별자와 원래 슬롯만 반환합니다. `next` cursor를 `after`로, 첫 페이지의 revision을 `checkpointRevision`으로 넘기며 페이지 사이 checkpoint가 바뀌면 거절합니다. 원문·네트워크·native 쓰기는 없습니다. pristine 상태와 손상·잠금·hot WAL을 구분하고, 읽기 불능을 빈 checkpoint로 대체하지 않습니다.
 
 작업 ID는 계획 ID와 정확한 관측에서 유도한 `s2p-` 접두를 사용하여 `enqueue-round`의 `s2r-` 작업과 구분합니다. 서비스는 기존 CLI 작업을 HTTP 작업으로 재사용하지 않습니다. replay 계획은 분석 fixture와 필요한 topic fixture의 해시를, live 계획은 런타임 identity를 고정합니다(live에 fixture를 주면 `fixture_not_allowed`). 같은 입력을 같은 출력 경로에 다시 주면 기존 파일을 바꾸지 않고, 다른 입력은 거절합니다. 기존 경로를 덮어쓰지 않는 원자적 이름 변경을 지원하지 않는 플랫폼도 거절합니다. 계획 생성 시에는 구문·현재 원천 권한을 확인하며, snapshot 근거와 실행 문맥은 실제 dispatch에서 검사합니다.
 
-**하지 않는 일.** 설치된 approvals를 자동으로 만들거나 바꾸지 않고, 유료 호출 승인·예산도 내지 않는다. 공개 `JobCreate`의 `planId` 처리는 구현했다고 주장하지 않는다(BE 대기). 실제 공급원·모델 품질·자동 주기 실행은 이 범위가 아니다.
+계획 생성은 현재 source 권한과 명시된 선택 정책에 따라 입력을 고정하는 단계입니다. 실제 S2/S3 실행은 별도의 서비스 admission·model-send·예산 규칙을 따르며, 앱 `analyze_plan` 큐와 회차 HTTP가 이 계획을 소비합니다([회차 계약](../../api/docs/GRAPH_ROUND.md)).
 
 **검증(2026-10-22, 로컬, 모델 호출 0).** 단위 시험 6개와 설치된 `plan-round`를 쓰는 실제 HTTP 시험 2개(주제 단계와 S3 `ready` 포함)가 통과했다.
 

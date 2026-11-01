@@ -111,6 +111,9 @@ public class GraphRoundAdminCommandService {
 
     /** The stage a retry resumes at: what the failure event recorded, else what the failure code's family says. */
     static GraphRoundStage resumeStage(GraphRound round, List<GraphRoundEvent> events) {
+        String code = round.failureCode().orElse("");
+        // Terminal jobs re-enter the queue's retry judgement even when an older event named analysis_queued.
+        if (code.equals("analysis_failed") || code.startsWith("analysis_failed:")) return GraphRoundStage.PLAN_READY;
         for (int i = events.size() - 1; i >= 0; i--) {
             GraphRoundEvent event = events.get(i);
             if (event.outcome() != Outcome.FAILED) continue;
@@ -125,12 +128,11 @@ public class GraphRoundAdminCommandService {
             }
             break;
         }
-        String code = round.failureCode().orElse("");
         if (code.startsWith("import")) return GraphRoundStage.HANDOFF_READY;
         if (code.startsWith("freeze") || code.startsWith("bindings")) return GraphRoundStage.ANALYSIS_DONE;
         // R4's wait for a still-running job timed out: keep reading that job. R3's analysis_queue_timeout (no job yet), a finished
         // job (analysis_failed) and a rejected plan are queued again from plan_ready.
-        if (code.equals("analysis_timeout")) return GraphRoundStage.ANALYSIS_QUEUED;
+        if (code.equals("analysis_timeout") && round.analysisJobId().isPresent()) return GraphRoundStage.ANALYSIS_QUEUED;
         if (code.startsWith("analysis") || code.startsWith("plan_rejected")) return GraphRoundStage.PLAN_READY;
         return GraphRoundStage.SCHEDULED;
     }
