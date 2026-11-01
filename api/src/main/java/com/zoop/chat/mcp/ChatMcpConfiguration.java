@@ -2,6 +2,7 @@ package com.zoop.chat.mcp;
 
 import com.zoop.chat.executor.ChatJobExecutor;
 import com.zoop.chat.orchestrator.ChatModels;
+import com.zoop.chat.orchestrator.ChatCitationSource;
 import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.ai.http.HttpChatStageClient;
 import org.springframework.beans.factory.ObjectProvider;
@@ -82,7 +83,7 @@ public class ChatMcpConfiguration {
     @ConditionalOnProperty(name = "zoop.chat.mcp.agent-enabled", havingValue = "true")
     ChatMcpAgent chatMcpAgent(ObjectProvider<ChatModels.Agent> agent, ChatMcpTools tools, ChatMcpGrants grants,
             ChatSendGrants sendGrants, ChatExecutionRepository runs, ChatToolRunner runner,
-            ObjectProvider<HttpChatStageClient> client, Clock clock,
+            ObjectProvider<ChatCitationSource> citations, ObjectProvider<HttpChatStageClient> client, Clock clock,
             @Value("${zoop.ai.chat-client.mode:replay}") String mode) {
         ChatModels.Agent stages = agent.getIfAvailable();
         HttpChatStageClient transport = client.getIfAvailable();
@@ -90,7 +91,8 @@ public class ChatMcpConfiguration {
             throw new IllegalStateException("zoop.chat.mcp.agent-enabled needs the chat model stages (zoop.ai.chat-client.enabled)");
         }
         var circuit = "replay".equals(mode) ? null : new ChatMcpCircuitBreaker(transport::probeMcp, clock);
-        return new ChatMcpAgent(stages, tools, grants, sendGrants.recipient(), runs, runner, circuit);
+        return new ChatMcpAgent(stages, tools, grants, sendGrants.recipient(), runs, runner, circuit,
+                citations.getIfAvailable());
     }
 
     @Bean(destroyMethod = "")

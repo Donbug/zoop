@@ -34,6 +34,7 @@ final class ChatResults {
             Map.entry("ambiguous_target", "어떤 기업이나 사건에 대한 질문인지 알려 주세요."),
             Map.entry("plan_over_budget", "질문 범위가 넓어 한 번에 조회할 수 없어요. 대상이나 기간을 좁혀 주세요."),
             Map.entry("checkpoint_excess", "조건에 맞는 대상이 예상보다 많아요. 이어서 볼 대상을 골라 주세요."),
+            Map.entry("web_company_selection", "외부 자료를 더 확인할 기업이 두 곳보다 많아요. 이번에 검색할 두 기업을 골라 주세요."),
             Map.entry("clarification_limit", "확인 질문을 두 번 했는데도 범위를 정하지 못했어요. 기업 이름과 기간을 구체적으로 적어 새 질문으로 "
                     + "보내 주세요."),
             Map.entry("out_of_scope", "이 질문은 지금 답할 수 있는 범위 밖이에요. 기업과 사건의 연결이나 근거 자료에 대해 물어봐 주세요."),
