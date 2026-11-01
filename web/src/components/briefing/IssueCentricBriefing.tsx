@@ -199,7 +199,7 @@ function CompanyInIssue({
         </section>
       )}
       {price?.status === 'available' && (
-        <div className="rounded border border-zoop-border bg-zoop-card p-3">
+        <div className="rounded-md border border-zoop-border bg-zoop-card p-3">
           <p className="text-body font-semibold">
             {price.sessionDate}{' '}
             {price.latest.kind === 'daily_close' ? '종가' : '완료 봉'}{' '}
@@ -357,7 +357,7 @@ function IssueFollowUp({
             .map((c) => (
               <div
                 key={c.company.id}
-                className="mb-3 rounded border border-zoop-border p-3"
+                className="mb-3 rounded-md border border-zoop-border p-3"
               >
                 <p className="text-caption font-semibold">
                   {c.company.name} · 같은 이슈의 이전 판단

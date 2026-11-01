@@ -43,7 +43,7 @@ export default function BriefingContinuity({
         {value.references.map((item) => (
           <article
             key={item.issueId}
-            className="rounded border border-zoop-border p-3"
+            className="rounded-lg border border-zoop-border p-3"
           >
             <h4 className="text-body font-semibold">{item.title}</h4>
             <p className={NOTE}>

@@ -10,14 +10,14 @@ export default function AppLayout() {
   // 같은 메뉴 안 이동(/companies/A → /companies/B)까지 다시 만들면 화면 상태와 그래프를 잃는다.
   const section = pathname.split('/')[1] ?? '';
   const isStocks = pathname === '/stocks';
-  // D-COM-01: 기업 상세만 지도 개선 테마의 페이지/헤더 표면을 사용한다.
-  const companySurface =
-    section === 'companies'
+  // D-COM-01 · D-BRF-01/02: 페이지와 탐색 바의 표면 역할을 공유한다.
+  const pageSurface =
+    section === 'companies' || section === 'briefing'
       ? ' bg-zoop-page! [&_.relationship-header]:bg-zoop-surface! [&_.service-bottom-nav]:bg-zoop-surface!'
       : '';
   return (
     <div
-      className={`service-surface${pathname === '/briefing' ? ' briefing-login-surface' : ''}${isStocks ? ' stocks-login-surface' : ''}${companySurface}`}
+      className={`service-surface${isStocks ? ' stocks-login-surface' : ''}${pageSurface}`}
     >
       <SkipLink />
       <ServiceHeader navLabel="데스크톱 주 메뉴" />

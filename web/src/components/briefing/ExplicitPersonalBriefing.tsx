@@ -471,7 +471,7 @@ export default function ExplicitPersonalBriefing({
       )}
       {result && !editing && (
         <>
-          <div className="rounded border border-zoop-border p-3">
+          <div className="rounded-lg border border-zoop-border p-3">
             <p className="font-semibold">
               선택한 종목: {names(result.choice.companyIds)}
             </p>
@@ -521,7 +521,7 @@ export default function ExplicitPersonalBriefing({
               .map((item) => (
                 <article
                   key={item.eventId}
-                  className="rounded border border-zoop-border p-4"
+                  className="rounded-lg border border-zoop-border p-4"
                 >
                   <h3 className="font-semibold">
                     분석 대기·보류: {item.title}

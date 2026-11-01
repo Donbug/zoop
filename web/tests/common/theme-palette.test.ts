@@ -6,6 +6,48 @@ import { appearanceColors } from '@/components/graph/graph-appearance';
 // Vitest stubs CSS imports; inspect the source tokens rather than that empty module.
 const css = readFileSync('src/index.css', 'utf8');
 
+test('D-BRF-01/02 theme: briefing uses the shared page and navigation surfaces', () => {
+  const layout = readFileSync('src/components/common/AppLayout.tsx', 'utf8');
+  expect(layout).toMatch(/section === 'companies' \|\| section === 'briefing'/);
+  expect(layout).toContain('bg-zoop-page!');
+  expect(layout).toContain('[&_.relationship-header]:bg-zoop-surface!');
+  expect(layout).toContain('[&_.service-bottom-nav]:bg-zoop-surface!');
+  const local = readFileSync(
+    'src/components/common/briefing-login-surface.css',
+    'utf8',
+  );
+  expect(local).not.toContain('.briefing-login-surface');
+});
+
+test('D-BRF-01/02 feedback theme: controls and pressed text use shared surfaces', () => {
+  const feedback = readFileSync(
+    'src/components/common/FeedbackButtons.tsx',
+    'utf8',
+  );
+  for (const token of [
+    'rounded-md',
+    'border-zoop-border',
+    'bg-zoop-control',
+    'bg-zoop-surface',
+    'hover:bg-zoop-selected',
+    'aria-pressed:text-zoop-on-ink',
+  ])
+    expect(feedback).toContain(token);
+  expect(feedback).not.toMatch(
+    /rounded-\[3px\]|border-\[0\.667px\]|bg-zoop-paper|border-zoop-line/,
+  );
+});
+
+test('D-COM-01/02 theme: section surfaces apply once beneath each workspace column', () => {
+  const workspace = readFileSync(
+    'src/components/company/CompanyWorkspace.tsx',
+    'utf8',
+  );
+  expect(workspace).not.toContain('[&_section]:bg-zoop-card');
+  expect(workspace).toContain('[&>div>section]:bg-zoop-card');
+  expect(workspace).toContain('[&>aside>section]:bg-zoop-card');
+});
+
 function tokens(selector: string) {
   const start = css.indexOf(selector);
   const block = css.slice(start, css.indexOf('}', start));

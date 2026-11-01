@@ -109,9 +109,18 @@ Black `/graph-assets` icons with `data-icon` are inverted in dark; company logos
 
 ### Company and briefing surfaces (D-COM-01/02 · D-BRF-01/02)
 
+Company and briefing routes share `bg-zoop-page` for the page and
+`bg-zoop-surface` for the header and bottom navigation. Apply company section
+surfaces only to direct sections of each workspace column so nested document
+quotes and evidence do not receive a second card background and padding.
+Shared `FeedbackButtons` use `rounded-md border border-zoop-border
+bg-zoop-control`, `hover:bg-zoop-selected`, and pressed `bg-zoop-ink
+text-zoop-on-ink`; reason inputs use `bg-zoop-surface`. The same recipe applies
+to briefing, evidence analysis and AI chat results.
+
 These opt-in tokens follow the existing improved map; they do not change login,
-tutorial or map background values. Keep briefing's paper page background and its
-existing section order, content, data state and action semantics.
+tutorial or map background values. Keep the existing briefing section order,
+content, data state and action semantics.
 
 | Token           | Light     | Dark      |
 | --------------- | --------- | --------- |
@@ -129,7 +138,7 @@ Briefing uses the `CARD`/`SECTION`/`EMPTY`/`PRIMARY_BUTTON` recipes from
 `components/briefing/briefingStyles.ts` for common, scheduled and explicit flows.
 The page scopes input/select treatments to briefing; it does not style other routes.
 Faint text on the darkest selected surface still reaches 4.78:1.
-Details and dependency assumptions: [theme integration](theme-unify-2026-11-01.md).
+Dependency assumptions and validation evidence belong in the pull request.
 
 ## Behavior checklist
 

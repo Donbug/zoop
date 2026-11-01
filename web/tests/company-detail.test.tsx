@@ -398,9 +398,12 @@ test.each(['events', 'documents', 'info'])(
   },
 );
 
-test.each(['/stocks', '/briefing'])(
-  'D-COM-01 theme surface stays scoped away from %s',
-  (path) => {
+test.each([
+  ['/stocks', false],
+  ['/briefing', true],
+] as const)(
+  'D-COM-01 · D-BRF-01 theme page surface is correctly scoped for %s',
+  (path, themed) => {
     renderRoutes(
       [
         {
@@ -414,7 +417,7 @@ test.each(['/stocks', '/briefing'])(
       screen
         .getByRole('main')
         .parentElement?.classList.contains('bg-zoop-page!'),
-    ).toBe(false);
+    ).toBe(themed);
   },
 );
 function openHistory() {
