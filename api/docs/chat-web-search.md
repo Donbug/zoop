@@ -60,7 +60,7 @@ agent가 읽을 수 없어 서버가 읽은 계획(기간이 있는 Q05, Q06, Q0
 
 - **대상**(`webGaps`): 자기 조회가 모두 성공했고 회원이 고른 근거로 좁히지 않은 요구. Q03·Q04·Q07은 0건·잘림이면, Q05·Q06·Q08은 외부 출처를 명시했을 때만 대상이다. 비교 결과·발행 회차·선정 기록은 웹으로 대신하지 않기 때문이다.
 - **회원 범위**: 이 실행의 요구에는 서버가 해석한 대상 ID를 넣지 않는다(`searchOnly`). 보유·관심 종목이 대상 ID로 나가지 않으며, 검색어는 요구 문구에서만 나온다. "내 종목" 같은 말은 검색어 검사가 거절하므로 기업을 적지 않은 Q07은 검색되지 않는다.
-- **시간**: `min(20초, 남은 시간 − 생성·검증·서버 44초)`이며 10초가 안 되면 시작하지 않고 `web_budget_exhausted`다. job 기한은 60초 그대로다.
+- **시간**: `min(20초, 남은 시간 − 생성 최소 10초 − 검증 최소 6초 − 서버 3초)`이며 10초가 안 되면 시작하지 않고 `web_budget_exhausted`다. direct와 agent 모두 job 기한은 45초다.
 - **실패**: 단계 실패·시간 부족은 `web_unavailable` notice이고 내부 결과로 답을 계속한다. preflight가 막아도 같다.
 - **전송 grant**: 웹 snippet이 생성 단계로 가므로 `web-search:<공급자>` grant에 `chat-answer` 목적이 있어야 한다. 없으면 AI runtime이 `source_grant_denied`로 생성 단계를 거절해 job이 실패한다. 켜기 전에 등록한다.
 - **기록**: route 요약의 `webAfterReads`(`searched`, `no_time`, `unavailable`, `failed`)와 `webSteps`, `webApproved`, `webDenied`.

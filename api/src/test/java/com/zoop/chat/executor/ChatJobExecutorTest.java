@@ -58,7 +58,7 @@ class ChatJobExecutorTest {
         store.add(queued("job-00001", null, null, 0, "run"));
         var engine = new ScriptedChatEngine((run, control) -> {
             assertTrue(control.owned());
-            assertEquals(Duration.ofSeconds(60), control.remaining());
+            assertEquals(Duration.ofSeconds(45), control.remaining());
             control.beforeModelCall();
             control.phase("writing");
             control.beforeModelCall();
@@ -316,8 +316,8 @@ class ChatJobExecutorTest {
         store.add(queued("job-00002", null, null, 0, "run"));
         var engine = new ScriptedChatEngine((run, control) -> {
             if (run.jobId().equals("job-00001")) control.beforeModelCall();
-            // Past the 60 s deadline, still inside the 15 s lease grace: the write would be accepted by the fence.
-            clock.advance(Duration.ofSeconds(65));
+            // Past the 45 s deadline, still inside the 15 s lease grace: the write would be accepted by the fence.
+            clock.advance(Duration.ofSeconds(50));
             return ScriptedChatEngine.generalAnswer("늦은 답");
         });
         var executor = executor(engine);
@@ -462,13 +462,13 @@ class ChatJobExecutorTest {
     void aShortenedDeadlineHoldsForTheFinalStoreAndForARequestReachingTheRun() {
         store.add(queued("job-00001", null, null, 0, "run"));
         executor(new ScriptedChatEngine((run, control) -> {
-            control.shortenDeadline(NOW.plusSeconds(45));
+            control.shortenDeadline(NOW.plusSeconds(40));
             control.shortenDeadline(NOW.plusSeconds(50));
-            assertEquals(Duration.ofSeconds(45), control.remaining(), "a deadline is only ever brought forward");
+            assertEquals(Duration.ofSeconds(40), control.remaining(), "a deadline is only ever brought forward");
             var attached = executor(null).attach("job-00001", 1).orElseThrow();
-            assertEquals(Duration.ofSeconds(45), attached.control().remaining(), "the MCP endpoint sees it too");
-            // Verification ends past 45 s but well inside the job's 60 s: the result is not stored as completed.
-            clock.advance(Duration.ofSeconds(50));
+            assertEquals(Duration.ofSeconds(40), attached.control().remaining(), "the MCP endpoint sees it too");
+            // Verification ends past the shortened path deadline but inside the job's 45 s: completion is still refused.
+            clock.advance(Duration.ofSeconds(42));
             return ScriptedChatEngine.generalAnswer("늦은 답");
         })).runOnce();
 

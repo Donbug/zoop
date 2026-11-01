@@ -81,8 +81,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      * stage 3 s after that (its deadline per stage, for process start and ledger writes). A model stage here also covers what
      * comes outside that deadline: up to 1 s waiting for a free slot before it starts, and the reply's transport and decoding.
      * A limit equal to the service's would discard answers the service delivered in time, with their cost spent.
-     * Without tools the worst case (9 + 30 + 11 + 3 = 53 s) fits the 60 s job deadline. With tools it would not (63 s): a run
-     * whose router took more than 6 s ends as {@code deadline_guard} before any tool or further model call.
+     * The values remain per-stage ceilings, not time reservations. Direct stages shrink to the time left after the minimum
+     * answer, verification and terminal-write reservations below, so every route remains inside the 45 s job deadline.
      */
     record StageLimits(Duration router, Duration tools, Duration generate, Duration verify, Duration server) {
         /** The AI service's slot wait (1 s) and 1 s for transport and decoding, beyond its own stage deadline. */
@@ -91,6 +91,10 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 Duration.ofSeconds(28).plus(SERVICE_HEADROOM), Duration.ofSeconds(9).plus(SERVICE_HEADROOM),
                 Duration.ofSeconds(3));
     }
+    /** Minimum direct answer window kept after reads (and after an optional search-only step). */
+    static final Duration MIN_DIRECT_GENERATE = Duration.ofSeconds(10);
+    /** Minimum semantic-verification window kept before the terminal write. */
+    static final Duration MIN_VERIFY = Duration.ofSeconds(6);
     private static final Set<String> SUPPORT = Set.of("supported", "contradicted", "hold");
     private static final Set<String> ADVICE = Set.of("no", "yes", "hold");
 
@@ -114,9 +118,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     /** The least an agent step is given: the time to write the answer (MCP actions contract 3.2). */
     static final Duration MIN_AGENT_STEP = Duration.ofSeconds(10);
     /**
-     * An agent run ends within 45 s of its start, verification and saving included (MCP actions contract 3.2), inside the
-     * job's own deadline ({@link ChatJobExecutor#MAX_DEADLINE}, kept for the direct path until its stage limits are re-set
-     * from measured p95: router, tools, answer and verification do not fit 45 s).
+     * An agent run ends within 45 s of its start, verification and saving included (MCP actions contract 3.2). This equals
+     * the job-wide deadline and remains named here because the agent budget is part of the external execution contract.
      */
     static final Duration AGENT_JOB = Duration.ofSeconds(45);
     /** All agent steps together (MCP round trips, approvals, tool calls and the final answer): at most 35 s. */
@@ -205,7 +208,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     private ChatEngineOutcome run(ChatRun run, ChatRunControl control, ObjectNode route) {
         Set<String> bound = registry.bound();
         ChatRouteDecision decision = model(control, limits.router(),
-                limits.generate().plus(limits.verify()).plus(limits.server()),
+                limits.tools().plus(MIN_DIRECT_GENERATE).plus(MIN_VERIFY).plus(limits.server()),
                 () -> router.route(run, bound));
         ChatPlan plan = planner.plan(run, decision, bound);
         var coverage = new ChatRequirementCoverage(decision);
@@ -233,9 +236,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             // checked below against exactly the results of the calls that ran, each requirement against its own.
             control.phase("retrieving");
             if (control.toolCallsLeft() < 1) throw new Stop(TOOL_BUDGET_SPENT);
-            // The run's deadline becomes 45 s from the job's start: verification and the final store keep to it too.
+            // Idempotently keep the agent path on the same 45 s deadline as every other route.
             control.shortenDeadline(run.deadline().minus(ChatJobExecutor.MAX_DEADLINE.minus(AGENT_JOB)));
-            Duration after = limits.verify().plus(limits.server());
+            Duration after = MIN_VERIFY.plus(limits.server());
             // Luna has min(35 s, what is left of it before verification and saving): never 35 s on top.
             Duration luna = min(AGENT_TOTAL, control.remaining().minus(after));
             if (luna.compareTo(MIN_AGENT_STEP) < 0) throw new DeadlineGuard();
@@ -263,7 +266,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             control.phase("retrieving");
             // A rerun reads within what is left of the job's calls, never a new budget.
             if (ChatPlanner.worstCaseCalls(confirmed) > control.toolCallsLeft()) throw new Stop(TOOL_BUDGET_SPENT);
-            guard(control, limits.tools().plus(limits.generate()).plus(limits.verify()).plus(limits.server()));
+            guard(control, limits.tools().plus(MIN_DIRECT_GENERATE).plus(MIN_VERIFY).plus(limits.server()));
             retrieved = retrieval.run(run, control, confirmed);
             if (retrieved.failed() != null) throw new Stop(toolFailure(retrieved.failed()));
             coverage.read(confirmed, retrieved.results());
@@ -323,7 +326,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         } else {
             control.phase("writing");
             var context = new ChatBranchContext(run.turns(), run.context(), branches, ChatAnswerCheck.MAX_CITATIONS);
-            generated = model(control, limits.generate(), limits.verify().plus(limits.server()),
+            generated = modelAtLeast(control, limits.generate(), MIN_DIRECT_GENERATE,
+                    MIN_VERIFY.plus(limits.server()),
                     () -> generator.generate(run, context));
         }
         var checked = ChatAnswerCheck.check(branches, generated);
@@ -359,7 +363,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         control.phase("verifying");
         List<Citation> allCited = List.copyOf(cited.values());
         ChatModels.ServerFacts facts = ChatModels.ServerFacts.capture(run, passed.sections(), branches);
-        ChatSemanticVerdicts verdicts = model(control, limits.verify(), limits.server(),
+        ChatSemanticVerdicts verdicts = modelAtLeast(control, limits.verify(), MIN_VERIFY, limits.server(),
                 () -> verifier.verify(run, passed.sections(), allCited, facts));
         Verified verified = verified(passed.sections(), verdicts);
         if (verified == null) return validationFailed();
@@ -573,6 +577,21 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      */
     private <T> T model(ChatRunControl control, Duration stage, Duration after, Supplier<T> call) {
         guard(control, stage.plus(after));
+        return awaitModel(control, stage, call);
+    }
+
+    /**
+     * A direct model stage with a fixed minimum and a larger provisional ceiling. It uses slack left by faster earlier stages
+     * but never consumes the minimum reserved for the stages and terminal write after it.
+     */
+    private <T> T modelAtLeast(ChatRunControl control, Duration ceiling, Duration minimum, Duration after,
+            Supplier<T> call) {
+        guard(control, minimum.plus(after));
+        Duration available = control.remaining().minus(after);
+        return awaitModel(control, min(ceiling, available), call);
+    }
+
+    private <T> T awaitModel(ChatRunControl control, Duration stage, Supplier<T> call) {
         control.beforeModelCall();
         Future<T> pending = models.submit(call::get);
         try {
@@ -671,7 +690,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      */
     private WebAfterReads webAfterReads(ChatRun run, ChatRunControl control, List<ChatModels.AgentRequirement> gaps,
             boolean agentRefused, ObjectNode route) {
-        Duration after = limits.generate().plus(limits.verify()).plus(limits.server());
+        Duration after = MIN_DIRECT_GENERATE.plus(MIN_VERIFY).plus(limits.server());
         Duration budget = min(WEB_AFTER_READS, control.remaining().minus(after));
         if (budget.compareTo(MIN_AGENT_STEP) < 0) {
             route.put("webAfterReads", "no_time");
