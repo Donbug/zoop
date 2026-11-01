@@ -515,6 +515,25 @@ class ChatMcpAgentTest {
     }
 
     @Test
+    void aFoundItemStillOpensTheWebWhenItsEvidenceMissesTheRequestedPeriodAndField() {
+        var found = new ChatToolResult("chat-tool/v1", "tc-1", "company.read", "v",
+                List.of(new ChatToolItem("KRX:000660", "company", "SK하이닉스 실적",
+                        List.of("KRX:000660"), List.of("ev-old"))), List.of("ev-old"), false, false, null);
+        var requirement = new ChatModels.AgentRequirement("r2", "지난달 SK하이닉스 매출", false,
+                List.of("KRX:000660"), true);
+        var run = executor.attach(JOB, 1).orElseThrow().run();
+        ChatCitationSource old = (id, version, asOf, trace) -> Optional.of(new Citation("article", id,
+                "영업이익 기사", "art-1", "v1", null, null, 0, 6, "실적", "언론사", NOW,
+                "https://example.invalid/old"));
+
+        assertEquals(java.util.Set.of("r2"), ChatMcpAgent.unmet(List.of(found), Map.of("tc-1", List.of("r2")),
+                java.util.Set.of(), java.util.Set.of(), List.of(requirement), run, old));
+        assertEquals(java.util.Set.of(), ChatMcpAgent.unmet(List.of(found), Map.of("tc-1", List.of("r2")),
+                java.util.Set.of("tc-1"), java.util.Set.of(), List.of(requirement), run, old),
+                "a withheld internal read is never replaced by search");
+    }
+
+    @Test
     void aReadCutByTheSendGrantOpensNoSearchEvenWhenItsRequirementAsksForAnOutsideSource() {
         var withheld = new ChatToolResult("chat-tool/v1", "tc-1", "company.read", "v", List.of(), List.of(), true, false, null);
 

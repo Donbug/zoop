@@ -275,7 +275,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 route.putArray("toolFaults").addAll(strings(retrieved.limitations().entrySet().stream()
                         .filter(e -> ChatRetrieval.TOOL_UNAVAILABLE.equals(e.getValue())).map(Map.Entry::getKey).toList()));
             }
-            List<ChatModels.AgentRequirement> gaps = webGaps(confirmed, retrieved);
+            ChatPlan.Stop webScope = webScopeStop(run, confirmed, retrieved);
+            if (webScope != null) return stopped(run, route, webScope, coverage);
+            List<ChatModels.AgentRequirement> gaps = webGaps(run, confirmed, retrieved);
             if (!gaps.isEmpty()) {
                 WebAfterReads web = webAfterReads(run, control, gaps, directStart, route);
                 agentNotices = web.notices();
@@ -724,7 +726,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      * What only ZOOP's records can say (the comparison, the published round, the selection of Q05, Q06, Q08) is never replaced
      * by the web, so an empty read opens nothing there; only words asking for an outside source do, for background beside it.
      */
-    private List<ChatModels.AgentRequirement> webGaps(ChatPlan.Run plan, ChatRetrieval.Outcome retrieved) {
+    private List<ChatModels.AgentRequirement> webGaps(ChatRun run, ChatPlan.Run plan, ChatRetrieval.Outcome retrieved) {
         if (agent == null || !agent.tools().contains(ChatCapability.WEB_SEARCH)) return List.of();
         List<ChatModels.AgentRequirement> gaps = new ArrayList<>();
         for (Planned p : plan.requirements()) {
@@ -732,13 +734,54 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                     || retrieved.limitations().containsKey(p.id()) || retrieved.partial().contains(p.id())) continue;
             List<ChatToolResult> reads = retrieved.results().getOrDefault(p.id(), List.of());
             boolean recordsOnly = p.types().stream().anyMatch(RECORD_TYPES::contains);
-            boolean thin = retrieved.noneFound().contains(p.id()) || reads.isEmpty()
-                    || reads.stream().anyMatch(r -> r.items().isEmpty() || Boolean.TRUE.equals(r.truncated()));
-            if (ChatWebDemand.asksExternalSource(p.label()) || thin && !recordsOnly) {
+            boolean incomplete = retrieved.noneFound().contains(p.id())
+                    || ChatWebDemand.coverage(p.label(), run.askedAt(), p.targets(), reads,
+                            id -> demandCitation(run, id)).incomplete();
+            if (ChatWebDemand.asksExternalSource(p.label()) || incomplete && !recordsOnly) {
                 gaps.add(ChatModels.AgentRequirement.searchOnly(p.id(), p.label()));
             }
         }
         return gaps;
+    }
+
+    /**
+     * Q07 may read five member companies internally, but one run may search only two of them. If more than two still need
+     * public facts, ask the member which pair to search before any search or final generation; never pick a pair by order.
+     */
+    private ChatPlan.Stop webScopeStop(ChatRun run, ChatPlan.Run plan, ChatRetrieval.Outcome retrieved) {
+        if (agent == null || !agent.tools().contains(ChatCapability.WEB_SEARCH)) return null;
+        for (Planned p : plan.requirements()) {
+            if (p.mode() != Mode.TOOLS || !p.types().contains(ChatQueryType.Q07) || !p.onScope()
+                    || p.evidenceScope() != null || retrieved.limitations().containsKey(p.id())
+                    || retrieved.partial().contains(p.id())) continue;
+            ChatRetrieval.Found scope = ChatRetrieval.found(
+                    retrieved.results().getOrDefault(p.dependsOn().requirementId(), List.of()));
+            if (scope.companies().size() <= 2) continue;
+            List<ChatToolResult> reads = retrieved.results().getOrDefault(p.id(), List.of());
+            Map<String, String> missing = new LinkedHashMap<>();
+            boolean external = ChatWebDemand.asksExternalSource(p.label());
+            scope.companies().forEach((id, label) -> {
+                if (external || ChatWebDemand.coverage(p.label(), run.askedAt(), List.of(id), reads,
+                        evidenceId -> demandCitation(run, evidenceId)).incomplete()) {
+                    missing.put(id, label);
+                }
+            });
+            if (missing.size() > 2) {
+                var pair = new ChatRouteDecision.Dependency("web", "exactly", 2);
+                return ChatPlanner.clarify(run, "web_company_selection",
+                        ChatRetrieval.choices(new ChatRetrieval.Found(missing, false), pair));
+            }
+        }
+        return null;
+    }
+
+    /** A refused or temporarily unreadable internal citation never becomes permission to replace it with the web. */
+    private Optional<Citation> demandCitation(ChatRun run, String evidenceId) {
+        try {
+            return citations.cite(evidenceId, run.graphVersionId(), run.context().asOf(), run.jobId());
+        } catch (ChatToolUnavailable unavailable) {
+            return Optional.empty();
+        }
     }
 
     /** Whether the agent was offered nothing but the web: a concept question with no read of its own. */

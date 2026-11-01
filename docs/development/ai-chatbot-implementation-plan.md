@@ -105,7 +105,7 @@ flowchart LR
 | 3 router·Luna agent | 부분 구현 | Jev router·Luna Responses MCP·Java 승인 루프는 구현(합성 replay로만 확인). 라우터 wire `dependsOn`도 구현(2026-10-30, `zoop-ai-chat-3`, 확신이 낮거나 요구가 대상을 지목하면 의존 없음). 승인 요청의 요구 매핑도 구현(2026-10-30, `zoop-ai-chat-4`). live 확인 |
 | 4 읽기 도구 | 부분 구현 | Q03(`document.search`는 기업별 문서 읽기, 2026-10-31. 본문 검색 색인은 없음), Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`·`briefing.evidence`, 2026-10-31), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 공급자), Q01 승인 저장소·기본 비활성 어댑터 구현. Q01 승인본·활성화와 실제 웹 공급자 미정 |
 | 5 생성·출력 검증 | 구현(합성 회귀) | 서버 claim 분할과 claim별 support·`unsupportedCausality`, 입력 24k·답변 2k 구현. 실제 모델 보정은 단계 7 |
-| 6 웹 | 구현 | 관계·근거·내 종목 `uiActions[]`, OpenAPI 타입 생성 seam, 실제 백엔드와의 종단 확인 |
+| 6 웹 | 부분 구현(합성 회귀) | 합성 공급자·예산·요구별 gate·웹 인용, 대상·기간·필수 필드·인용 coverage와 Q07 웹 대상 2개 초과 선택 확인 구현. 실제 공급자·요청 캐시·금액 상한·snapshot 저장은 미정 |
 | 7 평가·출시 | 부분 구현 | 고정 평가 세트 v1(대본 실행)만 있음. 실제 모델·데이터 평가와 임계값 보정, 보안·종단·배포 증명 |
 
 ### 단계 0 — 계약 고정과 fixture
