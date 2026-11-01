@@ -26,6 +26,7 @@ import BriefingRecap from './BriefingRecap';
 import BriefingContinuity from './BriefingContinuity';
 import BriefingComparison from './BriefingComparison';
 import PersonalizedIssueSelection from './PersonalizedIssueSelection';
+import ScheduledPersonalBriefing from './ScheduledPersonalBriefing';
 import { BriefingCorrections, BriefingOutlook } from './BriefingPublishedNotes';
 import { BRIEFING_DISCLAIMER, splitCorrections } from './briefingCorrections';
 import { issueAnchor } from '@/util/briefingIssueView';
@@ -357,7 +358,13 @@ export default function PublishedBriefing({
             {error}
           </p>
         )}
-        {result && (
+        {result && personal ? (
+          <ScheduledPersonalBriefing
+            key={`${result.id}:${memberId}`}
+            round={result}
+            compact={compact}
+          />
+        ) : result && (
           <>
             <header className="border-b-[0.667px] border-zoop-line pb-[18px]">
               <div className="flex flex-wrap items-center gap-2">

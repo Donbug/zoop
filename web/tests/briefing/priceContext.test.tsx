@@ -322,3 +322,12 @@ describe('v5 independently verified outlook binding', () => {
     expect(validAiPriceOutlooks(r)).toBeNull();
   });
 });
+
+it('D-BRF-01/02 explicit selections authenticate reused prices using a separate frozen basis without reusing its business prose', () => {
+  const r = result();
+  r.companyPriceBasis = r.editionReview;
+  delete r.editionReview;
+  expect(validPriceContext(r)).toBeTruthy();
+  r.companyPriceBasis!.resultVersion = 'wrong-review';
+  expect(validPriceContext(r)).toBeNull();
+});
