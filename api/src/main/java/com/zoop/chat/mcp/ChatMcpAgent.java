@@ -42,7 +42,8 @@ import tools.jackson.databind.json.JsonMapper;
  * has it from a round after an approved internal read serving it came back empty or cut, or after any such read when its own
  * words ask for a source outside ZOOP: the web is the last resort of what ZOOP's own data left unmet, never the first look,
  * and another requirement's gap opens nothing. A read cut by the send grant is no gap: no search stands in for what was
- * refused. Its query must pass
+ * refused. A requirement the server's own reads already left unmet ({@link ChatModels.AgentRequirement#readByServer}) has it
+ * from the first round. Its query must pass
  * {@link com.zoop.chat.tool.ChatWebQueryPolicy} and it takes the job's and the day's web budgets when it is reserved; a spent
  * budget denies it and is reported as {@code web_budget_exhausted}.</li>
  * <li>The final answer is returned with the results of the calls that ran, read back from {@code chat_tool_calls.result}:
@@ -122,6 +123,8 @@ public final class ChatMcpAgent implements ChatAgentPath {
         Set<String> searches = new LinkedHashSet<>();
         Set<String> external = new LinkedHashSet<>();
         requirements.stream().filter(ChatModels.AgentRequirement::externalSource).forEach(r -> external.add(r.id()));
+        Set<String> openFromStart = new LinkedHashSet<>();
+        requirements.stream().filter(ChatModels.AgentRequirement::readByServer).forEach(r -> openFromStart.add(r.id()));
         for (int step = 1, rounds = 0; ; step++) {
             var input = new ChatModels.AgentInput(requirements, token, names, recipient, maxCitations, previous,
                     decisions);
@@ -158,7 +161,9 @@ public final class ChatMcpAgent implements ChatAgentPath {
             List<ChatToolResult> done = closing ? List.of() : kept(run);
             done.forEach(result -> served.getOrDefault(result.toolCallId(), List.of())
                     .forEach(id -> reachable.get(id).addAll(reached(result))));
-            Set<String> webOpen = webOpen(unmet(done, served, withheldReads(run), external), concepts, searched, searchable);
+            Set<String> gaps = unmet(done, served, withheldReads(run), external);
+            gaps.addAll(openFromStart);
+            Set<String> webOpen = webOpen(gaps, concepts, searched, searchable);
             List<ChatModels.Decision> next = new ArrayList<>();
             int round = 0;
             for (ChatModels.ApprovalRequest request : outcome.approvals()) {

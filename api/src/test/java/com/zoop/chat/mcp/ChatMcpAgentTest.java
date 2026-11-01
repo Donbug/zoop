@@ -536,6 +536,22 @@ class ChatMcpAgentTest {
     }
 
     @Test
+    void aRequirementTheServerAlreadyReadSearchesInTheFirstRoundAndReadsNothing() {
+        useWeb();
+        var gap = ChatModels.AgentRequirement.searchOnly("r2", "삼성전자 최신 소식");
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(searchFor("w0", "삼성전자 소식", "r2"),
+                serving("c1", "KRX:005930", "r2")), null));
+        luna.script.add(n -> done());
+
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit());
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        agent.run(attached.run(), attached.control(), List.of(gap), List.of(ChatCapability.WEB_SEARCH), 20, steps(false));
+
+        assertEquals(List.of(new ChatModels.Decision("w0", true), new ChatModels.Decision("c1", false)),
+                luna.inputs.get(1).decisions());
+    }
+
+    @Test
     void anOutsideSourceRequestStillWaitsForTheInternalReadInTheLoop() {
         useWeb();
         var asked = new ChatModels.AgentRequirement("r2", "SK하이닉스 외신 보도", false, List.of("KRX:000660"), true, true);
