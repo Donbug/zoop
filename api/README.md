@@ -395,11 +395,11 @@ ai/pipeline/.venv/bin/python api/scripts/graph_handoff_activation_smoke.py \
 
 결과 경로는 매번 새 파일을 지정합니다. 명령은 자체 Docker bridge·tmpfs PostgreSQL·loopback JVM과 합성 CLI 원장만 만들고 종료 시 자신의 자원만 정리합니다. PostgreSQL 포트는 `127.0.0.1`에만 엽니다. DB 설정·provider 자격·Spring 설정은 상속하지 않으며 AI 클라이언트는 모두 끕니다. 실제 계정이나 로그인 대신 시험 DB의 합성 관리자·세션을 사용하고, 실제 세션 조회로 받은 CSRF 토큰과 관리자 쿠키·Origin으로 요청합니다. 비밀번호 로그인·OAuth·운영자 계정 발급은 이 시험의 증명 범위가 아닙니다.
 
-bundle `-7` 스테이징 뒤, 공개 제외 저장소가 연결된 기본 설정의 JVM에서 현재 권리 철회에 따른 활성화 거절(409)과 활성 포인터·review revision·활성화 이력·감사·멱등 기록의 불변을 확인합니다. 권리를 복구한 뒤 같은 JVM에서 개발용 우회 플래그 없이 실제 관리자 HTTP 활성화, 같은 키 재전송·다른 본문 충돌·오래된 활성 포인터·새 키로 이미 활성인 버전 요청을 검사하고, 같은 버전의 공개 graph·event·정확한 evidence span 및 현재 권리 철회·복구를 확인합니다. 공개 제외 저장소를 읽지 못할 때의 fail-closed 계약은 Java 시험에서 별도로 확인합니다. SQL은 카탈로그·인증 fixture만 준비하며, 양성 HTTP 활성화를 대신하지 않습니다. 기존 fixture seeder의 활성화도 별도로 집계합니다.
+bundle `-8` 스테이징 뒤, 공개 제외 저장소가 연결된 기본 설정의 JVM에서 현재 권리 철회에 따른 활성화 거절(409)과 활성 포인터·review revision·활성화 이력·감사·멱등 기록의 불변을 확인합니다. 권리를 복구한 뒤 같은 JVM에서 개발용 우회 플래그 없이 실제 관리자 HTTP 활성화, 같은 키 재전송·다른 본문 충돌·오래된 활성 포인터·새 키로 이미 활성인 버전 요청을 검사하고, 같은 버전의 공개 graph·event·정확한 evidence span 및 현재 권리 철회·복구를 확인합니다. `--unknown-fields`를 추가하면 근거가 있는 미확인 국가와 보류된 원문 시각의 receipt 보존·공개 투영도 검사합니다. 공개 제외 저장소를 읽지 못할 때의 fail-closed 계약은 Java 시험에서 별도로 확인합니다. SQL은 카탈로그·인증 fixture만 준비하며, 양성 HTTP 활성화를 대신하지 않습니다. 기존 fixture seeder의 활성화도 별도로 집계합니다.
 
 마지막 JSON과 `--result`에는 단계별 상태 코드, `importActivationWrites: 0`, `sqlHarnessActivations: 0`, 실제 HTTP 포인터 변경 수, 현재 권리, `modelCalls: 0`, 소스 HEAD·jar hash와 소유 자원 정리 결과를 기록합니다. 실패는 0이 아닌 종료 코드와 실패 JSON으로 남습니다. 이 시험은 앱의 공개 제외 reader가 연결된 기본 설정을 사용하지만 제외 명령의 변경·해제, 실제 기사 권리, 운영 공개 준비 또는 외부 모델 실행을 증명하지 않습니다. `.env`와 운영 기본값은 바꾸지 않습니다.
 
-**bundle 계약 수정 이력:** 최초 실행에서는 `EventDetailService`가 bundle `-5`만 읽어 `-7` 사건 상세가 503 `SOURCE_UNAVAILABLE`로 차단됐습니다. 이후 읽기 소비자가 정확한 `-5`·`-6`·`-7` receipt를 지원하도록 수정했고, 새 수입은 계속 `-7`만 허용합니다. 당시 수정 후 새 jar의 실제 HTTP 28단계가 통과했으며, 공개 제외 저장소 통합 후 위 기본 설정 경로의 재검증과는 별개입니다. 스크립트는 미지원 계약을 성공으로 처리하거나 bundle 버전을 낮추지 않으며, 향후 같은 불일치가 생기면 `blocked`·종료 코드 1로 기록합니다. 로컬 실행 증거와 운영·수령자 확인은 구분합니다.
+**bundle 계약 수정 이력:** 최초 실행에서는 `EventDetailService`가 bundle `-5`만 읽어 `-7` 사건 상세가 503 `SOURCE_UNAVAILABLE`로 차단됐습니다. 이후 읽기 소비자가 정확한 `-5`·`-6`·`-7` receipt를 지원하도록 수정했고, 당시 신규 수입은 `-7`만 허용했습니다. 당시 수정 후 새 jar의 실제 HTTP 28단계가 통과했으며, 공개 제외 저장소 통합 후 위 기본 설정 경로의 재검증과는 별개입니다. 스크립트는 미지원 계약을 성공으로 처리하거나 bundle 버전을 낮추지 않으며, 향후 같은 불일치가 생기면 `blocked`·종료 코드 1로 기록합니다. 로컬 실행 증거와 운영·수령자 확인은 구분합니다.
 
 
 ## 그래프 정기 회차 (#55)
@@ -424,6 +424,29 @@ bundle `-7` 스테이징 뒤, 공개 제외 저장소가 연결된 기본 설정
 - **`exclude-query` 기본 선택의 예외:** 실제로 해석한 원본 버전 목록도 요청 hash에 포함됩니다. 이후 수입으로 목록이 바뀌면 같은 요청 ID는 `request_conflict`가 되며, 원본이 20개를 넘으면 기록 조회 전에 `exposure_batch_required`가 됩니다. 이전 실행의 커밋 여부는 `disclosure_exclusion_requests`의 같은 요청 ID와 결과를 먼저 확인합니다.
 
 변경 하나는 공통 publication lock 아래 한 트랜잭션이며 `revision`은 MAX+1입니다. 공개 그래프·근거·챗봇·기업 문서와 브리핑 그래프 basis는 평탄한 원본 소유자를 따라 최신 제외와 현재 권한을 적용합니다. 기사 제외는 정확한 `(articleId,articleVersion)`을 가리키며, 같은 원본을 사용하는 모든 구성본에 전파됩니다. 저장소나 현재 권한을 읽을 수 없으면 `503 SOURCE_UNAVAILABLE`입니다. S1 분석은 별도의 현재 기사 접근 상태와 S1 grant를 계속 확인하고, 이미 발행한 브리핑 저장본은 불변으로 유지합니다. 브리핑 그래프의 필수 대상이 현재 제외되면 해당 graph basis는 사용할 수 없는 상태로 반환합니다. 캐시·Neo4j는 현재 앱 백엔드 제외 소비자 범위와 구분합니다. 실패 단계별 재실행 경계는 [FS067-03·FS081 복구 표](docs/GRAPH_READ_HANDOFF.md#실패-단계와-재실행-경계-fs067-03--fs081)를 따릅니다.
+
+### 공개 제외 왕복의 별도 합성 smoke
+
+설치된 `zoop-ai-handoff-exposure`의 실제 보고서 → 비웹 제외·해제 명령 → 같은 버전의 공개 graph·event·evidence HTTP 경로를 검사합니다. [관리자 HTTP 활성화 smoke](#관리자-http-활성화의-별도-합성-smoke)와 같은 실행 전제가 필요합니다. 현재 소스로 미리 빌드한 API boot jar와 pipeline Python, `zoop-ai-handoff`·`zoop-ai-ingest`·`zoop-ai-handoff-exposure`를 준비합니다. 설치된 Python package 소스가 현재 checkout과 다르면 거절합니다.
+
+```sh
+ai/pipeline/.venv/bin/python api/scripts/graph_handoff_exclusion_smoke.py \
+  --jar api/build/libs/zoop-api-0.0.1-SNAPSHOT.jar \
+  --result /tmp/zoop-graph-exclusion-result.json
+```
+
+`--result`는 매번 새 파일로 지정합니다. 명령은 자체 bridge·tmpfs PostgreSQL·loopback JVM·합성 원장·artifact root를 만들고 종료 시 자신의 자원만 정리합니다. 상속 환경은 활성화 smoke의 allowlist를 사용합니다. 합성 bundle `-8` 두 개를 현재 import helper로 비활성 등록하고, 비교용 원본 버전을 먼저 관리자 HTTP로 활성화합니다. 그 버전을 base로 검사 대상 원본을 기존 비웹 publication composer에 추가해 구성본을 만듭니다. 구성 요청은 그 시점의 활성 포인터·receipt hash·rule/review revision을 고정하며, 구성본은 실제 CSRF·Origin·포인터 CAS 검사를 거쳐 HTTP로 활성화합니다. SQL은 카탈로그·인증 fixture 준비와 상태 대조에 사용합니다.
+
+버전만 지정한 공개 조회는 최초 활성화 시점의 `asOf`를 적용하므로, 이 시나리오의 공장 기사는 수집 입력부터 발행 시각을 `2026-10-08T00:00:00+00:00`으로 명시합니다. 실제 ingestion·분석·freeze 뒤 두 bundle의 기사 발행 시각을 대조합니다. 공통 합성 builder의 기본값은 계속 발행 시각 미상입니다.
+
+- 공개 → 제외 → 명시적 `lift` → 재제외를 같은 구성본 버전의 HTTP로 확인합니다. 보고서·제외·해제는 검사 대상 **원본 버전**에 고정하고, 공개 조회에만 구성본 ID를 사용합니다. graph 관계는 생산자 관계 ID를 bundle의 `(type, source, target)`으로 매핑해 표시 간선과 비교하고, evidence는 정확한 문서 버전·인용 좌표까지 대조합니다. 먼저 공개한 비교용 원본 버전의 같은 ID는 계속 읽을 수 있어야 합니다.
+- 두 handoff를 선택한 실제 보고서에서 **두 번째 receipt의** manifest·bundle·content pin을 하나씩 바꾼 입력은 `receipt_mismatch`로 전체 거절되어야 합니다. revision·대상·명령 기록의 불변을 확인하며, 변조 입력은 거절 검사용으로만 사용합니다.
+- 같은 제외 명령 재실행은 상태를 유지해야 합니다. 실제 작은 문서 보고서와 원장에 기록됐지만 S2에 묶이지 않은 합성 문서의 빈 보고서도 기존 제외를 해제하지 않아야 합니다.
+- 관측한 revision과 typed target 목록을 담은 `lift`로 복구한 뒤 다시 제외합니다. 과거 성공 `lift`의 동일 재실행은 과거 결과만 반환하고 새 제외를 유지해야 하며, 같은 과거 revision의 새 해제 명령은 `revision_stale`로 거절되어야 합니다.
+
+source registry의 권리와 원장 파일은 전체 실행 전후로, artifact 파일과 공개 포인터·review revision·활성화 이력·감사·멱등 기록은 공개 준비가 끝난 뒤 제외·해제 시나리오 전후로 대조합니다. source-change는 합성 검토 입력이며, `lift`의 성공은 실제로 철회된 원문 권리의 복구를 뜻하지 않습니다. 검증 범위는 지정한 원본에 대한 실제 제외·해제 명령과 구성본·비교용 원본의 graph·event·evidence 조회입니다.
+
+마지막 stdout JSON과 결과 파일에는 생산자 보고서·운영자 결과·HTTP 상태와 hash·검사 상태·외부 호출 수·최종 revision·소스 및 실행 바이트의 pin·소유 자원 이름·정리 결과를 기록합니다. jar hash는 실행 바이트의 식별자이며 빌드 출처 증명은 별도입니다. 실패하면 종료 코드 1과 실패 단계가 남습니다. 강제 종료 후에는 `docker ps -a --filter label=com.zoop.graph-exclusion-smoke=1`과 `docker network ls --filter label=com.zoop.graph-exclusion-smoke=1`로 후보를 확인하고, 해당 실행의 JSON `resources`에 기록된 정확한 이름만 정리합니다.
 
 ## 기본 기업 카탈로그 적재
 
