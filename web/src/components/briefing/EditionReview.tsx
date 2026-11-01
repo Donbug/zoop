@@ -54,7 +54,7 @@ function Statement({
           >
             근거 {value.evidenceIds.length}건 · 원문 보기
           </summary>
-          <ul className="space-y-3 border-l-2 border-panel-line pl-3">
+          <ul className="space-y-3 border-l-2 border-zoop-border pl-3">
             {value.evidenceIds.map((id) => {
               const s = review.sources[id];
               return (
@@ -115,7 +115,7 @@ function CompanyCard({
     <details
       open={!compact}
       aria-label={`${c.companyName} ${evening ? '하루 점검' : '오늘 관찰'}`}
-      className="rounded-lg border border-zoop-line p-4"
+      className="rounded-lg border border-zoop-border p-4"
     >
       <summary className={`cursor-pointer list-none ${FOCUS_RING}`}>
         <span className="flex flex-wrap gap-2">
@@ -163,7 +163,7 @@ function CompanyCard({
           </span>
         )}
       </summary>
-      <div className="mt-4 space-y-4 border-t border-zoop-line pt-3">
+      <div className="mt-4 space-y-4 border-t border-zoop-border pt-3">
         {(ai?.previous.status === 'available' || (!ai && c.previous)) && (
           <div>
             <h4 className="text-body font-semibold">
@@ -398,7 +398,7 @@ export default function EditionReview({
           </div>
         </>
       )}
-      <div className="mt-5 rounded-lg border border-zoop-line p-3">
+      <div className="mt-5 rounded-lg border border-zoop-border p-3">
         <h3 className="text-body font-bold">
           {evening ? '오늘 장 평가' : '시장 참고 기준'}
         </h3>
@@ -525,7 +525,7 @@ export default function EditionReview({
           </div>
         </details>
       )}
-      <div className="mt-5 border-t border-zoop-line pt-4">
+      <div className="mt-5 border-t border-zoop-border pt-4">
         <h3 className="text-body font-bold">
           {evening
             ? '다음 거래일 전망·확인 조건'

@@ -201,7 +201,7 @@ export default function BriefingComparison(props: Props) {
           {items.map((item) => (
             <li
               key={`${item.change}-${item.eventId}`}
-              className="flex gap-3 border-b-[0.667px] border-zoop-line py-3 last:border-b-0 max-sm:flex-col max-sm:gap-1"
+              className="flex gap-3 border-b border-zoop-border py-3 last:border-b-0 max-sm:flex-col max-sm:gap-1"
             >
               <p className="w-28 shrink-0 font-num text-caption text-zoop-muted tabular-nums">
                 {reported(item.reportedAt, roundDate ?? '')}
@@ -209,9 +209,9 @@ export default function BriefingComparison(props: Props) {
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <p className="flex flex-wrap items-start gap-x-2 gap-y-1">
                   <span
-                    className={`shrink-0 rounded-full border-[0.667px] px-2 py-[2px] text-caption font-semibold ${
+                    className={`shrink-0 rounded-full border px-2 py-[2px] text-caption font-semibold ${
                       item.change === 'dropped'
-                        ? 'border-zoop-line text-zoop-muted'
+                        ? 'border-zoop-border text-zoop-muted'
                         : 'border-zoop-ink text-zoop-ink'
                     }`}
                   >

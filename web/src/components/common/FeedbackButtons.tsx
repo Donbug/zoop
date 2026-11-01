@@ -12,7 +12,7 @@ import type {
 
 const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink';
-const TOGGLE = `inline-flex h-8 items-center gap-1 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-caption font-semibold text-zoop-muted hover:bg-zoop-wash aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper disabled:opacity-60 ${FOCUS_RING}`;
+const TOGGLE = `inline-flex h-8 items-center gap-1 rounded-md border border-zoop-border bg-zoop-control px-2.5 text-caption font-semibold text-zoop-muted hover:bg-zoop-selected aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-on-ink disabled:opacity-60 ${FOCUS_RING}`;
 
 type Props = {
   feature: FeedbackFeature;
@@ -211,7 +211,7 @@ function MemberFeedback({
             maxLength={200}
             placeholder="어떤 점이 아쉬웠나요? (선택)"
             onChange={(event) => setReason(event.target.value)}
-            className={`h-8 min-w-0 flex-1 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-caption text-zoop-ink ${FOCUS_RING}`}
+            className={`h-8 min-w-0 flex-1 rounded-md border border-zoop-border bg-zoop-surface px-2.5 text-caption text-zoop-ink ${FOCUS_RING}`}
           />
           <button
             type="submit"

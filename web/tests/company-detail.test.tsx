@@ -384,6 +384,11 @@ test.each(['events', 'documents', 'info'])(
     expect(screen.getAllByRole('main')).toHaveLength(1);
     const main = screen.getByRole('main');
     expect(main.id).toBe('service-main');
+    // D-COM-01: 세 탭 모두 같은 지도 테마 표면 안에서 본문 랜드마크를 유지한다.
+    expect(main.parentElement?.classList.contains('bg-zoop-page!')).toBe(true);
+    const catalog = screen.getByRole('complementary', { name: '기업 선택' });
+    expect(catalog.classList.contains('bg-zoop-surface')).toBe(true);
+    expect(catalog.classList.contains('rounded-xl')).toBe(true);
     await view.user.click(
       screen.getByRole('link', { name: '본문으로 건너뛰기' }),
     );
@@ -393,6 +398,28 @@ test.each(['events', 'documents', 'info'])(
   },
 );
 
+test.each([
+  ['/stocks', false],
+  ['/briefing', true],
+] as const)(
+  'D-COM-01 · D-BRF-01 theme page surface is correctly scoped for %s',
+  (path, themed) => {
+    renderRoutes(
+      [
+        {
+          element: <AppLayout />,
+          children: [{ path, element: <h1>합성 화면</h1> }],
+        },
+      ],
+      path,
+    );
+    expect(
+      screen
+        .getByRole('main')
+        .parentElement?.classList.contains('bg-zoop-page!'),
+    ).toBe(themed);
+  },
+);
 function openHistory() {
   return renderRoutes(
     [

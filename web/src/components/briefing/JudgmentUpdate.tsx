@@ -39,7 +39,7 @@ function Statement({
         >
           출처·검증에 사용한 원문 문맥 {value.evidenceIds.length}건
         </summary>
-        <ul className="space-y-3 border-l-2 border-panel-line pl-3">
+        <ul className="space-y-3 border-l-2 border-zoop-border pl-3">
           {value.evidenceIds.map((id) => {
             const source = update.sources![id];
             return (
@@ -98,7 +98,7 @@ function Company({
   return (
     <details
       open={!compact}
-      className="rounded-lg border border-zoop-line bg-zoop-surface p-4"
+      className="rounded-lg border border-zoop-border bg-zoop-surface p-4"
       aria-label={`${c.companyName} 판단 갱신`}
     >
       <summary className={`cursor-pointer list-none ${FOCUS_RING}`}>
@@ -116,7 +116,7 @@ function Company({
           {c.description.text}
         </span>
       </summary>
-      <div className="mt-4 space-y-4 border-t border-zoop-line pt-3">
+      <div className="mt-4 space-y-4 border-t border-zoop-border pt-3">
         <div>
           <h4 className="text-body font-semibold">이전 실제 판단</h4>
           {c.previousJudgment ? (

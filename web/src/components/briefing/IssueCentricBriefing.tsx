@@ -112,7 +112,7 @@ function CompanyInIssue({
   return (
     <section
       aria-label={`${company.name} 관련 판단`}
-      className="space-y-3 border-t border-zoop-line pt-4"
+      className="space-y-3 border-t border-zoop-border pt-4"
     >
       <h5 className="flex flex-wrap items-center gap-2 text-body font-bold">
         {company.id ? (
@@ -199,7 +199,7 @@ function CompanyInIssue({
         </section>
       )}
       {price?.status === 'available' && (
-        <div className="rounded border border-zoop-line bg-zoop-wash p-3">
+        <div className="rounded-md border border-zoop-border bg-zoop-card p-3">
           <p className="text-body font-semibold">
             {price.sessionDate}{' '}
             {price.latest.kind === 'daily_close' ? '종가' : '완료 봉'}{' '}
@@ -318,7 +318,7 @@ function CompanyInIssue({
                 )}
                 <p className={NOTE}>{briefingTime(s.publishedAt)}</p>
                 <blockquote
-                  className={`${NOTE} mt-2 border-l-2 border-zoop-line pl-3`}
+                  className={`${NOTE} mt-2 border-l-2 border-zoop-border pl-3`}
                 >
                   {s.quote}
                 </blockquote>
@@ -357,7 +357,7 @@ function IssueFollowUp({
             .map((c) => (
               <div
                 key={c.company.id}
-                className="mb-3 rounded border border-zoop-line p-3"
+                className="mb-3 rounded-md border border-zoop-border p-3"
               >
                 <p className="text-caption font-semibold">
                   {c.company.name} · 같은 이슈의 이전 판단
@@ -507,8 +507,8 @@ function IssueCard({
           if (next && !open) recordOpen();
           setOpen(next);
         }}
-        className={`scroll-mt-4 overflow-hidden border border-zoop-line bg-zoop-paper ${
-          corrections.length ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'
+        className={`scroll-mt-4 overflow-hidden border border-zoop-border bg-zoop-surface ${
+          corrections.length ? 'rounded-t-xl border-b-0' : 'rounded-xl'
         }`}
       >
         <summary
@@ -534,7 +534,7 @@ function IssueCard({
           </span>
         </summary>
         {open && (
-          <div className="space-y-6 border-t border-zoop-line p-5 sm:p-6">
+          <div className="space-y-6 border-t border-zoop-border p-5 sm:p-6">
             <p className={NOTE}>
               시장 관측 ·{' '}
               {newsObserved
@@ -719,7 +719,7 @@ function IssueCard({
       </details>
       {corrections.length > 0 && (
         // 접힌 카드에서도 정정이 보이도록 카드 아래쪽 테두리 안에 붙여 둔다.
-        <div className="rounded-b-2xl border border-t-0 border-zoop-line bg-zoop-paper px-5 pb-5 sm:px-6">
+        <div className="rounded-b-xl border border-t-0 border-zoop-border bg-zoop-surface px-5 pb-5 sm:px-6">
           <IssueCorrections corrections={corrections} />
         </div>
       )}

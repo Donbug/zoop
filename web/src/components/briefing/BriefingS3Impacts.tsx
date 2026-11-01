@@ -75,11 +75,11 @@ export default function BriefingS3Impacts({
   return (
     <section
       aria-label="이슈별 S3 기업 영향"
-      className="space-y-3 border-t border-zoop-line pt-4"
+      className="space-y-3 border-t border-zoop-border pt-4"
     >
       <h4 className="text-body font-bold">이 이슈의 기업별 영향</h4>
       {value?.reviewContext && (
-        <span className="inline-flex rounded border border-zoop-line px-2 py-1 text-caption text-zoop-muted">
+        <span className="inline-flex rounded-md border border-zoop-border px-2 py-1 text-caption text-zoop-muted">
           발행 후 추가 평가
         </span>
       )}
@@ -107,7 +107,7 @@ export default function BriefingS3Impacts({
             <section
               aria-label={`${c.companyName} S3 영향`}
               key={c.companyId}
-              className="space-y-3 rounded border border-zoop-line p-3"
+              className="space-y-3 rounded-lg border border-zoop-border p-3"
             >
               <h5 className="text-body font-semibold">{c.companyName}</h5>
               {c.assessments.length === 0 && (
@@ -136,7 +136,7 @@ export default function BriefingS3Impacts({
                   {a.evidencePlan?.research?.timeCheck && (
                     <aside
                       aria-label="원문 발행 시각 점검"
-                      className="space-y-2 rounded border border-zoop-line bg-zoop-wash p-3"
+                      className="space-y-2 rounded-lg border border-zoop-border bg-zoop-card p-3"
                     >
                       <p className="text-caption font-semibold">
                         원문 발행 시각 확인 필요
@@ -177,7 +177,7 @@ export default function BriefingS3Impacts({
                   {a.supplementalReview && (
                     <section
                       aria-label={`${c.companyName} 최신 재검증`}
-                      className="space-y-3 rounded border border-zoop-line bg-zoop-wash p-3"
+                      className="space-y-3 rounded-lg border border-zoop-border bg-zoop-card p-3"
                     >
                       <h6 className="text-body font-semibold">
                         <ImpactCue tone={a.supplementalReview.label} badge>
@@ -210,7 +210,7 @@ export default function BriefingS3Impacts({
                         </summary>
                         {a.supplementalReview.evidence.map((e) => (
                           <div
-                            className="space-y-2 border-t border-zoop-line py-3"
+                            className="space-y-2 border-t border-zoop-border py-3"
                             key={e.id}
                           >
                             <p className="text-caption font-semibold">
@@ -219,7 +219,7 @@ export default function BriefingS3Impacts({
                               </ImpactCue>
                             </p>
                             <blockquote
-                              className={`${BODY} border-l-2 border-zoop-line pl-3`}
+                              className={`${BODY} border-l-2 border-zoop-border pl-3`}
                             >
                               {e.quote}
                             </blockquote>
@@ -258,7 +258,7 @@ export default function BriefingS3Impacts({
                             사실 근거 · {f.title}
                           </summary>
                           <blockquote
-                            className={`${BODY} border-l-2 border-zoop-line pl-3`}
+                            className={`${BODY} border-l-2 border-zoop-border pl-3`}
                           >
                             {f.quote}
                           </blockquote>
@@ -308,7 +308,7 @@ export default function BriefingS3Impacts({
                               </ImpactCue>
                             </p>
                             <blockquote
-                              className={`${BODY} border-l-2 border-zoop-line pl-3`}
+                              className={`${BODY} border-l-2 border-zoop-border pl-3`}
                             >
                               {e.quote}
                             </blockquote>
@@ -348,7 +348,7 @@ export default function BriefingS3Impacts({
                       {a.evidencePlan.research &&
                         a.evidencePlan.research.sources.length > 0 && (
                           <section
-                            className="space-y-3 rounded border border-zoop-line bg-zoop-wash p-3"
+                            className="space-y-3 rounded-lg border border-zoop-border bg-zoop-card p-3"
                             aria-label="새로 확인한 공식 자료"
                           >
                             <h6 className="text-caption font-semibold">
@@ -365,7 +365,7 @@ export default function BriefingS3Impacts({
                             {a.evidencePlan.research.sources.map((source) => (
                               <div
                                 key={source.id}
-                                className="space-y-2 border-t border-zoop-line pt-3"
+                                className="space-y-2 border-t border-zoop-border pt-3"
                               >
                                 <p className={BODY}>{source.summary}</p>
                                 <p className={NOTE}>{source.limitations}</p>
@@ -376,7 +376,7 @@ export default function BriefingS3Impacts({
                                     공식 출처 · {source.title}
                                   </summary>
                                   <blockquote
-                                    className={`${BODY} border-l-2 border-zoop-line pl-3`}
+                                    className={`${BODY} border-l-2 border-zoop-border pl-3`}
                                   >
                                     {source.excerpt}
                                   </blockquote>
@@ -426,7 +426,7 @@ export default function BriefingS3Impacts({
                                 보강 원문 · {fact.source.title}
                               </summary>
                               <blockquote
-                                className={`${BODY} border-l-2 border-zoop-line pl-3`}
+                                className={`${BODY} border-l-2 border-zoop-border pl-3`}
                               >
                                 {fact.source.quote}
                               </blockquote>

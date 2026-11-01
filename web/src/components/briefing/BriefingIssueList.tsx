@@ -57,7 +57,7 @@ export default function BriefingIssueList({
         {graphHref && (
           <Link
             to={graphHref}
-            className={`inline-flex h-7 items-center rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-caption font-semibold hover:bg-zoop-wash ${FOCUS_RING}`}
+            className={`inline-flex h-7 items-center rounded-md border border-zoop-border bg-zoop-surface px-2.5 text-caption font-semibold hover:bg-zoop-card ${FOCUS_RING}`}
           >
             이 회차 전체 관계 그래프
           </Link>
@@ -83,7 +83,7 @@ export default function BriefingIssueList({
               <li
                 key={item.eventId}
                 id={issueAnchor(item)}
-                className="scroll-mt-4 flex flex-col gap-1.5 border-t-[0.667px] border-zoop-line pt-5 first:border-t-0 first:pt-0 [&+li]:mt-5"
+                className="scroll-mt-4 flex flex-col gap-1.5 border-t-[0.667px] border-zoop-border pt-5 first:border-t-0 first:pt-0 [&+li]:mt-5"
               >
                 <BriefingReadingSection
                   compact={compact}
@@ -94,7 +94,7 @@ export default function BriefingIssueList({
                     {item.rank}. {item.title}
                   </h4>
                   {(item.matchedCompanyIds ?? []).length > 0 && (
-                    <p className="self-start rounded-full border-[0.667px] border-zoop-ink px-2 py-[2px] text-caption font-semibold">
+                    <p className="self-start rounded-full border border-zoop-ink px-2 py-[2px] text-caption font-semibold">
                       내 종목:{' '}
                       {item.companies
                         .filter((company) =>

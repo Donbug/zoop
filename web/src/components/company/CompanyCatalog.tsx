@@ -148,7 +148,7 @@ export default function CompanyCatalog({
   return (
     <aside
       aria-label="기업 선택"
-      className="min-w-0 rounded-2xl bg-white p-4 font-panel shadow-sm max-md:max-h-[320px] max-md:overflow-auto [&_section]:py-3!"
+      className="min-w-0 rounded-xl border border-zoop-border bg-zoop-surface p-4 font-panel shadow-sm max-md:max-h-[320px] max-md:overflow-auto [&_section]:py-3!"
     >
       <CompanyCatalogRow
         id={id}
@@ -180,7 +180,7 @@ export default function CompanyCatalog({
             onChange={(e) => setInput(e.target.value)}
             className="min-w-0 flex-1 text-caption"
           />
-          <button className="shrink-0 bg-zoop-ink! px-2! text-caption! text-white">
+          <button className="shrink-0 bg-zoop-ink! px-2! text-caption! text-zoop-on-ink">
             검색
           </button>
         </div>

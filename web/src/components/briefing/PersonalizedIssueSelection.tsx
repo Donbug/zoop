@@ -80,7 +80,7 @@ export default function PersonalizedIssueSelection({
   return (
     <section
       aria-label="내 종목 핵심 이슈"
-      className="my-6 space-y-4 border-b border-zoop-line pb-6"
+      className="my-6 space-y-4 border-b border-zoop-border pb-6"
     >
       <div>
         <h2 className="text-lg font-bold">내 종목 핵심 이슈</h2>
@@ -103,7 +103,7 @@ export default function PersonalizedIssueSelection({
         )}
       </div>
       {ai && (
-        <div className="rounded-panel bg-zoop-wash p-4">
+        <div className="rounded-panel bg-zoop-card p-4">
           <p className="text-sm font-semibold">내 종목 영향 요약</p>
           <p className="mt-2 text-sm leading-relaxed">{overview?.text}</p>
           {overview?.comparisonNote && (
@@ -140,7 +140,7 @@ export default function PersonalizedIssueSelection({
       {result.items.map((item, i) => (
         <article
           key={item.issueId}
-          className="rounded-panel border border-panel-line p-4"
+          className="rounded-panel border border-zoop-border p-4"
         >
           <p className={NOTE}>관련 이슈 {i + 1}</p>
           <h3 className="mt-1 text-base font-bold">{item.title}</h3>
@@ -196,7 +196,7 @@ export default function PersonalizedIssueSelection({
             {item.sources.map((s) => (
               <blockquote
                 key={s.evidenceId}
-                className="mt-3 border-l-2 border-panel-line pl-3 text-sm"
+                className="mt-3 border-l-2 border-zoop-border pl-3 text-sm"
               >
                 {s.quote}
                 <p className={NOTE}>
@@ -235,7 +235,7 @@ export default function PersonalizedIssueSelection({
         {result.tracking.map((t) => (
           <div
             key={`${t.issueId}:${t.companyId}`}
-            className="mt-3 border-t border-panel-line pt-3 text-sm"
+            className="mt-3 border-t border-zoop-border pt-3 text-sm"
           >
             <strong>
               {t.title} · {t.companyName}

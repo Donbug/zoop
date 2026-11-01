@@ -64,7 +64,7 @@ function BodyContext({ evidence }: { evidence: BriefingItemEvidence }) {
       {matches ? (
         <>
           {points.slice(0, start).join('')}
-          <mark className="bg-zoop-wash font-semibold text-zoop-ink underline decoration-zoop-muted underline-offset-4">
+          <mark className="bg-zoop-card font-semibold text-zoop-ink underline decoration-zoop-muted underline-offset-4">
             {points.slice(start, end).join('')}
           </mark>
           {points.slice(end).join('')}
@@ -96,7 +96,7 @@ function EvidenceCard({
       <article
         id={id}
         tabIndex={-1}
-        className={`rounded-panel border border-panel-line p-4 ${FOCUS_RING}`}
+        className={`rounded-panel border border-zoop-border p-4 ${FOCUS_RING}`}
         aria-label={`근거 ${index + 1}: ${evidence.title}`}
       >
         <div className="flex flex-wrap items-center gap-2">
@@ -118,7 +118,7 @@ function EvidenceCard({
         <p className={`${ui.itemTitle} mt-4`}>고정 직접 인용</p>
         <blockquote
           cite={href}
-          className={`${BODY} mt-2 border-l-2 border-panel-line pl-3`}
+          className={`${BODY} mt-2 border-l-2 border-zoop-border pl-3`}
         >
           {evidence.quote}
         </blockquote>
@@ -302,7 +302,7 @@ export default function BriefingItemDetails({
         id={`${id}-detail`}
         hidden={!detailOpen || !detail}
         aria-label={`${issueLabel} ${item.rank} 상세`}
-        className="mt-3 rounded-panel border border-panel-line p-4"
+        className="mt-3 rounded-panel border border-zoop-border p-4"
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             setDetailOpen(false);

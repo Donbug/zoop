@@ -4,7 +4,7 @@ import type { BriefingEdition, BriefingRoundRef } from '@/types/briefing';
 import { FOCUS_RING } from './briefingStyles';
 import { LoadingSpinner } from '@/components/common/LoadingIndicator';
 
-const EDITION_BUTTON = `min-h-10 min-w-[88px] whitespace-nowrap rounded-full border border-zoop-line bg-zoop-paper px-4 text-caption font-semibold text-zoop-ink transition-colors aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper disabled:cursor-not-allowed disabled:opacity-50 max-sm:flex-1 ${FOCUS_RING}`;
+const EDITION_BUTTON = `min-h-10 min-w-[88px] whitespace-nowrap rounded-md border border-zoop-border bg-zoop-surface px-4 text-caption font-semibold text-zoop-ink transition-colors aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-on-ink disabled:cursor-not-allowed disabled:opacity-50 max-sm:flex-1 ${FOCUS_RING}`;
 const LABELS = { morning: '출근', evening: '퇴근' };
 const EDITIONS = ['morning', 'evening'] as const;
 type Availability = 'published' | 'suspended' | 'absent' | 'unknown';
@@ -39,7 +39,7 @@ function chooseEdition(
   );
 }
 
-const CONTROL = `h-[38px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3 text-caption text-zoop-ink max-sm:w-full ${FOCUS_RING}`;
+const CONTROL = `h-[38px] rounded-md border border-zoop-border bg-zoop-surface px-3 text-caption text-zoop-ink max-sm:w-full ${FOCUS_RING}`;
 
 type State = {
   rounds: BriefingRoundRef[];
