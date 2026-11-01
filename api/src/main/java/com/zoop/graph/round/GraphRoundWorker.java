@@ -443,8 +443,10 @@ public final class GraphRoundWorker {
             detail.put("httpStatus", rejection.httpStatus());
             detail.put("code", rejection.code());
             boolean busy = rejection.httpStatus() == 409 && "round_busy".equals(rejection.code());
-            boolean incomplete = rejection.httpStatus() == 409 && "analysis_incomplete".equals(rejection.code());
-            if (busy || incomplete || rejection.httpStatus() >= 500 || rejection.httpStatus() == 429 || rejection.retryable()) {
+            if (rejection.httpStatus() == 409 && "analysis_incomplete".equals(rejection.code())) {
+                return wait(round, "ai:analysis_incomplete", detail, properties.waitRetryAfter(), timeoutCode);
+            }
+            if (busy || rejection.httpStatus() >= 500 || rejection.httpStatus() == 429 || rejection.retryable()) {
                 Duration after = rejection.retryAfter().filter(d -> d.compareTo(properties.busyRetryAfter()) <= 0)
                         .orElse(busy ? properties.busyRetryAfter() : properties.waitRetryAfter());
                 return wait(round, "ai:" + rejection.code(), detail, after, timeoutCode);

@@ -437,9 +437,13 @@ class GraphRoundWorkerTest {
     @Test
     void initialIncompleteWaitsAtR5AndAcceptedIncompleteMovesToR6WithoutRegeneratingBindings() {
         handoffs.answer(R1805, new RoundServiceErrorException(AiOperation.ROUND_HANDOFF, "req-incomplete", 409,
-                "analysis_incomplete", false, Optional.empty(), Optional.empty(), Optional.empty()));
+                "analysis_incomplete", false, Optional.empty(), Optional.empty(), Optional.of(Duration.ofSeconds(1))));
         tick(S1805.plusSeconds(10));
         assertEquals(GraphRoundStage.ANALYSIS_DONE, round(R1805).stage());
+        assertEquals(Optional.of(S1805.plusSeconds(70)), round(R1805).nextAttemptAt());
+        tick(S1805.plusSeconds(25));
+        assertEquals(1, round(R1805).attempts());
+        assertEquals(1, handoffs.bodies.size());
         byte[] original = rounds.request(R1805, "freeze").orElseThrow().body();
         worker = new GraphRoundWorker(rounds, new GraphRoundClock(properties), runs, handoffs, queue,
                 () -> { throw new AssertionError("saved freeze regenerated bindings"); }, bridge, properties, BINDING, clock, "worker-restarted");
@@ -456,6 +460,40 @@ class GraphRoundWorkerTest {
         org.junit.jupiter.api.Assertions.assertArrayEquals(original, handoffs.bodies.get(1));
         assertEquals(List.of(R1805, R1805), handoffs.reads);
         assertTrue(codes(R1805).contains("advanced:analysis_incomplete"));
+    }
+
+    @Test
+    void initialIncompleteUsesNormalWaitsUntilTheFreezeAttemptBound() {
+        var incomplete = new RoundServiceErrorException(AiOperation.ROUND_HANDOFF, "req-incomplete", 409,
+                "analysis_incomplete", false, Optional.empty(), Optional.empty(), Optional.of(Duration.ofSeconds(1)));
+        Instant first = S1805.plusSeconds(10);
+        handoffs.answer(R1805, incomplete);
+        tick(first);
+        byte[] original = rounds.request(R1805, "freeze").orElseThrow().body();
+
+        for (int attempt = 1; attempt < 20; attempt++) {
+            assertEquals(GraphRoundStage.ANALYSIS_DONE, round(R1805).stage());
+            assertEquals(attempt, round(R1805).attempts());
+            assertEquals(Optional.of(first.plusSeconds(attempt * 60L)), round(R1805).nextAttemptAt());
+            for (int seconds = 15; seconds < 60; seconds += 15) {
+                tick(first.plusSeconds((attempt - 1) * 60L + seconds));
+            }
+            assertEquals(attempt, round(R1805).attempts());
+            assertEquals(attempt, handoffs.bodies.size());
+            assertEquals(attempt - 1, handoffs.reads.size());
+            handoffs.answer(R1805, missingRound(), incomplete);
+            tick(first.plusSeconds(attempt * 60L));
+        }
+
+        assertEquals(GraphRoundStage.FAILED, round(R1805).stage());
+        assertEquals(Optional.of("freeze_timeout"), round(R1805).failureCode());
+        assertEquals(20, round(R1805).attempts());
+        assertEquals("analysis_done", rounds.events(R1805).getLast().detail().orElseThrow().get("failedAt").stringValue());
+        assertEquals(20, handoffs.bodies.size());
+        assertEquals(19, handoffs.reads.size());
+        for (byte[] body : handoffs.bodies) {
+            org.junit.jupiter.api.Assertions.assertArrayEquals(original, body);
+        }
     }
 
     @Test

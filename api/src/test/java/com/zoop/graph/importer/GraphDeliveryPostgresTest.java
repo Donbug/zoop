@@ -290,7 +290,7 @@ class GraphDeliveryPostgresTest {
             assertEquals(history, upgradeJdbc.queryForList(
                     "SELECT * FROM flyway_schema_history ORDER BY installed_rank LIMIT ?", history.size()));
             assertEquals(List.of("20261031150000", "20261031160000", "20261031170000", "20261031180000",
-                            "20261101090000", "20261101100000"),
+                            "20261101100000", "20261101110000"),
                     upgradeJdbc.queryForList("""
                             SELECT version FROM flyway_schema_history
                             WHERE version > '20261031130000' AND success ORDER BY installed_rank
@@ -304,19 +304,27 @@ class GraphDeliveryPostgresTest {
         }
     }
 
-    @Test void requestJournalUpgradesTheCurrentPublicationLineageOnly() {
+    @Test void requestJournalUpgradesAlreadyAppliedApprovedChatDocumentsWithoutRewritingHistory() {
         String schema = "round_upgrade_" + UUID.randomUUID().toString().replace("-", "");
         var upgradeSource = source(schema);
         var upgradeJdbc = new JdbcTemplate(upgradeSource);
         try {
             Flyway.configure().dataSource(upgradeSource).schemas(schema).defaultSchema(schema)
-                    .target("20261031180000").load().migrate();
+                    .target("20261101100000").outOfOrder(false).load().migrate();
             var history = upgradeJdbc.queryForList("SELECT * FROM flyway_schema_history ORDER BY installed_rank");
-            var candidate = Flyway.configure().dataSource(upgradeSource).schemas(schema).defaultSchema(schema).load();
-            assertEquals(2, candidate.migrate().migrationsExecuted);
+            assertEquals("20261101100000", history.getLast().get("version"));
+            assertEquals(List.of("chat_document_versions"), upgradeJdbc.queryForList("""
+                    SELECT table_name FROM information_schema.tables
+                    WHERE table_schema = ? AND table_name IN ('chat_document_versions', 'graph_round_requests')
+                    ORDER BY table_name
+                    """, String.class, schema));
+            var candidate = Flyway.configure().dataSource(upgradeSource).schemas(schema).defaultSchema(schema)
+                    .outOfOrder(false).load();
+            assertEquals(1, candidate.migrate().migrationsExecuted);
             candidate.validate();
             assertEquals(history, upgradeJdbc.queryForList(
                     "SELECT * FROM flyway_schema_history ORDER BY installed_rank LIMIT ?", history.size()));
+            assertEquals("20261101110000", candidate.info().current().getVersion().getVersion());
             assertEquals(0, upgradeJdbc.queryForObject("SELECT count(*) FROM graph_round_requests", Integer.class));
             assertEquals(1, upgradeJdbc.queryForObject("""
                     SELECT count(*) FROM information_schema.columns

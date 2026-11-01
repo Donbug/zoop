@@ -27,13 +27,26 @@ trigger로 `graph_rounds`는 DELETE와 식별 열(`round_id`·`slot_at`·`starte
 
 **fencing.** `advance`와 `link`는 호출자가 claim한 행(그 `lease_token`)과 그때의 stage를 WHERE 조건으로 씁니다(`round_id = ? AND stage = <예상 stage> AND lease_token = ?`). lease가 만료되어 다른 인스턴스가 행을 가져갔거나 행이 이미 다른 단계로 갔으면 아무것도 쓰지 않고(이벤트도 없음) `advance`는 빈 Optional, `link`는 false를 돌려주며 호출자는 행을 다시 읽습니다. 종결 단계로 가면 lease 세 열을 모두 비웁니다.
 
-기존 `V20261031100000` 회차 테이블과 `V20261031130000` ingestion ID migration은 그대로 두고, 현재 `V20261031180000` 뒤에 `V20261101090000__graph_round_requests.sql`만 추가합니다. 새 migration은 요청 journal과 불변 guard만 만듭니다.
+기존 migration은 그대로 두고, 이미 배포된 `V20261101100000__create_approved_chat_documents.sql` 뒤에 `V20261101110000__graph_round_requests.sql`을 추가합니다. 새 migration은 요청 journal과 불변 guard만 만듭니다. `out-of-order=false`인 DB가 `V20261101100000`까지 적용된 상태에서도 순서대로 업그레이드합니다.
+
+**journal 도입 전 배포 조건.** 기존 바이너리와 기존 credential로 열린 회차를 모두 끝낸 뒤 모든 인스턴스의 스케줄러를 중지하고 배포합니다. 아래 drain 절차처럼 새 슬롯·수동 시작이 들어오지 않는 시간대를 확보해야 합니다. journal 없이 R1·R5를 지난 회차를 새 바이너리로 넘기면 `run_request_missing` 또는 `freeze_request_missing`으로 실패합니다. 최초 요청 바이트와 binding을 사후에 추정해 채우지 않습니다. 기존 `failed` 회차도 AI 측 결과를 대조하여 미확정 실행을 정리한 뒤 전환하며, journal이 없는 회차의 관리자 retry를 복구 수단으로 사용하지 않습니다.
 
 ### 원래 바이트와 같은 서비스로 복구
 
 Java는 최초 POST 전에 전체 요청 바이트와 SHA-256, 정규 endpoint·예상 principal·credential SHA로 만든 `RoundServiceBinding`을 저장합니다. 응답이 불명이면 같은 binding으로 GET을 먼저 합니다. 정확하게 해석된 scoped 404 `round_not_found`일 때만 저장한 바이트를 그대로 다시 보냅니다. endpoint·principal·credential이 달라지거나 이전 binding이 없으면 네트워크 요청 전에 거절합니다. bindings를 다시 만들거나 회차 ID를 바꾸어 불명 요청을 피하지 않습니다.
 
 AI의 신규 접수는 202, 같은 principal·가족·roundId와 동일한 원래 바이트는 실행 중·종결 여부와 무관하게 200입니다. 다른 바이트는 `request_conflict`, profile 전체에 다른 예약·실행이 있으면 `round_busy`입니다. `analysis_incomplete` 대기 행은 실행 슬롯을 비우며 background dispatcher만 다시 잡습니다. GET과 정확한 재전송은 실행을 시작하지 않습니다. 시작한 native 명령의 `round_outcome_unknown`은 재시작 뒤에도 종결 상태입니다.
+
+### 토큰 교체 전 drain
+
+credential SHA는 불변 복구 신원의 일부입니다. principal이 같아도 토큰이 바뀌면 기존 요청은 `run_binding_mismatch` 또는 `freeze_binding_mismatch`로 거절됩니다. 관리자 retry도 저장된 binding을 그대로 사용하므로 토큰 교체를 우회하는 수단이 아닙니다.
+
+1. 수동 시작·retry를 통제하고 마지막 일일 슬롯 이후부터 다음 슬롯 전까지 drain 시간을 확보합니다. 기존 endpoint·principal·토큰을 유지한 스케줄러로 열린 회차를 끝냅니다. `ZOOP_GRAPH_ROUND_ENABLED=false`는 drain 모드가 아니라 전체 중지이므로, 먼저 끄면 기존 회차도 전진하지 않습니다.
+2. 관리자 overview의 `openRounds=0`과 회차별 종결 상태를 확인합니다. `failed` 회차의 미확정 결과와 AI 측 예약·실행도 기존 binding의 조회로 대조합니다. 재개할 회차가 남으면 교체를 미루고 기존 credential을 유지합니다. `round_outcome_unknown`은 종결 기록으로 보존하며 재실행하지 않습니다.
+3. 모든 API 인스턴스에서 `ZOOP_GRAPH_ROUND_ENABLED=false`로 스케줄러를 중지하고 진행 중 호출의 종료를 확인합니다. 그다음 AI와 API의 토큰 설정을 교체하고 기존 토큰을 폐기합니다. 새 설정을 적용할 때까지 수동 시작·retry 통제를 유지합니다.
+4. 새 토큰의 권한과 예상 principal을 확인한 뒤 스케줄러를 다시 켭니다. 신규 회차는 새 binding을 저장하며, 기존 journal·이벤트·AI 원장은 감사·대조 자료로 보존합니다. endpoint나 principal을 바꿀 때도 같은 절차를 따릅니다.
+
+유출 대응처럼 기존 토큰을 즉시 폐기해야 하면 스케줄러를 중지하고 영향 회차와 원장을 보존한 채 별도 대조를 진행합니다. 안전하게 원래 credential을 다시 사용할 수 있을 때만 같은 binding으로 복구합니다. 사용할 수 없으면 해당 회차는 중지 상태로 남기고 운영자가 결과를 확인해야 합니다. journal 수정·삭제나 새 roundId 재전송으로 결과 불명을 해소하지 않습니다.
 
 ## 스케줄러 (R1~R6, `GraphRoundScheduler`·`GraphRoundWorker`·`GraphRoundClock`)
 
@@ -50,6 +63,8 @@ AI의 신규 접수는 202, 같은 principal·가족·roundId와 동일한 원�
 | R7 `handoff_ready` | bridge(아래 절) | `imported` | 수입 대기 사유 | `import:<code>` |
 
 실패 이벤트의 `failedAt`은 재개할 단계를 기록합니다. 끝난 분석 job의 `analysis_failed`는 이전 이벤트와 무관하게 `plan_ready`로 돌아가 기존 큐의 retry 판단을 거칩니다. 아직 실행 중인 job의 대기 상한은 같은 job 조회를 이어 갑니다. wire는 [#387 조정안](https://github.com/Donbug/zoop/issues/387#issuecomment-6516072392)의 `zoop-ai-round-run-1`·`zoop-ai-round-handoff-1`이며, 앱 회차 ID와 native ingestion ID는 구분합니다.
+
+R5의 최초 409 `analysis_incomplete`는 접수 전 대기이므로 `analysis_done`에 머물며 `Retry-After` 대신 `wait-retry-after`(기본 1분)를 사용합니다. R6의 접수 후 `analysis_incomplete`도 같은 정상 간격으로 기다립니다. 두 단계는 각각 `max-attempts-per-stage`(기본 20)를 적용해 20번째 미완료 응답에서 `freeze_timeout`으로 끝납니다. 기본 설정에서는 첫 응답부터 최소 19분이며, R4의 별도 `analysis-wait-deadline`(기본 2시간)은 그대로 유지합니다. R5 재시도는 같은 binding으로 GET을 먼저 하고 scoped `round_not_found`일 때만 최초 요청 바이트를 다시 보냅니다.
 
 정상 선택 결과가 전부 withheld이면 AI는 `no_public_material/window_empty`와 정확한 native 보고서를 반환합니다. 앱은 ready와 skipped 이벤트 모두에 상태별 개수와 `selection.reasons[status][code]`를 남깁니다. 새 handoff나 활성 포인터 변경은 없습니다. 설정·권한 조회 오류는 정상 빈 선택과 구분합니다.
 
