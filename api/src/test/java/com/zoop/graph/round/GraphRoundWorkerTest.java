@@ -57,6 +57,7 @@ class GraphRoundWorkerTest {
     private static final String DIGEST = "3".repeat(64);
     private static final String HANDOFF = "hr-" + "4".repeat(64);
     private static final byte[] BINDINGS = "{\"schemaVersion\":\"zoop-app-document-bindings-1\",\"bindings\":[]}".getBytes(StandardCharsets.UTF_8);
+    private static final RoundServiceBinding BINDING = new RoundServiceBinding("a".repeat(64));
 
     private final InMemoryGraphRoundRepository rounds = new InMemoryGraphRoundRepository();
     private final FakeRuns runs = new FakeRuns();
@@ -87,7 +88,7 @@ class GraphRoundWorkerTest {
     void setUp() {
         properties = properties(20, Duration.ofHours(2));
         worker = new GraphRoundWorker(rounds, new GraphRoundClock(properties), runs, handoffs, queue, () -> BINDINGS, bridge,
-                properties, clock, "worker-a");
+                properties, BINDING, clock, "worker-a");
         when(bridge.importRound(any())).thenAnswer(invocation -> {
             GraphRound claimed = invocation.getArgument(0);
             return rounds.advance(claimed, GraphRoundPatch.advanceTo(GraphRoundStage.IMPORTED).graphVersion("gv-" + "5".repeat(64)),
@@ -174,7 +175,7 @@ class GraphRoundWorkerTest {
     void aSlotWithoutNewMaterialAndTheFreezeOnlySlotAskForACarryOnlyFreeze() {
         properties = properties(20, Duration.ofHours(2), 100);
         worker = new GraphRoundWorker(rounds, new GraphRoundClock(properties), runs, handoffs, queue, () -> BINDINGS, bridge,
-                properties, clock, "worker-a");
+                properties, BINDING, clock, "worker-a");
         runs.answer(R0905, new RoundRun(R0905, RoundRun.State.NO_NEW_MATERIAL, Optional.of(INGESTION), Optional.empty(),
                 Optional.empty(), Optional.of("outside_operating_window")));
         handoffs.answer(R0905, handoffReady());
@@ -236,7 +237,7 @@ class GraphRoundWorkerTest {
     void waitingPastTheAttemptBoundFailsWithTheStagesTimeoutAndTheAnalysisWaitHasItsOwnBound() {
         properties = properties(3, Duration.ofMinutes(2));
         worker = new GraphRoundWorker(rounds, new GraphRoundClock(properties), runs, handoffs, queue, () -> BINDINGS, bridge,
-                properties, clock, "worker-a");
+                properties, BINDING, clock, "worker-a");
         runs.answerAlways(R0905, running());
         tick(Instant.parse("2026-10-30T00:05:10Z"));                   // R1 → run_requested (attempt 0 at the new stage)
         tick(Instant.parse("2026-10-30T00:06:00Z"));                   // R2 running → attempt 1
@@ -335,6 +336,7 @@ class GraphRoundWorkerTest {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
         };
         GraphRound expired = rounds.claim(R0905, "worker-a", Duration.ofMinutes(2), now.get()).orElseThrow();
+        rounds.saveRequest(expired, "run", com.zoop.ai.http.HttpRoundClient.runBody(R0905), BINDING, now.get());
         now.set(now.get().plus(Duration.ofMinutes(5)));
         worker.progress(expired);
         GraphRound kept = round(R0905);
@@ -372,6 +374,111 @@ class GraphRoundWorkerTest {
         assertTrue(stolen.planId().isEmpty(), "worker-a's ready answer was not recorded");
     }
 
+    @Test
+    void unknownRunRecoversByGetAndOnlyScopedAbsenceRetransmitsOriginalBytes() {
+        runs.answer(R0905, new AiTransportException(AiOperation.ROUND_RUN, "req-lost",
+                AiTransportException.Failure.TIMEOUT, OptionalInt.empty(), null));
+        tick(S0905.plusSeconds(10));
+        byte[] original = rounds.request(R0905, "run").orElseThrow().body();
+        assertEquals(Optional.of(BINDING), rounds.request(R0905, "run").orElseThrow().binding());
+        runs.answer(R0905, missingRound(), running());
+        worker = new GraphRoundWorker(rounds, new GraphRoundClock(properties), runs, handoffs, queue,
+                () -> BINDINGS, bridge, properties, BINDING, clock, "worker-restarted");
+        tick(S0905.plusSeconds(80));
+        assertEquals("worker-a", round(R0905).lease().orElseThrow().owner());
+        assertEquals(1, runs.bodies.size());
+        assertTrue(runs.reads.isEmpty(), "a restarted owner waits for the original lease to expire");
+        tick(round(R0905).lease().orElseThrow().until().plusSeconds(1));
+        assertEquals(2, runs.bodies.size());
+        org.junit.jupiter.api.Assertions.assertArrayEquals(original, runs.bodies.get(0));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(original, runs.bodies.get(1));
+        assertEquals(List.of(R0905, R0905), runs.reads);
+        assertEquals(GraphRoundStage.RUN_REQUESTED, round(R0905).stage());
+    }
+
+    @Test
+    void aDifferentServiceBindingRefusesBeforeEitherRecoveryReadOrPost() {
+        runs.answer(R0905, new AiTransportException(AiOperation.ROUND_RUN, "req-lost",
+                AiTransportException.Failure.TIMEOUT, OptionalInt.empty(), null));
+        tick(S0905.plusSeconds(10));
+        worker = new GraphRoundWorker(rounds, new GraphRoundClock(properties), runs, handoffs, queue,
+                () -> BINDINGS, bridge, properties, new RoundServiceBinding("b".repeat(64)), clock, "worker-restarted");
+        tick(S0905.plusSeconds(80));
+        assertEquals("worker-a", round(R0905).lease().orElseThrow().owner());
+        assertTrue(round(R0905).failureCode().isEmpty());
+        assertEquals(1, runs.bodies.size());
+        assertTrue(runs.reads.isEmpty(), "binding recovery cannot bypass the previous owner's lease");
+        tick(round(R0905).lease().orElseThrow().until().plusSeconds(1));
+        assertEquals(Optional.of("run_binding_mismatch"), round(R0905).failureCode());
+        assertEquals(1, runs.bodies.size());
+        assertTrue(runs.reads.isEmpty());
+    }
+
+    @Test
+    void anUnknownNativeOutcomeAndAnUnscoped404NeverAuthorizeAnotherPost() {
+        runs.answer(R0905, new AiTransportException(AiOperation.ROUND_RUN, "req-lost",
+                AiTransportException.Failure.TIMEOUT, OptionalInt.empty(), null));
+        tick(S0905.plusSeconds(10));
+        runs.answer(R0905, new RoundRun(R0905, RoundRun.State.FAILED, Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of("round_outcome_unknown")));
+        tick(S0905.plusSeconds(80));
+        assertEquals(Optional.of("run_failed:round_outcome_unknown"), round(R0905).failureCode());
+        assertEquals(1, runs.bodies.size());
+        runs.answer(R0935, new AiTransportException(AiOperation.ROUND_RUN, "req-lost-2",
+                AiTransportException.Failure.TIMEOUT, OptionalInt.empty(), null));
+        tick(S0935.plusSeconds(10));
+        runs.answer(R0935, new RoundServiceErrorException(AiOperation.ROUND_READ, "req-other", 404, "not_found", false,
+                Optional.empty(), Optional.empty(), Optional.empty()));
+        tick(S0935.plusSeconds(80));
+        assertEquals(Optional.of("run_refused:not_found"), round(R0935).failureCode());
+        assertEquals(2, runs.bodies.size());
+    }
+
+    @Test
+    void initialIncompleteWaitsAtR5AndAcceptedIncompleteMovesToR6WithoutRegeneratingBindings() {
+        handoffs.answer(R1805, new RoundServiceErrorException(AiOperation.ROUND_HANDOFF, "req-incomplete", 409,
+                "analysis_incomplete", false, Optional.empty(), Optional.empty(), Optional.empty()));
+        tick(S1805.plusSeconds(10));
+        assertEquals(GraphRoundStage.ANALYSIS_DONE, round(R1805).stage());
+        byte[] original = rounds.request(R1805, "freeze").orElseThrow().body();
+        worker = new GraphRoundWorker(rounds, new GraphRoundClock(properties), runs, handoffs, queue,
+                () -> { throw new AssertionError("saved freeze regenerated bindings"); }, bridge, properties, BINDING, clock, "worker-restarted");
+        handoffs.answer(R1805, missingRound(), new RoundHandoff(R1805, RoundHandoff.State.ANALYSIS_INCOMPLETE,
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of("analysis_incomplete")));
+        tick(S1805.plusSeconds(80));
+        assertEquals("worker-a", round(R1805).lease().orElseThrow().owner());
+        assertEquals(GraphRoundStage.ANALYSIS_DONE, round(R1805).stage());
+        assertEquals(1, handoffs.bodies.size());
+        assertTrue(handoffs.reads.isEmpty(), "R5 recovery also waits for the original lease");
+        tick(round(R1805).lease().orElseThrow().until().plusSeconds(1));
+        assertEquals(GraphRoundStage.FREEZE_REQUESTED, round(R1805).stage());
+        assertEquals(2, handoffs.bodies.size());
+        org.junit.jupiter.api.Assertions.assertArrayEquals(original, handoffs.bodies.get(1));
+        assertEquals(List.of(R1805, R1805), handoffs.reads);
+        assertTrue(codes(R1805).contains("advanced:analysis_incomplete"));
+    }
+
+    @Test
+    void skippedWindowRetainsWithheldReasonsAndNeverImports() {
+        var selection = JsonMapper.builder().build().readTree("""
+                {"schemaVersion":"zoop-ai-handoff-selection-1","jobs":[
+                  {"jobId":"old","status":"withheld","code":"analysis_contract_changed"}]}
+                """);
+        handoffs.answer(R1805, new RoundHandoff(R1805, RoundHandoff.State.NO_PUBLIC_MATERIAL,
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(selection), Optional.of("window_empty")));
+        tick(S1805.plusSeconds(10));
+        assertEquals(GraphRoundStage.SKIPPED, round(R1805).stage());
+        var detail = rounds.events(R1805).getLast().detail().orElseThrow();
+        assertEquals("window_empty", detail.get("code").stringValue());
+        assertEquals(1, detail.get("selection").get("reasons").get("withheld").get("analysis_contract_changed").intValue());
+        verify(bridge, never()).importRound(any());
+    }
+
+    private static RoundServiceErrorException missingRound() {
+        return new RoundServiceErrorException(AiOperation.ROUND_READ, "req-absent", 404, "round_not_found", false,
+                Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
     // ------------------------------------------------------------------------------------------------ doubles
 
     private static RoundRun running() {
@@ -401,6 +508,8 @@ class GraphRoundWorkerTest {
     /** Answers per round id, in order; the last answer repeats. An answer may be an exception to throw. */
     static final class FakeRuns implements RoundRunClient {
         final List<String> requested = new ArrayList<>();
+        final List<byte[]> bodies = new ArrayList<>();
+        final List<String> reads = new ArrayList<>();
         private final Map<String, Deque<Object>> answers = new HashMap<>();
         private final Map<String, Object> always = new HashMap<>();
 
@@ -415,13 +524,15 @@ class GraphRoundWorkerTest {
         }
 
         @Override
-        public RoundRun request(String roundId) {
+        public RoundRun requestRun(String roundId, byte[] body) {
             requested.add(roundId);
+            bodies.add(body.clone());
             return next(roundId);
         }
 
         @Override
         public RoundRun runStatus(String roundId) {
+            reads.add(roundId);
             return next(roundId);
         }
 
@@ -437,6 +548,8 @@ class GraphRoundWorkerTest {
 
     static final class FakeHandoffs implements RoundHandoffClient {
         final List<Request> requests = new ArrayList<>();
+        final List<byte[]> bodies = new ArrayList<>();
+        final List<String> reads = new ArrayList<>();
         private final Map<String, Deque<Object>> answers = new HashMap<>();
 
         /** Replaces the answers for the round: given in order, the last one repeats. */
@@ -445,13 +558,18 @@ class GraphRoundWorkerTest {
         }
 
         @Override
-        public RoundHandoff request(Request request) {
-            requests.add(request);
-            return next(request.roundId());
+        public RoundHandoff requestHandoff(String roundId, byte[] body) {
+            bodies.add(body.clone());
+            var parsed = JsonMapper.builder().build().readTree(body);
+            requests.add(new Request(roundId, Optional.ofNullable(parsed.get("ingestionRoundId")).map(n -> n.stringValue()),
+                    Optional.ofNullable(parsed.get("planId")).map(n -> n.stringValue()),
+                    com.zoop.common.json.StrictJson.write(parsed.get("bindings"))));
+            return next(roundId);
         }
 
         @Override
         public RoundHandoff handoffStatus(String roundId) {
+            reads.add(roundId);
             return next(roundId);
         }
 

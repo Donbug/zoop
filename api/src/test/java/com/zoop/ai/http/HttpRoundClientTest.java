@@ -57,7 +57,7 @@ class HttpRoundClientTest {
     void aRunRequestIsAPostKeyedOnTheRoundIdAndAcceptedWithTwoOhTwo() throws Exception {
         server.respond(StubAiServer.Reply.json(202, run("running", "")));
 
-        RoundRun accepted = client.request(ROUND);
+        RoundRun accepted = client.requestRun(ROUND, HttpRoundClient.runBody(ROUND));
 
         assertEquals(RoundRun.State.RUNNING, accepted.state());
         assertTrue(accepted.planId().isEmpty());
@@ -113,7 +113,7 @@ class HttpRoundClientTest {
     void aFreezeRequestEmbedsTheBindingsAndTheOptionalPlanAndIngestionRound() throws Exception {
         server.respond(StubAiServer.Reply.json(202, handoff("running", "")));
 
-        client.request(new RoundHandoffClient.Request(ROUND, Optional.of(INGESTION), Optional.of(PLAN), BINDINGS));
+        client.requestHandoff(ROUND, HttpRoundClient.handoffBody(new RoundHandoffClient.Request(ROUND, Optional.of(INGESTION), Optional.of(PLAN), BINDINGS)));
 
         var seen = server.requests.getFirst();
         assertEquals(HttpRoundClient.HANDOFFS, seen.path());
@@ -126,7 +126,7 @@ class HttpRoundClientTest {
         assertTrue(body.get("bindings").get("bindings").isArray());
 
         server.respond(StubAiServer.Reply.json(202, handoff("running", "")));
-        client.request(new RoundHandoffClient.Request(ROUND, Optional.empty(), Optional.empty(), BINDINGS));
+        client.requestHandoff(ROUND, HttpRoundClient.handoffBody(new RoundHandoffClient.Request(ROUND, Optional.empty(), Optional.empty(), BINDINGS)));
         var carryOnly = JsonMapper.builder().build().readTree(server.requests.get(1).body());
         assertFalse(carryOnly.has("planId"), "a carry-only freeze names no plan");
         assertFalse(carryOnly.has("ingestionRoundId"));
@@ -144,7 +144,8 @@ class HttpRoundClientTest {
 
         server.respond(StubAiServer.Reply.json(200, handoff("analysis_incomplete", ",\"code\":\"analysis_incomplete\"")));
         assertEquals(RoundHandoff.State.ANALYSIS_INCOMPLETE, client.handoffStatus(ROUND).state());
-        server.respond(StubAiServer.Reply.json(200, handoff("no_public_material", ",\"code\":\"window_empty\"")));
+        server.respond(StubAiServer.Reply.json(200, handoff("no_public_material",
+                ",\"code\":\"window_empty\",\"selection\":{\"schemaVersion\":\"zoop-ai-handoff-selection-1\",\"jobs\":[]}")));
         RoundHandoff empty = client.handoffStatus(ROUND);
         assertEquals(RoundHandoff.State.NO_PUBLIC_MATERIAL, empty.state());
         assertEquals(Optional.of("window_empty"), empty.code());
@@ -165,7 +166,7 @@ class HttpRoundClientTest {
     void aRefusalEnvelopeBecomesTheRoundFamilysExceptionAndAMutatingFiveHundredMayHaveBeenProcessed() {
         server.respond(seen -> StubAiServer.Reply.json(409, StubAiServer.error("round_busy", true, seen.requestId(), null, null))
                 .header("Retry-After", "5"));
-        RoundServiceErrorException busy = assertThrows(RoundServiceErrorException.class, () -> client.request(ROUND));
+        RoundServiceErrorException busy = assertThrows(RoundServiceErrorException.class, () -> client.requestRun(ROUND, HttpRoundClient.runBody(ROUND)));
         assertEquals(409, busy.httpStatus());
         assertEquals("round_busy", busy.code());
         assertEquals(AiOperation.ROUND_RUN, busy.operation());
@@ -173,7 +174,7 @@ class HttpRoundClientTest {
         assertFalse(busy.requestMaybeProcessed(), "a 4xx says the request was not taken");
 
         server.respond(seen -> StubAiServer.Reply.json(503, StubAiServer.error("runtime_unavailable", true, seen.requestId(), null, null)));
-        RoundServiceErrorException down = assertThrows(RoundServiceErrorException.class, () -> client.request(ROUND));
+        RoundServiceErrorException down = assertThrows(RoundServiceErrorException.class, () -> client.requestRun(ROUND, HttpRoundClient.runBody(ROUND)));
         assertTrue(down.requestMaybeProcessed(), "a 5xx after a POST may still have started the run");
 
         server.respond(seen -> StubAiServer.Reply.json(404, StubAiServer.error("round_not_found", false, seen.requestId(), null, null)));
@@ -182,10 +183,11 @@ class HttpRoundClientTest {
 
     @Test
     void theRoundIdAndTheBindingsAreCheckedBeforeAnyRequest() {
-        assertThrows(IllegalArgumentException.class, () -> client.request("round-1"));
+        assertThrows(IllegalArgumentException.class, () -> client.requestRun("round-1", HttpRoundClient.runBody("round-1")));
         assertThrows(IllegalArgumentException.class, () -> client.handoffStatus("../x"));
-        assertThrows(IllegalArgumentException.class, () -> client.request(new RoundHandoffClient.Request(ROUND, Optional.empty(),
-                Optional.empty(), "[1]".getBytes(StandardCharsets.UTF_8))));
+        assertThrows(IllegalArgumentException.class, () -> client.requestHandoff(ROUND,
+                HttpRoundClient.handoffBody(new RoundHandoffClient.Request(ROUND, Optional.empty(),
+                        Optional.empty(), "[1]".getBytes(StandardCharsets.UTF_8)))));
         assertTrue(server.requests.isEmpty());
     }
 }

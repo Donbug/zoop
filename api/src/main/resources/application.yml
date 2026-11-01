@@ -223,6 +223,7 @@ zoop:
       enabled: ${ZOOP_AI_ROUND_CLIENT_ENABLED:false}
       base-url: ${ZOOP_AI_ROUND_CLIENT_BASE_URL:}
       token: ${ZOOP_AI_ROUND_CLIENT_TOKEN:}
+      expected-principal: ${ZOOP_AI_ROUND_CLIENT_EXPECTED_PRINCIPAL:}
       connect-timeout: ${ZOOP_AI_ROUND_CLIENT_CONNECT_TIMEOUT:3s}
       request-timeout: ${ZOOP_AI_ROUND_CLIENT_REQUEST_TIMEOUT:30s}
       max-response-bytes: ${ZOOP_AI_ROUND_CLIENT_MAX_RESPONSE_BYTES:2097152}

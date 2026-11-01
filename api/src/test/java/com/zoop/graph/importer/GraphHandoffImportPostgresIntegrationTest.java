@@ -116,7 +116,7 @@ class GraphHandoffImportPostgresIntegrationTest {
     /** Removes everything this test creates, children first; the fixture versions are re-seeded by every test. */
     private static void clean() {
         // Round rows reference versions (SET NULL on delete) and are guarded against DELETE: TRUNCATE first.
-        jdbc.execute("TRUNCATE graph_round_events, graph_rounds");
+        jdbc.execute("TRUNCATE graph_round_requests, graph_round_events, graph_rounds");
         jdbc.update("DELETE FROM graph_activations");
         jdbc.update("DELETE FROM graph_versions");
         jdbc.update("DELETE FROM evidence WHERE article_id = ?", HandoffFixtures.ARTICLE_ID);

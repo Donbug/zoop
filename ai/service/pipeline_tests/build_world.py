@@ -28,7 +28,7 @@ from scripts.relation_smoke import (BAD, CO, COMP, GOOD, SUP, SUP2, build_world,
 
 
 def main() -> dict:
-    world = build_world(ROOT)
+    world = build_world(ROOT, slot="2026-10-31T09:00:00+09:00")
     kit = world.kit
     proposals = main_proposals(world)
     cite = lambda text, nth=0: world_cite(world, "main", text, nth)  # noqa: E731

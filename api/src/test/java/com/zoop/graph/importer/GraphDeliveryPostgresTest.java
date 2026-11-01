@@ -285,15 +285,38 @@ class GraphDeliveryPostgresTest {
             var history = upgradeJdbc.queryForList(
                     "SELECT * FROM flyway_schema_history ORDER BY installed_rank");
             var candidate = Flyway.configure().dataSource(upgradeSource).schemas(schema).defaultSchema(schema).load();
-            assertEquals(4, candidate.migrate().migrationsExecuted);
+            assertEquals(5, candidate.migrate().migrationsExecuted);
             candidate.validate();
             assertEquals(history, upgradeJdbc.queryForList(
                     "SELECT * FROM flyway_schema_history ORDER BY installed_rank LIMIT ?", history.size()));
-            assertEquals(List.of("20261031150000", "20261031160000", "20261031170000", "20261031180000"),
+            assertEquals(List.of("20261031150000", "20261031160000", "20261031170000", "20261031180000", "20261101090000"),
                     upgradeJdbc.queryForList("""
                             SELECT version FROM flyway_schema_history
                             WHERE version > '20261031130000' AND success ORDER BY installed_rank
                             """, String.class));
+            assertEquals(1, upgradeJdbc.queryForObject("""
+                    SELECT count(*) FROM information_schema.columns
+                    WHERE table_schema = ? AND table_name = 'graph_rounds' AND column_name = 'ingestion_round_id'
+                    """, Integer.class, schema));
+        } finally {
+            jdbc.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+        }
+    }
+
+    @Test void requestJournalUpgradesTheCurrentPublicationLineageOnly() {
+        String schema = "round_upgrade_" + UUID.randomUUID().toString().replace("-", "");
+        var upgradeSource = source(schema);
+        var upgradeJdbc = new JdbcTemplate(upgradeSource);
+        try {
+            Flyway.configure().dataSource(upgradeSource).schemas(schema).defaultSchema(schema)
+                    .target("20261031180000").load().migrate();
+            var history = upgradeJdbc.queryForList("SELECT * FROM flyway_schema_history ORDER BY installed_rank");
+            var candidate = Flyway.configure().dataSource(upgradeSource).schemas(schema).defaultSchema(schema).load();
+            assertEquals(1, candidate.migrate().migrationsExecuted);
+            candidate.validate();
+            assertEquals(history, upgradeJdbc.queryForList(
+                    "SELECT * FROM flyway_schema_history ORDER BY installed_rank LIMIT ?", history.size()));
+            assertEquals(0, upgradeJdbc.queryForObject("SELECT count(*) FROM graph_round_requests", Integer.class));
             assertEquals(1, upgradeJdbc.queryForObject("""
                     SELECT count(*) FROM information_schema.columns
                     WHERE table_schema = ? AND table_name = 'graph_rounds' AND column_name = 'ingestion_round_id'

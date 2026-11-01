@@ -44,7 +44,9 @@ final class RoundWire {
         if (planId.isPresent() != planDigest.isPresent()) throw new Malformed("roundRun.planDigest");
         if (state == RoundRun.State.READY && (ingestion.isEmpty() || planId.isEmpty())) throw new Malformed("roundRun.planId");
         if (state != RoundRun.State.READY && planId.isPresent()) throw new Malformed("roundRun.planId");
-        if (state == RoundRun.State.FAILED && code.isEmpty()) throw new Malformed("roundRun.code");
+        if ((state == RoundRun.State.FAILED || state == RoundRun.State.NO_NEW_MATERIAL) && code.isEmpty()) {
+            throw new Malformed("roundRun.code");
+        }
         return new RoundRun(roundId, state, ingestion, planId, planDigest, code);
     }
 
@@ -65,6 +67,10 @@ final class RoundWire {
         if ((state == RoundHandoff.State.FAILED || state == RoundHandoff.State.ANALYSIS_INCOMPLETE
                 || state == RoundHandoff.State.NO_PUBLIC_MATERIAL) && code.isEmpty()) {
             throw new Malformed("roundHandoff.code");
+        }
+        if (state == RoundHandoff.State.NO_PUBLIC_MATERIAL
+                && (!code.orElse("").equals("window_empty") || selection.isEmpty())) {
+            throw new Malformed("roundHandoff.selection");
         }
         return new RoundHandoff(roundId, state, handoffId, manifest, bundle, selection, code);
     }

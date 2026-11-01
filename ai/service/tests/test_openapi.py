@@ -33,23 +33,23 @@ def test_every_route_is_documented_with_its_enforced_scope():
                   for path, item in spec()["paths"].items() for method, operation in item.items()}
     routes = {(method, route.path) for route in create_app().routes if hasattr(route, "methods") and route.path.startswith("/internal")
               for method in route.methods}
-    assert set(documented) == routes and len(routes) == 29
+    assert set(documented) == routes and len(routes) == 33
     assert set(documented.values()) == {"analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover",
                                         "relation.submit", "relation.read", "relation.cancel", "relation.recover", "relation.review",
                                         "extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover", "graph.read", "handoff.read",
-                                        "handoff.exposure", "chat.invoke", "plan.admit", "plan.read", "plan.policy", "observation.read"}
+                                        "handoff.exposure", "chat.invoke", "plan.admit", "plan.read", "plan.policy", "observation.read", "round.run", "round.read"}
 
 
 def test_documented_scopes_are_what_the_service_enforces(start, tmp_path):
     workspace = Workspace(tmp_path / "scope-workspace", replay=document_replay())
-    workspace.credentials.scopes["alpha"] += ["plan.admit", "plan.read", "observation.read"]
+    workspace.credentials.scopes["alpha"] += ["plan.admit", "plan.read", "observation.read", "round.run", "round.read"]
     workspace.credentials.tokens["policy-operator"] = "t" + "synthetic-policy-token-" * 3
     workspace.credentials.scopes["policy-operator"] = ["plan.policy"]
     service = start(workspace=workspace)
     job_id = document_jobs()[0]["jobId"]
     for (method, path), scope in {(m.upper(), p): o["security"][0]["bearerAuth"][0]
                                    for p, i in spec()["paths"].items() for m, o in i.items()}.items():
-        url = path.replace("{jobId}", job_id).replace("{operationId}", "review-op-1").replace("{versionId}", "graph-main-1").replace("{handoffId}", "handoff-synthetic-1").replace("{stage}", "chat-router").replace("{planId}", "s2plan-" + "0" * 64)
+        url = path.replace("{jobId}", job_id).replace("{operationId}", "review-op-1").replace("{versionId}", "graph-main-1").replace("{handoffId}", "handoff-synthetic-1").replace("{stage}", "chat-router").replace("{planId}", "s2plan-" + "0" * 64).replace("{roundId}", "round-20261031T0905")
         lacking = "submitter" if scope != "analysis.submit" else "reader"
         assert service.request(method, url, as_=lacking).status_code == 403, (method, path)
         assert service.request(method, url, as_=None).status_code == 401, (method, path)
@@ -163,3 +163,17 @@ def test_observation_export_documents_exact_native_selector_and_response():
     assert "202" not in operation["responses"]
     assert all(parameter["name"] != "Idempotency-Key" for parameter in operation.get("parameters", []))
     assert operation["responses"]["200"]["headers"]["Cache-Control"]["schema"]["const"] == "no-store"
+
+
+def test_round_request_schemas_keep_original_body_identity_and_full_bindings():
+    document = spec()
+    for family, model in (("runs", "RunRequest"), ("handoffs", "HandoffRequest")):
+        post = document["paths"]["/internal/v1/round-" + family]["post"]
+        get = document["paths"]["/internal/v1/round-" + family + "/{roundId}"]["get"]
+        assert post["security"] == [{"bearerAuth": ["round.run"]}]
+        assert get["security"] == [{"bearerAuth": ["round.read"]}]
+        assert {"200", "202", "409", "422"} <= set(post["responses"])
+        assert post["requestBody"]["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/" + model}
+        assert document["components"]["schemas"][model]["additionalProperties"] is False
+    assert "bindings" in document["components"]["schemas"]["HandoffRequest"]["required"]
+    assert document["components"]["schemas"]["DocumentBindings"]["properties"]["bindings"]["maxItems"] == 20000

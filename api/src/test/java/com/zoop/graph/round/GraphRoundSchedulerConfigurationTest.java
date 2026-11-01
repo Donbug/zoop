@@ -56,6 +56,7 @@ class GraphRoundSchedulerConfigurationTest {
         valid.put("ZOOP_AI_ROUND_CLIENT_ENABLED", "true");
         valid.put("ZOOP_AI_ROUND_CLIENT_BASE_URL", "https://ai.internal.example");
         valid.put("ZOOP_AI_ROUND_CLIENT_TOKEN", "round-token-0123456789abcdefghijklmnopqrstuvwxyz");
+        valid.put("ZOOP_AI_ROUND_CLIENT_EXPECTED_PRINCIPAL", "alpha");
         valid.put("ZOOP_ANALYSIS_ANALYZE_PLAN_ENABLED", "true");
         valid.put("ZOOP_GRAPH_ROUND_INTERVAL", "PT5S");
     }
@@ -140,6 +141,20 @@ class GraphRoundSchedulerConfigurationTest {
             assertNotNull(failure);
             assertTrue(failure.getMessage().startsWith("zoop.graph.round.zone "), failure.getMessage());
         });
+    }
+
+    @Test
+    void endpointPrincipalAndCredentialEachBindRecoveryIdentity() {
+        var first = com.zoop.ai.AiClientSettings.of("https://ai.internal.example", "synthetic-token-a".repeat(3),
+                java.time.Duration.ofSeconds(3), java.time.Duration.ofSeconds(30), 2097152);
+        var endpoint = com.zoop.ai.AiClientSettings.of("https://other.internal.example", "synthetic-token-a".repeat(3),
+                java.time.Duration.ofSeconds(3), java.time.Duration.ofSeconds(30), 2097152);
+        var credential = com.zoop.ai.AiClientSettings.of("https://ai.internal.example", "synthetic-token-b".repeat(3),
+                java.time.Duration.ofSeconds(3), java.time.Duration.ofSeconds(30), 2097152);
+        var binding = RoundServiceBinding.of(first, "alpha");
+        org.junit.jupiter.api.Assertions.assertNotEquals(binding, RoundServiceBinding.of(endpoint, "alpha"));
+        org.junit.jupiter.api.Assertions.assertNotEquals(binding, RoundServiceBinding.of(first, "beta"));
+        org.junit.jupiter.api.Assertions.assertNotEquals(binding, RoundServiceBinding.of(credential, "alpha"));
     }
 
     private static Throwable configurationFailure(Throwable failure) {

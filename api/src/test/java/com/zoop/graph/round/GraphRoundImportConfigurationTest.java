@@ -16,6 +16,7 @@ import javax.sql.DataSource;
 
 import com.zoop.ai.config.AiHandoffReadClientConfiguration;
 import com.zoop.document.repository.DocumentRegistryRepository;
+import com.zoop.ai.observation.ObservationExportClient;
 import com.zoop.graph.importer.GraphHandoffRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -106,6 +107,17 @@ class GraphRoundImportConfigurationTest {
             assertNull(context.getStartupFailure());
             assertNotNull(context.getBean(GraphRoundImportBridge.class));
         });
+    }
+
+    @Test
+    void httpUsesTheExistingObservationExporterFactoryWithoutCliPaths() {
+        runner().withBean(ObservationExportClient.class, () -> Mockito.mock(ObservationExportClient.class))
+                .withPropertyValues(with("ZOOP_GRAPH_ROUND_IMPORT_SOURCE", "http",
+                        "ZOOP_GRAPH_ROUND_INGESTION_CLI", "", "ZOOP_GRAPH_ROUND_INGESTION_STATE_DIR", "",
+                        "ZOOP_GRAPH_ROUND_INGESTION_SOURCES", "")).run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertNotNull(context.getBean(GraphRoundImportBridge.class));
+                });
     }
 
     @Test

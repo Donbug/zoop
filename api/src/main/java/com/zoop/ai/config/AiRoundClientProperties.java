@@ -18,6 +18,7 @@ public record AiRoundClientProperties(
         @DefaultValue("false") boolean enabled,
         String baseUrl,
         String token,
+        String expectedPrincipal,
         @DefaultValue("3s") Duration connectTimeout,
         @DefaultValue("30s") Duration requestTimeout,
         @DefaultValue("2097152") int maxResponseBytes) {

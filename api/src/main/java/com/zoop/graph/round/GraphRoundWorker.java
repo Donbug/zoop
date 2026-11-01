@@ -20,6 +20,7 @@ import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.document.bindings.DocumentBindingsException;
 import com.zoop.document.bindings.DocumentBindingsFailure;
+import com.zoop.graph.round.GraphRoundRepository.SavedRequest;
 import com.zoop.graph.round.GraphRoundClock.Slot;
 import com.zoop.graph.round.GraphRoundEvent.Outcome;
 import com.zoop.graph.round.RoundAnalysisQueue.JobStatus;
@@ -33,8 +34,8 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * One pass of the periodic round (design {@code plan-55-round-scheduler.md} §2, #387 contract of 2026-10-30): open the slots
  * that came due, then take every open round oldest first and move it as far as it goes without waiting. Each stage is one
- * attempt against an external party, recorded on the row and its timeline; the row is the only state (a restart continues from
- * it) and every write is fenced on the lease this pass claimed.
+ * attempt against an external party. The row and immutable first-request journal are durable recovery state; every write is
+ * fenced on the lease this pass claimed.
  * <ul>
  * <li>R1 {@code scheduled} → {@code POST round-runs} → {@code run_requested} (a freeze-only slot goes to {@code analysis_done}
  *     at once, code {@code freeze_only})</li>
@@ -58,8 +59,8 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code Retry-After} up to {@code busy-retry-after}); past {@code max-attempts-per-stage} the round fails with
  * {@code <stage>_timeout}. Every other 4xx is a refusal that ends the round ({@code run_refused:<code>},
  * {@code plan_rejected:<code>}, {@code freeze_refused:<code>}). A failure event carries {@code failedAt}, the stage the retry
- * resumes at. Nothing here decides, approves or publishes: the AI side chooses the window, the importer verifies, the
- * auto-activation publishes.
+ * resumes at. The AI side chooses the window and the importer stages an incoming version. Composition and activation are
+ * separate authorized operations.
  */
 public final class GraphRoundWorker {
     private static final Logger log = LoggerFactory.getLogger(GraphRoundWorker.class);
@@ -78,6 +79,7 @@ public final class GraphRoundWorker {
     private final RoundBindingsSource bindings;
     private final GraphRoundImportBridge bridge;
     private final GraphRoundProperties properties;
+    private final RoundServiceBinding binding;
     private final Clock clock;
     private final String owner;
     private final JsonNodeFactory nodes = JsonNodeFactory.instance;
@@ -86,7 +88,7 @@ public final class GraphRoundWorker {
 
     public GraphRoundWorker(GraphRoundRepository rounds, GraphRoundClock calendar, RoundRunClient runs,
             RoundHandoffClient handoffs, RoundAnalysisQueue analysis, RoundBindingsSource bindings, GraphRoundImportBridge bridge,
-            GraphRoundProperties properties, Clock clock, String owner) {
+            GraphRoundProperties properties, RoundServiceBinding binding, Clock clock, String owner) {
         this.rounds = rounds;
         this.calendar = calendar;
         this.runs = runs;
@@ -95,6 +97,7 @@ public final class GraphRoundWorker {
         this.bindings = bindings;
         this.bridge = bridge;
         this.properties = properties;
+        this.binding = binding;
         this.clock = clock;
         this.owner = owner;
     }
@@ -158,12 +161,17 @@ public final class GraphRoundWorker {
                 return;
             }
             boolean moved = next.stage() != round.stage();
+            if (next.lease().isPresent()
+                    && next.lease().get().token() != round.lease().orElseThrow().token()) return;
             round = next;
             if (!moved) return;
         }
     }
 
-    GraphRound step(GraphRound round) {
+    GraphRound step(GraphRound expected) {
+        Optional<GraphRound> held = renew(expected);
+        if (held.isEmpty()) return current(expected);
+        GraphRound round = held.get();
         return switch (round.stage()) {
             case SCHEDULED -> calendar.freezeOnly(round.slotAt())
                     ? record(round, GraphRoundPatch.advanceTo(GraphRoundStage.ANALYSIS_DONE), Outcome.ADVANCED, FREEZE_ONLY, null)
@@ -181,14 +189,39 @@ public final class GraphRoundWorker {
     // ------------------------------------------------------------------------------------------------ R1 · R2
 
     private GraphRound requestRun(GraphRound round) {
+        Optional<SavedRequest> saved = rounds.request(round.roundId(), "run");
+        if (saved.isPresent()) {
+            Optional<GraphRound> refused = bindingRefusal(round, "run", saved);
+            if (refused.isPresent()) return refused.get();
+        }
         try {
-            return applyRun(round, runs.request(round.roundId()));
+            if (saved.isPresent()) {
+                try {
+                    return applyRun(round, runs.runStatus(round.roundId()));
+                } catch (AiClientException failure) {
+                    if (!missingRound(failure)) throw failure;
+                }
+            }
+            byte[] body = saved.map(SavedRequest::body)
+                    .orElseGet(() -> com.zoop.ai.http.HttpRoundClient.runBody(round.roundId()));
+            if (saved.isEmpty() && !rounds.saveRequest(round, "run", body, binding, clock.instant())) return round;
+            Optional<GraphRound> held = renew(round);
+            if (held.isEmpty()) return current(round);
+            return applyRun(held.get(), runs.requestRun(round.roundId(), body));
         } catch (AiClientException failure) {
             return aiFailure(round, failure, "run_refused", "run_timeout");
         }
     }
 
+    /** Only a decoded absence for this scoped identity permits the original POST again. */
+    private static boolean missingRound(AiClientException failure) {
+        return failure instanceof AiServiceRejectionException rejection
+                && rejection.httpStatus() == 404 && "round_not_found".equals(rejection.code());
+    }
+
     private GraphRound readRun(GraphRound round) {
+        Optional<GraphRound> refused = bindingRefusal(round, "run", rounds.request(round.roundId(), "run"));
+        if (refused.isPresent()) return refused.get();
         try {
             return applyRun(round, runs.runStatus(round.roundId()));
         } catch (AiClientException failure) {
@@ -277,9 +310,22 @@ public final class GraphRoundWorker {
     // ------------------------------------------------------------------------------------------------ R5 · R6
 
     private GraphRound requestFreeze(GraphRound round) {
+        Optional<GraphRound> prior = priorRunBindingRefusal(round);
+        if (prior.isPresent()) return prior.get();
         ObjectNode detail = nodes.objectNode();
         round.planId().ifPresent(id -> detail.put("planId", id));
         round.ingestionRoundId().ifPresent(id -> detail.put("ingestionRoundId", id));
+        Optional<SavedRequest> saved = rounds.request(round.roundId(), "freeze");
+        if (saved.isPresent()) {
+            Optional<GraphRound> refused = bindingRefusal(round, "freeze", saved);
+            if (refused.isPresent()) return refused.get();
+            try {
+                return applyHandoff(round, handoffs.handoffStatus(round.roundId()), detail);
+            } catch (AiClientException failure) {
+                if (!missingRound(failure)) return aiFailure(round, failure, "freeze_refused", "freeze_timeout");
+            }
+            return sendFreeze(round, saved.orElseThrow().body(), detail);
+        }
         byte[] exported;
         try {
             exported = bindings.export();
@@ -294,15 +340,27 @@ public final class GraphRoundWorker {
             return wait(round, "bindings_error", detail, properties.waitRetryAfter(), "freeze_timeout");
         }
         detail.put("bindingsBytes", exported.length);
+        byte[] body = com.zoop.ai.http.HttpRoundClient.handoffBody(new RoundHandoffClient.Request(round.roundId(),
+                round.ingestionRoundId(), round.planId(), exported));
+        if (!rounds.saveRequest(round, "freeze", body, binding, clock.instant())) return round;
+        return sendFreeze(round, body, detail);
+    }
+
+    private GraphRound sendFreeze(GraphRound round, byte[] body, ObjectNode detail) {
+        Optional<GraphRound> held = renew(round);
+        if (held.isEmpty()) return current(round);
         try {
-            return applyHandoff(round, handoffs.request(new RoundHandoffClient.Request(round.roundId(), round.ingestionRoundId(),
-                    round.planId(), exported)), detail);
+            return applyHandoff(held.get(), handoffs.requestHandoff(round.roundId(), body), detail);
         } catch (AiClientException failure) {
             return aiFailure(round, failure, "freeze_refused", "freeze_timeout");
         }
     }
 
     private GraphRound readFreeze(GraphRound round) {
+        Optional<GraphRound> prior = priorRunBindingRefusal(round);
+        if (prior.isPresent()) return prior.get();
+        Optional<GraphRound> refused = bindingRefusal(round, "freeze", rounds.request(round.roundId(), "freeze"));
+        if (refused.isPresent()) return refused.get();
         try {
             return applyHandoff(round, handoffs.handoffStatus(round.roundId()), nodes.objectNode());
         } catch (AiClientException failure) {
@@ -310,37 +368,65 @@ public final class GraphRoundWorker {
         }
     }
 
+    private Optional<GraphRound> priorRunBindingRefusal(GraphRound round) {
+        if (calendar.freezeOnly(round.slotAt())) return Optional.empty();
+        return bindingRefusal(round, "run", rounds.request(round.roundId(), "run"));
+    }
+
+    /** Refuse before either GET or POST; preserve the possible remote outcome for reconciliation. */
+    private Optional<GraphRound> bindingRefusal(GraphRound round, String kind, Optional<SavedRequest> saved) {
+        if (saved.isEmpty()) return Optional.of(fail(round, kind + "_request_missing", null));
+        if (saved.get().binding().isEmpty()) return Optional.of(fail(round, kind + "_binding_missing", null));
+        if (!saved.get().binding().orElseThrow().equals(binding)) {
+            return Optional.of(fail(round, kind + "_binding_mismatch", null));
+        }
+        return Optional.empty();
+    }
+
     private GraphRound applyHandoff(GraphRound round, RoundHandoff handoff, ObjectNode detail) {
         handoff.code().ifPresent(code -> detail.put("code", code));
+        handoff.selection().ifPresent(selection -> detail.set("selection", selectionCounts(selection)));
         return switch (handoff.state()) {
             case RUNNING -> round.stage() == GraphRoundStage.ANALYSIS_DONE
                     ? record(round, GraphRoundPatch.advanceTo(GraphRoundStage.FREEZE_REQUESTED), Outcome.ADVANCED, null, detail)
                     : wait(round, "freeze_running", detail, properties.waitRetryAfter(), "freeze_timeout");
             case READY -> {
-                handoff.selection().ifPresent(selection -> detail.set("selection", selectionCounts(selection)));
                 detail.put("handoffId", handoff.handoffId().orElseThrow());
                 yield record(round, GraphRoundPatch.advanceTo(GraphRoundStage.HANDOFF_READY).handoff(handoff.handoffId().orElseThrow(),
                         handoff.manifestDigest().orElseThrow(), handoff.bundleDigest().orElseThrow()), Outcome.ADVANCED,
                         "handoff_ready", detail);
             }
-            case ANALYSIS_INCOMPLETE -> wait(round, "analysis_incomplete", detail, properties.waitRetryAfter(), "freeze_timeout");
+            case ANALYSIS_INCOMPLETE -> round.stage() == GraphRoundStage.ANALYSIS_DONE
+                    ? record(round, GraphRoundPatch.advanceTo(GraphRoundStage.FREEZE_REQUESTED), Outcome.ADVANCED,
+                            "analysis_incomplete", detail)
+                    : wait(round, "analysis_incomplete", detail, properties.waitRetryAfter(), "freeze_timeout");
             case NO_PUBLIC_MATERIAL -> record(round, GraphRoundPatch.advanceTo(GraphRoundStage.SKIPPED), Outcome.SKIPPED,
                     NO_PUBLIC_MATERIAL, detail);
             case FAILED -> fail(round, "freeze_failed:" + handoff.code().orElse("unknown"), detail);
         };
     }
 
-    /** The producer's selection report reduced to how many jobs each status holds; the report itself is not stored. */
+    /** Compact status and exclusion-reason counts, retained for ready and skipped outcomes. */
     static ObjectNode selectionCounts(JsonNode selection) {
         ObjectNode counts = JsonNodeFactory.instance.objectNode();
         JsonNode jobs = selection.get("jobs");
         if (jobs == null || !jobs.isArray()) return counts;
         Map<String, Integer> byStatus = new HashMap<>();
+        Map<String, Map<String, Integer>> byReason = new HashMap<>();
         for (JsonNode job : jobs) {
             JsonNode status = job.get("status");
             if (status != null && status.isString()) byStatus.merge(status.stringValue(), 1, Integer::sum);
+            JsonNode code = job.get("code");
+            if (status != null && status.isString() && code != null && code.isString()) {
+                byReason.computeIfAbsent(status.stringValue(), ignored -> new HashMap<>()).merge(code.stringValue(), 1, Integer::sum);
+            }
         }
         byStatus.keySet().stream().sorted().forEach(status -> counts.put(status, byStatus.get(status)));
+        ObjectNode reasons = counts.putObject("reasons");
+        byReason.keySet().stream().sorted().forEach(status -> {
+            ObjectNode codes = reasons.putObject(status);
+            byReason.get(status).keySet().stream().sorted().forEach(code -> codes.put(code, byReason.get(status).get(code)));
+        });
         return counts;
     }
 
@@ -357,7 +443,8 @@ public final class GraphRoundWorker {
             detail.put("httpStatus", rejection.httpStatus());
             detail.put("code", rejection.code());
             boolean busy = rejection.httpStatus() == 409 && "round_busy".equals(rejection.code());
-            if (busy || rejection.httpStatus() >= 500 || rejection.httpStatus() == 429 || rejection.retryable()) {
+            boolean incomplete = rejection.httpStatus() == 409 && "analysis_incomplete".equals(rejection.code());
+            if (busy || incomplete || rejection.httpStatus() >= 500 || rejection.httpStatus() == 429 || rejection.retryable()) {
                 Duration after = rejection.retryAfter().filter(d -> d.compareTo(properties.busyRetryAfter()) <= 0)
                         .orElse(busy ? properties.busyRetryAfter() : properties.waitRetryAfter());
                 return wait(round, "ai:" + rejection.code(), detail, after, timeoutCode);
