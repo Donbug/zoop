@@ -685,7 +685,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     private static List<ChatModels.AgentRequirement> agentRequirements(ChatPlan.Run plan) {
         return plan.requirements().stream().filter(p -> p.mode() == Mode.TOOLS || p.mode() == Mode.GENERAL)
                 .map(p -> new ChatModels.AgentRequirement(p.id(), p.label(), p.mode() == Mode.GENERAL,
-                        p.mode() == Mode.TOOLS ? p.targets() : List.of(), webMayServe(p)))
+                        p.mode() == Mode.TOOLS ? p.targets() : List.of(), webMayServe(p),
+                        ChatWebDemand.asksExternalSource(p.label())))
                 .toList();
     }
 

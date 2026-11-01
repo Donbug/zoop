@@ -511,7 +511,44 @@ class ChatMcpAgentTest {
                 false, false, null);
 
         assertEquals(java.util.Set.of("r2"), ChatMcpAgent.unmet(List.of(empty, found),
-                Map.of("tc-1", List.of("r2"), "tc-2", List.of("r3"))));
+                Map.of("tc-1", List.of("r2"), "tc-2", List.of("r3")), java.util.Set.of(), java.util.Set.of()));
+    }
+
+    @Test
+    void aReadCutByTheSendGrantOpensNoSearchEvenWhenItsRequirementAsksForAnOutsideSource() {
+        var withheld = new ChatToolResult("chat-tool/v1", "tc-1", "company.read", "v", List.of(), List.of(), true, false, null);
+
+        assertEquals(java.util.Set.of(), ChatMcpAgent.unmet(List.of(withheld), Map.of("tc-1", List.of("r2")),
+                java.util.Set.of("tc-1"), java.util.Set.of("r2")), "no search stands in for refused data");
+    }
+
+    @Test
+    void aRequirementAskingForAnOutsideSourceSearchesAfterItsOwnReadFoundSomething() {
+        var found = new ChatToolResult("chat-tool/v1", "tc-1", "company.read", "v",
+                List.of(new com.zoop.chat.tool.ChatToolItem("KRX:000660", "company", "SK하이닉스", List.of(), List.of())), List.of(),
+                false, false, null);
+        var served = Map.of("tc-1", List.of("r2", "r3"));
+
+        assertEquals(java.util.Set.of("r2"),
+                ChatMcpAgent.unmet(List.of(found), served, java.util.Set.of(), java.util.Set.of("r2")));
+        assertEquals(java.util.Set.of(), ChatMcpAgent.unmet(List.of(), served, java.util.Set.of(), java.util.Set.of("r2")),
+                "the internal read still comes first");
+    }
+
+    @Test
+    void anOutsideSourceRequestStillWaitsForTheInternalReadInTheLoop() {
+        useWeb();
+        var asked = new ChatModels.AgentRequirement("r2", "SK하이닉스 외신 보도", false, List.of("KRX:000660"), true, true);
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(searchFor("w0", "SK하이닉스 외신", "r2"),
+                serving("c1", "KRX:000660", "r2")), null));
+        luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(searchFor("w1", "SK하이닉스 외신", "r2")), null));
+        luna.script.add(n -> done());
+
+        webRun(asked);
+
+        assertEquals(List.of(new ChatModels.Decision("w0", false), new ChatModels.Decision("c1", true)),
+                luna.inputs.get(1).decisions());
+        assertEquals(List.of(new ChatModels.Decision("w1", true)), luna.inputs.get(2).decisions());
     }
 
     @Test

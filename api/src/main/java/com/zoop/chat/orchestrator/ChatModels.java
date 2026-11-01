@@ -254,9 +254,15 @@ public final class ChatModels {
     }
 
     /** A requirement the agent answers, with the ids the server already resolved for it. */
-    public record AgentRequirement(String id, String label, boolean general, List<String> targets, boolean web) {
+    public record AgentRequirement(String id, String label, boolean general, List<String> targets, boolean web,
+            boolean externalSource) {
         public AgentRequirement {
             targets = List.copyOf(targets);
+        }
+
+        /** A requirement that asks for no source outside ZOOP. */
+        public AgentRequirement(String id, String label, boolean general, List<String> targets, boolean web) {
+            this(id, label, general, targets, web, false);
         }
     }
 
