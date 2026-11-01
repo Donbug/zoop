@@ -64,8 +64,10 @@ def cli(config, command, *, expected=0):
         assert found, "Install the frozen local project console entry before this smoke"
         executable = Path(found)
     env = {"PATH": os.environ.get("PATH", os.defpath), "HOME": str(Path.home()),
-           "LANG": "en_US.UTF-8", "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": str(PIPELINE / "src"), **PROXY_ENV}
-    child = subprocess.run([str(executable), command, "--config", str(config)], cwd=PIPELINE,
+           "LANG": "en_US.UTF-8", "PYTHONDONTWRITEBYTECODE": "1", "PYTHONNOUSERSITE": "1", **PROXY_ENV}
+    for key, name in (("ZOOP_STATE_DIR", "reserved-app"), ("ZOOP_AI_WORKER_STATE_DIR", "reserved-s1-worker")):
+        env[key] = os.environ.get(key) or str(config.parent / name)
+    child = subprocess.run([str(executable), command, "--config", str(config)], cwd=config.parent,
                            capture_output=True, env=env, timeout=150)
     assert child.returncode == expected, (child.returncode, child.stdout, child.stderr)
     assert PRIVATE.encode() not in child.stdout + child.stderr
