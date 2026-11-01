@@ -117,6 +117,10 @@ zoop:
     # submit and retry answer 503 MODEL_UNAVAILABLE instead of leaving a job queued forever, and startup refuses intake on
     # without an engine. Reading conversations and jobs always works.
     questions-enabled: ${ZOOP_CHAT_QUESTIONS_ENABLED:false}
+    approved-docs:
+      # Q01 help.search and screenSpec.read. Keep off until immutable approved versions of both guides have been registered
+      # in chat_document_versions. Enabling without both current approved documents fails startup instead of exposing drafts.
+      enabled: ${ZOOP_CHAT_APPROVED_DOCS_ENABLED:false}
     executor:
       # Claims queued jobs and recovers expired leases in the web application; runs nothing while no ChatEngine exists.
       enabled: ${ZOOP_CHAT_EXECUTOR_ENABLED:true}

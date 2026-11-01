@@ -1,6 +1,6 @@
 # Zoop 도움말·화면 설명 (초안, 미승인)
 
-챗봇 Q01 서비스 안내의 `help.search`(도움말)와 `screenSpec.read`(화면 설명)가 인용할 회원용 문서의 **초안**입니다. 아직 팀 승인을 받지 않았으므로 챗봇이 읽지 않습니다. 두 도구는 승인 전까지 도구 레지스트리에 연결하지 않습니다.
+챗봇 Q01 서비스 안내의 `help.search`(도움말)와 `screenSpec.read`(화면 설명)가 인용할 회원용 문서의 **초안**입니다. 아직 팀 승인을 받지 않았으므로 챗봇이 읽지 않습니다. 두 도구의 어댑터와 승인 문서 저장소는 구현됐지만 기본 기능 플래그가 꺼져 있고, 승인본 없이 켜면 서버 기동이 실패합니다.
 
 | 초안 | 도구 | 내용 |
 | --- | --- | --- |
@@ -9,13 +9,13 @@
 
 ## 지금 챗봇이 인용하는 문서
 
-정책 문서만 인용합니다. `zoopPolicy.read`가 `term_versions`에 등록된 승인 약관([서비스 이용약관·개인정보 처리방침](../legal/README.md))을 읽고, 각 `##` 절을 `Citation.sourceKind=zoop_doc` 인용 하나로 씁니다. 인용은 문서 ID(`policy.service`, `policy.privacy`)·버전·code point 구간을 가지며, 그 버전이 시행 중일 때만 보입니다.
+현재 migration에는 도움말·화면 설명 승인본이 한 건도 없으므로 정책 문서만 인용합니다. `zoopPolicy.read`가 `term_versions`에 등록된 승인 약관([서비스 이용약관·개인정보 처리방침](../legal/README.md))을 읽고, 각 `##` 절을 `Citation.sourceKind=zoop_doc` 인용 하나로 씁니다. 인용은 문서 ID(`policy.service`, `policy.privacy`)·버전·code point 구간을 가지며, 그 버전이 시행 중일 때만 보입니다.
 
 ## 초안을 승인 문서로 올리는 순서
 
 1. 팀이 초안을 검수합니다. 각 절은 현재 `web/` 화면 동작과 맞아야 합니다. 와이어프레임(`docs/wireframe/`)이나 프로토타입 화면계획서만 근거로 쓴 문장은 남기지 않습니다.
-2. 승인본을 `docs/help/approved/<문서>-<버전>.md`로 고정하고, 약관처럼 버전·시행 시각·철회 상태를 가진 앱 쪽 등록 경로(새 Flyway migration)를 정합니다. 승인본은 적용 뒤 고치지 않고 새 버전을 만듭니다.
-3. `ChatZoopDocs`가 그 등록을 읽게 하고, `help.search`·`screenSpec.read` 어댑터를 레지스트리에 연결합니다. 인용 형식은 정책 문서와 같습니다(절 단위, 결정적 인용 ID, 시행 버전만 읽기 가능).
+2. 승인본을 `docs/help/approved/<문서>-<버전>.md`로 고정하고 승인 근거를 발급합니다. 새 Flyway migration은 `chat_document_versions`에 문서 ID(`help.service-guide` 또는 `screen.guide`), 종류, 버전, 제목, 본문, `approval_ref`, 승인·시행 시각을 넣습니다. 승인본은 적용 뒤 수정·삭제하지 않고 새 버전을 넣으며, 기존 버전은 `retired_at`만 기록할 수 있습니다.
+3. 두 승인본이 현재 시행 중인지 확인한 뒤에만 `ZOOP_CHAT_APPROVED_DOCS_ENABLED=true`로 배포합니다. `ChatZoopDocs`와 `help.search`·`screenSpec.read` 어댑터는 이미 연결돼 있으며, 문서가 없거나 절이 20개를 넘거나 한 절이 2,000자를 넘으면 기동을 거절합니다. 기본값은 `false`입니다.
 4. 운영자 챗봇 grant 파일에 원천 `zoop-docs`의 `model-send` grant가 있어야 생성·검증 단계로 인용문을 보낼 수 있습니다. 정책 문서도 같은 원천을 씁니다.
 
 초안 문장은 `##` 절 하나가 인용 하나가 되도록 씁니다. 한 절은 2,000자를 넘지 않게 하고(모델 단계 인용 상한), 한 문서의 절은 20개 이하로 둡니다(도구 호출 한 번의 근거 상한). 지금 두 문서는 이 상한에 차 있으므로, 절을 더하려면 절을 합치거나 문서를 나눠야 합니다.

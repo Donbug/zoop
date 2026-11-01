@@ -73,7 +73,12 @@ public enum ChatCapability {
      * name a document); none for any other capability, which reads the requirement's targets.
      */
     public List<String> documents() {
-        return this == ZOOP_POLICY_READ ? ChatZoopDocs.POLICIES : List.of();
+        return switch (this) {
+            case HELP_SEARCH -> ChatZoopDocs.HELP_DOCUMENTS;
+            case SCREEN_SPEC_READ -> ChatZoopDocs.SCREEN_DOCUMENTS;
+            case ZOOP_POLICY_READ -> ChatZoopDocs.POLICIES;
+            default -> List.of();
+        };
     }
 
     /** What a capability that can read the whole public graph reads when its requirement names nothing. */
