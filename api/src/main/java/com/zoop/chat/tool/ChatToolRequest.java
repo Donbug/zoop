@@ -9,7 +9,7 @@ import java.util.List;
  * One planned tool call in the common request envelope (design summary 5.1): the capability, its targets and a result limit.
  * {@code evidenceScope}, when not null, is the only evidence the call may pass on (the member narrowed the selection to it).
  * {@code since}, when not null, is the moment a comparison read compares the run's pinned graph with (Q05: the public graph
- * of that moment); null for every other read, and for a comparison with the previous public graph.
+ * of that moment), or where a document read starts; null for every other read, and for a comparison with the previous public graph.
  * The job, graph version and asOf are never part of it: the runner takes them from the run's frozen context
  * ({@link ChatToolScope}), and a member id is never accepted from a plan.
  */

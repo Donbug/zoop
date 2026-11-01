@@ -227,6 +227,24 @@ def test_the_model_accepts_exactly_what_it_was_given_and_dumps_it_back_unchanged
     assert json.loads(json.dumps(parsed.wire())) == bundle
 
 
+def test_source_policy_discriminator_keeps_historical_bytes_and_requires_current_country_pin():
+    current = example_bundle()
+    assert Bundle.model_validate(current).wire() == current
+    historical = copy.deepcopy(current)
+    for source in historical["sources"]:
+        source["policies"]["policy"] = "zoop-relation-policy-1"
+        del source["policies"]["countryContext"]
+    assert Bundle.model_validate(historical).wire() == historical
+    for change in (lambda p: p.pop("countryContext"), lambda p: p.update(countryContext="zoop-country-context-2"),
+                   lambda p: p.update(countryContext=None), lambda p: p.update(countryContext=""),
+                   lambda p: p.update(policy="zoop-relation-policy-1"), lambda p: p.update(policy="zoop-relation-policy-3"),
+                   lambda p: p.update(unrecognized="pin")):
+        broken = copy.deepcopy(current)
+        change(broken["sources"][0]["policies"])
+        with pytest.raises(ValidationError):
+            Bundle.model_validate(broken)
+
+
 @pytest.mark.parametrize("name,bundle", SAMPLES, ids=[n for n, _ in SAMPLES])
 def test_a_key_the_producer_did_not_define_is_refused_at_every_level(name, bundle):
     checked = 0
@@ -738,3 +756,51 @@ def test_a_blank_or_over_long_reviewer_is_refused_and_the_automatic_verifier_has
     assert BApprovalBasis.model_validate(automatic).reviewer is None and RcApprovalBasis.model_validate(automatic).reviewer is None
     with pytest.raises(ValidationError):
         BApprovalBasis.model_validate({**automatic, "reviewer": "someone"})   # a verifier verdict has no human reviewer
+
+
+GT_RESOURCES = Path(__file__).resolve().parents[3] / "api/src/test/resources/graph-handoff"
+GT_CASES = json.loads((GT_RESOURCES / "public-unknown-fields-cases.json").read_text("utf-8"))
+
+
+@pytest.mark.parametrize("case", GT_CASES["accept"], ids=lambda case: case["name"])
+def test_shared_geography_and_raw_time_fixture_is_relayed_verbatim(case):
+    assert Bundle.model_validate(case["bundle"]).wire() == case["bundle"]
+
+
+@pytest.mark.parametrize("case", GT_CASES["reject"], ids=lambda case: case["name"])
+def test_shared_geography_conflict_or_unreviewed_raw_time_is_refused(case):
+    with pytest.raises(ValidationError):
+        Bundle.model_validate(case["bundle"])
+
+
+def test_service_calendar_classifier_matches_the_shared_strict_vectors():
+    from zoop_ai_service.handoff_wire import event_precision
+    vectors = json.loads((GT_RESOURCES / "mention-time-vectors.json").read_text("utf-8"))
+    for item in vectors["accept"]:
+        assert event_precision(item["value"]) == item["precision"]
+    for item in vectors["reject"]:
+        with pytest.raises(ValueError):
+            event_precision(item["value"])
+
+
+def test_bundle9_unknown_branch_preserves_original_country_declaration():
+    wire = example_bundle()
+    wire["schemaVersion"] = "zoop-graph-handoff-bundle-9"
+    wire["policy"].update(version="zoop-public-projection-policy-3", geography="operator-field-verdict-or-explicit-unknown")
+    for issue in wire["issues"]:
+        issue["geography"].update(value=None, policyVersion="zoop-public-projection-policy-3", countries=[],
+                                  evidenceIds=[], verification="not-established", reasonCode="not-supported")
+    assert Bundle.model_validate(wire).wire() == wire
+    assert wire["issues"][0]["geography"]["basis"][0]["countries"] == ["KR"]
+    for fault in ("known-without-evidence", "old-schema", "old-policy", "missing-basis"):
+        broken = copy.deepcopy(wire)
+        if fault == "known-without-evidence":
+            broken["issues"][0]["geography"].update(value="domestic")
+        elif fault == "old-schema":
+            broken["schemaVersion"] = "zoop-graph-handoff-bundle-8"
+        elif fault == "old-policy":
+            broken["policy"]["version"] = "zoop-public-projection-policy-2"
+        else:
+            broken["issues"][0]["geography"]["basis"] = []
+        with pytest.raises(ValidationError):
+            Bundle.model_validate(broken)

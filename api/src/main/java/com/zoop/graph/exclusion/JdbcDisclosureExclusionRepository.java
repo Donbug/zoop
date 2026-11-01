@@ -119,14 +119,16 @@ public class JdbcDisclosureExclusionRepository {
     }
 
     /**
-     * The imported ({@code snapshot}) versions after this one in import order, oldest first: what a lift with
-     * {@code laterVersions} also covers. Empty when the version is unknown.
+     * The original imported ({@code snapshot}) versions after this one in import order, oldest first: what a lift with
+     * {@code laterVersions} also covers. Cumulative publications are left out: their exclusions belong to their original
+     * versions, and neither an operator change nor a carry writes to their own id. Empty when the version is unknown.
      */
     public List<String> laterVersions(String versionId) {
         return jdbc.queryForList("""
-                SELECT id FROM graph_versions
-                 WHERE kind = 'snapshot' AND sequence > (SELECT sequence FROM graph_versions WHERE id = :id)
-                 ORDER BY sequence
+                SELECT v.id FROM graph_versions v
+                 WHERE v.kind = 'snapshot' AND v.sequence > (SELECT sequence FROM graph_versions WHERE id = :id)
+                   AND NOT EXISTS (SELECT 1 FROM graph_publications p WHERE p.version_id = v.id)
+                 ORDER BY v.sequence
                 """, new MapSqlParameterSource("id", versionId), String.class);
     }
 

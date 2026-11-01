@@ -38,6 +38,10 @@
 | 작업 | 메서드·목표 경로 | WBS | 권한 |
 | --- | --- | --- | --- |
 | [getPipelineOverview](../../api/out/zoop-api-spec.md#getpipelineoverview) | GET /api/v1/admin/pipeline/overview | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
+| [listGraphRounds](../../api/out/zoop-api-spec.md#listgraphrounds) | GET /api/v1/admin/pipeline/rounds | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
+| [startGraphRound](../../api/out/zoop-api-spec.md#startgraphround) | POST /api/v1/admin/pipeline/rounds | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
+| [getGraphRound](../../api/out/zoop-api-spec.md#getgraphround) | GET /api/v1/admin/pipeline/rounds/{roundId} | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
+| [retryGraphRound](../../api/out/zoop-api-spec.md#retrygraphround) | POST /api/v1/admin/pipeline/rounds/{roundId}/retry | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
 | [decideAnalysisCandidate](../../api/out/zoop-api-spec.md#decideanalysiscandidate) | POST /api/v1/admin/pipeline/candidates/{candidate_id}/decision | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 | 관리자(작업별 권한) |
 | [listPublicationRules](../../api/out/zoop-api-spec.md#listpublicationrules) | GET /api/v1/admin/pipeline/rules | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.5 | 관리자(작업별 권한) |
 | [setPublicationRule](../../api/out/zoop-api-spec.md#setpublicationrule) | PUT /api/v1/admin/pipeline/rules/{rule_id} | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 | 관리자(작업별 권한) |

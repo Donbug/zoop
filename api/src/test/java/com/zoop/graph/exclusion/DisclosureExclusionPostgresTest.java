@@ -120,7 +120,7 @@ class DisclosureExclusionPostgresTest {
         clean();
         store = ArtifactFileStore.at(Files.createDirectory(temp.toRealPath().resolve("artifacts")));
         service = new DisclosureExclusionService(new JdbcDisclosureExclusionRepository(context.getBean(NamedParameterJdbcTemplate.class)),
-                registry, store, new TransactionTemplate(context.getBean(PlatformTransactionManager.class)));
+                registry, store, new TransactionTemplate(context.getBean(PlatformTransactionManager.class)), null, publications());
         stageVersion(HANDOFF_1);
         stageVersion(HANDOFF_2);
     }
@@ -167,13 +167,21 @@ class DisclosureExclusionPostgresTest {
         return service.run(parser.parse(request));
     }
 
-    /** What an activation does under the publication lock in its transaction: carry {@code base}'s exclusions to {@code target}. */
+    /**
+     * What an activation does under the publication lock in its transaction when both versions are original versions: carry
+     * {@code base}'s exclusions to {@code target} (a null base is a first activation).
+     */
     private int carry(String base, String target) {
+        return carry(base == null ? List.of() : List.of(base), List.of(target));
+    }
+
+    /** The same over the original versions of the public version and of the version being activated. */
+    private int carry(List<String> baseSources, List<String> targetSources) {
         JdbcDisclosureExclusionRepository repository = new JdbcDisclosureExclusionRepository(
                 context.getBean(NamedParameterJdbcTemplate.class));
         return new TransactionTemplate(context.getBean(PlatformTransactionManager.class)).execute(status -> {
             repository.lockPublication();
-            return new DisclosureExclusionCarry(repository).carry(base, target, "system");
+            return new DisclosureExclusionCarry(repository).carry(baseSources, targetSources, "system");
         });
     }
 
@@ -199,7 +207,13 @@ class DisclosureExclusionPostgresTest {
 
     private DisclosureExclusionService querying(HandoffExposureClient exposure) {
         return new DisclosureExclusionService(new JdbcDisclosureExclusionRepository(context.getBean(NamedParameterJdbcTemplate.class)),
-                registry, store, new TransactionTemplate(context.getBean(PlatformTransactionManager.class)), exposure);
+                registry, store, new TransactionTemplate(context.getBean(PlatformTransactionManager.class)), exposure, publications());
+    }
+
+    private com.zoop.graph.publication.GraphPublicationReader publications() {
+        return new com.zoop.graph.publication.GraphPublicationReader(
+                context.getBean(com.zoop.graph.importer.GraphHandoffRepository.class), registry, store,
+                context.getBean(com.zoop.graph.publication.JdbcGraphPublicationRepository.class));
     }
 
     private ExclusionFailure failure(DisclosureExclusionService with, byte[] request) {
@@ -269,8 +283,8 @@ class DisclosureExclusionPostgresTest {
     }
 
     @Test
-    void byDefaultTheImportedVersionsThatMayStillBecomePublicAreAskedAndAnOlderBundleIsLeftOut() throws Exception {
-        stageVersion(HANDOFF_OLD, "zoop-graph-handoff-bundle-5");
+    void aDefaultSelectionContainingAnOlderBundleRefusesUntilTheOperatorSelectsABoundedScope() throws Exception {
+        stageVersion(HANDOFF_OLD, "zoop-graph-handoff-bundle-7");
         List<String> targets = new JdbcDisclosureExclusionRepository(context.getBean(NamedParameterJdbcTemplate.class))
                 .exposureTargets();
         assertTrue(targets.containsAll(List.of(v1, v2)), "imported after the active version and not active");
@@ -283,11 +297,14 @@ class DisclosureExclusionPostgresTest {
         ExclusionResult result = querying(fake).run(parser.parse(
                 ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange())));
 
-        assertTrue(result.succeeded(), () -> String.valueOf(result.failure()));
-        assertTrue(fake.asked.getFirst().containsAll(List.of(HANDOFF_1, HANDOFF_2)));
-        assertFalse(fake.asked.getFirst().contains(HANDOFF_OLD), "the AI cannot map an older bundle: never asked by default");
+        assertEquals(ExclusionFailure.VERSIONS_INVALID, result.failure().failure());
+        assertEquals(List.of(), fake.asked);
+        assertEquals(Set.of(), reader.current(v1).issueIds());
+        ExclusionResult scoped = querying(fake).run(parser.parse(
+                ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v1, v2)));
+        assertTrue(scoped.succeeded(), () -> String.valueOf(scoped.failure()));
+        assertEquals(List.of(List.of(HANDOFF_1, HANDOFF_2)), fake.asked);
         assertEquals(Set.of("issue-d"), reader.current(v1).issueIds());
-        // Named explicitly, it is refused before anything is asked.
         assertEquals(ExclusionFailure.VERSIONS_INVALID, failure(querying(fake), ExposureReports.query(ExposureReports.requestId(),
                 ExposureReports.sourceChange(), DisclosureExclusionService.versionId(HANDOFF_OLD))));
         assertEquals(1, fake.asked.size());
@@ -333,7 +350,7 @@ class DisclosureExclusionPostgresTest {
             // The 22nd default target's receipt is gone: reading it would be receipt_unavailable, so stopping at the 21st shows.
             jdbc.update("DELETE FROM artifacts WHERE id = ?", "artifact-receipt-" + DisclosureExclusionService.versionId(extra.getLast()));
             FakeExposure fake = new FakeExposure();
-            assertEquals(ExclusionFailure.VERSIONS_INVALID,
+            assertEquals(ExclusionFailure.EXPOSURE_BATCH_REQUIRED,
                     failure(querying(fake), ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange())));
             assertEquals(List.of(), fake.asked);
         } finally {
@@ -384,7 +401,9 @@ class DisclosureExclusionPostgresTest {
 
         new DisclosureExclusionConfiguration().disclosureExclusionRunner(properties, context,
                 new JdbcDisclosureExclusionRepository(context.getBean(NamedParameterJdbcTemplate.class)), registry,
-                new TransactionTemplate(context.getBean(PlatformTransactionManager.class)), exposure).run(null);
+                new TransactionTemplate(context.getBean(PlatformTransactionManager.class)), exposure,
+                context.getBean(com.zoop.graph.importer.GraphHandoffRepository.class),
+                context.getBean(com.zoop.graph.publication.JdbcGraphPublicationRepository.class)).run(null);
 
         assertEquals("applied", StrictJson.parseObject(Files.readAllBytes(resultFile)).string("outcome"));
         assertEquals(List.of(List.of(HANDOFF_1)), fake.asked);
@@ -501,6 +520,56 @@ class DisclosureExclusionPostgresTest {
                 + "(revision, action, cause, report_sha256, base_version_id, reason, operator, changed_at) VALUES (?, 'exclude', "
                 + "'source-change', ?, ?, 'x', 'system', now())", revision() + 1, "9".repeat(64), v1),
                 "an operator exclude never names a base version");
+        // The receipt-pinned causes of the earlier migrations keep their meaning: a receipt hash, no base version.
+        for (String cause : List.of("legacy-operator", "publication-operator")) {
+            jdbc.update("INSERT INTO disclosure_exclusion_changes (revision, action, cause, report_sha256, reason, operator, "
+                    + "changed_at) VALUES (?, 'exclude', ?, ?, 'x', 'it-operator', now())", revision() + 1, cause, "7".repeat(64));
+            assertThrows(DataAccessException.class, () -> jdbc.update("INSERT INTO disclosure_exclusion_changes "
+                    + "(revision, action, cause, report_sha256, base_version_id, reason, operator, changed_at) VALUES (?, 'exclude', "
+                    + "?, ?, ?, 'x', 'it-operator', now())", revision() + 1, cause, "7".repeat(64), v1), cause + " names no base");
+        }
+    }
+
+    /**
+     * A cumulative activation (#55 A-14 on the publication model): the carry goes only to the target's new original versions,
+     * one change per base original that holds something, each naming that original; a target two bases exclude is carried once.
+     * Rolled back with its transaction, it leaves nothing.
+     */
+    @Test
+    void aCarryGoesToTheNewOriginalsOnceNamingEachBaseOriginalAndRollsBackWithItsTransaction() {
+        run(ExposureReports.exclude(ExposureReports.report(
+                ExposureReports.handoff(HANDOFF_1, List.of("issue-a", "issue-b"), List.of(), false))));
+        long before = revision();
+
+        // The base already holds v1; the target keeps v1 and adds v2. Nothing goes to v1 (it keeps its own exclusions).
+        assertEquals(2, carry(List.of(v1), List.of(v1, v2)));
+        assertEquals(before + 1, revision(), "one change: v1 is the only base original with exclusions");
+        assertEquals(v1, jdbc.queryForObject("SELECT base_version_id FROM disclosure_exclusion_changes WHERE revision = ?",
+                String.class, before + 1), "named after the original version, never a publication");
+        assertEquals(Set.of("issue-a", "issue-b"), reader.current(v2).issueIds());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM disclosure_exclusion_targets WHERE revision = ? "
+                + "AND graph_version_id = ?", Integer.class, before + 1, v1), "the retained original gets no copy");
+        assertEquals(0, carry(List.of(v1), List.of(v1, v2)), "a retried activation appends nothing");
+        assertEquals(0, carry(List.of(v1, v2), List.of(v1, v2)), "no new original, nothing to carry");
+
+        // The carried copy ends with a lift on the original over later versions, without a stale refusal.
+        ExclusionResult lift = run(ExposureReports.lift(v1, revision(), true, "issue-a"));
+        assertEquals(ExclusionResult.APPLIED, lift.outcome(), () -> String.valueOf(lift.failure()));
+        assertFalse(reader.current(v2).issueIds().contains("issue-a"));
+
+        // A carry that its transaction then rolls back (a refused activation) leaves neither the change nor the targets.
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_2, List.of("issue-z"), List.of(), false))));
+        long kept = revision();
+        JdbcDisclosureExclusionRepository repository = new JdbcDisclosureExclusionRepository(
+                context.getBean(NamedParameterJdbcTemplate.class));
+        assertThrows(IllegalStateException.class, () -> new TransactionTemplate(context.getBean(PlatformTransactionManager.class))
+                .executeWithoutResult(status -> {
+                    repository.lockPublication();
+                    assertEquals(1, new DisclosureExclusionCarry(repository).carry(List.of(v2), List.of(v1), "system"));
+                    throw new IllegalStateException("refused after the carry");
+                }));
+        assertEquals(kept, revision(), "the carried change went with the refused activation");
+        assertFalse(reader.current(v1).issueIds().contains("issue-z"), "and so did its targets");
     }
 
     @Test
@@ -568,6 +637,27 @@ class DisclosureExclusionPostgresTest {
 
         assertEquals(before, revision(), "the whole report is refused: nothing of the matching handoff is written either");
         assertEquals(Set.of(), reader.current(v1).issueIds());
+    }
+
+    @Test
+    void retainedVersionSevenReportsApplyOnlyToTheirOriginalReceiptVersionAndPins() throws Exception {
+        String historical = HANDOFF_OLD;
+        stageVersion(historical, "zoop-graph-handoff-bundle-7");
+        ObjectNode row = ExposureReports.handoff(historical, List.of("issue-old"), List.of(), false);
+        long before = revision();
+        assertEquals(ExclusionFailure.RECEIPT_MISMATCH,
+                run(ExposureReports.exclude(ExposureReports.report(row))).failure().failure());
+        row.put("bundleSchema", "zoop-graph-handoff-bundle-7").put("bundleDigest", "d".repeat(64));
+        assertEquals(ExclusionFailure.RECEIPT_MISMATCH,
+                run(ExposureReports.exclude(ExposureReports.report(row))).failure().failure());
+        assertEquals(before, revision());
+        row.put("bundleDigest", ExposureReports.DIGEST_B);
+        assertEquals(ExclusionResult.APPLIED, run(ExposureReports.exclude(ExposureReports.report(row))).outcome());
+        assertEquals(Set.of("issue-old"), reader.current(DisclosureExclusionService.versionId(historical)).issueIds());
+        ObjectNode current = ExposureReports.handoff(HANDOFF_1, List.of("issue-current"), List.of(), false);
+        current.put("bundleSchema", "zoop-graph-handoff-bundle-7");
+        assertEquals(ExclusionFailure.RECEIPT_MISMATCH,
+                run(ExposureReports.exclude(ExposureReports.report(current))).failure().failure());
     }
 
     @Test
@@ -664,7 +754,7 @@ class DisclosureExclusionPostgresTest {
         };
         DisclosureExclusionService unsure = new DisclosureExclusionService(
                 new JdbcDisclosureExclusionRepository(context.getBean(NamedParameterJdbcTemplate.class)), registry, store,
-                lostCommitReply);
+                lostCommitReply, null, publications());
         byte[] request = ExposureReports.exclude(ExposureReports.report(
                 ExposureReports.handoff(HANDOFF_1, List.of("issue-a"), List.of(), false)));
 

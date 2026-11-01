@@ -26,6 +26,9 @@ import com.zoop.document.evidence.service.EvidenceService;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.document.repository.VersionRow;
 import com.zoop.graph.importer.MentionIds;
+import com.zoop.graph.publication.GraphPublicationReader;
+import com.zoop.graph.publication.GraphPublicationReader.*;
+import com.zoop.graph.publication.GraphPublicationAuthority;
 import com.zoop.graph.read.dto.EventDetail;
 import com.zoop.graph.read.dto.EventDetail.MentionOut;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
@@ -39,8 +42,13 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
+import java.util.Set;
+import java.util.HashMap;
+import java.util.ArrayList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.node.ObjectNode;
 
 class EventDetailServiceTest {
     private static final Instant NOW = Instant.parse("2026-10-16T00:00:00Z");
@@ -174,9 +182,30 @@ class EventDetailServiceTest {
     }
 
     @Test
+    void bundleEightHidesReviewedRawTimesAndEarlierReceiptsKeepTheirVersionContract() {
+        for (String raw : List.of("10.19일", "'25.8월")) {
+            var receipt = bundle(false);
+            ((ObjectNode) receipt.node()).put("schemaVersion", "zoop-graph-handoff-bundle-8");
+            var issue = receipt.objects("issues").get(0);
+            ((ObjectNode) issue.objects("mentions").get(1).node()).put("eventTime", raw).put("timePrecision", "unresolved");
+            ((ObjectNode) issue.objects("fieldVerdicts").get(1).node()).put("value", raw).put("reasonCode", "unsupported-format");
+            EventDetail detail = imported(receipt).get(EUV, null, null, null, "r");
+            assertNull(detail.mentions().get(1).eventTime());
+            assertEquals("unknown", detail.mentions().get(1).timePrecision());
+            assertEquals(new EventDetail.FieldOutcome("eventTime", "HOLD", "unsupported-format"),
+                    detail.fieldDecisions().get(1).outcomes().get(0));
+            for (String old : List.of("zoop-graph-handoff-bundle-5", "zoop-graph-handoff-bundle-6", "zoop-graph-handoff-bundle-7")) {
+                ((ObjectNode) receipt.node()).put("schemaVersion", old);
+                assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                        () -> imported(receipt).get(EUV, null, null, null, "r")).getErrorCode());
+            }
+        }
+    }
+
+    @Test
     void knownReceiptFormatsKeepEventMetadataAndTheSameFieldAndHeadGates() {
         for (String schema : List.of("zoop-graph-handoff-bundle-5", "zoop-graph-handoff-bundle-6",
-                "zoop-graph-handoff-bundle-7")) {
+                "zoop-graph-handoff-bundle-7", "zoop-graph-handoff-bundle-8", "zoop-graph-handoff-bundle-9")) {
             String json = bundle(false).node().toString().replace("zoop-graph-handoff-bundle-5", schema);
             EventDetailService service = imported(StrictJson.parseObject(json));
             EventDetail detail = service.get(EUV, null, "gv-imported", null, "req-compatible");
@@ -279,7 +308,7 @@ class EventDetailServiceTest {
 
     @Test
     void anUnreadableReceiptIsUnavailable() {
-        when(receipts.graphImportBundle(anyString(), anyString()))
+        when(receipts.graphPublication(anyString(), anyString()))
                 .thenThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
         CustomException failure = assertThrows(CustomException.class,
                 () -> imported(null).get(EUV, null, null, null, "r"));
@@ -289,7 +318,7 @@ class EventDetailServiceTest {
 
     @Test
     void aMalformedPinnedReceiptIsUnavailableWithoutRetryingIt() {
-        when(receipts.graphImportBundle(anyString(), anyString()))
+        when(receipts.graphPublication(anyString(), anyString()))
                 .thenThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false));
 
         CustomException failure = assertThrows(CustomException.class,
@@ -322,7 +351,7 @@ class EventDetailServiceTest {
     @Test
     void aShownRelationRestingOnAnOperatorApprovalIsAnAdminReviewWithoutARule() {
         for (String schema : List.of("zoop-graph-handoff-bundle-5", "zoop-graph-handoff-bundle-6",
-                "zoop-graph-handoff-bundle-7")) {
+                "zoop-graph-handoff-bundle-7", "zoop-graph-handoff-bundle-8", "zoop-graph-handoff-bundle-9")) {
             String json = operatorApproved().node().toString().replace("zoop-graph-handoff-bundle-5", schema);
             EventDetail.ApprovalOut approval = imported(StrictJson.parseObject(json)).get(EUV, null, null, null, "r")
                     .approval();
@@ -498,7 +527,7 @@ class EventDetailServiceTest {
     @Test
     void anUnsupportedReceiptSchemaIsUnavailableNotEmpty() {
         for (String schema : new String[] {"zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2",
-                "zoop-graph-handoff-bundle-3", "zoop-graph-handoff-bundle-4", "zoop-graph-handoff-bundle-8",
+                "zoop-graph-handoff-bundle-3", "zoop-graph-handoff-bundle-4", "zoop-graph-handoff-bundle-10",
                 "zoop-graph-handoff-bundle-7-extra", "zoop-graph-handoff-bundle-70", ""}) {
             String old = bundle(false).node().toString().replace("zoop-graph-handoff-bundle-5", schema);
             assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
@@ -543,7 +572,6 @@ class EventDetailServiceTest {
     /** euvRepresentative null: the EUV mentions agree on every head field (fieldProvenance.selection unanimous). */
     private EventDetailService imported(StrictJson.Obj bundle, List<PublicGraphSnapshot.Article> extraArticles,
             DisclosureExclusions exclusions, String euvRepresentative) {
-        if (bundle != null) when(receipts.graphImportBundle(anyString(), anyString())).thenReturn(bundle);
         // Every citation is readable now unless a test withdraws one.
         when(receipts.shownNow(anyString(), anyString(), any(), anyString())).thenReturn(true);
         PublicGraphSnapshot base = GraphReadFixtures.snapshot("fixture-2026-10-08");
@@ -569,8 +597,203 @@ class EventDetailServiceTest {
                 return record.id().equals(id) ? Optional.of(NOW) : Optional.empty();
             }
         };
+        GraphPublicationReader publications = mock(GraphPublicationReader.class);
+        GraphPublicationAuthority authority = mock(GraphPublicationAuthority.class);
+        if (bundle != null) {
+            Publication publication = publication(snapshot, bundle);
+            when(receipts.graphPublication(anyString(), anyString())).thenReturn(publication);
+            when(publications.read(anyString(), any())).thenReturn(publication);
+        }
+        when(authority.current(any(), any())).thenReturn(exclusions);
         PublicGraphReader reader = new PublicGraphReader(new GraphVersionSelector(versions, Clock.fixed(NOW, ZoneOffset.UTC)),
-                version -> snapshot, pinned -> exclusions);
+                version -> snapshot, pinned -> exclusions, publications, authority);
+        return new EventDetailService(reader, receipts, registry);
+    }
+
+    private static Publication publication(PublicGraphSnapshot snapshot, StrictJson.Obj bundle) {
+        var source = new Contribution("gv-imported", "handoff", "native", null, null, snapshot, bundle);
+        Map<String, IssueOwners> issues = new HashMap<>();
+        for (Issue issue : snapshot.issues()) {
+            IssueRef ref = source.issueRef(issue.issueId());
+            issues.put(issue.issueId(), new IssueOwners(issue.issueId(), List.of(ref), fields(ref)));
+        }
+        Map<String, RelationOwners> relations = new HashMap<>();
+        for (var relation : snapshot.relations()) relations.put(relation.relationId(), new RelationOwners(relation.relationId(),
+                List.of(new RelationRef(source.sourceVersionId(), relation.relationId())), relation.source(), relation.target()));
+        return new Publication("gv-imported", null, null, null, null, null, null, snapshot, List.of(source),
+                StrictJson.parseObject("{\"schemaVersion\":\"zoop-graph-publication-decisions-1\",\"issueMappings\":[],\"fieldSelections\":[],\"relationSelections\":[]}"), issues, relations);
+    }
+
+    private static Map<String, IssueRef> fields(IssueRef ref) {
+        return Map.of("label", ref, "action", ref, "target", ref, "assertionStatus", ref,
+                "eventTime", ref, "period", ref, "geography", ref);
+    }
+
+    @Test
+    void composedEventRetainsLocalVerdictsDeduplicatesExactTextAndUsesSelectedUnknownHeadline() {
+        var service = composed();
+        var detail = service.get("public-issue", null, null, null, "r");
+        assertEquals("Selected native title", detail.title());
+        assertNull(detail.eventTime());
+        assertEquals("unknown", detail.timePrecision());
+        assertEquals(List.of("legacy mention", "native mention"), detail.mentions().stream().map(MentionOut::title).toList());
+        assertEquals(java.util.Arrays.asList("2026", null),
+                detail.mentions().stream().map(MentionOut::eventTime).toList());
+        assertEquals(List.of("HOLD"), detail.fieldDecisions().getFirst().outcomes().stream().map(EventDetail.FieldOutcome::decision).toList());
+        assertEquals(new EventDetail.SourceSupportOut(2, 1, List.of("article-a"), null,
+                List.of(List.of("article-a", "article-b"))), detail.sourceSupport());
+        assertNull(detail.approval(), "native review cannot relabel the legacy rule approval");
+        assertTrue(detail.relations().stream().allMatch(r -> r.source().equals("public-issue")));
+        assertTrue(detail.relations().stream().allMatch(r -> r.edgeId().equals(
+                DisplayGraph.edgeId("INVOLVES", "public-issue", "company"))));
+    }
+
+    @Test
+    void legacyMetadataUnknownWithholdsRetainedTemporalValuesInOriginalAndComposedDetails() {
+        TemporalScenario scenario = composedScenario(true);
+        var retained = scenario.originalIssue().objects("mentions").getFirst();
+        assertEquals("2026", retained.string("eventTime"));
+        assertEquals("2026H2", retained.string("period"));
+        assertEquals(List.of(), scenario.originalIssue().objects("fieldVerdicts"),
+                "the metadata policy is not a historical field verdict");
+
+        EventDetail original = scenario.original().get("issue-a", null, null, null, "r");
+        assertNull(original.eventTime());
+        assertEquals("unknown", original.timePrecision());
+        assertNull(original.period());
+        assertEquals(List.of(), original.fieldDecisions());
+        assertNull(original.mentions().getFirst().eventTime());
+        assertEquals("unknown", original.mentions().getFirst().timePrecision());
+        assertNull(original.mentions().getFirst().period());
+
+        EventDetail composed = scenario.composed().get("public-issue", null, null, null, "r");
+        assertNull(composed.eventTime());
+        assertEquals("unknown", composed.timePrecision());
+        assertNull(composed.period());
+        assertEquals(List.of("legacy mention", "native mention"),
+                composed.mentions().stream().map(MentionOut::title).toList());
+        assertTrue(composed.mentions().stream().allMatch(m -> m.eventTime() == null
+                && "unknown".equals(m.timePrecision()) && m.period() == null));
+        assertEquals(List.of("HOLD"), composed.fieldDecisions().stream()
+                .flatMap(d -> d.outcomes().stream()).map(EventDetail.FieldOutcome::decision).toList(),
+                "the native verdict remains; no legacy HOLD is invented");
+    }
+
+    private record TemporalScenario(EventDetailService original, EventDetailService composed, StrictJson.Obj originalIssue) { }
+
+    @Test
+    void selectedLeafWithdrawalClosesComposedEventDespiteAnotherReadableLeaf() {
+        var service = composed();
+        when(receipts.shownNow(eq("proof-b"), anyString(), any(), anyString())).thenReturn(false);
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
+                () -> service.get("public-issue", null, null, null, "r")).getErrorCode());
+    }
+
+    private EventDetailService composed() {
+        return composedScenario(false).composed();
+    }
+
+    private TemporalScenario composedScenario(boolean legacyUnknown) {
+        List<Contribution> sources = new ArrayList<>();
+        List<MentionRef> mentions = new ArrayList<>();
+        List<PublicGraphSnapshot.Article> articles = new ArrayList<>();
+        List<PublicGraphSnapshot.Evidence> evidence = new ArrayList<>();
+        List<PublicGraphSnapshot.Relation> relations = new ArrayList<>();
+        Map<String, RelationOwners> relationOwners = new HashMap<>();
+        List<IssueRef> members = new ArrayList<>();
+        for (String suffix : List.of("a", "b")) {
+            boolean legacy = suffix.equals("a");
+            String articleId = "article-" + suffix;
+            String mentionId = MentionIds.of(articleId, "v1", "m");
+            var mention = new MentionRef(mentionId, articleId, "v1");
+            var issue = new Issue("issue-" + suffix, legacy ? "Legacy headline" : "Selected native title",
+                    legacy ? (legacyUnknown ? null : "2026") : null,
+                    legacy ? (legacyUnknown ? "unknown" : "year") : "unknown", null, "occurred", "supply", null,
+                    null, legacy ? "legacy-real-projection-3" : "zoop-public-projection-policy-3", List.of(),
+                    List.of(articleId), List.of("proof-" + suffix), List.of(mention), mentionId, NOW.toString());
+            var article = new PublicGraphSnapshot.Article(articleId, "v1", "Article " + suffix,
+                    "https://example.invalid/" + suffix, NOW.toString());
+            var span = new PublicGraphSnapshot.Evidence("proof-" + suffix, articleId, "v1", 0, 4);
+            var relation = new PublicGraphSnapshot.Relation("relation-" + suffix, "INVOLVES", issue.issueId(),
+                    "company", null, null, List.of(span.evidenceId()), List.of());
+            var projection = new PublicGraphSnapshot(4, "source-" + suffix, "handoff-" + suffix,
+                    List.of(new PublicGraphSnapshot.Company("company", "Company", null, null)), List.of(issue),
+                    List.of(relation), List.of(article), List.of(span));
+            var raw = StrictJson.newObject().put("schemaVersion", legacy
+                    ? com.zoop.graph.importer.LegacyRealPackage.METADATA_BUNDLE_SCHEMA : "zoop-graph-handoff-bundle-9");
+            var rawMention = StrictJson.parseObject("""
+                    {"documentId":"doc","documentVersion":"v1","mentionId":"m","articleId":"%s","articleVersion":"v1",
+                     "title":"%s mention","action":"supply","target":null,"eventTime":"2026","timePrecision":"year",
+                     "period":%s,"assertionStatus":"occurred","participants":[],"evidenceIds":["proof-%s"],"background":false}
+                    """.formatted(articleId, legacy ? "legacy" : "native", legacy && legacyUnknown ? "\"2026H2\"" : "null", suffix));
+            if (legacy) ((ObjectNode) rawMention.node()).put("approvalBasis", "review-rule:R1@2");
+            var original = StrictJson.newObject().put("id", issue.issueId());
+            original.set("mentions", StrictJson.newArray().add(rawMention.node()));
+            original.set("fieldVerdicts", legacy ? StrictJson.newArray() : StrictJson.newArray().add(StrictJson.parseObject("""
+                    {"documentId":"doc","documentVersion":"v1","mentionId":"m","field":"eventTime",
+                     "decision":"HOLD","reasonCode":"not-supported"}
+                    """).node()));
+            if (legacy) {
+                var policy = StrictJson.newObject();
+                for (String field : List.of("eventTime", "period")) {
+                    var value = policy.putObject(field).put("mode", legacyUnknown ? "unknown" : "preserve");
+                    if (legacyUnknown) value.put("reasonCode", "not-supported");
+                }
+                policy.putObject("geography").put("mode", "preserve");
+                original.set("metadataPolicy", policy);
+            }
+            if (legacyUnknown) original.set("sourceSupport", StrictJson.parseObject("""
+                    {"articleCount":1,"knownLineageCount":null,"unknownLineageArticles":["article-a"],
+                     "independentSourceCount":null,"duplicateGroups":[]}
+                    """).node());
+            raw.set("issues", StrictJson.newArray().add(original));
+            var rawRelation = StrictJson.newObject().put("id", relation.relationId());
+            if (legacy) rawRelation.set("legacy", StrictJson.newObject().put("role_unconfirmed", false));
+            else rawRelation.set("provenance", StrictJson.newObject().put("s3SemanticValidation", "manual-operator-final-approval"));
+            raw.set("relations", StrictJson.newArray().add(rawRelation));
+            var fact = StrictJson.newObject().put("articleId", articleId).put("articleVersion", "v1").put("textSha256", "a".repeat(64));
+            if (!legacy) fact.set("origin", StrictJson.newObject().put("originId", "origin-b"));
+            raw.set("articles", StrictJson.newArray().add(fact));
+            var source = new Contribution("source-" + suffix, "handoff-" + suffix, legacy ? "legacy-real" : "native",
+                    null, null, projection, StrictJson.Obj.of(raw));
+            sources.add(source); members.add(source.issueRef(issue.issueId())); mentions.add(mention); articles.add(article); evidence.add(span);
+            relations.add(new PublicGraphSnapshot.Relation(relation.relationId(), relation.relationType(), "public-issue",
+                    relation.target(), null, null, relation.evidenceIds(), List.of()));
+            relationOwners.put(relation.relationId(), new RelationOwners(relation.relationId(),
+                    List.of(new RelationRef(source.sourceVersionId(), relation.relationId())), "public-issue", "company"));
+        }
+        var issue = new Issue("public-issue", "Selected native title", null, "unknown", null, "occurred", "supply", null,
+                null, "zoop-public-projection-policy-3", List.of(), articles.stream().map(PublicGraphSnapshot.Article::articleId).toList(),
+                evidence.stream().map(PublicGraphSnapshot.Evidence::evidenceId).toList(), mentions, mentions.getLast().mentionId(), NOW.toString());
+        var snapshot = new PublicGraphSnapshot(4, "publication-version", "publication", sources.getFirst().projection().companies(),
+                List.of(issue), relations, articles, evidence);
+        Map<String, IssueRef> headline = new HashMap<>(fields(members.getLast()));
+        if (legacyUnknown) {
+            headline.put("eventTime", members.getFirst());
+            headline.put("period", members.getFirst());
+        }
+        var publication = new Publication("publication-version", "publication", "digest", null, null, null, null, snapshot,
+                sources, StrictJson.parseObject("{\"schemaVersion\":\"zoop-graph-publication-decisions-1\",\"issueMappings\":[],\"fieldSelections\":[],\"relationSelections\":[]}"), Map.of("public-issue", new IssueOwners("public-issue", members, headline)),
+                relationOwners);
+        var originalSource = sources.getFirst();
+        var originalRef = members.getFirst();
+        var originalPublication = new Publication("source-a", null, null, null, null, null, null,
+                originalSource.projection(), List.of(originalSource), publication.effectiveDecisions(),
+                Map.of("issue-a", new IssueOwners("issue-a", List.of(originalRef), fields(originalRef))),
+                Map.of("relation-a", new RelationOwners("relation-a", List.of(new RelationRef("source-a", "relation-a")),
+                        "issue-a", "company")));
+        return new TemporalScenario(detailService(originalSource.projection(), originalPublication, "source-a"),
+                detailService(snapshot, publication, "publication-version"),
+                originalSource.bundle().objects("issues").getFirst());
+    }
+
+    private EventDetailService detailService(PublicGraphSnapshot snapshot, Publication publication, String versionId) {
+        var reader = mock(PublicGraphReader.class);
+        when(reader.read(any(), any(), any(), any())).thenReturn(new PublicGraphReader.Pinned(
+                new com.zoop.graph.version.SelectedGraphVersion(new GraphVersionRecord(versionId, 4, "snapshot",
+                        "artifact", "uri", "a".repeat(64), true), NOW, false), DisplayGraph.of(snapshot)));
+        when(receipts.graphPublication(eq(versionId), anyString())).thenReturn(publication);
+        when(receipts.shownNow(anyString(), eq(versionId), any(), anyString())).thenReturn(true);
         return new EventDetailService(reader, receipts, registry);
     }
 

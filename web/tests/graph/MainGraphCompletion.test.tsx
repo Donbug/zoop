@@ -1153,9 +1153,17 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
         })
       )[0],
     );
-    await screen.findByRole('heading', { name: '근거 문서' });
-    await screen.findByText('튜토리얼 5/5');
+    // D-GRP-T4/T5: 근거를 읽는 동안 4단계를 유지하고, 닫은 뒤 AI 동작을 노출한다.
+    const evidenceDialog = await screen.findByRole('dialog', {
+      name: '근거 문서',
+    });
+    await within(evidenceDialog).findAllByRole('heading', { level: 3 });
+    expect(screen.getByText('튜토리얼 4/5')).toBeTruthy();
+    expect(screen.queryByText('튜토리얼 5/5')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: '근거 창 닫기' }));
+    await screen.findByText('튜토리얼 5/5');
+    expect(screen.queryByRole('dialog', { name: '근거 문서' })).toBeNull();
+    expect(useGraphUiStore.getState().evidenceTarget).toBeNull();
     expect(screen.getByRole('heading', { name: 'AI에게 질문' })).toBeTruthy();
     expect(
       screen.queryByRole('button', { name: '튜토리얼 건너뛰기' }),
@@ -1202,6 +1210,11 @@ describe('D-GRP-06 · 기업 영향 경로', () => {
       name: '기업 패널 너비 조절',
     });
     expect(separator.getAttribute('aria-valuenow')).toBe('320');
+    // 패널은 열릴 때 제목으로 포커스를 옮긴다. 그 뒤에 조절 손잡이로 옮겨야 키 입력이 빗나가지 않는다.
+    const heading = await within(panel).findByRole('heading', {
+      name: '삼성전자',
+    });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
     separator.focus();
     await userEvent.keyboard('{ArrowLeft}');
     expect(separator.getAttribute('aria-valuenow')).toBe('336');

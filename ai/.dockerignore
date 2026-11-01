@@ -23,3 +23,13 @@ service/**
 !service/uv.lock
 !service/src/
 !service/src/**
+
+!pipeline/
+pipeline/**
+!pipeline/pyproject.toml
+!pipeline/uv.lock
+!pipeline/src/
+!pipeline/src/**
+
+**/__pycache__/
+**/*.pyc

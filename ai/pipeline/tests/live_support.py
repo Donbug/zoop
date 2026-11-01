@@ -37,9 +37,18 @@ def article(body: str = DOC_TEXT) -> Article:
                    withdrawn=False, allow_model_send=False, synthetic=True)
 
 
+
+def article_source(a: Article) -> dict:
+    return {"documentId": a.article_id, "documentVersion": VERSION_A, "article_id": a.article_id,
+            "article_version": a.version, "text": a.body, "mapped": [[0, len(a.body)]]}
+
+
+def document_source(d: dict) -> dict:
+    return {**{k: d[k] for k in ("documentId", "documentVersion", "text")}, "mapped": [[0, len(d["text"])]]}
+
 def extract_payload() -> dict[str, Any]:
     a = article()
-    return {"article": a.model_dump(mode="json"), "article_version": a.version, "prompt_version": "legacy",
+    return {"article": a.model_dump(mode="json"), "article_version": a.version, "prompt_version": "legacy", "citationSources": [article_source(a)],
             "companies": [{"company_id": "SYNTH-1", "name": "가상고객", "aliases": [], "ticker": None}]}
 
 
@@ -49,7 +58,8 @@ def relation_payload() -> dict[str, Any]:
             "upstream": {"jobId": "JOB-SECRET", "inputDigest": "b" * 64},
             "catalogue": [{"companyId": "SYNTH-1", "names": ["가상고객"]}, {"companyId": "SYNTH-3", "names": ["가상공급"]}],
             "events": [], "topics": [],
-            "documents": [{"documentId": "doc-1", "documentVersion": VERSION_A, "title": "가상 제목", "text": DOC_TEXT}]}
+            "documents": [{"documentId": "doc-1", "documentVersion": VERSION_A, "title": "가상 제목", "text": DOC_TEXT}],
+            "citationSources": [document_source({"documentId": "doc-1", "documentVersion": VERSION_A, "text": DOC_TEXT})]}
 
 
 def endpoint(kind: str, ref: str, name: str) -> dict[str, Any]:
@@ -135,18 +145,37 @@ def no_authorization() -> None:
 def compare_payload() -> dict[str, Any]:
     first, second = article("본문 하나"), article("본문 둘")
     return {"mention": {"mention_id": "m1"}, "issue": {"issue_id": "evc-1", "mentions": [], "articles": [first.model_dump(mode="json")]},
-            "article": second.model_dump(mode="json")}
+            "article": second.model_dump(mode="json"), "citationSources": [article_source(first), article_source(second)]}
 
 
 def topic_payload() -> dict[str, Any]:
-    return {"schemaVersion": "zoop-topic-request-1", "producerVersion": "zoop-topic-replay-producer-1", "events": [], "documents": []}
+    return {"schemaVersion": "zoop-topic-request-1", "producerVersion": "zoop-topic-replay-producer-1", "events": [], "documents": [], "citationSources": []}
 
 
 def impact_payload() -> dict[str, Any]:
     return {"schemaVersion": "zoop-impact-request-1", "stage": "impact", "producerVersion": "zoop-impact-producer-1",
             "policyVersion": "zoop-impact-policy-1", "relation": facts(), "relationQuotes": [quote("ev-a")],
             "companies": [endpoint("company", "SYNTH-1", "가상고객")],
-            "documents": [{"documentId": "doc-1", "documentVersion": VERSION_A, "title": "가상 제목", "text": DOC_TEXT}]}
+            "documents": [{"documentId": "doc-1", "documentVersion": VERSION_A, "title": "가상 제목", "text": DOC_TEXT}],
+            "citationSources": [document_source({"documentId": "doc-1", "documentVersion": VERSION_A, "text": DOC_TEXT})]}
+
+
+def reference_answer(stage: str, payload: dict, native: dict) -> dict:
+    """Author a synthetic provider reply from exact native fixture spans; never used by production or on actual receipts."""
+    from zoop_ai_pipeline import live_prompts
+    _, references = live_prompts.catalogue(stage, payload)
+
+    def visit(node):
+        if isinstance(node, dict):
+            if {"start", "end", "quote"} <= node.keys():
+                identity = ("article_id", "article_version") if "article_id" in node else ("documentId", "documentVersion")
+                matches = [ref for ref, citation in references.items() if all(node[k] == citation[k] for k in (*identity, "start", "end", "quote"))]
+                assert len(matches) == 1, node
+                return {"segmentId": matches[0]}
+            return {k: visit(v) for k, v in node.items()}
+        return [visit(v) for v in node] if isinstance(node, list) else node
+
+    return {**visit(native), "citationFormat": live_prompts.CITATION_FORMAT}
 
 
 PAYLOADS = {"extract": extract_payload, "compare": compare_payload, "topic": topic_payload, "relation": relation_payload,

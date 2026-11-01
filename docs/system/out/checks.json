@@ -548,6 +548,27 @@
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
+      "target": "listGraphRounds",
+      "severity": "warning",
+      "message": "회차 단위 보기의 FE 구성(단계 진행 바·실패 사유·변경 없음 표시)은 화면 계획과 함께 검증한다.",
+      "source": ""
+    },
+    {
+      "code": "TEAM_DECISION_REQUIRED",
+      "target": "startGraphRound",
+      "severity": "warning",
+      "message": "수동 시작이 같은 슬롯의 자동 회차와 겹칠 때의 규칙(같은 슬롯은 한 행)을 FE 문구와 함께 확정한다.",
+      "source": ""
+    },
+    {
+      "code": "TEAM_DECISION_REQUIRED",
+      "target": "retryGraphRound",
+      "severity": "warning",
+      "message": "analyze_plan job의 retry가 job당 1회인 제약 위에서 회차 retry의 의미(단계 재개 vs plan 재접수)를 확정한다.",
+      "source": ""
+    },
+    {
+      "code": "TEAM_DECISION_REQUIRED",
       "target": "listAnalysisCandidates",
       "severity": "warning",
       "message": "대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다.",
@@ -1985,7 +2006,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getConversation",
       "severity": "difference",
-      "message": "목표만 222 · BFF만 32 · 형식/필수/권한 변경 23",
+      "message": "목표만 229 · BFF만 32 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2006,7 +2027,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCurrentConversation",
       "severity": "difference",
-      "message": "목표만 222 · BFF만 32 · 형식/필수/권한 변경 23",
+      "message": "목표만 229 · BFF만 32 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2020,7 +2041,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "submitQuestion",
       "severity": "difference",
-      "message": "목표만 389 · BFF만 34 · 형식/필수/권한 변경 42",
+      "message": "목표만 403 · BFF만 34 · 형식/필수/권한 변경 42",
       "source": ""
     },
     {
@@ -2034,7 +2055,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getQuestionJob",
       "severity": "difference",
-      "message": "목표만 239 · BFF만 23 · 형식/필수/권한 변경 23",
+      "message": "목표만 246 · BFF만 23 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2048,7 +2069,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "retryQuestionJob",
       "severity": "difference",
-      "message": "목표만 379 · BFF만 34 · 형식/필수/권한 변경 39",
+      "message": "목표만 393 · BFF만 34 · 형식/필수/권한 변경 39",
       "source": ""
     },
     {
@@ -2062,7 +2083,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "cancelQuestionJob",
       "severity": "difference",
-      "message": "목표만 270 · BFF만 23 · 형식/필수/권한 변경 23",
+      "message": "목표만 277 · BFF만 23 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2146,7 +2167,35 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getPipelineOverview",
       "severity": "difference",
-      "message": "목표만 131 · BFF만 36 · 형식/필수/권한 변경 12",
+      "message": "목표만 193 · BFF만 36 · 형식/필수/권한 변경 12",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "listGraphRounds",
+      "severity": "difference",
+      "message": "GET /api/v1/admin/pipeline/rounds: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "startGraphRound",
+      "severity": "difference",
+      "message": "POST /api/v1/admin/pipeline/rounds: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "getGraphRound",
+      "severity": "difference",
+      "message": "GET /api/v1/admin/pipeline/rounds/{roundId}: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "retryGraphRound",
+      "severity": "difference",
+      "message": "POST /api/v1/admin/pipeline/rounds/{roundId}/retry: 직접 대응 BFF 없음",
       "source": ""
     },
     {
@@ -2258,7 +2307,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "activateGraphVersion",
       "severity": "difference",
-      "message": "목표만 165 · BFF만 12 · 형식/필수/권한 변경 9",
+      "message": "목표만 167 · BFF만 12 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -2692,7 +2741,7 @@
     "RESERVED_REQUIREMENT_UNMAPPED": 1,
     "INDEX_DETAIL_RANGE_STALE": 17,
     "INDEX_REQUIREMENT_META_MISMATCH": 4,
-    "TEAM_DECISION_REQUIRED": 39,
+    "TEAM_DECISION_REQUIRED": 42,
     "REQUIREMENT_TITLE_REVIEW": 42,
     "REQUIREMENT_BINDING_BY_MEANING": 12,
     "CONTRACT_UNDECIDED": 1,
@@ -2703,28 +2752,28 @@
     "BFF_CACHED_OBSERVATION": 1,
     "BFF_PATH_DIFFERENCE": 81,
     "BFF_FIELD_DIFFERENCE": 81,
-    "TARGET_ONLY_API": 11,
+    "TARGET_ONLY_API": 15,
     "PROTOTYPE_ONLY_API": 3
   },
   "severityCounts": {
-    "warning": 207,
-    "difference": 176
+    "warning": 210,
+    "difference": 180
   },
   "xlsxReadback": {
     "status": "passed",
     "sheetDataRows": {
-      "추적표": 692,
-      "화면→기능→API": 1493,
+      "추적표": 728,
+      "화면→기능→API": 1529,
       "기능→WBS→구현 상태": 500,
-      "API 목록": 92,
+      "API 목록": 96,
       "오류 코드": 28,
-      "경고": 383,
+      "경고": 390,
       "원문 WBS": 173,
       "원문 제안·유효 기준": 8,
       "범위 예외·상세 권한": 34,
       "수용 기준": 121
     },
-    "cells": 49676
+    "cells": 50923
   },
   "acceptanceCoverage": {
     "status": "passed",
@@ -2769,15 +2818,15 @@
       "BE": 82,
       "FE": 33
     },
-    "targetOperations": 92
+    "targetOperations": 96
   },
   "sheetDataRows": {
-    "추적표": 692,
-    "화면→기능→API": 1493,
+    "추적표": 728,
+    "화면→기능→API": 1529,
     "기능→WBS→구현 상태": 500,
-    "API 목록": 92,
+    "API 목록": 96,
     "오류 코드": 28,
-    "경고": 383,
+    "경고": 390,
     "원문 WBS": 173,
     "원문 제안·유효 기준": 8,
     "범위 예외·상세 권한": 34,

@@ -21,8 +21,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 
 /**
- * The rights and source check of EVERY observation the bundle records, through the installed
- * {@code zoop-ai-ingest export --require-store} (one fresh subprocess per observation, nothing cached). The bundle's own grant
+ * The rights and source check of EVERY observation the bundle records, through the S2-1 export with {@code --require-store}:
+ * the installed {@code zoop-ai-ingest} as one fresh subprocess per observation, or ai/service's observation export route
+ * (one request per observation); nothing is cached in either case. The bundle's own grant
  * fields are data, not authority: the app persists quotes of these documents, so it needs the CURRENT registry to allow
  * {@code read}, {@code store} and {@code quote-display}, which the handoff CLI does not check ({@code store}) and which may have
  * changed since the freeze.

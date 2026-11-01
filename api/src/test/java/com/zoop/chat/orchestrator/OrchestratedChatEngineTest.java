@@ -246,6 +246,50 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
+    void theRouteRecordsWhereEachRequirementEndedAndWhichCallsServedIt() {
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(),
+                List.of(new ChatToolItem(HYNIX, "company", "SK하이닉스", List.of(HYNIX), List.of())), List.of(), false, false));
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of(HYNIX)));
+        answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리 칩을 쌓은 메모리입니다.", "r1-c")), List.of("r1"),
+                List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        var coverage = outcome.routeSummary().path("coverage");
+        assertEquals(2, coverage.size());
+        var fact = coverage.get(0);
+        assertEquals("r1", fact.path("requirementId").asString());
+        assertTrue(fact.path("explicit").asBoolean());
+        assertEquals("limited", fact.path("status").asString());
+        assertEquals("evidence_insufficient", fact.path("reason").asString());
+        assertEquals(1, fact.path("toolCallIds").size(), "the read that found nothing to cite");
+        var concept = coverage.get(1);
+        assertEquals("r1-c", concept.path("requirementId").asString());
+        assertFalse(concept.path("explicit").asBoolean(), "the server split it off");
+        assertEquals("answered", concept.path("status").asString());
+        assertTrue(concept.path("toolCallIds").isEmpty());
+        assertTrue(concept.path("reason").isMissingNode());
+    }
+
+    @Test
+    void aStopAtACheckpointRecordsTheRequirementsAsAskedBack() {
+        issueCompanies = List.of(HYNIX, NVDA, AMD);
+        decision = dependent("exactly", 2);
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        assertEquals("clarification", outcome.result().outcome());
+        var coverage = outcome.routeSummary().path("coverage");
+        assertFalse(coverage.isEmpty());
+        coverage.forEach(entry -> assertEquals("clarify", entry.path("status").asString(), entry.toString()));
+        assertEquals(1, coverage.get(0).path("toolCallIds").size(), "the source read that ran before the stop");
+    }
+
+    @Test
     void whenTheFactPartHasNoEvidenceOrNoLookupTheConceptIsStillAnswered() {
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(),
                 List.of(new ChatToolItem(HYNIX, "company", "SK하이닉스", List.of(HYNIX), List.of())), List.of(), false, false));
@@ -478,6 +522,84 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
+    void aRequirementAnsweredOnTheRestOfItsReadsSaysOneFailedWithoutBeingPartial() {
+        // D-AI-02: tool_unavailable as a notice, beside an answer that stands on what was read.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9, "issue.read", 0.9), List.of(HYNIX)));
+        tools.put(ChatCapability.ISSUE_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))),
+                List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        ChatResult result = outcome.result();
+        assertEquals("complete", result.answerStatus());
+        assertTrue(result.limitations().isEmpty());
+        assertEquals(List.of("tool_unavailable"), result.notices().stream().map(n -> n.code()).toList());
+        assertEquals(List.of("요구 r1"), result.notices().getFirst().labels());
+        assertEquals("r1", outcome.routeSummary().path("partialFaults").get(0).asString());
+        assertEquals("answered", outcome.routeSummary().path("coverage").get(0).path("status").asString());
+    }
+
+    @Test
+    void aRequirementLeftUnansweredWithAReadMissingIsTheFaultNeverMissingEvidence() {
+        decision = ChatPlannerTest.decision(
+                req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9, "issue.read", 0.9), List.of(HYNIX)),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)));
+        tools.put(ChatCapability.ISSUE_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r2"), evidence(HYNIX))),
+                List.of("r1"), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        assertEquals(List.of("tool_unavailable"), outcome.result().limitations().stream().map(l -> l.kind()).toList());
+        assertTrue(outcome.result().notices().isEmpty());
+        assertEquals("tool_unavailable", outcome.routeSummary().path("coverage").get(0).path("reason").asString());
+    }
+
+    @Test
+    void readsThatReturnedNothingBesideAFaultAnswerNothing() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9, "issue.read", 0.9), List.of(HYNIX)));
+        tools.put(ChatCapability.ISSUE_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(), List.of(),
+                List.of(), false, false));
+
+        assertFailed("transient", null, true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertTrue(generated.isEmpty(), "an empty read beside a fault is not 'nothing found'");
+    }
+
+    @Test
+    void aSourceOfAnotherRequirementIsNotReadInPart() {
+        // The next stage would be planned on part of what the source finds.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("issue.read", 0.9, "company.read", 0.9), List.of("iss-1")),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9)).dependingOn(new Dependency("r1", "exactly", 1)));
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        var control = new Control(Duration.ofSeconds(60));
+
+        assertFailed("transient", null, true, engine().answer(run(), control));
+        assertEquals(2, control.reserved.size(), "the dependent stage never ran");
+        assertTrue(generated.isEmpty());
+    }
+
+    @Test
+    void anAnswerHeldWithAReadMissingIsAFailureToRerun() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9, "issue.read", 0.9), List.of(HYNIX)));
+        tools.put(ChatCapability.ISSUE_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))),
+                List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("hold", "no")));
+
+        assertFailed("transient", null, true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+    }
+
+    @Test
     void anAdapterFaultInOneRequirementStillEndsTheRun() {
         decision = ChatPlannerTest.decision(
                 req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)),
@@ -565,7 +687,7 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
-    void verdictsBlockContradictionsAndDropHeldRequirements() {
+    void verdictsDropContradictedOrHeldRequirementsAndBlockAdvice() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()),
                 req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)),
                 req("r3", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(NVDA)));
@@ -577,12 +699,15 @@ class OrchestratedChatEngineTest {
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no"), new Verdict("contradicted", "no"), supported,
                 supported));
-        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult contradicted = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertEquals(List.of("개념", "엔비디아", "둘을 잇는 문장"), contradicted.sections().stream()
+                .map(s -> s.text().replace(ChatAnswerCheck.GENERAL_NOTICE + " ", "")).toList());
+        assertTrue(contradicted.limitations().isEmpty(), "a separately verified joining claim still answers r2");
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "yes"), supported, supported, supported));
         assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no"), new Verdict("hold", "no"), supported,
-                supported));
+                new Verdict("hold", "no")));
         ChatResult held = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
         assertEquals("answered", held.outcome());
         assertEquals(List.of("개념", "엔비디아"), held.sections().stream()
@@ -598,7 +723,7 @@ class OrchestratedChatEngineTest {
                 "the kind stays, the message says why");
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "hold"), new Verdict("hold", "no"),
-                new Verdict("hold", "no"), supported));
+                new Verdict("hold", "no"), new Verdict("hold", "no")));
         ChatResult none = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
         assertEquals("insufficient_evidence", none.outcome());
         assertEquals("none", none.answerBasis());
@@ -607,6 +732,26 @@ class OrchestratedChatEngineTest {
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
         assertFailed("transient", "provider_error", true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+    }
+
+    @Test
+    void unsupportedCausalClaimIsRemovedWhileItsSupportedClaimRemains() {
+        decision = ChatPlannerTest.decision(req("r2", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of(HYNIX)));
+        answer = new ChatGeneratedAnswer(List.of(grounded(
+                "공급 계약이 확인됐습니다. 그래서 주가가 오릅니다.", List.of("r2"), evidence(HYNIX))),
+                List.of(), List.of(HYNIX));
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("no", List.of(
+                new ChatSemanticVerdicts.ClaimVerdict("s0c0", "supported", "no"),
+                new ChatSemanticVerdicts.ClaimVerdict("s0c1", "supported", "yes")))));
+
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        assertEquals("answered", result.outcome());
+        assertEquals("공급 계약이 확인됐습니다.", result.answer());
+        assertEquals("complete", result.answerStatus());
+        assertTrue(result.limitations().isEmpty());
+        assertEquals(List.of(evidence(HYNIX)), result.citations().stream().map(Citation::evidenceId).toList());
     }
 
     @Test

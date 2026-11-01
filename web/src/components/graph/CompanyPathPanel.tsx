@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import { formatEventTime } from './event-format';
 import type { GraphResponse } from '@/types/map/graph';
@@ -79,9 +80,10 @@ export default function CompanyPathPanel({
       </header>
       <div className={ui.scroll}>
         {loading ? (
-          <p className={ui.state} role="status">
-            경로의 기준 그래프를 확인하고 있어요.
-          </p>
+          <LoadingIndicator
+            label="경로의 기준 그래프를 확인하고 있어요."
+            className={`${ui.state} flex min-h-12 w-full`}
+          />
         ) : error && unavailable ? (
           <p className={ui.state} role="status">
             이 회차의 관계 지도는 아직 제공하지 않아요.
@@ -137,7 +139,7 @@ export default function CompanyPathPanel({
           <section className={ui.section}>
             <div className="flex items-center justify-between gap-2">
               <h3>{path.edgeIds.length}단계 연결</h3>
-              <details className="relative text-xs">
+              <details className="relative text-caption">
                 <summary
                   aria-label="경로를 찾는 방법"
                   className="cursor-pointer rounded-full border border-panel-line px-2"
@@ -169,11 +171,13 @@ export default function CompanyPathPanel({
                         logoUrl={node.logoUrl}
                         className={ui.avatar}
                       />
-                      <strong className="text-xs">{node.label}</strong>
+                      <strong className="text-caption">{node.label}</strong>
                     </button>
                   ) : (
                     <>
-                      <strong className="block text-xs">{node.label}</strong>
+                      <strong className="block text-caption">
+                        {node.label}
+                      </strong>
                       <p className={ui.muted}>
                         {formatEventTime(
                           node.eventTime,

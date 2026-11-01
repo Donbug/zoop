@@ -4,7 +4,7 @@
 Authors the exact stage inputs the Java adapters (`com.zoop.chat.model.ChatModelStages`) must build for a fixed synthetic
 scenario, and an authored replay answer for each, keyed by the worker's own request identity. A Java input that differs in
 any field has no replay entry and is refused (`replay_input_mismatch`), so the gate proves the two sides agree on the
-`zoop-ai-chat-2` inputs and answers, not only on the envelope. Before any process starts, the fixture is replayed in-process
+`zoop-ai-chat-5` inputs and answers, not only on the envelope. Before any process starts, the fixture is replayed in-process
 through the worker runtime so an authoring mistake fails here and not as a Java mismatch.
 
 Then starts one real `ai/service` (127.0.0.1, fresh temp state, replay only, live gate closed: a supported Jev model name so
@@ -44,13 +44,14 @@ from support import PGREP, ServiceProcess, Workspace, remove_tree, terminate_run
 API = ROOT / "api"
 RESULTS = API / "build" / "test-results" / "aiChatContractTest"
 GRADLE_TIMEOUT_SECONDS = 900
-SCHEMA = "zoop-ai-chat-2"
+SCHEMA = "zoop-ai-chat-5"
 # Not a secret: the one Jev model the worker supports. Set so a live request passes the stage configuration and is refused
 # by the closed live gate itself; live enable, budget and provider keys stay unset.
 LIVE_JEV_MODEL = "jev-1.14.0"
 # One test per contract boundary: a boundary whose test went missing fails the gate even when every remaining test passes.
 CONTRACT_TESTS = frozenset({
     "theRouterAnswersTheServerSplitRequirementsWithTypedProbabilities",
+    "theRouterCarriesADependentRequirementCheckpoint",
     "theAnswerIsGeneratedFromTheGrantedQuote",
     "theVerifierJudgesEachSection",
     "theOrchestratorSendsBoundMemberAndComparisonFacts",
@@ -79,6 +80,13 @@ ROUTER_INPUT = {
     "capabilities": [{"capabilityId": "company.read", "description": "기업과 그 기업의 승인된 관계, 관계를 뒷받침하는 근거 읽기"},
                      {"capabilityId": "issue.read", "description": "사건(이슈)과 관련 기업, 사건 근거 읽기"}],
 }
+DEPENDENCY_QUESTION = "내 종목과 연결된 회사를 찾아줘? 정확히 두 곳이면 그 회사 최근 사건을 알려줘"
+DEPENDENCY_ROUTER_INPUT = {
+    "turns": [{"text": DEPENDENCY_QUESTION, "choiceLabel": None}],
+    "requirements": [{"requirementId": "r1", "text": "내 종목과 연결된 회사를 찾아줘", "explicit": True},
+                     {"requirementId": "r2", "text": "정확히 두 곳이면 그 회사 최근 사건을 알려줘", "explicit": True}],
+    "capabilities": ROUTER_INPUT["capabilities"],
+}
 ANSWER_INPUT = {
     "turns": [{"text": ANSWER_QUESTION, "choiceLabel": None}],
     "branches": [{"requirementId": "r1", "label": ANSWER_QUESTION, "general": False, "noneFound": False,
@@ -91,16 +99,18 @@ VERIFICATION_INPUT = {
     "requestBinding": {"invocationId": "chat-verify-gate.1.verify", "graphVersionId": "gv-synthetic",
                        "asOf": "2026-10-21T00:00:00Z"},
     "sections": [{"sectionId": "s0", "requirementIds": ["r1"], "serverFacts": [],
-                  "basis": "evidence_grounded", "text": EVIDENCE_TEXT, "evidenceIds": [EVIDENCE]},
+                  "basis": "evidence_grounded", "claims": [{"claimId": "s0c0", "text": EVIDENCE_TEXT}],
+                  "evidenceIds": [EVIDENCE]},
                  {"sectionId": "s1", "requirementIds": ["r2"], "serverFacts": [],
-                  "basis": "general_knowledge", "text": GENERAL_TEXT, "evidenceIds": []}],
+                  "basis": "general_knowledge", "claims": [{"claimId": "s1c0", "text": GENERAL_TEXT}],
+                  "evidenceIds": []}],
     "citations": [QUOTE],
 }
 FACT_VERIFICATION_INPUT = {
     "requestBinding": {"invocationId": "chat-facts-gate.1.verify", "graphVersionId": "gv-synthetic",
                        "asOf": "2026-10-21T00:00:00Z"},
     "sections": [{"sectionId": "s0", "requirementIds": ["r1"], "basis": "evidence_grounded",
-                  "text": "보유 종목 삼성전자와 관심 종목 NVIDIA의 조회된 지도 변경입니다.",
+                  "claims": [{"claimId": "s0c0", "text": "보유 종목 삼성전자와 관심 종목 NVIDIA의 조회된 지도 변경입니다."}],
                   "evidenceIds": [EVIDENCE], "serverFacts": [
         {"kind": "portfolio_scope", "requirementId": "r1", "timing": "current_request_read",
          "queryScope": "current_member", "companyIds": [], "companyLimit": 5, "truncated": True,
@@ -132,6 +142,23 @@ def _noul(p: float) -> dict[str, Any]:
     return {"type": "noul", "noul": p}
 
 
+def _choice(name: str, names: list[str], p: float = 0.97) -> dict[str, Any]:
+    rest = (1 - p) / (len(names) - 1)
+    return {"type": "choice", "choice": name, "confidence": 0.93,
+            "probabilities": {candidate: (p if candidate == name else rest) for candidate in names}}
+
+
+def _router_answers(questions: dict[str, Any]) -> dict[str, Any]:
+    answers = {}
+    for key, question in questions.items():
+        if question["type"] == "noul":
+            answers[key] = _noul(0.03)
+        else:
+            names = list(question["criteria"])
+            answers[key] = _choice("none" if "none" in names else names[0], names)
+    return answers
+
+
 def author_replay() -> dict[str, Any]:
     """One authored answer per stage, in the provider's raw shape, keyed by the worker's request identity."""
     from zoop_ai import chat_jev
@@ -146,12 +173,25 @@ def author_replay() -> dict[str, Any]:
 
     router = _request("chat-router", ROUTER_INPUT)
     questions = chat_jev.build_router_request(router.parsed(), "authored")["questions"]
-    answers = {key: _noul(0.03) for key in questions}
+    answers = _router_answers(questions)
     answers["r0-q02"] = _noul(0.93)   # r1: a concept
     answers["r1-q03"] = _noul(0.88)   # r2: company and issue facts
     answers["r1-cap0"] = _noul(0.91)  # r2 reads company.read
     answers["r1-cap1"] = _noul(0.84)  # and issue.read
     entry("chat-router", ROUTER_INPUT, {"model": "authored-synthetic-chat-router", "answers": answers})
+
+    dependency_router = _request("chat-router", DEPENDENCY_ROUTER_INPUT)
+    dependency_questions = chat_jev.build_router_request(dependency_router.parsed(), "authored")["questions"]
+    dependency_answers = _router_answers(dependency_questions)
+    dependency_answers["r0-q07"] = _noul(0.93)
+    dependency_answers["r0-cap0"] = _noul(0.91)
+    dependency_answers["r1-q03"] = _noul(0.93)
+    dependency_answers["r1-cap0"] = _noul(0.91)
+    dependency_answers["r1-dependency-source"] = _choice("r0", ["none", "r0"])
+    dependency_answers["r1-dependency-cardinality"] = _choice("exactly", ["exactly", "atLeast", "atMost"])
+    dependency_answers["r1-dependency-count"] = _choice("count2", [f"count{count}" for count in range(1, 6)])
+    entry("chat-router", DEPENDENCY_ROUTER_INPUT,
+          {"model": "authored-synthetic-chat-router", "answers": dependency_answers})
 
     entry("chat-answer", ANSWER_INPUT, {"model": "authored-synthetic-chat-answer",
                                          "choices": [{"message": {"role": "assistant",
@@ -160,10 +200,13 @@ def author_replay() -> dict[str, Any]:
     supported = {"type": "choice", "choice": "supported", "confidence": 0.93,
                  "probabilities": {"supported": 0.97, "contradicted": 0.015, "insufficient": 0.015}}
     entry("chat-verification", VERIFICATION_INPUT, {"model": "authored-synthetic-chat-verification",
-                                                    "answers": {"s0-support": supported, "s0-advice": _noul(0.02),
+                                                    "answers": {"s0c0-support": supported, "s0c0-causality": _noul(0.02),
+                                                                "s0-advice": _noul(0.02), "s1c0-causality": _noul(0.02),
                                                                 "s1-advice": _noul(0.02)}})
     entry("chat-verification", FACT_VERIFICATION_INPUT, {"model": "authored-synthetic-chat-verification",
-                                                        "answers": {"s0-support": supported, "s0-advice": _noul(0.02)}})
+                                                        "answers": {"s0c0-support": supported,
+                                                                    "s0c0-causality": _noul(0.02),
+                                                                    "s0-advice": _noul(0.02)}})
     return {"schemaVersion": SCHEMA, "recordingKind": "authored-test", "responses": entries}
 
 
@@ -184,11 +227,13 @@ def check_fixture(replay: dict[str, Any], registry: dict[str, Any], state: Path)
     path.write_text(json.dumps(replay, ensure_ascii=False), encoding="utf-8")
     sender = ReplaySender(path)
     parsed = ChatGrantRegistry.model_validate(registry)
-    for stage, payload in (("chat-router", ROUTER_INPUT), ("chat-answer", ANSWER_INPUT),
-                           ("chat-verification", VERIFICATION_INPUT), ("chat-verification", FACT_VERIFICATION_INPUT)):
+    for index, (stage, payload) in enumerate((("chat-router", ROUTER_INPUT), ("chat-router", DEPENDENCY_ROUTER_INPUT),
+                                              ("chat-answer", ANSWER_INPUT),
+                                              ("chat-verification", VERIFICATION_INPUT),
+                                              ("chat-verification", FACT_VERIFICATION_INPUT))):
         request = _request(stage, payload)
         if stage != "chat-verification":
-            request = request.model_copy(update={"invocation_id": f"check-{stage}"})
+            request = request.model_copy(update={"invocation_id": f"check-{index}-{stage}"})
         if stage == "chat-verification":
             _, outbound = provider_body(request, stage_config(stage, "replay"))
             assert outbound["state"]["requestBinding"] == payload["requestBinding"]
@@ -310,7 +355,9 @@ def check_native_http(root: Path, command: Path) -> None:
 
         response = send(body)
         assert response.status_code == 200, response.text
-        assert response.json()["answer"]["sections"] == [{"support": "supported", "prohibitedAdvice": "no"}]
+        assert response.json()["answer"]["sections"] == [{
+            "claims": [{"claimId": "s0c0", "support": "supported", "unsupportedCausality": "no"}],
+            "prohibitedAdvice": "no"}]
         assert len(provider.requests) == 1
         observed = provider.requests[0]
         assert observed["path"] == "/v1/systemone"
@@ -318,7 +365,7 @@ def check_native_http(root: Path, command: Path) -> None:
         assert state_sent["requestBinding"] == FACT_VERIFICATION_INPUT["requestBinding"]
         assert state_sent["sections"][0]["serverFacts"] == FACT_VERIFICATION_INPUT["sections"][0]["serverFacts"]
         assert state_sent["sections"][0]["citedQuotes"] == [{"quote": QUOTE["quote"]}]
-        assert set(observed["body"]["questions"]) == {"s0-support", "s0-advice"}
+        assert set(observed["body"]["questions"]) == {"s0c0-support", "s0c0-causality", "s0-advice"}
 
         for change in (
                 lambda v: v.update(invocationId="foreign-job.1.verify"),
@@ -337,7 +384,9 @@ def check_native_http(root: Path, command: Path) -> None:
         absent["input"]["citations"] = []
         response = send(absent)
         assert response.status_code == 200, response.text
-        assert response.json()["answer"]["sections"] == [{"support": "hold", "prohibitedAdvice": "no"}]
+        assert response.json()["answer"]["sections"] == [{
+            "claims": [{"claimId": "s0c0", "support": "hold", "unsupportedCausality": "no"}],
+            "prohibitedAdvice": "no"}]
         assert len(provider.requests) == 2
         assert provider.requests[1]["body"]["state"]["sections"][0]["serverFacts"] == []
         print("chat-native-loopback: context=bound, forgeryRejections=5, absentContext=hold, localProviderCalls=2, externalCalls=0")

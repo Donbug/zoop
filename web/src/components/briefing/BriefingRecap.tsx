@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { Link } from 'react-router-dom';
 import { getBriefingRecap } from '@/apis/briefing/briefing';
 import type {
@@ -61,9 +62,10 @@ export default function BriefingRecap({
         이번 회차에 다시 평가한 전망이 아닙니다.
       </p>
       {!current && (
-        <p className={NOTE} role="status">
-          고정된 이전 브리핑을 확인하고 있어요.
-        </p>
+        <LoadingIndicator
+          label="고정된 이전 브리핑을 확인하고 있어요."
+          className={`${NOTE} flex min-h-8 w-full`}
+        />
       )}
       {current?.error && (
         <p className={EMPTY} role="alert">
@@ -94,7 +96,7 @@ export default function BriefingRecap({
                   compact={compact}
                   title={`이전 이슈 · ${item.title}`}
                 >
-                  <h4 className="text-sm font-bold">
+                  <h4 className="text-body font-bold">
                     이전 이슈 · {item.title}
                   </h4>
                   <p className={BODY}>
@@ -113,7 +115,7 @@ export default function BriefingRecap({
             ))}
           </ol>
           <Link
-            className={`mt-3 inline-block text-xs font-semibold underline ${FOCUS_RING}`}
+            className={`mt-3 inline-block text-caption font-semibold underline ${FOCUS_RING}`}
             to={`/briefing?date=${previous.date}&edition=${previous.edition}&reading=full`}
           >
             이전 브리핑 전문·관전 조건 확인

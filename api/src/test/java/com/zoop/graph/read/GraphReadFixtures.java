@@ -76,12 +76,10 @@ final class GraphReadFixtures {
     /** A reader over {@link #withAnUndatedArticle} for every version, at a fixed request time. */
     static PublicGraphReader undatedReader(Instant now) {
         var snapshot = withAnUndatedArticle();
-        return new PublicGraphReader(new GraphVersionSelector(repository(), Clock.fixed(now, ZoneOffset.UTC)),
-                version -> snapshot, pinned -> DisclosureExclusions.NONE);
+        return new PublicGraphReader(new GraphVersionSelector(repository(), Clock.fixed(now, ZoneOffset.UTC)), version -> snapshot, pinned -> DisclosureExclusions.NONE, null, null);
     }
 
     static PublicGraphReader reader(Instant now, DisclosureExclusionReader exclusions) {
-        return new PublicGraphReader(new GraphVersionSelector(repository(), Clock.fixed(now, ZoneOffset.UTC)),
-                new FixtureGraphSnapshotStore(GraphReadFixtures.class.getClassLoader()), exclusions);
+        return new PublicGraphReader(new GraphVersionSelector(repository(), Clock.fixed(now, ZoneOffset.UTC)), new FixtureGraphSnapshotStore(GraphReadFixtures.class.getClassLoader()), exclusions, null, null);
     }
 }

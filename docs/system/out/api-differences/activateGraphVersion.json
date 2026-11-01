@@ -23,6 +23,14 @@
     "request:application/json.expectedActiveVersionId<anyOf:1>": {
       "type": "null"
     },
+    "request:application/json.mode": {
+      "type": "string",
+      "enum": [
+        "forward",
+        "rollback"
+      ]
+    },
+    "request:application/json.mode:required": false,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },

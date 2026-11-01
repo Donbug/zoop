@@ -267,7 +267,7 @@ def test_wrong_pins_are_refused_with_nothing_written(rig, name, change, code):
     change(manifest)
     out = rig.run("freeze", manifest, expected=2)
     assert out["error"]["code"] == code, (name, out)
-    assert rig.rows() == 0 and not list((rig.state / "bundles").iterdir())
+    assert rig.rows() == 0 and not list((rig.state / "bundles").glob("*"))
 
 
 def test_a_review_change_after_the_pin_refuses_a_new_freeze_but_not_an_unrelated_export(rig):
@@ -348,9 +348,9 @@ def test_geography_is_excluded_unless_the_field_verdict_matches_every_source_men
 
 
 
-def test_a_missing_country_field_excludes_the_issue_and_never_defaults_to_international(rig):
+def test_a_conflicting_country_field_excludes_the_issue_and_preserves_other_grounded_decisions(rig):
     bundle = rig.bundle()
-    assert excluded(bundle)[("issue", "issue:overseas")] == "geography_unproven" and "issue:overseas-2026q4" not in issue_ids(bundle)
+    assert excluded(bundle)[("issue", "issue:overseas")] == "geography_countries_disagree" and "issue:overseas-2026q4" not in issue_ids(bundle)
     assert {i["geography"]["value"] for i in bundle["issues"]} == {"domestic", "international"}
     assert all(i["geography"]["verification"] == "operator-field-verdict" and i["geography"]["policyVersion"] == POLICY and i["geography"]["evidenceIds"]
                for i in bundle["issues"])
@@ -729,6 +729,29 @@ def mutated(bundle: dict, change) -> dict:
     copy = json.loads(json.dumps(bundle))
     change(copy)
     return copy
+
+
+def test_source_policy_shapes_preserve_history_and_require_current_country_pin(valid_bundle):
+    current = copy.deepcopy(valid_bundle)
+    assert all(source["policies"]["policy"] == "zoop-relation-policy-2"
+               and source["policies"]["countryContext"] == "zoop-country-context-1" for source in current["sources"])
+    validate_bundle(current)
+    historical = copy.deepcopy(current)
+    for source in historical["sources"]:
+        source["policies"]["policy"] = "zoop-relation-policy-1"
+        del source["policies"]["countryContext"]
+    before = json_bytes(historical)
+    validate_bundle(historical)
+    assert json_bytes(historical) == before
+    for change in (lambda p: p.pop("countryContext"), lambda p: p.update(countryContext="zoop-country-context-2"),
+                   lambda p: p.update(countryContext=None), lambda p: p.update(countryContext=""),
+                   lambda p: p.update(policy="zoop-relation-policy-1"), lambda p: p.update(policy="zoop-relation-policy-3"),
+                   lambda p: p.update(unrecognized="pin")):
+        broken = copy.deepcopy(current)
+        change(broken["sources"][0]["policies"])
+        with pytest.raises(ExtractionFailure) as caught:
+            validate_bundle(broken)
+        assert caught.value.code == "handoff_bundle_invalid"
 
 
 def test_the_valid_bundle_validates_and_every_listed_corruption_is_refused(valid_bundle):
@@ -1219,10 +1242,10 @@ def keys_of(value):
 
 def test_every_public_issue_carries_its_hand_written_original_mentions_with_reachable_evidence(rig):
     bundle = rig.bundle()
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8"
     assert mentions_of(bundle) == hs.expected_mentions(rig.world)
     hs.assert_mentions_reachable(bundle)
-    assert rig.run("inspect", rig.sel())["receipt"]["bundleSchema"] == "zoop-graph-handoff-bundle-7"
+    assert rig.run("inspect", rig.sel())["receipt"]["bundleSchema"] == "zoop-graph-handoff-bundle-8"
 
 
 def test_a_mention_is_a_closed_unverified_source_record_and_no_decision_support_approval_publisher_or_impact_is_invented(rig):
@@ -1311,21 +1334,21 @@ def test_one_mention_identity_with_different_values_in_two_upstreams_excludes_th
 def test_a_members_event_time_without_an_offset_excludes_the_issue_although_the_issue_time_itself_is_clean(a2_time_offsetless, tmp_path):
     bundle = Rig(a2_time_offsetless, tmp_path).bundle()
     assert [i for i in bundle["exclusions"]["items"] if i["id"] == "issue:supply"] == [{"kind": "issue", "id": "issue:supply", "jobId": None,
-                                                                                         "code": "mention_event_time_unsupported"}]
+                                                                                         "code": "mention_event_time_unreviewed"}]
     assert issue_ids(bundle) == ["issue:factory-2026q4"] and "event_time_unsupported" not in set(excluded(bundle).values())
 
 
 def test_a_members_iso_week_event_time_is_unsupported_even_though_python_parses_it_as_a_day(a2_time_iso_week, tmp_path):
     bundle = Rig(a2_time_iso_week, tmp_path).bundle()
     assert [i for i in bundle["exclusions"]["items"] if i["id"] == "issue:supply"] == [{"kind": "issue", "id": "issue:supply", "jobId": None,
-                                                                                         "code": "mention_event_time_unsupported"}]
+                                                                                         "code": "mention_event_time_unreviewed"}]
     assert issue_ids(bundle) == ["issue:factory-2026q4"]
 
 
 def test_an_issue_whose_every_member_carries_an_iso_week_time_is_excluded_visibly_while_other_issues_still_freeze(event_time_iso_week, tmp_path):
     bundle = Rig(event_time_iso_week, tmp_path).bundle()          # freeze and export both succeed
     assert [i for i in bundle["exclusions"]["items"] if i["id"] == "issue:supply"] == [{"kind": "issue", "id": "issue:supply", "jobId": None,
-                                                                                         "code": "mention_event_time_unsupported"}]
+                                                                                         "code": "mention_event_time_unreviewed"}]
     assert issue_ids(bundle) == ["issue:factory-2026q4"] and "2026-W40-3" not in json.dumps(bundle)
 
 
@@ -1637,19 +1660,19 @@ def test_field_provenance_that_follows_exact_value_equality_is_accepted(valid_bu
     validate_bundle(rehashed(valid_bundle, change))
 
 
-@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4, hs.BUNDLE_5, hs.BUNDLE_6])
+@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4, hs.BUNDLE_5, hs.BUNDLE_6, hs.BUNDLE_7])
 def test_a_bundle_of_an_earlier_schema_is_never_a_valid_current_bundle(rig, valid_bundle, schema):
     old = hs.legacy_bundle(valid_bundle, rig.manifest("old"), schema)
-    assert old["schemaVersion"] == schema and "issueSummary" not in old["policy"] and all("summary" not in i for i in old["issues"])          # `-7` added the summary
-    # `-6` already had the impact rows (the content digest covered seven collections); every earlier schema had none.
-    assert (schema == hs.BUNDLE_6) == ("impacts" in old) == ("impacts" in old["counts"]) == ("impacts" in old["policy"])
-    if schema not in (hs.BUNDLE_5, hs.BUNDLE_6):
+    assert old["schemaVersion"] == schema and old["policy"]["version"] == "zoop-public-projection-policy-1"
+    assert (schema == hs.BUNDLE_7) == ("issueSummary" in old["policy"])
+    assert (schema in (hs.BUNDLE_6, hs.BUNDLE_7)) == ("impacts" in old) == ("impacts" in old["counts"]) == ("impacts" in old["policy"])
+    if schema not in (hs.BUNDLE_5, hs.BUNDLE_6, hs.BUNDLE_7):
         later = schema in (hs.BUNDLE_3, hs.BUNDLE_4)
         assert all(("fieldProvenance" in i) == later and ("mentions" in i) == (schema != hs.BUNDLE_1)
                    and ("fieldVerdicts" in i) == (schema == hs.BUNDLE_4) for i in old["issues"])
         assert "pathCompanies" not in old and "pathCompanies" not in old["counts"] and all("structuralPath" not in r for r in old["relations"])
         assert all("businessScope" not in b and "productScope" not in b for r in old["relations"] for b in r["basis"])
-    for broken in (old, {**old, "schemaVersion": "zoop-graph-handoff-bundle-7"}):          # nor does the current schema string make the earlier shape valid
+    for broken in (old, {**old, "schemaVersion": "zoop-graph-handoff-bundle-8"}):          # nor does the current schema string make the earlier shape valid
         with pytest.raises(ExtractionFailure) as exc:
             validate_bundle(broken)
         assert exc.value.code == "handoff_bundle_invalid"
@@ -1671,7 +1694,7 @@ def legacy_rig(rig, rows: dict | None = None, **plant) -> dict:
             for name, (state, artifact) in (rows or LEGACY_ROWS).items()}
 
 
-@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4, hs.BUNDLE_5, hs.BUNDLE_6])
+@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4, hs.BUNDLE_5, hs.BUNDLE_6, hs.BUNDLE_7])
 def test_a_handoff_frozen_under_an_earlier_bundle_schema_is_history_answered_from_the_ledger_alone(rig, schema):
     planted = legacy_rig(rig, schema=schema)
     assert {row["receipt"]["bundleSchema"] for row in planted.values()} == {schema}
@@ -1699,7 +1722,7 @@ def test_a_handoff_frozen_under_an_earlier_bundle_schema_is_history_answered_fro
     assert hs.ledger_snapshot(rig.state) == before          # no byte, mode, mtime or file changed: nothing was opened for writing, created, settled or marked failed
 
 
-@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4, hs.BUNDLE_5, hs.BUNDLE_6])
+@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4, hs.BUNDLE_5, hs.BUNDLE_6, hs.BUNDLE_7])
 def test_the_methods_recheck_the_contract_under_their_own_lock_without_the_cli_preflight(rig, schema):
     planted = legacy_rig(rig, schema=schema)
     manifests = {name: Manifest.model_validate(rig.manifest(name)) for name in planted}
@@ -1722,7 +1745,7 @@ def test_the_methods_recheck_the_contract_under_their_own_lock_without_the_cli_p
     assert stored(rig) == before          # no attempt was added, no state settled, no file written
 
 
-@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4, hs.BUNDLE_5, hs.BUNDLE_6])
+@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4, hs.BUNDLE_5, hs.BUNDLE_6, hs.BUNDLE_7])
 def test_a_new_handoff_id_freezes_and_exports_beside_the_legacy_history_which_stays_as_it_was(rig, schema):
     planted = legacy_rig(rig, schema=schema)
 
@@ -1733,7 +1756,7 @@ def test_a_new_handoff_id_freezes_and_exports_beside_the_legacy_history_which_st
 
     before = history()
     bundle = rig.bundle("h2")
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["handoffId"] == "h2"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and bundle["handoffId"] == "h2"
     assert history() == before
 
 
@@ -1908,3 +1931,55 @@ def test_a_bundle_whose_own_and_every_sources_mode_is_live_provider_is_valid_and
     assert valid_bundle["provenance"]["observedSourceKind"] == "synthetic"        # the material kind (synthetic or actual) is a separate, independently truthful fact
 
 
+def test_p3_explicit_unknown_preserves_source_countries_and_unrestricted_basis(rig):
+    decisions = rig.docs["decisions"]
+    decisions.update(schemaVersion="zoop-public-decisions-5", policyVersion="zoop-public-projection-policy-3")
+    supply = next(issue for issue in decisions["issues"] if issue["canonicalId"] == "issue:supply")
+    supply["geography"] = {"classification": None, "countries": [], "evidence": [], "reasonCode": "not-supported",
+                           "decisionRef": "synthetic-unknown", "decisionVersion": "1"}
+    relation = find(rig.world.jobs["rel-a"], "SUPPLIES", "SYNTH-3", "SYNTH-1")
+    decisions["structural"][0]["applicability"]["bindingDigest"] = hs.digest({
+        "policy": "zoop-public-projection-policy-3", "issue": "issue:supply", "company": "co:synth-3", "decisionVersion": "v1",
+        "eventTime": "2026-09-30", "geography": None, "sourceEvents": hs.source_events(rig.world),
+        "basis": [{"jobId": "rel-a", "relationCandidateId": relation["relationCandidateId"], "relationKey": relation["relationKey"],
+                   "type": "SUPPLIES", "revision": relation["eligibility"]["revision"]}]})
+    rig.write()
+    frozen = rig.freeze("unknown-p3", policyVersion="zoop-public-projection-policy-3")
+    exported = rig.run("export", rig.sel("unknown-p3"))
+    bundle = exported["bundle"]
+    assert frozen["receipt"]["bundleSchema"] == bundle["schemaVersion"] == "zoop-graph-handoff-bundle-9"
+    issue = supply_of(bundle)
+    assert issue["geography"]["value"] is None and issue["geography"]["evidenceIds"] == []
+    assert {tuple(row["countries"]) for row in issue["geography"]["basis"]} == {("KR",)}
+    assert issue["geography"]["verification"] == "not-established"
+    assert issue["eventTime"] == "2026-09-30" and issue["fieldVerdicts"] == []
+    assert len(structural_edges(bundle)) == 1
+    validate_bundle(bundle)
+    constrained = rehashed(bundle, lambda value: structural_edges(value)[0]["basis"][0].update(countries=["KR"]))
+    with pytest.raises(ExtractionFailure) as failure:
+        validate_bundle(constrained)
+    assert failure.value.detail == {"at": "basis_countries_unprovable"}
+
+
+@pytest.mark.parametrize("change", [
+    lambda geo: geo.update(classification="domestic"),
+    lambda geo: geo.update(countries=["KR"]),
+    lambda geo: geo.update(reasonCode="unknown"),
+])
+def test_p3_unknown_is_closed_and_known_values_cannot_downgrade(rig, change):
+    doc = copy.deepcopy(rig.docs["decisions"])
+    doc.update(schemaVersion="zoop-public-decisions-5", policyVersion="zoop-public-projection-policy-3")
+    doc["issues"][0]["geography"] = {"classification": None, "countries": [], "evidence": [], "reasonCode": "not-stated",
+                                    "decisionRef": "synthetic-unknown", "decisionVersion": "1"}
+    Decisions.model_validate(doc)
+    change(doc["issues"][0]["geography"])
+    with pytest.raises(ValidationError):
+        Decisions.model_validate(doc)
+
+
+def test_decisions4_keeps_strict_geography_and_rejects_p3_pair(rig):
+    doc = copy.deepcopy(rig.docs["decisions"])
+    Decisions.model_validate(doc)
+    doc["policyVersion"] = "zoop-public-projection-policy-3"
+    with pytest.raises(ValidationError):
+        Decisions.model_validate(doc)

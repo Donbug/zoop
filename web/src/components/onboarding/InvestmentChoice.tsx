@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import ErrorNotice from '@/components/common/ErrorNotice';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import OnboardingStep from '@/components/onboarding/OnboardingStep';
 import { useMemberSettings } from '@/hooks/useMemberSettings';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
@@ -94,9 +95,10 @@ export default function InvestmentChoice() {
   return (
     <OnboardingStep title="지금 주식에 투자하고 계신가요?">
       {settings.status === 'loading' && (
-        <p role="status" className="text-sm text-gray-500">
-          설정을 불러오고 있어요
-        </p>
+        <LoadingIndicator
+          label="설정을 불러오고 있어요"
+          className="flex min-h-10 w-full text-body"
+        />
       )}
       {settings.status === 'error' && (
         <ErrorNotice
@@ -120,14 +122,14 @@ export default function InvestmentChoice() {
                     : 'border-gray-200 bg-white hover:bg-gray-50'
                 }`}
               >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-800">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-zoop-ink">
                   <option.Icon />
                 </span>
                 <span className="flex min-w-0 flex-col gap-1">
-                  <span className="font-semibold text-gray-950">
+                  <span className="font-semibold text-zoop-ink">
                     {option.title}
                   </span>
-                  <span className="text-sm text-gray-600">
+                  <span className="text-body text-zoop-ink">
                     {option.description}
                   </span>
                 </span>
@@ -137,7 +139,7 @@ export default function InvestmentChoice() {
         </ul>
       )}
       {saving && (
-        <p role="status" className="text-sm text-gray-500">
+        <p role="status" className="text-body text-zoop-ink">
           선택을 저장하고 있어요
         </p>
       )}

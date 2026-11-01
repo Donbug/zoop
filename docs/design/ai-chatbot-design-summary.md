@@ -123,7 +123,7 @@ Q07의 `portfolio.scope.read`는 Java server-only precondition이며 MCP에 노�
 
 notices는 답변을 막지 않은 장애/처리 정보, limitations는 미충족 요구다. 이 둘을 분리해 답한 요구와 limitation을 정확히 하나에 대응시키는 기존 규칙을 유지한다. 웹 오류를 evidence_insufficient나 ‘관련 뉴스 없음’으로 숨기지 않는다.
 
-현재 공개 limitation kind는 `investment_advice`, `precondition_unmet`, `results_truncated`, `not_in_member_scope`(내 종목(Q07) 질문이 지목한 기업이 회원의 보유·관심 종목이 아님, 서버 `portfolio.scope.read` 판정), `evidence_insufficient`, `out_of_scope`, `tool_unavailable`(direct 경로에서 일부 요구의 조회만 시간 초과·자료 일시 불가)다.
+현재 공개 limitation kind는 `investment_advice`, `precondition_unmet`, `results_truncated`, `not_in_member_scope`(내 종목(Q07) 질문이 지목한 기업이 회원의 보유·관심 종목이 아님, 서버 `portfolio.scope.read` 판정), `evidence_insufficient`, `out_of_scope`, `tool_unavailable`(일부 요구의 조회가 시간 초과·자료 일시 불가로 실패해 답하지 못함. 일부 조회로 답하면 같은 코드의 notice)다.
 
 ## 8. 검증과 복구
 
@@ -163,7 +163,7 @@ general_knowledge에는 서버 고정 안내 ‘일반 개념 설명입니다. �
 | --- | --- | --- |
 | 공개 job | 회원 전용 저장·polling·멱등성·취소·lease·재시도, answerStatus/notices·`tool_unavailable` limitation, 저장 복구(`save_only`) | 종단 시험 |
 | 모델 | chat-router Jev·chat-verification Jev, direct의 chat-answer Luna(chat/completions·high·도구 없음), agent의 chat-agent Luna(Responses MCP·medium·Java 승인 continuation, 기본 꺼짐, 합성 replay로만 확인) | live 확인, 입력 추정·출력 몫 실측 보정 |
-| 도구 | company.read, issue.read, evidence.resolve, graph.path.read, graph.version.diff, portfolio.scope.read, zoopPolicy.read, briefing.read, selectionRule.read, web.search(합성 공급자만). portfolio.scope.read·briefing.read·selectionRule.read는 server-only, 나머지는 MCP 공통 gate·cache·direct 시작 경로 위 | help.search, screenSpec.read, document.search, briefing.evidence, 실제 웹 공급자 |
+| 도구 | company.read, issue.read, evidence.resolve, graph.path.read, graph.version.diff, portfolio.scope.read, zoopPolicy.read, document.search(기업별 문서 읽기, 본문 검색 없음), briefing.read, briefing.evidence, selectionRule.read, web.search(합성 공급자만), 승인 문서 저장소와 기본 비활성 `help.search`·`screenSpec.read`. portfolio.scope.read·briefing.read·briefing.evidence·selectionRule.read는 server-only, 나머지는 MCP 공통 gate·cache·direct 시작 경로 위 | Q01 실제 승인본 등록·기능 플래그 활성화, 실제 웹 공급자 |
 | 근거·검증 | BranchContext·서버 citation·결정론 검사·section Jev·서버 사실·웹 출처·grant 선반환 검사 | claim 인과 검증·웹 snapshot |
 | 화면 | D-AI-01~02b API 연결·결과/인용/확인/실패·부분 안내·웹 보도 구간·uiActions(기업·경로·브리핑) | 관계·근거·내 종목 동작, 와이어프레임 근거와 종단 시험 |
 

@@ -23,6 +23,18 @@ public sealed interface ExclusionRequest {
             implements ExclusionRequest {
     }
 
+    /** Explicit legacy receipt-bound exclusion; uses the same append-only revisions and lift operation. */
+    record LegacyExclude(String requestId, String requestSha256, String operator, String reason, String graphVersionId,
+            String receiptSha256, List<Target> targets) implements ExclusionRequest {
+        public LegacyExclude { targets = List.copyOf(targets); }
+    }
+
+    /** Publication targets are resolved to every original owner before the source-scoped change is persisted. */
+    record PublicationExclude(String requestId, String requestSha256, String operator, String reason, String graphVersionId,
+            String receiptSha256, List<Target> targets) implements ExclusionRequest {
+        public PublicationExclude { targets = List.copyOf(targets); }
+    }
+
     /**
      * Asks the AI service which public ids {@code changed} touches in these versions ({@code queryGraphHandoffExposure}) and then
      * excludes them exactly as an {@link Exclude} of that report would. {@code graphVersionIds} empty: the active version and the
@@ -61,7 +73,7 @@ public sealed interface ExclusionRequest {
      * One selected handoff with the pins the app must find in the receipt of its imported version and the public ids the report
      * proposes to exclude there (empty unless {@code exposed}).
      */
-    record Handoff(String handoffId, String manifestDigest, String bundleDigest, String contentDigest, boolean exposed,
+    record Handoff(String handoffId, String bundleSchema, String manifestDigest, String bundleDigest, String contentDigest, boolean exposed,
             List<Target> targets) {
         public Handoff {
             targets = List.copyOf(targets);

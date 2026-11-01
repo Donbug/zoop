@@ -243,6 +243,8 @@ class Grant(Wire):
 
     @model_validator(mode="after")
     def expiry(self):
+        if self.grant_id.startswith("private-processing:"):
+            raise ValueError("reserved private authority reference")
         if self.expires_at is not None:
             timestamp(self.expires_at)
         return self
@@ -258,11 +260,20 @@ class Scope(Wire):
 
 class Source(Wire):
     source_id: str = Field(min_length=1)
-    adapter: Literal["authored-files", "collected-http"]
+    adapter: Literal["authored-files", "collected-http", "retained-private"]
     input_root: str = Field(min_length=1)
     allowed_hosts: list[str] = Field(min_length=1, max_length=100)
     scopes: list[Scope] = Field(min_length=1, max_length=100)
     grant: Grant
+    retained_roots: list[str] | None = Field(default=None, min_length=1, max_length=1000)
+
+    @model_serializer(mode="wrap")
+    def _without_unused_retained_roots(self, handler):
+        value = handler(self)
+        if self.retained_roots is None:
+            value.pop("retainedRoots", None)
+            value.pop("retained_roots", None)
+        return value
 
     @model_validator(mode="after")
     def bindings(self):
@@ -272,11 +283,21 @@ class Source(Wire):
             raise ValueError("absolute operator namespace required")
         if any(h != h.lower().rstrip(".") or any(c in h for c in "/:@* ") for h in self.allowed_hosts):
             raise ValueError("exact hosts required")
+        if self.adapter == "retained-private":
+            if (not self.retained_roots or any(not Path(root).is_absolute() for root in self.retained_roots)
+                    or self.grant.enabled or self.grant.rights not in {"unknown", "denied"}
+                    or self.grant.allowed_operations or self.grant.recipients or self.grant.purposes):
+                raise ValueError("retained sources have no public grant")
+        elif self.retained_roots is not None:
+            raise ValueError("retained roots belong to retained sources")
         return self
 
     def configuration(self, scope: Scope):
-        return {"sourceId": self.source_id, "adapter": self.adapter, "inputRoot": self.input_root,
-                "allowedHosts": self.allowed_hosts, "scope": scope.wire()}
+        result = {"sourceId": self.source_id, "adapter": self.adapter, "inputRoot": self.input_root,
+                  "allowedHosts": self.allowed_hosts, "scope": scope.wire()}
+        if self.adapter == "retained-private":
+            result["retainedRoots"] = self.retained_roots
+        return result
 
 
 class Registry(Wire):
@@ -406,17 +427,48 @@ class Receipt(Wire):
         return self
 
 
+class Retained(Wire):
+    """Original retained-record coordinates, never an acquisition receipt or public licence."""
+    provenance: Literal["retained_private"]
+    state_dir: str = Field(min_length=1)
+    private_id: str = Field(min_length=1, max_length=200)
+    record_schema: Literal["zoop-private-news-record-1", "zoop-private-news-record-2", "zoop-private-news-record-3", "zoop-official-source-record-1"]
+    record: FileRef
+    observed_at: str
+    final_url: str | None
+    canonical_url: str | None
+    published: Published
+
+    @model_validator(mode="after")
+    def coordinates(self):
+        if not Path(self.state_dir).is_absolute():
+            raise ValueError("absolute retained namespace required")
+        timestamp(self.observed_at)
+        return self
+
+
 class Item(Declared):
     candidate_id: str = Field(min_length=1, max_length=200)
     supplier_document_id: str | None = Field(default=None, min_length=1, max_length=500)
     url: str = Field(min_length=1, max_length=4000)
     body_ref: str = Field(min_length=1, max_length=200)
-    media_type: Literal["text/html", "application/pdf"]
+    media_type: Literal["text/html", "application/pdf", "text/markdown"]
     title: str = Field(max_length=2000)
     published_at: str | None
     modified_at: str | None
     source_revision: str | None
     collection: Collected | None = None
+    private: Retained | None = None
+    language: str | None = Field(default=None, min_length=2, max_length=35)
+
+    @model_serializer(mode="wrap")
+    def _without_unspecified_metadata(self, handler):
+        value = handler(self)
+        # Nested dumps must preserve historical authored/HTTP raw-version identities too.
+        for name in ("private", "language", "publisher"):
+            if getattr(self, name) is None:
+                value.pop(name, None)
+        return value
 
     @model_validator(mode="after")
     def dates(self):
@@ -427,12 +479,18 @@ class Item(Declared):
             declared = self.collection.published
             if self.published_at != (declared.raw if declared.precision == "instant" else None):
                 raise ValueError("published time must be the declared instant, never an inferred one")
+        if self.private is not None:
+            declared = self.private.published
+            if self.collection is not None or self.published_at != (declared.raw if declared.precision == "instant" else None):
+                raise ValueError("retained publication identity conflict")
+        if self.media_type == "text/markdown" and self.private is None:
+            raise ValueError("Markdown requires a retained representation")
         return self
 
     def metadata(self):
         # Collection facts describe one observation; they are not part of the immutable raw-version identity.
         # A present publisher stays in this metadata (it is raw-version identity); an unspecified one has no key at all.
-        return {k: v for k, v in self.wire().items() if k not in {"candidateId", "bodyRef", "url", "supplierDocumentId", "collection"}}
+        return {k: v for k, v in self.wire().items() if k not in {"candidateId", "bodyRef", "url", "supplierDocumentId", "collection", "private"}}
 
 
 def read_file(path: Path, maximum: int) -> bytes:
@@ -464,9 +522,13 @@ NAVER_SEARCH = frozenset({"naver-search", "naver-developers-search"})
 
 
 class Authority:
+    public = True
+
     def __init__(self, path: Path):
         self.path = path
         self.raw = read_file(path, MAX_INPUT)
+        if json.loads(self.raw).get("schemaVersion") in {"zoop-private-processing-1", "zoop-private-execution-1"}:
+            raise IngestionFailure("private_processing_not_public")
         self.registry = Registry.model_validate_json(self.raw)
 
     def check(self, source_id: str, scope_id: str, operations=("read", "store"), config=None, *, purpose: str | None = None, recipient: str | None = None):
@@ -483,6 +545,8 @@ class Authority:
         scope = next((s for s in source.scopes if s.scope_id == scope_id), None) if source else None
         if source is None or scope is None:
             raise IngestionFailure("source_unauthorized")
+        if source.adapter == "retained-private":
+            raise IngestionFailure("private_processing_not_public")
         g = source.grant
         if not g.enabled or g.rights != "known" or not any(e.strip() for e in g.evidence) or not set(operations) <= set(g.allowed_operations) or (g.expires_at is not None and timestamp(g.expires_at) <= datetime.now(UTC)):
             raise IngestionFailure("source_unauthorized")
@@ -507,6 +571,18 @@ class Authority:
             raise IngestionFailure("fixture_hash_mismatch")
         return raw
 
+    def admit(self, source_id, scope_id, item, body_hash):
+        """Public sources already bind their receipt or authored body through the ingestion owner."""
+
+    def member(self, row, candidate, content, *, purpose=None, recipient=None):
+        """Public source grants are scope-wide; private authorities narrow them to exact members."""
+
+    def reference(self, source, row, candidate):
+        return {"grantId": source.grant.grant_id, "revision": source.grant.revision}
+
+    def check_runtime(self, binding):
+        """Public send authority is checked for each runtime purpose and recipient."""
+
 
 class Sending:
     """`Authority` as seen by one outbound model call (usable anywhere an Authority is): `check` always adds this purpose and recipient."""
@@ -517,6 +593,19 @@ class Sending:
     @property
     def raw(self) -> bytes:
         return self.authority.raw
+
+    @property
+    def public(self):
+        return self.authority.public
+
+    def admit(self, source_id, scope_id, item, body_hash):
+        return self.authority.admit(source_id, scope_id, item, body_hash)
+
+    def member(self, row, candidate, content):
+        return self.authority.member(row, candidate, content, purpose=self.purpose, recipient=self.recipient)
+
+    def reference(self, source, row, candidate):
+        return self.authority.reference(source, row, candidate)
 
     def check(self, source_id: str, scope_id: str, operations=("read", "store"), config=None):
         return self.authority.check(source_id, scope_id, operations, config, purpose=self.purpose, recipient=self.recipient)

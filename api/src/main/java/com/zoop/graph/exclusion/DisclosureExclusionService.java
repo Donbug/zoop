@@ -58,8 +58,8 @@ import tools.jackson.databind.JsonNode;
  */
 public final class DisclosureExclusionService {
     static final String RECEIPT_KIND = "verification_receipt";
-    /** The only bundle schema the exposure query and its reports map. */
-    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-7";
+    /** New exposure queries follow the producer's current contract; retained reports bind their own schema to the receipt. */
+    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-8";
     private static final Logger log = LoggerFactory.getLogger(DisclosureExclusionService.class);
 
     private final JdbcDisclosureExclusionRepository repository;
@@ -67,20 +67,19 @@ public final class DisclosureExclusionService {
     private final ArtifactFileStore store;
     private final TransactionOperations transaction;
     private final HandoffExposureClient exposure;
+    private final com.zoop.graph.publication.GraphPublicationReader publications;
 
-    public DisclosureExclusionService(JdbcDisclosureExclusionRepository repository, DocumentRegistryRepository registry,
-            ArtifactFileStore store, TransactionOperations transaction) {
-        this(repository, registry, store, transaction, null);
-    }
 
     /** {@code exposure} null: an {@code exclude-query} is {@code exposure_unavailable}; report files still work. */
     public DisclosureExclusionService(JdbcDisclosureExclusionRepository repository, DocumentRegistryRepository registry,
-            ArtifactFileStore store, TransactionOperations transaction, HandoffExposureClient exposure) {
+            ArtifactFileStore store, TransactionOperations transaction, HandoffExposureClient exposure,
+            com.zoop.graph.publication.GraphPublicationReader publications) {
         this.repository = repository;
         this.registry = registry;
         this.store = store;
         this.transaction = transaction;
         this.exposure = exposure;
+        this.publications = publications;
     }
 
     /** The graph version an import staged from this handoff (the importer's id formula). */
@@ -95,6 +94,8 @@ public final class DisclosureExclusionService {
                 case Exclude exclude -> exclude(exclude);
                 case Query query -> query(query);
                 case Lift lift -> lift(lift);
+                case ExclusionRequest.LegacyExclude legacy -> legacyExclude(legacy);
+                case ExclusionRequest.PublicationExclude publication -> publicationExclude(publication);
             };
             log.info("disclosure exclusion {} {} at revision {}{}", action, result.outcome(), result.revision(),
                     result.replay() ? " (recorded result)" : "");
@@ -106,6 +107,8 @@ public final class DisclosureExclusionService {
             // A read before the transaction: nothing was written.
             log.error("disclosure exclusion database failure: {}", database.getClass().getSimpleName());
             return ExclusionResult.failed(action, new ExclusionException(ExclusionFailure.DATABASE_UNAVAILABLE));
+        } catch (com.zoop.graph.publication.PublicationException invalid) {
+            return ExclusionResult.failed(action, new ExclusionException(ExclusionFailure.RECEIPT_UNAVAILABLE));
         }
     }
 
@@ -141,23 +144,116 @@ public final class DisclosureExclusionService {
         });
     }
 
+    private ExclusionResult legacyExclude(ExclusionRequest.LegacyExclude request) {
+        Optional<ExclusionResult> recorded = recorded(request);
+        if (recorded.isPresent()) return recorded.get();
+        if (!"snapshot".equals(repository.versionKind(request.graphVersionId()).orElse(null)))
+            throw new ExclusionException(ExclusionFailure.VERSION_UNKNOWN);
+        ArtifactRow artifact = registry.findArtifact("artifact-receipt-" + request.graphVersionId())
+                .orElseThrow(() -> new ExclusionException(ExclusionFailure.RECEIPT_UNAVAILABLE));
+        if (!artifact.sha256().equals(request.receiptSha256())) throw new ExclusionException(ExclusionFailure.RECEIPT_MISMATCH);
+        Obj receipt = receipt(request.graphVersionId());
+        try {
+            receipt.exactly(com.zoop.graph.importer.LegacyRealPackage.RECEIPT_KEYS);
+            if (!com.zoop.graph.importer.LegacyRealPackage.isReceiptSchema(receipt.string("schemaVersion"))
+                    || !request.graphVersionId().equals(versionId(receipt.string("migrationId"))))
+                throw new StrictJson.Malformed();
+            Obj bundle = receipt.object("bundle");
+            for (Target target : request.targets()) {
+                boolean member = switch (target.kind()) {
+                    case "article" -> bundle.objects("articles").stream().anyMatch(a -> target.id().equals(a.string("articleId"))
+                            && target.articleVersion().equals(a.string("articleVersion")));
+                    case "issue" -> bundle.objects("issues").stream().anyMatch(i -> target.id().equals(i.string("id")));
+                    case "relation" -> bundle.objects("relations").stream().anyMatch(r -> target.id().equals(r.string("id")));
+                    case "evidence" -> bundle.objects("evidence").stream().anyMatch(e -> target.id().equals(e.string("id")));
+                    default -> false;
+                };
+                if (!member) throw new StrictJson.Malformed();
+            }
+        } catch (StrictJson.Malformed invalid) {
+            throw new ExclusionException(ExclusionFailure.RECEIPT_MISMATCH);
+        }
+        return commit(request, () -> {
+            Set<Target> current = repository.excluded(request.graphVersionId());
+            List<Target> added = request.targets().stream().filter(t -> !current.contains(t)).toList();
+            List<Target> kept = request.targets().stream().filter(current::contains).toList();
+            return write("exclude", "legacy-operator", request.receiptSha256(), request, Map.of(request.graphVersionId(), added),
+                    List.of(new VersionChange(request.graphVersionId(), null, !request.targets().isEmpty(),
+                            byKind(added), byKind(kept))));
+        });
+    }
+
+    private ExclusionResult publicationExclude(ExclusionRequest.PublicationExclude request) {
+        Optional<ExclusionResult> recorded = recorded(request);
+        if (recorded.isPresent()) return recorded.get();
+        var publication = publications.read(request.graphVersionId());
+        if (!publication.composed() || !publication.receipt().sha256().equals(request.receiptSha256()))
+            throw new ExclusionException(ExclusionFailure.RECEIPT_MISMATCH);
+        Map<String, Set<Target>> owners = new java.util.TreeMap<>();
+        for (Target target : request.targets()) {
+            boolean resolved = false;
+            for (var source : publication.contributions()) {
+                List<Target> original = switch (target.kind()) {
+                    case "issue" -> {
+                        var issue = publication.issueSources().get(target.id());
+                        yield issue == null ? List.of() : issue.members().stream()
+                                .filter(r -> r.sourceVersionId().equals(source.sourceVersionId()))
+                                .map(r -> new Target("issue", r.issueId(), "")).toList();
+                    }
+                    case "relation" -> {
+                        var relation = publication.relationSources().get(target.id());
+                        yield relation == null ? List.of() : relation.sources().stream()
+                                .filter(r -> r.sourceVersionId().equals(source.sourceVersionId()))
+                                .map(r -> new Target("relation", r.relationId(), "")).toList();
+                    }
+                    case "evidence" -> source.projection().evidence().stream().anyMatch(e -> e.evidenceId().equals(target.id())) ? List.of(target) : List.of();
+                    case "article" -> source.projection().articles().stream().anyMatch(a -> a.articleId().equals(target.id())
+                            && a.version().equals(target.articleVersion())) ? List.of(target) : List.of();
+                    default -> throw new ExclusionException(ExclusionFailure.REQUEST_INVALID);
+                };
+                if (!original.isEmpty()) {
+                    resolved = true;
+                    owners.computeIfAbsent(source.sourceVersionId(), ignored -> new java.util.LinkedHashSet<>()).addAll(original);
+                }
+            }
+            if (!resolved) throw new ExclusionException(ExclusionFailure.RECEIPT_MISMATCH);
+        }
+        return commit(request, () -> {
+            List<VersionChange> changes = new ArrayList<>(); Map<String, List<Target>> fresh = new LinkedHashMap<>();
+            for (var entry : owners.entrySet()) {
+                Set<Target> current = repository.excluded(entry.getKey());
+                List<Target> added = entry.getValue().stream().filter(t -> !current.contains(t)).toList();
+                List<Target> kept = entry.getValue().stream().filter(current::contains).toList();
+                fresh.put(entry.getKey(), added);
+                changes.add(new VersionChange(entry.getKey(), publication.source(entry.getKey()).sourceId(), true, byKind(added), byKind(kept)));
+            }
+            return write("exclude", "publication-operator", request.receiptSha256(), request, fresh, changes);
+        });
+    }
+
     private ExclusionResult query(Query request) {
-        // The versions and their receipts, read once (no AI call yet). By default an imported version of another bundle schema is
-        // left out: the AI service cannot map it and would refuse the whole selection. Named explicitly, it is refused.
         boolean byDefault = request.graphVersionIds().isEmpty();
         Map<String, Obj> receipts = new LinkedHashMap<>();
         for (String versionId : byDefault ? repository.exposureTargets() : request.graphVersionIds()) {
-            if (!"snapshot".equals(repository.versionKind(versionId).orElse(null))) {
+            if (!"snapshot".equals(repository.versionKind(versionId).orElse(null)))
                 throw new ExclusionException(ExclusionFailure.VERSION_UNKNOWN);
+            Obj selected = receipt(versionId);
+            if (com.zoop.graph.publication.GraphPublicationReader.RECEIPT_SCHEMA.equals(selected.string("schemaVersion"))) {
+                var publication = publications.read(versionId);
+                for (var source : publication.contributions()) {
+                    if (!"native".equals(source.sourceKind())) throw new ExclusionException(ExclusionFailure.VERSIONS_INVALID);
+                    Obj original = receipt(source.sourceVersionId());
+                    if (!BUNDLE_SCHEMA.equals(bundleSchema(original)) && !"zoop-graph-handoff-bundle-9".equals(bundleSchema(original)))
+                        throw new ExclusionException(ExclusionFailure.VERSIONS_INVALID);
+                    receipts.put(source.sourceVersionId(), original);
+                }
+            } else {
+                if (!BUNDLE_SCHEMA.equals(bundleSchema(selected)) && !"zoop-graph-handoff-bundle-9".equals(bundleSchema(selected)))
+                    throw new ExclusionException(ExclusionFailure.VERSIONS_INVALID);
+                receipts.put(versionId, selected);
             }
-            Obj receipt = receipt(versionId);
-            if (!BUNDLE_SCHEMA.equals(bundleSchema(receipt))) {
-                if (byDefault) continue;
-                throw new ExclusionException(ExclusionFailure.VERSIONS_INVALID);
-            }
-            receipts.put(versionId, receipt);
-            // One more than a query can select is already refused: stop before reading any further receipt.
-            if (receipts.size() > HandoffExposureClient.MAX_HANDOFFS) throw new ExclusionException(ExclusionFailure.VERSIONS_INVALID);
+            if (receipts.size() > HandoffExposureClient.MAX_HANDOFFS)
+                throw new ExclusionException(ExclusionFailure.EXPOSURE_BATCH_REQUIRED);
         }
         if (receipts.isEmpty()) {
             throw new ExclusionException(ExclusionFailure.VERSIONS_INVALID);
@@ -223,6 +319,9 @@ public final class DisclosureExclusionService {
         if (repository.versionKind(request.graphVersionId()).isEmpty()) {
             throw new ExclusionException(ExclusionFailure.VERSION_UNKNOWN);
         }
+        if ("snapshot".equals(repository.versionKind(request.graphVersionId()).orElse(null))
+                && com.zoop.graph.publication.GraphPublicationReader.RECEIPT_SCHEMA.equals(receipt(request.graphVersionId()).string("schemaVersion")))
+            throw new ExclusionException(ExclusionFailure.VERSIONS_INVALID);
         return commit(request, () -> {
             if (request.expectedRevision() > repository.revision()) throw new ExclusionException(ExclusionFailure.REVISION_STALE);
             // The versions this lift covers are resolved under the lock: the named one and, with laterVersions, every imported
@@ -302,6 +401,7 @@ public final class DisclosureExclusionService {
     private static void verifyReceipt(Handoff handoff, Obj receipt) {
         try {
             if (!handoff.handoffId().equals(receipt.string("handoffId"))
+                    || !handoff.bundleSchema().equals(receipt.object("bundle").string("schemaVersion"))
                     || !handoff.manifestDigest().equals(receipt.string("manifestDigest"))
                     || !handoff.bundleDigest().equals(receipt.string("bundleDigest"))
                     || !handoff.contentDigest().equals(receipt.string("contentDigest"))) {

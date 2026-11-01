@@ -361,6 +361,68 @@ public final class ArtifactFileStore {
             return readVerified(root, rootOwner, uri, sha256, bytes);
         }
 
+        /**
+         * Checks predictable put refusals without content mutation or durability barriers.
+         * True means an identical secure final file exists; hold the session through all preflights and writes.
+         */
+        public boolean preflight(String uri, String sha256, long bytes) {
+            if (uri == null || !uri.startsWith(URI_SCHEME) || sha256 == null || !SHA256.matcher(sha256).matches()
+                    || bytes < 0 || bytes > MAX_READ_BYTES) {
+                throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "uri");
+            }
+            String relative = uri.substring(URI_SCHEME.length());
+            int slash = relative.indexOf('/');
+            if (slash <= 0 || relative.indexOf('/', slash + 1) >= 0) {
+                throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "uri");
+            }
+            String directory = relative.substring(0, slash);
+            String fileName = relative.substring(slash + 1);
+            if (!DIRECTORY.matcher(directory).matches() || !FILE_NAME.matcher(fileName).matches()) {
+                throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "name");
+            }
+            try {
+                PosixFileAttributes rootAttributes = requireRoot(root, rootOwner);
+                Path folder = root.resolve(directory);
+                PosixFileAttributes folderAttributes;
+                try {
+                    folderAttributes = Files.readAttributes(folder, PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                } catch (NoSuchFileException absent) {
+                    if (!rootAttributes.permissions().contains(PosixFilePermission.OWNER_WRITE)
+                            || !rootAttributes.permissions().contains(PosixFilePermission.OWNER_EXECUTE)
+                            || !Files.isWritable(root) || !Files.isExecutable(root)) {
+                        throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "root");
+                    }
+                    return false;
+                }
+                if (!folderAttributes.isDirectory() || !OWNER_DIRECTORY.equals(folderAttributes.permissions())
+                        || !rootOwner.equals(folderAttributes.owner())) {
+                    throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "directory");
+                }
+                try {
+                    Files.readAttributes(folder.resolve(fileName), PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                    read(uri, sha256, bytes);
+                    return true;
+                } catch (NoSuchFileException absent) {
+                    // put scans stale names only when the final file is absent.
+                }
+                try (DirectoryStream<Path> stale = Files.newDirectoryStream(folder, "." + fileName + ".*.tmp")) {
+                    for (Path candidate : stale) {
+                        PosixFileAttributes attributes = Files.readAttributes(candidate, PosixFileAttributes.class,
+                                LinkOption.NOFOLLOW_LINKS);
+                        if (attributes.isRegularFile() && (!OWNER_FILE.equals(attributes.permissions())
+                                || !rootOwner.equals(attributes.owner()))) {
+                            throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "temporary");
+                        }
+                    }
+                }
+                return false;
+            } catch (ArtifactStoreException error) {
+                throw error;
+            } catch (IOException | UnsupportedOperationException | SecurityException error) {
+                throw unavailable(error);
+            }
+        }
+
         @Override
         public void close() {
             try {

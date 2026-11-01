@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import ErrorNotice from '@/components/common/ErrorNotice';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import OnboardingStep from '@/components/onboarding/OnboardingStep';
 import {
   connectPortfolio,
@@ -25,7 +26,7 @@ const MOCK_NOTICE = '실제 증권 계좌가 아닌 준비된 모의 데이터�
 const primaryButton =
   'w-full rounded-xl bg-gray-950 px-4 py-3 font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300';
 const secondaryButton =
-  'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 font-semibold text-gray-950 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300';
+  'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 font-semibold text-zoop-ink hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300';
 
 const iconProps = {
   'aria-hidden': true,
@@ -63,7 +64,7 @@ function CheckIcon() {
 
 function MockNotice() {
   return (
-    <p className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
+    <p className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-body text-zoop-ink">
       {MOCK_NOTICE}
     </p>
   );
@@ -165,14 +166,15 @@ export default function PortfolioConnect({
         >
           <h2
             id="portfolio-connected-holdings"
-            className="mb-3 text-lg font-semibold"
+            className="mb-3 text-title-sm font-semibold"
           >
             {label} 보유 종목
           </h2>
           {portfolio.status === 'loading' && (
-            <p role="status" className="text-sm text-gray-500">
-              보유 종목을 불러오고 있어요
-            </p>
+            <LoadingIndicator
+              label="보유 종목을 불러오고 있어요"
+              className="flex min-h-8 w-full text-body"
+            />
           )}
           {portfolio.status === 'error' && (
             <ErrorNotice
@@ -182,7 +184,7 @@ export default function PortfolioConnect({
             />
           )}
           {portfolio.status === 'success' && holdings.length === 0 && (
-            <p className="text-sm text-gray-500">
+            <p className="text-body text-zoop-ink">
               이 계좌에는 보유 종목이 없어요.
             </p>
           )}
@@ -190,8 +192,8 @@ export default function PortfolioConnect({
             <ul className="divide-y divide-gray-100">
               {holdings.map((holding) => (
                 <li key={holding.companyId} className="py-3">
-                  <p className="font-medium text-gray-950">{holding.name}</p>
-                  <p className="text-sm text-gray-500 tabular-nums">
+                  <p className="font-medium text-zoop-ink">{holding.name}</p>
+                  <p className="text-body text-zoop-ink tabular-nums">
                     {[
                       holding.ticker,
                       formatQuantity(holding.quantity),
@@ -257,15 +259,16 @@ export default function PortfolioConnect({
       >
         <h2
           id="portfolio-connect-options"
-          className="flex items-center gap-2 font-semibold text-gray-950"
+          className="flex items-center gap-2 font-semibold text-zoop-ink"
         >
           {/* <BankIcon className="size-5 shrink-0" /> */}
           가상 계좌 선택
         </h2>
         {(options.status === 'loading' || portfolio.status === 'loading') && (
-          <p role="status" className="text-sm text-gray-500">
-            가상 계좌를 불러오고 있어요
-          </p>
+          <LoadingIndicator
+            label="가상 계좌를 불러오고 있어요"
+            className="flex min-h-8 w-full text-body"
+          />
         )}
         {portfolio.status === 'error' && (
           <ErrorNotice
@@ -281,7 +284,7 @@ export default function PortfolioConnect({
           />
         )}
         {options.status === 'success' && items.length === 0 && (
-          <p className="text-sm text-gray-500">
+          <p className="text-body text-zoop-ink">
             지금은 연결할 수 있는 가상 계좌가 없어요.
           </p>
         )}
@@ -300,12 +303,12 @@ export default function PortfolioConnect({
                       : 'border-gray-200 bg-white hover:bg-gray-50'
                   }`}
                 >
-                  <BankIcon className="size-6 shrink-0 text-gray-700" />
+                  <BankIcon className="size-6 shrink-0 text-zoop-ink" />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="font-semibold text-gray-950">
+                    <span className="font-semibold text-zoop-ink">
                       {item.label}
                     </span>
-                    <span className="text-sm text-gray-500 tabular-nums">
+                    <span className="text-body text-zoop-ink tabular-nums">
                       보유 종목 {item.holdingsCount}개
                     </span>
                   </span>
@@ -325,16 +328,17 @@ export default function PortfolioConnect({
             <div>
               <h2
                 id="portfolio-preview-heading"
-                className="font-semibold text-gray-950"
+                className="font-semibold text-zoop-ink"
               >
                 {items.find((item) => item.id === selectedId)?.label}
               </h2>
             </div>
           </div>
           {preview.status === 'loading' && (
-            <p role="status" className="text-sm text-gray-500">
-              종목과 비중을 불러오고 있어요
-            </p>
+            <LoadingIndicator
+              label="종목과 비중을 불러오고 있어요"
+              className="flex min-h-8 w-full text-body"
+            />
           )}
           {preview.status === 'error' && (
             <ErrorNotice
@@ -345,16 +349,16 @@ export default function PortfolioConnect({
           )}
           {preview.status === 'success' && preview.data && (
             <>
-              <dl className="mb-3 grid grid-cols-2 gap-2 rounded-lg bg-gray-50 p-3 text-sm">
+              <dl className="mb-3 grid grid-cols-2 gap-2 rounded-lg bg-gray-50 p-3 text-body">
                 <div>
-                  <dt className="text-xs text-gray-500">계좌 종류</dt>
-                  <dd className="mt-1 font-medium text-gray-900">
+                  <dt className="text-caption text-zoop-ink">계좌 종류</dt>
+                  <dd className="mt-1 font-medium text-zoop-ink">
                     모의 주식 계좌
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-gray-500">예수금</dt>
-                  <dd className="mt-1 font-medium text-gray-900">
+                  <dt className="text-caption text-zoop-ink">예수금</dt>
+                  <dd className="mt-1 font-medium text-zoop-ink">
                     {preview.data.cash
                       ? formatMoney(
                           preview.data.cash.amount,
@@ -364,8 +368,8 @@ export default function PortfolioConnect({
                   </dd>
                 </div>
                 <div className="col-span-2">
-                  <dt className="text-xs text-gray-500">평가 기준</dt>
-                  <dd className="mt-1 text-gray-700">
+                  <dt className="text-caption text-zoop-ink">평가 기준</dt>
+                  <dd className="mt-1 text-zoop-ink">
                     {preview.data.valuation.currency
                       ? `${preview.data.valuation.currency} · `
                       : ''}
@@ -374,7 +378,7 @@ export default function PortfolioConnect({
                 </div>
               </dl>
               {preview.data.holdings.length === 0 ? (
-                <p className="text-sm text-gray-500">보유 종목이 없어요.</p>
+                <p className="text-body text-zoop-ink">보유 종목이 없어요.</p>
               ) : (
                 <ul
                   aria-label="미리보기 보유 종목"
@@ -386,17 +390,17 @@ export default function PortfolioConnect({
                       className="flex items-center justify-between gap-3 py-3"
                     >
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-gray-950">
+                        <p className="truncate font-medium text-zoop-ink">
                           {holding.name}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-caption text-zoop-ink">
                           {[holding.ticker, formatQuantity(holding.quantity)]
                             .filter(Boolean)
                             .join(' · ')}
                         </p>
                       </div>
-                      <div className="shrink-0 text-right text-sm">
-                        <p className="font-medium text-gray-900">
+                      <div className="shrink-0 text-right text-body">
+                        <p className="font-medium text-zoop-ink">
                           {holding.marketValue !== null &&
                           holding.quote.status === 'available'
                             ? formatMoney(
@@ -405,7 +409,7 @@ export default function PortfolioConnect({
                               )
                             : '평가 금액 미제공'}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-caption text-zoop-ink">
                           {formatWeight(holding.weight)}
                         </p>
                       </div>
@@ -414,7 +418,7 @@ export default function PortfolioConnect({
                 </ul>
               )}
               {preview.data.valuation.weightUnavailableReason && (
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-2 text-caption text-zoop-ink">
                   비중을 계산할 수 없어요:{' '}
                   {preview.data.valuation.weightUnavailableReason}
                 </p>

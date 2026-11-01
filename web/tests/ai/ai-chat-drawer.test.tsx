@@ -14,6 +14,7 @@ import AiChatDrawer from '@/components/ai/AiChatDrawer';
 import { contextFromTarget } from '@/hooks/use-chat-conversation';
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import type { ChatJob, ChatResult } from '@/types/ai';
 import type { Session } from '@/types/auth';
 import type { GraphTarget } from '@/types/map';
@@ -511,6 +512,7 @@ describe('D-AI-01b · clarification', () => {
     outcome: 'clarification',
     result: result({
       outcome: 'clarification',
+      answerStatus: 'guidance',
       reason: '어느 기업인지 골라 주세요.',
       choices: [
         { id: 'c-opaque-1', label: '삼성전자', kind: 'company' },
@@ -538,7 +540,13 @@ describe('D-AI-01b · clarification', () => {
       );
     });
     const { user } = await open();
-    await screen.findByText('어느 기업인지 골라 주세요.');
+    const card = await screen.findByRole('article', {
+      name: '그 기업은 언제?',
+    });
+    expect(within(card).getByLabelText('답변 상태: 안내').textContent).toBe(
+      '안내',
+    );
+    await within(card).findByText('어느 기업인지 골라 주세요.');
     await user.click(screen.getByRole('button', { name: 'SK하이닉스' }));
     await screen.findByText('확인 질문 “그 기업은 언제?”에 대한 답');
     const body = server.calls('POST', JOBS)[0].body as Record<string, unknown>;
@@ -634,6 +642,9 @@ describe('D-AI-02 · job states and stored results', () => {
     const card = await screen.findByRole('article', {
       name: 'HBM이 뭐고 SK하이닉스 최근 HBM 뉴스는?',
     });
+    expect(
+      within(card).getByLabelText('답변 상태: 일부 답변').textContent,
+    ).toBe('일부 답변');
     expect(within(card).getByText('일반 개념 + 근거 확인됨')).toBeTruthy();
     expect(
       within(card).getByRole('region', { name: '일반 개념 구간' }),
@@ -684,6 +695,8 @@ describe('D-AI-02 · job states and stored results', () => {
       edition: null,
       graphVersion: null,
       asOf: null,
+      edgeId: null,
+      evidenceIds: null,
     };
     const offered = job({
       result: result({
@@ -716,6 +729,20 @@ describe('D-AI-02 · job states and stored results', () => {
               toId: 'KRX:000660',
               graphVersion: 'gv-1',
             },
+          },
+          {
+            actionId: 'action-5',
+            kind: 'focus_relation',
+            label: '관계 보기 · NVIDIA – SK하이닉스',
+            requirementIds: ['r1'],
+            target: { ...target, edgeId: 'edge-1', graphVersion: 'gv-1' },
+          },
+          {
+            actionId: 'action-6',
+            kind: 'open_watchlist',
+            label: '내 종목 보기',
+            requirementIds: ['r1'],
+            target,
           },
           {
             actionId: 'action-4',
@@ -754,6 +781,63 @@ describe('D-AI-02 · job states and stored results', () => {
       asOf: null,
     });
     expect(screen.getByText(/지금 지도에서 열 수 없어요/)).toBeTruthy();
+
+    expect(
+      screen.getByRole('link', { name: '내 종목 보기' }).getAttribute('href'),
+    ).toBe('/my');
+    onViewOnMap.mockReturnValueOnce(true);
+    await user.click(
+      screen.getByRole('button', { name: '관계 보기 · NVIDIA – SK하이닉스' }),
+    );
+    expect(onViewOnMap).toHaveBeenLastCalledWith({
+      id: 'edge-1',
+      kind: 'edge',
+      graphVersion: 'gv-1',
+      asOf: null,
+    });
+  });
+
+  it('opens the articles an answer cited in the evidence window, only on the map', async () => {
+    useGraphUiStore.setState({ evidenceTarget: null });
+    const offered = job({
+      result: result({
+        sections: [
+          { basis: 'evidence_grounded', text: '본문', evidenceIds: [] },
+        ],
+        uiActions: [
+          {
+            actionId: 'action-1',
+            kind: 'open_evidence',
+            label: '근거 보기 · 2건',
+            requirementIds: ['r1'],
+            target: {
+              companyId: null,
+              fromId: null,
+              toId: null,
+              date: null,
+              edition: null,
+              graphVersion: 'gv-1',
+              asOf: null,
+              edgeId: null,
+              evidenceIds: ['ev-1', 'ev-2'],
+            },
+          },
+        ],
+      }),
+    });
+    server.on('GET', CURRENT, () => json(conversation([offered])));
+    const { user } = await open();
+
+    await user.click(
+      await screen.findByRole('button', { name: '근거 보기 · 2건' }),
+    );
+
+    expect(useGraphUiStore.getState().evidenceTarget).toMatchObject({
+      evidenceIds: ['ev-1', 'ev-2'],
+      mapContext: { graphVersion: 'gv-1' },
+    });
+    expect(useAiChatStore.getState().isOpen).toBe(false);
+    useGraphUiStore.setState({ evidenceTarget: null });
   });
 
   it('shows a company profile citation with its catalog title and publisher and links only a safe homepage', async () => {
@@ -915,6 +999,9 @@ describe('D-AI-02 · job states and stored results', () => {
     const card = await screen.findByRole('article', {
       name: '내 종목 중에 NVIDIA와 연결된 게 있어?',
     });
+    expect(
+      within(card).getByLabelText('답변 상태: 답변 완료').textContent,
+    ).toBe('답변 완료');
     const notices = within(card).getByRole('region', { name: '안내' });
     expect(notices.textContent).toContain('기본 조회 방식으로 답했어요');
     expect(notices.textContent).toContain('NVIDIA 최근 소식: 웹 검색을');

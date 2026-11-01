@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { ApiError } from '@/apis/auth/ApiService';
 import { setFeedback } from '@/apis/feedback/feedback';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import type {
   FeedbackFeature,
   FeedbackItem,
@@ -11,7 +12,7 @@ import type {
 
 const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink';
-const TOGGLE = `inline-flex h-8 items-center gap-1 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-[11px] font-semibold text-zoop-muted hover:bg-zoop-wash aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper disabled:opacity-60 ${FOCUS_RING}`;
+const TOGGLE = `inline-flex h-8 items-center gap-1 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-caption font-semibold text-zoop-muted hover:bg-zoop-wash aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper disabled:opacity-60 ${FOCUS_RING}`;
 
 type Props = {
   feature: FeedbackFeature;
@@ -40,13 +41,14 @@ export default function FeedbackButtons(props: Props) {
   const revision = useAuthStore((s) => s.sessionRevision);
   if (checking)
     return (
-      <p role="status" className="text-[11px] text-zoop-muted">
-        로그인 상태를 확인하고 있어요.
-      </p>
+      <LoadingIndicator
+        label="로그인 상태를 확인하고 있어요."
+        className="flex min-h-8 w-full text-caption text-zoop-muted"
+      />
     );
   if (!memberId)
     return (
-      <p className="flex flex-wrap items-center gap-x-2 text-[11px] text-zoop-muted">
+      <p className="flex flex-wrap items-center gap-x-2 text-caption text-zoop-muted">
         <span>평가는 로그인한 회원만 남길 수 있어요.</span>
         <Link
           to="/login"
@@ -169,10 +171,6 @@ function MemberFeedback({
       >
         {toggle('up', '도움이 됐어요')}
         {toggle('down', '도움이 안 됐어요')}
-        <span role="status" className="text-[11px] text-zoop-muted">
-          {current === 'up' && '도움이 됐다고 남겼어요'}
-          {current === 'down' && '도움이 안 됐다고 남겼어요'}
-        </span>
       </div>
       {reasonOpen && current === 'down' && (
         <form
@@ -189,7 +187,7 @@ function MemberFeedback({
             maxLength={200}
             placeholder="어떤 점이 아쉬웠나요? (선택)"
             onChange={(event) => setReason(event.target.value)}
-            className={`h-8 min-w-0 flex-1 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-[11px] text-zoop-ink ${FOCUS_RING}`}
+            className={`h-8 min-w-0 flex-1 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-caption text-zoop-ink ${FOCUS_RING}`}
           />
           <button
             type="submit"
@@ -203,7 +201,7 @@ function MemberFeedback({
       {failed && (
         <p
           role="alert"
-          className="flex flex-wrap items-center gap-2 text-[11px] text-zoop-alert"
+          className="flex flex-wrap items-center gap-2 text-caption text-zoop-alert"
         >
           {failed.error instanceof ApiError && failed.error.status === 409
             ? '결과가 바뀌어 평가를 저장하지 않았어요. 화면을 새로 고친 뒤 다시 평가해 주세요.'

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getBriefing, getBriefingGraphBasis } from '@/apis/briefing/briefing';
 import BriefingItemDetails from '@/components/briefing/BriefingItemDetails';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { useAsyncData } from '@/hooks/useAsyncData';
 
 /** D-BRF-04: keep the issue text/citations bound to its original publication, even when the map was reconstructed. */
@@ -51,9 +52,10 @@ export default function BriefingRoundIssuePanel({
       </header>
       <div className={ui.scroll}>
         {result.status === 'loading' && (
-          <p className={ui.state} role="status">
-            발행본을 확인하고 있어요.
-          </p>
+          <LoadingIndicator
+            label="발행본을 확인하고 있어요."
+            className={`${ui.state} flex min-h-12 w-full`}
+          />
         )}
         {result.status === 'error' && (
           <div className={ui.state} role="alert">

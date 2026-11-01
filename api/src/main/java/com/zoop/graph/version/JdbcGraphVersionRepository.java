@@ -168,12 +168,15 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
      */
     @Transactional
     public Activation activateByAdmin(String versionId, String expectedActiveVersionId, String adminId,
-            String adminEmail, String reason, Supplier<Consumer<Instant>> publishable) {
+            String adminEmail, String reason, String mode, Supplier<Consumer<Instant>> publishable) {
         jdbc.getJdbcTemplate().execute("SELECT pg_advisory_xact_lock(" + PUBLICATION_LOCK + ")");
-        if (find(versionId).isEmpty()) throw new IllegalArgumentException("Unknown graph version " + versionId);
-        if (!Objects.equals(expectedActiveVersionId, active().map(GraphVersionRecord::id).orElse(null))) {
+        GraphVersionRecord target = find(versionId)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown graph version " + versionId));
+        Optional<GraphVersionRecord> current = active();
+        if (!Objects.equals(expectedActiveVersionId, current.map(GraphVersionRecord::id).orElse(null))) {
             throw new CustomException(ErrorCode.REVISION_CONFLICT);
         }
+        requireActivationMode(target, current, mode);
         return activateChecked(versionId, adminId, adminEmail, reason, publishable);
     }
 
@@ -186,15 +189,46 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
                 """, new MapSqlParameterSource(), String.class));
     }
 
+    private void requireActivationMode(GraphVersionRecord target, Optional<GraphVersionRecord> current, String mode) {
+        if ("rollback".equals(mode)) {
+            if (!everActivated(target.id())) throw new CustomException(ErrorCode.INVALID_REQUEST);
+            return;
+        }
+        if (!"forward".equals(mode)) throw new CustomException(ErrorCode.INVALID_REQUEST);
+        String currentId = current.map(GraphVersionRecord::id).orElse(null);
+        if (target.id().equals(currentId)) return;
+        if (!"fixture".equals(target.kind()) && everActivated(target.id())) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        Optional<PublicationBasis> basis = first(jdbc.query("""
+                SELECT base_version_id, expected_active_version_id FROM graph_publications WHERE version_id = :id
+                """, new MapSqlParameterSource("id", target.id()), (rs, row) ->
+                new PublicationBasis(rs.getString("base_version_id"), rs.getString("expected_active_version_id"))));
+        boolean realBase = current.filter(version -> !"fixture".equals(version.kind())).isPresent();
+        if (basis.isEmpty()) {
+            if (realBase) throw new CustomException(ErrorCode.REVISION_CONFLICT);
+            return;
+        }
+        PublicationBasis candidate = basis.get();
+        if (!Objects.equals(candidate.expectedActiveVersionId(), currentId)
+                || !Objects.equals(candidate.baseVersionId(), realBase ? currentId : null)) {
+            throw new CustomException(ErrorCode.REVISION_CONFLICT);
+        }
+    }
+
+    private record PublicationBasis(String baseVersionId, String expectedActiveVersionId) { }
+
     /**
-     * The newest imported version that was imported at or after {@code since}, was never the public pointer and comes after the
-     * active version (FS059: an older import never replaces a newer public version). Imports are ordered by {@code sequence},
-     * the import order. When the last pointer change was an administrator's, only versions imported after it count: an admin
-     * rollback is never undone by an import that was already waiting, only by the next one.
+     * The newest automatically eligible original native version imported at or after {@code since}, while the current pointer
+     * is null or a fixture. Cumulative publications and legacy inputs require explicit administrator activation.
+     * Imports staged before the last administrator pointer change remain ineligible.
      */
     public Optional<GraphVersionRecord> autoActivationCandidate(Instant since) {
         return first(jdbc.query(SELECT + """
                 WHERE v.kind = 'snapshot' AND v.created_at >= :since
+                  AND COALESCE(v.source_label, '') NOT LIKE 'legacy-real:%'
+                  AND NOT EXISTS (SELECT 1 FROM graph_publications p WHERE p.version_id = v.id)
+                  AND NOT EXISTS (SELECT 1 FROM graph_versions c WHERE c.active AND c.kind <> 'fixture')
                   AND NOT EXISTS (SELECT 1 FROM graph_activations g WHERE g.version_id = v.id AND g.pointer_changed)
                   AND v.sequence > COALESCE((SELECT c.sequence FROM graph_versions c WHERE c.active), 0)
                   AND NOT EXISTS (

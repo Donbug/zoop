@@ -73,6 +73,80 @@ class HandoffBundleVerifierTest {
     }
 
     @Test
+    void bundle9ExplicitUnknownKeepsSourceFactsAndRequiresProvenStructuralApplicability() {
+        var built = HandoffFixtures.build(HandoffFixtures.Spec.standard().withEvent(null, "unknown").withValidity(null, null));
+        ObjectNode envelope = built.envelope().deepCopy();
+        ObjectNode bundle = (ObjectNode) envelope.get("bundle"), manifest = (ObjectNode) envelope.get("manifest");
+        bundle.put("schemaVersion", "zoop-graph-handoff-bundle-9");
+        manifest.put("policyVersion", "zoop-public-projection-policy-3");
+        ObjectNode policy = (ObjectNode) bundle.get("policy");
+        policy.put("version", "zoop-public-projection-policy-3"); policy.put("geography", "operator-field-verdict-or-explicit-unknown");
+        ObjectNode issue = (ObjectNode) bundle.get("issues").get(0), geo = (ObjectNode) issue.get("geography");
+        var removed = new java.util.HashSet<>(StrictJson.Obj.of(geo).strings("evidenceIds"));
+        geo.putNull("value"); geo.put("policyVersion", "zoop-public-projection-policy-3"); geo.put("verification", "not-established");
+        geo.put("reasonCode", "not-supported"); geo.putArray("countries"); geo.putArray("evidenceIds");
+        ArrayNode ids = (ArrayNode) issue.get("evidenceIds");
+        for (int n = ids.size() - 1; n >= 0; n--) if (removed.contains(ids.get(n).asString())) ids.remove(n);
+        ArrayNode evidence = (ArrayNode) bundle.get("evidence");
+        for (int n = evidence.size() - 1; n >= 0; n--) if (removed.contains(evidence.get(n).get("id").asString())) evidence.remove(n);
+        ((ObjectNode) bundle.get("counts")).put("evidence", evidence.size());
+        ObjectNode basis = null;
+        for (JsonNode relation : bundle.get("relations")) if ("STRUCTURALLY_RELATED_TO".equals(relation.get("type").asString())) {
+            basis = (ObjectNode) relation.get("basis").get(0); basis.putArray("countries");
+        }
+        String manifestDigest = Canonical.digest(manifest);
+        bundle.put("manifestDigest", manifestDigest);
+        ((ObjectNode) bundle.get("digests")).put("content", HandoffBundleVerifier.contentDigest(bundle));
+        ObjectNode receipt = (ObjectNode) envelope.get("receipt");
+        receipt.put("manifestDigest", manifestDigest); receipt.put("bundleSchema", "zoop-graph-handoff-bundle-9");
+        receipt.put("bundleDigest", Canonical.digest(bundle)); receipt.put("contentDigest", HandoffBundleVerifier.contentDigest(bundle));
+        receipt.put("bundleBytes", Canonical.bytes(bundle).length); receipt.set("counts", bundle.get("counts"));
+        byte[] bytes = Canonical.bytes(envelope);
+        var verified = new HandoffExportParser().parse(bytes, pinning(bytes));
+        var snapshot = com.zoop.graph.snapshot.GraphSnapshotCodec.read(
+                HandoffSnapshotWriter.snapshot(HandoffSnapshotWriter.versionId(verified.bundle().handoffId()), verified),
+                HandoffSnapshotWriter.versionId(verified.bundle().handoffId()));
+        assertEquals(4, snapshot.snapshotFormat());
+        assertTrue(snapshot.issues().getFirst().hasExplicitUnknownGeography());
+        assertEquals(List.of("KR"), StrictJson.Obj.of(geo).objects("basis").getFirst().strings("countries"));
+        assertNull(snapshot.issues().getFirst().eventTime());
+        assertEquals(2, snapshot.relations().size());
+        basis.putArray("countries").add("KR");
+        ((ObjectNode) bundle.get("digests")).put("content", HandoffBundleVerifier.contentDigest(bundle));
+        assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(bundle));
+        basis.putArray("countries"); basis.put("validFrom", "2026-01-01");
+        ((ObjectNode) bundle.get("digests")).put("content", HandoffBundleVerifier.contentDigest(bundle));
+        assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(bundle));
+        basis.putNull("validFrom"); geo.put("value", "domestic");
+        ((ObjectNode) bundle.get("digests")).put("content", HandoffBundleVerifier.contentDigest(bundle));
+        assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(bundle));
+    }
+
+    @Test
+    void sourcePoliciesKeepHistoricalBytesAndRequireTheExactCurrentCountryPin() throws Exception {
+        ObjectNode historical = (ObjectNode) HandoffFixtures.parse(resource("export-valid.json")).get("bundle");
+        String before = historical.toString();
+        HandoffBundleVerifier.verify(historical);
+        assertEquals(before, historical.toString());
+        ObjectNode current = historical.deepCopy();
+        for (JsonNode source : current.get("sources").values()) {
+            ObjectNode policies = (ObjectNode) source.get("policies");
+            policies.put("policy", "zoop-relation-policy-2");
+            policies.put("countryContext", "zoop-country-context-1");
+        }
+        HandoffBundleVerifier.verify(current);
+        for (Consumer<ObjectNode> change : List.<Consumer<ObjectNode>>of(
+                p -> p.remove("countryContext"), p -> p.put("countryContext", "zoop-country-context-2"),
+                p -> p.putNull("countryContext"), p -> p.put("countryContext", ""),
+                p -> p.put("policy", "zoop-relation-policy-1"), p -> p.put("policy", "zoop-relation-policy-3"),
+                p -> p.put("unrecognized", "pin"))) {
+            ObjectNode broken = current.deepCopy();
+            change.accept((ObjectNode) broken.get("sources").get(0).get("policies"));
+            assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(broken));
+        }
+    }
+
+    @Test
     void aRealProducerExportCarriesTheHandWrittenFieldProvenanceAndAnyEditOfItIsRefused() throws Exception {
         // expected-field-provenance.json is written by hand in graph_handoff_smoke.py (never derived from the planner): per export file,
         // per issue id, the field provenance the authored world implies.
@@ -153,7 +227,7 @@ class HandoffBundleVerifierTest {
             byte[] export = resource(name);
             HandoffBundle verified = new HandoffExportParser().parse(export, pinning(export)).bundle();
             JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
-            assertEquals("zoop-graph-handoff-bundle-7", bundle.get("schemaVersion").stringValue(), name);
+            assertEquals("zoop-graph-handoff-bundle-8", bundle.get("schemaVersion").stringValue(), name);
             assertEquals(headlines.get(name).size(), bundle.get("issues").size(), name);
             for (JsonNode issue : bundle.get("issues")) {
                 String id = issue.get("id").stringValue();
@@ -333,7 +407,7 @@ class HandoffBundleVerifierTest {
         assertRefused("the schema version before field verdicts", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-3"));
         assertRefused("the schema version before structural paths", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-4"));
         assertRefused("the schema version before impacts", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-5"));
-        assertRefused("wrong policy version", b -> ((ObjectNode) b.get("policy")).put("version", "zoop-public-projection-policy-2"));
+        assertRefused("previous policy version", b -> ((ObjectNode) b.get("policy")).put("version", "zoop-public-projection-policy-1"));
         assertRefused("live without a provider recording", b -> setMode(b, "live", "authored-test"));
         assertRefused("a provider recording of a replay", b -> setMode(b, "replay", "provider"));
         assertRefused("an unknown execution mode", b -> setMode(b, "recorded", "provider"));
@@ -2384,7 +2458,7 @@ class HandoffBundleVerifierTest {
             ((ObjectNode) earlier.get("digests")).put("content", Canonical.digest(withoutImpactsSubset(earlier)));
             HandoffBundleVerifier.verify(earlier);
         }, "the bundle-5 shape: no impacts, the five-collection digest");
-        assertRefusedFrom(BUILT, "a later schema", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-8"));
+        assertRefusedFrom(BUILT, "a later schema", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-9"));
         // A bundle-7 whose provenance says live cannot carry the replay-only technical code.
         assertRefusedFrom(LIVE, "a replay-only code in a live bundle",
                 b -> candidateRow(impactRow(b, 0), "technical-reject", "verifier_reply_invalid", true, true));
@@ -2412,7 +2486,7 @@ class HandoffBundleVerifierTest {
             byte[] export = resource(name);
             HandoffBundle verified = new HandoffExportParser().parse(export, pinning(export)).bundle();
             JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
-            assertEquals("zoop-graph-handoff-bundle-7", bundle.get("schemaVersion").stringValue(), name);
+            assertEquals("zoop-graph-handoff-bundle-8", bundle.get("schemaVersion").stringValue(), name);
             assertEquals(expected.get(name), bundle.get("impacts"), name);
             assertEquals(expected.get(name).size(), bundle.get("counts").get("impacts").intValue(), name);
             assertEquals("s3-independent-verifier-quote-effect", bundle.get("policy").get("impacts").stringValue(), name);
@@ -2949,7 +3023,7 @@ class HandoffBundleVerifierTest {
             }
             new HandoffExportParser().parse(export, pinning(export));
             JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
-            assertEquals("zoop-graph-handoff-bundle-7", bundle.get("schemaVersion").stringValue(), name);
+            assertEquals("zoop-graph-handoff-bundle-8", bundle.get("schemaVersion").stringValue(), name);
             assertEquals("zoop-issue-summary-policy-1", bundle.get("policy").get("issueSummary").stringValue(), name);
             assertEquals(want.size(), bundle.get("issues").size(), name);
             for (JsonNode issue : bundle.get("issues")) {

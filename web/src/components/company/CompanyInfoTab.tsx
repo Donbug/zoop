@@ -1,6 +1,7 @@
 import type { Resource } from '@/hooks/useCompanyResource';
 import type { Company } from '@/types/company/detail';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 
 const fields = [
   ['legalName', '정식 법인명'],
@@ -51,7 +52,10 @@ export default function CompanyInfoTab({
     >
       <h2>기업 기준정보</h2>
       {resource.loading ? (
-        <p role="status">기업 기준정보를 불러오고 있어요.</p>
+        <LoadingIndicator
+          label="기업 기준정보를 불러오고 있어요."
+          className="flex min-h-12 w-full"
+        />
       ) : resource.error ? (
         <div role="alert">
           <p>
@@ -80,7 +84,7 @@ export default function CompanyInfoTab({
           {!fields.some(([key]) => provided(company[key])) && !href && (
             <p role="status">확인된 기업 기준정보가 없습니다.</p>
           )}
-          <dl className="grid grid-cols-2 gap-x-4 text-xs max-sm:grid-cols-1">
+          <dl className="grid grid-cols-2 gap-x-4 text-caption max-sm:grid-cols-1">
             {fields.map(([key, label]) => (
               <div key={key} className="min-w-0 border-b border-zoop-line py-4">
                 <dt className="text-zoop-muted">{label}</dt>

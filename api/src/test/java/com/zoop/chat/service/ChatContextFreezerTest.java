@@ -155,8 +155,7 @@ class ChatContextFreezerTest {
     /** The public evidence read is stubbed: every id is readable except those in {@link #unreadable}; checks are recorded. */
     private ChatContextFreezer freezer(boolean versions, DisclosureExclusions exclusions) {
         var selector = new GraphVersionSelector(repository(versions), Clock.fixed(NOW, ZoneOffset.UTC));
-        var reader = new PublicGraphReader(selector,
-                new FixtureGraphSnapshotStore(ChatContextFreezerTest.class.getClassLoader()), pinned -> exclusions);
+        var reader = new PublicGraphReader(selector, new FixtureGraphSnapshotStore(ChatContextFreezerTest.class.getClassLoader()), pinned -> exclusions, null, null);
         return new ChatContextFreezer(reader, selector, (id, version, asOf, requestId) -> {
             accessChecks.add(id + "@" + version + "@" + asOf);
             return !unreadable.contains(id);

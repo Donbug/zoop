@@ -254,9 +254,29 @@ public final class ChatModels {
     }
 
     /** A requirement the agent answers, with the ids the server already resolved for it. */
-    public record AgentRequirement(String id, String label, boolean general, List<String> targets) {
+    public record AgentRequirement(String id, String label, boolean general, List<String> targets, boolean web,
+            boolean externalSource, boolean readByServer) {
         public AgentRequirement {
             targets = List.copyOf(targets);
+        }
+
+        /** A requirement that asks for no source outside ZOOP. */
+        public AgentRequirement(String id, String label, boolean general, List<String> targets, boolean web) {
+            this(id, label, general, targets, web, false, false);
+        }
+
+        /** A requirement of a run whose internal reads are still the agent's. */
+        public AgentRequirement(String id, String label, boolean general, List<String> targets, boolean web,
+                boolean externalSource) {
+            this(id, label, general, targets, web, externalSource, false);
+        }
+
+        /**
+         * A requirement the server's own reads already left unmet: its search is open from the first round. It carries no
+         * targets, so a member's companies never reach the agent; the query comes from the requirement's own words.
+         */
+        public static AgentRequirement searchOnly(String id, String label) {
+            return new AgentRequirement(id, label, false, List.of(), true, false, true);
         }
     }
 
@@ -282,11 +302,15 @@ public final class ChatModels {
         }
     }
 
-    /** A tool call Luna proposed, held by the provider until the server decides. */
-    public record ApprovalRequest(String id, String toolName, Map<String, Object> arguments) {
+    /**
+     * A tool call Luna proposed, held by the provider until the server decides. {@code requirementIds} are the requirements
+     * Luna says it serves, apart from the arguments; none when it named none validly.
+     */
+    public record ApprovalRequest(String id, String toolName, Map<String, Object> arguments, List<String> requirementIds) {
         public ApprovalRequest {
             // A model may write an explicit null; the server's argument check refuses it, so it is kept as written.
             arguments = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(arguments));
+            requirementIds = List.copyOf(requirementIds);
         }
     }
 

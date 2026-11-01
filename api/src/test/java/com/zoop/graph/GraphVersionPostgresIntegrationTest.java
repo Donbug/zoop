@@ -7,22 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zoop.ZoopApplication;
-import com.zoop.admin.auth.repository.AdminAuditRepository;
 import com.zoop.admin.auth.service.AdminPrincipal;
 import com.zoop.admin.dashboard.repository.AdminDashboardRepository;
 import com.zoop.admin.graph.AdminGraphVersionService;
 import com.zoop.admin.graph.GraphVersionActivateRequest;
-import com.zoop.admin.graph.JdbcAdminGraphVersionRepository;
-import com.zoop.document.evidence.service.EvidenceService;
-import com.zoop.graph.exclusion.DisclosureExclusionCarry;
-import com.zoop.graph.read.DisclosureExclusionReader;
-import java.time.Clock;
-import java.util.concurrent.atomic.AtomicInteger;
-import tools.jackson.databind.ObjectMapper;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
 import com.zoop.admin.graph.GraphVersionAdminResponse.GraphVersionOut;
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
 import com.zoop.auth.service.MemberSettingsService;
@@ -68,12 +56,15 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** Graph version migration, fixture registration and version pinning against the disposable company test database. */
 @Tag("graph-postgres")
 class GraphVersionPostgresIntegrationTest {
+    private static final String SCHEMA = "graph_version_" + UUID.randomUUID().toString().replace("-", "");
+    private static JdbcTemplate schemaJdbc;
     private static ConfigurableApplicationContext context;
     private static JdbcTemplate jdbc;
     private static JdbcGraphVersionRepository repository;
@@ -88,10 +79,15 @@ class GraphVersionPostgresIntegrationTest {
             throw new IllegalStateException("Set ZOOP_COMPANY_TEST_DB_URL to the dedicated localhost zoop_company_test_19 database");
         }
         String password = System.getenv().getOrDefault("ZOOP_COMPANY_TEST_DB_PASSWORD", "");
+        schemaJdbc = new JdbcTemplate(new DriverManagerDataSource(url, "company_test", password));
+        schemaJdbc.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public");
+        schemaJdbc.execute("CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public");
         context = new SpringApplicationBuilder(ZoopApplication.class)
                 .web(WebApplicationType.NONE)
-                .run("--spring.datasource.url=" + url,
+                .run("--spring.datasource.url=" + url + "?currentSchema=" + SCHEMA + ",public",
                         "--spring.datasource.username=company_test", "--spring.datasource.password=" + password,
+                        "--spring.flyway.schemas=" + SCHEMA, "--spring.flyway.default-schema=" + SCHEMA,
+                        "--spring.jpa.properties.hibernate.default_schema=" + SCHEMA,
                         "--spring.jpa.hibernate.ddl-auto=validate", "--zoop.ai.client.enabled=false",
                         "--zoop.graph.snapshot.source=fixture",
                         "--ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=test",
@@ -105,11 +101,16 @@ class GraphVersionPostgresIntegrationTest {
 
     @AfterAll
     static void stop() {
-        if (context != null) context.close();
+        try {
+            if (context != null) context.close();
+        } finally {
+            if (schemaJdbc != null) schemaJdbc.execute("DROP SCHEMA IF EXISTS " + SCHEMA + " CASCADE");
+        }
     }
 
     @BeforeEach
     void reseed() throws Exception {
+        jdbc.execute("TRUNCATE graph_publication_inputs, graph_publications");
         jdbc.update("DELETE FROM graph_activations");
         jdbc.update("DELETE FROM graph_versions");
         jdbc.update("DELETE FROM artifacts WHERE kind = 'graph_snapshot' AND id LIKE 'artifact-fixture-%'");
@@ -351,13 +352,17 @@ class GraphVersionPostgresIntegrationTest {
         AdminPrincipal admin = admin();
         var service = context.getBean(AdminGraphVersionService.class);
 
-        var result = service.activate("fixture-2026-10-01", new GraphVersionActivateRequest("rollback check", "fixture-2026-10-08"),
+        var result = service.activate("fixture-2026-10-01", new GraphVersionActivateRequest("rollback check", "fixture-2026-10-08", "rollback"),
                 "graph-key-1", admin, "it-activate");
-        var replay = service.activate("fixture-2026-10-01", new GraphVersionActivateRequest("rollback check", "fixture-2026-10-08"),
+        var replay = service.activate("fixture-2026-10-01", new GraphVersionActivateRequest("rollback check", "fixture-2026-10-08", "rollback"),
                 "graph-key-1", admin, "it-activate-replay");
 
         assertEquals("fixture-2026-10-08", result.previousActiveVersionId());
         assertFalse(result.idempotent());
+        var changedMode = assertThrows(CustomException.class, () -> service.activate("fixture-2026-10-01",
+                new GraphVersionActivateRequest("rollback check", "fixture-2026-10-08", "forward"),
+                "graph-key-1", admin, "it-activate-mode-conflict"));
+        assertEquals(ErrorCode.IDEMPOTENCY_CONFLICT, changedMode.getErrorCode());
         assertEquals(result, replay);
         assertEquals("fixture-2026-10-01", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
         assertEquals(1, jdbc.queryForObject("""
@@ -367,6 +372,7 @@ class GraphVersionPostgresIntegrationTest {
         assertEquals(1, jdbc.queryForObject("""
                 SELECT count(*) FROM audit_logs WHERE action = 'graph.version.activate' AND admin_id = ?
                   AND target_id = 'fixture-2026-10-01' AND detail->>'previousVersionId' = 'fixture-2026-10-08'
+                  AND detail->>'mode' = 'rollback'
                 """, Integer.class, admin.adminId()));
 
         var list = service.list(null, null);
@@ -387,11 +393,11 @@ class GraphVersionPostgresIntegrationTest {
     void adminActivationWithAStaleExpectedVersionIsAConflictAndMovesNothing() {
         var service = context.getBean(AdminGraphVersionService.class);
         // Another admin already moved the pointer to 10-01; this admin still saw 10-08 as active.
-        service.activate("fixture-2026-10-01", new GraphVersionActivateRequest("first", "fixture-2026-10-08"),
+        service.activate("fixture-2026-10-01", new GraphVersionActivateRequest("first", "fixture-2026-10-08", "forward"),
                 "graph-key-race-1", admin(), "it-race-1");
 
         var error = assertThrows(CustomException.class, () -> service.activate("fixture-2026-10-08",
-                new GraphVersionActivateRequest("second", "fixture-2026-10-08"), "graph-key-race-2", admin(), "it"));
+                new GraphVersionActivateRequest("second", "fixture-2026-10-08", "forward"), "graph-key-race-2", admin(), "it"));
 
         assertEquals(ErrorCode.REVISION_CONFLICT, error.getErrorCode());
         assertEquals("fixture-2026-10-01", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
@@ -413,7 +419,7 @@ class GraphVersionPostgresIntegrationTest {
                 """);
 
         var error = assertThrows(CustomException.class, () -> context.getBean(AdminGraphVersionService.class)
-                .activate("fixture-unreadable", new GraphVersionActivateRequest("try", "fixture-2026-10-08"), "graph-key-2", admin(), "it"));
+                .activate("fixture-unreadable", new GraphVersionActivateRequest("try", "fixture-2026-10-08", "forward"), "graph-key-2", admin(), "it"));
 
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, error.getErrorCode());
         assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
@@ -428,7 +434,7 @@ class GraphVersionPostgresIntegrationTest {
         AdminPrincipal admin = admin();
 
         context.getBean(AdminGraphVersionService.class).activate("fixture-2026-10-01",
-                new GraphVersionActivateRequest("first publish", "fixture-2026-10-08"), "graph-key-pub",
+                new GraphVersionActivateRequest("first publish", "fixture-2026-10-08", "forward"), "graph-key-pub",
                 admin, "it-pub");
 
         Timestamp published = jdbc.queryForObject(
@@ -459,7 +465,7 @@ class GraphVersionPostgresIntegrationTest {
         AdminPrincipal admin = admin();
 
         context.getBean(AdminGraphVersionService.class).activate("fixture-2026-10-01",
-                new GraphVersionActivateRequest("after the lock", "fixture-2026-10-08"), "graph-key-wait",
+                new GraphVersionActivateRequest("after the lock", "fixture-2026-10-08", "forward"), "graph-key-wait",
                 admin, "it-wait");
         holder.join();
 
@@ -475,65 +481,22 @@ class GraphVersionPostgresIntegrationTest {
     }
 
     @Test
-    void importedVersionPassesTheExclusionStoreGateAndIsStillCheckedBeforeThePointerMoves() {
-        // An unpublished imported version over a readable snapshot (kind is what the gate looks at). The exclusion store exists
-        // (FS081), so the version is no longer refused for want of one: it goes on to the rights and evidence checks, which a
-        // fixture snapshot without imported evidence rows fails, and the pointer stays.
+    void importedVersionRequiresOriginalProofBeforeThePointerMoves() {
         unpublish("fixture-2026-10-01");
+        jdbc.update("DELETE FROM graph_activations WHERE version_id = 'fixture-2026-10-01'");
         jdbc.update("UPDATE graph_versions SET kind = 'snapshot' WHERE id = 'fixture-2026-10-01'");
         // The snapshot itself is readable, so the refusal below is a check of its content, not a broken file.
         context.getBean(GraphSnapshotStore.class).load(repository.find("fixture-2026-10-01").orElseThrow());
 
         var error = assertThrows(CustomException.class, () -> context.getBean(AdminGraphVersionService.class)
-                .activate("fixture-2026-10-01", new GraphVersionActivateRequest("go live",
-                        "fixture-2026-10-08"), "graph-key-imported", admin(), "it"));
+                .activate("fixture-2026-10-01", new GraphVersionActivateRequest("go live", "fixture-2026-10-08", "forward"), "graph-key-imported", admin(), "it"));
 
-        assertEquals(ErrorCode.REVISION_CONFLICT, error.getErrorCode(), "a withheld citation, not exclusion_store_unavailable");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, error.getErrorCode(), "the original import receipt is required");
         assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
         assertNull(jdbc.queryForObject("SELECT published_at FROM graph_versions WHERE id = 'fixture-2026-10-01'",
                 Timestamp.class));
         assertEquals(0, jdbc.queryForObject(
                 "SELECT count(*) FROM graph_activations WHERE reason = 'go live'", Integer.class));
-    }
-
-    @Test
-    void aRefusedActivationRollsBackTheExclusionsItCarriedFromThePublicVersion() {
-        // The public version carries an exclusion (as the operator command writes it); the candidate is an imported-kind version
-        // whose rights check fails. The carry (#55 A-14) runs in the activation's transaction, so it is rolled back with it.
-        long revision = jdbc.queryForObject("SELECT COALESCE(MAX(revision), 0) + 1 FROM disclosure_exclusion_changes", Long.class);
-        jdbc.update("INSERT INTO disclosure_exclusion_changes (revision, action, cause, report_sha256, reason, operator, changed_at) "
-                + "VALUES (?, 'exclude', 'source-change', ?, 'it exclusion', 'it-operator', now())", revision, "8".repeat(64));
-        jdbc.update("INSERT INTO disclosure_exclusion_targets (revision, graph_version_id, target_kind, target_id) "
-                + "VALUES (?, 'fixture-2026-10-08', 'issue', 'issue-carried')", revision);
-        unpublish("fixture-2026-10-01");
-        // Both as imported versions: the public one is the carry's base, the candidate gets the rights checks.
-        jdbc.update("UPDATE graph_versions SET kind = 'snapshot' WHERE id IN ('fixture-2026-10-01', 'fixture-2026-10-08')");
-        // The real service over the real beans, with the carry observed: the proof that it ran, and what it wrote, inside the
-        // activation's transaction before the refusal.
-        DisclosureExclusionCarry carry = spy(context.getBean(DisclosureExclusionCarry.class));
-        AtomicInteger carried = new AtomicInteger(-1);
-        doAnswer(invocation -> {
-            int count = (int) invocation.callRealMethod();
-            carried.set(count);
-            return count;
-        }).when(carry).carry(any(), any(), any());
-        AdminGraphVersionService service = new AdminGraphVersionService(context.getBean(JdbcAdminGraphVersionRepository.class),
-                repository, context.getBean(GraphSnapshotStore.class), context.getBean(DisclosureExclusionReader.class), carry,
-                context.getBean(EvidenceService.class), context.getBean(AdminAuditRepository.class),
-                context.getBean(ObjectMapper.class), context.getBean(Clock.class), false, "fixture");
-        AdminPrincipal admin = admin();
-
-        var error = assertThrows(CustomException.class, () -> service.activate("fixture-2026-10-01",
-                new GraphVersionActivateRequest("carry", "fixture-2026-10-08"), "graph-key-carry", admin, "it"));
-
-        assertEquals(ErrorCode.REVISION_CONFLICT, error.getErrorCode());
-        verify(carry).carry("fixture-2026-10-08", "fixture-2026-10-01", "admin:" + admin.adminId());
-        assertEquals(1, carried.get(), "the carry wrote the one target before the rights check refused the activation");
-        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM disclosure_exclusion_targets WHERE graph_version_id = "
-                + "'fixture-2026-10-01'", Integer.class), "the carried targets went with the refused activation");
-        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM disclosure_exclusion_changes WHERE revision > ?", Integer.class,
-                revision), "and so did the carried change");
-        assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
     }
 
     @Test
@@ -543,8 +506,7 @@ class GraphVersionPostgresIntegrationTest {
                 "Ghost", "admin", "session-ghost");
 
         var error = assertThrows(CustomException.class, () -> context.getBean(AdminGraphVersionService.class)
-                .activate("fixture-2026-10-01", new GraphVersionActivateRequest("audit fails",
-                        "fixture-2026-10-08"), "graph-key-ghost", ghost, "it"));
+                .activate("fixture-2026-10-01", new GraphVersionActivateRequest("audit fails", "fixture-2026-10-08", "forward"), "graph-key-ghost", ghost, "it"));
 
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, error.getErrorCode());
         assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
@@ -567,6 +529,21 @@ class GraphVersionPostgresIntegrationTest {
                     relation_count, article_count, snapshot_artifact_id, review_revision)
                 VALUES (?, ?, 'snapshot', ?, 'operator:test', 'auto', 0, 0, 0, ?, 0)
                 """, id, sequence, Timestamp.from(createdAt), "artifact-fixture-" + id);
+    }
+
+    @Test
+    void legacySnapshotRequiresExplicitActivationWhileNativeCandidateRemainsEligible() {
+        Instant since = Instant.now().minusSeconds(60);
+        imported("native-eligible", 101, Instant.now());
+        imported("legacy-explicit", 102, Instant.now());
+        jdbc.update("UPDATE graph_versions SET source_label = 'legacy-real:test-package' WHERE id = 'legacy-explicit'");
+        assertEquals("native-eligible", repository.autoActivationCandidate(since).orElseThrow().id());
+        assertTrue(repository.activateBySystem("legacy-explicit", "fixture-2026-10-08", since, "automatic",
+                () -> { throw new AssertionError("Legacy must be refused before publication checks"); }).isEmpty());
+        assertEquals("fixture-2026-10-08", repository.active().orElseThrow().id());
+        assertTrue(repository.activateBySystem("native-eligible", "fixture-2026-10-08", since, "automatic",
+                () -> at -> { }).isPresent());
+        assertEquals("native-eligible", repository.active().orElseThrow().id());
     }
 
     @Test
@@ -605,9 +582,7 @@ class GraphVersionPostgresIntegrationTest {
     }
 
     @Test
-    void activateImportedRunsTheSameRealChecksInsideTheLockAndARefusalMovesNothing() {
-        // A seeded fixture made an unpublished imported version after the active one: its snapshot is readable, but it has no
-        // imported evidence rows, so the real current-rights gate (the admin path's) refuses it.
+    void activateImportedRequiresTheSameOriginalProofAndARefusalMovesNothing() {
         jdbc.update("DELETE FROM graph_activations WHERE version_id = 'fixture-2026-10-01'");
         unpublish("fixture-2026-10-01");
         jdbc.update("UPDATE graph_versions SET kind = 'snapshot', sequence = 1000, created_at = now() "
@@ -619,7 +594,7 @@ class GraphVersionPostgresIntegrationTest {
 
         var error = assertThrows(CustomException.class, () -> service.activateImported(candidate, since, "it-auto"));
 
-        assertEquals(ErrorCode.REVISION_CONFLICT, error.getErrorCode(), "a withheld citation, as for an admin activation");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, error.getErrorCode(), "missing original proof, as for an admin activation");
         assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
         assertEquals(0, jdbc.queryForObject(
                 "SELECT count(*) FROM graph_activations WHERE version_id = 'fixture-2026-10-01'", Integer.class));
@@ -633,7 +608,7 @@ class GraphVersionPostgresIntegrationTest {
         imported("auto-waiting", 96, Instant.now().minusSeconds(5));
         // The administrator moves the pointer back to an older version: the waiting import is newer than it, but staged before.
         repository.activateByAdmin("fixture-2026-10-01", "fixture-2026-10-08", "graph-admin-rollback", "rollback@example.com",
-                "rollback", () -> at -> { });
+                "rollback", "rollback", () -> at -> { });
 
         assertTrue(repository.autoActivationCandidate(since).isEmpty(),
                 "an import staged before the admin's choice never undoes it");
@@ -656,6 +631,204 @@ class GraphVersionPostgresIntegrationTest {
                 Integer.class));
         assertNull(jdbc.queryForObject("SELECT published_at FROM graph_versions WHERE id = 'auto-3'", Timestamp.class));
         assertEquals("auto-3", repository.autoActivationCandidate(since).orElseThrow().id(), "still the candidate");
+    }
+
+    @Test
+    void aRealBaseBlocksRawReplacementsAndAnAlreadySelectedAutoCandidate() {
+        Instant since = Instant.now().minusSeconds(60);
+        imported("real-base", 101, Instant.now());
+        imported("raw-native", 102, Instant.now());
+        imported("raw-legacy", 103, Instant.now());
+        jdbc.update("UPDATE graph_versions SET source_label = 'legacy-real:batch' WHERE id = 'raw-legacy'");
+        assertEquals("raw-native", repository.autoActivationCandidate(since).orElseThrow().id());
+        forward("real-base", "fixture-2026-10-08");
+
+        assertTrue(repository.autoActivationCandidate(since).isEmpty());
+        assertTrue(repository.activateBySystem("raw-native", "real-base", since, "automatic",
+                () -> { throw new AssertionError("A raw replacement must be refused"); }).isEmpty());
+        for (String raw : List.of("raw-native", "raw-legacy")) {
+            var refusal = assertThrows(CustomException.class, () -> forward(raw, "real-base"));
+            assertEquals(ErrorCode.REVISION_CONFLICT, refusal.getErrorCode());
+        }
+        assertEquals("real-base", selector.select(null, null, null).version().id());
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM graph_activations WHERE version_id IN ('raw-native', 'raw-legacy')", Integer.class));
+    }
+
+    @Test
+    void aCandidateCannotBeRetargetedToTheNewPointerEvenWithAFreshRequestCas() {
+        imported("real-base", 101, Instant.now());
+        forward("real-base", "fixture-2026-10-08");
+        composed("composed-first", 102, "real-base", "real-base", "a");
+        composed("composed-stale", 103, "real-base", "real-base", "b");
+        forward("composed-first", "real-base");
+
+        for (String expected : List.of("real-base", "composed-first")) {
+            var refusal = assertThrows(CustomException.class, () -> forward("composed-stale", expected));
+            assertEquals(ErrorCode.REVISION_CONFLICT, refusal.getErrorCode());
+        }
+        assertEquals("composed-first", selector.select(null, null, null).version().id());
+        assertFalse(repository.everActivated("composed-stale"));
+    }
+
+    @Test
+    void nullBaseCompositionBootstrapsFromFixtureManuallyAndRejectsAWrongBase() {
+        composed("initial-composed", 101, null, "fixture-2026-10-08", "a");
+        composed("fixture-union", 102, "fixture-2026-10-08", "fixture-2026-10-08", "b");
+        Instant since = Instant.now().minusSeconds(60);
+
+        assertTrue(repository.autoActivationCandidate(since).isEmpty());
+        assertTrue(repository.activateBySystem("initial-composed", "fixture-2026-10-08", since, "automatic",
+                () -> { throw new AssertionError("Composition is manual-only"); }).isEmpty());
+        assertEquals(ErrorCode.REVISION_CONFLICT, assertThrows(CustomException.class,
+                () -> forward("fixture-union", "fixture-2026-10-08")).getErrorCode());
+        forward("initial-composed", "fixture-2026-10-08");
+
+        assertEquals("initial-composed", selector.select(null, null, null).version().id());
+    }
+
+    @Test
+    void aNullPointerAllowsFirstRawOrAtomicNullBaseComposition() {
+        jdbc.update("UPDATE graph_versions SET active = false WHERE active");
+        imported("first-raw", 101, Instant.now());
+        forward("first-raw", null);
+        assertEquals("first-raw", selector.select(null, null, null).version().id());
+        jdbc.update("UPDATE graph_versions SET active = false WHERE active");
+        composed("initial-composed", 102, null, null, "a");
+
+        forward("initial-composed", null);
+
+        assertEquals("initial-composed", selector.select(null, null, null).version().id());
+    }
+
+    @Test
+    void aRealBaseRequiresTheCompositeBaseEvenWhenExpectedActiveMatches() {
+        imported("real-base", 101, Instant.now());
+        forward("real-base", "fixture-2026-10-08");
+        composed("missing-base", 102, null, "real-base", "a");
+
+        var refusal = assertThrows(CustomException.class, () -> forward("missing-base", "real-base"));
+
+        assertEquals(ErrorCode.REVISION_CONFLICT, refusal.getErrorCode());
+        assertEquals("real-base", selector.select(null, null, null).version().id());
+    }
+
+    @Test
+    void rollbackRequiresActualHistoryAndStillUsesCurrentRightsAndActualPointerCas() {
+        imported("real-base", 101, Instant.now());
+        imported("never-active", 102, Instant.now());
+        forward("real-base", "fixture-2026-10-08");
+        composed("composed-current", 103, "real-base", "real-base", "a");
+        forward("composed-current", "real-base");
+        var admin = admin();
+
+        assertEquals(ErrorCode.INVALID_REQUEST, assertThrows(CustomException.class, () ->
+                repository.activateByAdmin("never-active", "composed-current", admin.adminId(), admin.email(),
+                        "restore", "rollback", () -> at -> { })).getErrorCode());
+        assertEquals(ErrorCode.REVISION_CONFLICT, assertThrows(CustomException.class, () ->
+                repository.activateByAdmin("real-base", "real-base", admin.adminId(), admin.email(),
+                        "restore", "rollback", () -> at -> { })).getErrorCode());
+        assertEquals(ErrorCode.REVISION_CONFLICT, assertThrows(CustomException.class, () ->
+                repository.activateByAdmin("real-base", "composed-current", admin.adminId(), admin.email(),
+                        "restore", "rollback", () -> at -> {
+                            throw new CustomException(ErrorCode.REVISION_CONFLICT);
+                        })).getErrorCode());
+        assertEquals("composed-current", selector.select(null, null, null).version().id());
+
+        var restored = repository.activateByAdmin("real-base", "composed-current", admin.adminId(), admin.email(),
+                "restore", "rollback", () -> at -> { });
+        assertTrue(restored.pointerChanged());
+        assertEquals("real-base", selector.select(null, null, null).version().id());
+        assertEquals(ErrorCode.INVALID_REQUEST, assertThrows(CustomException.class,
+                () -> forward("composed-current", "real-base")).getErrorCode(),
+                "a previously active composition needs explicit rollback");
+        repository.activateByAdmin("composed-current", "real-base", admin.adminId(), admin.email(),
+                "restore again", "rollback", () -> at -> { });
+        assertEquals("composed-current", selector.select(null, null, null).version().id());
+    }
+
+    @Test
+    void alreadyActiveCompositionIsIdempotentOnlyAfterCurrentChecks() {
+        composed("initial-composed", 101, null, "fixture-2026-10-08", "a");
+        forward("initial-composed", "fixture-2026-10-08");
+        var admin = admin();
+        var checked = new java.util.concurrent.atomic.AtomicBoolean();
+
+        var same = repository.activateByAdmin("initial-composed", "initial-composed", admin.adminId(), admin.email(),
+                "again", "forward", () -> at -> checked.set(true));
+
+        assertTrue(checked.get());
+        assertFalse(same.pointerChanged());
+        assertEquals(ErrorCode.REVISION_CONFLICT, assertThrows(CustomException.class, () ->
+                repository.activateByAdmin("initial-composed", "initial-composed", admin.adminId(), admin.email(),
+                        "withheld", "forward", () -> at -> {
+                            throw new CustomException(ErrorCode.REVISION_CONFLICT);
+                        })).getErrorCode());
+        assertEquals("initial-composed", selector.select(null, null, null).version().id());
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM graph_activations WHERE reason = 'withheld'", Integer.class));
+    }
+
+    @Test
+    void concurrentCandidatesWithTheSameBaseHaveOneWinner() throws Exception {
+        imported("real-base", 101, Instant.now());
+        forward("real-base", "fixture-2026-10-08");
+        composed("composed-a", 102, "real-base", "real-base", "a");
+        composed("composed-b", 103, "real-base", "real-base", "b");
+        var admin = admin();
+        CountDownLatch underLock = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch contenderStarted = new CountDownLatch(1);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> repository.activateByAdmin("composed-a", "real-base", admin.adminId(),
+                    admin.email(), "winner", "forward", () -> {
+                        underLock.countDown();
+                        try {
+                            if (!release.await(10, TimeUnit.SECONDS)) throw new AssertionError("Lock holder timed out");
+                        } catch (InterruptedException exception) {
+                            Thread.currentThread().interrupt();
+                            throw new AssertionError(exception);
+                        }
+                        return at -> { };
+                    }));
+            try {
+                assertTrue(underLock.await(10, TimeUnit.SECONDS));
+                var second = executor.submit(() -> {
+                    contenderStarted.countDown();
+                    return repository.activateByAdmin("composed-b", "real-base", admin.adminId(), admin.email(),
+                            "contender", "forward", () -> at -> { });
+                });
+                assertTrue(contenderStarted.await(10, TimeUnit.SECONDS));
+                release.countDown();
+                assertTrue(first.get(10, TimeUnit.SECONDS).pointerChanged());
+                var failure = assertThrows(java.util.concurrent.ExecutionException.class,
+                        () -> second.get(10, TimeUnit.SECONDS));
+                assertTrue(failure.getCause() instanceof CustomException);
+                assertEquals(ErrorCode.REVISION_CONFLICT, ((CustomException) failure.getCause()).getErrorCode());
+            } finally {
+                release.countDown();
+            }
+        }
+        assertEquals("composed-a", selector.select(null, null, null).version().id());
+        assertFalse(repository.everActivated("composed-b"));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT count(*) FROM graph_activations WHERE version_id IN ('composed-a', 'composed-b')", Integer.class));
+    }
+
+    private static void composed(String id, long sequence, String base, String expected, String digestCharacter) {
+        imported(id, sequence, Instant.now());
+        String digest = digestCharacter.repeat(64);
+        jdbc.update("""
+                INSERT INTO graph_publications
+                    (version_id, publication_id, composition_digest, base_version_id, expected_active_version_id)
+                VALUES (?, ?, ?, ?, ?)
+                """, id, "publication:" + digest, digest, base, expected);
+    }
+
+    private static void forward(String versionId, String expected) {
+        var admin = admin();
+        repository.activateByAdmin(versionId, expected, admin.adminId(), admin.email(), "publish", "forward",
+                () -> at -> { });
     }
 
     /** A snapshot file names its own version id, so tests reuse a seeded version and clear its publication stamp. */

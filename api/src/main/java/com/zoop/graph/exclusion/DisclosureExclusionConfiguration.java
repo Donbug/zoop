@@ -41,7 +41,8 @@ public class DisclosureExclusionConfiguration {
     @Bean
     DisclosureExclusionRunner disclosureExclusionRunner(Properties properties, ApplicationContext context,
             JdbcDisclosureExclusionRepository repository, DocumentRegistryRepository registry, TransactionOperations transaction,
-            ObjectProvider<HandoffExposureClient> exposure) {
+            ObjectProvider<HandoffExposureClient> exposure, com.zoop.graph.importer.GraphHandoffRepository graph,
+            com.zoop.graph.publication.JdbcGraphPublicationRepository publications) {
         if (context instanceof WebApplicationContext) {
             throw new IllegalStateException("zoop.disclosure-exclusion.enabled requires spring.main.web-application-type=none");
         }
@@ -53,7 +54,8 @@ public class DisclosureExclusionConfiguration {
         }
         return new DisclosureExclusionRunner(path("request", properties.request()), path("result", properties.result()),
                 new ExclusionRequestParser(), new DisclosureExclusionService(repository, registry, store, transaction,
-                        exposure.getIfAvailable()));
+                        exposure.getIfAvailable(),
+                        new com.zoop.graph.publication.GraphPublicationReader(graph, registry, store, publications)));
     }
 
     private static Path path(String name, String value) {

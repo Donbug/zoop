@@ -43,30 +43,25 @@ STAGES = ("extract", "compare", "topic", "relation", "verify-relation", "impact"
 _pipeline_answer = smoke.simulated_answer
 
 
-def first_line(text: str) -> str:
-    return next(line.strip() for line in text.split("\n") if line.strip())
-
-
-def relation_answer(projection: dict) -> dict:
-    """One directed company relation between the first two catalogue companies, cited by the first line of (up to) two of the SENT documents, so every citation is
-    an exact source quote and the pipeline's own resolver grounds it."""
+def relation_answer(projection: dict, sources: list[dict]) -> dict:
+    """One directed company relation between the first two catalogue companies, citing the first citable segment of up to two sent sources.
+    The pipeline expands each reference to the exact native source quote."""
     companies = [company["companyId"] for company in projection["catalogue"]][:2]
     relation_type = "SUPPLIES" if "SUPPLIES" in projection["vocabulary"] else next(iter(projection["vocabulary"]))
-    citations = [{"documentId": d["documentId"], "documentVersion": d["documentVersion"], "start": None, "end": None, "quote": first_line(d["text"])}
-                 for d in projection["documents"][:2]]
+    citations = [smoke.first_reference(source) for source in sources[:2]]
     return {"schemaVersion": "zoop-relation-response-1", "producerVersion": projection["producerVersion"], "relations": [{
         "type": relation_type, "subject": {"kind": "company", "ref": companies[0]}, "object": {"kind": "company", "ref": companies[1]},
         "connection": "direct", "businessScope": None, "productScope": None, "validity": {"from": None, "until": None, "citations": []},
         "countries": [], "reason": "simulated: the cited sentences state the relationship", "citations": citations, "path": []}]}
 
 
-def simulated_answer(stage: str, projection: dict) -> dict:
+def simulated_answer(stage: str, projection: dict, sources: list[dict]) -> dict:
     if stage == "relation":
-        return relation_answer(projection)
+        return relation_answer(projection, sources)
     if stage == "impact":
         # "Return no impact for a company the text does not decide": an empty list is a valid reply and asks for no impact verifier call.
         return {"schemaVersion": "zoop-impact-response-1", "producerVersion": projection["producerVersion"], "impacts": []}
-    return _pipeline_answer(stage, projection)
+    return _pipeline_answer(stage, projection, sources)
 
 
 smoke.simulated_answer = simulated_answer  # the pipeline simulator's handler resolves this name at call time

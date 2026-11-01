@@ -178,10 +178,10 @@ public class ChatResponseGuard {
                 r.limitations(), r.metadata(), r.answerStatus(), r.notices(), uiActions);
     }
 
-    /** The graph ids an action opens; a briefing round names none, its screen checks itself. */
+    /** The graph ids an action opens; a briefing round, evidence and the member's own list name none, their screens check. */
     private static List<String> graphIds(ChatUiAction action) {
         var target = action.target();
-        return Stream.of(target.companyId(), target.fromId(), target.toId()).filter(Objects::nonNull).toList();
+        return Stream.of(target.companyId(), target.fromId(), target.toId(), target.edgeId()).filter(Objects::nonNull).toList();
     }
 
     private static List<ChatAppliedItem> visibleOnly(List<ChatAppliedItem> items, Map<String, Boolean> seen, String at) {

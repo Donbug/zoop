@@ -14,11 +14,11 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = AiExtractionClientProperties.PREFIX, name = "enabled", havingValue = "true")
-@EnableConfigurationProperties(AiExtractionClientProperties.class)
+@EnableConfigurationProperties({AiExtractionClientProperties.class, AiTransportProperties.class})
 public class AiExtractionClientConfiguration {
 
     @Bean
-    HttpExtractionClient aiExtractionClient(AiExtractionClientProperties properties) {
-        return new HttpExtractionClient(properties.toSettings());
+    HttpExtractionClient aiExtractionClient(AiExtractionClientProperties properties, AiTransportProperties transport) {
+        return new HttpExtractionClient(properties.toSettings(transport));
     }
 }

@@ -177,6 +177,10 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [getAdminDashboard](#getadmindashboard) | GET | /api/v1/admin/dashboard | 관리자(작업별 권한) | P1 |
 | [listAuditRecords](#listauditrecords) | GET | /api/v1/admin/audit-log | 관리자(작업별 권한) | P1 |
 | [getPipelineOverview](#getpipelineoverview) | GET | /api/v1/admin/pipeline/overview | 관리자(작업별 권한) | P1 |
+| [listGraphRounds](#listgraphrounds) | GET | /api/v1/admin/pipeline/rounds | 관리자(작업별 권한) | P1 |
+| [startGraphRound](#startgraphround) | POST | /api/v1/admin/pipeline/rounds | 관리자(작업별 권한) | P2 |
+| [getGraphRound](#getgraphround) | GET | /api/v1/admin/pipeline/rounds/{roundId} | 관리자(작업별 권한) | P1 |
+| [retryGraphRound](#retrygraphround) | POST | /api/v1/admin/pipeline/rounds/{roundId}/retry | 관리자(작업별 권한) | P2 |
 | [listAnalysisCandidates](#listanalysiscandidates) | GET | /api/v1/admin/pipeline/candidates | 관리자(작업별 권한) | P1 |
 | [getAnalysisCandidate](#getanalysiscandidate) | GET | /api/v1/admin/pipeline/candidates/{candidate_id} | 관리자(작업별 권한) | P1 |
 | [decideAnalysisCandidate](#decideanalysiscandidate) | POST | /api/v1/admin/pipeline/candidates/{candidate_id}/decision | 관리자(작업별 권한) | P1 |
@@ -1761,6 +1765,119 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | --- | --- | --- | --- | --- |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
+<a id="listgraphrounds"></a>
+
+## listGraphRounds · 그래프 정기 회차 목록 조회
+
+그래프 정기 회차(#55) 목록. 최신 슬롯부터, stage 필터, 불투명 커서. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/admin/pipeline/rounds` |
+| 권한·우선순위 | 관리자(작업별 권한) · P1 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [GraphRoundList](#schema-graphroundlist), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, INVALID_CURSOR, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
+| FS/NFS | [FS058](../../system/out/feature-FS058.md) · [FS059](../../system/out/feature-FS059.md) · [FS063](../../system/out/feature-FS063.md) · [FS067-01](../../system/out/feature-FS067-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS012](../../system/out/feature-NFS012.md) |
+| 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
+| WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 직접 대응 BFF 작업 없음. 정기 회차는 정식 API(#55)에서 처음 생긴다. |
+| 팀 확인 필요 | 회차 단위 보기의 FE 구성(단계 진행 바·실패 사유·변경 없음 표시)은 화면 계획과 함께 검증한다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| stage | query | 선택 | GraphRoundStage / null |  |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
+| limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
+
+<a id="startgraphround"></a>
+
+## startGraphRound · 그래프 정기 회차 수동 시작
+
+지금 또는 지정 슬롯의 회차를 관리자가 시작한다(started_by=admin:<id>). 자동 회차와 같은 단계를 밟는다. 스케줄러와 함께 구현되며 그 전에는 404. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `POST /api/v1/admin/pipeline/rounds` |
+| 권한·우선순위 | 관리자(작업별 권한) · P2 |
+| 요청 본문 | [GraphRoundStartRequest](#schema-graphroundstartrequest) |
+| 응답 | 202: [GraphRoundOut](#schema-graphroundout), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
+| FS/NFS | [FS058](../../system/out/feature-FS058.md) · [FS059](../../system/out/feature-FS059.md) · [FS063](../../system/out/feature-FS063.md) · [FS067-01](../../system/out/feature-FS067-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS012](../../system/out/feature-NFS012.md) |
+| 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
+| WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 직접 대응 BFF 작업 없음. 스케줄러(PR-R2)와 함께 구현한다. |
+| 팀 확인 필요 | 수동 시작이 같은 슬롯의 자동 회차와 겹칠 때의 규칙(같은 슬롯은 한 행)을 FE 문구와 함께 확정한다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| Idempotency-Key | header | 필수 | string | 같은 주체·작업의 중복 실행 방지 키. 보존 기간은 팀 확인 필요다. |
+
+본문 스키마: [GraphRoundStartRequest](#schema-graphroundstartrequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
+
+<a id="getgraphround"></a>
+
+## getGraphRound · 그래프 정기 회차 상세·이력 조회
+
+회차 행 전체와 이벤트 타임라인(코드·요청 ID·시각·detail). 경로·본문·비밀은 없다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/admin/pipeline/rounds/{roundId}` |
+| 권한·우선순위 | 관리자(작업별 권한) · P1 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [GraphRoundDetail](#schema-graphrounddetail), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
+| FS/NFS | [FS058](../../system/out/feature-FS058.md) · [FS059](../../system/out/feature-FS059.md) · [FS063](../../system/out/feature-FS063.md) · [FS067-01](../../system/out/feature-FS067-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS012](../../system/out/feature-NFS012.md) |
+| 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
+| WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 직접 대응 BFF 작업 없음. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| roundId | path | 필수 | string |  |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
+<a id="retrygraphround"></a>
+
+## retryGraphRound · 실패한 그래프 정기 회차 재시도
+
+failed 또는 대기 초과 회차를 같은 roundId로 멈춘 단계부터 다시 시도한다(이벤트 retried에 관리자 id, 감사 기록; started_by는 바꾸지 않음). 스케줄러와 함께 구현되며 그 전에는 404. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `POST /api/v1/admin/pipeline/rounds/{roundId}/retry` |
+| 권한·우선순위 | 관리자(작업별 권한) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 202: [GraphRoundOut](#schema-graphroundout), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | RESOURCE_NOT_FOUND, JOB_NOT_RETRYABLE, IDEMPOTENCY_CONFLICT, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
+| FS/NFS | [FS058](../../system/out/feature-FS058.md) · [FS059](../../system/out/feature-FS059.md) · [FS063](../../system/out/feature-FS063.md) · [FS067-01](../../system/out/feature-FS067-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS012](../../system/out/feature-NFS012.md) |
+| 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
+| WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 직접 대응 BFF 작업 없음. 스케줄러(PR-R2)와 함께 구현한다. |
+| 팀 확인 필요 | analyze_plan job의 retry가 job당 1회인 제약 위에서 회차 retry의 의미(단계 재개 vs plan 재접수)를 확정한다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| roundId | path | 필수 | string |  |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| Idempotency-Key | header | 필수 | string | 같은 주체·작업의 중복 실행 방지 키. 보존 기간은 팀 확인 필요다. |
+
 <a id="listanalysiscandidates"></a>
 
 ## listAnalysisCandidates · 검수 후보 목록 조회
@@ -1975,7 +2092,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## activateGraphVersion · 기존 공개 버전 활성화
 
-기존 공개 버전 활성화. 공개 포인터를 수입·등록된 버전으로 옮긴다(FS059). 서버는 공유 publication lock 안에서 expectedActiveVersionId를 현재 활성 버전과 비교하고 다르면 REVISION_CONFLICT/409로 거절한다(그래프 조회 계약 §0 '기대 활성 버전 비교'). 포인터를 옮기기 전에 선택한 스냅샷을 읽고 hash를 검증하며 실패하면 SOURCE_UNAVAILABLE/503이고 활성 버전은 그대로다. 합성 fixture 버전(kind=fixture)은 서버의 스냅샷 소스가 fixture(로컬·개발 전용)일 때만 활성화할 수 있고, 그 외 구성에서는 남아 있는 fixture 행이 공개 그래프가 되지 않도록 INVALID_REQUEST/422로 거절한다. 수입한(fixture가 아닌) 버전은 같은 lock 안에서 현재 공개 적격성도 다시 확인한다(그래프 조회 계약 §0 '활성화 직전 현재 권리·제외 재확인'). (1) 공개 제외 저장소(FS081)가 없으면 '제외 없음'을 확인할 수 없으므로 SOURCE_UNAVAILABLE/503으로 거절하며, 운영자가 서버 설정으로 명시 허용한 경우에만 이 단계를 넘긴다. (2) 현재 제외를 적용한 스냅샷의 모든 근거에 getEvidence와 같은 검사(검증된 본문 인용·기사 접근 상태·문서 버전·선택 버전 receipt의 grant·현재 원천 registry)를 수행하고, 수입 이후 철회·비공개·grant 변경으로 하나라도 보류되면 REVISION_CONFLICT/409, registry·저장소를 읽을 수 없으면 SOURCE_UNAVAILABLE/503이며 활성 버전은 그대로다. 검사 중 인용 기사 행은 공유 잠금으로 고정한다. 활성화 시각은 lock 획득·기대 버전 비교·적격성 검사 뒤에 정해 graph_activations·최초 published_at·감사 기록에 같은 값을 쓰며, 근거가 고정한 grant의 만료·철회 판정도 검사 시작 시각이 아니라 이 활성화 시각에 원천 registry를 다시 읽어 한다(검사 중 만료된 grant는 REVISION_CONFLICT/409), 멱등 레코드 생성 시각(요청 수신 시각)과 구분한다. 이미 활성인 버전이면 idempotent=true이고 포인터는 움직이지 않는다. 같은 Idempotency-Key·같은 본문은 최초 응답을 재현하고 다른 본문은 IDEMPOTENCY_CONFLICT다(본문 비교는 versionId·expectedActiveVersionId·reason의 정규 JSON이라 expectedActiveVersionId의 null과 빈 문자열은 다른 본문이다). expectedActiveVersionId가 본문에 없으면 INVALID_REQUEST/422이고 명시적 null은 '활성 버전 없음'이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+공개 포인터를 등록된 버전으로 옮긴다(FS059). mode는 forward(기본값) 또는 rollback이다. 서버는 공유 publication lock 안에서 expectedActiveVersionId와 실제 활성 버전을 비교하며, 다르면 REVISION_CONFLICT/409로 거절한다. forward에서 실제 활성 버전이 실데이터이면 원본 native/legacy 입력으로 교체할 수 없다. 누적 후보의 불변 expected-active는 요청과 실제 포인터에 모두 일치해야 하며, base도 실제 활성 실데이터 버전이어야 한다. 활성 버전이 없거나 fixture이면 첫 원본 입력 또는 base=null인 누적 후보를 활성화할 수 있다. fixture 데이터는 누적에 포함하지 않는다. 과거 활성 실데이터 버전을 다시 선택하려면 rollback을 명시해야 한다. rollback 대상에 실제 포인터 변경 이력이 없으면 INVALID_REQUEST/422이다. 합성 fixture는 서버 스냅샷 소스가 fixture인 로컬·개발 구성에서만 활성화할 수 있으며, 다른 구성에서는 INVALID_REQUEST/422이다. 포인터를 옮기기 전에 스냅샷과 모든 원본 receipt·projection의 무결성 및 현재 공개 적격성을 검사한다. 원본 출처와 누적 버전의 현재 제외를 함께 적용하고, publication lock 다음에 모든 원본 기사 행을 정렬하여 공유 잠금한다. 활성화 시각에 현재 원천 registry를 다시 읽어 정확한 기사 버전의 읽기·저장·인용 표시 권리와 철회 상태를 확인한다. 권리가 거절되면 REVISION_CONFLICT/409, proof·registry·저장소가 없거나 읽을 수 없으면 SOURCE_UNAVAILABLE/503이며 포인터는 그대로다. 공개 제외 저장소가 없으면 SOURCE_UNAVAILABLE/503이고, 기존 운영자 설정으로 명시 허용한 경우에만 저장소 존재 검사를 넘긴다. 활성화 시각은 잠금과 적격성 검사 뒤에 정해 graph_activations·최초 published_at·감사 기록에 같은 값을 쓴다. 이미 활성인 대상도 현재 proof·권리·제외·읽기 준비 상태 검사를 통과해야 idempotent=true를 반환한다. 같은 Idempotency-Key와 같은 요청은 저장된 최초 응답을 재현한다. versionId·expectedActiveVersionId·reason·정규화한 mode가 다르면 IDEMPOTENCY_CONFLICT이다. 생략한 mode와 명시적 forward는 같은 요청이며, mode는 감사 기록에도 저장한다. expectedActiveVersionId는 필수이고 명시적 null은 활성 버전 없음을 뜻한다. 누락은 INVALID_REQUEST/422이며 null과 빈 문자열은 서로 다른 요청이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -4747,7 +4864,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| code | 필수 | string {mcp_direct_start, web_unavailable, web_no_results, web_budget_exhausted, web_not_configured, tool_unavailable, tool_budget_exhausted} | mcp_direct_start: 도구 연결(MCP) 사전 확인이 실패해 서버가 정한 기본 조회 경로로 처음부터 답함(답변 검증은 같음). web_*: 보조 웹 검색이 실패·0건·예산 소진·미설정이라 쓰지 못함. tool_*: 내부 조회 하나가 실패하거나 호출 예산이 모자랐으나 다른 근거로 해당 요구를 답함. 지금 서버가 만드는 값은 mcp_direct_start뿐이며 나머지는 웹 검색 도구·도구 장애 부분 답변과 함께 생긴다. 클라이언트는 모르는 code도 message로 표시한다. |
+| code | 필수 | string {mcp_direct_start, web_unavailable, web_no_results, web_budget_exhausted, web_not_configured, tool_unavailable, tool_budget_exhausted} | mcp_direct_start: 도구 연결(MCP) 사전 확인이 실패해 서버가 정한 기본 조회 경로로 처음부터 답함(답변 검증은 같음). web_*: 보조 웹 검색이 실패·0건·예산 소진·미설정이라 쓰지 못함. tool_*: 내부 조회 하나가 실패하거나 호출 예산이 모자랐으나 다른 근거로 해당 요구를 답함. web_not_configured와 tool_budget_exhausted는 아직 서버가 만들지 않는다. 클라이언트는 모르는 code도 message로 표시한다. |
 | labels | 필수 | string[] | 알림이 해당하는 요구를 회원 질문의 표현으로 나타낸 문구. 실행 전체에 해당하면 빈 배열이다. |
 | message | 필수 | string | code별 서버 템플릿으로 만든 안내 문장 |
 
@@ -4797,7 +4914,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | actionId | 필수 | string | 이 결과 안에서만 유일한 서버 발급 ID |
-| kind | 필수 | string {open_company, focus_path, open_briefing} | open_company: 기업 상세. focus_path: 지도에서 두 기업 사이 경로. open_briefing: 해당 회차 브리핑. 클라이언트는 모르는 kind를 표시하지 않는다. |
+| kind | 필수 | string {open_company, focus_path, open_briefing, focus_relation, open_evidence, open_watchlist} | open_company: 기업 상세. focus_path: 지도에서 두 기업 사이 경로. open_briefing: 해당 회차 브리핑. focus_relation: 지도에서 답변이 인용한 경로 단계의 관계. open_evidence: 요구가 인용한 기사를 근거 창에서 함께 연다. open_watchlist: 회원 본인의 내 종목 화면. 클라이언트는 모르는 kind를 표시하지 않는다. |
 | label | 필수 | string | 서버가 조회 결과의 이름으로 만든 표시 문구 |
 | requirementIds | 필수 | string[] | 이 동작을 낳은 답한 요구 |
 | target | 필수 | [ChatUiActionTarget](#schema-chatuiactiontarget) |  |
@@ -4815,8 +4932,10 @@ kind에 해당하는 필드만 값이 있다.
 | toId | 필수 | string / null | focus_path 끝 기업 |
 | date | 필수 | string / null | open_briefing 회차의 KST 날짜 |
 | edition | 필수 | string {morning, evening} / null | open_briefing 회차 |
-| graphVersion | 필수 | string / null | focus_path: 경로를 읽은 그래프 버전. 지금 지도가 다른 스냅샷이면 열지 않고 안내한다. |
-| asOf | 필수 | string (date-time) / null | focus_path: 질문에 고정된 기준 시각 |
+| graphVersion | 필수 | string / null | focus_path·focus_relation·open_evidence: 읽은 그래프 버전. 지도 동작은 지금 지도가 다른 스냅샷이면 열지 않고 안내한다. |
+| asOf | 필수 | string (date-time) / null | focus_path·focus_relation·open_evidence: 질문에 고정된 기준 시각 |
+| edgeId | 필수 | string / null | focus_relation 관계 |
+| evidenceIds | 필수 | string[] / null | open_evidence 근거 |
 
 <a id="schema-chatsessionresponse"></a>
 
@@ -5909,7 +6028,7 @@ getPipelineOverview: the graph state recorded with the active version, never a c
 | action | 필수 | string / null |  |
 | target | 필수 | string / null |  |
 | evidenceCount | 필수 | integer / null | Issue nodes: number of evidence ids of the issue (length of `GET /api/events/{id}` evidenceIds); null for companies. |
-| geography | 필수 | string, null {domestic, international, None} | 이슈에는 검증된 국내/국제 값이 필수다. 기업은 null이다. 미판정 이슈를 임의 분류하지 않고 공개 검증 단계에서 제외하거나 보완한다. |
+| geography | 필수 | string, null {domestic, international, None} | 이슈의 국내/국제 분류는 해당 사건의 출처 근거가 있을 때 제공한다. 명시적 미확인 정책으로 보류한 지역은 null이며 국내·국제 필터에 포함되지 않는다. 기업의 null은 적용 대상이 아님을 뜻한다. |
 
 <a id="schema-graphresponse"></a>
 
@@ -5944,6 +6063,7 @@ getPipelineOverview: the graph state recorded with the active version, never a c
 | --- | --- | --- | --- |
 | reason | 필수 | string |  |
 | expectedActiveVersionId | 필수 | string / null | 관리자가 목록에서 확인한 현재 활성 버전 ID. 활성 버전이 없었으면 null. 현재 값과 다르면 REVISION_CONFLICT/409. |
+| mode | 선택 | string {forward, rollback} | forward는 실제 활성 실데이터를 기반으로 만든 누적 후보만 허용한다. 활성 버전이 없거나 fixture이면 첫 원본 또는 base=null인 누적 후보를 허용한다. rollback은 실제 활성 이력이 있는 대상에만 허용하며 현재 proof·권리·제외 검사와 실제 포인터 CAS를 동일하게 적용한다. mode는 멱등 요청 해시와 감사 기록에 포함한다. |
 
 <a id="schema-graphversionlist"></a>
 
@@ -6681,6 +6801,136 @@ FS062: one project mock profile with its account id, cash, valued holdings and w
 | publication | 필수 | [PublicationState](#schema-publicationstate) |  |
 | jobs | 필수 | [OverviewJobs](#schema-overviewjobs) |  |
 | runs | 필수 | [PastRun](#schema-pastrun)[] |  |
+| rounds | 선택 | [GraphRoundsSection](#schema-graphroundssection) |  |
+
+<a id="schema-graphroundstage"></a>
+
+### GraphRoundStage
+
+
+
+string {scheduled, run_requested, plan_ready, analysis_queued, analysis_done, freeze_requested, handoff_ready, imported, skipped, failed}
+
+<a id="schema-graphroundssection"></a>
+
+### GraphRoundsSection
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| enabled | 필수 | boolean |  |
+| nextSlotAt | 선택 | string, null (date-time) |  |
+| lastTickAt | 선택 | string, null (date-time) |  |
+| openRounds | 필수 | integer |  |
+| recent | 필수 | [GraphRoundOut](#schema-graphroundout)[] |  |
+
+<a id="schema-graphroundlist"></a>
+
+### GraphRoundList
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| items | 필수 | [GraphRoundOut](#schema-graphroundout)[] |  |
+| nextCursor | 선택 | string, null |  |
+
+<a id="schema-graphrounddetail"></a>
+
+### GraphRoundDetail
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| round | 필수 | [GraphRoundOut](#schema-graphroundout) |  |
+| events | 필수 | [GraphRoundEventOut](#schema-graphroundeventout)[] |  |
+
+<a id="schema-graphroundout"></a>
+
+### GraphRoundOut
+
+회차 한 행. 코드·id·digest만 있고 경로·본문·비밀은 없다. failureCode는 failed일 때만, activatedVersionId는 활성화 뒤 사후 기록.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| roundId | 필수 | string |  |
+| slotAt | 필수 | string (date-time) |  |
+| stage | 필수 | [GraphRoundStage](#schema-graphroundstage) |  |
+| startedBy | 필수 | string | system:scheduler 또는 admin:<id> |
+| attempts | 필수 | integer |  |
+| nextAttemptAt | 선택 | string, null (date-time) |  |
+| plan | 선택 | [GraphRoundPlan](#schema-graphroundplan) / null |  |
+| analysisJobId | 선택 | string, null |  |
+| handoff | 선택 | [GraphRoundHandoff](#schema-graphroundhandoff) / null |  |
+| graphVersionId | 선택 | string, null |  |
+| activatedVersionId | 선택 | string, null |  |
+| activationNote | 선택 | string, null |  |
+| failureCode | 선택 | string, null |  |
+| lease | 선택 | [GraphRoundLease](#schema-graphroundlease) / null |  |
+| createdAt | 필수 | string (date-time) |  |
+| updatedAt | 필수 | string (date-time) |  |
+
+<a id="schema-graphroundplan"></a>
+
+### GraphRoundPlan
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| planId | 선택 | string, null |  |
+| planDigest | 선택 | string, null |  |
+
+<a id="schema-graphroundhandoff"></a>
+
+### GraphRoundHandoff
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| handoffId | 선택 | string, null |  |
+| manifestDigest | 선택 | string, null |  |
+| bundleDigest | 선택 | string, null |  |
+
+<a id="schema-graphroundlease"></a>
+
+### GraphRoundLease
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| owner | 필수 | string |  |
+| until | 필수 | string (date-time) |  |
+
+<a id="schema-graphroundeventout"></a>
+
+### GraphRoundEventOut
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | integer (int64) |  |
+| at | 필수 | string (date-time) |  |
+| stage | 필수 | [GraphRoundStage](#schema-graphroundstage) |  |
+| outcome | 필수 | string {advanced, waiting, failed, retried, skipped} |  |
+| code | 선택 | string, null |  |
+| requestId | 선택 | string, null |  |
+| detail | 선택 | object, null | 외부 응답의 코드·digest만. 경로·본문·비밀 없음 |
+
+<a id="schema-graphroundstartrequest"></a>
+
+### GraphRoundStartRequest
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| slotAt | 선택 | string, null (date-time) | 생략하면 지금. 같은 슬롯의 행이 이미 있으면 409 |
 
 <a id="schema-overviewfeedback"></a>
 

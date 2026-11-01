@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { Link } from 'react-router-dom';
 import type { BriefingItem, BriefingResponse } from '@/types/briefing';
 import { issueAnchor } from '@/util/briefingIssueView';
@@ -56,18 +57,23 @@ export default function BriefingIssueList({
         {graphHref && (
           <Link
             to={graphHref}
-            className={`inline-flex h-7 items-center rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-[11px] font-semibold hover:bg-zoop-wash ${FOCUS_RING}`}
+            className={`inline-flex h-7 items-center rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-caption font-semibold hover:bg-zoop-wash ${FOCUS_RING}`}
           >
             이 회차 전체 관계 그래프
           </Link>
         )}
       </div>
       {!items || items.length === 0 ? (
-        <p className={EMPTY}>
-          {items
-            ? '이 회차의 선정 기준을 충족한 핵심 이슈가 없어요.'
-            : '이 회차의 핵심 이슈를 준비하고 있어요.'}
-        </p>
+        !items ? (
+          <LoadingIndicator
+            label="이 회차의 핵심 이슈를 준비하고 있어요."
+            className={`${EMPTY} flex min-h-12 w-full`}
+          />
+        ) : (
+          <p className={EMPTY}>
+            이 회차의 선정 기준을 충족한 핵심 이슈가 없어요.
+          </p>
+        )
       ) : (
         <ol>
           {[...items]
@@ -84,11 +90,11 @@ export default function BriefingIssueList({
                   title={`${item.rank}. ${item.title} · 근거 ${item.evidenceCount}건`}
                 >
                   <p className={NOTE}>{eventTimeLabel(item)}</p>
-                  <h4 className="text-sm font-bold">
+                  <h4 className="text-body font-bold">
                     {item.rank}. {item.title}
                   </h4>
                   {(item.matchedCompanyIds ?? []).length > 0 && (
-                    <p className="self-start rounded-full border-[0.667px] border-zoop-ink px-2 py-[2px] text-[11px] font-semibold">
+                    <p className="self-start rounded-full border-[0.667px] border-zoop-ink px-2 py-[2px] text-caption font-semibold">
                       내 종목:{' '}
                       {item.companies
                         .filter((company) =>
@@ -99,7 +105,7 @@ export default function BriefingIssueList({
                         (item.matchedCompanyIds ?? []).join(', ')}
                     </p>
                   )}
-                  <p className="text-[11px] text-zoop-muted">
+                  <p className="text-caption text-zoop-muted">
                     {item.companies.length
                       ? item.companies.map((company, index) => (
                           <span key={company.id || index}>

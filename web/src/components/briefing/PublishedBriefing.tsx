@@ -7,7 +7,8 @@ import { getMyFeedback } from '@/apis/feedback/feedback';
 import FeedbackButtons from '@/components/common/FeedbackButtons';
 import BriefingPreviewFeedback from './BriefingPreviewFeedback';
 import { validIssueIntelligence } from '@/util/issueIntelligence';
-import { usePersonalBriefing } from '@/hooks/usePersonalBriefing';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
+
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import type { FeedbackValue } from '@/types/feedback';
 import type {
@@ -24,7 +25,7 @@ import BriefingIssueList from './BriefingIssueList';
 import BriefingRecap from './BriefingRecap';
 import BriefingContinuity from './BriefingContinuity';
 import BriefingComparison from './BriefingComparison';
-import PersonalBasisNotice from './PersonalBasisNotice';
+import PersonalizedIssueSelection from './PersonalizedIssueSelection';
 import { BriefingCorrections, BriefingOutlook } from './BriefingPublishedNotes';
 import { BRIEFING_DISCLAIMER, splitCorrections } from './briefingCorrections';
 import { issueAnchor } from '@/util/briefingIssueView';
@@ -36,7 +37,6 @@ import {
   FOCUS_RING,
   PRIMARY_BUTTON,
   SECTION,
-  SECTION_TITLE,
   STATUS_PILL,
 } from './briefingStyles';
 
@@ -110,14 +110,6 @@ export default function PublishedBriefing({
   const previewAnalysis =
     import.meta.env.VITE_BRIEFING_PREVIEW_FEEDBACK === 'true' && result
       ? validIssueIntelligence(result)
-      : null;
-  const personalView = usePersonalBriefing(
-    personal && memberId && published ? published : null,
-  );
-  const personalBriefing =
-    personalView.state.status === 'ready' &&
-    personalView.state.briefing?.id === published?.id
-      ? personalView.state.briefing
       : null;
   // FS066-01: 이 회차와 핵심 이슈의 내 평가. 읽기 실패는 평가 없음과 구분하고, 확인 후 원하는 최종 상태로 저장한다.
   const [feedbackAttempt, setFeedbackAttempt] = useState(0);
@@ -194,7 +186,7 @@ export default function PublishedBriefing({
 
   const publicationInfo = result && (
     <>
-      <p className="mt-1.5 font-inter text-[11px] leading-normal text-zoop-faint">
+      <p className="mt-1.5 font-num text-caption leading-normal text-zoop-faint">
         발행일 {result.date} · 예정 {clock(result.scheduledAt)} · 생성{' '}
         {briefingTime(result.generatedAt)} · 발행{' '}
         {briefingTime(result.publishedAt)} · 데이터 기준{' '}
@@ -248,7 +240,7 @@ export default function PublishedBriefing({
             eventId={item.eventId}
             compact={compact}
             to={`/?round=${encodeURIComponent(result.id)}&select=${encodeURIComponent(`node:${item.eventId}`)}`}
-            className={`self-start text-[11px] font-semibold underline underline-offset-4 ${FOCUS_RING}`}
+            className={`self-start text-caption font-semibold underline underline-offset-4 ${FOCUS_RING}`}
           >
             이 회차 관계 그래프에서 보기
           </BriefingIssueMapLink>
@@ -292,7 +284,6 @@ export default function PublishedBriefing({
     );
   const roundFeedback = result && (
     <section className={SECTION} aria-label="이 브리핑 평가">
-      <h3 className={SECTION_TITLE}>이 브리핑은 어땠나요?</h3>
       {previewAnalysis ? (
         <BriefingPreviewFeedback
           key={`${previewAnalysis.resultVersion}:round`}
@@ -301,7 +292,6 @@ export default function PublishedBriefing({
           feature="briefing_round"
           targetId={result.id}
           subject="이 브리핑 회차"
-          showNote
         />
       ) : result.graphVersion ? (
         <FeedbackButtons
@@ -322,9 +312,7 @@ export default function PublishedBriefing({
 
   // 화면은 순위 상위 3건만 그린다. 나머지 이슈의 정정은 회차 정정으로 남긴다.
   const shownItems = result
-    ? [...(personalBriefing ?? result).items]
-        .sort((a, b) => a.rank - b.rank)
-        .slice(0, 3)
+    ? [...result.items].sort((a, b) => a.rank - b.rank).slice(0, 3)
     : [];
   const corrections = splitCorrections(
     result?.corrections ?? [],
@@ -344,9 +332,10 @@ export default function PublishedBriefing({
         aria-busy={loading}
       >
         {loading && (
-          <p role="status" className="text-xs text-zoop-muted">
-            브리핑을 불러오고 있어요.
-          </p>
+          <LoadingIndicator
+            label="브리핑을 불러오고 있어요."
+            className="flex min-h-16 w-full text-caption text-zoop-muted"
+          />
         )}
         {error && (
           <p role="alert" className={EMPTY}>
@@ -357,7 +346,7 @@ export default function PublishedBriefing({
           <>
             <header className="border-b-[0.667px] border-zoop-line pb-[18px]">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-bold tracking-[-0.025em]">
+                <h2 className="text-title-sm font-bold tracking-[-0.025em]">
                   {result.edition === 'morning' ? '출근' : '퇴근'} 브리핑
                 </h2>
                 <span className={STATUS_PILL}>
@@ -391,7 +380,7 @@ export default function PublishedBriefing({
             {!compact && result.status === 'published' && (
               <BriefingOutlook
                 outlook={result.outlook}
-                issues={(personalBriefing ?? result).items.map((item) => ({
+                issues={result.items.map((item) => ({
                   eventId: item.eventId,
                   title: item.title,
                   anchor: shownItems.includes(item)
@@ -410,20 +399,20 @@ export default function PublishedBriefing({
               )}
             {result.status === 'published' && compact && (
               <>
-                {personal && (
-                  <PersonalBasisNotice
-                    member={Boolean(memberId)}
-                    checking={checking}
-                    state={personalView.state}
-                    dataAsOf={result.dataAsOf}
-                    onRetry={personalView.reload}
-                  />
-                )}
                 {!knownLimits && partialInfo}
                 {feedbackReadError}
                 <IssueCentricBriefing
                   result={result}
-                  items={(personalBriefing ?? result).items}
+                  beforeIssues={
+                    personal ? (
+                      <PersonalizedIssueSelection
+                        roundId={result.id}
+                        dataAsOf={result.dataAsOf}
+                        checking={checking}
+                      />
+                    ) : undefined
+                  }
+                  items={result.items}
                   renderExtra={issueExtra}
                   issueCorrections={corrections.byIssue}
                 />
@@ -446,7 +435,16 @@ export default function PublishedBriefing({
                     <IssueCentricBriefing
                       compact={false}
                       result={result}
-                      items={(personalBriefing ?? result).items}
+                      beforeIssues={
+                        personal ? (
+                          <PersonalizedIssueSelection
+                            roundId={result.id}
+                            dataAsOf={result.dataAsOf}
+                            checking={checking}
+                          />
+                        ) : undefined
+                      }
+                      items={result.items}
                       renderExtra={issueExtra}
                       issueCorrections={corrections.byIssue}
                     />
@@ -480,20 +478,18 @@ export default function PublishedBriefing({
                       compact={compact}
                     />
                   )}
-                {personal && (
-                  <PersonalBasisNotice
-                    member={Boolean(memberId)}
-                    checking={checking}
-                    state={personalView.state}
+                {personal && !result.issueIntelligence && (
+                  <PersonalizedIssueSelection
+                    roundId={result.id}
                     dataAsOf={result.dataAsOf}
-                    onRetry={personalView.reload}
+                    checking={checking}
                   />
                 )}
                 {feedbackReadError}
                 {!result.issueIntelligence && (
                   <BriefingIssueList
                     compact={compact}
-                    items={(personalBriefing ?? result).items}
+                    items={result.items}
                     roundId={result.id}
                     graphVersion={result.graphVersion}
                     graphHref={`/?round=${encodeURIComponent(result.id)}`}
@@ -530,15 +526,6 @@ export default function PublishedBriefing({
               </BriefingReadingSection>
             )}
             {compact && result.status === 'published' && roundFeedback}
-            {compact && (
-              <BriefingReadingSection
-                compact
-                title="발행 정보와 자료 확인 범위"
-              >
-                {publicationInfo}
-                {knownLimits && partialInfo}
-              </BriefingReadingSection>
-            )}
           </>
         )}
         {result?.status === 'published' && (

@@ -69,6 +69,19 @@ class IngestionExportParserTest {
     }
 
     @Test
+    void declaredNativeLanguageDoesNotChangeDocumentIdentityOrPublicMetadata() {
+        for (String language : List.of("ko", "en-US", "und", "x".repeat(35))) {
+            ObjectNode export = export(observation, MIXED_TEXT, MIXED_HASH);
+            observationOf(export).put("language", language);
+            VerifiedDocument document = parser.parse(ExportFixtures.bytes(export), observation);
+            assertEquals(observation, document.observation());
+            assertEquals(MIXED_TEXT, document.text());
+            assertEquals("authored", document.title());
+            assertNull(document.publisher());
+        }
+    }
+
+    @Test
     void sourceHashIsPythonCanonicalJsonOfTheText() {
         // (text, sourceHash) pairs computed by Python json.dumps(ensure_ascii=False) + sha256.
         List<String[]> vectors = List.of(
@@ -252,6 +265,23 @@ class IngestionExportParserTest {
     }
 
     @Test
+    void nativeLanguageIsOptionalAndBoundedWithoutChangingDocumentText() {
+        for (String language : List.of("ko", "en-US", "und", "x".repeat(35))) {
+            ObjectNode value = export(observation, PLAIN_TEXT, PLAIN_HASH);
+            observationOf(value).put("language", language);
+            assertEquals(PLAIN_TEXT, parser.parse(ExportFixtures.bytes(value), observation).text());
+        }
+        ObjectNode value = export(observation, PLAIN_TEXT, PLAIN_HASH);
+        observationOf(value).putNull("language");
+        assertEquals(PLAIN_TEXT, parser.parse(ExportFixtures.bytes(value), observation).text());
+        for (String language : List.of("", "k", "x".repeat(36), "a b", "a\nb")) {
+            assertEquals(DocumentImportFailure.METADATA_UNSUPPORTED,
+                    failureOf(e -> observationOf(e).put("language", language)));
+        }
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).put("language", 7)));
+    }
+
+    @Test
     void aPublisherIsOptionalAndAbsentOrExplicitNullBothMeanNoneDeclared() {
         ObjectNode absent = export(observation, PLAIN_TEXT, PLAIN_HASH);
         assertTrue(!observationOf(absent).has("publisher"), "the fixture of an older export must not carry the key");
@@ -279,6 +309,41 @@ class IngestionExportParserTest {
         assertEquals("합성일보", document.publisher());
         assertNotNull(document.collected());
         assertEquals(LocalDate.of(2026, 10, 14), document.publishedDate());
+    }
+
+    @Test
+    void aLanguageIsOptionalCheckedOnlyAndNeverStoredAbsentOrNullMeanNoneDeclared() {
+        ObjectNode absent = export(observation, PLAIN_TEXT, PLAIN_HASH);
+        assertTrue(!observationOf(absent).has("language"), "the fixture of an older export must not carry the key");
+        assertNotNull(parser.parse(ExportFixtures.bytes(absent), observation));
+
+        ObjectNode none = export(observation, PLAIN_TEXT, PLAIN_HASH);
+        observationOf(none).putNull("language");
+        assertNotNull(parser.parse(ExportFixtures.bytes(none), observation));
+
+        // The collector's declared tag (ai/pipeline, 2026-10-30): 2 to 35 characters, kept out of the verified document.
+        for (String declared : List.of("ko", "en-US", "und", "zh-Hant-TW", "x".repeat(IngestionExportParser.MAX_LANGUAGE_CODE_POINTS))) {
+            ObjectNode export = export(observation, PLAIN_TEXT, PLAIN_HASH);
+            observationOf(export).put("language", declared);
+            VerifiedDocument document = parser.parse(ExportFixtures.bytes(export), observation);
+            assertEquals(PLAIN_TEXT, document.text());
+            assertEquals(observation, document.observation());
+        }
+        ObjectNode collectedWithLanguage = collectedExport("day", "2026-10-14");
+        observationOf(collectedWithLanguage).put("language", "ko");
+        assertNotNull(parser.parse(ExportFixtures.bytes(collectedWithLanguage), observation).collected());
+    }
+
+    @Test
+    void aLanguageMustBeAStringOfTwoToThirtyFiveCodePointsWithoutControlOrSeparatorCharacters() {
+        for (String refused : List.of("", "k", "x".repeat(IngestionExportParser.MAX_LANGUAGE_CODE_POINTS + 1), "a b", "a\tb", "a\nb",
+                "a\u0000b", "  ", "ko\u2028")) {
+            assertEquals(DocumentImportFailure.METADATA_UNSUPPORTED,
+                    failureOf(e -> observationOf(e).put("language", refused)), "language " + refused.length());
+        }
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).put("language", 7)));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).put("language", false)));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).putArray("language").add("ko")));
     }
 
     @Test

@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
@@ -56,12 +57,23 @@ public class BriefingReadTool implements ChatTool {
 
     @Override
     public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
-        if (scope.graphVersionId() == null) throw new ChatToolUnavailable("the question froze no graph version");
-        ChatBriefingRound round = ChatBriefingRound.parse(request.targets().getFirst());
         Set<String> companies = new HashSet<>(request.targets().subList(1, request.targets().size()));
         if (companies.stream().anyMatch(ChatBriefingRound::isRef)) {
             throw new IllegalArgumentException("a briefing read names one round");
         }
+        return round(scope, request, issue -> companies.isEmpty() || involved(issue).stream().anyMatch(companies::contains));
+    }
+
+    private static List<String> involved(JsonNode issue) {
+        List<String> involved = new ArrayList<>();
+        issue.path("companies").forEach(c -> involved.add(c.path("id").asString()));
+        return involved;
+    }
+
+    /** The issues {@code kept} takes of the round the first target names, each with its evidence readable now. */
+    ChatToolOutput round(ChatToolScope scope, ChatToolRequest request, Predicate<JsonNode> kept) {
+        if (scope.graphVersionId() == null) throw new ChatToolUnavailable("the question froze no graph version");
+        ChatBriefingRound round = ChatBriefingRound.parse(request.targets().getFirst());
         JsonNode response;
         try {
             response = rounds.get(round.date(), round.edition(), scope.traceId());
@@ -82,9 +94,7 @@ public class BriefingReadTool implements ChatTool {
         boolean truncated = false;
         List<ChatToolItem> items = new ArrayList<>();
         for (JsonNode issue : response.path("items")) {
-            List<String> involved = new ArrayList<>();
-            issue.path("companies").forEach(c -> involved.add(c.path("id").asString()));
-            if (!companies.isEmpty() && involved.stream().noneMatch(companies::contains)) continue;
+            if (!kept.test(issue)) continue;
             List<String> evidence = new ArrayList<>();
             for (JsonNode id : issue.path("evidenceIds")) {
                 String evidenceId = id.asString();
@@ -102,7 +112,7 @@ public class BriefingReadTool implements ChatTool {
             }
             String label = "[" + header + " " + issue.path("rank").asInt() + "위] " + issue.path("title").asString()
                     + " — 선정 이유: " + issue.path("reason").asString();
-            items.add(new ChatToolItem(issue.path("eventId").asString(), "briefing_item", label, involved, evidence));
+            items.add(new ChatToolItem(issue.path("eventId").asString(), "briefing_item", label, involved(issue), evidence));
         }
         return new ChatToolOutput(ChatBriefingRound.dataVersion(response.path("date").asString(),
                 response.path("edition").asString(), response.path("id").asString()), items, List.copyOf(passed), truncated,

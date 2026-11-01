@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.Optional;
 
 import com.zoop.ai.config.AiChatClientProperties;
+import com.zoop.ai.config.AiTransportProperties;
 import com.zoop.ai.http.HttpChatStageClient;
 import com.zoop.chat.orchestrator.ChatAgentPath;
 import com.zoop.chat.orchestrator.ChatCitationSource;
@@ -26,12 +27,12 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "zoop.ai.chat-client", name = "enabled", havingValue = "true")
-@EnableConfigurationProperties(AiChatClientProperties.class)
+@EnableConfigurationProperties({AiChatClientProperties.class, AiTransportProperties.class})
 public class ChatModelConfiguration {
 
     @Bean
-    HttpChatStageClient aiChatStageClient(AiChatClientProperties properties) {
-        return new HttpChatStageClient(properties.toSettings());
+    HttpChatStageClient aiChatStageClient(AiChatClientProperties properties, AiTransportProperties transport) {
+        return new HttpChatStageClient(properties.toSettings(transport));
     }
 
     @Bean

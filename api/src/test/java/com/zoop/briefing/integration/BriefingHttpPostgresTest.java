@@ -53,6 +53,8 @@ class BriefingHttpPostgresTest {
     private static final String MORNING = "/api/v1/briefings?date=2026-10-15&edition=morning";
     private static final String EVENING = "/api/v1/briefings?date=2026-10-15&edition=evening";
     private static final String ROUND = "brf-test-2026-10-15-evening";
+    private static final String GRAPH_VERSION = "gv-" + com.zoop.common.json.Canonical.sha256("briefing-round-http");
+    private static final String GRAPH_EVIDENCE = "ev-" + "7".repeat(64);
 
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
@@ -78,7 +80,7 @@ class BriefingHttpPostgresTest {
         loadFixture(resource("fixture.sql"));
     }
 
-    private void loadQuietEveningFixture() throws IOException {
+    private String quietEveningFixture() throws IOException {
         String fixture = resource("fixture.sql");
         int start = fixture.indexOf("$records$") + "$records$".length();
         int end = fixture.indexOf("$records$", start);
@@ -93,7 +95,7 @@ class BriefingHttpPostgresTest {
                 ((tools.jackson.databind.node.ObjectNode) payload.get("references")).putArray("eventIds");
             }
         }
-        loadFixture(fixture.substring(0, start) + JSON.writeValueAsString(records) + fixture.substring(end));
+        return fixture.substring(0, start) + JSON.writeValueAsString(records) + fixture.substring(end);
     }
 
     private void loadFixture(String sql) throws IOException {
@@ -126,6 +128,78 @@ class BriefingHttpPostgresTest {
         }
     }
 
+    @Autowired com.zoop.auth.service.MemberSessionService personalSessions;
+
+    @Test
+    void personalSelectionUsesDbWatchlistWholePoolAndPreservesPublication() throws Exception {
+        String member="personal-test-"+UUID.randomUUID();
+        String other="personal-test-"+UUID.randomUUID();
+        String before=jdbc.queryForObject("SELECT payload_sha256 FROM briefing_rounds WHERE id=?",String.class,ROUND);
+        try {
+            for(String id:java.util.List.of(member,other)) {
+                jdbc.update("""
+                    INSERT INTO members(id,analytics_key,email,email_key,display_name,signup_method,status,created_at,
+                    mode,completed,tutorial_completed,settings_version,updated_at)
+                    VALUES(?,?,?,?,?,'google','active',now(),'watchlist',true,true,1,now())
+                    """,id,id,id+"@example.invalid",id+"@example.invalid","[합성] 개인화 시험");
+            }
+            jdbc.update("INSERT INTO member_watchlist(member_id,company_id,position) VALUES(?,?,0)",member,"brf-test-company");
+            jdbc.update("""
+                INSERT INTO article_versions(article_id,version,title,publisher,url,published_at,publication_precision,text_artifact_id,collected_at)
+                SELECT article_id,'synthetic-personal-v1',title,publisher,url,'2026-10-15T01:00:00Z','datetime',text_artifact_id,collected_at
+                FROM article_versions WHERE article_id='brf-test-document' AND version='synthetic-v1'
+                """);
+            var pool=JSON.createObjectNode().put("schemaVersion","personal-candidate-pool-v1").put("complete",true)
+                .put("roundId",ROUND).put("inputSha256","c".repeat(64)).put("cutoff","2026-10-15T08:30:00Z")
+                .put("candidateCount",4).put("previousRoundId","").put("scope","synthetic_test")
+                .put("publicationPayloadSha256",before);
+            var candidates=pool.putArray("candidates");
+            for(int i=0;i<4;i++) {
+                var c=candidates.addObject().put("issueId","personal-event-"+i).put("eventKey","independent-event-"+i)
+                    .put("title","[합성] 독립 계약 "+i).put("verified",true).put("importance",i==3?1:2)
+                    .put("informationChange","new_event").put("whyImportant","[합성] 계약 변경").put("whyNow","[합성] 이번 확정");
+                c.putArray("companies").addObject().put("companyId","brf-test-company").put("name","[합성] 시험기업")
+                    .put("directness","direct").put("reason","[합성] 계약 당사자").putArray("evidenceIds").add("personal-e-"+i);
+                var source=c.putArray("sources").addObject().put("evidenceId","personal-e-"+i).put("documentId","brf-test-document")
+                    .put("documentVersion","synthetic-personal-v1").put("bodySha256","a".repeat(64)).put("grantId","brf-test-grant")
+                    .put("grantRevision","synthetic-v1").put("publishedAt","2026-10-15T01:00:00Z").put("quoteVerified",true)
+                    .put("quote","[합성] 독립 계약 "+i).put("url","https://example.invalid/synthetic");
+                source.putArray("recipients").add("authored-replay");
+            }
+            String raw=pool.toString();
+            jdbc.update("""
+                INSERT INTO briefing_personal_pools(id,round_id,input_sha256,snapshot,snapshot_sha256)
+                VALUES('personal-test-pool',?,'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',?::jsonb,
+                encode(sha256(convert_to((?::jsonb)::text,'UTF8')),'hex'))
+                """,ROUND,raw,raw);
+            assertThrows(DataAccessException.class,()->jdbc.update("UPDATE briefing_personal_pools SET snapshot='{}'"));
+            var unauth=http.send(HttpRequest.newBuilder(URI.create(base()+"/api/v1/briefings/"+ROUND+"/personalized/issues")).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(401,unauth.statusCode());
+            String token=personalSessions.issue(member,null,"personal-test").token();
+            var response=http.send(HttpRequest.newBuilder(URI.create(base()+"/api/v1/briefings/"+ROUND+"/personalized/issues?memberId="+other))
+                .header("Cookie","zoop_session="+token).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,response.statusCode(),response.body());
+            assertEquals("no-store",response.headers().firstValue("Cache-Control").orElse(null));
+            var result=JSON.readTree(response.body());
+            assertEquals(3,result.path("items").size());
+            assertEquals(3,result.path("eligibleCount").asInt());
+            assertTrue(result.path("items").valueStream().noneMatch(c->c.path("issueId").asString().equals("brf-test-event")));
+            assertFalse(response.body().contains("grantId"));
+            String otherToken=personalSessions.issue(other,null,"personal-test").token();
+            var otherResponse=http.send(HttpRequest.newBuilder(URI.create(base()+"/api/v1/briefings/"+ROUND+"/personalized/issues?memberId="+member))
+                .header("Cookie","zoop_session="+otherToken).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals("no_companies",JSON.readTree(otherResponse.body()).path("status").asString());
+            jdbc.update("UPDATE articles SET access_status='private' WHERE id='brf-test-document'");
+            var revoked=http.send(HttpRequest.newBuilder(URI.create(base()+"/api/v1/briefings/"+ROUND+"/personalized/issues"))
+                .header("Cookie","zoop_session="+token).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(503,revoked.statusCode());
+            assertEquals(before,jdbc.queryForObject("SELECT payload_sha256 FROM briefing_rounds WHERE id=?",String.class,ROUND));
+        } finally {
+            jdbc.execute("TRUNCATE briefing_personal_pools");
+            jdbc.update("DELETE FROM members WHERE id IN (?,?)",member,other);
+        }
+    }
+
     @Test
     void publishedMorningAndEveningRestoreOriginalIssuesMarketAndComparisonOverRealHttp() throws Exception {
         var morning = get(MORNING, "morning-http-request");
@@ -153,7 +227,7 @@ class BriefingHttpPostgresTest {
 
     @Test
     void quietEveningRestoresFixedMorningRecapAndPreservesHashes() throws Exception {
-        loadQuietEveningFixture();
+        loadFixture(quietEveningFixture());
         String digest = jdbc.queryForObject("SELECT payload_sha256 FROM briefing_rounds WHERE id=?", String.class,
                 "brf-test-2026-10-15-morning");
         var response = get("/api/v1/briefings/" + ROUND + "/recap", "recap-http");
@@ -170,7 +244,7 @@ class BriefingHttpPostgresTest {
 
     @Test
     void recapDoesNotHidePriorRevocationCorrectionOrAnUnpublishedCurrentRound() throws Exception {
-        loadQuietEveningFixture();
+        loadFixture(quietEveningFixture());
         String path = "/api/v1/briefings/" + ROUND + "/recap";
         Files.writeString(GRANTS, "{}");
         assertEquals(503, get(path, "revoked-recap").status());
@@ -191,8 +265,7 @@ class BriefingHttpPostgresTest {
 
     @Test
     void recapAndGraphKeepCurrentEmptyScopeSeparateFromPreservedMorning() throws Exception {
-        loadQuietEveningFixture();
-        registerSyntheticGraph();
+        registerSyntheticGraph(quietEveningFixture());
         var recap = get("/api/v1/briefings/" + ROUND + "/recap", "combined-recap");
         assertEquals(200, recap.status(), recap.body());
         assertEquals("available", recap.json().path("status").asText());
@@ -360,7 +433,7 @@ class BriefingHttpPostgresTest {
 
     @Test
     void publishedRoundGraphRestoresCanonicalTargetsAndNeverUsesANewerActivePointer() throws Exception {
-        registerSyntheticGraph();
+        registerSyntheticGraph(resource("fixture.sql"));
         var basis = get("/api/v1/briefings/" + ROUND + "/graph", "basis-ready");
         assertEquals(200, basis.status(), basis.body());
         assertEquals("available", basis.json().path("status").asText());
@@ -369,13 +442,13 @@ class BriefingHttpPostgresTest {
         String query = "/api/v1/graph?round=" + ROUND;
         var graph = get(query, "graph-ready");
         assertEquals(200, graph.status(), graph.body());
-        assertEquals("synthetic-graph-v1", graph.json().at("/metadata/graphVersion").asText());
+        assertEquals(GRAPH_VERSION, graph.json().at("/metadata/graphVersion").asText());
         assertEquals("2026-10-15T08:30:00Z", graph.json().at("/metadata/asOf").asText());
         assertEquals(2, graph.json().path("nodes").size());
         assertEquals(1, graph.json().path("edges").size());
         assertTrue(graph.json().path("nodes").values().stream().allMatch(n -> n.path("isFocus").asBoolean()));
         // The round remains pinned even if the current market pointer is cleared.
-        jdbc.update("UPDATE graph_versions SET active=false WHERE id='synthetic-graph-v1'");
+        jdbc.update("UPDATE graph_versions SET active=false WHERE id=?", GRAPH_VERSION);
         assertEquals(200, get(query, "same-round-after-pointer-change").status());
         assertEquals(422, get(query + "&graphVersion=newest", "wrong-version").status());
         assertEquals(422, get(query + "&asOf=2026-10-16T00:20:00Z", "wrong-cutoff").status());
@@ -385,35 +458,13 @@ class BriefingHttpPostgresTest {
 
     @Test
     void originalRoundGraphRelationEvidenceAndDocumentsUseThePinnedReceiptOverHttp() throws Exception {
-        String version = "gv-" + com.zoop.common.json.Canonical.sha256("briefing-round-http");
-        String evidenceId = "ev-" + "7".repeat(64);
-        loadFixture(resource("fixture.sql").replace("synthetic-graph-v1", version).replace("brf-test-evidence", evidenceId));
-        byte[] snapshot = resource("graph-snapshot.json").replace("synthetic-graph-v1", version)
-                .replace("brf-test-evidence", evidenceId).getBytes(StandardCharsets.UTF_8);
-        Files.write(GRAPH_ROOT.resolve("graph/synthetic.json"), snapshot);
-        Files.setPosixFilePermissions(GRAPH_ROOT.resolve("graph/synthetic.json"), java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
-        String digest = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(snapshot));
-        jdbc.update("INSERT INTO artifacts(id,kind,storage_uri,sha256,bytes,media_type,created_at) VALUES ('brf-test-graph','graph_snapshot','artifact-root:graph/synthetic.json',?,?,'application/json','2026-10-15T09:00:00Z')", digest, snapshot.length);
-        jdbc.update("INSERT INTO graph_versions(id,sequence,kind,created_at,published_at,created_by,source_label,issue_count,relation_count,article_count,snapshot_artifact_id,review_revision,active) VALUES (?,1,'snapshot','2026-10-15T09:00:00Z','2026-10-15T09:00:00Z','system','synthetic',1,1,1,'brf-test-graph',1,true)", version);
-        jdbc.update("INSERT INTO graph_activations(version_id,action,actor_kind,pointer_changed,admin_email_snapshot,activated_at) VALUES (?,'publish','system',true,'system','2026-10-15T09:00:00Z')", version);
-        String receipt = """
-                {"schemaVersion":"zoop-graph-handoff-import-receipt-1","handoffId":"briefing-round-http","bundle":{"articles":[
-                {"articleId":"brf-test-document","articleVersion":"synthetic-v1","observations":[
-                {"sourceId":"authored-replay","grant":{"grantId":"round-read-grant","revision":"r1"}}]}]}}
-                """;
-        try (var files = com.zoop.artifact.storage.ArtifactFileStore.at(GRAPH_ROOT).open()) {
-            var file = files.put("verification_receipt", version + ".json", receipt.getBytes(StandardCharsets.UTF_8));
-            jdbc.update("INSERT INTO artifacts(id,kind,storage_uri,sha256,bytes,media_type,created_at) VALUES (?,'verification_receipt',?,?,?,'application/json','2026-10-15T09:00:00Z')", "artifact-receipt-" + version, file.uri(), file.sha256(), file.bytes());
-        }
-        String sources = """
-                {"schemaVersion":"zoop-ingestion-s2-1","revision":"r1","sources":[{"sourceId":"authored-replay","adapter":"authored-files",
-                "inputRoot":"/srv/zoop/test","allowedHosts":["example.invalid"],"scopes":[{"scopeId":"body","selection":"authored test",
-                "initialCursor":null,"articleXPath":null,"timestampLimitations":["synthetic"]}],"grant":{"grantId":"round-read-grant",
-                "revision":"r1","sourceId":"authored-replay","enabled":true,"rights":"known","allowedOperations":["read","store","quote-display"],
-                "recipients":[],"purposes":[],"evidence":["authored fixture"],"expiresAt":null}}]}
-                """;
-        Files.writeString(GRAPH_ROOT.resolve("sources.json"), sources);
+        String version = GRAPH_VERSION;
+        String evidenceId = GRAPH_EVIDENCE;
+        registerSyntheticGraph(resource("fixture.sql"));
+        String sources = Files.readString(GRAPH_ROOT.resolve("sources.json"));
         String original = publishedPayload();
+        var publication = get(EVENING, "round-original");
+        assertEquals(200, publication.status(), publication.body());
         var graph = get("/api/v1/graph?round=" + ROUND, "round-imported-graph");
         assertEquals(200, graph.status(), graph.body());
         String edge = graph.json().path("edges").get(0).path("id").asText();
@@ -437,9 +488,24 @@ class BriefingHttpPostgresTest {
         assertEquals(404, missingRound.status(), missingRound.body());
         assertEquals("RESOURCE_NOT_FOUND", missingRound.json().at("/error/code").asText());
         Files.writeString(GRAPH_ROOT.resolve("sources.json"), sources.replace("\"enabled\":true", "\"enabled\":false"));
-        assertEquals("EVIDENCE_UNAVAILABLE", get("/api/v1/evidence/" + evidenceId + query, "revoked-quote").json().at("/error/code").asText());
+        assertUnavailable(EVENING);
+        assertUnavailable("/api/v1/briefings/" + ROUND + "/graph");
+        assertUnavailable("/api/v1/graph?round=" + ROUND);
+        assertUnavailable("/api/v1/evidence/" + evidenceId + query);
         Files.writeString(GRAPH_ROOT.resolve("sources.json"), sources);
         assertEquals(200, get("/api/v1/evidence/" + evidenceId + query, "restored-quote").status());
+        String outsideScope = "ev-" + "8".repeat(64);
+        jdbc.update("""
+                INSERT INTO evidence(id,article_id,article_version,text_artifact_id,quote,start_offset,end_offset,
+                    offset_unit,input_kind,raw_locator_ids,quote_verified,verification_artifact_id,verified_at,created_at)
+                SELECT ?,article_id,article_version,text_artifact_id,quote,start_offset,end_offset,
+                    offset_unit,input_kind,raw_locator_ids,quote_verified,verification_artifact_id,verified_at,created_at
+                FROM evidence WHERE id=?
+                """, outsideScope, evidenceId);
+        var denied = get("/api/v1/evidence/" + outsideScope + query, "denied-scope");
+        assertEquals(404, denied.status(), denied.body());
+        assertEquals("EVIDENCE_UNAVAILABLE", denied.json().at("/error/code").asText());
+        assertEquals(200, get("/api/v1/evidence/" + evidenceId + query, "still-authorized-quote").status());
         assertEquals(original, publishedPayload(), "all reads preserve the original publication");
     }
 
@@ -457,27 +523,59 @@ class BriefingHttpPostgresTest {
 
     @Test
     void missingOrChangedSnapshotIsUnavailableWithoutAReplacementGraph() throws Exception {
-        registerSyntheticGraph();
+        registerSyntheticGraph(resource("fixture.sql"));
+        String original = publishedPayload();
+        var basis = get("/api/v1/briefings/" + ROUND + "/graph", "snapshot-ready");
+        assertEquals(200, basis.status(), basis.body());
+        assertEquals("available", basis.json().path("status").asText());
         Files.writeString(GRAPH_ROOT.resolve("graph/synthetic.json"), "{tampered}");
-        var basis = get("/api/v1/briefings/" + ROUND + "/graph", "snapshot-tampered");
-        assertEquals(200, basis.status());
-        assertEquals("unavailable", basis.json().path("status").asText());
-        assertEquals("snapshot_unavailable", basis.json().path("unavailableReason").asText());
-        assertTrue(basis.json().path("keyIssueIds").isEmpty());
-        assertEquals(503, get("/api/v1/graph?round=" + ROUND, "no-fallback").status());
+        assertUnavailable("/api/v1/briefings/" + ROUND + "/graph");
+        assertUnavailable("/api/v1/graph?round=" + ROUND);
+        assertUnavailable(EVENING);
+        Files.delete(GRAPH_ROOT.resolve("graph/synthetic.json"));
+        assertUnavailable("/api/v1/briefings/" + ROUND + "/graph");
+        assertUnavailable("/api/v1/graph?round=" + ROUND);
+        assertEquals(original, publishedPayload());
     }
 
-    private void registerSyntheticGraph() throws Exception {
-        byte[] bytes = resource("graph-snapshot.json").getBytes(StandardCharsets.UTF_8);
+    private void registerSyntheticGraph(String fixture) throws Exception {
+        loadFixture(fixture.replace("synthetic-graph-v1", GRAPH_VERSION).replace("brf-test-evidence", GRAPH_EVIDENCE));
+        var snapshot = (tools.jackson.databind.node.ObjectNode) JSON.readTree(
+                resource("graph-snapshot.json").replace("brf-test-evidence", GRAPH_EVIDENCE));
+        snapshot.put("versionId", GRAPH_VERSION).put("sourceBundleId", "briefing-round-http");
+        byte[] bytes = JSON.writeValueAsBytes(snapshot);
         Files.write(GRAPH_ROOT.resolve("graph/synthetic.json"), bytes);
         Files.setPosixFilePermissions(GRAPH_ROOT.resolve("graph/synthetic.json"), java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
         String sha = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
         jdbc.update("INSERT INTO artifacts(id,kind,storage_uri,sha256,bytes,media_type,created_at) VALUES ('brf-test-graph','graph_snapshot','artifact-root:graph/synthetic.json',?,?,'application/json','2026-10-15T09:00:00Z')", sha, bytes.length);
-        jdbc.execute("""
+        jdbc.update("""
                 INSERT INTO graph_versions(id,sequence,kind,created_at,published_at,created_by,source_label,issue_count,relation_count,article_count,snapshot_artifact_id,review_revision,active)
-                VALUES ('synthetic-graph-v1',1,'snapshot','2026-10-15T09:00:00Z','2026-10-15T09:00:00Z','system','synthetic',1,1,1,'brf-test-graph',1,true);
+                VALUES (?,1,'snapshot','2026-10-15T09:00:00Z','2026-10-15T09:00:00Z','system','graph-handoff:briefing-round-http',1,1,1,'brf-test-graph',1,true)
+                """, GRAPH_VERSION);
+        jdbc.update("""
                 INSERT INTO graph_activations(version_id,action,actor_kind,pointer_changed,admin_email_snapshot,activated_at)
-                VALUES ('synthetic-graph-v1','publish','system',true,'system','2026-10-15T09:00:00Z');
+                VALUES (?,'publish','system',true,'system','2026-10-15T09:00:00Z')
+                """, GRAPH_VERSION);
+        String receipt = """
+                {"schemaVersion":"zoop-graph-handoff-import-receipt-1","handoffId":"briefing-round-http","bundle":{"articles":[
+                {"articleId":"brf-test-document","articleVersion":"synthetic-v1","textSha256":"%s","observations":[
+                {"sourceId":"authored-replay","grant":{"grantId":"round-read-grant","revision":"r1"}}]}]}}
+                """.formatted("a".repeat(64));
+        try (var files = com.zoop.artifact.storage.ArtifactFileStore.at(GRAPH_ROOT).open()) {
+            var file = files.put("verification_receipt", GRAPH_VERSION + ".json", receipt.getBytes(StandardCharsets.UTF_8));
+            jdbc.update("INSERT INTO artifacts(id,kind,storage_uri,sha256,bytes,media_type,created_at) VALUES (?,'verification_receipt',?,?,?,'application/json','2026-10-15T09:00:00Z')",
+                    "artifact-receipt-" + GRAPH_VERSION, file.uri(), file.sha256(), file.bytes());
+        }
+        jdbc.update("""
+                INSERT INTO graph_version_sources(graph_version_id,ordinal,handoff_id,receipt_artifact_id,bundle_snapshot_artifact_id)
+                VALUES (?,0,'briefing-round-http',?,'brf-test-graph')
+                """, GRAPH_VERSION, "artifact-receipt-" + GRAPH_VERSION);
+        Files.writeString(GRAPH_ROOT.resolve("sources.json"), """
+                {"schemaVersion":"zoop-ingestion-s2-1","revision":"r1","sources":[{"sourceId":"authored-replay","adapter":"authored-files",
+                "inputRoot":"/srv/zoop/test","allowedHosts":["example.invalid"],"scopes":[{"scopeId":"body","selection":"authored test",
+                "initialCursor":null,"articleXPath":null,"timestampLimitations":["synthetic"]}],"grant":{"grantId":"round-read-grant",
+                "revision":"r1","sourceId":"authored-replay","enabled":true,"rights":"known","allowedOperations":["read","store","quote-display"],
+                "recipients":[],"purposes":[],"evidence":["authored fixture"],"expiresAt":null}}]}
                 """);
     }
 

@@ -5,6 +5,7 @@ Replay here is authored response replay, not independent AI inference: no networ
 """
 from __future__ import annotations
 
+import argparse
 import html as htmllib
 import hashlib
 import http.server
@@ -15,6 +16,7 @@ import sys
 import shutil
 import tempfile
 import threading
+import sqlite3
 import stat
 from pathlib import Path
 
@@ -23,6 +25,7 @@ sys.path[:0] = [str(PIPELINE)]
 
 from scripts.ingestion_smoke import OfflineFixture, exact_check, json_bytes, ownership_env  # noqa: E402
 from zoop_ai_pipeline import extraction_replay as analysis  # noqa: E402
+from zoop_ai_pipeline import extraction_contracts as contracts  # noqa: E402
 from zoop_ai_pipeline.extraction_contracts import REPLAY_FORMAT, SCHEMA, TOPIC_RESPONSE, Catalogue, Mention, digest  # noqa: E402
 
 PROMPT = "zoop-extraction-authored-1"
@@ -48,10 +51,11 @@ class Kit(OfflineFixture):
         self.rounds = 0
 
     # ---- ingestion ----------------------------------------------------------------------------------------------
-    def ingest(self, name: str, documents: list[dict]) -> list[dict]:
+    def ingest(self, name: str, documents: list[dict], *, slot: str | None = None) -> list[dict]:
         """documents: [{"supplier": str|None, "html": bytes, "published": iso|None, "url": str, "publisher": str|None}] -> exact observation refs.
 
-        `publisher` is the operator-declared outlet written into the real fixture item (absent or None: unspecified, no key)."""
+        `publisher` is the operator-declared outlet written into the real fixture item (absent or None: unspecified, no key). `slot` makes the round a timed one: its checked
+        window ends at that instant (`window.through`) and the manifest covers exactly it, like a `tick` round."""
         items, bodies = [], {}
         for index, document in enumerate(documents):
             ref = f"d{index}"
@@ -59,9 +63,9 @@ class Kit(OfflineFixture):
             item = self.item(f"c{index}", document["supplier"], document.get("url", f"https://example.invalid/{name}/{index}"), ref=ref, publisher=document.get("publisher"))
             item["publishedAt"] = document.get("published", "2026-10-08T00:00:00+00:00")
             items.append(item)
-        manifest = self.manifest(name, [items], bodies=bodies)
+        manifest = self.manifest(name, [items], bodies=bodies, coverage=slot)
         rid = f"round-{name}"
-        result = self.cli("run", self.request(manifest, rid, self.rounds), state="ingestion", manifest=manifest)
+        result = self.cli("run", self.request(manifest, rid, self.rounds, {"from": slot, "through": slot} if slot else None), state="ingestion", manifest=manifest)
         self.rounds += 1
         assert result["state"] == "complete" and result["counts"]["textReady"] == len(documents), result
         return [{"roundId": rid, "sourceId": "synthetic-source", "page": r["page"], "ordinal": r["ordinal"], "documentId": r["documentId"],
@@ -131,7 +135,7 @@ class Kit(OfflineFixture):
 
     # ---- process runner -------------------------------------------------------------------------------------
     def run(self, command: str, request: dict, *, state: str = "extraction", replay: Path | None = None, topic: Path | None = None,
-            crash: str | None = None, expected: int = 0, sources: bool = True, raw: bool = False, forbid_execution: bool = False,
+            crash: str | None = None, expected: int | tuple[int, ...] = 0, sources: bool = True, raw: bool = False, forbid_execution: bool = False,
             live: dict | None = None, extra: tuple = ()):
         """`forbid_execution` ends the process with 76 if it reaches stage execution, a replay model or a call reservation (a submit must not).
 
@@ -165,7 +169,7 @@ class Kit(OfflineFixture):
         if topic:
             argv += ["--topic-replay", str(topic)]
         child = subprocess.run(argv, input=json_bytes(request), stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=PIPELINE, timeout=120)
-        assert child.returncode == expected, (command, child.returncode, child.stdout.decode(), child.stderr.decode())
+        assert child.returncode in (expected if isinstance(expected, tuple) else (expected,)), (command, child.returncode, child.stdout.decode(), child.stderr.decode())
         assert not child.stderr or expected != 0, child.stderr.decode()
         if raw:
             return child.stdout.decode()
@@ -469,6 +473,138 @@ def smoke(root: Path) -> dict:
     return {"status": "passed", "schemaVersion": SCHEMA, "checks": checks, "providerCalls": 0, "modelCalls": 0, "networkAttempts": "audit hook rejected socket use in every CLI subprocess; none occurred"}
 
 
+def identity_smoke(root: Path) -> dict:
+    """Pinned company selection and event identity through installed CLIs and their actual immutable SQLite receipts."""
+    kit, checks, jobs = Kit(root), [], []
+    catalogue = {"revision": "identity-master-1", "companies": [
+        {"companyId": "SYNTH-1", "name": "합성기업", "aliases": ["Synthetic Co", "동명기업"], "ticker": "000001"},
+        {"companyId": "SYNTH-2", "name": "합성상대", "aliases": ["동명기업"], "ticker": None}]}
+    ref1, ref2, ref3 = kit.ingest("identity", [
+        {"supplier": "identity-1", "html": page(Q3, "Synthetic Co, 동명기업, 미등록기업은 별도 표기다.")},
+        {"supplier": "identity-2", "html": page(Q3B)},
+        {"supplier": "identity-3", "html": page("합성기업은 계약의 후속 내용을 알렸다.")}])
+    a1, a2, a3 = [kit.article(ref) for ref in (ref1, ref2, ref3)]
+    m1 = kit.mention(a1, "identity-mention", [kit.evidence(a1, Q3)], event_time="2026-09-30")
+    m2 = kit.mention(a2, "identity-mention", [kit.evidence(a2, Q3B)], event_time="2026-09-30")
+    m3 = kit.mention(a3, "identity-mention", [kit.evidence(a3, a3.body)], event_time="2026-09-30")
+    group1, group3 = [(ref1, a1, m1)], [(ref3, a3, m3)]
+    event1, event3 = kit.event("event-existing-1", [(ref1, m1)]), kit.event("event-existing-3", [(ref3, m3)])
+
+    def check(name, passed, **observed):
+        checks.append({"name": name, "passed": bool(passed), **observed})
+
+    def run(name, ref, article, mention, comparisons=(), *, masters=None):
+        request = kit.submit("identity-" + name, ref, [item[0] for item in comparisons])
+        request["catalogue"] = masters or catalogue
+        replay = kit.replay("identity-" + name)
+        replay.catalogue = Catalogue.model_validate(request["catalogue"])
+        replay.extract(article, [mention])
+        for event, group, relation, evidence in comparisons:
+            replay.compare(mention, event["eventId"], group, article, relation, "authored identity control", evidence)
+        path = replay.write()
+        result = kit.run("run", request, replay=path)
+        assert result["usage"]["providerCalls"] == result["usage"]["paidModelCalls"] == 0
+        assert result["provenance"] == {"sourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"}
+        with sqlite3.connect((root / "extraction" / "extraction.sqlite3").as_uri() + "?mode=ro&immutable=1", uri=True) as db:
+            saved = db.execute("SELECT response,verdict FROM calls WHERE job_id=? AND stage='extract'", (request["jobId"],)).fetchone()
+            count = db.execute("SELECT count(*) FROM event_candidates WHERE job_id=?", (request["jobId"],)).fetchone()[0]
+        check(name + ":receipt", json.loads(saved[0]) == {"mentions": [mention]}, verdict=saved[1], candidateRows=count)
+        jobs.append({"jobId": result["jobId"], "state": result["state"], "failure": result["failure"], "usage": result["usage"],
+                     "inputDigest": result["inputDigest"], "adapter": result["binding"]["adapter"],
+                     "replayDigest": hashlib.sha256(path.read_bytes()).hexdigest()})
+        return result, request, path
+
+    def candidate(result):
+        return result["eventCandidates"][0]
+
+    alias = {**m1, "participants": [{"company_id": "SYNTH-1", "name": "  sYnTheTiC   Co  ", "role": "issuer"}]}
+    first, request, replay = run("unique-alias", ref1, a1, alias)
+    check("normalized-explicit-alias", first["state"] == "ready" and candidate(first)["mention"]["participants"] == alias["participants"])
+    check("new", candidate(first)["disposition"]["status"] == "new-event-candidate" and candidate(first)["disposition"]["targetEventId"] is None)
+    before = hashlib.sha256((root / "extraction" / "extraction.sqlite3").read_bytes()).hexdigest()
+    repeated = kit.run("run", request, replay=replay)
+    resumed = kit.run("resume", kit.job_selector(request["jobId"]))
+    inspected = kit.run("inspect", kit.job_selector(request["jobId"]))
+    after = hashlib.sha256((root / "extraction" / "extraction.sqlite3").read_bytes()).hexdigest()
+    check("repeat-resume-inspect", first == repeated == resumed == inspected and before == after, ledgerSha256=after)
+    other_job = kit.run("run", {**request, "jobId": "identity-other-job"}, replay=replay)
+    check("stable-candidate-across-job-labels", candidate(other_job) == candidate(first))
+
+    evidence = [kit.evidence(a2, Q3B), kit.evidence(a1, Q3)]
+    same, _, _ = run("same", ref2, a2, m2, [(event1, group1, "SAME", evidence)])
+    sc = candidate(same)
+    check("same-links-existing-not-document", sc["disposition"]["status"] == "same-event-candidate"
+          and sc["disposition"]["targetEventId"] == "event-existing-1" and sc["eventCandidateId"] != candidate(first)["eventCandidateId"]
+          and sc["document"]["documentId"] != candidate(first)["document"]["documentId"])
+    check("event-date-not-publication-date", sc["mention"]["event_time"] == "2026-09-30" and a2.published_at == "2026-10-08T00:00:00+00:00")
+    for label, relation, expected in (("different", "DIFFERENT", "new-event-candidate"), ("hold", "HOLD", "held"), ("conflict", "CONFLICT", "held")):
+        result, _, _ = run(label, ref2, a2, m2, [(event1, group1, relation, [])])
+        check(label, candidate(result)["disposition"]["status"] == expected and candidate(result)["disposition"]["targetEventId"] is None)
+    missing, _, _ = run("same-without-evidence", ref2, a2, m2, [(event1, group1, "SAME", [])])
+    check("ungrounded-same-held", candidate(missing)["comparisons"][0]["effective"]["rule"] == "evidence_missing"
+          and candidate(missing)["disposition"]["status"] == "held")
+    multi, _, _ = run("multiple-same", ref2, a2, m2, [(event1, group1, "SAME", evidence),
+                        (event3, group3, "SAME", [kit.evidence(a2, Q3B), kit.evidence(a3, a3.body)])])
+    check("multiple-same-no-winner", candidate(multi)["disposition"]["status"] == "held"
+          and candidate(multi)["disposition"]["targetEventId"] is None and candidate(multi)["disposition"]["reason"] == "multiple_same_events")
+    conflicting, _, _ = run("period-conflict", ref2, a2, {**m2, "period": "2026Q4"}, [(event1, group1, "SAME", evidence)])
+    check("known-conflict-prevents-same", candidate(conflicting)["comparisons"][0]["effective"]["relation"] == "DIFFERENT"
+          and candidate(conflicting)["disposition"]["status"] == "new-event-candidate")
+
+    for label, name, claimed in (
+        ("ambiguous-null", "동명기업", None), ("nonmatch-null", "미등록기업", None), ("unique-null", "합성기업", None),
+        ("invented-id", "합성기업", "INVENTED"), ("wrong-master", "합성기업", "SYNTH-2"),
+        ("ambiguous-id", "동명기업", "SYNTH-1"), ("nonmatch-id", "미등록기업", "SYNTH-1"),
+        ("ticker-not-alias", "000001", "SYNTH-1"), ("punctuation-significant", "합성-기업", "SYNTH-1"),
+        ("suffix-significant", "합성기업(주)", "SYNTH-1")):
+        mention = {**m1, "participants": [{"company_id": claimed, "name": name, "role": "issuer"}]}
+        result, _, _ = run(label, ref1, a1, mention)
+        if claimed is None:
+            check(label, result["state"] == "ready" and candidate(result)["mention"]["participants"] == mention["participants"])
+        else:
+            check(label, result["state"] == "stopped" and result["failure"]["code"] == "extraction_reply_invalid" and not result["eventCandidates"],
+                  observedState=result["state"], observedFailure=result["failure"])
+            check(label + ":no-resend", kit.run("resume", kit.job_selector(result["jobId"])) == result)
+
+    forged = {**m1, "participants": [{"company_id": "INVENTED", "name": "합성기업", "role": "issuer"}]}
+    request = kit.submit("identity-bad-snapshot", ref2, [kit.event("event-existing-1", [(ref1, forged)])])
+    request["catalogue"] = catalogue
+    replay = kit.replay("identity-bad-snapshot")
+    replay.catalogue = Catalogue.model_validate(catalogue)
+    replay.extract(a2, [m2]).compare(m2, "event-existing-1", [(ref1, a1, forged)], a2, "SAME", "authored", evidence)
+    bad_snapshot = kit.run("run", request, replay=replay.write(), expected=(0, 2))
+    check("snapshot-cannot-bypass", bad_snapshot.get("error", {}).get("code") == "snapshot_member_invalid",
+          error=bad_snapshot.get("error"), observedState=bad_snapshot.get("state"))
+
+    revised = {**catalogue, "revision": "identity-master-2"}
+    versioned, _, _ = run("catalogue-revision", ref1, a1, alias, masters=revised)
+    check("catalogue-revision-reidentifies", candidate(versioned)["eventCandidateId"] != candidate(first)["eventCandidateId"]
+          and candidate(versioned)["mention"]["participants"] == alias["participants"])
+    raw1, = kit.ingest("identity-raw-1", [{"supplier": "identity-raw", "html": page(Q3), "url": "https://example.invalid/identity-raw"}])
+    raw2, = kit.ingest("identity-raw-2", [{"supplier": "identity-raw", "html": page(Q3).replace(b"&amp;", b"&#38;"), "url": "https://example.invalid/identity-raw"}])
+    ra, rb = kit.article(raw1), kit.article(raw2)
+    mr = kit.mention(ra, "identity-raw", [kit.evidence(ra, Q3)])
+    one, raw_request, raw_replay = run("raw-1", raw1, ra, mr)
+    two, _, _ = run("raw-2", raw2, rb, mr)
+    check("raw-version-identities", ra.version == rb.version and raw1["documentId"] == raw2["documentId"]
+          and raw1["rawVersion"] != raw2["rawVersion"] and raw1["documentVersion"] != raw2["documentVersion"]
+          and candidate(one)["eventCandidateId"] != candidate(two)["eventCandidateId"])
+    conflict = kit.run("run", {**raw_request, "incoming": raw2}, replay=raw_replay, expected=2)
+    check("same-job-changed-input-refused", conflict["error"]["code"] == "job_input_conflict")
+    ambiguous_version, _, _ = run("ambiguous-version", raw2, rb, mr,
+        [(kit.event("event-raw", [(raw1, mr)]), [(raw1, ra, mr)], "SAME", [kit.evidence(rb, Q3)])])
+    check("same-projection-distinct-version-held", candidate(ambiguous_version)["comparisons"][0]["effective"]["rule"] == "evidence_source_ambiguous"
+          and candidate(ambiguous_version)["disposition"]["status"] == "held")
+    return {"status": "passed" if all(c["passed"] for c in checks) else "failed", "schemaVersion": SCHEMA,
+            "scope": "FS077 / WBS 6.6.16: pinned-name identity admission and event candidate controls, not app master creation or AI quality",
+            "checks": checks, "jobs": jobs, "providerCalls": 0, "modelCalls": 0,
+            "implementation": str(Path(analysis.__file__).resolve()),
+            "limits": {"companies": contracts.MAX_COMPANIES, "snapshotEvents": contracts.MAX_EVENTS, "membersPerEvent": contracts.MAX_MEMBERS,
+                       "documents": contracts.MAX_DOCUMENTS, "comparisons": contracts.MAX_COMPARISONS},
+            "failureClassification": "extraction_reply_invalid is identity/shape admission failure, not semantic REJECT",
+            "network": "offline authored fixtures; CLI socket/DNS audit guard; no provider credentials inherited"}
+
+
 # ======================================================================== live provider path ==========================
 # Two entry points over the same scenario: `--live-loopback` runs it (plus a fault matrix) against a deterministic provider SIMULATOR on 127.0.0.1 with fake
 # keys, no paid call; `--live` runs it ONCE against the real provider with the live environment the operator exported (gate, models, budget directory, keys).
@@ -564,7 +700,7 @@ def live_scenario(world: LiveWorld, requests=None) -> dict:
     assert queued["state"] == "queued" and queued["calls"] == [] and queued["provenance"] == request["provenance"] and "replay" not in queued["binding"]
     live = queued["binding"]["live"]
     assert live["bindingDigest"] == world.identity == live["runtime"]["identity"] and live["runtime"] == world.runtime.binding() and live["analysisVersion"] == "live-" + world.identity
-    assert queued["binding"]["adapter"]["version"] == "zoop-extraction-native-live-1" and queued["usage"]["executionMode"] == "live" and queued["usage"]["providerCalls"] == 0
+    assert queued["binding"]["adapter"]["version"] == contracts.LIVE_ADAPTER_VERSION and queued["usage"]["executionMode"] == "live" and queued["usage"]["providerCalls"] == 0
     assert world.run("submit", request, forbid_execution=True) == queued and (requests is None or len(requests) == 0)
     assert world.run("submit", request, env={}, expected=2)["error"]["code"] == "live_not_enabled"  # a live freeze needs the gate; nothing was written for it
     done = world.run("resume", selector, extra=("--initial-only",))
@@ -585,14 +721,14 @@ def live_scenario(world: LiveWorld, requests=None) -> dict:
 FAKE_KEYS = {"ZOOP_AI_API_KEY": "sk-offline-simulator-openai-key", "TYPESAFE_API_KEY": "tsk-offline-simulator-jev-key"}
 
 
-def _first_line(text: str) -> str:
-    return next(line.strip() for line in text.split("\n") if line.strip())
+def first_reference(source: dict) -> dict:
+    return {"segmentId": next(s["segmentId"] for s in source["segments"] if s["segmentId"] is not None and s["text"].strip())}
 
 
-def simulated_answer(stage: str, projection: dict) -> dict:
+def simulated_answer(stage: str, projection: dict, sources: list[dict]) -> dict:
     if stage == "extract":
         article = projection["article"]
-        evidence = {"article_id": article["article_id"], "article_version": article["article_version"], "start": None, "end": None, "quote": _first_line(article["body"])}
+        evidence = first_reference(sources[0])
         return {"mentions": [{"mention_id": "m-sim-1", "article_id": article["article_id"], "article_version": article["article_version"], "title": "합성 공급 계약",
                               "event_type": "supply_contract", "action": "공급 계약 발표", "target": "공급 계약", "event_time": None, "period": "2026Q3",
                               "assertion_status": "announced", "participants": [{"company_id": "SYNTH-1", "name": "합성기업", "role": "issuer"}],
@@ -600,14 +736,25 @@ def simulated_answer(stage: str, projection: dict) -> dict:
     if stage == "compare":
         incoming, member = projection["article"], projection["issue"]["articles"][0]
         return {"relation": "SAME", "reason": "simulated: same 2026Q3 supply contract", "evidence": [
-            {"article_id": a["article_id"], "article_version": a["article_version"], "start": None, "end": None, "quote": _first_line(a["body"])} for a in (incoming, member)]}
+            first_reference(next(s for s in sources if s["article_version"] == a["article_version"])) for a in (incoming, member)]}
     if stage == "topic":
         # The request carries schemaVersion zoop-topic-request-1, but the reply contract (and the strict schema the provider enforces) pins the RESPONSE literal.
         return {"schemaVersion": TOPIC_RESPONSE, "producerVersion": projection["producerVersion"], "topics": [{
             "label": "합성 공급 계약", "criteria": "simulated: same company contract events", "rationale": "simulated grouping",
             "members": [{"kind": e["kind"], "ref": e["ref"]} for e in projection["events"]],
-            "citations": [{"documentId": d["documentId"], "documentVersion": d["documentVersion"], "start": None, "end": None, "quote": _first_line(d["text"])}
-                          for d in projection["documents"][:2]]}]}
+            "citations": [first_reference(d) for d in sources[:2]]}]}
+    if stage == "relation":
+        event = next(e for e in projection["events"] if e["origin"] == "event-candidate")
+        document = event["documents"][0]
+        src = next(s for s in sources if all(s[k] == document[k] for k in ("documentId", "documentVersion")))
+        return {"schemaVersion": "zoop-relation-response-1", "producerVersion": "zoop-relation-producer-1", "relations": [{
+            "type": "PARTICIPATES_IN", "subject": {"kind": "company", "ref": "SYNTH-1"}, "object": {"kind": "event", "ref": event["ref"]},
+            "connection": "direct", "businessScope": None, "productScope": "공급 계약", "validity": {"from": None, "until": None, "citations": []},
+            "countries": [], "reason": "synthetic control", "citations": [first_reference(src)], "path": []}]}
+    if stage == "impact":
+        return {"schemaVersion": "zoop-impact-response-1", "producerVersion": "zoop-impact-producer-1", "impacts": [{
+            "impactedCompanyId": "SYNTH-1", "direction": "positive", "reason": "synthetic control",
+            "supporting": [first_reference(sources[0])], "opposing": [], "limitations": None}]}
     raise AssertionError(stage)
 
 
@@ -619,8 +766,17 @@ def chat_reply(content: str, *, prompt_tokens: int = 1200, completion_tokens: in
 
 
 def simulate(body: dict) -> dict:
+    if "questions" in body:
+        answers = {}
+        for key, question in body["questions"].items():
+            choices = list(question["criteria"])
+            winner = "supported" if "supported" in choices else "positive"
+            answers[key] = {"type": "choice", "choice": winner, "confidence": .95,
+                            "probabilities": {c: .97 if c == winner else .03 / (len(choices) - 1) for c in choices}}
+        return {"model": "jev-1.14.0", "answers": answers, "usage": {"input_tokens": 1200, "output_tokens": 0}}
     stage_input = json.loads(body["messages"][1]["content"])
-    return chat_reply(json.dumps(simulated_answer(stage_input["stage"], stage_input["input"]), ensure_ascii=False))
+    answer = simulated_answer(stage_input["stage"], stage_input["input"], stage_input["sources"])
+    return chat_reply(json.dumps({**answer, "citationFormat": stage_input["citationFormat"]}, ensure_ascii=False))
 
 
 class SimulatedProvider:
@@ -672,13 +828,47 @@ def simulator_env(base_url: str, budget: Path, **changes: str) -> dict[str, str]
             "ZOOP_AI_PIPELINE_LIVE_MAX_USD": "5", "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS": "40", "ZOOP_AI_PIPELINE_LIVE_TIMEOUT_SECONDS": "10", **FAKE_KEYS, **changes}
 
 
+def relation_scenario(world: LiveWorld, hits: list) -> dict:
+    """Actual S3 module CLI over the completed S2 job and the same synthetic loopback provider."""
+    kit = world.kit
+    upstream = world.run("inspect", kit.job_selector("live-main"), env={})
+    request = {"schemaVersion": "zoop-relation-s3", "jobId": "live-relation", "provenance": upstream["provenance"],
+               "upstream": {"jobId": "live-main", "inputDigest": upstream["inputDigest"]}}
+    common = ["--state-dir", str(kit.root / "relation"), "--extraction-state-dir", str(kit.root / "extraction"),
+              "--ingestion-state-dir", str(kit.root / "ingestion"), "--sources", str(kit.registry_path)]
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", **ownership_env(), **CUSTOM}
+
+    def run(command, value, live):
+        child = subprocess.run([sys.executable, "-m", "zoop_ai_pipeline.relation_cli", command, *common], input=json_bytes(value),
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, env={**env, **(world.env if live else {})}, cwd=PIPELINE, timeout=120)
+        assert child.returncode == 0 and not child.stderr, (child.returncode, child.stdout.decode(), child.stderr.decode())
+        return json.loads(child.stdout)
+
+    before = len(hits)
+    done = run("run", request, True)
+    assert done["state"] == "ready" and done["delivery"]["status"] == "current", done
+    assert done["counts"]["eligibility"]["eligible"] == 1 and done["counts"]["impactLabels"]["positive"] == 1, done
+    assert len(hits) == before + 4 and all(c["state"] == "received" and c["verdict"] is None for c in done["calls"])
+    assert {c["stage"] for c in done["calls"]} == {"relation", "verify-relation", "impact", "verify-impact"}
+    for hit in hits[before:]:
+        key = "TYPESAFE_API_KEY" if hit["path"].endswith("systemone") else "ZOOP_AI_API_KEY"
+        assert hit["authorization"] == "Bearer " + FAKE_KEYS[key]
+    texts = world.documents()
+    for c in done["relations"][0]["citations"]:
+        assert texts[(c["documentId"], c["documentVersion"])][c["start"]:c["end"]] == c["quote"]
+    selector = {"schemaVersion": "zoop-relation-s3", "jobId": "live-relation"}
+    assert run("inspect", selector, False) == done and run("resume", selector, False) == done and len(hits) == before + 4
+    return {"state": done["state"], "delivery": done["delivery"]["status"], "counts": done["counts"], "providerRequests": 4}
+
+
 def loopback_smoke(root: Path) -> dict:
     """The live path through actual CLI subprocesses against the simulator: the main scenario plus every provider/process fault the contract names."""
     checks = []
     with SimulatedProvider() as provider:
-        env = simulator_env(provider.base_url, root / "budget")
+        env = simulator_env(provider.base_url, root / "budget", TYPESAFE_BASE_URL=provider.base_url)
         world = LiveWorld(root / "world", env)
         kit, hits = world.kit, provider.requests
+        kit.allow_model_send(world.runtime, ("extract", "compare", "topic", "relation", "verify-relation", "impact", "verify-impact"))
 
         report = live_scenario(world, hits)
         assert report["state"] == "ready" and report["usage"]["providerCalls"] == 3 == len(hits) and report["counts"]["topicCandidates"] == 1, report
@@ -686,6 +876,8 @@ def loopback_smoke(root: Path) -> dict:
         assert all(h["authorization"] == "Bearer " + FAKE_KEYS["ZOOP_AI_API_KEY"] for h in hits)
         assert not any(leak in h["body"]["messages"][1]["content"] for h in hits for leak in ("allow_model_send", "example.invalid", "operator-grant"))
         checks.append("main scenario: frozen live binding, one automatic dispatch, extract+compare+topic receipts, exact citations, env-free inspect, no resend, no key in any state file")
+        relation_report = relation_scenario(world, hits)
+        checks.append("S3 module CLI: relation+impact references expand after raw receipts, independent verifier requests, ready/current, env-free read and resume")
 
         # Provider silence after the request left: reconciling, never resent, usage unknown rather than zero.
         before, provider.mode = len(hits), "silent"
@@ -747,7 +939,7 @@ def loopback_smoke(root: Path) -> dict:
         checks.append("model-send rights (operation, purpose, recipient) and the frozen configuration are enforced before any send; a drifted environment cannot resume or re-freeze a job")
 
         no_secret_anywhere(root, env)
-    return {"status": "passed", "schemaVersion": SCHEMA, "checks": checks, "providerRequests": len(hits), "paidModelCalls": 0,
+    return {"status": "passed", "schemaVersion": SCHEMA, "checks": checks, "s2": report, "s3": relation_report, "providerRequests": len(hits), "paidModelCalls": 0,
             "network": "loopback simulator only (no external host, fake keys)"}
 
 
@@ -762,18 +954,26 @@ def real_smoke(root: Path) -> dict:
 
 
 def main() -> None:
-    flags = set(sys.argv[1:]) - {"--keep"}
-    assert flags <= {"--live", "--live-loopback"} and len(flags) <= 1, "usage: extraction_smoke.py [--live | --live-loopback] [--keep]"
-    run = real_smoke if "--live" in flags else loopback_smoke if "--live-loopback" in flags else smoke
+    parser = argparse.ArgumentParser()
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--live", action="store_true")
+    mode.add_argument("--live-loopback", action="store_true")
+    mode.add_argument("--identity-only", action="store_true")
+    parser.add_argument("--keep", action="store_true")
+    parser.add_argument("--report", type=Path)
+    args = parser.parse_args()
+    run = real_smoke if args.live else loopback_smoke if args.live_loopback else identity_smoke if args.identity_only else smoke
     with tempfile.TemporaryDirectory(prefix="zoop-s2-2-smoke-") as temporary:
         root = Path(temporary).resolve()
         result = run(root)
-        if "--keep" in sys.argv:
+        if args.keep:
             kept = Path(tempfile.mkdtemp(prefix="zoop-s2-2-kept-")) / "state"
             shutil.copytree(root, kept)
             result["keptState"] = str(kept)
     assert not root.exists()
     result["temporaryStateCleanup"] = {"removed": True, "root": str(root)}
+    if args.report:
+        args.report.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps(result, ensure_ascii=False, indent=2))
     if result["status"] not in {"passed", "completed"}:
         raise SystemExit(1)

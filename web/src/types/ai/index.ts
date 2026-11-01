@@ -149,7 +149,13 @@ export type ChatNotice = {
 // 서버가 답한 요구의 조회 결과로 만든 동작. 눌렀을 때만 실행하며 target은 kind에 해당하는 필드만 값이 있다.
 export type ChatUiAction = {
   actionId: string;
-  kind: 'open_company' | 'focus_path' | 'open_briefing';
+  kind:
+    | 'open_company'
+    | 'focus_path'
+    | 'open_briefing'
+    | 'focus_relation'
+    | 'open_evidence'
+    | 'open_watchlist';
   label: string;
   requirementIds: string[];
   target: {
@@ -160,6 +166,8 @@ export type ChatUiAction = {
     edition: 'morning' | 'evening' | null;
     graphVersion: string | null;
     asOf: string | null;
+    edgeId: string | null;
+    evidenceIds: string[] | null;
   };
 };
 

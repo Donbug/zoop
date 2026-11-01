@@ -20,7 +20,7 @@ SCHEMA = "zoop-relation-s3"
 LEDGER_VERSION = "zoop-relation-ledger-1"
 CANDIDATE_VERSION = "zoop-relation-candidate-1"
 IMPACT_CANDIDATE_VERSION = "zoop-impact-candidate-1"
-POLICY = "zoop-relation-policy-1"
+POLICY = "zoop-relation-policy-2"  # explicit S2 geography resolution; historical bindings fail closed, never migrate receipts
 REVALIDATION_POLICY = "zoop-relation-revalidation-policy-1"
 IMPACT_POLICY = "zoop-impact-policy-1"
 
@@ -145,6 +145,7 @@ class Step(Wire):
 
 
 class Proposal(Wire):
+    """Each non-null scope is an asserted restriction; null is unspecified, not unrestricted applicability."""
     type: str = Field(min_length=1, max_length=100)  # an unsupported type is a private hold, not a malformed reply
     subject: Endpoint
     object: Endpoint
