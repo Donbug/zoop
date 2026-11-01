@@ -15,6 +15,27 @@ classes. Omit the prop for standalone documents to keep their original levels.
 
 ## Import and reuse
 
+## Loading states
+
+Use `LoadingIndicator` for pending page, API and panel content instead of
+showing a standalone loading sentence. It renders an animated token-colored
+spinner and keeps the supplied label available to assistive technology. The
+spinner respects `prefers-reduced-motion` and remains visible as a static arc.
+For compact “load more” buttons, use `LoadingSpinner` with an `sr-only` label.
+Applied to relationship map and detail panels (D-GRP-01/02/03/04/05), stocks
+(D-STK-01), and briefing views (D-BRF-01/02), plus other API-backed containers.
+
+```tsx
+import LoadingIndicator, {
+  LoadingSpinner,
+} from '@/components/common/LoadingIndicator';
+
+<LoadingIndicator label="시세를 불러오는 중" className="flex min-h-10 w-full" />
+<button disabled={loading}>
+  {loading ? <><LoadingSpinner size="sm" /><span className="sr-only">더 불러오는 중</span></> : '더 보기'}
+</button>
+```
+
 ```tsx
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 

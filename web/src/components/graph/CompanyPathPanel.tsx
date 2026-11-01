@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import { formatEventTime } from './event-format';
 import type { GraphResponse } from '@/types/map/graph';
@@ -79,9 +80,10 @@ export default function CompanyPathPanel({
       </header>
       <div className={ui.scroll}>
         {loading ? (
-          <p className={ui.state} role="status">
-            경로의 기준 그래프를 확인하고 있어요.
-          </p>
+          <LoadingIndicator
+            label="경로의 기준 그래프를 확인하고 있어요."
+            className={`${ui.state} flex min-h-12 w-full`}
+          />
         ) : error && unavailable ? (
           <p className={ui.state} role="status">
             이 회차의 관계 지도는 아직 제공하지 않아요.

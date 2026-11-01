@@ -39,6 +39,7 @@ const canvas = vi.hoisted(() => ({
   layout: vi.fn(),
   fitView: vi.fn(),
   setPlugins: vi.fn(),
+  setZoomRange: vi.fn(),
   zoomTo: vi.fn(),
   translateTo: vi.fn(),
   translateBy: vi.fn(),
@@ -46,6 +47,7 @@ const canvas = vi.hoisted(() => ({
     async () => {},
   ),
   getZoom: vi.fn(() => 1),
+  getZoomRange: vi.fn(() => [0.01, 2.5]),
   getPosition: vi.fn(() => [0, 0]),
   setSize: vi.fn(),
   setNode: vi.fn(),
@@ -67,7 +69,9 @@ vi.mock('@antv/g6', () => ({
     layout = canvas.layout;
     fitView = canvas.fitView;
     setPlugins = canvas.setPlugins;
+    setZoomRange = canvas.setZoomRange;
     getZoom = canvas.getZoom;
+    getZoomRange = canvas.getZoomRange;
     getPosition = canvas.getPosition;
     zoomTo = canvas.zoomTo;
     translateTo = canvas.translateTo;

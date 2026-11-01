@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import LoadingIndicator, {
+  LoadingSpinner,
+} from '@/components/common/LoadingIndicator';
 import { adminErrorMessage, BUTTON, FOCUS_RING } from './adminStyles';
 
 // 관리자 화면이 함께 쓰는 표시 부품. 모두 Tailwind 유틸리티와 zoop 토큰만 쓴다(#169 시각 기준).
@@ -22,9 +25,10 @@ export function PageHeader({
 
 export function Loading({ children }: { children: ReactNode }) {
   return (
-    <p role="status" className="text-caption text-zoop-muted">
-      {children}
-    </p>
+    <LoadingIndicator
+      label={String(children)}
+      className="flex min-h-10 w-full py-2"
+    />
   );
 }
 
@@ -255,7 +259,14 @@ export function MoreButton({
         disabled={loading}
         className={BUTTON}
       >
-        {loading ? '불러오고 있어요' : '더 보기'}
+        {loading ? (
+          <>
+            <LoadingSpinner size="sm" />
+            <span className="sr-only">다음 항목을 불러오는 중</span>
+          </>
+        ) : (
+          '더 보기'
+        )}
       </button>
       {error && (
         <p role="alert" className="text-caption text-zoop-alert">

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import ErrorNotice from '@/components/common/ErrorNotice';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import OnboardingStep from '@/components/onboarding/OnboardingStep';
 import { useMemberSettings } from '@/hooks/useMemberSettings';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
@@ -94,9 +95,10 @@ export default function InvestmentChoice() {
   return (
     <OnboardingStep title="지금 주식에 투자하고 계신가요?">
       {settings.status === 'loading' && (
-        <p role="status" className="text-body text-zoop-ink">
-          설정을 불러오고 있어요
-        </p>
+        <LoadingIndicator
+          label="설정을 불러오고 있어요"
+          className="flex min-h-10 w-full text-body"
+        />
       )}
       {settings.status === 'error' && (
         <ErrorNotice

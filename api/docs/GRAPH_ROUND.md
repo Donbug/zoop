@@ -83,8 +83,11 @@ AI의 신규 접수는 202, 같은 principal·가족·roundId와 동일한 원�
 | `ZOOP_GRAPH_ROUND_IMPORT_SOURCE` | `cli`(기본)는 설치된 `zoop-ai-ingest export --require-store`, `http`는 `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED=true`인 기존 관측 exporter를 사용합니다. 두 경로 모두 같은 파서·현재 권한·commit 직전 재검증을 거칩니다 |
 | `ZOOP_GRAPH_ROUND_INGESTION_CLI` / `INGESTION_STATE_DIR` / `INGESTION_SOURCES` | `import-source=cli`일 때 필수(실행 파일·디렉터리·파일, 정규화된 절대 경로) |
 | `ZOOP_AI_ROUND_CLIENT_EXPECTED_PRINCIPAL` | round client의 서버 principal. endpoint·credential fingerprint와 함께 복구 binding에 고정하며 필수입니다 |
+| `ZOOP_AI_PLAINTEXT_HTTP_HOSTS` | 모든 AI 클라이언트가 공유하는 정확한 plaintext HTTP host 목록입니다. dev의 `http://ai:8000`은 `ai`를 명시해야 하며, round 클라이언트와 스케줄러의 복구 binding 생성에도 같은 설정을 적용합니다([허용 규칙](AI_INTEGRATION.md#설정)) |
 
 켜면 다음도 요구합니다(아니면 설정 이름을 담은 메시지로 기동 거절): `ZOOP_GRAPH_SNAPSHOT_SOURCE=artifact`와 존재하는 `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT`(bridge가 올린 버전을 같은 프로세스의 자동 활성화가 읽어야 하므로 **같은 root**에 씁니다. `fixture`는 seeder가 활성화하므로 거절), `ZOOP_AI_HANDOFF_READ_CLIENT_ENABLED=true`, `ZOOP_AI_ROUND_CLIENT_ENABLED=true`(+`_BASE_URL`·`_TOKEN`, scope `round.run`·`round.read`; R1·R2·R5·R6), `ZOOP_ANALYSIS_ANALYZE_PLAN_ENABLED=true`(R3·R4). 앱 수입 전용 principal 하나가 `handoff.read`·`observation.read`·`round.run`·`round.read`를 가집니다(#431 답, 10-30). 운영자 명령의 `ZOOP_GRAPH_HANDOFF_IMPORT_*`·`ZOOP_ARTIFACT_ROOT`와는 별개 설정이며, 둘이 같은 root를 가리키면 lock으로 서로 `import_busy`가 됩니다.
+
+dev에서 round URL을 `http://ai:8000`으로 바꾸어도 기존 요청 journal은 최초 바이트와 서비스 binding을 보존합니다. 기존 endpoint와 새 endpoint가 다르면 해당 회차는 네트워크 호출 전에 `run_binding_mismatch` 또는 `freeze_binding_mismatch`로 거절됩니다. 복구는 [원래 바이트와 같은 서비스로 복구](#원래-바이트와-같은-서비스로-복구)의 규칙을 따릅니다.
 
 **배포 제약.** durable artifact root와 POSIX lock·소유권·인스턴스 간 공유 방식은 Infra가 정합니다. HTTP 연결 구현만으로 EFS 잠금·TLS·무중단 배포가 검증된 것은 아닙니다. 서비스 쓰기 profile·원장과 기존 read-only archive는 따로 유지합니다.
 

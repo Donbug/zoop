@@ -12,6 +12,7 @@ import {
   useState,
 } from 'react';
 import CompanyLogo from '@/components/common/CompanyLogo';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { getCompanyMetrics } from '@/apis/graph/companies';
@@ -71,7 +72,13 @@ function Status<T>({
   resource: Resource<T>;
   label: string;
 }) {
-  if (resource.loading) return <p role="status">{label} 불러오는 중…</p>;
+  if (resource.loading)
+    return (
+      <LoadingIndicator
+        label={`${label} 불러오는 중`}
+        className="flex min-h-10 w-full"
+      />
+    );
   if (!resource.error) return null;
   // 계약의 오류 코드별 안내. 다시 보내도 같은 결과인 오류(없음·버전 없음·조건 오류)에는 다시 시도를 두지 않는다.
   const fixed = fixedFailure(
@@ -686,9 +693,10 @@ export default function CompanyWorkspace() {
           </div>
         )}
         {versionOnly && (company.loading || versionStart) && (
-          <p role="status" className="mb-4 text-body text-zoop-muted">
-            그래프 버전({version})이 처음 공개된 시점을 확인하고 있어요.
-          </p>
+          <LoadingIndicator
+            label={`그래프 버전(${version})이 처음 공개된 시점을 확인하고 있어요.`}
+            className="mb-4 flex min-h-9 w-full text-body text-zoop-muted"
+          />
         )}
         {versionOnly && !company.loading && !versionStart && (
           <p role="alert" className="mb-4 text-body text-zoop-alert">
@@ -832,7 +840,10 @@ export default function CompanyWorkspace() {
         <section aria-label="주요 지표">
           <h2>주요 지표 · 최신 기준</h2>
           {metrics.status === 'loading' && (
-            <p role="status">주요 지표를 불러오고 있어요</p>
+            <LoadingIndicator
+              label="주요 지표를 불러오고 있어요"
+              className="flex min-h-10 w-full"
+            />
           )}
           {metrics.status === 'error' && (
             <div role="alert">
@@ -1074,7 +1085,10 @@ export default function CompanyWorkspace() {
             <h2>사건 타임라인</h2>
             <Status resource={events} label="타임라인" />
             {!ready && !versionOnly && (
-              <p role="status">타임라인의 기준 시점을 확인하고 있어요.</p>
+              <LoadingIndicator
+                label="타임라인의 기준 시점을 확인하고 있어요."
+                className="flex min-h-8 w-full"
+              />
             )}
             {events.data && (
               <>
@@ -1334,7 +1348,10 @@ export default function CompanyWorkspace() {
         )}
         <Status resource={graph} label="관계 그래프" />
         {!ready && !versionOnly && (
-          <p role="status">관계 그래프의 기준 시점을 확인하고 있어요.</p>
+          <LoadingIndicator
+            label="관계 그래프의 기준 시점을 확인하고 있어요."
+            className="flex min-h-8 w-full"
+          />
         )}
         {graph.data && (
           <>

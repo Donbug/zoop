@@ -39,7 +39,7 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 
 ## 3. 도구 (`ChatMcpTools`)
 
-노출: 레지스트리에 바인딩된 기능 중 `portfolio.scope.read`, `briefing.read`, `selectionRule.read`를 뺀 전부(서버가 회원 범위·요구 문구로 입력을 정하는 도구). MCP 이름은 기능 ID의 `.`을 `_`로 바꾼 것(`company.read` → `company_read`)이며 `tools/list`는 grant가 허용한 도구만 보여 준다. 모든 도구는 `readOnlyHint=true`다.
+노출: 레지스트리에 바인딩된 기능 중 `portfolio.scope.read`, `briefing.read`, `selectionRule.read`를 뺀 전부(서버가 회원 범위·요구 문구로 입력을 정하는 도구). MCP 이름은 기능 ID의 `.`을 `_`로 바꾼 것(`company.read` → `company_read`)이며 `tools/list`는 grant가 허용한 도구만 보여 준다. 모든 도구는 `readOnlyHint=true`다. Q01 `help.search`·`screenSpec.read`는 `ZOOP_CHAT_APPROVED_DOCS_ENABLED=true`일 때만 레지스트리에 들어오며, 두 승인 문서가 모두 현재 시행 중이지 않으면 애플리케이션 기동 자체를 거절한다.
 
 모델이 정하는 인자는 조회 인자 둘과 요구 지목(`requirementIds`)뿐이고 나머지는 서버가 job의 고정 문맥에서 넣는다.
 

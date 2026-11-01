@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import ErrorNotice from '@/components/common/ErrorNotice';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
+import { LoadingSpinner } from '@/components/common/LoadingIndicator';
 import StockRow from '@/components/my/StockRow';
 import CompanySearch from '@/components/stocks/CompanySearch';
 import HeldBadge from '@/components/stocks/HeldBadge';
@@ -125,9 +127,10 @@ export default function WatchlistSection({
       </div>
 
       {settings.status === 'loading' && (
-        <p role="status" className="text-body text-zoop-ink">
-          관심 종목을 불러오고 있어요
-        </p>
+        <LoadingIndicator
+          label="관심 종목을 불러오고 있어요"
+          className="flex min-h-10 w-full text-body"
+        />
       )}
       {settings.status === 'error' && (
         <ErrorNotice
@@ -164,10 +167,17 @@ export default function WatchlistSection({
               if (!brief) {
                 return (
                   <li key={id} className="flex items-center gap-2 py-3">
-                    <p className="flex-1 text-body text-zoop-ink">
-                      {entry?.status === 'error'
-                        ? '종목 정보를 불러오지 못했어요.'
-                        : '종목 정보를 불러오고 있어요'}
+                    <p className="flex flex-1 items-center gap-2 text-body text-zoop-ink">
+                      {entry?.status === 'error' ? (
+                        '종목 정보를 불러오지 못했어요.'
+                      ) : (
+                        <>
+                          <LoadingSpinner size="sm" />
+                          <span className="sr-only">
+                            종목 정보를 불러오고 있어요
+                          </span>
+                        </>
+                      )}
                     </p>
                     {entry?.status === 'error' && (
                       <button

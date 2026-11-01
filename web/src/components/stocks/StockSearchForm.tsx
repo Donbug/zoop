@@ -47,7 +47,7 @@ export default function StockSearchForm({
             disabled={disabled}
             placeholder="예: 삼성, NVIDIA, 005930"
             onChange={(event) => onDraftChange(event.target.value)}
-            className="h-[42px] w-full rounded-[3px] border-[1.333px] border-zoop-ink bg-zoop-paper pr-[38px] pl-[34px] text-body text-zoop-ink disabled:opacity-50 [&::-webkit-search-cancel-button]:hidden"
+            className="h-[46px] w-full rounded-[3px] border border-zoop-line bg-zoop-paper pr-[38px] pl-[34px] text-body text-zoop-ink outline-none transition-colors focus-visible:border-zoop-ink focus-visible:ring-1 focus-visible:ring-zoop-ink disabled:opacity-50 [&::-webkit-search-cancel-button]:hidden"
           />
           {draft && (
             <button
@@ -67,7 +67,7 @@ export default function StockSearchForm({
         <button
           type="submit"
           disabled={disabled}
-          className="flex h-[42px] shrink-0 items-center gap-1.5 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3.5 text-body font-bold text-zoop-ink disabled:opacity-50"
+          className="flex h-[46px] shrink-0 items-center gap-1.5 rounded-[3px] bg-zoop-ink px-4 text-body font-bold text-zoop-paper transition-opacity hover:opacity-85 disabled:opacity-50"
         >
           <GraphIcon name="search" size={14} />
           검색

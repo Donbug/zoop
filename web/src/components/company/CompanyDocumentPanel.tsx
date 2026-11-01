@@ -1,4 +1,5 @@
 import { useParams } from 'react-router-dom';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useCompanyResource, type Resource } from '@/hooks/useCompanyResource';
 import { companyUrl } from '@/apis/company/company';
@@ -21,7 +22,13 @@ function Failure<T>({
   resource: Resource<T>;
   label: string;
 }) {
-  if (resource.loading) return <p role="status">{label} 불러오는 중…</p>;
+  if (resource.loading)
+    return (
+      <LoadingIndicator
+        label={`${label} 불러오는 중`}
+        className="flex min-h-10 w-full"
+      />
+    );
   if (!resource.error) return null;
   const permission =
     [401, 403].includes(resource.errorStatus ?? 0) ||
@@ -245,7 +252,10 @@ export default function CompanyDocumentPanel() {
         </nav>
       )}
       {!ready && !versionOnlyAddress(asOf, version) && (
-        <p role="status">기업 상세의 기준 시점을 확인하고 있어요.</p>
+        <LoadingIndicator
+          label="기업 상세의 기준 시점을 확인하고 있어요."
+          className="flex min-h-8 w-full"
+        />
       )}
       <Failure resource={list} label="뉴스·공시" />
       {list.data && (
@@ -380,7 +390,10 @@ export default function CompanyDocumentPanel() {
           <h3>근거 상세</h3>
           <Failure resource={evidence} label="근거" />
           {evidence.data && list.loading && (
-            <p role="status">근거의 문서 소속을 확인하고 있어요.</p>
+            <LoadingIndicator
+              label="근거의 문서 소속을 확인하고 있어요."
+              className="flex min-h-8 w-full"
+            />
           )}
           {evidence.data &&
             !list.loading &&

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import CompanyLogo from '@/components/common/CompanyLogo';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import StockQuote from '@/components/stocks/StockQuote';
 import { getPortfolio } from '@/apis/portfolio/portfolio';
 import { getSettings } from '@/apis/settings/settings';
@@ -273,9 +274,10 @@ function HoldingsList({
             보유 종목
           </h3>
           {portfolio.status === 'loading' && (
-            <p role="status" className="px-4 py-4 text-caption">
-              보유 종목을 불러오는 중이에요.
-            </p>
+            <LoadingIndicator
+              label="보유 종목을 불러오는 중이에요."
+              className="flex min-h-10 w-full px-4 text-caption"
+            />
           )}
           {portfolio.status === 'error' && (
             <p role="alert" className="px-4 py-4 text-caption">
@@ -306,9 +308,10 @@ function HoldingsList({
           관심 종목
         </h3>
         {settings.status === 'loading' && (
-          <p role="status" className="px-4 py-4 text-caption">
-            관심 종목을 불러오는 중이에요.
-          </p>
+          <LoadingIndicator
+            label="관심 종목을 불러오는 중이에요."
+            className="flex min-h-10 w-full px-4 text-caption"
+          />
         )}
         {settings.status === 'error' && (
           <p role="alert" className="px-4 py-4 text-caption">
@@ -330,9 +333,10 @@ function HoldingsList({
         {settings.status === 'success' &&
           settings.data.watchlistIds.length > 0 &&
           watchedCompanies.status === 'loading' && (
-            <p role="status" className="px-4 py-4 text-caption">
-              관심 기업을 불러오는 중이에요.
-            </p>
+            <LoadingIndicator
+              label="관심 기업을 불러오는 중이에요."
+              className="flex min-h-10 w-full px-4 text-caption"
+            />
           )}
         {settings.status === 'success' &&
           settings.data.watchlistIds.length > 0 &&

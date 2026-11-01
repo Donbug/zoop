@@ -1,4 +1,5 @@
 import BriefingRoundIssuePanel from '@/components/graph/BriefingRoundIssuePanel';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import {
   useContext,
   useEffect,
@@ -173,7 +174,10 @@ export default function MapPage() {
   return (
     <GraphAppearanceContext value={appearance}>
       {tour && readyEntry !== entryKey ? (
-        <p role="status">튜토리얼 지도를 준비하고 있어요.</p>
+        <LoadingIndicator
+          label="튜토리얼 지도를 준비하고 있어요."
+          className="flex min-h-screen w-full"
+        />
       ) : (
         <MapWorkspace
           appearance={appearance}
@@ -1253,15 +1257,20 @@ function MapWorkspace({
               />
             ) : (
               <div className="relationship-canvas">
-                <p className="relationship-message" role="status">
-                  {loading
-                    ? '관계 지도를 불러오는 중입니다.'
-                    : unavailableReason === 'snapshot_not_recorded'
+                {loading ? (
+                  <LoadingIndicator
+                    label="관계 지도를 불러오는 중입니다."
+                    className="relationship-message flex min-h-12 w-full"
+                  />
+                ) : (
+                  <p className="relationship-message" role="status">
+                    {unavailableReason === 'snapshot_not_recorded'
                       ? '이 회차의 그래프 저장본이 없습니다.'
                       : unavailableReason && !graphErrorRetryable
                         ? '이 회차의 관계 지도는 아직 제공하지 않아요.'
                         : '관계 지도를 불러오지 못했습니다.'}
-                </p>
+                  </p>
+                )}
               </div>
             )}
             {pathFrom && (pathIsCollapsed || Boolean(displayedPath)) && (
@@ -1616,10 +1625,10 @@ function MapWorkspace({
                 role={error && graphErrorRetryable ? 'alert' : 'status'}
               >
                 {switching && (
-                  <p role="status">
-                    {switching === 'all' ? '시장 전체' : '내 종목'} 지도 전환
-                    중… 현재 지도를 유지합니다.
-                  </p>
+                  <LoadingIndicator
+                    label={`${switching === 'all' ? '시장 전체' : '내 종목'} 지도를 전환하고 있어요. 현재 지도를 유지합니다.`}
+                    className="flex min-h-8 w-full"
+                  />
                 )}
                 {transitionNotice && (
                   <p>
@@ -1629,7 +1638,12 @@ function MapWorkspace({
                     </button>
                   </p>
                 )}
-                {loading && <p>선택한 그래프 조회 중…</p>}
+                {loading && (
+                  <LoadingIndicator
+                    label="선택한 그래프 조회 중"
+                    className="flex min-h-8 w-full"
+                  />
+                )}
                 {error && (
                   <p>
                     {unavailableReason ? error : `조회 실패: ${error}`}

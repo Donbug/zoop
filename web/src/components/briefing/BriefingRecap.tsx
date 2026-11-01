@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { Link } from 'react-router-dom';
 import { getBriefingRecap } from '@/apis/briefing/briefing';
 import type {
@@ -61,9 +62,10 @@ export default function BriefingRecap({
         이번 회차에 다시 평가한 전망이 아닙니다.
       </p>
       {!current && (
-        <p className={NOTE} role="status">
-          고정된 이전 브리핑을 확인하고 있어요.
-        </p>
+        <LoadingIndicator
+          label="고정된 이전 브리핑을 확인하고 있어요."
+          className={`${NOTE} flex min-h-8 w-full`}
+        />
       )}
       {current?.error && (
         <p className={EMPTY} role="alert">

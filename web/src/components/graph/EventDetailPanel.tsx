@@ -1,4 +1,5 @@
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -149,10 +150,10 @@ export default function EventDetailPanel({
       </header>
       <div className={ui.scroll} aria-busy={loading}>
         {loading && (
-          <div className={ui.state} role="status">
-            <span className="block h-16 rounded-panel bg-panel-line motion-safe:animate-pulse" />
-            <p>사건 정보를 불러오는 중입니다.</p>
-          </div>
+          <LoadingIndicator
+            label="사건 정보를 불러오는 중입니다."
+            className={`${ui.state} flex min-h-16 w-full`}
+          />
         )}
         {error && (
           <div className={ui.state} role="alert">

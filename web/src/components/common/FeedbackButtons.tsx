@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { ApiError } from '@/apis/auth/ApiService';
 import { setFeedback } from '@/apis/feedback/feedback';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import type {
   FeedbackFeature,
   FeedbackItem,
@@ -40,9 +41,10 @@ export default function FeedbackButtons(props: Props) {
   const revision = useAuthStore((s) => s.sessionRevision);
   if (checking)
     return (
-      <p role="status" className="text-caption text-zoop-muted">
-        로그인 상태를 확인하고 있어요.
-      </p>
+      <LoadingIndicator
+        label="로그인 상태를 확인하고 있어요."
+        className="flex min-h-8 w-full text-caption text-zoop-muted"
+      />
     );
   if (!memberId)
     return (
