@@ -40,6 +40,12 @@ const ANSWER_BASIS_LABEL: Partial<Record<ChatAnswerBasis, string>> = {
   mixed: '일반 개념 + 근거 확인됨',
 };
 
+const ANSWER_STATUS_LABEL: Record<ChatResult['answerStatus'], string> = {
+  complete: '답변 완료',
+  partial: '일부 답변',
+  guidance: '안내',
+};
+
 const KIND_LABEL: Record<string, string> = {
   company: '기업',
   issue: '사건',
@@ -171,14 +177,22 @@ function JobState({
   }
   if (job.status === 'completed' && job.result) {
     return (
-      <ResultView
-        job={job}
-        result={job.result}
-        busy={busy}
-        onChoose={onChoose}
-        onAnswerFreely={onAnswerFreely}
-        onViewOnMap={onViewOnMap}
-      />
+      <div className="flex flex-col gap-3">
+        <p
+          className={ui.badge}
+          aria-label={`답변 상태: ${ANSWER_STATUS_LABEL[job.result.answerStatus]}`}
+        >
+          {ANSWER_STATUS_LABEL[job.result.answerStatus]}
+        </p>
+        <ResultView
+          job={job}
+          result={job.result}
+          busy={busy}
+          onChoose={onChoose}
+          onAnswerFreely={onAnswerFreely}
+          onViewOnMap={onViewOnMap}
+        />
+      </div>
     );
   }
   return <p className={ui.muted}>이 질문의 상태를 확인하지 못했어요.</p>;
