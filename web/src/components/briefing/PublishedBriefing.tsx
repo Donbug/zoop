@@ -364,191 +364,193 @@ export default function PublishedBriefing({
             round={result}
             compact={compact}
           />
-        ) : result && (
-          <>
-            <header className="border-b-[0.667px] border-zoop-line pb-[18px]">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-title-sm font-bold tracking-[-0.025em]">
-                  {result.edition === 'morning' ? '출근' : '퇴근'} 브리핑
-                </h2>
-                <span className={STATUS_PILL}>
-                  {result.continuity?.mode === 'reference'
-                    ? '참고 브리핑'
-                    : result.continuity?.mode === 'recap'
-                      ? result.continuity.recap.status === 'available'
-                        ? '복기 브리핑'
-                        : '확인 브리핑'
-                      : statuses[result.status]}
-                </span>
-              </div>
-              {compact && (
-                <p className={`${NOTE} mt-2`}>
-                  데이터 기준 {briefingTime(result.dataAsOf)}
-                  {result.metadata.source.includes('simulation') ||
-                  result.metadata.source.includes('replay')
-                    ? ' · 과거 자료 시뮬레이션'
-                    : ''}
+        ) : (
+          result && (
+            <>
+              <header className="border-b-[0.667px] border-zoop-line pb-[18px]">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-title-sm font-bold tracking-[-0.025em]">
+                    {result.edition === 'morning' ? '출근' : '퇴근'} 브리핑
+                  </h2>
+                  <span className={STATUS_PILL}>
+                    {result.continuity?.mode === 'reference'
+                      ? '참고 브리핑'
+                      : result.continuity?.mode === 'recap'
+                        ? result.continuity.recap.status === 'available'
+                          ? '복기 브리핑'
+                          : '확인 브리핑'
+                        : statuses[result.status]}
+                  </span>
+                </div>
+                {compact && (
+                  <p className={`${NOTE} mt-2`}>
+                    데이터 기준 {briefingTime(result.dataAsOf)}
+                    {result.metadata.source.includes('simulation') ||
+                    result.metadata.source.includes('replay')
+                      ? ' · 과거 자료 시뮬레이션'
+                      : ''}
+                  </p>
+                )}
+                {!compact && publicationInfo}
+              </header>
+              {result.notice && (
+                <p className={`${EMPTY} mt-4`} role="status">
+                  {result.notice.message}
+                  {result.notice.reason && ` · ${result.notice.reason}`}
+                  {result.notice.at && ` · ${briefingTime(result.notice.at)}`}
                 </p>
               )}
-              {!compact && publicationInfo}
-            </header>
-            {result.notice && (
-              <p className={`${EMPTY} mt-4`} role="status">
-                {result.notice.message}
-                {result.notice.reason && ` · ${result.notice.reason}`}
-                {result.notice.at && ` · ${briefingTime(result.notice.at)}`}
-              </p>
-            )}
-            {!compact && result.status === 'published' && (
-              <BriefingOutlook
-                outlook={result.outlook}
-                issues={result.items.map((item) => ({
-                  eventId: item.eventId,
-                  title: item.title,
-                  anchor: shownItems.includes(item)
-                    ? issueAnchor(item)
-                    : undefined,
-                }))}
-              />
-            )}
-            {!compact &&
-              result.continuity &&
-              result.continuity.mode !== 'core' && (
-                <BriefingContinuity
-                  value={result.continuity}
-                  compact={compact}
+              {!compact && result.status === 'published' && (
+                <BriefingOutlook
+                  outlook={result.outlook}
+                  issues={result.items.map((item) => ({
+                    eventId: item.eventId,
+                    title: item.title,
+                    anchor: shownItems.includes(item)
+                      ? issueAnchor(item)
+                      : undefined,
+                  }))}
                 />
               )}
-            {result.status === 'published' && compact && (
-              <>
-                {!knownLimits && partialInfo}
-                {feedbackReadError}
-                <IssueCentricBriefing
-                  result={result}
-                  beforeIssues={
-                    personal ? (
-                      <PersonalizedIssueSelection
-                        roundId={result.id}
-                        dataAsOf={result.dataAsOf}
-                        checking={checking}
-                      />
-                    ) : undefined
-                  }
-                  items={result.items}
-                  renderExtra={issueExtra}
-                  issueCorrections={corrections.byIssue}
-                />
-                <BriefingCorrections corrections={corrections.round} />
-              </>
-            )}
-            {result.status === 'published' && !compact && (
-              <BriefingReadingSection
-                compact={
-                  compact &&
-                  Boolean(
-                    result.continuity && result.continuity.mode !== 'core',
-                  )
-                }
-                title="시장·지표와 전체 저장 상태 보기"
-              >
-                {(!compact || !knownLimits) && partialInfo}
-                {result.issueIntelligence ? (
-                  <>
-                    <IssueCentricBriefing
-                      compact={false}
-                      result={result}
-                      beforeIssues={
-                        personal ? (
-                          <PersonalizedIssueSelection
-                            roundId={result.id}
-                            dataAsOf={result.dataAsOf}
-                            checking={checking}
-                          />
-                        ) : undefined
-                      }
-                      items={result.items}
-                      renderExtra={issueExtra}
-                      issueCorrections={corrections.byIssue}
-                    />
-                    <BriefingReadingSection
-                      compact
-                      title="이전 생성 전문·시장 요약·시세 보존본"
-                    >
-                      {original ? (
-                        <BriefingPreservedContext
-                          result={original}
-                          compact={false}
-                        />
-                      ) : (
-                        <p className={NOTE}>
-                          이전 발행본을 확인하지 못해 보존본을 표시하지
-                          않습니다.
-                        </p>
-                      )}
-                    </BriefingReadingSection>
-                  </>
-                ) : (
-                  currentContext
-                )}
-                {result.items.length === 0 &&
-                  result.emptyReason === 'no_issues_in_window' &&
-                  !result.issueIntelligence &&
-                  !result.continuity && (
-                    <BriefingRecap
-                      key={`${result.id}:${result.graphVersion}:${result.dataAsOf}`}
-                      round={result}
-                      compact={compact}
-                    />
-                  )}
-                {personal && !result.issueIntelligence && (
-                  <PersonalizedIssueSelection
-                    roundId={result.id}
-                    dataAsOf={result.dataAsOf}
-                    checking={checking}
+              {!compact &&
+                result.continuity &&
+                result.continuity.mode !== 'core' && (
+                  <BriefingContinuity
+                    value={result.continuity}
+                    compact={compact}
                   />
                 )}
-                {feedbackReadError}
-                {!result.issueIntelligence && (
-                  <BriefingIssueList
-                    compact={compact}
+              {result.status === 'published' && compact && (
+                <>
+                  {!knownLimits && partialInfo}
+                  {feedbackReadError}
+                  <IssueCentricBriefing
+                    result={result}
+                    beforeIssues={
+                      personal ? (
+                        <PersonalizedIssueSelection
+                          roundId={result.id}
+                          dataAsOf={result.dataAsOf}
+                          checking={checking}
+                        />
+                      ) : undefined
+                    }
                     items={result.items}
-                    roundId={result.id}
-                    graphVersion={result.graphVersion}
-                    graphHref={`/?round=${encodeURIComponent(result.id)}`}
                     renderExtra={issueExtra}
                     issueCorrections={corrections.byIssue}
                   />
-                )}
+                  <BriefingCorrections corrections={corrections.round} />
+                </>
+              )}
+              {result.status === 'published' && !compact && (
                 <BriefingReadingSection
-                  compact={compact}
-                  title="이전 브리핑과 핵심 이슈 변화 보기"
+                  compact={
+                    compact &&
+                    Boolean(
+                      result.continuity && result.continuity.mode !== 'core',
+                    )
+                  }
+                  title="시장·지표와 전체 저장 상태 보기"
                 >
-                  {result.edition === 'evening' && (
-                    <BriefingComparison
-                      since={result.sinceMorning}
-                      roundDate={result.date}
-                      graphRoundId={
-                        result.issueIntelligence ? undefined : result.id
-                      }
+                  {(!compact || !knownLimits) && partialInfo}
+                  {result.issueIntelligence ? (
+                    <>
+                      <IssueCentricBriefing
+                        compact={false}
+                        result={result}
+                        beforeIssues={
+                          personal ? (
+                            <PersonalizedIssueSelection
+                              roundId={result.id}
+                              dataAsOf={result.dataAsOf}
+                              checking={checking}
+                            />
+                          ) : undefined
+                        }
+                        items={result.items}
+                        renderExtra={issueExtra}
+                        issueCorrections={corrections.byIssue}
+                      />
+                      <BriefingReadingSection
+                        compact
+                        title="이전 생성 전문·시장 요약·시세 보존본"
+                      >
+                        {original ? (
+                          <BriefingPreservedContext
+                            result={original}
+                            compact={false}
+                          />
+                        ) : (
+                          <p className={NOTE}>
+                            이전 발행본을 확인하지 못해 보존본을 표시하지
+                            않습니다.
+                          </p>
+                        )}
+                      </BriefingReadingSection>
+                    </>
+                  ) : (
+                    currentContext
+                  )}
+                  {result.items.length === 0 &&
+                    result.emptyReason === 'no_issues_in_window' &&
+                    !result.issueIntelligence &&
+                    !result.continuity && (
+                      <BriefingRecap
+                        key={`${result.id}:${result.graphVersion}:${result.dataAsOf}`}
+                        round={result}
+                        compact={compact}
+                      />
+                    )}
+                  {personal && !result.issueIntelligence && (
+                    <PersonalizedIssueSelection
+                      roundId={result.id}
+                      dataAsOf={result.dataAsOf}
+                      checking={checking}
                     />
                   )}
-                  {result.edition === 'morning' && (
-                    <BriefingComparison
-                      basis="previous"
-                      previous={result.previousComparison ?? null}
-                      roundDate={result.date}
-                      graphRoundId={
-                        result.issueIntelligence ? undefined : result.id
-                      }
+                  {feedbackReadError}
+                  {!result.issueIntelligence && (
+                    <BriefingIssueList
+                      compact={compact}
+                      items={result.items}
+                      roundId={result.id}
+                      graphVersion={result.graphVersion}
+                      graphHref={`/?round=${encodeURIComponent(result.id)}`}
+                      renderExtra={issueExtra}
+                      issueCorrections={corrections.byIssue}
                     />
                   )}
+                  <BriefingReadingSection
+                    compact={compact}
+                    title="이전 브리핑과 핵심 이슈 변화 보기"
+                  >
+                    {result.edition === 'evening' && (
+                      <BriefingComparison
+                        since={result.sinceMorning}
+                        roundDate={result.date}
+                        graphRoundId={
+                          result.issueIntelligence ? undefined : result.id
+                        }
+                      />
+                    )}
+                    {result.edition === 'morning' && (
+                      <BriefingComparison
+                        basis="previous"
+                        previous={result.previousComparison ?? null}
+                        roundDate={result.date}
+                        graphRoundId={
+                          result.issueIntelligence ? undefined : result.id
+                        }
+                      />
+                    )}
+                  </BriefingReadingSection>
+                  <BriefingCorrections corrections={corrections.round} />
+                  {roundFeedback}
                 </BriefingReadingSection>
-                <BriefingCorrections corrections={corrections.round} />
-                {roundFeedback}
-              </BriefingReadingSection>
-            )}
-            {compact && result.status === 'published' && roundFeedback}
-          </>
+              )}
+              {compact && result.status === 'published' && roundFeedback}
+            </>
+          )
         )}
         {result?.status === 'published' && (
           <p className={`${NOTE} mt-4`}>{BRIEFING_DISCLAIMER}</p>
