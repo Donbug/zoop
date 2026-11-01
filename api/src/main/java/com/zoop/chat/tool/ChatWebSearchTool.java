@@ -3,6 +3,7 @@ package com.zoop.chat.tool;
 import com.zoop.common.json.Canonical;
 import java.net.URI;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -23,11 +24,15 @@ public final class ChatWebSearchTool implements ChatTool {
     public static final int MAX_HITS = 5;
 
     private final ChatWebSearchProvider provider;
-    private final Clock clock;
+    private final ChatWebSearchRequestCache cache;
 
     public ChatWebSearchTool(ChatWebSearchProvider provider, Clock clock) {
+        this(provider, clock, ChatWebSearchRequestCache.DEFAULT_TTL, ChatWebSearchRequestCache.DEFAULT_MAX_ENTRIES);
+    }
+
+    ChatWebSearchTool(ChatWebSearchProvider provider, Clock clock, Duration cacheTtl, int cacheEntries) {
         this.provider = provider;
-        this.clock = clock;
+        this.cache = new ChatWebSearchRequestCache(clock, cacheTtl, cacheEntries);
     }
 
     @Override
@@ -42,8 +47,10 @@ public final class ChatWebSearchTool implements ChatTool {
         String query = ChatWebQueryPolicy.checked(request.targets().getFirst())
                 .orElseThrow(() -> new IllegalArgumentException("the query may not be sent"));
         int limit = Math.min(MAX_HITS, request.limit());
-        ChatWebSearchProvider.Page page = provider.search(query, limit);
-        Instant searchedAt = clock.instant();
+        ChatWebSearchRequestCache.Search search = cache.search(provider.id(), query, limit,
+                () -> provider.search(query, limit));
+        ChatWebSearchProvider.Page page = search.page();
+        Instant searchedAt = search.searchedAt();
         Map<String, ChatWebResult> kept = new LinkedHashMap<>();
         for (ChatWebSearchProvider.Hit hit : page.hits()) {
             ChatWebResult result = bounded(hit, searchedAt);
