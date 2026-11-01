@@ -18,9 +18,9 @@ export const GraphAppearanceContext = createContext<GraphAppearance | null>(
 export function appearanceColors(appearance: GraphAppearance) {
   const dark = appearance.theme === 'dark';
   return {
-    ink: dark ? '#ededed' : '#212121',
+    ink: dark ? '#fafafa' : '#212121',
     paper: dark ? '#262626' : '#ffffff',
-    muted: dark ? '#a0a0a0' : '#212121',
+    muted: dark ? '#d4d4d4' : '#212121',
     line: dark ? '#a5a9b1' : '#71757c',
     selected:
       appearance.variant === 'improved'

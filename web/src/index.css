@@ -21,6 +21,14 @@
   --color-zoop-paper: #ffffff;
   --color-zoop-wash: #f5f5f5;
   --color-zoop-soft: #f8f8f8;
+  /* D-COM-01: 메인 지도 개선 테마의 면/컨트롤 팔레트. 기존 화면의 배경은 유지한다. */
+  --color-zoop-page: #f7f7f5;
+  --color-zoop-surface: #ffffff;
+  --color-zoop-card: #f5f5f4;
+  --color-zoop-control: #efefed;
+  --color-zoop-border: #d9d9d6;
+  --color-zoop-selected: #ededeb;
+  --color-zoop-on-ink: #ffffff;
   --color-zoop-up: #d23c3c;
   --color-zoop-down: #2f6fd8;
   --color-zoop-alert: #b42318;
@@ -90,17 +98,25 @@
 
 /* 다크 테마도 로그인 화면과 같은 중성 회색 팔레트를 쓴다.
    Tailwind 기본 흰색·회색 단계도 뒤집어, 아직 토큰으로 옮기지 않은 화면도 함께 어두워지게 한다.
-   글자는 순백 대신 #ededed(본문)·#a0a0a0(보조)·#8f8f8f(옅은 보조)를 쓴다.
-   본문 대비는 라이트(#212121/#fff, 약 16:1)와 비슷한 약 15:1이고, 옅은 보조도 #262626 패널 위에서 4.5:1을 넘긴다. */
+   글자는 브리핑에서 확인한 #fafafa(본문)·#d4d4d4(보조)·#a3a3a3(옅은 보조)를 쓴다.
+   본문 대비는 #171717에서 약 17.2:1, #262626에서 약 14.5:1이며,
+   옅은 보조도 #262626 패널 위에서 약 6:1을 유지한다. */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --color-zoop-ink: #ededed;
-  --color-zoop-muted: #a0a0a0;
-  --color-zoop-faint: #8f8f8f;
+  --color-zoop-ink: #fafafa;
+  --color-zoop-muted: #d4d4d4;
+  --color-zoop-faint: #a3a3a3;
   --color-zoop-line: #373737;
   --color-zoop-paper: #171717;
   --color-zoop-wash: #171717;
   --color-zoop-soft: #262626;
+  --color-zoop-page: #171717;
+  --color-zoop-surface: #262626;
+  --color-zoop-card: #2b2b2d;
+  --color-zoop-control: #303032;
+  --color-zoop-border: #414144;
+  --color-zoop-selected: #363638;
+  --color-zoop-on-ink: #171717;
   --color-zoop-map: #333333;
   --color-zoop-up: #ffb4ad;
   --color-zoop-down: #a9c5ff;
@@ -108,9 +124,9 @@
   --color-zoop-positive: #86efac;
   --color-zoop-mixed: #fcd34d;
   --color-zoop-hold: #fdba74;
-  --color-panel-ink: #ededed;
-  --color-panel-secondary: #a0a0a0;
-  --color-panel-muted: #8f8f8f;
+  --color-panel-ink: #fafafa;
+  --color-panel-secondary: #d4d4d4;
+  --color-panel-muted: #a3a3a3;
   --color-panel-line: #373737;
   --color-panel-control: #373737;
   --color-panel-soft: #262626;
@@ -124,8 +140,8 @@
   --color-gray-600: #bdbdbd;
   --color-gray-700: #d4d4d4;
   --color-gray-800: #e5e5e5;
-  --color-gray-900: #ededed;
-  --color-gray-950: #f5f5f5;
+  --color-gray-900: #fafafa;
+  --color-gray-950: #fafafa;
 }
 
 /* 기본 규칙은 base 레이어에 둔다. 레이어 밖에 두면 Tailwind 유틸리티(text-xs 등)보다

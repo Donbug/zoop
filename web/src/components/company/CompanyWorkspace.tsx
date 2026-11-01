@@ -63,7 +63,7 @@ import {
 const COMPANY_FINANCIALS_ENABLED = false;
 
 const workspaceClasses =
-  'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-3 m-0 overflow-visible text-zoop-ink max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-zoop-line [&_section]:py-4 [&_h1]:text-display [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-body [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-caption [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-full [&_button]:border [&_button]:border-zoop-line [&_button]:bg-white [&_button]:min-h-[36px] [&_button]:px-4 [&_button]:py-2 [&_button]:text-caption! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-caption [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1.5 [&_article]:border-b [&_article]:border-zoop-line [&_article]:py-3 [&_table]:w-full [&_table]:text-caption [&_table]:wrap-anywhere [&_[role=alert]]:text-zoop-alert [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-zoop-line [&_input]:bg-white [&_input]:px-3 [&_input]:py-2 [&_input]:min-h-[38px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
+  'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-3 m-0 overflow-visible text-zoop-ink max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&_section]:my-3 [&_section]:rounded-lg [&_section]:border-0 [&_section]:bg-zoop-card [&_section]:p-4 [&_h1]:text-display [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-body [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-caption [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-md [&_button]:border [&_button]:border-zoop-border [&_button]:bg-zoop-control [&_button]:min-h-[36px] [&_button]:px-4 [&_button]:py-2 [&_button]:text-caption! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-zoop-on-ink [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-caption [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1.5 [&_article]:border-b [&_article]:border-zoop-border [&_article]:py-3 [&_table]:w-full [&_table]:text-caption [&_table]:wrap-anywhere [&_[role=alert]]:text-zoop-alert [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-md [&_input]:border [&_input]:border-zoop-border [&_input]:bg-zoop-surface [&_input]:px-3 [&_input]:py-2 [&_input]:min-h-[38px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
 
 function Status<T>({
   resource,
@@ -684,7 +684,7 @@ export default function CompanyWorkspace() {
           settings={settings}
         />
       )}
-      <div className="min-w-0 rounded-2xl bg-white p-6 shadow-sm max-md:p-4">
+      <div className="min-w-0 rounded-xl border border-zoop-border bg-zoop-surface p-6 shadow-sm max-md:p-4">
         {routeNotice?.companyId === id && (
           <div role="status">
             {routeNotice.messages.map((message) => (
@@ -952,7 +952,7 @@ export default function CompanyWorkspace() {
         <section aria-label="시세 차트" data-screen-id="D-COM-06">
           <h2 className="sr-only">시세 차트·기준 시점</h2>
           <nav aria-label="차트 기간" className="items-center gap-3!">
-            <div className="inline-flex overflow-hidden rounded-[3px] border border-zoop-line">
+            <div className="inline-flex overflow-hidden rounded-md border border-zoop-line">
               {periods.map((p) => (
                 <button
                   key={p.value}
@@ -1318,7 +1318,7 @@ export default function CompanyWorkspace() {
           1000px 이하에서는 본문 아래로 옮겨 넓게 본다. */}
       <aside
         ref={graphPanel}
-        className="min-w-0 self-start rounded-2xl bg-white p-4 shadow-sm min-[1001px]:sticky min-[1001px]:top-4 min-[1001px]:max-h-[calc(100vh-2rem)] min-[1001px]:overflow-y-auto max-[1000px]:col-start-2 [&_li]:text-caption [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-line max-md:w-full"
+        className="min-w-0 self-start rounded-xl border border-zoop-border bg-zoop-surface p-4 shadow-sm min-[1001px]:sticky min-[1001px]:top-4 min-[1001px]:max-h-[calc(100vh-2rem)] min-[1001px]:overflow-y-auto max-[1000px]:col-start-2 [&_li]:text-caption [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-card max-md:w-full"
         aria-label="시점 기반 관계 그래프"
         data-screen-id="D-COM-04"
       >
@@ -1333,7 +1333,7 @@ export default function CompanyWorkspace() {
             <button
               key={d}
               aria-pressed={depth === d}
-              className="rounded-none! first:rounded-l-[3px]! last:rounded-r-[3px]!"
+              className="rounded-none! first:rounded-l-md! last:rounded-r-md!"
               onClick={() => updateQuery({ depth: String(d), bucket: null })}
             >
               {d}단계

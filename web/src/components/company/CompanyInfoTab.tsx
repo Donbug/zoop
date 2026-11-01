@@ -86,14 +86,17 @@ export default function CompanyInfoTab({
           )}
           <dl className="grid grid-cols-2 gap-x-4 text-caption max-sm:grid-cols-1">
             {fields.map(([key, label]) => (
-              <div key={key} className="min-w-0 border-b border-zoop-line py-4">
+              <div
+                key={key}
+                className="min-w-0 border-b border-zoop-border py-4"
+              >
                 <dt className="text-zoop-muted">{label}</dt>
                 <dd className="mt-1 font-semibold wrap-anywhere">
                   {provided(company[key]) ?? '미제공'}
                 </dd>
               </div>
             ))}
-            <div className="min-w-0 border-b border-zoop-line py-4">
+            <div className="min-w-0 border-b border-zoop-border py-4">
               <dt className="text-zoop-muted">홈페이지</dt>
               <dd className="mt-1 wrap-anywhere">
                 {href ? (

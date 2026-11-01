@@ -93,7 +93,7 @@ export default function CompanyGraphPreview({
         viewBox={`${view.x} ${view.y} ${320 / view.scale} ${300 / view.scale}`}
         role="img"
         aria-label="기준 시점 기업 관계 그래프"
-        className="h-auto w-full touch-none rounded-[3px] bg-zoop-line"
+        className="h-auto w-full touch-none rounded-lg bg-zoop-card"
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={(event) => {
