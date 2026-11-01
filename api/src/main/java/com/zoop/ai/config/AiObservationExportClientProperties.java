@@ -10,8 +10,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
  * {@code zoop.ai.observation-export-client.*} ({@code ZOOP_AI_OBSERVATION_EXPORT_CLIENT_*}): the observation export route
- * (scope {@code observation.read}) the graph handoff import uses in place of the installed {@code zoop-ai-ingest export
- * --require-store}. Disabled by default and independent of every other AI client. The AI side runs the CLI child for at most
+ * (scope {@code observation.read}) the graph handoff import, the document import and the web round bridge use in place of the
+ * installed {@code zoop-ai-ingest export --require-store}. Disabled by default and independent of every other AI client. The AI side runs the CLI child for at most
  * 45 s and answers at most 16 MiB, so the defaults are a 50 s request deadline and a 16 MiB response bound.
  */
 @ConfigurationProperties("zoop.ai.observation-export-client")
