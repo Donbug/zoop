@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 export default function ProtectedRoute() {
   const location = useLocation();
   const auth = useAuth();
@@ -21,7 +22,12 @@ export default function ProtectedRoute() {
     return outlet;
   }
   if (auth.status === 'checking')
-    return <p role="status">로그인 상태를 확인하고 있어요.</p>;
+    return (
+      <LoadingIndicator
+        label="로그인 상태를 확인하고 있어요."
+        className="flex min-h-screen w-full"
+      />
+    );
   if (auth.status === 'error')
     return (
       <div role="alert">

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ApiError } from '@/apis/auth/ApiService';
 import { getBriefingGraphBasis } from '@/apis/briefing/briefing';
 import { useAsyncData } from '@/hooks/useAsyncData';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { briefingTime } from '@/util/briefingTime';
 
@@ -68,19 +69,26 @@ export default function BriefingSnapshotBanner({
     >
       <div className="min-w-0 flex-1">
         <p className="text-body font-bold">{title}</p>
-        <p
-          role={
-            basis.status === 'error' ||
-            (data &&
-              data.status !== 'available' &&
-              data.unavailableReason !== 'snapshot_not_recorded')
-              ? 'alert'
-              : 'status'
-          }
-          className="mt-0.5 text-caption break-words text-zoop-muted"
-        >
-          {detail}
-        </p>
+        {basis.status === 'loading' ? (
+          <LoadingIndicator
+            label="회차 기준을 확인하고 있어요."
+            className="mt-0.5 flex min-h-7 w-full text-caption text-zoop-muted"
+          />
+        ) : (
+          <p
+            role={
+              basis.status === 'error' ||
+              (data &&
+                data.status !== 'available' &&
+                data.unavailableReason !== 'snapshot_not_recorded')
+                ? 'alert'
+                : 'status'
+            }
+            className="mt-0.5 text-caption break-words text-zoop-muted"
+          >
+            {detail}
+          </p>
+        )}
         {data?.graphOrigin === 'reconstructed' && (
           <p className="mt-1 text-caption text-zoop-muted">
             {data.message} 재구성 시각{' '}

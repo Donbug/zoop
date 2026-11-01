@@ -10,6 +10,7 @@ import { useAuthCompletion } from '@/hooks/useAuthCompletion';
 import type { SignupTerm } from '@/types/auth/session';
 import SessionStatus from './SessionStatus';
 import MarkdownContent from '@/components/common/MarkdownContent';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import {
   authAlert,
   authHeading,
@@ -230,9 +231,10 @@ export default function SignupForm({ social = false }: { social?: boolean }) {
         <fieldset disabled={frozen} className="mt-3 flex flex-col gap-2">
           <legend className={authLabel}>약관 동의</legend>
           {terms === null && !termsError && (
-            <p role="status" className={authStatus}>
-              약관을 불러오고 있어요.
-            </p>
+            <LoadingIndicator
+              label="약관을 불러오고 있어요."
+              className={`${authStatus} flex min-h-9 w-full`}
+            />
           )}
           {(termsError || unavailable) && (
             <div role="alert" className="flex flex-col gap-2">

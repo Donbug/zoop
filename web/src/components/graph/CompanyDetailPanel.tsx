@@ -2,6 +2,7 @@ import { companyLogo } from '@/util/company-logo';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import type { EventContext } from '@/types/map/event';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { setWatchlistCompany } from '@/apis/graph/companies';
@@ -243,9 +244,10 @@ export default function CompanyDetailPanel(props: Props) {
         </div>
       </header>
       {loading && (
-        <p className="company-panel-loading" role="status">
-          기업 정보를 불러오는 중…
-        </p>
+        <LoadingIndicator
+          label="기업 정보를 불러오는 중"
+          className="company-panel-loading flex min-h-12 w-full"
+        />
       )}
       {!loading && !company && (
         <div className="company-panel-fatal" role="alert">

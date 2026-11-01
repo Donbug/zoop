@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CompanyLogo from '@/components/common/CompanyLogo';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import {
@@ -229,9 +230,10 @@ export default function WatchlistSelector() {
         언제든 바꿀 수 있어요.
       </p>
       {lookup.loading && (
-        <p role="status" className="text-body text-zoop-ink">
-          보유 종목과 관심 목록을 확인하고 있어요.
-        </p>
+        <LoadingIndicator
+          label="보유 종목과 관심 목록을 확인하고 있어요."
+          className="flex min-h-10 w-full text-body"
+        />
       )}
       {(lookup.settingsError || lookup.portfolioError) && (
         <div
@@ -337,9 +339,10 @@ export default function WatchlistSelector() {
             </div>
           )}
         {search.loading && (
-          <p role="status" className="text-body text-zoop-ink">
-            검색하고 있어요.
-          </p>
+          <LoadingIndicator
+            label="검색하고 있어요."
+            className="flex min-h-10 w-full text-body"
+          />
         )}
         {search.error && (
           <div

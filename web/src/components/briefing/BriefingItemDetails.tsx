@@ -13,6 +13,7 @@ import type {
 } from '@/types/briefing';
 import { briefingTime } from '@/util/briefingTime';
 import { useBriefingIssueTracking } from './briefingTelemetryContext';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { hasOnlyKnownLimitations } from './briefingLimitations';
 import { BODY, EMPTY, FOCUS_RING, NOTE, STATUS_PILL } from './briefingStyles';
 
@@ -255,9 +256,10 @@ export default function BriefingItemDetails({
       {visible && (
         <div className="mt-3" aria-busy={state.status === 'loading'}>
           {state.status === 'loading' && (
-            <p role="status" className={EMPTY}>
-              {roundLabel}의 상세·근거를 불러오고 있어요.
-            </p>
+            <LoadingIndicator
+              label={`${roundLabel}의 상세·근거를 불러오고 있어요.`}
+              className={`${EMPTY} flex min-h-12 w-full`}
+            />
           )}
           {state.status === 'error' && (
             <div className={EMPTY}>

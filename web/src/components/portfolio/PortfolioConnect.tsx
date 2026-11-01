@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import ErrorNotice from '@/components/common/ErrorNotice';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import OnboardingStep from '@/components/onboarding/OnboardingStep';
 import {
   connectPortfolio,
@@ -170,9 +171,10 @@ export default function PortfolioConnect({
             {label} 보유 종목
           </h2>
           {portfolio.status === 'loading' && (
-            <p role="status" className="text-body text-zoop-ink">
-              보유 종목을 불러오고 있어요
-            </p>
+            <LoadingIndicator
+              label="보유 종목을 불러오고 있어요"
+              className="flex min-h-8 w-full text-body"
+            />
           )}
           {portfolio.status === 'error' && (
             <ErrorNotice
@@ -263,9 +265,10 @@ export default function PortfolioConnect({
           가상 계좌 선택
         </h2>
         {(options.status === 'loading' || portfolio.status === 'loading') && (
-          <p role="status" className="text-body text-zoop-ink">
-            가상 계좌를 불러오고 있어요
-          </p>
+          <LoadingIndicator
+            label="가상 계좌를 불러오고 있어요"
+            className="flex min-h-8 w-full text-body"
+          />
         )}
         {portfolio.status === 'error' && (
           <ErrorNotice
@@ -332,9 +335,10 @@ export default function PortfolioConnect({
             </div>
           </div>
           {preview.status === 'loading' && (
-            <p role="status" className="text-body text-zoop-ink">
-              종목과 비중을 불러오고 있어요
-            </p>
+            <LoadingIndicator
+              label="종목과 비중을 불러오고 있어요"
+              className="flex min-h-8 w-full text-body"
+            />
           )}
           {preview.status === 'error' && (
             <ErrorNotice

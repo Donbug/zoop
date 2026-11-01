@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { listBriefingRounds } from '@/apis/briefing/briefing';
 import type { BriefingEdition, BriefingRoundRef } from '@/types/briefing';
 import { FOCUS_RING } from './briefingStyles';
+import { LoadingSpinner } from '@/components/common/LoadingIndicator';
 
 const EDITION_BUTTON = `min-h-10 min-w-[88px] whitespace-nowrap rounded-full border border-zoop-line bg-zoop-paper px-4 text-caption font-semibold text-zoop-ink transition-colors aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper disabled:cursor-not-allowed disabled:opacity-50 max-sm:flex-1 ${FOCUS_RING}`;
 const LABELS = { morning: '출근', evening: '퇴근' };
@@ -271,7 +272,14 @@ export default function BriefingRoundPicker({
           onClick={() => void load(state.nextCursor ?? undefined)}
           className={`shrink-0 text-caption text-zoop-muted underline underline-offset-4 hover:text-zoop-ink disabled:opacity-60 ${FOCUS_RING}`}
         >
-          {state.loading ? '불러오고 있어요' : '이전 회차 더 보기'}
+          {state.loading ? (
+            <>
+              <LoadingSpinner size="sm" />
+              <span className="sr-only">회차를 불러오고 있어요</span>
+            </>
+          ) : (
+            '이전 회차 더 보기'
+          )}
         </button>
       )}
       {state.error && state.rounds.length > 0 && (
@@ -321,6 +329,9 @@ export default function BriefingRoundPicker({
           className="w-full text-caption text-zoop-muted"
           aria-live="polite"
         >
+          {(state.loading || selecting !== null) && (
+            <LoadingSpinner size="sm" />
+          )}{' '}
           {message}
         </p>
       )}

@@ -7,6 +7,7 @@ import { useEvidenceData } from '@/hooks/useEvidenceData';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import type { EvidenceResponse } from '@/types/evidence';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import EvidenceAnalysis from './EvidenceAnalysis';
 
 interface Props {
@@ -269,11 +270,10 @@ export default function EvidenceDrawer({
           </div>
 
           {loading && (
-            <div className={ui.state} role="status">
-              <span />
-              <span />
-              <p>근거 문서를 불러오는 중입니다.</p>
-            </div>
+            <LoadingIndicator
+              label="근거 문서를 불러오는 중입니다."
+              className={`${ui.state} flex min-h-16 w-full`}
+            />
           )}
 
           {!loading && evidenceIds.length === 0 && (

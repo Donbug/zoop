@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import ErrorNotice from '@/components/common/ErrorNotice';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import StockRow from '@/components/my/StockRow';
 import { disconnectPortfolio, getPortfolio } from '@/apis/portfolio/portfolio';
 import { companyLogo } from '@/util/company-logo';
@@ -124,9 +125,10 @@ export default function HoldingsSection({
       </div>
 
       {portfolio.status === 'loading' && (
-        <p role="status" className="text-body text-zoop-ink">
-          보유 종목을 불러오고 있어요
-        </p>
+        <LoadingIndicator
+          label="보유 종목을 불러오고 있어요"
+          className="flex min-h-10 w-full text-body"
+        />
       )}
       {portfolio.status === 'error' && (
         <ErrorNotice
