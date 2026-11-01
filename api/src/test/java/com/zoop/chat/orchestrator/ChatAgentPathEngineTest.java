@@ -358,7 +358,7 @@ class ChatAgentPathEngineTest {
 
         agent.served = Map.of("tc-0", List.of("r1"));
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+                engine(agent).answer(run(), new Control(ChatJobExecutor.MAX_DEADLINE)));
         ChatResult result = outcome.result();
         assertEquals("answered", result.outcome());
         assertEquals(List.of(EV_HYNIX), result.citations().stream().map(Citation::evidenceId).toList());
@@ -443,11 +443,11 @@ class ChatAgentPathEngineTest {
         decision = ChatPlannerTest.decision(req("r1", Q03, Map.of("company.read", 0.9), List.of(HYNIX)));
         var agent = new Agent(Set.of(ChatCapability.WEB_SEARCH));
         directAnswer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
-        readTakes = Duration.ofSeconds(8);
+        readTakes = Duration.ofSeconds(17);
         verdicts = new ChatSemanticVerdicts(List.of());
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+                engine(agent).answer(run(), new Control(ChatJobExecutor.MAX_DEADLINE)));
 
         assertEquals(List.of(), agent.requirements);
         assertEquals("no_time", outcome.routeSummary().path("webAfterReads").asString());
@@ -605,18 +605,18 @@ class ChatAgentPathEngineTest {
         agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of(),
                 List.of(HYNIX));
         agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
-        // At the start of the job (60 s to its deadline): the run's deadline becomes 45 s from the start, so verification
-        // and the final store keep to it too, and Luna has min(35, 45 - 14) = 31 s.
+        // At the start of the job the direct and agent paths share the 45 s deadline. Verification and the final store keep
+        // nine seconds, so Luna receives its 35 s ceiling when the router returns immediately.
         var control = new Control(ChatJobExecutor.MAX_DEADLINE);
         assertInstanceOf(ChatEngineOutcome.Completed.class, engine(agent).answer(run(), control));
         assertEquals(NOW.plus(OrchestratedChatEngine.AGENT_JOB), control.deadline);
-        assertEquals(List.of(false), agent.closing, "31 s leave room for more than the closing step");
-        // A router that took 20 s leaves 25 s of the agent run: 11 s for Luna, only the step that writes the answer.
+        assertEquals(List.of(false), agent.closing, "35 s leave room for more than the closing step");
+        // A router that took 20 s leaves 25 s of the job: 16 s for Luna, only the step that writes the answer.
         assertInstanceOf(ChatEngineOutcome.Completed.class, routedFor(agent, Duration.ofSeconds(20)));
         assertEquals(List.of(false, true), agent.closing);
-        // One that took 22 s leaves 23 s of it, 9 s for Luna: the agent does not start (the job's 60 s would still have 38 s).
+        // One that took 27 s leaves 18 s, only 9 s for Luna: the agent does not start.
         assertEquals(new ChatEngineOutcome.Failed("transient", "deadline_guard", true),
-                routedFor(agent, Duration.ofSeconds(22)));
+                routedFor(agent, Duration.ofSeconds(27)));
         assertEquals(2, agent.requirements.size());
     }
 
@@ -648,7 +648,7 @@ class ChatAgentPathEngineTest {
         }
     }
 
-    /** A run of a job started now: its deadline is the job's 60 s. */
+    /** A run of a job started now: its deadline is the job-wide 45 s. */
     private ChatRun run() {
         ChatRun r = ChatPlannerTest.run(0, "v1");
         return new ChatRun(r.jobId(), r.sessionId(), r.memberId(), r.attemptNo(), r.mode(), r.turns(), r.context(),
