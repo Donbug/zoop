@@ -1,6 +1,10 @@
+/// <reference types="node" />
+import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { appearanceColors } from '@/components/graph/graph-appearance';
-import css from '@/index.css?raw';
+
+// Vitest stubs CSS imports; inspect the source tokens rather than that empty module.
+const css = readFileSync('src/index.css', 'utf8');
 
 function tokens(selector: string) {
   const start = css.indexOf(selector);
