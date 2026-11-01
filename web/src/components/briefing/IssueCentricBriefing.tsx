@@ -47,7 +47,7 @@ const labels = {
   positive: '긍정 요인',
   negative: '부정 요인',
   mixed: '긍정·부정 혼재',
-  watch: '판단 유보',
+  watch: '판단 보류',
 };
 type Correction = BriefingResponse['corrections'][number];
 const articleCount = (item: BriefingItem) =>

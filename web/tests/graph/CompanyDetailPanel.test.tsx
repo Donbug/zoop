@@ -333,6 +333,40 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     ).toBe(false);
   });
 
+  it('D-GRP-03 관련 기업이 5곳보다 많으면 나머지를 접어 두고 펼쳐서 고를 수 있다', async () => {
+    const onSelectRelation = vi.fn();
+    const related = Array.from({ length: 7 }, (_, i) => ({
+      id: `KRX:00000${i}`,
+      name: `합성 기업 ${i + 1}`,
+      sharedIssueCount: 1,
+    }));
+    render(
+      <MemoryRouter>
+        <CompanyDetailPanel
+          companyId={company.id}
+          fallback={fallback}
+          relatedCompanies={related}
+          token={null}
+          onClose={vi.fn()}
+          onSelectIssue={vi.fn()}
+          onFocus={vi.fn()}
+          onAskAi={vi.fn()}
+          onSelectRelation={onSelectRelation}
+        />
+      </MemoryRouter>,
+    );
+    const more = screen.getByText('관련 기업 2곳 더 보기');
+    const hidden = screen.getByRole('button', {
+      name: /합성 기업 7/,
+      hidden: true,
+    });
+    expect(more.closest('details')!.open).toBe(false);
+    expect(more.closest('details')!.contains(hidden)).toBe(true);
+    await userEvent.click(more);
+    await userEvent.click(screen.getByRole('button', { name: /합성 기업 7/ }));
+    expect(onSelectRelation).toHaveBeenCalledWith('KRX:000006');
+  });
+
   it('D-GRP-03 N-e 직접 이슈의 정확한 시각은 KST로, 날짜만 있는 값은 그대로 보인다', () => {
     const [first, second] = company.directIssues;
     vi.mocked(useCompanyData).mockReturnValue({
