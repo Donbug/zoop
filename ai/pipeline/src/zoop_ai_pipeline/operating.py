@@ -6,12 +6,13 @@ import json
 import os
 import re
 import signal
+import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
 from pydantic import ValidationError
 
-from . import extraction, relation
+from . import extraction, operating_collection, relation
 from .extraction_contracts import ExtractionFailure, Submit as ExtractionSubmit
 from .ingestion_contracts import Authority, IngestionFailure, now
 from .live_budget import Budget, BudgetError
@@ -179,6 +180,82 @@ class Owner:
                 self._register(unit, token)
         return {"registered": [unit["setId"] for unit in units], "metering": self.budget.snapshot()}
 
+    def register_collection(self, value: dict) -> dict:
+        """Prepare every pinned target and register its supplied set under one owner lock."""
+        adapter = operating_collection
+        progress = False
+        failures = (BudgetError, LiveFailure, ExtractionFailure, IngestionFailure)
+        invalid = (OSError, ValueError, TypeError, KeyError, sqlite3.Error)
+        try:
+            batch = adapter.request(value)
+            request_digest = digest(batch.wire())
+            binding = {"schemaVersion": adapter.REQUEST, "requestDigest": request_digest}
+            with self.budget.owner() as token:
+                previous = self.budget.bound(batch.binding_name)
+                progress = previous is not None
+                if previous is not None and previous != binding:
+                    raise IngestionFailure("operating_collection_input_conflict")
+                adapter.boundaries(batch, self.config)
+                authority = Authority(Path(batch.sources))
+                collection, path, items = adapter.load_collection(batch, authority, self.config)
+                authority.check(batch.source_id, batch.scope_id, ("read", "store", "quote-display"))
+                context = self.budget.bound("native-input-context")
+                if context is not None and context != batch.context:
+                    raise BudgetError("operating_source_context_changed")
+                self._check_native_stores()
+                existing = {entry["id"]: entry for entry in self.budget.sets()}
+                lifecycle = self.config["policy"]["lifecycle"]
+                for unit in batch.sets:
+                    if lifecycle["kind"] == "frontier" and unit.set_id not in lifecycle["setIds"]:
+                        raise BudgetError("operating_frontier_refused")
+                    for job in (unit.extraction_job_id, unit.relation_job_id):
+                        claim = self.budget.bound("job:" + job)
+                        if claim is not None and claim != unit.set_id:
+                            raise BudgetError("operating_binding_changed")
+                    if unit.set_id in existing:
+                        saved = existing[unit.set_id]["pins"]["unit"]
+                        if (saved["extraction"]["jobId"] != unit.extraction_job_id
+                                or saved["relationJobId"] != unit.relation_job_id
+                                or saved["stageAllowances"] != unit.stage_allowances):
+                            raise BudgetError("operating_set_binding_changed")
+                if not any(unit.set_id in existing for unit in batch.sets):
+                    # Fail fast for new batches; mixed replay must first finish already-admitted sets.
+                    with self.budget._tx(readonly=True) as db:
+                        self.budget._operating_gate(db, admission=True, owner=token)
+                self.budget.bind(batch.binding_name, binding)
+                progress = True
+                native, generated, refs, error = None, None, [], None
+                registration = {"registered": [], "interruptedSetId": None,
+                                "notAttempted": [unit.set_id for unit in batch.sets]}
+                try:
+                    native = adapter.prepare(batch, collection, path, authority)
+                    refs = adapter.observations(batch, collection, items, native, authority)
+                    generated = adapter.operating_manifest(batch, refs)
+                    adapter.authorize(batch, authority, refs)
+                    for index, unit in enumerate(generated["sets"]):
+                        registration["interruptedSetId"] = unit["setId"]
+                        registration["notAttempted"] = [later.set_id for later in batch.sets[index + 1:]]
+                        self._register(unit, token)
+                        registration["registered"].append(unit["setId"])
+                        registration["interruptedSetId"] = None
+                except failures as exc:
+                    error = {"code": exc.code}
+                except invalid:
+                    error = {"code": "operating_collection_invalid"}
+                # A changed/revoked registry suppresses even otherwise useful partial-progress metadata.
+                adapter.authorize(batch, authority, refs)
+                return adapter.Result.model_validate({
+                    "schemaVersion": adapter.RESULT, "status": "registered" if error is None else "incomplete",
+                    "requestDigest": request_digest,
+                    "collection": {"collectionId": collection.collection_id, "resultSha256": batch.collection.sha256,
+                                   "manifestSha256": collection.manifest.sha256, "state": "complete"},
+                    "ingestion": native, "manifest": generated, "registration": registration, "error": error,
+                }).wire()
+        except failures as exc:
+            return adapter.refusal(exc.code, progress=progress)
+        except invalid:
+            return adapter.refusal("operating_collection_invalid", progress=progress)
+
     def _register(self, unit: dict, token: str) -> None:
         context = {key: unit[key] for key in ("ingestionStateDirectory", "sources")}
         bound = self.budget.bound("native-input-context")
@@ -301,9 +378,10 @@ class Owner:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("init", "register", "run", "status", "pause", "resume", "stop", "force-stop"))
+    parser.add_argument("command", choices=("init", "register", "register-collection", "run", "status", "pause", "resume", "stop", "force-stop"))
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--batch", type=Path)
     parser.add_argument("--max-sets", type=int)
     parser.add_argument("--set-id", action="append", dest="set_ids", metavar="ID",
                         help="run only these already-admitted sets, in admission order; repeatable")
@@ -311,6 +389,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if (args.command == "register") != (args.manifest is not None) or (args.command == "run") != (args.max_sets is not None):
         parser.error("register requires --manifest; run requires --max-sets")
+    if (args.command == "register-collection") != (args.batch is not None):
+        parser.error("register-collection requires --batch")
     if args.set_ids is not None and args.command != "run":
         parser.error("--set-id requires run")
     control = args.command in {"pause", "resume", "stop", "force-stop"}
@@ -326,6 +406,8 @@ def main(argv: list[str] | None = None) -> int:
                 previous[signum] = signal.signal(signum, stop)
         if args.command == "register":
             result = owner.register(load(args.manifest, MAX_MANIFEST_BYTES))
+        elif args.command == "register-collection":
+            result = owner.register_collection(operating_collection.read_batch(args.batch, owner.config, args.config))
         elif args.command == "run":
             try:
                 result = owner.run(args.max_sets, set_ids=args.set_ids)
@@ -341,12 +423,15 @@ def main(argv: list[str] | None = None) -> int:
         else:
             result = {"metering": owner.budget.snapshot()}
         print(canonical(result))
+        if args.command == "register-collection":
+            return 0 if result.get("status") == "registered" else 2
         return 2 if result.get("status") == "blocked" else 0
     except (BudgetError, LiveFailure, ExtractionFailure, IngestionFailure) as exc:
-        print(canonical({"error": exc.code}))
+        print(canonical(operating_collection.refusal(exc.code) if args.command == "register-collection" else {"error": exc.code}))
         return 2
     except (OSError, ValueError, TypeError, KeyError, ValidationError):
-        print(canonical({"error": "operating_input_or_configuration_invalid"}))
+        print(canonical(operating_collection.refusal("operating_collection_invalid") if args.command == "register-collection"
+                        else {"error": "operating_input_or_configuration_invalid"}))
         return 2
     finally:
         for signum, handler in previous.items():
