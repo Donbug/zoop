@@ -215,17 +215,35 @@ Q07의 `portfolio.scope.read`는 Java server-only precondition으로 실행하�
 
 내부 응답에는 provider 원문 응답·비밀·자유 형식 추론을 넣지 않는다. 앱 completed는 AI 서비스가 ready를 반환한 시점이 아니라 Java가 artifact·영수증·도구 호출·검증 결과를 확인하고 DB에 원자 저장한 뒤에만 전이한다.
 
-## 5. 다음 PR 범위
+## 5. 다음 구현 순서 (2026-11-01)
 
-1. latency spike: MCP 서버 단독 시험, 합성 Responses replay, 승인된 소량 live 도구 1·4·8회 측정. 무내용 evidence와 p50/p95·토큰·비용·45초 gate는 [live spike 절차](chat-live-spike.md)와 `scripts/chat_live_spike_report.py`에 고정했다. 운영 HTTPS·grant·Responses 보유 조건·키 회전·사고 대응 결정은 [운영 readiness gate](chat-operations-readiness.md)가 같은 후보 commit의 spike와 결속한다. 실제 호출은 운영 승인 뒤 별도 실행하며, 총 8회 시나리오는 합성 공급자로 실행해 통과하기 전까지 미충족으로 남긴다.
-2. ~~StageLimits 8/6/2·45초, 요청 캐시·single-flight, 서버 requirement coverage~~ 구현(direct 경로 45초 제외)
-3. ~~Java Tool Service 추출, 원격 MCP endpoint·서비스 인증·크기/rate limit·grant, preflight direct 시작·circuit breaker~~ 구현
-4. ~~ai/service Luna Responses 전환, allowed_tools·Java 승인 continuation·usage/deadline~~ 구현(`chat-agent` 단계, direct의 `chat-answer`는 유지)
-5. ~~answerStatus/notices·부분 결과·재열람 guard의 DTO·migration·OpenAPI·웹 동시 변경~~ 구현(migration 없음)
-6. Q02~Q08 수직 도구와 웹 일일 한도, Q01 승인 문서 저장소·기본 비활성 어댑터는 구현. Q01 실제 승인본·활성화와 웹 공급자·권리·개인정보는 남음
-7. 고정 fixture·live eval·부하·장애 시험과 기능 플래그 단계 활성화
+Q01 승인 문서 저장소와 기본 비활성 `help.search`·`screenSpec.read` 어댑터까지 구현됐다(`chat-tools/v11`). 현재 migration에는 승인본이 없고 기능 플래그도 꺼져 있으므로, 다음 작업은 초안을 코드에 복사하는 일이 아니라 **승인 근거가 있는 본문을 확정하고 안전하게 등록하는 일**이다. Q02~Q08 수직 도구와 합성 `web.search`·일일 한도는 구현돼 있고, 실제 웹 공급자와 출시 증명은 후속이다.
 
-각 PR은 현재 저장·멱등·권한·호출 원장을 유지한다. MCP 서버와 Responses 연결만 먼저 합쳐 공개 계약을 앞서 내보내지 않는다.
+### 5.1 바로 다음 PR — Q01 승인본 확정·등록
+
+1. [도움말·화면 설명 초안](../help/README.md)의 `검수 필요` 5개 항목을 제품·운영 담당자가 결정하고, 현재 `web/` 동작과 문장별로 대조한다. 결정 전에는 초안을 `chat_document_versions`에 넣거나 플래그를 켜지 않는다.
+2. 확정 본문을 `docs/help/approved/service-guide-<version>.md`와 `screen-guide-<version>.md`로 고정하고 문서별 승인 근거(`approval_ref`), 승인 시각, 시행 시각을 기록한다. 승인 뒤 본문 수정은 금지하고 개정은 새 버전으로 낸다.
+3. 새 Flyway migration이 `help.service-guide`와 `screen.guide` 두 행만 등록하게 한다. 기존 `V20261101100000`은 수정하지 않으며, 시행 기간 중첩·본문 변경·삭제·철회 취소 제약을 유지한다.
+4. 실제 PostgreSQL에서 두 현재 문서의 버전·`##` 절 수·2,000자 상한·code point 구간·결정적 evidence ID·과거 버전 거부를 검증한다. 기능 플래그를 켠 Spring context, direct 도구와 MCP 고정 인자/결과 동등성, `zoop_doc` citation 재열람도 합성 질문으로 시험한다.
+5. 저장소 기본값 `ZOOP_CHAT_APPROVED_DOCS_ENABLED=false`는 유지한다. 승인 migration 적용과 `zoop-docs` model-send grant 확인 뒤 승인된 환경에서만 플래그를 켜며, 실제 모델 호출·운영 배포는 별도 승인으로 실행한다.
+
+완료 조건: 승인 파일과 승인 근거가 존재하고, 두 문서만 현재 시행 중이며, 플래그를 켠 기동·direct/MCP 조회·citation 재열람·철회 후 재열람 거부가 CI에서 통과해야 한다. 승인 의사결정이 끝나지 않으면 이 범위를 억지로 완료 처리하지 않고 아래 5.2를 먼저 진행한다.
+
+### 5.2 후속 PR — 실제 웹 검색 공급자와 권리 경계
+
+1. 공급자를 선정하고 이용약관·재배포/인용 권리·보관 기간·개인정보 전송 금지·지역·장애 대응·비용 상한을 문서로 승인한다. 합성 공급자는 운영 공급자로 승격하지 않는다.
+2. 공급자 adapter는 기존 `ChatWebSearchProvider` 경계 뒤에 추가하고 timeout·0건·unavailable, 일일 한도, 요청 cache/single-flight, source/model-send grant, URL/본문 최소화를 유지한다.
+3. 웹 결과 snapshot과 철회/만료 정책, Q01 웹 금지, Q02 기본 보조, Q03~Q08 내부 근거 뒤 마지막 검색을 direct·MCP 양쪽에서 검증한다.
+
+완료 조건: 실제 공급자 계약과 운영 설정이 승인되고, 외부 호출 없는 replay/fixture CI와 별도 승인된 소량 smoke가 모두 통과해야 한다. 공급자 미정 상태에서는 `ZOOP_CHAT_WEB_PROVIDER=synthetic`만 로컬·시험에서 사용한다.
+
+### 5.3 출시 전 검증·활성화
+
+1. [live spike 절차](chat-live-spike.md)로 MCP 도구 1·4·8회와 승인 1·3라운드의 p50/p95·토큰·비용을 측정하고, direct 경로를 포함한 terminal DB commit 45초 조건을 실측해 남은 direct deadline을 구현·보정한다.
+2. [운영 readiness gate](chat-operations-readiness.md)에 운영 HTTPS·grant·Responses 보유 조건·키 회전·사고 대응과 같은 후보 commit의 spike 결과를 결속한다. 승인 없는 실제 모델 호출은 하지 않는다.
+3. 고정 fixture, 실제 모델 한국어 평가, 부하·장애·철회 시험을 통과한 registry/model/prompt/policy 조합만 Q01 → Q02 → Q03~Q08 순으로 활성화한다. 실제 백엔드·웹 종단 시험과 D-AI-01/01b/02/02b 상태 계약도 이 단계에서 증명한다.
+
+각 PR은 현재 저장·멱등·권한·호출 원장과 기본 비활성 원칙을 유지한다. 구현 코드가 존재한다는 이유만으로 승인 문서, 외부 공급자, 유료 모델 호출 또는 운영 배포가 승인됐다고 표시하지 않는다.
 
 ## 6. 필수 테스트 목록
 
