@@ -66,6 +66,7 @@ import {
 } from './detail-model';
 import { useColorTheme } from '@/util/theme-color';
 import { useCompanyMapEntry } from '@/hooks/useCompanyMapEntry';
+import { useCompanyScroll } from '@/hooks/useCompanyScroll';
 
 // D-COM-01 B1: 백엔드 financials 컨트롤러가 생기면 계약을 확인하고 다시 켠다.
 const COMPANY_FINANCIALS_ENABLED = false;
@@ -688,6 +689,13 @@ export default function CompanyWorkspace() {
       graphPanel.current?.scrollIntoView({ block: 'start' });
   }
   // D-COM-05 D4: 선택한 카드 바로 아래에 같은 상세 상태를 표시한다.
+  useCompanyScroll(
+    `${id}|${owner}`,
+    !company.loading &&
+      !prices.loading &&
+      !graph.loading &&
+      (tab !== 'events' || (!events.loading && !event.loading)),
+  );
   const selectedEventDetails = eventId ? (
     <div role="region" aria-label="선택 사건 상세" id="company-selected-event">
       <Status resource={event} label="선택 사건" />
