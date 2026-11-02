@@ -4,8 +4,8 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * A public web search provider behind {@link ChatWebSearchTool} (web search design 7: none is selected yet, so only the
- * synthetic one exists). It gets one query the server already checked, never a question, member or conversation, and returns
+ * A public web search provider behind {@link ChatWebSearchTool} (web search design 7: selecting a real one is still an open
+ * decision). It gets one query the server already checked, never a question, member or conversation, and returns
  * at most {@code limit} hits plus whether it had more. An outage or provider error throws {@link ChatToolUnavailable}; it is
  * never an empty list.
  */
