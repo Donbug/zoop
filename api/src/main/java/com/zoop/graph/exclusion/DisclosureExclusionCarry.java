@@ -24,10 +24,11 @@ import org.slf4j.LoggerFactory;
  * so a row there could never end. Each carried change instead names, in {@code base_version_id}, the original version whose
  * current exclusion it copies, and goes to each new source of the target: a source of {@code targetSources} that is not one of
  * {@code baseSources}. A target is carried whether or not the new source holds the id: a lift is the only end of an exclusion
- * (exposure consumption rule 4), and an absent id filters nothing. A target the operator lifted on the new source itself (its
+ * (exposure consumption rule 4), and an absent id filters nothing (the read skips it; the record stays for a later source
+ * that holds the id). A target the operator lifted on the new source itself (its
  * latest change there is a lift) is not carried over that decision, and one already excluded there is not carried again, so a
  * re-activation or a retried activation appends nothing twice. A lift on the original version is not carried either; a lift with
- * {@code laterVersions} on that original version also ends the copies on the original versions imported after it.
+ * {@code laterVersions} on that original version also ends the copies, on whichever versions they were carried to.
  */
 public class DisclosureExclusionCarry {
     public static final String CAUSE = "carried";

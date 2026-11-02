@@ -621,6 +621,29 @@ class DisclosureExclusionPostgresTest {
     }
 
     @Test
+    void aLiftOverLaterVersionsAlsoEndsACopyCarriedToAVersionImportedBefore() {
+        // v2 was imported after v1 but public first; activating v1 then carried v2's exclusion back to v1.
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_2, List.of("issue-d"), List.of(), false))));
+        long decided = revision();
+        assertEquals(1, carry(v2, v1));
+        assertEquals(Set.of("issue-d"), reader.current(v1).issueIds());
+
+        ExclusionResult lifted = run(ExposureReports.lift(v2, decided, true, "issue-d"));
+        assertEquals(ExclusionResult.APPLIED, lifted.outcome(), () -> String.valueOf(lifted.failure()));
+        assertEquals(List.of(v2, v1), lifted.versions().stream().map(VersionChange::graphVersionId).toList(),
+                "the named version, then the carried copy on the earlier import");
+        assertEquals(Set.of(), reader.current(v1).issueIds());
+        assertEquals(Set.of(), reader.current(v2).issueIds());
+
+        // Without laterVersions the copy stays.
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_2, List.of("issue-e"), List.of(), false))));
+        assertEquals(1, carry(v2, v1));
+        ExclusionResult named = run(ExposureReports.lift(v2, revision(), false, "issue-e"));
+        assertEquals(List.of(v2), named.versions().stream().map(VersionChange::graphVersionId).toList());
+        assertEquals(Set.of("issue-e"), reader.current(v1).issueIds());
+    }
+
+    @Test
     void aReportThatDoesNotMatchTheImportedReceiptOrVersionWritesNothing() {
         long before = revision();
         ObjectNode otherImport = ExposureReports.handoff(HANDOFF_2, List.of("issue-a"), List.of(), false);

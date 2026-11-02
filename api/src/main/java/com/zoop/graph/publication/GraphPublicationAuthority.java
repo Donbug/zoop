@@ -39,7 +39,12 @@ public final class GraphPublicationAuthority {
             for (var source : publication.contributions()) {
                 DisclosureExclusions excluded = source.sourceVersionId().equals(publication.versionId()) ? own : exclusions.current(source.sourceVersionId());
                 revision = Math.max(revision, excluded.revision());
-                for (String issue : excluded.issueIds()) issues.add(publication.publicIssue(new IssueRef(source.sourceVersionId(), issue)));
+                // An id the source does not hold filters nothing: an activation carries an exclusion to a new source whether or
+                // not it holds the id (#55 A-14), and the record stays for a later source that does.
+                for (String issue : excluded.issueIds()) {
+                    if (source.projection().issues().stream().anyMatch(i -> i.issueId().equals(issue)))
+                        issues.add(publication.publicIssue(new IssueRef(source.sourceVersionId(), issue)));
+                }
                 relations.addAll(excluded.relationIds()); evidence.addAll(excluded.evidenceIds()); articles.addAll(excluded.articleTargets());
                 for (var article : source.projection().articles()) {
                     if (!allowed(source, article, registry, current, at)) articles.add(new ArticleTarget(article.articleId(), article.version()));

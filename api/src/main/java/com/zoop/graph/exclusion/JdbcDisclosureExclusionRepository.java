@@ -119,14 +119,24 @@ public class JdbcDisclosureExclusionRepository {
     }
 
     /**
-     * The original imported ({@code snapshot}) versions after this one in import order, oldest first: what a lift with
-     * {@code laterVersions} also covers. Cumulative publications are left out: their exclusions belong to their original
-     * versions, and neither an operator change nor a carry writes to their own id. Empty when the version is unknown.
+     * What a lift with {@code laterVersions} also covers, in import order: the original imported ({@code snapshot}) versions
+     * after this one, and every version a carry copied this one's exclusions to, followed through carries of those copies. A
+     * carry follows activation order, not import order, so a version imported before this one can hold a copy. Cumulative
+     * publications are left out: their exclusions belong to their original versions, and neither an operator change nor a carry
+     * writes to their own id. Empty when the version is unknown.
      */
     public List<String> laterVersions(String versionId) {
         return jdbc.queryForList("""
+                WITH RECURSIVE carried(id) AS (
+                    SELECT CAST(:id AS text)
+                    UNION
+                    SELECT t.graph_version_id FROM carried k
+                      JOIN disclosure_exclusion_changes c ON c.cause = 'carried' AND c.base_version_id = k.id
+                      JOIN disclosure_exclusion_targets t ON t.revision = c.revision
+                )
                 SELECT v.id FROM graph_versions v
-                 WHERE v.kind = 'snapshot' AND v.sequence > (SELECT sequence FROM graph_versions WHERE id = :id)
+                 WHERE v.kind = 'snapshot' AND v.id <> :id
+                   AND (v.sequence > (SELECT sequence FROM graph_versions WHERE id = :id) OR v.id IN (SELECT id FROM carried))
                    AND NOT EXISTS (SELECT 1 FROM graph_publications p WHERE p.version_id = v.id)
                  ORDER BY v.sequence
                 """, new MapSqlParameterSource("id", versionId), String.class);
