@@ -220,3 +220,25 @@ it.each(['light', 'dark'] as const)(
     );
   },
 );
+
+it.each(['light', 'dark'] as const)(
+  'D-AUT-01 G1 %s login theme button uses the same next-action name and hover text',
+  async (theme) => {
+    document.documentElement.dataset.theme = theme;
+    render(
+      <MemoryRouter>
+        <LoginFrame>
+          <p>합성 본문</p>
+        </LoginFrame>
+      </MemoryRouter>,
+    );
+    const label =
+      theme === 'light' ? '다크 모드로 바꾸기' : '라이트 모드로 바꾸기';
+    const button = screen.getByRole('button', { name: label });
+    expect(button.getAttribute('title')).toBe(label);
+    await userEvent.click(button);
+    expect(button.getAttribute('title')).toBe(
+      theme === 'light' ? '라이트 모드로 바꾸기' : '다크 모드로 바꾸기',
+    );
+  },
+);

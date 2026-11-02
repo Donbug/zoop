@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useThemeToggle } from '@/util/theme-color';
+import { useColorTheme, useThemeToggle } from '@/util/theme-color';
 import './service-shell.css';
 
 // D-AUT-01/02 · D-ONB-01/02 · D-WAT-01/01b, Figma 619:1087.
@@ -9,6 +9,9 @@ export default function SlimHeader({
   themeSwitch?: boolean;
 }) {
   const toggleTheme = useThemeToggle();
+  // G1: same next-action label as ServiceHeader, also shown on hover.
+  const themeLabel =
+    useColorTheme() === 'dark' ? '라이트 모드로 바꾸기' : '다크 모드로 바꾸기';
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-zoop-line bg-white px-5 text-zoop-ink">
       <Link
@@ -34,8 +37,8 @@ export default function SlimHeader({
         {themeSwitch ? (
           <button
             type="button"
-            aria-label="화면 테마 전환"
-            title="밝은 모드 / 어두운 모드 전환"
+            aria-label={themeLabel}
+            title={themeLabel}
             onClick={toggleTheme}
             className="grid size-8 place-items-center rounded-full hover:bg-zoop-soft focus-visible:outline-2 focus-visible:outline-offset-2"
           >
