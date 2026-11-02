@@ -65,6 +65,7 @@ import {
   versionOnlyAddress,
 } from './detail-model';
 import { useColorTheme } from '@/util/theme-color';
+import { useCompanyMapEntry } from '@/hooks/useCompanyMapEntry';
 
 // D-COM-01 B1: 백엔드 financials 컨트롤러가 생기면 계약을 확인하고 다시 켠다.
 const COMPANY_FINANCIALS_ENABLED = false;
@@ -261,6 +262,7 @@ export default function CompanyWorkspace() {
   const auth = useAuth();
   const revision = useAuthStore((s) => s.sessionRevision);
   const owner = auth.isAuthenticated ? `${auth.member?.id}:${revision}` : '';
+  const mapEntry = useCompanyMapEntry(`${id}|${owner}`);
   const period = (periods.find((p) => p.value === params.get('period'))
     ?.value ?? '1m') as ChartPeriod;
   const asOf = params.get('asOf'),
@@ -828,6 +830,7 @@ export default function CompanyWorkspace() {
           </p>
         )}
         <section aria-label="기업 개요">
+          {mapEntry && <Link to={mapEntry}>그래프로 돌아가기</Link>}
           <Status resource={company} label="기업 정보" />
           {company.data && (
             <>

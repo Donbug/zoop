@@ -3219,3 +3219,34 @@ test('D-COM-05 D4 expands details directly below the selected card and closes th
   );
   expect(screen.queryByRole('region', { name: '선택 사건 상세' })).toBeNull();
 });
+
+test('D-COM-01 D7 returns to the original map URL after changing a company tab', async () => {
+  const entry =
+    '/?mode=personal&scope=watchlist&focus=KRX%3ASYNTHETIC&hops=2&select=node%3Aissue-a';
+  render(
+    <MemoryRouter
+      initialEntries={[
+        {
+          pathname: `/companies/${encodeURIComponent(id)}`,
+          search: pinned,
+          state: { from: entry },
+        },
+      ]}
+    >
+      <CompanyDetailPage />
+    </MemoryRouter>,
+  );
+  const link = await screen.findByRole('link', { name: '그래프로 돌아가기' });
+  expect(link.getAttribute('href')).toBe(entry);
+  await userEvent.click(
+    screen.getByRole('button', { name: '문서', exact: true }),
+  );
+  expect(
+    screen
+      .getByRole('link', { name: '그래프로 돌아가기' })
+      .getAttribute('href'),
+  ).toBe(entry);
+  expect(
+    screen.getByRole('link', { name: '지도에서 보기' }).getAttribute('href'),
+  ).toContain('mode=all');
+});

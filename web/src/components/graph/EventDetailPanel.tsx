@@ -2,7 +2,7 @@ import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import LoadingIndicator from '@/components/common/LoadingIndicator';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useEventData } from '@/hooks/useEventData';
 import type { EventContext, EventDetail } from '@/types/map/event';
 import type { GraphNode } from '@/types/map/graph';
@@ -43,6 +43,7 @@ export default function EventDetailPanel({
   onAction,
 }: Props) {
   const [retry, setRetry] = useState(0);
+  const location = useLocation();
   const [notice, setNotice] = useState('');
   const heading = useRef<HTMLHeadingElement>(null);
   const { data, loading, error } = useEventData(id, context, retry);
@@ -94,6 +95,9 @@ export default function EventDetailPanel({
                 </button>
               ) : (
                 <Link
+                  state={{
+                    from: `${location.pathname}${location.search}${location.hash}`,
+                  }}
                   to={
                     companyDetailHref?.(company.id) ??
                     `/companies/${encodeURIComponent(company.id)}`
