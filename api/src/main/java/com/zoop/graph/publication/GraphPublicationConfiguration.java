@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.util.Set;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.common.json.Canonical;
+import com.zoop.common.json.StrictJson;
 import com.zoop.document.evidence.config.DocumentReadProperties;
 import com.zoop.document.evidence.service.DocumentReadSources;
 import com.zoop.document.repository.DocumentRegistryRepository;
@@ -74,8 +75,10 @@ public class GraphPublicationConfiguration {
                     PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))) {
                 ObjectNode answer;
                 try {
-                    answer = composer.run(PublicationComposeRequest.parse(readOperatorFile(request, PublicationComposeRequest.MAX_BYTES)),
-                            readOperatorFile(decisions, 4_000_000));
+                    var parsed = PublicationComposeRequest.parse(readOperatorFile(request, PublicationComposeRequest.MAX_BYTES));
+                    byte[] decisionBytes = readOperatorFile(decisions, 4_000_000);
+                    // Only the preparation writes automatic decisions; an operator file claiming them could later be replaced as automatic.
+                    answer = claimsAutomaticReviewer(decisionBytes) ? GraphPublicationComposer.failed("request_invalid") : composer.run(parsed, decisionBytes);
                 } catch (PublicationException invalid) { answer = GraphPublicationComposer.failed(invalid.code()); }
                 ByteBuffer bytes = ByteBuffer.wrap(Canonical.bytes(answer));
                 while (bytes.hasRemaining()) output.write(bytes);
@@ -98,6 +101,13 @@ public class GraphPublicationConfiguration {
             if (!attrs.isDirectory() || attrs.permissions().contains(PosixFilePermission.GROUP_WRITE)
                     || attrs.permissions().contains(PosixFilePermission.OTHERS_WRITE)) throw new IOException();
         } catch (IOException error) { throw new IllegalArgumentException("publication result parent unavailable"); }
+    }
+    static boolean claimsAutomaticReviewer(byte[] decisions) {
+        try {
+            return PublicationMerger.claimsAutomaticReviewer(StrictJson.parseObject(decisions));
+        } catch (StrictJson.Malformed | IllegalArgumentException malformed) {
+            return false; // the composer refuses a malformed document as request_invalid
+        }
     }
     static byte[] readOperatorFile(Path path, int max) {
         try {
