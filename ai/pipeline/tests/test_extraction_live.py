@@ -11,15 +11,24 @@ import hashlib
 import json
 import os
 import sqlite3
+import subprocess
+import sys
+import threading
+from decimal import Decimal
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 import httpx
 import pytest
 from pydantic import ValidationError
 
-from scripts.extraction_smoke import (FAKE_KEYS, LIVE_ENV_NAMES, Q3, Q3B, LiveWorld, chat_reply, loopback_smoke, simulate, simulator_env)
+from scripts.extraction_smoke import (FAKE_KEYS, LIVE_ENV_NAMES, Q3, Q3B, LiveWorld, chat_reply, first_reference, loopback_smoke, simulate, simulator_env)
+from scripts.ingestion_smoke import ownership_env
+from tests.live_support import jev_reply
+from zoop_ai_pipeline import direct_deepseek, live_budget, live_funding, live_runtime
 from zoop_ai_pipeline import extraction_replay as analysis
 from zoop_ai_pipeline.extraction import Extractor, Fixtures, LiveAccess, Sources, Store
-from zoop_ai_pipeline.extraction_contracts import ExtractionFailure, ObservationRef, Provenance, Submit
+from zoop_ai_pipeline.extraction_contracts import ADAPTER_VERSION, LIVE_ADAPTER_VERSION, ExtractionFailure, ObservationRef, Provenance, Submit
 from zoop_ai_pipeline.ingestion_contracts import Authority, IngestionFailure
 from zoop_ai_pipeline.live_budget import Budget, nano_from_usd
 from zoop_ai_pipeline.live_runtime import LiveRuntime
@@ -46,7 +55,7 @@ class Provider:
         reply = simulate(body)
         if self.mode == "ungrounded":
             answer = json.loads(reply["choices"][0]["message"]["content"])
-            answer["mentions"][0]["evidence"][0]["quote"] = "원문에 없는 문장이다."
+            answer["mentions"][0]["evidence"][0]["segmentId"] = "q-unknown"
             reply = chat_reply(json.dumps(answer, ensure_ascii=False))
         if self.after is not None:
             self.after()
@@ -231,7 +240,7 @@ def test_live_job_extracts_compares_and_groups_through_the_runtime_with_per_docu
         assert texts[(citation["documentId"], citation["documentVersion"])][citation["start"]:citation["end"]] == citation["quote"]
     live = out["binding"]["live"]
     assert "replay" not in out["binding"] and live["runtime"] == runtime.binding() and live["bindingDigest"] == runtime.binding()["identity"]
-    assert out["binding"]["adapter"]["version"] == "zoop-extraction-native-live-1"
+    assert out["binding"]["adapter"]["version"] == LIVE_ADAPTER_VERSION
     usage = out["usage"]
     assert (usage["executionMode"], usage["providerCalls"], usage["receivedCalls"], usage["startedWithoutReceipt"], usage["unsentCalls"], usage["replayCalls"]) == ("live", 3, 3, 0, 0, 0)
     assert (usage["inputTokens"], usage["outputTokens"], usage["reasoningTokens"], usage["paidModelCalls"]) == (3600, 900, 360, 3)
@@ -382,7 +391,7 @@ def test_provider_silence_is_reconciling_never_resent_and_its_usage_is_unknown(l
     assert cancelled["state"] == "cancelled" and len(p.requests) == 1
 
 
-@pytest.mark.parametrize("mode,code", [("garbage", "live_reply_not_json"), ("http500", "live_http_500"), ("ungrounded", "extraction_reply_invalid")])
+@pytest.mark.parametrize("mode,code", [("garbage", "live_reply_not_json"), ("http500", "live_http_500"), ("ungrounded", "live_citation_reference_unknown")])
 def test_an_unusable_reply_stays_a_durable_failed_receipt_and_is_never_repaired(lw, mode, code):
     w, p = lw, lw.provider
     p.mode = mode
@@ -472,10 +481,293 @@ def test_a_replay_job_never_reads_the_live_runtime_or_environment(lw):
         assert ex.resume("job-replay", NONE, initial_only=False) == done
     assert done["state"] == "ready" and done["usage"] == {"executionMode": "replay", "replayCalls": 1, "startedWithoutReceipt": 0, "providerCalls": 0,
                                                           "paidModelCalls": 0, "creatorJobId": "job-replay"}
-    assert "live" not in done["binding"] and done["binding"]["adapter"]["version"] == "zoop-extraction-native-replay-1"
+    assert "live" not in done["binding"] and done["binding"]["adapter"]["version"] == ADAPTER_VERSION
     assert set(done["calls"][0]) == {"stage", "state", "requestDigest", "fixtureHash", "responseDigest", "verdict"}
 
 
 def test_the_loopback_cli_smoke_exercises_the_live_path_through_real_processes(tmp_path):
     report = loopback_smoke(tmp_path)
-    assert report["status"] == "passed" and report["paidModelCalls"] == 0 and len(report["checks"]) == 6
+    assert report["status"] == "passed" and report["paidModelCalls"] == 0
+    assert report["s2"]["state"] == "ready" and report["s3"]["state"] == "ready" and report["s3"]["delivery"] == "current"
+
+
+# Admitted-set chains use actual native CLI processes and loopback sockets. Only transport routing is substituted:
+# provider identities and funding remain production-shaped, while every socket is restricted to this test-owned listener.
+CHAIN_NOW = "2026-10-28T01:00:00+00:00"
+CHAIN_START, CHAIN_END = "2026-10-28T00:15:00Z", "2026-10-28T08:30:00Z"
+
+
+class ChainPeer:
+    def __init__(self):
+        self.requests, self.behavior = [], {}
+        peer = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                role = self.path.split("/")[1]
+                projection = json.loads(body["messages"][1]["content"]) if "messages" in body else None
+                stage = projection["stage"] if projection else "verify-relation"
+                peer.requests.append((role, stage, body))
+                action = peer.behavior.get((role, stage))
+                if action == "unknown":
+                    self.close_connection = True
+                    return
+                status = 500 if action == "http500" else 200
+                if role == "typesafe":
+                    reply = jev_reply({"body": body})
+                else:
+                    if stage == "relation":
+                        from scripts.relation_smoke import co, proposal, relation_reply
+                        citation = first_reference(projection["sources"][0])
+                        answer = relation_reply([proposal("SUPPLIES", co("SYNTH-1"), co("SYNTH-2"), [citation])])
+                        reply = chat_reply(json.dumps({**answer, "citationFormat": projection["citationFormat"]}, ensure_ascii=False))
+                    elif stage == "impact":
+                        from scripts.relation_smoke import impact_reply
+                        reply = chat_reply(json.dumps({**impact_reply([]), "citationFormat": projection["citationFormat"]}))
+                    else:
+                        reply = simulate(body)
+                    reply["model"] = direct_deepseek.MODEL_REVISION if role == "deepseek" else live_runtime.MODEL
+                    if action == "invalid":
+                        reply["choices"][0]["message"]["content"] = "not-json"
+                    elif action == "refusal":
+                        reply["choices"][0]["message"]["refusal"] = "authored refusal"
+                    elif action == "ungrounded":
+                        answer = json.loads(reply["choices"][0]["message"]["content"])
+                        answer["evidence"][0]["segmentId"] = "q-unknown"
+                        reply["choices"][0]["message"]["content"] = json.dumps(answer)
+                    elif action == "http500":
+                        reply = {"error": {"message": "authored unavailable"}}
+                data = json.dumps(reply, ensure_ascii=False).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *args):
+                pass
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(target=self.server.serve_forever)
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join()
+
+
+def chain_world(tmp_path, monkeypatch, *, fallback_grant=True):
+    env = simulator_env(live_funding.OPENAI_URL, tmp_path / "budget", **{
+        live_runtime.PROFILE_VAR: live_funding.CAPPED_PROFILE, live_runtime.RUN_ID_VAR: "native-chain-test",
+        live_runtime.ADMIT_FROM_VAR: CHAIN_START, live_runtime.ADMIT_UNTIL_VAR: CHAIN_END,
+        live_runtime.FINISH_BY_VAR: "2026-10-28T09:30:00Z",
+        live_runtime.SET_ID_VAR: "set-native", live_runtime.MAX_USD_VAR: "4",
+        live_runtime.MAX_CALLS_VAR: "100000", live_runtime.SHARED_MAX_VAR: "3.5", live_runtime.PERSONAL_MAX_VAR: "0.5",
+        direct_deepseek.KEY_VAR: "synthetic-direct-test-key",
+    })
+    for name in tuple(os.environ):
+        if name.startswith("ZOOP_AI_PIPELINE_LIVE_") or name in (*LIVE_ENV_NAMES, direct_deepseek.KEY_VAR):
+            monkeypatch.delenv(name, raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(live_budget, "_now", lambda: CHAIN_NOW)
+    world = LiveWorld(tmp_path / "world", env)
+    world.kit.allow_model_send(world.runtime, live_runtime.STAGES)
+    if fallback_grant:
+        world.kit.registry["sources"][0]["grant"]["recipients"].append(world.runtime.fallback_recipient("extract"))
+        world.kit.save_registry()
+    world.budget = Budget(tmp_path / "budget", 4 * live_budget.NANO, 100000,
+                          funding=world.runtime.binding()["funding"], bucket_caps={"shared": 3_500_000_000, "personal": 500_000_000},
+                          finish_by="2026-10-28T09:30:00Z")
+    world.budget.admit_set("set-native", "a" * 64, dict.fromkeys(live_funding.GENERATION_STAGES + live_funding.VERIFY_STAGES, 8))
+    return world
+
+
+def chain_cli(world, peer, command, request, *, family="extraction", hook="", expected=0, live=True):
+    # Transport rejects any unexpected provider before socket creation. Socket audit rejects non-loopback even if runtime routing regresses.
+    script = f"""
+import json, os, runpy, sys, httpx
+from zoop_ai_pipeline import live_budget
+live_budget._now = lambda: {CHAIN_NOW!r}
+from datetime import datetime
+from zoop_ai_pipeline import live_funding
+class Clock(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return datetime.fromisoformat(live_budget._now())
+live_funding.datetime = Clock
+original = httpx.HTTPTransport.handle_request
+roles = {{'api.openai.com': 'openai', 'api.deepseek.com': 'deepseek', 'api.typesafe.ai': 'typesafe'}}
+def mapped(self, request):
+    role = roles[request.url.host]
+    url = request.url.copy_with(scheme='http', host='127.0.0.1', port={peer.server.server_port}, path='/' + role + request.url.path)
+    replacement = httpx.Request(request.method, url, headers=request.headers, content=request.read(), extensions=request.extensions)
+    return original(self, replacement)
+httpx.HTTPTransport.handle_request = mapped
+def audit(event, args):
+    if event == 'socket.connect' and (args[1][0] != '127.0.0.1' or args[1][1] != {peer.server.server_port}):
+        raise RuntimeError('non-loopback test socket')
+sys.addaudithook(audit)
+{hook}
+runpy.run_module('zoop_ai_pipeline.{family}_cli', run_name='__main__')
+"""
+    args = [sys.executable, "-c", script, command, "--state-dir", str(world.kit.root / family),
+            "--ingestion-state-dir", str(world.kit.root / "ingestion"), "--sources", str(world.kit.registry_path)]
+    if family == "relation":
+        args += ["--extraction-state-dir", str(world.kit.root / "extraction")]
+    pipeline = Path(__file__).resolve().parents[1]
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8",
+           "PYTHONDONTWRITEBYTECODE": "1", **ownership_env(), **(world.env if live else {}),
+           "PYTHONPATH": os.pathsep.join((str(pipeline / "src"), str(pipeline.parent / "worker" / "src")))}
+    child = subprocess.run(args, input=json.dumps(request).encode(), capture_output=True, env=env,
+                           cwd=Path(__file__).resolve().parents[1], timeout=60)
+    assert child.returncode == expected, (child.returncode, child.stdout.decode(), child.stderr.decode())
+    return json.loads(child.stdout) if child.stdout else None
+
+
+def chain_receipts(world, family="extraction"):
+    with sqlite3.connect(world.kit.root / family / f"{family}.sqlite3") as db:
+        return db.execute("SELECT stage,attempt_id,state,response,response_digest FROM calls ORDER BY started_at,attempt_id").fetchall()
+
+
+def test_native_chain_cli_primary_success_does_not_require_optional_fallback_grant(tmp_path, monkeypatch):
+    world = chain_world(tmp_path, monkeypatch, fallback_grant=False)
+    with ChainPeer() as peer:
+        out = chain_cli(world, peer, "run", world.request("primary-only", topic=False))
+        assert out["state"] == "ready"
+        assert [(role, stage) for role, stage, _ in peer.requests] == [("openai", "extract"), ("openai", "compare")]
+        assert out["usage"]["providerCalls"] == out["usage"]["receivedCalls"] == 2
+
+
+def test_native_chain_cli_fallback_sums_physical_costs_and_never_replays_extraction(tmp_path, monkeypatch):
+    world = chain_world(tmp_path, monkeypatch)
+    with ChainPeer() as peer:
+        peer.behavior["openai", "compare"] = "invalid"
+        out = chain_cli(world, peer, "run", world.request("fallback"))
+        assert out["state"] == "ready"
+        assert [(role, stage) for role, stage, _ in peer.requests] == [
+            ("openai", "extract"), ("openai", "compare"), ("deepseek", "compare"), ("openai", "topic")]
+        assert len(out["calls"]) == 3
+        assert (out["usage"]["providerCalls"], out["usage"]["receivedCalls"], out["usage"]["startedWithoutReceipt"]) == (4, 4, 0)
+        assert (out["usage"]["inputTokens"], out["usage"]["outputTokens"], out["usage"]["reasoningTokens"]) == (4800, 1200, 480)
+        saved = chain_receipts(world)
+        envelopes = [json.loads(row[3]) for row in saved]
+        leaves = [p["receipt"] for r in envelopes for p in r["physicalAttempts"] if p["state"] == "received"]
+        for field in ("estimatedUsd", "chargedUsd"):
+            assert Decimal(out["usage"][field]) == sum(Decimal(r["cost"][field]) for r in leaves)
+        assert {r["funding"]["accountRole"] for r in leaves} == {"shared-openai", "personal-deepseek"}
+        snapshot = world.budget.snapshot()
+        for role, bucket in (("shared-openai", "shared"), ("personal-deepseek", "personal")):
+            assert Decimal(snapshot["buckets"][bucket]["chargedUsd"]) == sum(
+                Decimal(r["cost"]["chargedUsd"]) for r in leaves if r["funding"]["accountRole"] == role)
+        for row, envelope in zip(saved, envelopes):
+            assert envelope["attemptId"] == envelope["logicalAttemptId"] == row[1]
+            assert envelope["winnerAttemptId"] in {p["attemptId"] for p in envelope["physicalAttempts"]}
+            assert all(p["attemptId"] != row[1] for p in envelope["physicalAttempts"])
+        calls = out["calls"]
+        assert calls[1]["recipient"] is None and len(calls[1]["physicalAttempts"]) == 2
+        assert {p["funding"]["accountRole"] for p in calls[1]["physicalAttempts"]} == {"shared-openai", "personal-deepseek"}
+        assert chain_cli(world, peer, "resume", world.kit.job_selector("fallback"), live=False) == out
+        assert chain_receipts(world) == saved and len(peer.requests) == 4
+
+
+@pytest.mark.parametrize("outcome", ["denied", "unknown", "all-errors"])
+def test_native_chain_cli_failed_fallback_keeps_known_primary_and_unknown_distinct(tmp_path, monkeypatch, outcome):
+    world = chain_world(tmp_path, monkeypatch, fallback_grant=outcome != "denied")
+    with ChainPeer() as peer:
+        peer.behavior["openai", "compare"] = "invalid"
+        peer.behavior["deepseek", "compare"] = "unknown" if outcome == "unknown" else "invalid"
+        out = chain_cli(world, peer, "run", world.request("chain-failed", topic=False))
+        assert out["stages"]["extract"]["state"] == "complete" and out["stages"]["compare"]["state"] == "pending"
+        assert out["state"] == ("reconciling" if outcome == "unknown" else "stopped")
+        usage = out["usage"]
+        assert usage["providerCalls"] == (2 if outcome == "denied" else 3)
+        assert usage["receivedCalls"] == (3 if outcome == "all-errors" else 2)
+        assert usage["startedWithoutReceipt"] == (1 if outcome == "unknown" else 0)
+        saved = chain_receipts(world)
+        compare = next(row for row in saved if row[0] == "compare")
+        envelope = json.loads(compare[3])
+        assert envelope["winnerAttemptId"] is None and envelope["physicalAttempts"][0]["state"] == "received"
+        assert envelope["physicalAttempts"][1]["state"] == {"denied": "released", "unknown": "unknown", "all-errors": "received"}[outcome]
+        if outcome == "unknown":
+            assert compare[2] == "started" and out["calls"][1]["state"] == "started" and out["resumeMode"] == "reconcile_only"
+            assert out["failure"]["code"] == "live_response_unknown"
+            assert all(usage[k] is None for k in ("inputTokens", "outputTokens", "estimatedUsd", "chargedUsd"))
+            assert world.budget.snapshot()["states"]["reserved"] == 1
+            assert Decimal(world.budget.snapshot()["buckets"]["personal"]["unknownUsd"]) > 0
+        if outcome == "denied":
+            assert out["failure"]["code"] == "source_purpose_or_recipient_denied"
+            assert all(role != "deepseek" for role, _, _ in peer.requests)
+            assert usage["unsentCalls"] == 1
+        sent = len(peer.requests)
+        again = chain_cli(world, peer, "resume", world.kit.job_selector("chain-failed"), live=False)
+        assert again["state"] == out["state"] and again["usage"] == usage
+        assert chain_receipts(world) == saved and len(peer.requests) == sent
+
+
+@pytest.mark.parametrize("action", ["refusal", "ungrounded"])
+def test_native_chain_cli_content_and_grounding_refusals_never_trigger_fallback(tmp_path, monkeypatch, action):
+    world = chain_world(tmp_path, monkeypatch)
+    with ChainPeer() as peer:
+        peer.behavior["openai", "compare"] = action
+        out = chain_cli(world, peer, "run", world.request("blocked", topic=False))
+        assert out["state"] == "stopped"
+        assert [(role, stage) for role, stage, _ in peer.requests] == [("openai", "extract"), ("openai", "compare")]
+        assert out["usage"]["providerCalls"] == 2
+
+
+def test_native_chain_cli_receipt_resume_decodes_winner_without_resending_either_attempt(tmp_path, monkeypatch):
+    world = chain_world(tmp_path, monkeypatch)
+    hook = """
+from zoop_ai_pipeline.extraction import Extractor
+receive = Extractor._receive
+def crash(self, attempt, raw):
+    receive(self, attempt, raw)
+    if raw['stage'] == 'compare':
+        os._exit(75)
+Extractor._receive = crash
+"""
+    with ChainPeer() as peer:
+        peer.behavior["openai", "compare"] = "invalid"
+        chain_cli(world, peer, "run", world.request("receipt-resume", topic=False), hook=hook, expected=75)
+        saved = chain_receipts(world)
+        assert len(peer.requests) == 3
+        out = chain_cli(world, peer, "resume", world.kit.job_selector("receipt-resume"), live=False)
+        assert out["state"] == "ready" and out["usage"]["providerCalls"] == 3
+        assert chain_receipts(world) == saved and len(peer.requests) == 3
+
+
+@pytest.mark.parametrize("field", ["attemptId", "logicalAttemptId", "stage", "requestDigest", "bindingIdentity"])
+def test_native_chain_cli_rejects_outer_receipt_bound_to_another_invocation(tmp_path, monkeypatch, field):
+    world = chain_world(tmp_path, monkeypatch)
+    hook = f"""
+from zoop_ai_pipeline.live_runtime import LiveRuntime
+send = LiveRuntime.send
+def wrong(self, *args, **kwargs):
+    result = send(self, *args, **kwargs)
+    if result.get('format') == 'zoop-live-chain-receipt-1':
+        result = {{**result, {field!r}: 'other'}}
+    return result
+LiveRuntime.send = wrong
+"""
+    with ChainPeer() as peer:
+        out = chain_cli(world, peer, "run", world.request("wrong-parent", snapshot=False, topic=False), hook=hook)
+        assert out["state"] == "stopped" and out["failure"]["code"] == "receipt_binding_mismatch"
+        assert out["stages"]["extract"]["state"] == "pending" and out["eventCandidates"] == []
+        assert len(peer.requests) == 1
+
+
+def test_native_chain_cli_source_policy_denial_never_routes_to_another_recipient(tmp_path, monkeypatch):
+    world = chain_world(tmp_path, monkeypatch)
+    grant = world.kit.registry["sources"][0]["grant"]
+    grant["recipients"] = [world.runtime.fallback_recipient("extract")]
+    world.kit.save_registry()
+    with ChainPeer() as peer:
+        out = chain_cli(world, peer, "run", world.request("source-denied", snapshot=False, topic=False))
+        assert out["state"] == "stopped" and out["failure"]["code"] == "source_purpose_or_recipient_denied"
+        assert out["calls"] == [] and out["usage"]["providerCalls"] == 0 and peer.requests == []

@@ -13,7 +13,7 @@ it('D-AUT-02 F3 preserves standalone Markdown heading levels and styling by defa
   ] as const) {
     const heading = screen.getByRole('heading', { name, level });
     expect(heading.classList.contains('font-semibold')).toBe(true);
-    expect(heading.classList.contains('text-gray-900')).toBe(true);
+    expect(heading.classList.contains('text-zoop-ink')).toBe(true);
   }
 });
 
@@ -27,6 +27,6 @@ it('D-AUT-02 F3 offsets embedded headings without exceeding h6 or changing style
   ] as const) {
     const heading = screen.getByRole('heading', { name, level });
     expect(heading.classList.contains('font-semibold')).toBe(true);
-    expect(heading.classList.contains('text-gray-900')).toBe(true);
+    expect(heading.classList.contains('text-zoop-ink')).toBe(true);
   }
 });

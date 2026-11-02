@@ -48,17 +48,17 @@ export default function GraphMobileTools({
     >
       <summary
         aria-label="더보기: 지도 보기 방식"
-        className="grid size-11 cursor-pointer list-none place-items-center rounded-full border border-zoop-line bg-zoop-paper text-lg font-bold text-zoop-ink shadow-sm marker:content-none focus-visible:outline-2 focus-visible:outline-offset-2"
+        className="grid size-11 cursor-pointer list-none place-items-center rounded-full border border-zoop-line bg-zoop-paper text-title-sm font-bold text-zoop-ink shadow-sm marker:content-none focus-visible:outline-2 focus-visible:outline-offset-2"
       >
         <span aria-hidden="true">···</span>
       </summary>
-      <div className="absolute right-14 bottom-0 w-56 rounded-lg border border-zoop-line bg-zoop-paper p-3 text-[13px] text-zoop-ink shadow-lg">
+      <div className="absolute right-14 bottom-0 w-56 rounded-lg border border-zoop-line bg-zoop-paper p-3 text-body text-zoop-ink shadow-lg">
         {onFlowChange && (
           <button
             type="button"
             aria-pressed={flow}
             disabled={focusActive}
-            className="block! h-auto! min-h-11! w-full! rounded border! border-zoop-line px-3! text-left! text-[13px]! whitespace-nowrap disabled:opacity-50"
+            className="block! h-auto! min-h-11! w-full! rounded border! border-zoop-line px-3! text-left! text-body! whitespace-nowrap disabled:opacity-50"
             onClick={() => {
               onFlowChange(!flow);
               if (menu.current) {

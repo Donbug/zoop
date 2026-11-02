@@ -7,10 +7,10 @@ import { useEvidenceData } from '@/hooks/useEvidenceData';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import type { EvidenceResponse } from '@/types/evidence';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import EvidenceAnalysis from './EvidenceAnalysis';
 
 interface Props {
-  onReady?: (targetId: string) => void;
   /** 사용자가 창을 닫았을 때. 튜토리얼은 근거를 불러오지 못해도 닫으면 다음 단계로 넘어간다. */
   onClosed?: () => void;
   onTutorialSkip?: () => void;
@@ -44,7 +44,7 @@ function EvidenceCard({
   const href = safeArticleUrl(evidence.article?.url ?? null);
   return (
     <article
-      className={`${ui.section} px-5! py-4! [&_h3]:mt-2! [&_h3]:mb-0! [&_blockquote]:mt-2 [&_blockquote]:rounded-[3px] [&_blockquote]:bg-panel-soft [&_blockquote]:px-3 [&_blockquote]:py-2.5 [&_blockquote]:text-[12px] [&_blockquote]:leading-[19.5px] [&_blockquote]:wrap-anywhere`}
+      className={`${ui.section} px-5! py-4! [&_h3]:mt-2! [&_h3]:mb-0! [&_blockquote]:mt-2 [&_blockquote]:rounded-[3px] [&_blockquote]:bg-panel-soft [&_blockquote]:px-3 [&_blockquote]:py-2.5 [&_blockquote]:text-caption [&_blockquote]:leading-[19.5px] [&_blockquote]:wrap-anywhere`}
     >
       {evidence.article ? (
         <>
@@ -103,7 +103,6 @@ function EvidenceCard({
 
 // D-GRP-05 · Figma 619:8225 · FS024 · ERD v6 evidence/article_versions.
 export default function EvidenceDrawer({
-  onReady,
   onClosed,
   onViewOnMap,
   onTutorialSkip,
@@ -125,11 +124,6 @@ export default function EvidenceDrawer({
     retry,
     target?.mapContext,
   );
-
-  useEffect(() => {
-    if (target && !loading && items.some((item) => item.article !== null))
-      onReady?.(target.id);
-  }, [target, loading, items, onReady]);
 
   useEffect(() => {
     if (!target) return;
@@ -254,7 +248,7 @@ export default function EvidenceDrawer({
           <p className={`mt-1 ${ui.secondary}`}>
             {target.label ?? '선택한 연결의 근거'}
           </p>
-          <span className="mt-2 block text-base" aria-hidden="true">
+          <span className="mt-2 block text-lead" aria-hidden="true">
             ▱
           </span>
         </header>
@@ -276,11 +270,10 @@ export default function EvidenceDrawer({
           </div>
 
           {loading && (
-            <div className={ui.state} role="status">
-              <span />
-              <span />
-              <p>근거 문서를 불러오는 중입니다.</p>
-            </div>
+            <LoadingIndicator
+              label="근거 문서를 불러오는 중입니다."
+              className={`${ui.state} flex min-h-16 w-full`}
+            />
           )}
 
           {!loading && evidenceIds.length === 0 && (

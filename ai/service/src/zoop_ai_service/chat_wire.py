@@ -1,5 +1,5 @@
 """Wire models of the chatbot model stage family (`/internal/v1/chat-stages`). The service never imports `zoop_ai`: these mirror the worker's
-`zoop-ai-chat-2` contract as an allowlisted view (unknown keys are dropped on output, missing ones fail closed), and the field-for-field agreement is
+`zoop-ai-chat-5` contract as an allowlisted view (unknown keys are dropped on output, missing ones fail closed), and the field-for-field agreement is
 tested. The stage input stays an opaque object for the service: the installed `zoop-ai-chat` validates it completely."""
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
-CHAT_SCHEMA = "zoop-ai-chat-2"
+CHAT_SCHEMA = "zoop-ai-chat-5"
 ChatStage = Literal["chat-router", "chat-answer", "chat-verification", "chat-agent"]
 STAGES: tuple[str, ...] = ("chat-router", "chat-answer", "chat-verification", "chat-agent")
 # The caller's invocation id. The service prefixes it with the principal before the child sees it, so two principals never share a ledger row.
@@ -29,12 +29,12 @@ class ChatView(ChatWire):
 
 
 class ChatStageRequest(ChatWire):
-    schema_version: Literal["zoop-ai-chat-2"]
+    schema_version: Literal["zoop-ai-chat-5"]
     invocation_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{8,96}$",
                                description="Identifies one stage of one attempt; must equal Idempotency-Key. The same id and input never send twice.")
     stage: ChatStage
     mode: Literal["replay", "live"]
-    input: dict[str, Any] = Field(description="The closed zoop-ai-chat-2 stage input (RouterInput, AnswerInput, VerificationInput or AgentInput).")
+    input: dict[str, Any] = Field(description="The closed zoop-ai-chat-5 stage input (RouterInput, AnswerInput, VerificationInput or AgentInput).")
 
 
 class ChatUsage(ChatView):
@@ -64,7 +64,7 @@ class ChatStageFailure(ChatView):
 class ChatMcpHealth(ChatView):
     """Whether the operator's ZOOP MCP server answered a content-free probe at its configured URL (`zoop-ai-chat probe-mcp`): an MCP ping
     with no grant that the endpoint itself must refuse as unauthenticated. Nothing is run and no model is called."""
-    schema_version: Literal["zoop-ai-chat-2"]
+    schema_version: Literal["zoop-ai-chat-5"]
     mcp: Literal["reachable", "unreachable"]
     reason: Literal["mcp_timeout", "mcp_connect_failed", "mcp_unavailable", "mcp_status_unexpected"] | None = Field(
         default=None, description="Why it is unreachable: no answer in time, no connection, a gateway in front answering 502/503/504 for a "
@@ -80,12 +80,19 @@ class ChatMcpHealth(ChatView):
 QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
 
 
+class RouterDependency(ChatWire):
+    requirement_id: str
+    cardinality: Literal["exactly", "atLeast", "atMost"]
+    count: int = Field(ge=1, le=5)
+
+
 class RoutedRequirement(ChatWire):
     """Closed like every stage answer: a key the worker contract does not define is refused, never relayed."""
     requirement_id: str
     types: dict[QueryType, float]
     capabilities: dict[str, float]
     prohibited_advice: float
+    depends_on: RouterDependency | None
 
 
 class RouterAnswer(ChatWire):
@@ -105,8 +112,14 @@ class ChatAnswer(ChatWire):
     graph_target_ids: list[str]
 
 
-class SectionVerdict(ChatWire):
+class ClaimVerdict(ChatWire):
+    claim_id: str
     support: Literal["supported", "contradicted", "hold"] | None
+    unsupported_causality: Literal["no", "yes", "hold"]
+
+
+class SectionVerdict(ChatWire):
+    claims: list[ClaimVerdict]
     prohibited_advice: Literal["no", "yes", "hold"]
 
 
@@ -115,10 +128,12 @@ class VerificationAnswer(ChatWire):
 
 
 class ApprovalRequest(ChatWire):
-    """A tool call the model proposed and the provider holds for the application's decision. The service relays it; it never decides."""
+    """A tool call the model proposed and the provider holds for the application's decision. The service relays it; it never decides.
+    `requirementIds` are the requirements the model says the call serves, apart from `arguments`; empty when it named none validly."""
     approval_request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
     tool_name: str = Field(pattern=r"^[A-Za-z0-9_]{1,64}$")
     arguments: dict[str, Any]
+    requirement_ids: list[str]
 
 
 class McpCallSummary(ChatWire):
@@ -150,7 +165,7 @@ class ChatStageResult(ChatView):
     """The outcome. Besides the field shapes the door checks the invariants: `succeeded` has an answer of its own stage's model, no failure and a
     receipt; `failed` has a failure and no answer; `unknown` implies `sent`; a receipt is present exactly when something was sent and names the
     requested mode."""
-    schema_version: Literal["zoop-ai-chat-2"]
+    schema_version: Literal["zoop-ai-chat-5"]
     invocation_id: str
     stage: ChatStage
     status: Literal["succeeded", "failed"]

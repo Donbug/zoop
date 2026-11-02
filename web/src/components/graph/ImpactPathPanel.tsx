@@ -1,4 +1,5 @@
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import GraphIcon from '@/components/graph/GraphIcon';
 import { useEffect, useRef, useState } from 'react';
@@ -111,34 +112,39 @@ export default function ImpactPathPanel({
         >
           {company?.label ?? companyId} · 영향 경로
         </h2>
-        <p className={ui.muted}>
-          {loading
-            ? '연결 확인 중'
-            : error
-              ? '연결 확인 불가'
-              : impact?.pathStatus === 'structural_path_details_unavailable'
-                ? '구조 관계 확인'
-                : impact?.pathStatus === 'direct_available'
-                  ? '직접 연결 확인'
-                  : impact?.pathStatus === 'no_direct_relation'
-                    ? '직접 연결 미확인'
-                    : impact?.steps.length
-                      ? '연결 확인'
-                      : '직접 연결 미확인'}{' '}
+        <p className={`${ui.muted} inline-flex items-center gap-1`}>
+          {loading ? (
+            <>
+              <LoadingIndicator label="연결 확인 중" size="sm" />{' '}
+              <span className="sr-only">연결 확인 중</span>
+            </>
+          ) : error ? (
+            '연결 확인 불가'
+          ) : impact?.pathStatus === 'structural_path_details_unavailable' ? (
+            '구조 관계 확인'
+          ) : impact?.pathStatus === 'direct_available' ? (
+            '직접 연결 확인'
+          ) : impact?.pathStatus === 'no_direct_relation' ? (
+            '직접 연결 미확인'
+          ) : impact?.steps.length ? (
+            '연결 확인'
+          ) : (
+            '직접 연결 미확인'
+          )}{' '}
           · 지도 기준 {new Date(graph.metadata.asOf).toLocaleString('ko-KR')}
         </p>
       </header>
       <div className={ui.scroll} aria-busy={loading}>
         {impact?.metadata.partial && (
-          <p className="px-4 py-2 text-[11px] text-zoop-alert" role="status">
+          <p className="px-4 py-2 text-caption text-zoop-alert" role="status">
             현재 공개 권한을 확인할 수 있는 근거만 표시합니다.
           </p>
         )}
         {loading && (
-          <div className={ui.state} role="status">
-            <span className="block h-14 rounded-panel bg-panel-line motion-safe:animate-pulse" />
-            <p>영향 경로를 불러오는 중입니다.</p>
-          </div>
+          <LoadingIndicator
+            label="영향 경로를 불러오는 중입니다."
+            className={`${ui.state} flex min-h-14 w-full`}
+          />
         )}
         {error && (
           <div className={ui.state} role="alert">
@@ -206,7 +212,7 @@ export default function ImpactPathPanel({
                             {node?.label ?? step.id}
                           </strong>
                           <button
-                            className="mt-1 text-[11px] font-semibold underline disabled:text-panel-muted"
+                            className="mt-1 text-caption font-semibold underline disabled:text-panel-muted"
                             disabled={stepEvidence.length === 0}
                             data-tutorial-action={
                               tutorialEvidence ? 'evidence' : undefined
@@ -318,7 +324,10 @@ function StructuralImpactDetails({
   if (loading && !data)
     return (
       <section className={ui.section} aria-label="사업 관계 상세" role="status">
-        사업 관계 상세를 불러오는 중입니다.
+        <LoadingIndicator
+          label="사업 관계 상세를 불러오는 중입니다."
+          className="flex min-h-14 w-full"
+        />
       </section>
     );
   if (error && !data)

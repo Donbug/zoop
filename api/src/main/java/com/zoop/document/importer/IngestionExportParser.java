@@ -32,6 +32,9 @@ public final class IngestionExportParser {
     static final int MAX_TITLE_CODE_POINTS = 2_000;
     static final int MAX_URL_CODE_POINTS = 8_000;
     static final int MAX_PUBLISHER_CODE_POINTS = 200;
+    /** The ledger's declared native language tag ({@code ai/pipeline}, 2026-10-30): 2 to 35 characters, as the AI service bounds it. */
+    static final int MIN_LANGUAGE_CODE_POINTS = 2;
+    static final int MAX_LANGUAGE_CODE_POINTS = 35;
     private static final int MAX_GRANT_CODE_POINTS = 1_000;
 
     private static final Pattern DOCUMENT_ID = Pattern.compile("doc-[0-9a-f]{64}");
@@ -47,10 +50,17 @@ public final class IngestionExportParser {
     private static final Set<String> COLLECTED_KEYS = Set.of("provenance", "collection");
     /**
      * The operator-declared publishing outlet; the ledger omits the key when none was declared, so every older export (which never has
-     * it) stays valid and unchanged. It is the only optional observation key that is not a collection fact.
+     * it) stays valid and unchanged. Language is independently optional and does not change app metadata or public responses.
      */
     private static final String PUBLISHER = "publisher";
-    private static final Set<String> OPTIONAL_OBSERVATION = Set.of("provenance", "collection", PUBLISHER);
+    /**
+     * The native language the collector declared for the document (a BCP 47-like tag such as {@code ko} or {@code und}). Older
+     * exports omit the key. Only its shape is checked (a string of 2 to 35 code points without control or separator
+     * characters, the AI side's own bound, so no value the producer accepts is refused here); it is not persisted: nothing in
+     * the app reads a document's language yet, and the text, hashes and identities are unchanged by it.
+     */
+    private static final String LANGUAGE = "language";
+    private static final Set<String> OPTIONAL_OBSERVATION = Set.of("provenance", "collection", PUBLISHER, LANGUAGE);
     private static final Set<String> COLLECTION = Set.of("provenance", "collectionId", "receipt", "fetchedAt", "finalUrl",
             "httpStatus", "contentType", "bodySha256", "documentKind", "network", "published");
     private static final Set<String> FILE_REF = Set.of("file", "sha256");
@@ -157,6 +167,7 @@ public final class IngestionExportParser {
             throw failure(DocumentImportFailure.METADATA_UNSUPPORTED);
         }
         String publisher = publisher(observation);
+        language(observation);
         return new VerifiedDocument(expected, textArtifactId, text, textUtf8, title, url, publisher, publishedAt, publishedDate,
                 precision, observedAt, grantId, grantRevision, collected, document.node());
     }
@@ -178,6 +189,24 @@ public final class IngestionExportParser {
             throw failure(DocumentImportFailure.METADATA_UNSUPPORTED);
         }
         return value;
+    }
+
+    /**
+     * The declared language, when present: absent and an explicit null both mean "not declared". A present value is a string of
+     * 2 to 35 code points that PostgreSQL could store, with no control character or separator. The tag's grammar is not checked
+     * (the producer's bound is the length alone). Checked only, never stored.
+     */
+    private static void language(StrictJson.Obj observation) {
+        if (!observation.has(LANGUAGE) || observation.isNull(LANGUAGE)) {
+            return;
+        }
+        String value = observation.string(LANGUAGE);
+        int codePoints = Text.codePoints(value);
+        if (codePoints < MIN_LANGUAGE_CODE_POINTS || codePoints > MAX_LANGUAGE_CODE_POINTS || !Text.storable(value)
+                || value.codePoints().anyMatch(point -> Character.getType(point) == Character.CONTROL
+                        || IngestionExportParser.separator(point))) {
+            throw failure(DocumentImportFailure.METADATA_UNSUPPORTED);
+        }
     }
 
     private static boolean separator(int point) {

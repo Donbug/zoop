@@ -61,7 +61,7 @@ public class ExplicitBriefingService {
         PersonalBriefingService.validatePool(pool,round);
         var eligible=PersonalBriefingService.eligible(pool,round);var matches=new ArrayList<JsonNode>();int excluded=0;
         for(var c:eligible)if(!PersonalBriefingService.matched(c,scope).isEmpty()){
-            if(access.readable(c,requestId))matches.add(c);else excluded++;
+            if(access.readableForRound(c,round,requestId))matches.add(c);else excluded++;
         }
         int max=choice.maxIssues()==null?3:choice.maxIssues(),min=choice.minIssues()==null?0:choice.minIssues(),per=choice.perCompanyLimit()==null?3:choice.perCompanyLimit();
         var selected=select(matches,scope,max,per);
@@ -149,7 +149,7 @@ public class ExplicitBriefingService {
         var previous=rounds.findById(priorId).orElse(null);if(previous==null||!previous.windowTo().isBefore(current.windowTo()))return result;
         try{var p=reads.get(previous.date(),previous.edition(),requestId);if(!priorId.equals(p.path("id").asString())||!"published".equals(p.path("status").asString()))return result;}catch(CustomException e){return result;}
         var old=pools.pool(priorId).orElse(null);if(old==null)return result;PersonalBriefingService.validatePool(old,previous);
-        for(var c:PersonalBriefingService.eligible(old,previous))if(!PersonalBriefingService.matched(c,scope).isEmpty()&&access.readable(c,requestId))
+        for(var c:PersonalBriefingService.eligible(old,previous))if(!PersonalBriefingService.matched(c,scope).isEmpty()&&access.readableForRound(c,previous,requestId))
             result.addObject().put("issueId",c.path("issueId").asString()).put("title",c.path("title").asString()).put("previousRoundId",priorId).put("nextCheck",c.path("nextCheck").asString("")).put("status","not_evaluated").put("poolVersion",old.path("inputSha256").asString());
         return result;
     }

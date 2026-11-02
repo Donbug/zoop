@@ -96,7 +96,6 @@ class IssueNameResolverTest {
             public Optional<Instant> firstActivatedAt(String v) { return everActivated(v) ? Optional.of(EARLY) : Optional.empty(); }
         };
         Clock clock = Clock.fixed(Instant.parse("2026-10-21T03:00:00Z"), ZoneOffset.UTC);
-        return new PublicGraphReader(new GraphVersionSelector(versions, clock),
-                new FixtureGraphSnapshotStore(IssueNameResolverTest.class.getClassLoader()), pinned -> DisclosureExclusions.NONE);
+        return new PublicGraphReader(new GraphVersionSelector(versions, clock), new FixtureGraphSnapshotStore(IssueNameResolverTest.class.getClassLoader()), pinned -> DisclosureExclusions.NONE, null, null);
     }
 }

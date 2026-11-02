@@ -12,6 +12,7 @@ import {
   useState,
 } from 'react';
 import CompanyLogo from '@/components/common/CompanyLogo';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { getCompanyMetrics } from '@/apis/graph/companies';
@@ -62,7 +63,7 @@ import {
 const COMPANY_FINANCIALS_ENABLED = false;
 
 const workspaceClasses =
-  'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-3 m-0 overflow-visible text-zoop-ink max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-zoop-line [&_section]:py-4 [&_h1]:text-[26px] [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-xs [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-full [&_button]:border [&_button]:border-zoop-line [&_button]:bg-white [&_button]:min-h-[36px] [&_button]:px-4 [&_button]:py-2 [&_button]:text-xs! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-xs [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1.5 [&_article]:border-b [&_article]:border-zoop-line [&_article]:py-3 [&_table]:w-full [&_table]:text-xs [&_table]:wrap-anywhere [&_[role=alert]]:text-zoop-alert [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-zoop-line [&_input]:bg-white [&_input]:px-3 [&_input]:py-2 [&_input]:min-h-[38px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
+  'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-3 m-0 overflow-visible text-zoop-ink max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-zoop-line [&_section]:py-4 [&_h1]:text-display [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-body [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-caption [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-full [&_button]:border [&_button]:border-zoop-line [&_button]:bg-white [&_button]:min-h-[36px] [&_button]:px-4 [&_button]:py-2 [&_button]:text-caption! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-caption [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1.5 [&_article]:border-b [&_article]:border-zoop-line [&_article]:py-3 [&_table]:w-full [&_table]:text-caption [&_table]:wrap-anywhere [&_[role=alert]]:text-zoop-alert [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-zoop-line [&_input]:bg-white [&_input]:px-3 [&_input]:py-2 [&_input]:min-h-[38px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
 
 function Status<T>({
   resource,
@@ -71,7 +72,13 @@ function Status<T>({
   resource: Resource<T>;
   label: string;
 }) {
-  if (resource.loading) return <p role="status">{label} 불러오는 중…</p>;
+  if (resource.loading)
+    return (
+      <LoadingIndicator
+        label={`${label} 불러오는 중`}
+        className="flex min-h-10 w-full"
+      />
+    );
   if (!resource.error) return null;
   // 계약의 오류 코드별 안내. 다시 보내도 같은 결과인 오류(없음·버전 없음·조건 오류)에는 다시 시도를 두지 않는다.
   const fixed = fixedFailure(
@@ -146,7 +153,7 @@ const relationLabel = (types: string[]) =>
 
 /** 사건·문서·기업 정보 탭(밑줄형) */
 const TAB =
-  'flex-1 rounded-none! border-0! border-b-2! border-transparent! bg-transparent! py-2.5! text-sm! text-zoop-muted aria-pressed:border-zoop-ink! aria-pressed:bg-transparent! aria-pressed:font-semibold aria-pressed:text-zoop-ink!';
+  'flex-1 rounded-none! border-0! border-b-2! border-transparent! bg-transparent! py-2.5! text-body! text-zoop-muted aria-pressed:border-zoop-ink! aria-pressed:bg-transparent! aria-pressed:font-semibold aria-pressed:text-zoop-ink!';
 
 /** 차트 기간의 처음 시세 대비 변화(D-COM-05). 상승은 빨강, 하락은 파랑으로 보인다. */
 function PriceChange({
@@ -656,7 +663,7 @@ export default function CompanyWorkspace() {
         className="mx-auto max-w-2xl px-4 py-12 text-zoop-ink"
         data-screen-id="D-COM-01"
       >
-        <h1 className="text-2xl font-bold">기업을 찾을 수 없어요</h1>
+        <h1 className="text-title font-bold">기업을 찾을 수 없어요</h1>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link className={ui.button} to="/?mode=all">
             시장 전체 지도에서 찾기
@@ -686,12 +693,13 @@ export default function CompanyWorkspace() {
           </div>
         )}
         {versionOnly && (company.loading || versionStart) && (
-          <p role="status" className="mb-4 text-[13px] text-zoop-muted">
-            그래프 버전({version})이 처음 공개된 시점을 확인하고 있어요.
-          </p>
+          <LoadingIndicator
+            label={`그래프 버전(${version})이 처음 공개된 시점을 확인하고 있어요.`}
+            className="mb-4 flex min-h-9 w-full text-body text-zoop-muted"
+          />
         )}
         {versionOnly && !company.loading && !versionStart && (
-          <p role="alert" className="mb-4 text-[13px] text-zoop-alert">
+          <p role="alert" className="mb-4 text-body text-zoop-alert">
             이 주소에는 기준 시점 없이 그래프 버전({version})만 있어, 그 버전의
             차트·사건·관계 그래프를 열 수 없어요.{' '}
             <button
@@ -707,12 +715,12 @@ export default function CompanyWorkspace() {
           </p>
         )}
         {pinnedFromVersion && !versionStartFailed && (
-          <p role="status" className="mb-4 text-[13px] text-zoop-muted">
+          <p role="status" className="mb-4 text-body text-zoop-muted">
             {`그래프 버전(${version})이 처음 공개된 시점(${formatKst(asOf!)})으로 보는 중이에요.`}
           </p>
         )}
         {versionStartFailed && (
-          <p role="alert" className="mb-4 text-[13px] text-zoop-alert">
+          <p role="alert" className="mb-4 text-body text-zoop-alert">
             {`그래프 버전(${version})이 처음 공개된 시점으로 열지 못했어요. `}
             <button
               type="button"
@@ -734,11 +742,11 @@ export default function CompanyWorkspace() {
                 <CompanyLogo
                   name={company.data.name}
                   logoUrl={company.data.logoUrl}
-                  className="size-12 rounded-full border border-zoop-line bg-zoop-paper text-lg"
+                  className="size-12 rounded-full border border-zoop-line bg-zoop-paper text-title-sm"
                 />
                 <div className="min-w-0 flex-1">
                   <h1 tabIndex={-1}>{company.data.name}</h1>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zoop-muted">
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-caption text-zoop-muted">
                     <span>
                       {company.data.sector ?? '업종 미제공'} ·{' '}
                       {company.data.ticker ?? '코드 미제공'} ·{' '}
@@ -773,7 +781,7 @@ export default function CompanyWorkspace() {
           )}
           {quote.data?.status === 'available' && (
             <>
-              <strong className="text-2xl">
+              <strong className="text-title">
                 {money(quote.data.quote.price, quote.data.quote.currency)}
               </strong>
               <span>
@@ -795,7 +803,7 @@ export default function CompanyWorkspace() {
                 · {quote.data.source.name} ·{' '}
                 {quote.data.source.delayNote ?? '지연 정보 미제공'}
               </p>
-              <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
+              <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-caption [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
                 <dt>시가총액</dt>
                 <dd>
                   {quote.data.quote.marketCap == null
@@ -832,7 +840,10 @@ export default function CompanyWorkspace() {
         <section aria-label="주요 지표">
           <h2>주요 지표 · 최신 기준</h2>
           {metrics.status === 'loading' && (
-            <p role="status">주요 지표를 불러오고 있어요</p>
+            <LoadingIndicator
+              label="주요 지표를 불러오고 있어요"
+              className="flex min-h-10 w-full"
+            />
           )}
           {metrics.status === 'error' && (
             <div role="alert">
@@ -849,7 +860,7 @@ export default function CompanyWorkspace() {
                 주요 지표 · {metrics.data.source.name} · 기준{' '}
                 <ReferenceTime value={metrics.data.asOf} />
               </p>
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs md:grid-cols-4">
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-caption md:grid-cols-4">
                 {metrics.data.items.map((item) => (
                   <div key={item.code} className="min-w-0">
                     <dt className="text-zoop-muted">{item.label}</dt>
@@ -876,7 +887,7 @@ export default function CompanyWorkspace() {
             )}
             {holding && (
               <>
-                <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
+                <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-caption [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
                   <dt>보유 수량</dt>
                   <dd>{number(holding.quantity)}주</dd>
                   <dt>평균 매입가</dt>
@@ -1035,7 +1046,7 @@ export default function CompanyWorkspace() {
                   {formatKst(prices.data.points.at(-1)?.time ?? null)} ·{' '}
                   {prices.data.source.delayNote ?? '지연 정보 미제공'}
                 </p>
-                <details className="text-xs">
+                <details className="text-caption">
                   <summary className="cursor-pointer text-zoop-muted">
                     표로 보기
                   </summary>
@@ -1065,7 +1076,7 @@ export default function CompanyWorkspace() {
                 </details>
               </>
             ))}
-          <p className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-xs text-zoop-muted">
+          <p className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-caption text-zoop-muted">
             차트와 사건의 시점이 겹쳐도 인과관계를 뜻하지 않아요.
           </p>
         </section>
@@ -1074,7 +1085,10 @@ export default function CompanyWorkspace() {
             <h2>사건 타임라인</h2>
             <Status resource={events} label="타임라인" />
             {!ready && !versionOnly && (
-              <p role="status">타임라인의 기준 시점을 확인하고 있어요.</p>
+              <LoadingIndicator
+                label="타임라인의 기준 시점을 확인하고 있어요."
+                className="flex min-h-8 w-full"
+              />
             )}
             {events.data && (
               <>
@@ -1088,13 +1102,13 @@ export default function CompanyWorkspace() {
                 {(events.data.metadata.failures ?? []).map((failure, index) => (
                   <p key={index}>{failure.message}</p>
                 ))}
-                <p className="text-xs text-zoop-muted">
+                <p className="text-caption text-zoop-muted">
                   {periods.find((p) => p.value === period)?.label} · 사건{' '}
                   {events.data.items.length}건 · 시점 미상 제외{' '}
                   {events.data.metadata.excludedUnknownTime ?? 0}건
                 </p>
                 {!groups.size && (
-                  <p className="text-xs text-zoop-muted">
+                  <p className="text-caption text-zoop-muted">
                     해당 기간에 공개·유효한 사건이 없어요.
                   </p>
                 )}
@@ -1106,7 +1120,7 @@ export default function CompanyWorkspace() {
                       id={bucketElementId(key)}
                       className={`grid grid-cols-[7rem_1fr] gap-4 border-b-[0.667px] border-zoop-line px-2 py-4 ${selectedBucket === key ? 'bg-zoop-wash' : ''}`}
                     >
-                      <p className="text-xs text-zoop-muted tabular-nums">
+                      <p className="text-caption text-zoop-muted tabular-nums">
                         {key}
                       </p>
                       <div className="flex flex-col gap-3">
@@ -1133,7 +1147,7 @@ export default function CompanyWorkspace() {
                               key={item.id}
                               className="flex flex-col gap-1 border-0! py-0! xl:grid xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start xl:gap-x-3 xl:[&>*]:col-start-1"
                             >
-                              <p className="text-[11px] text-zoop-muted">
+                              <p className="text-caption text-zoop-muted">
                                 문서 {item.articleCount}건 ·{' '}
                                 {relationLabel(item.relationTypes) ||
                                   '직접 관계 미확인'}
@@ -1141,11 +1155,11 @@ export default function CompanyWorkspace() {
                               <button
                                 aria-pressed={eventId === item.id}
                                 onClick={() => selectEvent(item)}
-                                className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-left text-sm! font-semibold text-zoop-ink underline-offset-4 hover:underline aria-pressed:underline"
+                                className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-left text-body! font-semibold text-zoop-ink underline-offset-4 hover:underline aria-pressed:underline"
                               >
                                 {item.title}
                               </button>
-                              <p className="text-[11px] text-zoop-muted tabular-nums">
+                              <p className="text-caption text-zoop-muted tabular-nums">
                                 {item.eventTime ? (
                                   <time dateTime={item.eventTime}>
                                     {formatTimelineTime(
@@ -1159,7 +1173,7 @@ export default function CompanyWorkspace() {
                               </p>
                               <button
                                 onClick={() => selectEvent(item, 'documents')}
-                                className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-[11px]! text-zoop-muted underline underline-offset-4"
+                                className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-caption! text-zoop-muted underline underline-offset-4"
                               >
                                 근거 문서 {item.articleCount}건 보기
                               </button>
@@ -1298,13 +1312,13 @@ export default function CompanyWorkspace() {
             )}
           </section>
         )}
-        <p className="text-xs text-zoop-muted">{BRIEFING_DISCLAIMER}</p>
+        <p className="text-caption text-zoop-muted">{BRIEFING_DISCLAIMER}</p>
       </div>
       {/* D-COM-04: 넓은 화면은 와이어프레임처럼 오른쪽 열에 두고 스크롤해도 화면 안에 남는다.
           1000px 이하에서는 본문 아래로 옮겨 넓게 본다. */}
       <aside
         ref={graphPanel}
-        className="min-w-0 self-start rounded-2xl bg-white p-4 shadow-sm min-[1001px]:sticky min-[1001px]:top-4 min-[1001px]:max-h-[calc(100vh-2rem)] min-[1001px]:overflow-y-auto max-[1000px]:col-start-2 [&_li]:text-xs [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-line max-md:w-full"
+        className="min-w-0 self-start rounded-2xl bg-white p-4 shadow-sm min-[1001px]:sticky min-[1001px]:top-4 min-[1001px]:max-h-[calc(100vh-2rem)] min-[1001px]:overflow-y-auto max-[1000px]:col-start-2 [&_li]:text-caption [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-line max-md:w-full"
         aria-label="시점 기반 관계 그래프"
         data-screen-id="D-COM-04"
       >
@@ -1334,7 +1348,10 @@ export default function CompanyWorkspace() {
         )}
         <Status resource={graph} label="관계 그래프" />
         {!ready && !versionOnly && (
-          <p role="status">관계 그래프의 기준 시점을 확인하고 있어요.</p>
+          <LoadingIndicator
+            label="관계 그래프의 기준 시점을 확인하고 있어요."
+            className="flex min-h-8 w-full"
+          />
         )}
         {graph.data && (
           <>

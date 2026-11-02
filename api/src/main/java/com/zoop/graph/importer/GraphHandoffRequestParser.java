@@ -17,7 +17,8 @@ public final class GraphHandoffRequestParser {
     public static final int MAX_BYTES = 64 * 1024;
 
     private static final Pattern HANDOFF_ID = HandoffWire.HANDOFF_ID;
-    private static final Pattern OPERATOR = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,63}");
+    /** Who runs an import, as recorded in {@code graph_versions.created_by = "operator:<operator>"}; shared with the round bridge. */
+    public static final Pattern OPERATOR = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,63}");
 
     public GraphHandoffRequest parse(byte[] bytes) {
         if (bytes.length == 0 || bytes.length > MAX_BYTES) {

@@ -24,9 +24,9 @@ const COPY: Record<
   reprocess: {
     title: '브리핑 재처리',
     reason: '재처리 사유',
-    submit: '재처리 요청(무료)',
+    submit: '재처리 요청',
     done: '재처리를 요청했어요.',
-    hint: '무료(모델을 다시 부르지 않아요). 지연·실패한 미발행 회차만 다시 처리해요. 새 회차를 만들거나 발행본을 덮어쓰지 않아요.',
+    hint: '미발행 회차의 고정 입력으로 다시 생성·검증·저장합니다. 서버에서 승인한 실행 방식과 호출 상한을 따르며, 저장 복구만 수행하면 모델을 다시 부르지 않습니다. 발행은 별도 절차입니다.',
   },
   correct: {
     title: '정정 등록',
@@ -60,7 +60,7 @@ function Field({
   const id = useId();
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-[11px] text-zoop-muted">
+      <label htmlFor={id} className="text-caption text-zoop-muted">
         {label}
       </label>
       {children(id)}
@@ -150,13 +150,13 @@ export default function RoundActionForm({
       className="flex flex-col gap-3 rounded-2xl bg-zoop-soft p-5"
     >
       <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-bold">{copy.title}</p>
-        <p className="text-[11px] text-zoop-muted tabular-nums">
+        <p className="text-body font-bold">{copy.title}</p>
+        <p className="text-caption text-zoop-muted tabular-nums">
           {round.date} {editionLabel[round.edition]} 브리핑
         </p>
       </div>
       {copy.hint && (
-        <p className="text-[11px] leading-relaxed text-zoop-muted">
+        <p className="text-caption leading-relaxed text-zoop-muted">
           {copy.hint}
         </p>
       )}
@@ -208,19 +208,19 @@ export default function RoundActionForm({
           />
         )}
       </Field>
-      <p className="text-[11px] text-zoop-muted">
+      <p className="text-caption text-zoop-muted">
         사유 {reason.length}/500자
         {action === 'correct' && ` · 정정 ${body.length}/2000자`}
       </p>
       {missing && (
-        <p role="alert" className="text-[11px] text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           {action === 'correct'
             ? '정정 내용과 사유를 모두 입력해 주세요.'
             : '사유를 입력해 주세요.'}
         </p>
       )}
       {error && (
-        <p role="alert" className="text-[11px] text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           {copy.title}에 실패했어요. {adminActionErrorMessage(error)}
         </p>
       )}

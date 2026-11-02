@@ -35,7 +35,7 @@ def example_manifest() -> dict[str, Any]:
     pin = {"relation": {"jobId": "s3-synthetic-relation", "inputDigest": "1" * 64},
            "upstream": {"jobId": "s2-synthetic-extraction", "inputDigest": "2" * 64, "digest": "9" * 64}, "reviewDigest": "d" * 64}
     return HandoffManifest.model_validate({"schemaVersion": "zoop-ai-handoff-1", "handoffId": HANDOFF, "sourceKind": "synthetic",
-                                           "policyVersion": "zoop-public-projection-policy-1", "sources": [pin],
+                                           "policyVersion": "zoop-public-projection-policy-2", "sources": [pin],
                                            "files": {"canonical": "6" * 64, "decisions": "7" * 64, "bindings": "8" * 64}}).wire()
 
 
@@ -109,17 +109,17 @@ def example_bundle(summary: str = "available") -> dict[str, Any]:
         provenance["withheld"] = ["eventTime"]
     held = summary == "temporal-review-pending"
     bundle: dict[str, Any] = {
-        "schemaVersion": "zoop-graph-handoff-bundle-7", "handoffId": HANDOFF, "manifestDigest": digest(example_manifest()),
+        "schemaVersion": "zoop-graph-handoff-bundle-8", "handoffId": HANDOFF, "manifestDigest": digest(example_manifest()),
         "provenance": {"declaredSourceKind": "synthetic", "observedSourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"},
-        "policy": {"version": "zoop-public-projection-policy-1", "files": {"canonical": "6" * 64, "decisions": "7" * 64, "bindings": "8" * 64},
+        "policy": {"version": "zoop-public-projection-policy-2", "files": {"canonical": "6" * 64, "decisions": "7" * 64, "bindings": "8" * 64},
                    "evidenceIdKind": "graph-body-span", "offsetUnit": "unicode_code_point", "geography": "operator-field-verdict",
                    "structural": "manual-operator-review", "sequence": "s2-comparison-with-operator-decision", "sourceSupport": "origin-or-exact-text-union",
                    "impacts": "s3-independent-verifier-quote-effect", "issueSummary": "zoop-issue-summary-policy-1"},
         "sources": [{"relation": job, "upstream": {**upstream, "digest": "9" * 64}, "reviewDigest": "d" * 64,
                      "provenance": {"sourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"},
                      "policies": {"producer": "zoop-relation-producer-1", "verifier": "zoop-relation-verifier-1", "impactProducer": "zoop-impact-producer-1",
-                                  "impactVerifier": "zoop-impact-verifier-1", "policy": "zoop-relation-policy-1", "revalidationPolicy": "zoop-revalidation-1",
-                                  "impactPolicy": "zoop-impact-policy-1"},
+                                  "impactVerifier": "zoop-impact-verifier-1", "policy": "zoop-relation-policy-2", "revalidationPolicy": "zoop-relation-revalidation-policy-1",
+                                  "impactPolicy": "zoop-impact-policy-1", "countryContext": "zoop-country-context-1"},
                      "reviewUsed": [{"relationCandidateId": relation_candidate, "revision": 1,
                                      "approvalBasis": {"kind": "automatic-verifier", "revision": 1, "reviewer": None, "decidedAt": "2026-10-13T00:00:01+00:00"}}],
                      "audit": {"s3Relations": 1, "eligibility": {"eligible": 1, "hold": 0, "reject": 0, "pending": 0}, "reviewPending": 0,
@@ -128,7 +128,7 @@ def example_bundle(summary: str = "available") -> dict[str, Any]:
         "pathCompanies": [],
         "issues": [{"id": "issue:synthetic-supply", "canonicalId": "issue:supply", "title": "합성 공급 계약", "action": "공급 계약 발표", "target": None,
                     "eventTime": None if held else "2026-09-30", "timePrecision": "unknown" if held else "day", "period": None, "assertionStatus": "announced",
-                    "geography": {"value": "domestic", "decisionRef": "geo-2026-10-16:1", "decisionVersion": "v1", "policyVersion": "zoop-public-projection-policy-1",
+                    "geography": {"value": "domestic", "decisionRef": "geo-2026-10-16:1", "decisionVersion": "v1", "policyVersion": "zoop-public-projection-policy-2",
                                   "countries": ["KR"], "verification": "operator-field-verdict", "evidenceIds": [evidence_id], "basis": [{**event, "countries": ["KR"]}]},
                     "evidenceIds": [evidence_id], "sourceEvents": [event], "mentions": [mention], "decisionRef": "issue-2026-10-16:1", "representative": None,
                     "fieldProvenance": provenance, "fieldVerdicts": [verdict],
@@ -180,7 +180,7 @@ def verification(bundle: dict[str, Any]) -> dict[str, Any]:
 DESCRIPTION = """\
 **Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only
 family over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle
-(`zoop-graph-handoff-bundle-7`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
+(`zoop-graph-handoff-bundle-8` / `zoop-public-projection-policy-2`, or bundle `-9` / policy `-3`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
 writes nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied
 path, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409
 `execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side
@@ -200,7 +200,7 @@ fields are refused at every level) and requires the model to dump back to exactl
 `issue_summary_pin_mismatch`, `issue_summary_basis_changed`, `issue_summary_issue_not_public`, `issue_summary_temporal_review_pending`,
 `issue_summary_input_too_large`,
 `handoff_contract_changed` ...) and nothing else: no `verification` (so no count, source id or digest) and no `bundle`. `handoff_contract_changed` means the
-handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1` ... `-6`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
+handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1` ... `-7`): its immutable receipt remains history, and a new projection requires a new handoff id.
 A withheld answer is not an error and not an empty bundle; do not import it and do not treat it as "no data". The checks are separate reads at separate instants,
 so a revocation that lands between them and the response is not covered and nothing recalls content a caller already received.
 
@@ -211,19 +211,33 @@ never verified, decided or approved fields, and they are not derived from the me
 S2 `role` text as is (not a confirmed role, not an `INVOLVES` relation); `companyId` is the public company only where every carrying upstream mapped the source id
 to the same company of this bundle, otherwise null.
 
+**Unknown source fields (bundle 8).** A nonempty explicit operator geography decision may supplement source countries `[]`, which remain unchanged in the
+geography basis. Every nonempty source declaration must match that decision exactly. Exact own-event document evidence and current rights remain required;
+the operator judges semantic country relevance. Unsupported nonempty original times are receipt-only `unresolved` values. Each such mention, including
+non-representatives, requires its own exact non-ALLOW eventTime verdict. `HOLD/unsupported-format` requires at least one exact own-document span; existing
+ambiguous/unstated/contradicted dispositions keep their rules. Withholding precedes strict public headline classification: null/unknown remains the public
+unknown pair, sameValueMentions uses the original selected value, and temporal-review-pending summaries and structural gates remain unchanged.
+
+**Explicit unknown geography (bundle 9 / P3).** The schema and policy form an exact pair. Known geography retains its nonempty countries and exact evidence.
+The separate unknown branch has `value:null`, empty countries/evidenceIds, `verification:not-established`, one of `not-stated`, `not-supported`, `conflicting`,
+and the real decision identity. Its nonempty basis retains every original event identity and country declaration, including nonempty unverified countries.
+Core event/company evidence and current read/store/quote-display authority remain mandatory. Unknown countries cannot prove a country-constrained structural
+basis (`basis_countries_unprovable`); unknown or insufficient dates cannot prove a date-constrained basis (`basis_validity_unprovable`). Unrestricted independently
+supported basis remains eligible. The temporal withholding and summary decision table above applies unchanged.
+
 **Field provenance.** Every issue carries a closed `fieldProvenance` that records how the producer chose the issue's six headline values (`title`, `action`,
 `target`, `eventTime`, `period`, `assertionStatus`): `selection` is `unanimous` (no operator representative; every mention states all six values) or
 `operator-representative` (the operator's single representative decision; it is one choice for all six fields, never a per-field decision). `sameValueMentions`
 lists per field, in the order of `mentions[]`, the identities (`documentId`, `documentVersion`, `mentionId`) of exactly those mentions whose own value equals the
 issue's value (null equals null; no trimming or time normalisation) where "the issue's value" is the SELECTED value, never a redacted null. `verification` is always
 `none`: this is the actual selection, never a fact verification, support or approval. `withheld` lists (`eventTime`, `period` order) the fields whose headline the
-producer nulled because of an operator HOLD or REJECT on the selected basis. The producer proves list exactness and closure; this service checks only the shapes.
+producer nulled because of an operator HOLD or REJECT on the selected basis. The producer proves list exactness and closure; the service also recomputes temporal withholding.
 
 **Field verdicts.** `issues[].fieldVerdicts` holds the operator's own per-field decisions on one original mention's `eventTime` or `period` (`field`, the exact
 reviewed `value`, `decision` ALLOW|HOLD|REJECT, a closed `reasonCode`, `evidenceIds` of the mention's own document, `reviewer`, `decisionRef`, `decisionVersion`,
 `verification` always `operator-field-verdict`). They are never AI output, carry no free-text note, and exist only where an operator reviewed; an empty list means
-"no field verdict exists", not "verified". This service neither derives nor judges them and checks only the shapes (decision/reason/evidence-count combinations:
-ALLOW+stated needs spans, HOLD+unstated none, HOLD+ambiguous spans, REJECT+contradicted spans). Original `mentions[]` values are never changed.
+"no field verdict exists", not "verified". The service checks exact mention/value binding, unresolved-time own-article evidence and decision/reason/evidence-count combinations:
+ALLOW+stated needs spans, HOLD+unstated none, HOLD+ambiguous and HOLD+unsupported-format spans, REJECT+contradicted spans. Original `mentions[]` values stay unchanged.
 
 **Impacts.** `impacts[]` has exactly one closed row per emitted `INVOLVES` source relation `(edgeId, sourceRelation.jobId, sourceRelation.relationCandidateId)`, sorted by
 that tuple. It never aggregates: two source relations of one edge stay two rows. A row says what the S3 independent verifier mapped for the company, or why there is

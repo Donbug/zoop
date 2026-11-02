@@ -16,10 +16,10 @@ export default function GraphFocusControls({
     <div
       data-screen-id="D-GRP-07b"
       role="group"
-      className="absolute top-4 left-9 z-10 flex min-h-11 max-w-[calc(100%-1rem)] items-center rounded-panel border border-zoop-line bg-zoop-paper p-1 font-panel text-[13px] text-zoop-ink shadow-sm max-md:top-2 max-md:left-2"
+      className="absolute top-4 left-9 z-10 flex min-h-11 max-w-[calc(100%-1rem)] items-center rounded-panel border border-zoop-line bg-zoop-paper p-1 font-panel text-body text-zoop-ink shadow-sm max-md:top-2 max-md:left-2"
       aria-label={`${label} 중심 보기`}
     >
-      <strong className="max-w-32 truncate px-2 text-[13px] font-semibold max-md:max-w-24">
+      <strong className="max-w-32 truncate px-2 text-body font-semibold max-md:max-w-24">
         {label} 중심
       </strong>
       <span className="mx-1 h-5 w-px bg-panel-line" aria-hidden="true" />

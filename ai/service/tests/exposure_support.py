@@ -32,7 +32,7 @@ def report(request=None):
             "identity": {"boundInSelection": True, "recordedInIngestion": None if relation else True},
             "scope": {"selection": "explicit", "handoffIds": sorted(request["handoffIds"]), "notCovered": list(NOT_COVERED)},
             "basis": BASIS[cause], "consistency": CONSISTENCY, "effect": EFFECT, "usage": {"providerCalls": 0, "modelCalls": 0},
-            "handoffs": [{"handoffId": ident, "bundleSchema": "zoop-graph-handoff-bundle-7", "manifestDigest": fixed["manifestDigest"],
+            "handoffs": [{"handoffId": ident, "bundleSchema": "zoop-graph-handoff-bundle-8", "manifestDigest": fixed["manifestDigest"],
                           "bundleDigest": fixed["bundleDigest"], "contentDigest": fixed["contentDigest"], "bound": True, "exposed": True,
                           "articles": [], "evidenceIds": [], "issues": [{"id": "issue:synthetic", "reasons": ["involvement-lost"]}],
                           "relations": [{"id": "edge:synthetic", "type": "INVOLVES", "reasons": ["source-relation" if relation else "upstream-input"]}],

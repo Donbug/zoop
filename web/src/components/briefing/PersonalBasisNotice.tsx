@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { ApiError } from '@/apis/auth/ApiService';
 import type { PersonalBriefingState } from '@/hooks/usePersonalBriefing';
 import { briefingTime } from '@/util/briefingTime';
@@ -30,9 +31,10 @@ export default function PersonalBasisNotice({
   const location = useLocation();
   if (checking)
     return (
-      <p role="status" className="mt-4 text-xs text-zoop-muted">
-        로그인 상태를 확인하고 있어요.
-      </p>
+      <LoadingIndicator
+        label="로그인 상태를 확인하고 있어요."
+        className="mt-4 flex min-h-8 w-full text-caption text-zoop-muted"
+      />
     );
   if (!member)
     return (
@@ -50,9 +52,10 @@ export default function PersonalBasisNotice({
 
   if (state.status === 'idle' || state.status === 'loading')
     return (
-      <p role="status" className="mt-4 text-xs text-zoop-muted">
-        내 종목 기준을 확인하고 있어요.
-      </p>
+      <LoadingIndicator
+        label="내 종목 기준을 확인하고 있어요."
+        className="mt-4 flex min-h-8 w-full text-caption text-zoop-muted"
+      />
     );
 
   if (state.status === 'error')
@@ -87,7 +90,7 @@ export default function PersonalBasisNotice({
   return (
     <p
       role="status"
-      className="mt-4 rounded-[3px] border-[0.667px] border-zoop-ink bg-zoop-paper px-3 py-2 text-[11px] leading-relaxed"
+      className="mt-4 rounded-[3px] border-[0.667px] border-zoop-ink bg-zoop-paper px-3 py-2 text-caption leading-relaxed"
     >
       <strong className="font-semibold">
         {basis.kind === 'holdings'

@@ -9,15 +9,26 @@ including reasoning, an input upper bound from the exact request bytes) and stay
   and counted as a call forever: a reservation is never reused to send again.
 
 Money is an integer number of nano-USD, so rates (USD per 1M tokens) are exact integers per token and no float is involved.
-The ceilings are bound to the budget directory on first use and may only decrease afterwards. Nothing here knows a provider.
+The ceilings bind on first use and may only decrease. Optional versioned funding binds account roles and a non-extendable window;
+an unfunded historical ledger is never upgraded or silently interpreted as a funded ledger.
 """
 from __future__ import annotations
 
+import json
+import re
 import os
+import fcntl
+import time
+import uuid
 import sqlite3
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+
+from .live_funding import (MODE, operating_policy, operating_timestamp, stage_allowances,
+    BUCKET_MAX_NANO, CAPPED_POLICY_VERSION, is_set_policy, GENERATION_STAGES, VERIFY_STAGES,
+    deadline, timestamp, validate_policy, finish_policy)
+from .relation_contracts import canonical, digest
 
 DB_NAME = "live-budget.sqlite3"
 NANO = 1_000_000_000
@@ -38,6 +49,19 @@ CREATE TABLE IF NOT EXISTS reservations(
 ) STRICT;
 """
 
+OPERATING_SCHEMA = """
+CREATE TABLE operating_identity(id TEXT PRIMARY KEY, policy TEXT NOT NULL) STRICT;
+CREATE TABLE operating_bindings(name TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
+CREATE TABLE operating_control(singleton INTEGER PRIMARY KEY CHECK(singleton=1), state TEXT NOT NULL,
+ reason TEXT NOT NULL, drain_until REAL, last_send REAL NOT NULL DEFAULT 0, owner TEXT, owner_pid INTEGER, resume_state TEXT) STRICT;
+CREATE TABLE operating_history(seq INTEGER PRIMARY KEY, at REAL NOT NULL, action TEXT NOT NULL, reason TEXT NOT NULL) STRICT;
+CREATE TABLE operating_sets(id TEXT PRIMARY KEY, pins TEXT NOT NULL, allowances TEXT NOT NULL, complete INTEGER NOT NULL DEFAULT 0) STRICT;
+CREATE TABLE operating_attempts(attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id),
+ set_id TEXT NOT NULL REFERENCES operating_sets(id), stage TEXT NOT NULL, request_digest TEXT NOT NULL,
+ dispatched INTEGER NOT NULL DEFAULT 0, deferred INTEGER NOT NULL DEFAULT 0, receipt TEXT, UNIQUE(set_id,stage,request_digest)) STRICT;
+CREATE TABLE operating_deferrals(seq INTEGER PRIMARY KEY, attempt_id TEXT NOT NULL, at REAL NOT NULL, code TEXT NOT NULL) STRICT;
+"""
+
 
 class BudgetError(Exception):
     """A budget refusal. The runtime maps `code` to a LiveFailure; none of these ever follows a sent request."""
@@ -45,6 +69,17 @@ class BudgetError(Exception):
     def __init__(self, code: str):
         self.code = code
         super().__init__(code)
+
+
+class BudgetBusy(BudgetError):
+    """SQLite BUSY/LOCKED after transaction cleanup; distinct from corruption or an unknown provider outcome."""
+
+
+def _database_failure(error: BaseException, operating: bool) -> BudgetError:
+    if (operating and isinstance(error, sqlite3.OperationalError)
+            and (getattr(error, "sqlite_errorcode", 0) & 0xFF) in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED)):
+        return BudgetBusy("operating_ledger_busy")
+    return BudgetError("live_budget_unavailable")
 
 
 def usd(nano: int) -> str:
@@ -68,24 +103,122 @@ def _now() -> str:
 
 
 class Budget:
-    """Handle to one budget directory. Every operation is its own short `BEGIN IMMEDIATE` transaction, so threads and processes
-    that share the directory serialize on the database lock and never overspend the shared ceiling."""
+    """One accounting directory. Writes serialize through short `BEGIN IMMEDIATE` transactions;
+    operating observers use read snapshots, and request control polling never waits on a database lock."""
 
-    def __init__(self, directory: str | Path, max_nano: int, max_calls: int):
+    def __init__(self, directory: str | Path, max_nano: int | None, max_calls: int | None, *, policy: dict | None = None,
+                 funding: dict | None = None, bucket_caps: dict[str, int] | None = None, finish_by: str | None = None):
         self.path = Path(directory) / DB_NAME
         self.max_nano, self.max_calls = max_nano, max_calls
+        if policy is not None and (funding is not None or bucket_caps is not None or finish_by is not None):
+            raise BudgetError("live_budget_policy_mismatch")
+        self.policy = operating_policy(policy) if policy is not None else None
+        self.marker = self.path.parent / "operating-identity.json"
+        self.identity = None
+        if self.policy is not None:
+            if max_nano is not None or max_calls is not None:
+                raise BudgetError("operating_caps_forbidden")
+            self._check_identity()
+        elif funding is None and (type(max_nano) is not int or max_nano <= 0 or type(max_calls) is not int or not 1 <= max_calls <= 100000):
+            raise BudgetError("live_budget_config_invalid")
+        try:
+            self.funding = validate_policy(funding) if funding is not None else None
+        except ValueError:
+            raise BudgetError("live_funding_config_invalid") from None
+        self.capped_funding = bool(self.funding and self.funding["version"] == CAPPED_POLICY_VERSION)
+        if self.capped_funding and (max_nano != self.funding["totalMaxNanoUsd"] or bucket_caps != self.funding["bucketMaxNanoUsd"]):
+            raise BudgetError("live_funding_config_invalid")
+        self.bucket_caps = dict(bucket_caps) if bucket_caps is not None else {"shared": BUCKET_MAX_NANO, "personal": BUCKET_MAX_NANO}
+        if self.funding and (type(max_nano) is not int or not 0 < max_nano <= 2 * BUCKET_MAX_NANO
+                             or type(max_calls) is not int or not 1 <= max_calls <= 100_000
+                             or set(self.bucket_caps) != {"shared", "personal"}
+                             or any(type(cap) is not int or not 0 <= cap <= BUCKET_MAX_NANO for cap in self.bucket_caps.values())):
+            raise BudgetError("live_funding_config_invalid")
+        self.set_funding = is_set_policy(self.funding)
+        try:
+            self.finish = finish_policy(finish_by) if finish_by is not None else None
+            if self.finish and (not self.set_funding or timestamp(finish_by) <= timestamp(self.funding["admitUntil"])):
+                raise ValueError("live_finish_policy_invalid")
+        except ValueError:
+            raise BudgetError("live_finish_policy_invalid") from None
+
+    @classmethod
+    def initialize(cls, directory: str | Path, policy: dict) -> Budget:
+        """Exclusive first initialization. A partial initialization is a recovery incident, never a new balance."""
+        policy = operating_policy(policy)
+        directory = Path(directory)
+        try:
+            directory.mkdir(mode=0o700, parents=True, exist_ok=False)
+            path = directory / DB_NAME
+            with path.open("xb") as output:
+                os.chmod(path, 0o600)
+                output.flush()
+                os.fsync(output.fileno())
+            identity = uuid.uuid4().hex
+            with closing(sqlite3.connect(path)) as db:
+                db.executescript(SCHEMA + OPERATING_SCHEMA)
+                db.execute("INSERT INTO operating_identity VALUES(?,?)", (identity, canonical(policy)))
+                db.execute("INSERT INTO operating_control(singleton,state,reason) VALUES(1,'running','initialized')")
+                db.execute("INSERT INTO operating_history(at,action,reason) VALUES(?,'initialize','initialized')", (time.time(),))
+                db.commit()
+            for name in ("owner.lock", "send.lock"):
+                with (directory / name).open("xb") as lock:
+                    os.chmod(directory / name, 0o600)
+                    os.fsync(lock.fileno())
+            stat = path.stat()
+            marker = {"id": identity, "device": stat.st_dev, "inode": stat.st_ino, "policyDigest": digest(policy),
+                      "locks": {name: (directory / name).stat().st_ino for name in ("owner.lock", "send.lock")}}
+            with (directory / "operating-identity.json").open("x") as output:
+                os.chmod(output.name, 0o600)
+                output.write(canonical(marker))
+                output.flush()
+                os.fsync(output.fileno())
+            fd = os.open(directory, os.O_RDONLY)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+        except (OSError, sqlite3.Error):
+            raise BudgetError("operating_initialization_refused") from None
+        return cls(directory, None, None, policy=policy)
+
+    def _check_identity(self) -> None:
+        try:
+            marker = json.loads(self.marker.read_text())
+            stat = self.path.stat()
+            if (self.path.is_symlink() or self.marker.is_symlink() or marker["policyDigest"] != digest(self.policy)
+                    or (marker["device"], marker["inode"]) != (stat.st_dev, stat.st_ino)
+                    or (self.identity is not None and self.identity != marker)):
+                raise BudgetError("operating_ledger_replaced")
+            if (stat.st_mode & 0o077 or self.path.parent.stat().st_mode & 0o077 or self.marker.stat().st_mode & 0o077
+                    or self.path.parent.resolve() != self.path.parent):
+                raise BudgetError("operating_storage_unsafe")
+            self.identity = marker
+        except (OSError, ValueError, KeyError, TypeError):
+            raise BudgetError("operating_ledger_missing") from None
 
     @contextmanager
-    def _tx(self):
+    def _tx(self, *, timeout: float | None = None, readonly: bool = False):
         try:
-            self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-            os.close(os.open(self.path, os.O_CREAT | os.O_WRONLY, 0o600))
-            connection = sqlite3.connect(self.path, timeout=BUSY_SECONDS, isolation_level=None)
-        except (OSError, sqlite3.Error):
-            raise BudgetError("live_budget_unavailable") from None
+            if self.policy is not None:
+                self._check_identity()
+                connection = sqlite3.connect(self.path.as_uri() + ("?mode=ro" if readonly else "?mode=rw"), uri=True,
+                                             timeout=BUSY_SECONDS if timeout is None else timeout, isolation_level=None)
+            else:
+                if self.marker.exists():
+                    raise BudgetError("live_budget_policy_mismatch")
+                self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+                os.close(os.open(self.path, os.O_CREAT | os.O_WRONLY, 0o600))
+                connection = sqlite3.connect(self.path, timeout=BUSY_SECONDS, isolation_level=None)
+        except (OSError, sqlite3.Error) as exc:
+            raise _database_failure(exc, self.policy is not None) from None
         try:
             with closing(connection):
-                connection.execute("BEGIN IMMEDIATE")
+                connection.execute("BEGIN" if readonly else "BEGIN IMMEDIATE")
+                if self.policy is not None:
+                    identity = connection.execute("SELECT id,policy FROM operating_identity").fetchall()
+                    if identity != [(self.identity["id"], canonical(self.policy))]:
+                        raise BudgetError("operating_ledger_replaced")
                 try:
                     yield connection
                 except BudgetError:
@@ -96,44 +229,408 @@ class Budget:
                     raise
                 else:
                     connection.execute("COMMIT")
-        except sqlite3.Error:
-            raise BudgetError("live_budget_unavailable") from None
+        except sqlite3.Error as exc:
+            raise _database_failure(exc, self.policy is not None) from None
+
+    def _bind_funding(self, db: sqlite3.Connection) -> None:
+        exists = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='funding_policy'").fetchone()
+        if self.funding is None:
+            if exists:
+                raise BudgetError("live_budget_policy_mismatch")
+            return
+        policy = canonical({k: v for k, v in self.funding.items() if k != "notAfter"})
+        if not exists:
+            if db.execute("SELECT 1 FROM meta LIMIT 1").fetchone() or db.execute("SELECT 1 FROM reservations LIMIT 1").fetchone():
+                raise BudgetError("live_budget_policy_mismatch")
+            db.execute("CREATE TABLE funding_policy(policy TEXT NOT NULL) STRICT")
+            db.execute("INSERT INTO funding_policy VALUES(?)", (policy,))
+            db.execute("""CREATE TABLE reservation_funding(
+                attempt_id TEXT PRIMARY KEY, account_role TEXT NOT NULL, bucket TEXT NOT NULL) STRICT""")
+            if self.set_funding:
+                db.execute("""CREATE TABLE admitted_sets(
+                    set_id TEXT PRIMARY KEY, unit_digest TEXT NOT NULL, plan TEXT NOT NULL,
+                    state TEXT NOT NULL CHECK(state IN ('admitted','completed','blocked','unknown')),
+                    admitted_at TEXT NOT NULL, finished_at TEXT) STRICT""")
+                db.execute("""CREATE TABLE reservation_sets(
+                    attempt_id TEXT PRIMARY KEY, set_id TEXT NOT NULL, stage TEXT NOT NULL,
+                    request_digest TEXT NOT NULL, UNIQUE(set_id,stage,request_digest)) STRICT""")
+                db.execute("""CREATE TABLE admission_stop(
+                    singleton INTEGER PRIMARY KEY CHECK(singleton=1), reason TEXT NOT NULL,
+                    stopped_at TEXT NOT NULL, forced INTEGER NOT NULL) STRICT""")
+                db.execute("""CREATE TABLE provider_invocations(
+                    logical_id TEXT PRIMARY KEY, set_id TEXT NOT NULL, stage TEXT NOT NULL,
+                    prepared_digest TEXT NOT NULL, binding_identity TEXT NOT NULL) STRICT""")
+                db.execute("""CREATE TABLE provider_attempts(
+                    attempt_id TEXT PRIMARY KEY, logical_id TEXT NOT NULL, ordinal INTEGER NOT NULL CHECK(ordinal IN (1,2)),
+                    profile TEXT NOT NULL, request_digest TEXT NOT NULL,
+                    state TEXT NOT NULL CHECK(state IN ('started','received','released','unknown')),
+                    receipt TEXT, error TEXT, UNIQUE(logical_id,ordinal)) STRICT""")
+        elif db.execute("SELECT policy FROM funding_policy").fetchall() != [(policy,)]:
+            raise BudgetError("live_budget_policy_mismatch")
+        self._bind_finish(db)
+
+    def _finish_authority(self, db):
+        if not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finish_authority'").fetchone():
+            return None
+        rows = db.execute("SELECT policy FROM finish_authority").fetchall()
+        try:
+            policy = json.loads(rows[0][0])
+            if len(rows) != 1 or finish_policy(policy["finishBy"]) != policy:
+                raise ValueError
+        except (IndexError, KeyError, TypeError, ValueError):
+            raise BudgetError("live_finish_policy_invalid") from None
+        return policy
+
+    def _bind_finish(self, db):
+        observed = self._finish_authority(db)
+        if self.finish is None:
+            return
+        if observed is not None:
+            if observed != self.finish:
+                raise BudgetError("live_finish_policy_mismatch")
+        else:
+            # Only a fresh ledger can gain this authority; no historical upgrade.
+            if db.execute("SELECT 1 FROM meta LIMIT 1").fetchone():
+                raise BudgetError("live_finish_policy_mismatch")
+            db.execute("CREATE TABLE finish_authority(singleton INTEGER PRIMARY KEY CHECK(singleton=1), policy TEXT NOT NULL) STRICT")
+            db.execute("INSERT INTO finish_authority VALUES(1,?)", (canonical(self.finish),))
+
+    def _check_deadline(self, db: sqlite3.Connection) -> None:
+        finish = self._finish_authority(db)
+        if finish is not None and (timestamp(finish["sendBefore"]) - datetime.fromisoformat(_now())).total_seconds() <= finish["maxHttpTimeoutSeconds"]:
+            raise BudgetError("live_finish_deadline")
+        if self.funding and not self.set_funding:
+            end = db.execute("SELECT value FROM meta WHERE key='not_after_seconds'").fetchone()[0]
+            if datetime.fromisoformat(_now()).timestamp() >= end:
+                raise BudgetError("live_budget_deadline")
 
     def _bind_ceilings(self, db: sqlite3.Connection) -> None:
+        if self.policy is not None:
+            return
+        if db.execute("SELECT 1 FROM sqlite_master WHERE name='operating_identity'").fetchone():
+            raise BudgetError("live_budget_policy_mismatch")
         for statement in SCHEMA.split(";"):
             if statement.strip():
                 db.execute(statement)
+        self._bind_funding(db)
         increase = False
-        for key, wanted in (("max_nano", self.max_nano), ("max_calls", self.max_calls)):
+        limits = [("max_nano", self.max_nano), ("max_calls", self.max_calls)]
+        if self.funding:
+            limits.extend((f"bucket_{name}", cap) for name, cap in self.bucket_caps.items())
+            if not self.set_funding:
+                limits.append(("not_after_seconds", int(deadline(self.funding["notAfter"]).timestamp())))
+        deadline_increase = False
+        for key, wanted in limits:
             row = db.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
             if row is None:
                 db.execute("INSERT INTO meta VALUES(?,?)", (key, wanted))
+            elif self.capped_funding and key != "max_calls" and wanted != row[0]:
+                raise BudgetError("live_budget_policy_mismatch")
             elif wanted > row[0]:
                 increase = True
+                deadline_increase |= key == "not_after_seconds"
             elif wanted < row[0]:
                 db.execute("UPDATE meta SET value=? WHERE key=?", (wanted, key))
         if increase:  # a decrease of the other ceiling is kept: the transaction commits on every deliberate refusal
-            raise BudgetError("live_budget_ceiling_increase")
+            raise BudgetError("live_budget_deadline_increase" if deadline_increase else "live_budget_ceiling_increase")
 
-    def reserve(self, attempt_id: str, stage: str, recipient: str, request_digest: str, worst_case_nano: int) -> None:
+    def _capacity_refusal(self, db: sqlite3.Connection, code: str, role: str | None) -> None:
+        if self.funding and role == "personal-typesafe":
+            db.execute("INSERT OR REPLACE INTO meta VALUES('verification_blocked',1)")
+        raise BudgetError(code)
+
+    def _funded_gate(self, db: sqlite3.Connection, role: str | None, extra_personal: int = 0) -> None:
+        if not self.funding:
+            return
+        if role == "personal-typesafe":
+            return
+        if db.execute("SELECT 1 FROM meta WHERE key='verification_blocked' AND value=1").fetchone():
+            raise BudgetError("live_budget_verification_blocked")
+        charged = db.execute("""SELECT COALESCE(SUM(r.charged_nano),0) FROM reservations r
+            JOIN reservation_funding f USING(attempt_id) WHERE f.bucket='personal' AND r.state!='released'""").fetchone()[0]
+        if self.bucket_caps["personal"] - charged - extra_personal < self.funding["minimumVerifierReserveNanoUsd"]:
+            raise BudgetError("live_budget_verification_blocked")
+
+    def _require_sets(self):
+        if not self.set_funding:
+            raise BudgetError("live_budget_policy_mismatch")
+
+    def close_admission(self, reason: str, *, forced: bool = False) -> None:
+        """Persist stop intent. A soft close never revokes an admitted set."""
+        self._require_sets()
+        with self._tx() as db:
+            self._bind_ceilings(db)
+            db.execute("INSERT OR IGNORE INTO admission_stop VALUES(1,?,?,?)", (reason, _now(), int(forced)))
+            if forced:
+                db.execute("UPDATE admission_stop SET forced=1 WHERE singleton=1")
+
+    def _check_admission(self, db):
+        current = datetime.fromisoformat(_now())
+        if current >= timestamp(self.funding["admitUntil"]):
+            db.execute("INSERT OR IGNORE INTO admission_stop VALUES(1,'admission_cutoff',?,0)", (_now(),))
+            raise BudgetError("live_set_admission_closed")
+        if current < timestamp(self.funding["admitFrom"]):
+            raise BudgetError("live_set_admission_not_open")
+        if db.execute("SELECT 1 FROM admission_stop").fetchone():
+            raise BudgetError("live_set_admission_closed")
+
+    def check_admission(self) -> None:
+        """Observe the common fence; admit_set repeats it atomically with admission."""
+        self._require_sets()
+        with self._tx() as db:
+            self._bind_ceilings(db)
+            self._check_admission(db)
+
+    def admit_set(self, set_id: str, unit_digest: str, plan: dict[str, int]) -> None:
+        """One admission, atomic with the cutoff/stop check; never an idempotent reset."""
+        self._require_sets()
+        if (not isinstance(set_id, str) or not re.fullmatch(r"[A-Za-z0-9._:-]{1,200}", set_id)
+                or not isinstance(unit_digest, str) or not re.fullmatch(r"[a-f0-9]{64}", unit_digest)
+                or not isinstance(plan, dict) or not set(plan) <= {stage for route in self.funding["roles"].values() for stage in route["stages"]}
+                or any(type(n) is not int or not 0 <= n <= 100_000 for n in plan.values())
+                or (not any(plan.values()) and not (plan == {} and self.finish is not None))):
+            raise BudgetError("live_set_plan_invalid")
+        with self._tx() as db:
+            self._bind_ceilings(db)
+            if db.execute("SELECT 1 FROM admitted_sets WHERE set_id=?", (set_id,)).fetchone():
+                raise BudgetError("live_set_admission_duplicate")
+            self._check_admission(db)
+            db.execute("INSERT INTO admitted_sets VALUES(?,?,?,'admitted',?,NULL)", (set_id, unit_digest, canonical(plan), _now()))
+
+    def set_status(self, set_id: str) -> str | None:
+        self._require_sets()
+        with self._tx() as db:
+            self._bind_ceilings(db)
+            row = db.execute("SELECT state FROM admitted_sets WHERE set_id=?", (set_id,)).fetchone()
+            return row[0] if row else None
+
+    def _check_set(self, db, set_id):
+        if db.execute("SELECT 1 FROM admission_stop WHERE forced=1").fetchone():
+            raise BudgetError("live_set_forced_stop")
+        row = db.execute("SELECT unit_digest,plan,state FROM admitted_sets WHERE set_id=?", (set_id,)).fetchone()
+        if row is None or row[2] != "admitted":
+            raise BudgetError("live_set_not_admitted")
+        return row
+
+    def set_request_holder(self, set_id: str, stage: str, request_digest: str) -> dict | None:
+        """Read the unique owner without reserving work or another HTTP allowance."""
+        self._require_sets()
+        with self._tx() as db:
+            self._bind_ceilings(db)
+            self._check_set(db, set_id)
+            finish = self._finish_authority(db)
+            if finish is not None and datetime.fromisoformat(_now()) >= timestamp(finish["sendBefore"]):
+                raise BudgetError("live_finish_deadline")
+            row = db.execute("""SELECT r.attempt_id,r.state,r.recipient,r.charged_nano,f.account_role,f.bucket
+                                FROM reservation_sets s JOIN reservations r USING(attempt_id)
+                                JOIN reservation_funding f USING(attempt_id)
+                                WHERE s.set_id=? AND s.stage=? AND s.request_digest=?""",
+                             (set_id, stage, request_digest)).fetchone()
+            return dict(zip(("attemptId", "state", "recipient", "chargedNano", "accountRole", "bucket"), row)) if row else None
+
+    def resume_set(self, set_id: str, unit_digest: str) -> dict:
+        """Known-receipt continuation keeps the same immutable admission and counters."""
+        self._require_sets()
+        with self._tx() as db:
+            self._bind_ceilings(db)
+            row = self._check_set(db, set_id)
+            if row[0] != unit_digest:
+                raise BudgetError("live_set_identity_mismatch")
+            if db.execute("""SELECT 1 FROM reservation_sets s JOIN reservations r USING(attempt_id)
+                             WHERE s.set_id=? AND r.state='reserved'""", (set_id,)).fetchone():
+                raise BudgetError("live_set_reconcile_only")
+            return json.loads(row[1])
+
+    def finish_set(self, set_id: str, state: str) -> None:
+        self._require_sets()
+        if state not in {"completed", "blocked", "unknown"}:
+            raise BudgetError("live_set_state_invalid")
+        with self._tx() as db:
+            self._bind_ceilings(db)
+            row = db.execute("SELECT state FROM admitted_sets WHERE set_id=?", (set_id,)).fetchone()
+            if row is None or row[0] not in {"admitted", state}:
+                raise BudgetError("live_set_not_admitted")
+            db.execute("UPDATE admitted_sets SET state=?,finished_at=COALESCE(finished_at,?) WHERE set_id=?",
+                       (state, _now(), set_id))
+
+    def _reserve_set(self, db, set_id, stage, request_digest):
+        row = self._check_set(db, set_id)
+        limit = json.loads(row[1]).get(stage, 0)
+        used = db.execute("SELECT COUNT(*) FROM reservation_sets WHERE set_id=? AND stage=?", (set_id, stage)).fetchone()[0]
+        if used >= limit:
+            raise BudgetError("live_set_work_exhausted")
+        if db.execute("SELECT 1 FROM reservation_sets WHERE set_id=? AND stage=? AND request_digest=?",
+                      (set_id, stage, request_digest)).fetchone():
+            raise BudgetError("live_set_request_duplicate")
+
+    def begin_invocation(self, logical_id: str, set_id: str, stage: str, prepared_digest: str, binding_identity: str):
+        self._require_sets()
+        with self._tx() as db:
+            self._bind_ceilings(db)
+            self._check_set(db, set_id)
+            if db.execute("SELECT 1 FROM provider_invocations WHERE logical_id=?", (logical_id,)).fetchone():
+                raise BudgetError("live_budget_attempt_duplicate")
+            db.execute("INSERT INTO provider_invocations VALUES(?,?,?,?,?)",
+                       (logical_id, set_id, stage, prepared_digest, binding_identity))
+
+    def begin_provider_attempt(self, logical_id: str, attempt_id: str, ordinal: int, profile: str, request_digest: str):
+        with self._tx() as db:
+            self._bind_ceilings(db)
+            invocation = db.execute("SELECT set_id FROM provider_invocations WHERE logical_id=?", (logical_id,)).fetchone()
+            if invocation is None or ordinal not in (1, 2):
+                raise BudgetError("live_chain_invalid")
+            self._check_set(db, invocation[0])
+            if db.execute("SELECT 1 FROM provider_attempts WHERE logical_id=? AND ordinal=?", (logical_id, ordinal)).fetchone():
+                raise BudgetError("live_budget_attempt_duplicate")
+            if ordinal == 2:
+                previous = db.execute("SELECT state,error FROM provider_attempts WHERE logical_id=? AND ordinal=1", (logical_id,)).fetchone()
+                if previous is None or previous[0] not in {"received", "released"} or previous[1] is None:
+                    raise BudgetError("live_chain_predecessor_not_settled")
+            db.execute("INSERT INTO provider_attempts VALUES(?,?,?,?,?,'started',NULL,NULL)",
+                       (attempt_id, logical_id, ordinal, profile, request_digest))
+
+    def record_provider_attempt(self, attempt_id: str, state: str, receipt: dict | None, error: dict | None):
+        if state not in {"received", "released", "unknown"}:
+            raise BudgetError("live_chain_invalid")
+        with self._tx() as db:
+            self._bind_funding(db)
+            if db.execute("SELECT state FROM provider_attempts WHERE attempt_id=?", (attempt_id,)).fetchone() != ("started",):
+                raise BudgetError("live_budget_attempt_duplicate")
+            db.execute("UPDATE provider_attempts SET state=?,receipt=?,error=? WHERE attempt_id=?",
+                       (state, canonical(receipt) if receipt is not None else None,
+                        canonical(error) if error is not None else None, attempt_id))
+
+    def provider_attempts(self, logical_id: str) -> list[dict]:
+        if not self.set_funding:
+            return []
+        with self._tx() as db:
+            self._bind_ceilings(db)
+            rows = db.execute("""SELECT p.attempt_id,p.profile,p.state,p.receipt,p.error,r.reserved_nano,r.charged_nano,
+                                 r.state,f.account_role,f.bucket,i.stage,p.request_digest,r.recipient FROM provider_attempts p
+                                 JOIN provider_invocations i USING(logical_id)
+                                 LEFT JOIN reservations r USING(attempt_id)
+                                 LEFT JOIN reservation_funding f USING(attempt_id)
+                                 WHERE p.logical_id=? ORDER BY p.ordinal""", (logical_id,)).fetchall()
+            return [{"attemptId": row[0], "profile": row[1], "state": "unknown" if row[2] == "started" else row[2],
+                     "receipt": json.loads(row[3]) if row[3] else None,
+                     "error": json.loads(row[4]) if row[4] else None,
+                     "stage": row[10], "requestDigest": row[11],
+                     "recipient": row[12] or self.funding["roles"][row[1]]["recipient"],
+                     "cost": {"reservedUsd": usd(row[5] or 0), "chargedUsd": usd(row[6] or 0),
+                              "settled": row[7] == "settled", "usageKnown": False, "estimatedUsd": None},
+                     "funding": {"accountRole": row[8] or row[1],
+                                 "bucket": row[9] or self.funding["roles"][row[1]]["bucket"],
+                                 "policyIdentity": digest(self.funding)}} for row in rows]
+
+    def reserve(self, attempt_id: str, stage: str, recipient: str, request_digest: str, worst_case_nano: int, *,
+                set_id: str | None = None, owner: str | None = None, binding_identity: str | None = None,
+                allow_defer: bool = False, resume_unsent: bool = False, account_role: str | None = None) -> None:
         """Durably charge the worst case of one future call. The unique attempt id spans S2 and S3 and every process."""
         with self._tx() as db:
             self._bind_ceilings(db)
-            if db.execute("SELECT 1 FROM reservations WHERE attempt_id=?", (attempt_id,)).fetchone():
-                raise BudgetError("live_budget_attempt_duplicate")
+            if type(worst_case_nano) is not int or worst_case_nano < 0:
+                raise BudgetError("live_budget_config_invalid")
+            bucket = None
+            if self.funding:
+                route = self.funding["roles"].get(account_role)
+                if route is None or route.get("stageRecipients", {}).get(stage, route["recipient"]) != recipient or stage not in route["stages"]:
+                    raise BudgetError("live_budget_policy_mismatch")
+                bucket = route["bucket"]
+            elif account_role is not None:
+                raise BudgetError("live_budget_policy_mismatch")
+            self._check_deadline(db)
+            prior = db.execute("SELECT state,stage,recipient,request_digest,reserved_nano FROM reservations WHERE attempt_id=?", (attempt_id,)).fetchone()
+            rearm = False
+            if prior is not None:
+                if self.policy is not None and prior[1:] == (stage, recipient, request_digest, worst_case_nano):
+                    intent = db.execute("SELECT set_id,dispatched,deferred,receipt FROM operating_attempts WHERE attempt_id=?", (attempt_id,)).fetchone()
+                    if intent is not None and intent[0] == set_id and intent[1] == 0 and intent[3] is None:
+                        rearm = ((prior[0] == "released" and intent[2] == 1)
+                                 or (resume_unsent and prior[0] == "reserved"))
+                if not rearm:
+                    raise BudgetError("live_budget_attempt_duplicate")
+            if self.policy is not None:
+                if not owner:
+                    raise BudgetError("operating_owner_required")
+                self._operating_gate(db, owner=owner, allow_pause=allow_defer)
+                item = db.execute("SELECT allowances,complete,pins FROM operating_sets WHERE id=?", (set_id,)).fetchone()
+                if item is None or item[1]:
+                    raise BudgetError("operating_set_unavailable")
+                if binding_identity != json.loads(item[2])["runtimeIdentity"]:
+                    raise BudgetError("operating_set_binding_changed")
+                limit = json.loads(item[0]).get(stage, 0)
+                count = db.execute("SELECT COUNT(*) FROM operating_attempts WHERE set_id=? AND stage=?", (set_id, stage)).fetchone()[0]
+                if not rearm and count >= limit:
+                    raise BudgetError("operating_stage_exhausted")
+                if not rearm and db.execute("SELECT 1 FROM operating_attempts WHERE set_id=? AND stage=? AND request_digest=?",
+                                            (set_id, stage, request_digest)).fetchone():
+                    raise BudgetError("live_budget_request_duplicate")
+                if db.execute("SELECT 1 FROM reservations WHERE state='reserved' AND (?=0 OR attempt_id!=?)", (int(rearm), attempt_id)).fetchone():
+                    raise BudgetError("operating_unresolved_attempt")
+            if self.set_funding:
+                self._reserve_set(db, set_id, stage, request_digest)
+            elif self.policy is None and set_id is not None:
+                raise BudgetError("live_budget_policy_mismatch")
             charged, calls = db.execute("SELECT COALESCE(SUM(charged_nano),0), COUNT(*) FROM reservations WHERE state!='released'").fetchone()
-            if calls + 1 > self.max_calls:
-                raise BudgetError("live_budget_exhausted_calls")
-            if charged + worst_case_nano > self.max_nano:
-                raise BudgetError("live_budget_exhausted_usd")
+            if self.max_calls is not None and calls + 1 > self.max_calls:
+                self._capacity_refusal(db, "live_budget_exhausted_calls", account_role)
+            if self.max_nano is not None and charged + worst_case_nano > self.max_nano:
+                self._capacity_refusal(db, "live_budget_exhausted_usd", account_role)
+            if bucket:
+                bucket_charged = db.execute("""SELECT COALESCE(SUM(r.charged_nano),0) FROM reservations r
+                    JOIN reservation_funding f USING(attempt_id) WHERE f.bucket=? AND r.state!='released'""", (bucket,)).fetchone()[0]
+                if bucket_charged + worst_case_nano > self.bucket_caps[bucket]:
+                    self._capacity_refusal(db, "live_budget_exhausted_" + bucket, account_role)
+            self._funded_gate(db, account_role, worst_case_nano if bucket == "personal" else 0)
             now = _now()
+            if rearm:
+                db.execute("UPDATE reservations SET state='reserved',charged_nano=reserved_nano,updated_at=? WHERE attempt_id=?", (now, attempt_id))
+                db.execute("UPDATE operating_attempts SET deferred=0 WHERE attempt_id=?", (attempt_id,))
+                return
             db.execute("INSERT INTO reservations VALUES(?,?,?,?,'reserved',?,?,0,?,?)",
                        (attempt_id, stage, recipient, request_digest, worst_case_nano, worst_case_nano, now, now))
+            if self.policy is not None:
+                db.execute("INSERT INTO operating_attempts(attempt_id,set_id,stage,request_digest) VALUES(?,?,?,?)",
+                           (attempt_id, set_id, stage, request_digest))
+            if bucket:
+                db.execute("INSERT INTO reservation_funding VALUES(?,?,?)", (attempt_id, account_role, bucket))
+            if self.set_funding:
+                db.execute("INSERT INTO reservation_sets VALUES(?,?,?,?)", (attempt_id, set_id, stage, request_digest))
+
+    def check_send(self, attempt_id: str) -> None:
+        """Recheck the funded window immediately before transport; settlement remains allowed after it closes."""
+        if self.funding is None:
+            return
+        with self._tx() as db:
+            self._bind_ceilings(db)
+            if db.execute("SELECT state FROM reservations WHERE attempt_id=?", (attempt_id,)).fetchone() != ("reserved",):
+                raise BudgetError("live_budget_attempt_duplicate")
+            self._check_deadline(db)
+            if self.set_funding:
+                set_row = db.execute("SELECT set_id FROM reservation_sets WHERE attempt_id=?", (attempt_id,)).fetchone()
+                if set_row is None:
+                    raise BudgetError("live_set_not_admitted")
+                self._check_set(db, set_row[0])
+            role = db.execute("SELECT account_role FROM reservation_funding WHERE attempt_id=?", (attempt_id,)).fetchone()[0]
+            charged, calls = db.execute("SELECT COALESCE(SUM(charged_nano),0),COUNT(*) FROM reservations WHERE state!='released'").fetchone()
+            if calls > self.max_calls:
+                self._capacity_refusal(db, "live_budget_exhausted_calls", role)
+            if charged > self.max_nano:
+                self._capacity_refusal(db, "live_budget_exhausted_usd", role)
+            for name, cap in self.bucket_caps.items():
+                total = db.execute("""SELECT COALESCE(SUM(r.charged_nano),0) FROM reservations r
+                    JOIN reservation_funding f USING(attempt_id) WHERE f.bucket=? AND r.state!='released'""", (name,)).fetchone()[0]
+                if total > cap:
+                    self._capacity_refusal(db, "live_budget_exhausted_" + name, role)
+            self._funded_gate(db, role)
 
     def settle(self, attempt_id: str, actual_nano: int | None) -> int:
         """A response arrived. `actual_nano` replaces the worst case only when the provider reported usable usage; None keeps it.
         Returns the nano-USD now charged for this attempt (an actual above the reservation is recorded, never hidden)."""
         with self._tx() as db:
+            self._bind_funding(db)
+            if actual_nano is not None and (type(actual_nano) is not int or actual_nano < 0):
+                raise BudgetError("live_budget_config_invalid")
             row = db.execute("SELECT state,charged_nano FROM reservations WHERE attempt_id=?", (attempt_id,)).fetchone()
             if row is None or row[0] != "reserved":
                 raise BudgetError("live_budget_unavailable")
@@ -145,14 +642,267 @@ class Budget:
     def release(self, attempt_id: str) -> None:
         """Only for a request that provably never reached the provider (a refusal before send). Charged 0, not counted."""
         with self._tx() as db:
+            if self.policy is not None:
+                row = db.execute("SELECT dispatched FROM operating_attempts WHERE attempt_id=?", (attempt_id,)).fetchone()
+                if row is None or row[0]:
+                    raise BudgetError("operating_release_not_proven_unsent")
+            self._bind_funding(db)
             db.execute("UPDATE reservations SET state='released', charged_nano=0, updated_at=? WHERE attempt_id=? AND state='reserved'",
                        (_now(), attempt_id))
 
     def snapshot(self) -> dict:
         """Totals for diagnostics and the smoke report: no attempt contents."""
-        with self._tx() as db:
+        with self._tx(readonly=self.policy is not None) as db:
             self._bind_ceilings(db)
             charged, calls = db.execute("SELECT COALESCE(SUM(charged_nano),0), COUNT(*) FROM reservations WHERE state!='released'").fetchone()
             ceilings = dict(db.execute("SELECT key,value FROM meta").fetchall())
             states = dict(db.execute("SELECT state, COUNT(*) FROM reservations GROUP BY state").fetchall())
-        return {"chargedUsd": usd(charged), "calls": calls, "maxUsd": usd(ceilings["max_nano"]), "maxCalls": ceilings["max_calls"], "states": states}
+            if self.policy is not None:
+                known, unknown, reserved = db.execute("""SELECT
+                    COALESCE(SUM(CASE WHEN state='settled' AND usage_known=1 THEN charged_nano ELSE 0 END),0),
+                    COALESCE(SUM(CASE WHEN state='settled' AND usage_known=0 THEN charged_nano ELSE 0 END),0),
+                    COALESCE(SUM(CASE WHEN state='reserved' THEN charged_nano ELSE 0 END),0) FROM reservations""").fetchone()
+                control = db.execute("SELECT state,reason,drain_until FROM operating_control").fetchone()
+                sets = db.execute("SELECT COUNT(*),COALESCE(SUM(complete),0) FROM operating_sets").fetchone()
+                return {"mode": MODE, "ledgerId": self.identity["id"], "chargedUsd": usd(charged), "calls": calls,
+                        "maxUsd": None, "maxCalls": None, "remainingUsd": None, "states": states,
+                        "settledKnownUsageUsd": usd(known), "settledUnknownUsageUsd": usd(unknown), "outstandingHoldUsd": usd(reserved),
+                        "control": {"state": control[0], "reason": control[1], "drainUntil": control[2]},
+                        "sets": {"admitted": sets[0], "complete": sets[1]}}
+            result = {"chargedUsd": usd(charged), "calls": calls, "maxUsd": usd(ceilings["max_nano"]),
+                      "maxCalls": ceilings["max_calls"], "states": states}
+            finish = self._finish_authority(db)
+            if finish is not None:
+                result["finishAuthority"] = finish
+            if self.funding:
+                buckets = {}
+                for name in self.bucket_caps:
+                    total, count, actual, reserved, unknown = db.execute("""SELECT COALESCE(SUM(r.charged_nano),0), COUNT(*),
+                        COALESCE(SUM(CASE WHEN r.usage_known=1 THEN r.charged_nano ELSE 0 END),0),
+                        COALESCE(SUM(CASE WHEN r.state='reserved' THEN r.charged_nano ELSE 0 END),0),
+                        COALESCE(SUM(CASE WHEN r.usage_known=0 THEN r.charged_nano ELSE 0 END),0)
+                        FROM reservations r JOIN reservation_funding f USING(attempt_id)
+                        WHERE f.bucket=? AND r.state!='released'""", (name,)).fetchone()
+                    cap = ceilings["bucket_" + name]
+                    buckets[name] = {"maxUsd": usd(cap), "chargedUsd": usd(total), "actualUsd": usd(actual),
+                                     "reservedUsd": usd(reserved), "unknownUsd": usd(unknown),
+                                     "remainingUsd": usd(max(0, cap - total)), "calls": count}
+                result.update(buckets=buckets, fundingPolicyIdentity=digest(self.funding),
+                              verificationBlocked=bool(ceilings.get("verification_blocked", 0)))
+                if self.set_funding:
+                    stop = db.execute("SELECT reason,stopped_at,forced FROM admission_stop").fetchone()
+                    result.update(admitFrom=self.funding["admitFrom"], admitUntil=self.funding["admitUntil"],
+                                  sets=dict(db.execute("SELECT state,COUNT(*) FROM admitted_sets GROUP BY state")),
+                                  stopIntent=None if stop is None else {"reason": stop[0], "stoppedAt": stop[1], "forced": bool(stop[2])})
+                else:
+                    result["notAfter"] = datetime.fromtimestamp(ceilings["not_after_seconds"], timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return result
+
+    def _operating_gate(self, db, *, admission: bool = False, owner: str | None = None, allow_pause: bool = False) -> None:
+        state, drain, current_owner, pid = db.execute("SELECT state,drain_until,owner,owner_pid FROM operating_control").fetchone()
+        if owner is not None and (owner != current_owner or pid != os.getpid()):
+            raise BudgetError("operating_owner_lost")
+        if (self.path.parent / "force-stop.json").exists():
+            raise BudgetError("operating_stopped")
+        now = time.time()
+        lifecycle = self.policy["lifecycle"]
+        if lifecycle["kind"] == "deadline":
+            end = operating_timestamp(lifecycle["until"])
+            if now >= end + (0 if admission else self.policy["drainSeconds"]):
+                raise BudgetError("operating_deadline")
+        if state == "stopped" or (state == "paused" and (admission or not allow_pause)) or (state == "stopping" and (admission or now >= drain)):
+            raise BudgetError("operating_" + state)
+
+    def check_active(self, owner: str) -> None:
+        with self._tx(timeout=0, readonly=True) as db:
+            self._operating_gate(db, owner=owner)
+
+    @contextmanager
+    def lock(self, name: str):
+        """A kernel-held process/thread gate; lock files are part of the initialization identity."""
+        self._check_identity()
+        try:
+            fd = os.open(self.path.parent / name, os.O_RDWR | os.O_NOFOLLOW)
+        except OSError:
+            raise BudgetError("operating_lock_unavailable") from None
+        try:
+            if os.fstat(fd).st_ino != self.identity["locks"][name]:
+                raise BudgetError("operating_lock_replaced")
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise BudgetError("operating_busy") from None
+            yield fd
+        finally:
+            os.close(fd)
+
+    @contextmanager
+    def owner(self):
+        with self.lock("owner.lock"):
+            token = uuid.uuid4().hex
+            with self._tx() as db:
+                db.execute("UPDATE operating_control SET owner=?,owner_pid=?", (token, os.getpid()))
+                db.execute("INSERT INTO operating_history(at,action,reason) VALUES(?,'owner','acquired')", (time.time(),))
+            try:
+                yield token
+            except KeyboardInterrupt:
+                self.control("force-stop", "owner-signal")
+                raise
+            finally:
+                with self._tx() as db:
+                    db.execute("UPDATE operating_control SET owner=NULL,owner_pid=NULL WHERE owner=?", (token,))
+
+    def control(self, action: str, reason: str) -> None:
+        if action not in {"pause", "resume", "stop", "force-stop"} or not isinstance(reason, str) or not 1 <= len(reason) <= 200:
+            raise BudgetError("operating_control_invalid")
+        if action == "force-stop":
+            intent = self.path.parent / "force-stop.json"
+            try:
+                with intent.open("x") as output:
+                    os.chmod(intent, 0o600)
+                    output.write(canonical({"reason": reason, "at": time.time()}))
+                    output.flush()
+                    os.fsync(output.fileno())
+                fd = os.open(self.path.parent, os.O_RDONLY)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+            except FileExistsError:
+                pass
+        with self._tx(timeout=BUSY_SECONDS) as db:
+            state, drain, resume = db.execute("SELECT state,drain_until,resume_state FROM operating_control").fetchone()
+            if state == "stopped" or (action == "resume" and state != "paused") or (state == "stopping" and action == "stop"):
+                raise BudgetError("operating_control_terminal")
+            if action == "pause":
+                target, resume = "paused", resume if state == "paused" else state
+            elif action == "resume":
+                target, resume = resume, None
+            elif action == "stop":
+                target = "paused" if state == "paused" else "stopping"
+                resume = "stopping" if state == "paused" else None
+                drain = time.time() + self.policy["drainSeconds"] if drain is None else drain
+            else:
+                target, resume = "stopped", None
+            db.execute("UPDATE operating_control SET state=?,reason=?,drain_until=?,resume_state=?", (target, reason, drain, resume))
+            db.execute("INSERT INTO operating_history(at,action,reason) VALUES(?,?,?)", (time.time(), action, reason))
+
+    def _fault_pause(self, db, reason: str) -> None:
+        state = db.execute("SELECT state FROM operating_control").fetchone()[0]
+        if state in {"running", "stopping"}:
+            db.execute("UPDATE operating_control SET state='paused',reason=?,resume_state=?", (reason, state))
+            db.execute("INSERT INTO operating_history(at,action,reason) VALUES(?,'pause',?)", (time.time(), reason))
+
+    def defer(self, attempt_id: str, code: str) -> None:
+        with self._tx() as db:
+            row = db.execute("""SELECT r.state,a.dispatched FROM reservations r JOIN operating_attempts a USING(attempt_id)
+                                WHERE attempt_id=?""", (attempt_id,)).fetchone()
+            if code != "operating_paused" or row != ("reserved", 0):
+                raise BudgetError("operating_deferral_not_proven")
+            db.execute("UPDATE reservations SET state='released',charged_nano=0,updated_at=? WHERE attempt_id=?", (_now(), attempt_id))
+            db.execute("UPDATE operating_attempts SET deferred=1 WHERE attempt_id=?", (attempt_id,))
+            db.execute("INSERT INTO operating_deferrals(attempt_id,at,code) VALUES(?,?,?)", (attempt_id, time.time(), code))
+
+    def is_deferred(self, attempt_id: str) -> bool:
+        with self._tx(readonly=True) as db:
+            return db.execute("""SELECT 1 FROM reservations r JOIN operating_attempts a USING(attempt_id)
+                                 WHERE attempt_id=? AND r.state='released' AND a.dispatched=0 AND a.deferred=1""",
+                              (attempt_id,)).fetchone() is not None
+
+    def admit_operating_set(self, set_id: str, pins: dict, allowances: dict, owner: str, *, jobs: tuple[str, ...] = (),
+                            source_context: dict | None = None) -> None:
+        allowances = stage_allowances(allowances)
+        with self._tx() as db:
+            row = db.execute("SELECT pins,allowances FROM operating_sets WHERE id=?", (set_id,)).fetchone()
+            expected = (canonical(pins), canonical(allowances))
+            if row is not None:
+                if row != expected:
+                    raise BudgetError("operating_set_binding_changed")
+                return
+            self._operating_gate(db, admission=True, owner=owner)
+            lifecycle = self.policy["lifecycle"]
+            if lifecycle["kind"] == "frontier" and set_id not in lifecycle["setIds"]:
+                raise BudgetError("operating_frontier_refused")
+            for job in jobs:
+                claim = db.execute("SELECT value FROM operating_bindings WHERE name=?", ("job:" + job,)).fetchone()
+                if claim is not None and claim[0] != canonical(set_id):
+                    raise BudgetError("operating_binding_changed")
+            if source_context is not None:
+                bound = db.execute("SELECT value FROM operating_bindings WHERE name='native-input-context'").fetchone()
+                if bound is not None and bound[0] != canonical(source_context):
+                    raise BudgetError("operating_source_context_changed")
+                db.execute("INSERT OR IGNORE INTO operating_bindings VALUES('native-input-context',?)", (canonical(source_context),))
+            for job in jobs:
+                db.execute("INSERT OR IGNORE INTO operating_bindings VALUES(?,?)", ("job:" + job, canonical(set_id)))
+            db.execute("INSERT INTO operating_sets(id,pins,allowances) VALUES(?,?,?)", (set_id, *expected))
+
+    def complete_set(self, set_id: str) -> None:
+        with self._tx() as db:
+            if db.execute("""SELECT 1 FROM reservations r JOIN operating_attempts a USING(attempt_id)
+                             WHERE a.set_id=? AND r.state='reserved'""", (set_id,)).fetchone():
+                raise BudgetError("operating_unresolved_attempt")
+            db.execute("UPDATE operating_sets SET complete=1 WHERE id=?", (set_id,))
+            lifecycle = self.policy["lifecycle"]
+            completed = {row[0] for row in db.execute("SELECT id FROM operating_sets WHERE complete=1")}
+            if lifecycle["kind"] == "frontier" and completed == set(lifecycle["setIds"]):
+                db.execute("UPDATE operating_control SET state='stopped',reason='frontier-complete'")
+                db.execute("INSERT INTO operating_history(at,action,reason) VALUES(?,'stop','frontier-complete')", (time.time(),))
+
+    def begin_send(self, attempt_id: str, owner: str) -> None:
+        with self._tx() as db:
+            self._operating_gate(db, owner=owner)
+            last = db.execute("SELECT last_send FROM operating_control").fetchone()[0]
+            if time.time() - last < self.policy["minIntervalMilliseconds"] / 1000:
+                raise BudgetError("operating_pacing")
+            changed = db.execute("UPDATE operating_attempts SET dispatched=1 WHERE attempt_id=? AND dispatched=0", (attempt_id,)).rowcount
+            if changed != 1:
+                raise BudgetError("live_budget_attempt_duplicate")
+            db.execute("UPDATE operating_control SET last_send=?", (time.time(),))
+
+    def pacing_delay(self) -> float:
+        with self._tx(readonly=True) as db:
+            last = db.execute("SELECT last_send FROM operating_control").fetchone()[0]
+            return max(0, self.policy["minIntervalMilliseconds"] / 1000 - (time.time() - last))
+
+    def record_response(self, attempt_id: str, receipt: dict, actual_nano: int | None, *, fault: str | None = None) -> None:
+        """Commit raw evidence and exact settlement together, before the native stage can decode it."""
+        with self._tx() as db:
+            row = db.execute("SELECT state,charged_nano FROM reservations WHERE attempt_id=?", (attempt_id,)).fetchone()
+            if row is None or row[0] != "reserved":
+                raise BudgetError("operating_receipt_conflict")
+            charged = row[1] if actual_nano is None else actual_nano
+            db.execute("UPDATE reservations SET state='settled',charged_nano=?,usage_known=?,updated_at=? WHERE attempt_id=?",
+                       (charged, int(actual_nano is not None), _now(), attempt_id))
+            db.execute("UPDATE operating_attempts SET receipt=? WHERE attempt_id=?", (canonical(receipt), attempt_id))
+            status = receipt["http"]["status"]
+            if fault is not None or actual_nano is None or not 200 <= status < 300:
+                reason = fault if fault is not None else ("usage-unresolved" if 200 <= status < 300 else "provider-" + str(status))
+                self._fault_pause(db, reason)
+
+    def receipt(self, attempt_id: str) -> dict | None:
+        with self._tx(readonly=True) as db:
+            row = db.execute("SELECT receipt FROM operating_attempts WHERE attempt_id=?", (attempt_id,)).fetchone()
+            return json.loads(row[0]) if row is not None and row[0] is not None else None
+
+    def bind(self, name: str, value) -> None:
+        with self._tx() as db:
+            row = db.execute("SELECT value FROM operating_bindings WHERE name=?", (name,)).fetchone()
+            if row is not None and row[0] != canonical(value):
+                raise BudgetError("operating_binding_changed")
+            db.execute("INSERT OR IGNORE INTO operating_bindings VALUES(?,?)", (name, canonical(value)))
+
+    def bound(self, name: str):
+        with self._tx(readonly=True) as db:
+            row = db.execute("SELECT value FROM operating_bindings WHERE name=?", (name,)).fetchone()
+            return json.loads(row[0]) if row else None
+
+    def sets(self) -> list[dict]:
+        with self._tx(readonly=True) as db:
+            return [{"id": row[0], "pins": json.loads(row[1]), "complete": bool(row[2])}
+                    for row in db.execute("SELECT id,pins,complete FROM operating_sets ORDER BY rowid")]
+
+    def attempts(self) -> dict[str, dict]:
+        with self._tx(readonly=True, timeout=BUSY_SECONDS) as db:
+            return {row[0]: {"state": row[1], "setId": row[2], "stage": row[3], "dispatched": bool(row[4]), "receipt": row[5] is not None}
+                    for row in db.execute("""SELECT r.attempt_id,r.state,a.set_id,a.stage,a.dispatched,a.receipt
+                                             FROM reservations r JOIN operating_attempts a USING(attempt_id)""")}

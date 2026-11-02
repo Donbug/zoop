@@ -5,7 +5,7 @@ export default function DesktopHeader() {
   return (
     <header className="border-b border-gray-200 bg-white">
       <div className="mx-auto flex h-16 max-w-screen-xl items-center justify-between px-8">
-        <NavLink to="/" className="text-xl font-bold text-gray-950">
+        <NavLink to="/" className="text-title font-bold text-zoop-ink">
           zoop
         </NavLink>
         <nav aria-label="데스크톱 주 메뉴">
@@ -17,8 +17,8 @@ export default function DesktopHeader() {
                   end={menu.to === '/'}
                   className={({ isActive }) =>
                     isActive
-                      ? 'font-semibold text-gray-950'
-                      : 'text-gray-500 hover:text-gray-950'
+                      ? 'font-semibold text-zoop-ink'
+                      : 'text-zoop-ink hover:text-zoop-ink'
                   }
                 >
                   {menu.label}

@@ -146,8 +146,7 @@ class GraphVersionDiffToolTest {
 
     private GraphVersionDiffTool tool() {
         GraphVersionRepository versions = repository();
-        var reader = new PublicGraphReader(new GraphVersionSelector(versions, Clock.fixed(NOW, ZoneOffset.UTC)),
-                new FixtureGraphSnapshotStore(GraphVersionDiffToolTest.class.getClassLoader()), pinned -> exclusions);
+        var reader = new PublicGraphReader(new GraphVersionSelector(versions, Clock.fixed(NOW, ZoneOffset.UTC)), new FixtureGraphSnapshotStore(GraphVersionDiffToolTest.class.getClassLoader()), pinned -> exclusions, null, null);
         ChatEvidenceAccess access = new ChatEvidenceAccess() {
             @Override
             public boolean readable(String id, String version, Instant asOf, String requestId) {

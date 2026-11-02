@@ -126,7 +126,7 @@ export default function MemberManagement() {
           <tbody>
             {members.items.map((row) => (
               <tr key={row.id}>
-                <td className={`${TD} whitespace-nowrap font-inter`}>
+                <td className={`${TD} whitespace-nowrap font-num`}>
                   <Link
                     to={`/admin/members/${encodeURIComponent(row.id)}`}
                     className={LINK}
@@ -140,14 +140,10 @@ export default function MemberManagement() {
                 <td className={`${TD} whitespace-nowrap`}>
                   {signupMethodLabel(row.signupMethod)}
                 </td>
-                <td
-                  className={`${TD} whitespace-nowrap font-inter tabular-nums`}
-                >
+                <td className={`${TD} whitespace-nowrap font-num tabular-nums`}>
                   {formatKst(row.createdAt)}
                 </td>
-                <td
-                  className={`${TD} whitespace-nowrap font-inter tabular-nums`}
-                >
+                <td className={`${TD} whitespace-nowrap font-num tabular-nums`}>
                   {row.lastActiveAt ? formatKst(row.lastActiveAt) : '–'}
                 </td>
                 <td className={NUM}>{count(row.activity.sessions)}</td>

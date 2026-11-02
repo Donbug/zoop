@@ -316,13 +316,13 @@ describe('D-BRF-01/02 available edition selection', () => {
     expect(
       (
         screen.getByRole('button', {
-          name: '☼ 출근 · 미발행',
+          name: '출근 · 미발행',
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
     expect(
-      screen.getByText('출근 브리핑은 발행 이력이 없습니다.'),
-    ).toBeTruthy();
+      screen.queryByText('출근 브리핑은 발행 이력이 없습니다.'),
+    ).toBeNull();
     expect(
       server
         .calls('GET', '/api/v1/briefings')
@@ -350,11 +350,11 @@ describe('D-BRF-01/02 available edition selection', () => {
     await user.selectOptions(select, '2026-10-22');
     expect(currentQuery().get('edition')).toBe('evening');
     expect(
-      (screen.getByRole('button', { name: '☼ 출근' }) as HTMLButtonElement)
+      (screen.getByRole('button', { name: '출근' }) as HTMLButtonElement)
         .disabled,
     ).toBe(false);
     expect(
-      (screen.getByRole('button', { name: '◔ 퇴근' }) as HTMLButtonElement)
+      (screen.getByRole('button', { name: '퇴근' }) as HTMLButtonElement)
         .disabled,
     ).toBe(false);
     await user.selectOptions(select, '2026-10-23');
@@ -362,7 +362,7 @@ describe('D-BRF-01/02 available edition selection', () => {
     expect(
       (
         screen.getByRole('button', {
-          name: '◔ 퇴근 · 미발행',
+          name: '퇴근 · 미발행',
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -406,7 +406,7 @@ describe('D-BRF-01/02 available edition selection', () => {
     await waitFor(() => expect(currentQuery().get('date')).toBe('2026-10-21'));
     expect(currentQuery().get('edition')).toBe('morning');
     expect(
-      (screen.getByRole('button', { name: '☼ 출근' }) as HTMLButtonElement)
+      (screen.getByRole('button', { name: '출근' }) as HTMLButtonElement)
         .disabled,
     ).toBe(false);
     expect(
@@ -440,7 +440,7 @@ describe('D-BRF-01/02 available edition selection', () => {
       ),
     ).toBeTruthy();
     expect(
-      (screen.getByRole('button', { name: '☼ 출근' }) as HTMLButtonElement)
+      (screen.getByRole('button', { name: '출근' }) as HTMLButtonElement)
         .disabled,
     ).toBe(false);
     expect(
@@ -471,7 +471,7 @@ describe('D-BRF-01/02 available edition selection', () => {
     await user.selectOptions(select, '2026-10-22');
     expect(currentQuery().get('edition')).toBe('evening');
     const stopped = screen.getByRole('button', {
-      name: '☼ 출근 · 중단',
+      name: '출근 · 중단',
     }) as HTMLButtonElement;
     expect(stopped.disabled).toBe(false);
     expect(
@@ -508,7 +508,7 @@ describe('D-BRF-01/02 available edition selection', () => {
     expect(
       (
         screen.getByRole('button', {
-          name: '◔ 퇴근 · 중단',
+          name: '퇴근 · 중단',
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(false);
@@ -526,7 +526,7 @@ describe('D-BRF-01/02 available edition selection', () => {
     expect(currentQuery().get('edition')).toBe('morning');
     expect(screen.queryByText(/브리핑은 발행 이력이 없습니다/)).toBeNull();
     expect(
-      (screen.getByRole('button', { name: '◔ 퇴근' }) as HTMLButtonElement)
+      (screen.getByRole('button', { name: '퇴근' }) as HTMLButtonElement)
         .disabled,
     ).toBe(false);
   });
@@ -576,7 +576,7 @@ describe('D-BRF-01/02 available edition selection', () => {
       <BriefingPage />,
     );
     const absent = (await screen.findByRole('button', {
-      name: '◔ 퇴근 · 미발행',
+      name: '퇴근 · 미발행',
     })) as HTMLButtonElement;
     await user.click(screen.getByRole('button', { name: '이전 회차 더 보기' }));
     expect(absent.disabled).toBe(true);
@@ -594,21 +594,18 @@ describe('D-BRF-01/02 available edition selection', () => {
       json({ items: fourRounds, nextCursor: null }),
     );
     renderAt('/briefing?date=2026-10-24&edition=morning', <BriefingPage />);
-    await screen.findByText(
-      '출근 브리핑은 발행 이력이 없습니다. 퇴근 브리핑은 발행 이력이 없습니다.',
-    );
     expect(
       (
-        screen.getByRole('button', {
-          name: '☼ 출근 · 미발행',
-        }) as HTMLButtonElement
+        (await screen.findByRole('button', {
+          name: '출근 · 미발행',
+        })) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
     expect(
       (
-        screen.getByRole('button', {
-          name: '◔ 퇴근 · 미발행',
-        }) as HTMLButtonElement
+        (await screen.findByRole('button', {
+          name: '퇴근 · 미발행',
+        })) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
     expect(

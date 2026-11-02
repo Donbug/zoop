@@ -437,6 +437,19 @@ class ChatPlannerTest {
     }
 
     @Test
+    void approvedHelpAndScreenGuidesAreSeparateFixedReadsWithoutAGraph() {
+        Set<String> bound = Set.of("help.search", "screenSpec.read");
+        var plan = run(planner.plan(run(0, null, List.of("iss-selected")), decision(req("r1",
+                Map.of(ChatQueryType.Q01, 0.9), Map.of("help.search", 0.9, "screenSpec.read", 0.8))), bound));
+        var r1 = plan.requirements().getFirst();
+
+        assertEquals(List.of(ChatCapability.HELP_SEARCH, ChatCapability.SCREEN_SPEC_READ), r1.capabilities());
+        assertEquals(ChatPlan.TargetSource.SERVER, r1.targetSource());
+        assertTrue(r1.targets().isEmpty());
+        assertEquals(2, ChatPlanner.worstCaseCalls(plan), "each approved guide is one fixed-document read");
+    }
+
+    @Test
     void aPolicyReadAlongsideAGraphLookupStillNeedsTheGraph() {
         Set<String> bound = Set.of("company.read", "zoopPolicy.read");
         assertStop("guidance", "graph_unavailable", planner.plan(run(0, null), decision(
@@ -552,6 +565,18 @@ class ChatPlannerTest {
         var stop = assertInstanceOf(ChatPlan.Stop.class, plan, plan.toString());
         assertEquals(outcome, stop.outcome());
         assertEquals(reason, stop.reason());
+    }
+
+    @Test
+    void anIssueABriefingQuestionNamesReadsItsEvidenceAndARoundAloneDoesNot() {
+        Set<String> bound = Set.of("briefing.read", "briefing.evidence");
+        var named = run(new ChatPlanner().plan(run(0, "v1"), decision(req("r1", Map.of(ChatQueryType.Q06, 0.9),
+                Map.of("briefing.read", 0.9), List.of("iss-1"))), bound)).requirements().getFirst();
+        assertEquals(List.of(ChatCapability.BRIEFING_EVIDENCE, ChatCapability.BRIEFING_READ), named.capabilities());
+
+        var round = run(new ChatPlanner().plan(run(0, "v1"), decision(req("r1", Map.of(ChatQueryType.Q06, 0.9),
+                Map.of("briefing.read", 0.9))), bound)).requirements().getFirst();
+        assertEquals(List.of(ChatCapability.BRIEFING_READ), round.capabilities());
     }
 
     static Req req(String id, Map<ChatQueryType, Double> types, Map<String, Double> capabilities) {

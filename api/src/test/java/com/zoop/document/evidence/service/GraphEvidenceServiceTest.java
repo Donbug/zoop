@@ -24,6 +24,9 @@ import com.zoop.document.evidence.graph.GraphEvidenceReader;
 import com.zoop.document.evidence.repository.EvidenceView;
 import com.zoop.document.repository.ArtifactRow;
 import com.zoop.document.repository.VersionRow;
+import com.zoop.graph.importer.LegacyRealPackage;
+import com.zoop.graph.publication.GraphPublicationAuthority;
+import com.zoop.graph.snapshot.ArtifactGraphSnapshotStore;
 import com.zoop.graph.read.DisclosureExclusions;
 import com.zoop.graph.read.GraphEvidenceSnapshotReader;
 import com.zoop.graph.read.PublicGraphReader;
@@ -77,8 +80,31 @@ class GraphEvidenceServiceTest {
     /** When set, the REAL pinned reader answers instead of the stub {@link #found}. */
     private GraphEvidenceReader realPort;
 
+    @Test
+    void legacyReceiptRequiresPinnedV2ManifestAndBundle() {
+        ObjectNode receipt = StrictJson.newObject();
+        receipt.put("schemaVersion", LegacyRealPackage.RECEIPT_SCHEMA);
+        ObjectNode manifest = receipt.putObject("manifest");
+        manifest.put("schemaVersion", LegacyRealPackage.MANIFEST_SCHEMA); manifest.put("bundleDigest", "a".repeat(64));
+        ObjectNode bundle = receipt.putObject("bundle");
+        bundle.put("schemaVersion", LegacyRealPackage.BUNDLE_SCHEMA);
+        bundle.put("provenanceKind", "legacy-real"); bundle.put("sourceSystem", "investmate-poc-bff");
+        for (String field : List.of("issues", "relations", "companies", "articles", "evidence")) bundle.putArray(field);
+        bundle.putObject("evidenceIdMap");
+        receipt.putObject("legacyProvenance"); receipt.putObject("appVerification");
+        receipt.put("bundleDigest", "a".repeat(64)); receipt.put("contentDigest", Canonical.digest(bundle));
+        String digest = Canonical.digest(manifest), migration = "legacy-real:" + digest;
+        receipt.put("manifestDigest", digest); receipt.put("migrationId", migration);
+        assertEquals(bundle, GraphReceiptGrants.bundle(Canonical.bytes(receipt), "gv-" + Canonical.sha256(migration)).node());
+        manifest.put("schemaVersion", "zoop-legacy-real-manifest-1");
+        digest = Canonical.digest(manifest); migration = "legacy-real:" + digest;
+        receipt.put("manifestDigest", digest); receipt.put("migrationId", migration);
+        String graphVersion = "gv-" + Canonical.sha256(migration);
+        assertThrows(GraphReceiptGrants.Malformed.class, () -> GraphReceiptGrants.bundle(Canonical.bytes(receipt), graphVersion));
+    }
+
     private void setUp() throws IOException {
-        world = new EvidenceWorld(temp);
+        world = new EvidenceWorld(temp, Instant.parse("2026-10-01T00:00:00Z"));
         sources = world.directory.resolve("sources.json");
         found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF,
                 new GraphEvidence.Span(ARTICLE, VERSION, (int) EvidenceWorld.START, (int) EvidenceWorld.END), List.of("iss-1", "iss-2"),
@@ -88,6 +114,7 @@ class GraphEvidenceServiceTest {
         world.read.evidence.put(EVIDENCE_ID, new EvidenceView(EVIDENCE_ID, ARTICLE, VERSION, TEXT, QUOTE, EvidenceWorld.START,
                 EvidenceWorld.END, "body", Boolean.TRUE, EARLIER_RECEIPT));
         writeReceipt(receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION)));
+        world.registerGraph(stackSnapshot(), stackSnapshot());
         writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, true, "known", List.of("read", "store", "quote-display"),
                 "operator-owned authored synthetic fixtures", null));
     }
@@ -134,16 +161,12 @@ class GraphEvidenceServiceTest {
         ObjectNode root = StrictJson.newObject();
         root.put("schemaVersion", GraphReceiptGrants.SCHEMA);
         root.put("handoffId", HANDOFF);
-        root.put("manifestDigest", "m".repeat(64));
         ObjectNode bundle = root.putObject("bundle");
         ArrayNode articles = bundle.putArray("articles");
-        ObjectNode other = articles.addObject();
-        other.put("articleId", "art-other");
-        other.put("articleVersion", VERSION);
-        other.putArray("observations").add(pins("someone-else", "other-grant", "other-rev"));
         ObjectNode article = articles.addObject();
         article.put("articleId", ARTICLE);
         article.put("articleVersion", VERSION);
+        article.put("textSha256", EvidenceWorld.TEXT_SHA);
         ArrayNode list = article.putArray("observations");
         for (ObjectNode observation : observations) {
             list.add(observation);
@@ -403,28 +426,33 @@ class GraphEvidenceServiceTest {
     }
 
     @Test
-    void aReceiptThatCannotBeVerifiedOrDoesNotDescribeThisVersionExactlyWithholdsTheEvidence() throws Exception {
+    void anUnverifiableReceiptMakesThePublicationUnavailableWhileInvalidGrantPinsWithholdEvidence() throws Exception {
         setUp();
         byte[] original = Files.readAllBytes(receiptFile());
 
         Files.write(receiptFile(), EvidenceWorld.bytes("{}"));
-        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "bytes differ from the registered hash");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused(), "bytes differ from the registered hash");
         Files.write(receiptFile(), original);
         assertNotNull(get());
 
+        for (Consumer<ObjectNode> edit : List.<Consumer<ObjectNode>>of(
+                n -> n.put("schemaVersion", "zoop-graph-handoff-import-receipt-2"),
+                n -> n.put("handoffId", "handoff-other"), n -> n.remove("bundle"))) {
+            ObjectNode edited = receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION));
+            edit.accept(edited);
+            rewriteRegisteredReceipt(edited);
+            assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused());
+        }
         List<Consumer<ObjectNode>> edits = new ArrayList<>();
-        edits.add(n -> n.put("schemaVersion", "zoop-graph-handoff-import-receipt-2"));
-        edits.add(n -> n.put("handoffId", "handoff-other"));
-        edits.add(n -> n.remove("bundle"));
         edits.add(n -> n.putObject("bundle").putArray("articles"));
         edits.add(n -> ((ArrayNode) n.get("bundle").get("articles")).add(
-                ((ArrayNode) n.get("bundle").get("articles")).get(1).deepCopy()));
-        edits.add(n -> ((ObjectNode) n.get("bundle").get("articles").get(1)).putArray("observations"));
-        edits.add(n -> ((ObjectNode) n.get("bundle").get("articles").get(1).get("observations").get(0).get("grant"))
+                ((ArrayNode) n.get("bundle").get("articles")).get(0).deepCopy()));
+        edits.add(n -> ((ObjectNode) n.get("bundle").get("articles").get(0)).putArray("observations"));
+        edits.add(n -> ((ObjectNode) n.get("bundle").get("articles").get(0).get("observations").get(0).get("grant"))
                 .put("revision", ""));
-        edits.add(n -> ((ObjectNode) n.get("bundle").get("articles").get(1).get("observations").get(0).get("grant"))
+        edits.add(n -> ((ObjectNode) n.get("bundle").get("articles").get(0).get("observations").get(0).get("grant"))
                 .put("revision", 7));
-        edits.add(n -> ((ObjectNode) n.get("bundle").get("articles").get(1).get("observations").get(0)).remove("grant"));
+        edits.add(n -> ((ObjectNode) n.get("bundle").get("articles").get(0).get("observations").get(0)).remove("grant"));
         int index = 0;
         for (Consumer<ObjectNode> edit : edits) {
             ObjectNode edited = receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION));
@@ -434,67 +462,6 @@ class GraphEvidenceServiceTest {
         }
     }
 
-    @Test
-    void theReceiptOfAnEarlierOrTheCurrentBundleSchemaServesTheSameEvidenceBecauseOnlyItsArticlesAreRead() throws Exception {
-        setUp();
-        // A version imported under bundle -1 (issues without mentions), -2 (mentions, no field provenance) or -3 (field provenance,
-        // no operator field verdicts) stays readable: nothing re-verifies the retained bundle, and -4 adds the issue's field verdicts
-        // (and the withheld list of its provenance) beside the same articles.
-        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3",
-                "zoop-graph-handoff-bundle-4", "zoop-graph-handoff-bundle-5", "zoop-graph-handoff-bundle-6")) {
-            ObjectNode edited = receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION));
-            ObjectNode bundle = (ObjectNode) edited.get("bundle");
-            bundle.put("schemaVersion", schema);
-            ObjectNode issue = bundle.putArray("issues").addObject();
-            issue.put("id", "iss-1");
-            if (!schema.endsWith("-1")) {
-                issue.putArray("mentions").addObject().put("verification", "none");
-            }
-            if (schema.endsWith("-3") || schema.endsWith("-4")) {
-                ObjectNode provenance = issue.putObject("fieldProvenance").put("selection", "unanimous").put("verification", "none");
-                if (schema.endsWith("-4")) {
-                    provenance.putArray("withheld").add("eventTime");
-                    ObjectNode verdict = issue.putArray("fieldVerdicts").addObject();
-                    verdict.put("field", "eventTime").put("decision", "REJECT").put("verification", "operator-field-verdict");
-                    verdict.putArray("evidenceIds");
-                }
-            }
-            rewriteRegisteredReceipt(edited);
-            assertNotNull(get(), schema);
-        }
-    }
-
-    @Test
-    void aReceiptOfTheFullBundle4WithApprovalBasesLiveProvenanceAndSourceSupportServesTheSameEvidence() throws Exception {
-        setUp();
-        // The importer's receipt holds the whole bundle: per-source provenance and review approvals (an operator's final approval
-        // beside an automatic verdict), the origin and text digest of every article and the issue's sourceSupport. The evidence
-        // read takes only the article's observation pins from it and must neither need nor trip over any of it.
-        ObjectNode edited = receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION));
-        ObjectNode bundle = (ObjectNode) edited.get("bundle");
-        bundle.put("schemaVersion", "zoop-graph-handoff-bundle-4");
-        bundle.putObject("provenance").put("declaredSourceKind", "synthetic").put("observedSourceKind", "synthetic")
-                .put("executionMode", "live").put("recordingKind", "provider");
-        ObjectNode source = bundle.putArray("sources").addObject();
-        source.putObject("provenance").put("sourceKind", "synthetic").put("executionMode", "live").put("recordingKind", "provider");
-        ArrayNode used = source.putArray("reviewUsed");
-        used.addObject().put("relationCandidateId", "rc-" + "1".repeat(64)).put("revision", 2).putObject("approvalBasis")
-                .put("kind", "automatic-verifier").put("revision", 2).putNull("reviewer").put("decidedAt", "2026-10-21T00:00:00Z");
-        used.addObject().put("relationCandidateId", "rc-" + "2".repeat(64)).put("revision", 3).putObject("approvalBasis")
-                .put("kind", "operator-final-approval").put("revision", 3).put("reviewer", "reviewer-1")
-                .put("decidedAt", "2026-10-21T01:00:00Z");
-        ArrayNode articles = (ArrayNode) bundle.get("articles");
-        ObjectNode article = (ObjectNode) articles.get(1);
-        article.put("textSha256", "a".repeat(64));
-        article.putObject("origin").put("originId", "origin-1").put("reviewer", "reviewer-1").put("decisionRef", "d:1")
-                .put("decisionVersion", "v1").put("verification", "operator-declared-origin");
-        ObjectNode issue = bundle.putArray("issues").addObject();
-        issue.put("id", "iss-1");
-        issue.putObject("sourceSupport").put("articleCount", 1).put("knownLineageCount", 1).put("independentSourceCount", 1)
-                .putArray("unknownLineageArticles");
-        rewriteRegisteredReceipt(edited);
-        assertNotNull(get());
-    }
 
     /** A new receipt file under the same artifact id: registered hash and size follow, so only the content is at fault. */
     private void rewriteRegisteredReceipt(ObjectNode receipt) throws IOException {
@@ -506,7 +473,7 @@ class GraphEvidenceServiceTest {
     }
 
     @Test
-    void aMissingOrWrongKindOfReceiptAndAMissingStoreAreHandledAsDenialOrUnavailable() throws Exception {
+    void aMissingOrWrongKindOfReceiptAndAMissingStoreMakeThePublicationUnavailable() throws Exception {
         setUp();
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE,
                 assertThrows(CustomException.class, () -> world.service(null, sources, null, port())
@@ -520,12 +487,12 @@ class GraphEvidenceServiceTest {
         ArtifactRow row = world.registry.findArtifact("artifact-receipt-" + GRAPH_VERSION).orElseThrow();
         world.registry.replaceArtifact(new ArtifactRow(row.id(), "exact_receipt", row.storageUri(), row.sha256(), row.bytes(),
                 row.mediaType(), row.createdAt()));
-        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "wrong kind");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused(), "wrong kind");
         world.registry.replaceArtifact(new ArtifactRow(row.id(), row.kind(), row.storageUri(), row.sha256(), row.bytes(),
                 "text/plain", row.createdAt()));
-        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "wrong media type");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused(), "wrong media type");
         world.registry.removeArtifact(row.id());
-        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "no receipt registered for the selected version");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused(), "no receipt registered for the selected version");
     }
 
     @Test
@@ -872,12 +839,12 @@ class GraphEvidenceServiceTest {
     }
 
     @Test
-    void aTamperedOrUnreadableReceiptKeepsItsDenialOrUnavailableStatusForABasisOnlySpan() throws Exception {
+    void aTamperedOrUnreadableReceiptMakesABasisOnlyPublicationUnavailable() throws Exception {
         basisOnly();
         byte[] original = Files.readAllBytes(receiptFile());
 
         Files.write(receiptFile(), EvidenceWorld.bytes("{}"));
-        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "bytes differ from the registered hash and size");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused(), "bytes differ from the registered hash and size");
         Files.write(receiptFile(), original);
         assertNotNull(get());
 
@@ -896,7 +863,7 @@ class GraphEvidenceServiceTest {
         other.put("handoffId", "handoff-other");
         rewriteRegisteredReceipt(other);
 
-        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused());
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused());
     }
 
     @Test
@@ -957,9 +924,10 @@ class GraphEvidenceServiceTest {
     private static final String AFTER_VERIFICATION = "2026-10-13T00:00:00Z";
 
     /** The version is the one active pointer from {@link #ACTIVATED} on, and the only one ever activated. */
-    private static final class OneVersion implements GraphVersionRepository {
-        private final GraphVersionRecord record = new GraphVersionRecord(GRAPH_VERSION, 1, "snapshot", "artifact-" + GRAPH_VERSION,
-                "artifact-root:graph_snapshot/" + GRAPH_VERSION + ".json", "c".repeat(64), true);
+    private final class OneVersion implements GraphVersionRepository {
+        private final ArtifactRow artifact = world.registry.findArtifact("artifact-" + GRAPH_VERSION).orElseThrow();
+        private final GraphVersionRecord record = new GraphVersionRecord(GRAPH_VERSION, 1, "snapshot", artifact.id(),
+                artifact.storageUri(), artifact.sha256(), true);
 
         @Override
         public Optional<GraphVersionRecord> find(String versionId) {
@@ -1000,7 +968,7 @@ class GraphEvidenceServiceTest {
                         new PublicGraphSnapshot.Relation(RELATION, BASIS_TYPE, "iss-1", "KRX:B", null, null, List.of(DIRECT_ID),
                                 List.of(new PublicGraphSnapshot.Basis(BASIS_KEY, "SUPPLIES", "2026-10-12T00:00:00Z", null, null, List.of("KR"),
                                         List.of(new PublicGraphSnapshot.ArticleRef(ARTICLE, VERSION)))))),
-                List.of(new PublicGraphSnapshot.Article(ARTICLE, VERSION, "제목", "https://example.invalid/1", "2026-10-01T00:00:00Z")),
+                List.of(new PublicGraphSnapshot.Article(ARTICLE, VERSION, "제목", "https://example.invalid/a", "2026-10-01T00:00:00Z")),
                 List.of(new PublicGraphSnapshot.Evidence(DIRECT_ID, ARTICLE, VERSION, (int) EvidenceWorld.START, (int) EvidenceWorld.END),
                         new PublicGraphSnapshot.Evidence(EVIDENCE_ID, ARTICLE, VERSION, (int) EvidenceWorld.START, (int) EvidenceWorld.END)));
     }
@@ -1010,12 +978,25 @@ class GraphEvidenceServiceTest {
     }
 
     private void realReader(java.util.function.Supplier<DisclosureExclusions> exclusions, PublicGraphSnapshot snapshot) throws IOException {
+        realReader(exclusions, snapshot, snapshot, List.of());
+    }
+
+    private void realReader(java.util.function.Supplier<DisclosureExclusions> exclusions, PublicGraphSnapshot snapshot,
+            PublicGraphSnapshot projection, List<com.zoop.graph.importer.GraphHandoffRepository.RuleRow> rules) throws IOException {
         basisOnly();
-        realPort = new GraphEvidenceSnapshotReader(new PublicGraphReader(
-                new GraphVersionSelector(new OneVersion(), java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)), version -> snapshot,
-                pinned -> exclusions.get()));
+        world.registerGraph(snapshot, projection, rules);
+        realPort = new GraphEvidenceSnapshotReader(publicReader(
+                new GraphVersionSelector(new OneVersion(), java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)), exclusions));
         world.read.evidence.put(DIRECT_ID, new EvidenceView(DIRECT_ID, ARTICLE, VERSION, TEXT, QUOTE, EvidenceWorld.START,
                 EvidenceWorld.END, "body", Boolean.TRUE, EARLIER_RECEIPT));
+    }
+
+    private PublicGraphReader publicReader(GraphVersionSelector selector,
+            java.util.function.Supplier<DisclosureExclusions> exclusions) {
+        return new PublicGraphReader(selector, new ArtifactGraphSnapshotStore(world.store, world.registry, null),
+                pinned -> exclusions.get(), world.publications(world.store),
+                new GraphPublicationAuthority(world.registry, new DocumentReadSources(sources), pinned -> exclusions.get(),
+                        java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)));
     }
 
     private ErrorCode outcome(String evidenceId, String graphVersion, String asOf) {
@@ -1101,8 +1082,8 @@ class GraphEvidenceServiceTest {
 
         byte[] original = Files.readAllBytes(receiptFile());
         Files.write(receiptFile(), EvidenceWorld.bytes("{}"));
-        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "a tampered receipt");
-        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(DIRECT_ID, null, null));
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "a tampered receipt");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, outcome(DIRECT_ID, null, null));
         Files.write(receiptFile(), original);
         assertNull(outcome(EVIDENCE_ID, null, null), "restored");
     }
@@ -1473,7 +1454,7 @@ class GraphEvidenceServiceTest {
 
         byte[] original = Files.readAllBytes(receiptFile());
         Files.write(receiptFile(), EvidenceWorld.bytes("{}"));
-        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "tampered receipt bytes");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused(), "tampered receipt bytes");
         Files.write(receiptFile(), original);
         assertNotNull(get(), "restored");
         Files.setPosixFilePermissions(receiptFile(), PosixFilePermissions.fromString("rw-r--r--"));
@@ -1483,7 +1464,7 @@ class GraphEvidenceServiceTest {
         ObjectNode other = verifiedReceipt();
         other.put("handoffId", "handoff-other");
         rewriteRegisteredReceipt(other);
-        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "the receipt of another graph version never proves an impact quote");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused(), "the receipt of another graph version never proves an impact quote");
     }
 
     // ---- the real pinned reader: impact-only quote end to end through the service ------------------------------------------------
@@ -1557,7 +1538,7 @@ class GraphEvidenceServiceTest {
 
         byte[] original = Files.readAllBytes(receiptFile());
         Files.write(receiptFile(), EvidenceWorld.bytes("{}"));
-        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "tampered receipt bytes");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "tampered receipt bytes");
         Files.write(receiptFile(), original);
         assertNull(outcome(EVIDENCE_ID, null, null), "restored");
     }
@@ -1583,9 +1564,9 @@ class GraphEvidenceServiceTest {
         realImpactReader(exclusions);
         var basis = new com.zoop.graph.version.BriefingGraphLookup.Basis("brf-1", GRAPH_VERSION, cutoff,
                 Map.of("iss-1", List.of("KRX:A")));
-        realPort = new GraphEvidenceSnapshotReader(new PublicGraphReader(
+        realPort = new GraphEvidenceSnapshotReader(publicReader(
                 new GraphVersionSelector(new OneVersion(), java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC),
-                        (round, request) -> basis), version -> stackSnapshot(), pinned -> exclusions.get()));
+                        (round, request) -> basis), exclusions));
     }
 
     private EvidenceResponse getRound() {
@@ -1640,8 +1621,8 @@ class GraphEvidenceServiceTest {
         rewriteRegisteredReceipt(verifiedReceipt());
         writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, true, "known", List.of("read", "store", "quote-display"),
                 "e", "2026-10-14T00:00:00Z"));
-        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, assertThrows(CustomException.class, this::getRound).getErrorCode(),
-                "the source was valid at the round cutoff but expired before the request");
+        assertEquals(ErrorCode.VERSION_UNAVAILABLE, assertThrows(CustomException.class, this::getRound).getErrorCode(),
+                "current rights removed the round's required headline source");
         writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, true, "known", List.of("read", "store", "quote-display"),
                 "e", null));
         assertNotNull(getRound());
@@ -1817,6 +1798,10 @@ class GraphEvidenceServiceTest {
                 relations, stack.articles(), stack.evidence());
     }
 
+    private static final com.zoop.graph.importer.GraphHandoffRepository.RuleRow FORECAST_RULE =
+            new com.zoop.graph.importer.GraphHandoffRepository.RuleRow("speculative-issue@1",
+                    "{\"kind\":\"assertion_status\",\"hide\":[\"forecast\"]}");
+
     /** What the importer stores for that snapshot with {@code speculative-issue@1} enabled. */
     private static PublicGraphSnapshot ruleApplied(boolean structural, boolean involves) {
         PublicationRuleEvaluator.Outcome outcome = PublicationRuleEvaluator.apply(withForecastIssue(structural, involves),
@@ -1847,9 +1832,10 @@ class GraphEvidenceServiceTest {
         assertFalse(located.impactRefs().isEmpty(), "an impact candidate on the same article version");
 
         // The same world and receipt, now pinned to what the importer stores with the rule on.
-        realPort = new GraphEvidenceSnapshotReader(new PublicGraphReader(
-                new GraphVersionSelector(new OneVersion(), java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)), version -> filtered,
-                pinned -> DisclosureExclusions.NONE));
+        world.registerGraph(filtered, withForecastIssue(true, true), List.of(FORECAST_RULE));
+        realPort = new GraphEvidenceSnapshotReader(publicReader(
+                new GraphVersionSelector(new OneVersion(), java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
+                () -> DisclosureExclusions.NONE));
         assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null),
                 "a candidate the receipt does not prove is never served once its own relation is hidden");
         assertNull(outcome(DIRECT_ID, null, null), "the visible issue's own evidence is untouched by the rule");
@@ -1867,7 +1853,7 @@ class GraphEvidenceServiceTest {
         assertFalse(located.basisRefs().isEmpty());
         assertEquals(List.of(), located.impactRefs(), "no visible INVOLVES edge cites the article version");
 
-        realReader(() -> DisclosureExclusions.NONE, filtered);
+        realReader(() -> DisclosureExclusions.NONE, filtered, withForecastIssue(true, false), List.of(FORECAST_RULE));
         rewriteRegisteredReceipt(receiptProvingNothing());
         assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null));
         rewriteRegisteredReceipt(verifiedReceipt());
@@ -1884,7 +1870,7 @@ class GraphEvidenceServiceTest {
         assertEquals(List.of(), located.basisRefs(), "no visible structural edge has a basis on the article version");
         assertFalse(located.impactRefs().isEmpty());
 
-        realReader(() -> DisclosureExclusions.NONE, filtered);
+        realReader(() -> DisclosureExclusions.NONE, filtered, withForecastIssue(false, true), List.of(FORECAST_RULE));
         rewriteRegisteredReceipt(receiptProvingNothing());
         assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null));
         rewriteRegisteredReceipt(basisReceipt());

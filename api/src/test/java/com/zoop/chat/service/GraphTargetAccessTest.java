@@ -66,8 +66,7 @@ class GraphTargetAccessTest {
     }
 
     private PublicGraphReader reader(GraphVersionRepository repository) {
-        return new PublicGraphReader(new GraphVersionSelector(repository, Clock.fixed(NOW, ZoneOffset.UTC)),
-                new FixtureGraphSnapshotStore(GraphTargetAccessTest.class.getClassLoader()), pinned -> exclusions);
+        return new PublicGraphReader(new GraphVersionSelector(repository, Clock.fixed(NOW, ZoneOffset.UTC)), new FixtureGraphSnapshotStore(GraphTargetAccessTest.class.getClassLoader()), pinned -> exclusions, null, null);
     }
 
     private static GraphVersionRepository repository() {

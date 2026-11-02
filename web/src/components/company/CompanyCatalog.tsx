@@ -1,3 +1,4 @@
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { useCompanyResource, type Resource } from '@/hooks/useCompanyResource';
@@ -140,7 +141,7 @@ export default function CompanyCatalog({
     );
   }
   const heading =
-    'mb-2! block font-mono text-[11px]! font-normal! tracking-[0.12em] text-zoop-muted';
+    'mb-2! block font-mono text-caption! font-normal! tracking-[0.12em] text-zoop-muted';
   const holdingIds = portfolio.data?.connected
     ? portfolio.data.holdings.map((h) => h.companyId)
     : [];
@@ -166,7 +167,7 @@ export default function CompanyCatalog({
       >
         <label
           htmlFor="company-search"
-          className="mb-1.5 block text-[11px] text-zoop-muted"
+          className="mb-1.5 block text-caption text-zoop-muted"
         >
           기업 검색
         </label>
@@ -177,9 +178,9 @@ export default function CompanyCatalog({
             placeholder="종목명"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            className="min-w-0 flex-1 text-[11px]"
+            className="min-w-0 flex-1 text-caption"
           />
-          <button className="shrink-0 bg-zoop-ink! px-2! text-[11px]! text-white">
+          <button className="shrink-0 bg-zoop-ink! px-2! text-caption! text-white">
             검색
           </button>
         </div>
@@ -188,7 +189,7 @@ export default function CompanyCatalog({
         <section aria-label="기업 검색 결과">
           <h2 className={heading}>SEARCH · 검색 결과</h2>
           {list.loading ? (
-            <p role="status">검색 중…</p>
+            <LoadingIndicator label="검색 중" className="flex min-h-9 w-full" />
           ) : list.error ? (
             <p role="alert">
               검색 실패 <button onClick={list.retry}>다시 시도</button>
@@ -211,7 +212,10 @@ export default function CompanyCatalog({
         {!member ? (
           <p>로그인 후 확인할 수 있어요.</p>
         ) : portfolio.loading ? (
-          <p role="status">보유 기업 확인 중…</p>
+          <LoadingIndicator
+            label="보유 기업 확인 중"
+            className="flex min-h-9 w-full"
+          />
         ) : portfolio.error ? (
           <p role="alert">
             보유 조회 실패 <button onClick={portfolio.retry}>다시 시도</button>
@@ -227,7 +231,10 @@ export default function CompanyCatalog({
         {!member ? (
           <p>로그인 후 확인할 수 있어요.</p>
         ) : settings.status === 'loading' ? (
-          <p role="status">관심 기업 확인 중…</p>
+          <LoadingIndicator
+            label="관심 기업 확인 중"
+            className="flex min-h-9 w-full"
+          />
         ) : settings.status === 'error' ? (
           <p role="alert">
             관심 조회 실패 <button onClick={settings.reload}>다시 시도</button>
@@ -245,7 +252,10 @@ export default function CompanyCatalog({
       <section aria-label="연결된 기업">
         <h2 className={heading}>LINKED · 연결된 기업</h2>
         {graphResource?.loading ? (
-          <p role="status">연결 기업 확인 중…</p>
+          <LoadingIndicator
+            label="연결 기업 확인 중"
+            className="flex min-h-9 w-full"
+          />
         ) : graphResource?.error ? (
           <p role="alert">
             연결 기업 조회 실패{' '}

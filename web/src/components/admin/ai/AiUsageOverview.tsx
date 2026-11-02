@@ -138,8 +138,13 @@ export default function AiUsageOverview() {
           />
         }
       />
+      <p className="text-xs text-zoop-muted">
+        날짜별 그래프는 영수증이 남아 있는 호출만 표시합니다. 과거 기록이 일부
+        누락된 경우 전체 사용량과 구분하며, 시작 시각이 없는 과거 영수증은 종료
+        시각(KST)으로 묶습니다.
+      </p>
       {usage.refreshError && (
-        <p role="status" className="text-[11px] text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}
@@ -187,20 +192,20 @@ export default function AiUsageOverview() {
               <Empty>{NOT_PROVIDED}</Empty>
             )}
           </Section>
-          <Section title={`${viewLabel} 날짜별 토큰 사용량`}>
+          <Section title={`${viewLabel} 기록된 날짜별 토큰 사용량`}>
             {days ? (
               <DailyTokenChart
-                title={`${viewLabel} 날짜별 토큰 사용량`}
+                title={`${viewLabel} 기록된 날짜별 토큰 사용량`}
                 days={days}
               />
             ) : (
               <Empty>{NOT_PROVIDED}</Empty>
             )}
           </Section>
-          <Section title={`${viewLabel} 날짜별 AI 비용`}>
+          <Section title={`${viewLabel} 기록된 날짜별 AI 비용`}>
             {days ? (
               <DailyCostChart
-                title={`${viewLabel} 날짜별 AI 비용`}
+                title={`${viewLabel} 기록된 날짜별 AI 비용`}
                 days={days}
                 currency={data.cost.currency}
               />
@@ -285,7 +290,7 @@ export default function AiUsageOverview() {
             ) && (
               <ul
                 aria-label="집계 참고"
-                className="flex flex-col gap-1 text-[11px] leading-relaxed text-zoop-muted"
+                className="flex flex-col gap-1 text-caption leading-relaxed text-zoop-muted"
               >
                 {features
                   .filter(
@@ -324,16 +329,14 @@ export default function AiUsageOverview() {
                   {errors.map((error, index) => (
                     <tr key={`${error.feature.feature}-${error.at}-${index}`}>
                       <td
-                        className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                        className={`${TD} whitespace-nowrap font-num tabular-nums`}
                       >
                         {formatKst(error.at)}
                       </td>
                       <td className={`${TD} whitespace-nowrap`}>
                         {error.feature.label}
                       </td>
-                      <td className={`${TD} font-inter`}>
-                        {error.code ?? '–'}
-                      </td>
+                      <td className={`${TD} font-num`}>{error.code ?? '–'}</td>
                       <td className={TD}>{error.message ?? '–'}</td>
                     </tr>
                   ))}

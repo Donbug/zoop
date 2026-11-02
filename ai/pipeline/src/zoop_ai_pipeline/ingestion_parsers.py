@@ -224,7 +224,34 @@ def _pdf(raw: bytes) -> dict:
     return output
 
 
-def prepare(raw: bytes, media_type: str, xpath: str | None) -> dict:
+def _markdown(raw: bytes, *, official: bool = False) -> dict:
+    """Exact retained UTF-8 Markdown coordinates, never DOM or original HTTP byte spans."""
+    try:
+        text = raw.decode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise IngestionFailure("markdown_extraction_failed") from exc
+    if not text.strip():
+        raise IngestionFailure("no_usable_body")
+    if len(text) > MAX_TEXT:
+        raise IngestionFailure("text_output_limit")
+    representation = "official-derived-utf8-text-1" if official else "markdown-utf8-exact-1"
+    limitations = (["exact Unicode coordinates in the separately retained official derived body artifact",
+                    "original container/member/XPath coordinates remain in the pinned extraction envelope, not these citation offsets"]
+                   if official else ["exact retained Markdown Unicode code points including syntax; not original HTML or byte coordinates",
+                                     "provider extraction is a new representation; original HTML spans are unavailable"])
+    return {"text": text, "sources": [{"representation": representation, "text": text}],
+            "segments": [{"cleanStart": 0, "cleanEnd": len(text), "sourceIndex": 0, "sourceStart": 0, "sourceEnd": len(text)}],
+            "runs": [{"start": 0, "end": len(text)}],
+            "limitations": limitations}
+
+
+def prepare(raw: bytes, media_type: str, xpath: str | None, *, retained_schema: str | None = None) -> dict:
     if len(raw) > MAX_RAW:
         raise IngestionFailure("raw_byte_limit")
-    return _html(raw, xpath) if media_type == "text/html" else _pdf(raw)
+    if media_type == "text/markdown":
+        return _markdown(raw, official=retained_schema == "zoop-official-source-record-1")
+    if media_type == "text/html":
+        return _html(raw, xpath)
+    if media_type == "application/pdf":
+        return _pdf(raw)
+    raise IngestionFailure("media_type_unsupported")

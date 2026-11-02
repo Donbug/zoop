@@ -9,9 +9,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The operator's S2-1 source registry ({@code zoop-ingestion-s2-1}) as the graph evidence read sees it: the same file the handoff
- * import checks, read fresh on every call and never cached. Unset, unreadable or invalid is {@code SOURCE_UNAVAILABLE} (503),
- * never an open or empty registry. The log line carries the failure code only: no path, no registry content.
+ * The operator's S2-1 registry or exact-tuple local authority set as graph evidence reads it. Current leaves are read fresh
+ * for every decision. Unset, unreadable or invalid authority is {@code SOURCE_UNAVAILABLE} (503).
+ * The log line carries the failure code only: no path, no registry content.
  */
 public final class DocumentReadSources {
     private static final Logger log = LoggerFactory.getLogger(DocumentReadSources.class);

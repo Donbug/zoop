@@ -14,7 +14,7 @@ public record ChatStageReply(String invocationId, String stage, boolean succeede
     /** {@code sent}: a request left the AI runtime. {@code unknown}: sent and its fate is unknown; never send it again. */
     public record Failure(String code, boolean sent, boolean unknown) { }
 
-    /** Who received the request and what they reported; token counts are null when not reported. */
+    /** Who received the request and what they reported; token counts are null when not reported. {@code outputTokens} includes {@code reasoningTokens}. */
     public record Receipt(String provider, String providerRevision, String model, String promptVersion, String executionMode,
-            Long inputTokens, Long outputTokens, Instant sentAt, Instant receivedAt) { }
+            Long inputTokens, Long outputTokens, Long reasoningTokens, Instant sentAt, Instant receivedAt) { }
 }

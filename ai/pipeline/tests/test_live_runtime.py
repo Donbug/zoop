@@ -17,7 +17,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from tests.live_support import (JEV_KEY, OPENAI_KEY, PAYLOADS, SECRETS, Fake, article, environment, extract_payload, jev_reply, json_response,
+from tests.live_support import (JEV_KEY, OPENAI_KEY, PAYLOADS, SECRETS, Fake, article, article_source, environment, extract_payload, jev_reply, json_response,
                                 no_authorization, openai_reply, verify_relation_payload)
 from zoop_ai_pipeline import live_runtime as live
 from zoop_ai_pipeline.live_budget import Budget, nano_from_usd
@@ -195,7 +195,7 @@ def test_unsupported_stages_unbuildable_payloads_and_oversize_requests_are_refus
         assert failure(lambda: rt.prepare(stage, {})).code == "live_payload_invalid" and failure(lambda: rt.prepare(stage, [])).code == "live_payload_invalid"
     huge_article = article("가" * 100_000)  # 300 kB of UTF-8, over the request cap
     huge = extract_payload()
-    huge.update(article=huge_article.model_dump(mode="json"), article_version=huge_article.version)
+    huge.update(article=huge_article.model_dump(mode="json"), article_version=huge_article.version, citationSources=[article_source(huge_article)])
     assert failure(lambda: rt.prepare("extract", huge)).code == "live_request_too_large"
     verify = verify_relation_payload()
     verify["quotes"][0]["text"] = "나" * 60_000

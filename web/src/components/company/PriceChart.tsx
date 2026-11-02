@@ -75,7 +75,9 @@ export default function PriceChart({
   onBucket: (bucket: string) => void;
 }) {
   if (!points.length)
-    return <p className="text-xs text-zoop-muted">제공된 가격 봉이 없어요.</p>;
+    return (
+      <p className="text-caption text-zoop-muted">제공된 가격 봉이 없어요.</p>
+    );
   const values = points.map((point) => point.close);
   const min = Math.min(...values),
     max = Math.max(...values);
@@ -103,7 +105,7 @@ export default function PriceChart({
   return (
     <figure className="flex flex-col gap-1">
       {period === '1d' && suppliedRange?.sessionDate && (
-        <p className="text-xs text-zoop-muted">
+        <p className="text-caption text-zoop-muted">
           {suppliedRange.sessionDate} 장 · 거래소 현지 거래일 · 시간 표시는 KST
         </p>
       )}
@@ -134,7 +136,7 @@ export default function PriceChart({
           x="592"
           y={y(max) - 4}
           textAnchor="end"
-          className="fill-zoop-muted text-[11px]"
+          className="fill-zoop-muted text-caption"
         >
           {won.format(max)}
         </text>
@@ -142,7 +144,7 @@ export default function PriceChart({
           x="592"
           y={y(min) + 12}
           textAnchor="end"
-          className="fill-zoop-muted text-[11px]"
+          className="fill-zoop-muted text-caption"
         >
           {won.format(min)}
         </text>
@@ -184,7 +186,7 @@ export default function PriceChart({
           </g>
         ))}
       </svg>
-      <figcaption className="flex justify-between text-[11px] text-zoop-muted tabular-nums">
+      <figcaption className="flex justify-between text-caption text-zoop-muted tabular-nums">
         <span>{axisLabel(range.from, period)}</span>
         <span>{axisLabel(range.to, period)}</span>
       </figcaption>

@@ -7,6 +7,7 @@ import { getMyFeedback } from '@/apis/feedback/feedback';
 import FeedbackButtons from '@/components/common/FeedbackButtons';
 import BriefingPreviewFeedback from './BriefingPreviewFeedback';
 import { validIssueIntelligence } from '@/util/issueIntelligence';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import type { FeedbackValue } from '@/types/feedback';
@@ -37,7 +38,6 @@ import {
   FOCUS_RING,
   PRIMARY_BUTTON,
   SECTION,
-  SECTION_TITLE,
   STATUS_PILL,
 } from './briefingStyles';
 
@@ -118,11 +118,13 @@ export default function PublishedBriefing({
     key: string;
     error?: boolean;
     values: Record<string, FeedbackValue>;
+    reasons?: Record<string, string | null>;
   } | null>(null);
+  const ratingVersion = published?.feedbackVersion ?? published?.graphVersion;
   const feedbackKey =
-    // 결과 버전(graphVersion)이 없으면 평가를 버전에 연결할 수 없으므로 읽지도 않는다.
-    published?.graphVersion && memberId
-      ? `${memberId}:${published.id}:${published.graphVersion}:${retry}:${feedbackAttempt}`
+    // 발행 결과 식별 버전이 없으면 평가를 버전에 연결할 수 없으므로 읽지도 않는다.
+    published && ratingVersion && memberId
+      ? `${memberId}:${published.id}:${ratingVersion}:${retry}:${feedbackAttempt}`
       : null;
   useEffect(() => {
     if (!feedbackKey || !published) return;
@@ -139,19 +141,28 @@ export default function PublishedBriefing({
       .then(([round, issues]) => {
         if (
           [...round.items, ...issues.items].some(
-            (item) => item.targetVersion !== published.graphVersion,
+            (item) => item.targetVersion !== ratingVersion,
           )
         )
           throw new Error('다른 버전의 평가입니다.');
-        return Object.fromEntries(
-          [...round.items, ...issues.items].map((item) => [
-            `${item.feature}:${item.targetId}`,
-            item.value,
-          ]),
-        );
+        const items = [...round.items, ...issues.items];
+        return {
+          values: Object.fromEntries(
+            items.map((item) => [
+              `${item.feature}:${item.targetId}`,
+              item.value,
+            ]),
+          ),
+          reasons: Object.fromEntries(
+            items.map((item) => [
+              `${item.feature}:${item.targetId}`,
+              item.reason,
+            ]),
+          ),
+        };
       })
-      .then((values) => {
-        if (active) setMyFeedback({ key: feedbackKey, values });
+      .then((data) => {
+        if (active) setMyFeedback({ key: feedbackKey, ...data });
       })
       .catch(() => {
         if (active)
@@ -160,14 +171,12 @@ export default function PublishedBriefing({
     return () => {
       active = false;
     };
-  }, [feedbackKey, published]);
+  }, [feedbackKey, published, ratingVersion]);
   const saved = (
     feature: string,
     targetId: string,
   ): FeedbackValue | undefined =>
-    published?.graphVersion &&
-    myFeedback?.key === feedbackKey &&
-    !myFeedback.error
+    ratingVersion && myFeedback?.key === feedbackKey && !myFeedback.error
       ? (myFeedback?.values[`${feature}:${targetId}`] ?? 'none')
       : undefined;
   const reload = () => {
@@ -187,7 +196,7 @@ export default function PublishedBriefing({
 
   const publicationInfo = result && (
     <>
-      <p className="mt-1.5 font-inter text-[11px] leading-normal text-zoop-faint">
+      <p className="mt-1.5 font-num text-caption leading-normal text-zoop-faint">
         발행일 {result.date} · 예정 {clock(result.scheduledAt)} · 생성{' '}
         {briefingTime(result.generatedAt)} · 발행{' '}
         {briefingTime(result.publishedAt)} · 데이터 기준{' '}
@@ -241,7 +250,7 @@ export default function PublishedBriefing({
             eventId={item.eventId}
             compact={compact}
             to={`/?round=${encodeURIComponent(result.id)}&select=${encodeURIComponent(`node:${item.eventId}`)}`}
-            className={`self-start text-[11px] font-semibold underline underline-offset-4 ${FOCUS_RING}`}
+            className={`self-start text-caption font-semibold underline underline-offset-4 ${FOCUS_RING}`}
           >
             이 회차 관계 그래프에서 보기
           </BriefingIssueMapLink>
@@ -256,14 +265,19 @@ export default function PublishedBriefing({
             subject={`핵심 이슈 ${item.rank}`}
           />
         ) : (
-          result.graphVersion && (
+          ratingVersion && (
             <FeedbackButtons
               key={`${feedbackKey}:${item.eventId}`}
               feature="briefing_issue"
               targetId={`${result.id}/${item.eventId}`}
-              targetVersion={result.graphVersion}
+              targetVersion={ratingVersion}
               subject={`핵심 이슈 ${item.rank}`}
               saved={saved('briefing_issue', `${result.id}/${item.eventId}`)}
+              savedReason={
+                myFeedback?.reasons?.[
+                  `briefing_issue:${result.id}/${item.eventId}`
+                ]
+              }
             />
           )
         )}
@@ -285,7 +299,6 @@ export default function PublishedBriefing({
     );
   const roundFeedback = result && (
     <section className={SECTION} aria-label="이 브리핑 평가">
-      <h3 className={SECTION_TITLE}>이 브리핑은 어땠나요?</h3>
       {previewAnalysis ? (
         <BriefingPreviewFeedback
           key={`${previewAnalysis.resultVersion}:round`}
@@ -294,16 +307,16 @@ export default function PublishedBriefing({
           feature="briefing_round"
           targetId={result.id}
           subject="이 브리핑 회차"
-          showNote
         />
-      ) : result.graphVersion ? (
+      ) : ratingVersion ? (
         <FeedbackButtons
           key={`${feedbackKey}:round`}
           feature="briefing_round"
           targetId={result.id}
-          targetVersion={result.graphVersion}
+          targetVersion={ratingVersion}
           subject="이 브리핑 회차"
           saved={saved('briefing_round', result.id)}
+          savedReason={myFeedback?.reasons?.[`briefing_round:${result.id}`]}
         />
       ) : (
         <p className={NOTE}>
@@ -335,9 +348,10 @@ export default function PublishedBriefing({
         aria-busy={loading}
       >
         {loading && (
-          <p role="status" className="text-xs text-zoop-muted">
-            브리핑을 불러오고 있어요.
-          </p>
+          <LoadingIndicator
+            label="브리핑을 불러오고 있어요."
+            className="flex min-h-16 w-full text-caption text-zoop-muted"
+          />
         )}
         {error && (
           <p role="alert" className={EMPTY}>

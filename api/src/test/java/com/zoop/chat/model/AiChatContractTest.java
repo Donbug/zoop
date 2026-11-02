@@ -63,7 +63,7 @@ import tools.jackson.databind.json.JsonMapper;
  * Real Java adapters -> ai/service (uvicorn) -> installed {@code zoop-ai-chat}, replay only. The inputs are built by the
  * production {@link ChatModelStages} from the same synthetic scenario the gate authored its replay fixture from
  * ({@code api/scripts/ai_chat_gate.py}); the replay answers only an input identical in every field, so a passing stage proves
- * the two sides agree on {@code zoop-ai-chat-2}. Not runnable on its own: {@code make api-ai-chat-smoke} starts the service and
+ * the two sides agree on {@code zoop-ai-chat-5}. Not runnable on its own: {@code make api-ai-chat-smoke} starts the service and
  * exports {@code ZOOP_AI_CHAT_CONTRACT_MANIFEST}. Without it every test fails; none skips.
  */
 @Tag("ai-chat-contract")
@@ -74,6 +74,7 @@ class AiChatContractTest {
     private static final String UNGRANTED_EVIDENCE = "ev-" + "2".repeat(64);
     private static final String QUOTE = "삼성전자가 HBM 공급 계약을 맺었다.";
     private static final String ROUTER_QUESTION = "PER이 뭐야? 삼성전자 관련 사건 알려줘";
+    private static final String DEPENDENCY_QUESTION = "내 종목과 연결된 회사를 찾아줘? 정확히 두 곳이면 그 회사 최근 사건을 알려줘";
     private static final String ANSWER_QUESTION = "삼성전자 관련 사건 알려줘";
     private static final String EVIDENCE_TEXT = "삼성전자는 HBM 공급 계약을 맺었습니다.";
     private static final String GENERAL_TEXT = "PER은 주가를 주당순이익으로 나눈 값입니다.";
@@ -187,6 +188,14 @@ class AiChatContractTest {
     }
 
     @Test
+    void theRouterCarriesADependentRequirementCheckpoint() {
+        ChatRouteDecision decision = stages().route(run(DEPENDENCY_QUESTION), BOUND);
+
+        assertNull(decision.requirements().getFirst().dependsOn());
+        assertEquals(new ChatRouteDecision.Dependency("r1", "exactly", 2), decision.requirements().get(1).dependsOn());
+    }
+
+    @Test
     void theAnswerIsGeneratedFromTheGrantedQuote() {
         ChatGeneratedAnswer answer = stages().generate(run(ANSWER_QUESTION), context(EVIDENCE));
         assertEquals(List.of(new ChatGeneratedAnswer.Section("evidence_grounded", EVIDENCE_TEXT, List.of("r1"), List.of(EVIDENCE))),
@@ -203,7 +212,11 @@ class AiChatContractTest {
         ChatRun run = run(ANSWER_QUESTION, "chat-verify-gate");
         ChatSemanticVerdicts verdicts = stages().verify(run, sections, List.of(citation(EVIDENCE, "art-synthetic")),
                 ChatModels.ServerFacts.withoutTools(run, sections));
-        assertEquals(List.of(new ChatSemanticVerdicts.Verdict("supported", "no"), new ChatSemanticVerdicts.Verdict(null, "no")),
+        assertEquals(List.of(
+                new ChatSemanticVerdicts.Verdict("no", List.of(
+                        new ChatSemanticVerdicts.ClaimVerdict("s0c0", "supported", "no"))),
+                new ChatSemanticVerdicts.Verdict("no", List.of(
+                        new ChatSemanticVerdicts.ClaimVerdict("s1c0", null, "no")))),
                 verdicts.sections());
     }
 

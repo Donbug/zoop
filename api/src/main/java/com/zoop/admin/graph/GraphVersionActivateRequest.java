@@ -2,6 +2,7 @@ package com.zoop.admin.graph;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -11,5 +12,9 @@ import jakarta.validation.constraints.Size;
  */
 public record GraphVersionActivateRequest(
         @NotBlank @Size(max = 1000) String reason,
-        @JsonProperty(required = true) @Size(max = 120) String expectedActiveVersionId) {
+        @JsonProperty(required = true) @Size(max = 120) String expectedActiveVersionId,
+        @Pattern(regexp = "forward|rollback") String mode) {
+    public GraphVersionActivateRequest {
+        if (mode == null) mode = "forward";
+    }
 }

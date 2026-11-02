@@ -437,7 +437,7 @@ class ChatMcpEndpointTest {
         var attached = executor.attach(JOB, 1).orElseThrow();
         @SuppressWarnings("unchecked")
         Map<String, Object> args = mapper.readValue(arguments, Map.class);
-        return tools.approve(attached, tool, args);
+        return tools.approve(attached, tool, args, List.of("r1"));
     }
 
     private String token(ChatCapability... allowed) {
@@ -478,9 +478,12 @@ class ChatMcpEndpointTest {
         return "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}";
     }
 
+    /** A provider's call, naming its requirement as the tool schema demands; the approval took it, the read does not see it. */
     private static String call(String name, String arguments) {
+        String named = "{}".equals(arguments) ? "{\"requirementIds\":[\"r1\"]}"
+                : "{\"requirementIds\":[\"r1\"]," + arguments.substring(1);
         return "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"" + name
-                + "\",\"arguments\":" + arguments + "}}";
+                + "\",\"arguments\":" + named + "}}";
     }
 
     /** A tool error result, or the protocol error the SDK answers for input its schema check refuses. */

@@ -159,7 +159,7 @@ def run(smoke: Smoke, world: HandoffWorld) -> list[str]:
                         for v in i["fieldVerdicts"])
                 and all(p["sameValueMentions"][f] == [identity(m) for m in i["mentions"] if m[f] == basis[0][f]] != []
                         and i[f] == (None if f in suppressed else basis[0][f]) for f in fields))
-    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and all(truthful(i) for i in bundle["issues"]),
+    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and all(truthful(i) for i in bundle["issues"]),
           "every issue states its actual field selection and any operator field verdict: exact same-value lists, withheld recomputed, never an inferred verdict")
     check(bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1" and [i["summary"] for i in bundle["issues"]]
           == [{"status": "unavailable", "code": "not-requested", "source": None}] * len(bundle["issues"]), "no decision pins a summary and no verdict holds a field: every issue is not-requested")
@@ -390,7 +390,7 @@ def run_summaries(smoke: Smoke, world: HandoffWorld, held_world: HandoffWorld) -
     bundle = wire["bundle"]
     check(bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and digest_of(bundle) == pins["bundleDigest"] == wire["verification"]["bundleDigest"],
           "the summary bundle equals the CLI export and hashes to the operator's pin")
-    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1" and producer_accepts(response.content),
+    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1" and producer_accepts(response.content),
           "bundle 7 with the summary policy, accepted by the producer's own validator")
     problems = summary_problems(bundle, world)
     check(not problems, f"delivered summaries equal the hand-written expectation: {problems}")

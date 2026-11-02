@@ -46,8 +46,11 @@ final class AiHttpTransport implements AutoCloseable {
     private static final Pattern JSON_MEDIA = Pattern.compile("application/json(\\s*;\\s*charset=\"?utf-8\"?)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern SECONDS = Pattern.compile("[0-9]{1,7}");
 
-    /** One accepted answer: the documented success status and its strictly parsed JSON object. */
-    record Reply(int status, JsonNode body, Optional<Duration> retryAfter, String requestId, AiOperation operation) {
+    /**
+     * One accepted answer: the documented success status, its strictly parsed JSON object and the exact bytes it was parsed
+     * from (for a family whose consumer re-verifies the document byte for byte, like the S2-1 export parser).
+     */
+    record Reply(int status, JsonNode body, byte[] raw, Optional<Duration> retryAfter, String requestId, AiOperation operation) {
     }
 
     /**
@@ -124,7 +127,7 @@ final class AiHttpTransport implements AutoCloseable {
             requireJsonAnswer(response, requestId);
             JsonNode document = WireJson.parse(WireJson.utf8(response.body()), "body");
             if (expected) {
-                return new Reply(status, document, retryAfter, requestId, operation);
+                return new Reply(status, document, response.body(), retryAfter, requestId, operation);
             }
             if (status < 400) {
                 throw transport(operation, requestId, Failure.UNEXPECTED_RESPONSE, OptionalInt.of(status), null);

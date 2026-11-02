@@ -1,6 +1,4 @@
-"""Live runtime families, offline: the default PIPELINE binding and prepared requests stay byte-identical (literals snapshotted from the
-code BEFORE families existed), the ISSUE_SUMMARY family has its own stages that never cross, and the issue-summary prompt/verifier
-projection, reply mapping and verdict policy are deterministic. Fake HTTP only; no key, endpoint or text is real."""
+"""Offline live family boundaries, stale citation-contract bindings, deterministic requests and issue-summary behavior."""
 from __future__ import annotations
 
 import json
@@ -16,27 +14,46 @@ from zoop_ai_pipeline.relation_contracts import canonical, digest
 
 BUDGET_IDENTITY = "ab" * 32
 
-# Snapshot of the unmodified runtime (constructor with a fixed budget identity, so it is path independent).
-GOLDEN_IDENTITY = "54e2b9e00c4d8cb4a88376a7cb3aa0eeea908e59ed807a736094e70c1a84db57"
-GOLDEN_BINDING_DIGEST = "0bd8f3972cb0a863b4d87307591fe1119250ac8a48e8b401b317d5ad13f7684a"
-GOLDEN_GENERATION = "d9ed73de755509652f5e071cc7be0dc800bff4c3daa8f648ff8acf3eacd08ec7"
-GOLDEN_VERIFIER = "ae7890815ca4c3622f58def8ee0d6ecbd330c01c40ab970ee4d08978930b8a32"
-GOLDEN_STAGES = {
-    "compare": "32a60d3071fbb6b9baf5e7fe552d00f1fb25431a0debdd74ab8044e48226c876",
-    "extract": "817c884c47f807e8a82faec118b95538e9426f8f69e463507909183f10a105f9",
-    "impact": "0bb0c7852df951336129d613b4f9c0be881acbaeb8c1035a2631607b56dec262",
-    "relation": "b5b3fd96dc56fd6bf913c46c1f816a5bc1bdac4c22f62da413ea4bab86cf10c9",
-    "topic": "49ccbe8e336111372503f5519f0ba089594502dd6820583788103110bf0f9f58",
-    "verify-impact": "44e278186db7e56aba621c980172325a12f26126c371a7b2b82a43fc3fe61db8",
-    "verify-relation": "8f5ac93576e0a3f473ad6b542ce70bda7bb1fcefe6dfaa3c2bd8256076707799"}
-GOLDEN_PREPARED = {
-    "extract": "e6b38213148c8eb4dd529cb14ed2a7deb0d5f615fed8a996a9e4eb7adcf02926",
-    "compare": "ef5ff59394784af6aff465ee2487cc58b30d8dab14c978a99b1561ac9f094af9",
-    "topic": "b45f6581c6bc5ef00bdda04f87d41e146ec60b7e9773b75134592101c0842655",
-    "relation": "6fe7d3ef434e26c9fdc5f0118ecee0516c5fc7ef8a5eb5db421e9af6f95e9996",
-    "impact": "7a4fffb33703fa26c14a3028dc6a58f74bee3cbfc2dfe39b251029fcd67a08c7",
-    "verify-relation": "ad0931921d916200fd76324c73bd080d44bc4845e67c1028837fd13d322cf24f",
-    "verify-impact": "13f040b4d44139ebce73f37ce08410a47198aa8a1884bd123c6256cdda945581"}
+# Synthetic binding emitted by the preserved pre-segment runtime with fixed() settings; not an actual job or receipt.
+ORIGINAL_BINDING = {
+    "budget": {"directoryIdentity": "abababababababababababababababababababababababababababababababab", "scope": "directory", "unit": "nanoUsd"},
+    "generation": {"api": "chat.completions", "endpoint": "https://api.openai.com/v1",
+                   "endpointRevision": "72ad3db948b22df147713c287d484511770cbb538350527656ee1311058d7425", "maxOutputTokens": 24000,
+                   "model": "gpt-6-luna", "provider": "openai-compatible", "reasoningEffort": "high"},
+    "identity": "54e2b9e00c4d8cb4a88376a7cb3aa0eeea908e59ed807a736094e70c1a84db57",
+    "limits": {"inputOverheadTokens": 1024, "maxRequestBytes": 300000, "maxResponseBytes": 8388608, "maxVerifierRequestBytes": 150000},
+    "pricing": {"asOf": "2026-10-21", "gpt-6-luna": {"input": 200, "output": 750}, "jev-1.14.0": {"input": 42, "output": 0},
+                "sources": ["https://developers.openai.com/api/docs/pricing", "https://docs.typesafe.ai/models.md"],
+                "tier": "conservative-long", "unit": "nanoUsdPerToken"},
+    "stages": {
+        "compare": {"maxOutputTokens": 24000, "promptVersion": "zoop-live-prompt-22f93421b48831497a09fb46", "provider": "openai-compatible",
+                    "purpose": "pipeline:compare", "recipient": "openai-compatible:72ad3db948b22df147713c287d484511770cbb538350527656ee1311058d7425",
+                    "schemaDigest": "62ffa1671fd3e8b38163927407d363b360a4bf240cfe2dc1cae6f83574483061"},
+        "extract": {"maxOutputTokens": 24000, "promptVersion": "zoop-live-prompt-9f9775d0a676d79d22c547da", "provider": "openai-compatible",
+                    "purpose": "pipeline:extract", "recipient": "openai-compatible:72ad3db948b22df147713c287d484511770cbb538350527656ee1311058d7425",
+                    "schemaDigest": "0a7d16932ffa0df58fdcf5de7c655f5f2f59e913a40930d51e054ba111b06ca9"},
+        "impact": {"maxOutputTokens": 24000, "promptVersion": "zoop-live-prompt-41c8ecb20302bca1509f93e6", "provider": "openai-compatible",
+                   "purpose": "pipeline:impact", "recipient": "openai-compatible:72ad3db948b22df147713c287d484511770cbb538350527656ee1311058d7425",
+                   "schemaDigest": "00c65e4b01d820c840a8adf1321cf9ea9caa80f5185c092555fdaf1687eae581"},
+        "relation": {"maxOutputTokens": 24000, "promptVersion": "zoop-live-prompt-64e8347805051e85b5c45c32", "provider": "openai-compatible",
+                     "purpose": "pipeline:relation", "recipient": "openai-compatible:72ad3db948b22df147713c287d484511770cbb538350527656ee1311058d7425",
+                     "schemaDigest": "40332ce04477b54fa20cc5bbec04a05f6648ad48d2e3cc72330639991d3a59e5"},
+        "topic": {"maxOutputTokens": 24000, "promptVersion": "zoop-live-prompt-d6169a32152d4ed8918f41d9", "provider": "openai-compatible",
+                  "purpose": "pipeline:topic", "recipient": "openai-compatible:72ad3db948b22df147713c287d484511770cbb538350527656ee1311058d7425",
+                  "schemaDigest": "854e42df52b93d9a6997fdaf585817d24be8cf17d5c89101709eca47d046ea2b"},
+        "verify-impact": {"maxOutputTokens": None, "promptVersion": "zoop-jev-pipeline-144e50e204fd5487", "provider": "typesafe-native",
+                          "purpose": "pipeline:verify-impact", "questionsDigest": "144e50e204fd54879765a382c8628a3b91805aed0337e6c93b6a41199eb2ea9c",
+                          "recipient": "typesafe-native:da3d84abb00b8d57b45bd84c9ba2c6c7af5aada27340104c3b1b23621760516a"},
+        "verify-relation": {"maxOutputTokens": None, "promptVersion": "zoop-jev-pipeline-144e50e204fd5487", "provider": "typesafe-native",
+                            "purpose": "pipeline:verify-relation", "questionsDigest": "144e50e204fd54879765a382c8628a3b91805aed0337e6c93b6a41199eb2ea9c",
+                            "recipient": "typesafe-native:da3d84abb00b8d57b45bd84c9ba2c6c7af5aada27340104c3b1b23621760516a"}},
+    "verifier": {"adapterIdentity": "144e50e204fd54879765a382c8628a3b91805aed0337e6c93b6a41199eb2ea9c", "adapterRevision": "zoop-jev-pipeline-verify-1",
+                 "api": "systemone", "endpoint": "https://api.typesafe.ai/v1",
+                 "endpointRevision": "da3d84abb00b8d57b45bd84c9ba2c6c7af5aada27340104c3b1b23621760516a", "model": "jev-1.14.0",
+                 "policy": {"choiceConfidence": 0.8, "choiceProbability": 0.9, "distributionTolerance": 0.02,
+                            "lowConfidence": {"claims": "insufficient", "effect": "uncertain", "target": "insufficient"}, "provisional": True},
+                 "provider": "typesafe-native"},
+    "version": "zoop-live-runtime-1"}
 
 
 def fixed(family=None, **override) -> LiveRuntime:
@@ -60,19 +77,25 @@ def failure(call) -> LiveFailure:
     return caught.value
 
 
-# ---------------------------------------------------------------- the default family is unchanged -----------------------
+# ---------------------------------------------------------------- pipeline citation contract ----------------------------
 
-def test_the_default_pipeline_binding_is_byte_identical_to_the_snapshot_taken_before_families_existed():
-    binding = fixed().binding()
-    assert binding["version"] == "zoop-live-runtime-1" and binding["identity"] == GOLDEN_IDENTITY
-    assert digest(binding) == GOLDEN_BINDING_DIGEST and canonical(binding) == canonical(fixed(PIPELINE).binding())
-    assert digest(binding["generation"]) == GOLDEN_GENERATION and digest(binding["verifier"]) == GOLDEN_VERIFIER
-    assert {stage: digest(entry) for stage, entry in binding["stages"].items()} == GOLDEN_STAGES
-
-
-def test_every_pipeline_prepared_request_is_byte_identical_to_the_snapshot():
+def test_the_pipeline_refuses_the_preserved_original_binding_and_keeps_the_verifier_policy():
     runtime = fixed()
-    assert {stage: runtime.prepare(stage, PAYLOADS[stage]())["digest"] for stage in live.STAGES} == GOLDEN_PREPARED
+    binding = runtime.binding()
+    assert digest({k: v for k, v in ORIGINAL_BINDING.items() if k != "identity"}) == ORIGINAL_BINDING["identity"]
+    assert failure(lambda: LiveRuntime.from_binding(ORIGINAL_BINDING)).code == "live_binding_mismatch"
+    assert runtime.accepts(ORIGINAL_BINDING) is False and binding["identity"] != ORIGINAL_BINDING["identity"]
+    assert binding["generation"] == ORIGINAL_BINDING["generation"] and binding["verifier"]["policy"] == ORIGINAL_BINDING["verifier"]["policy"]
+    assert all(binding["stages"][s]["schemaDigest"] != ORIGINAL_BINDING["stages"][s]["schemaDigest"] for s in live.GENERATION_STAGES)
+    assert binding["verifier"]["adapterIdentity"] != ORIGINAL_BINDING["verifier"]["adapterIdentity"]
+
+
+def test_same_input_and_frozen_contract_produce_identical_requests_after_runtime_reconstruction():
+    runtime = fixed()
+    rebuilt = LiveRuntime.from_binding(runtime.binding())
+    assert runtime.binding() == fixed(PIPELINE).binding() == rebuilt.binding()
+    for stage in live.STAGES:
+        assert runtime.prepare(stage, PAYLOADS[stage]()) == rebuilt.prepare(stage, PAYLOADS[stage]())
     assert runtime.family is PIPELINE and PIPELINE.stages == live.STAGES and PIPELINE.generation_stages == live.GENERATION_STAGES
     assert PIPELINE.verify_stages == live.VERIFY_STAGES and PIPELINE.version == live.VERSION
 
@@ -90,7 +113,7 @@ def test_the_issue_summary_family_is_a_separate_versioned_binding_with_exactly_i
     assert binding["version"] == "zoop-issue-summary-runtime-1" and binding["version"] != fixed().binding()["version"]
     assert set(binding["stages"]) == {"issue-summary", "verify-issue-summary"} == set(ISSUE_SUMMARY.stages)
     assert ISSUE_SUMMARY.generation_stages == ("issue-summary",) and ISSUE_SUMMARY.verify_stages == ("verify-issue-summary",)
-    assert not set(ISSUE_SUMMARY.stages) & set(PIPELINE.stages) and binding["identity"] != GOLDEN_IDENTITY
+    assert not set(ISSUE_SUMMARY.stages) & set(PIPELINE.stages) and binding["identity"] != fixed().binding()["identity"]
     assert binding["verifier"]["model"] == "jev-1.14.0" and binding["verifier"]["adapterRevision"] == jev.ADAPTER_REVISION
     assert binding["verifier"]["adapterIdentity"] == jev.identity() and binding["generation"] == fixed().binding()["generation"]
     runtime = fixed(ISSUE_SUMMARY)

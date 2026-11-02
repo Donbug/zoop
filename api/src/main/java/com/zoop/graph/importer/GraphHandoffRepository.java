@@ -80,7 +80,10 @@ public interface GraphHandoffRepository {
     }
 
     /** One catalog company: {@code name} is what a bundle label must equal. */
-    record CompanyRow(String id, String name) {
+    record CompanyRow(String id, String name, List<String> aliases) {
+        public CompanyRow {
+            aliases = List.copyOf(aliases);
+        }
     }
 
     /**

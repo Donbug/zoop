@@ -126,7 +126,7 @@ public class PersonalBriefingPreferences {
         PersonalBriefingService.validatePool(pools.getFirst(),r);
         for(var item:selection.path("presentation").path("items")){
             var c=pools.getFirst().path("candidates").valueStream().filter(x->x.path("issueId").equals(item.path("eventId"))).findFirst().orElseThrow(()->new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
-            if(!access.readable(c,requestId))throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            if(!access.readableForRound(c,r,requestId))throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         }
         for(var tracked:selection.path("tracking")){
             String prior=tracked.path("previousRoundId").asString();var pr=rounds.findById(prior).orElseThrow(()->new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
@@ -134,7 +134,7 @@ public class PersonalBriefingPreferences {
             var basis=jdbc.query("SELECT snapshot FROM briefing_personal_pools WHERE round_id=? AND input_sha256=? AND snapshot_sha256=encode(sha256(convert_to(snapshot::text,'UTF8')),'hex')",(rs,i)->StrictJson.parseObject(rs.getString(1)).node(),prior,tracked.path("poolVersion").asString());
             if(basis.size()!=1)throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);PersonalBriefingService.validatePool(basis.getFirst(),pr);
             var candidate=basis.getFirst().path("candidates").valueStream().filter(x->x.path("issueId").equals(tracked.path("issueId"))).findFirst().orElseThrow(()->new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
-            if(!access.readable(candidate,requestId))throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            if(!access.readableForRound(candidate,pr,requestId))throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         }
         row.remove(List.of("memberId","jobId"));return row;
     }

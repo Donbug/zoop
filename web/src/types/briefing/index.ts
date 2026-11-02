@@ -201,6 +201,8 @@ export type BriefingContinuity = {
 
 /** Consumer fields of getBriefing; publication snapshots are never recalculated. */
 export type BriefingResponse = {
+  /** Immutable feedback result version; graphVersion or publication digest when graph-less. */
+  feedbackVersion?: string | null;
   id: string;
   date: string;
   edition: BriefingEdition;
@@ -223,6 +225,8 @@ export type BriefingResponse = {
   };
   issueIntelligence?: import('./issueIntelligence').IssueIntelligence;
   issueReading?: import('./issueReading').IssueReading;
+  issueFollowUps?: import('./issueFollowUps').IssueFollowUps;
+  issueFollowUpReview?: import('./issueFollowUpReview').IssueFollowUpReview;
   judgmentUpdate?: import('./judgmentUpdate').JudgmentUpdate;
   companyOutlooks?: import('./companyOutlook').CompanyOutlooks;
   marketSummary: BriefingMarketSummary;

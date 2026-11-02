@@ -29,7 +29,7 @@ export default function ConfirmDialog({
         aria-labelledby={titleId}
         className="flex w-full max-w-md flex-col gap-4 rounded-xl bg-white p-5 shadow-lg"
       >
-        <h2 id={titleId} className="text-lg font-semibold text-gray-950">
+        <h2 id={titleId} className="text-title-sm font-semibold text-zoop-ink">
           {title}
         </h2>
         {children}
@@ -39,7 +39,7 @@ export default function ConfirmDialog({
             autoFocus
             disabled={pending}
             onClick={onCancel}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-body font-medium text-zoop-ink hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {cancelLabel}
           </button>
@@ -47,7 +47,7 @@ export default function ConfirmDialog({
             type="button"
             disabled={pending}
             onClick={onConfirm}
-            className="rounded-lg bg-gray-950 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+            className="rounded-lg bg-gray-950 px-4 py-2 text-body font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
           >
             {confirmLabel}
           </button>

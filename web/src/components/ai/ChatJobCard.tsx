@@ -1,11 +1,15 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import SavedResultFeedback from '@/components/common/SavedResultFeedback';
+import { Link, useLocation } from 'react-router-dom';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import { LoadingSpinner } from '@/components/common/LoadingIndicator';
 import { PHASES } from '@/components/ai/chat-phases';
 import {
   formatPublishedAt,
   safeArticleUrl,
 } from '@/components/graph/event-format';
+import { useAiChatStore } from '@/stores/useAiChatStore';
+import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import type {
   ChatAnswerBasis,
   ChatBasis,
@@ -36,6 +40,12 @@ const BASIS_LABEL: Record<ChatBasis, string> = {
 const ANSWER_BASIS_LABEL: Partial<Record<ChatAnswerBasis, string>> = {
   ...BASIS_LABEL,
   mixed: '일반 개념 + 근거 확인됨',
+};
+
+const ANSWER_STATUS_LABEL: Record<ChatResult['answerStatus'], string> = {
+  complete: '답변 완료',
+  partial: '일부 답변',
+  guidance: '안내',
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -96,6 +106,16 @@ export default function ChatJobCard(props: Props) {
       </p>
       <div className="mt-3">
         <JobState {...props} />
+        {job.status === 'completed' &&
+          job.result?.outcome === 'answered' &&
+          job.feedbackVersion && (
+            <SavedResultFeedback
+              feature="chatbot_answer"
+              targetId={job.result.messageId}
+              targetVersion={job.feedbackVersion}
+              subject="이 AI 답변"
+            />
+          )}
       </div>
     </article>
   );
@@ -116,9 +136,17 @@ function JobState({
     return (
       <div className={ui.state}>
         <p className="mt-0!">
-          {job.status === 'queued'
-            ? '질문을 접수했어요.'
-            : '답변을 준비하고 있어요. 검증을 마친 답변만 보여 드려요.'}
+          {job.status === 'queued' ? (
+            '질문을 접수했어요.'
+          ) : (
+            <>
+              <LoadingSpinner size="sm" />
+              <span>
+                {' '}
+                답변을 준비하고 있어요. 검증을 마친 답변만 보여 드려요.
+              </span>
+            </>
+          )}
         </p>
         {job.status === 'running' && (
           <ol className="m-0 flex list-none flex-wrap gap-1.5 p-0">
@@ -169,14 +197,22 @@ function JobState({
   }
   if (job.status === 'completed' && job.result) {
     return (
-      <ResultView
-        job={job}
-        result={job.result}
-        busy={busy}
-        onChoose={onChoose}
-        onAnswerFreely={onAnswerFreely}
-        onViewOnMap={onViewOnMap}
-      />
+      <div className="flex flex-col gap-3">
+        <p
+          className={ui.badge}
+          aria-label={`답변 상태: ${ANSWER_STATUS_LABEL[job.result.answerStatus]}`}
+        >
+          {ANSWER_STATUS_LABEL[job.result.answerStatus]}
+        </p>
+        <ResultView
+          job={job}
+          result={job.result}
+          busy={busy}
+          onChoose={onChoose}
+          onAnswerFreely={onAnswerFreely}
+          onViewOnMap={onViewOnMap}
+        />
+      </div>
     );
   }
   return <p className={ui.muted}>이 질문의 상태를 확인하지 못했어요.</p>;
@@ -225,7 +261,7 @@ function ResultView({
         )}
         <button
           type="button"
-          className="mt-2 text-[11px] underline"
+          className="mt-2 text-caption underline"
           disabled={busy}
           onClick={() => onAnswerFreely(job)}
         >
@@ -280,7 +316,7 @@ function Answer({
         result.sections.map((section, i) => (
           <section key={i} aria-label={`${BASIS_LABEL[section.basis]} 구간`}>
             <p className={`${ui.badge} mb-1`}>{BASIS_LABEL[section.basis]}</p>
-            <p className="m-0 whitespace-pre-wrap wrap-anywhere text-[12px] leading-[19.5px]">
+            <p className="m-0 whitespace-pre-wrap wrap-anywhere text-caption leading-[19.5px]">
               {section.text}
             </p>
             {section.evidenceIds.length > 0 && (
@@ -297,7 +333,7 @@ function Answer({
         ))
       ) : (
         // 인용을 지금 읽을 수 없어 서버가 고정 안내만 보낸 경우: 그대로 보여 준다.
-        <p className="m-0 whitespace-pre-wrap wrap-anywhere text-[12px] leading-[19.5px]">
+        <p className="m-0 whitespace-pre-wrap wrap-anywhere text-caption leading-[19.5px]">
           {result.answer}
         </p>
       )}
@@ -363,6 +399,9 @@ function Answer({
       {result.graphTargets.length > 0 && onViewOnMap && (
         <MapTargets job={job} result={result} onViewOnMap={onViewOnMap} />
       )}
+      {result.uiActions.length > 0 && (
+        <UiActions result={result} onViewOnMap={onViewOnMap} />
+      )}
       <Applied result={result} />
     </div>
   );
@@ -413,6 +452,147 @@ function MapTargets({
   );
 }
 
+// 서버가 준 동작만 눌렀을 때 연다. 대상 화면이 권한·공개 상태를 다시 확인하고, 모르는 kind는 그리지 않는다.
+function UiActions({
+  result,
+  onViewOnMap,
+}: {
+  result: ChatResult;
+  onViewOnMap?: Props['onViewOnMap'];
+}) {
+  const [unavailable, setUnavailable] = useState(false);
+  const close = useAiChatStore((state) => state.close);
+  const location = useLocation();
+  return (
+    <div>
+      <div className={ui.textActions}>
+        {result.uiActions.map((action) => {
+          const { target } = action;
+          if (action.kind === 'open_company' && target.companyId) {
+            return (
+              <Link
+                key={action.actionId}
+                to={`/companies/${encodeURIComponent(target.companyId)}`}
+                onClick={close}
+              >
+                {action.label}
+              </Link>
+            );
+          }
+          if (action.kind === 'open_briefing' && target.date) {
+            const query = new URLSearchParams({
+              date: target.date,
+              edition: target.edition ?? 'morning',
+            });
+            return (
+              <Link
+                key={action.actionId}
+                to={`/briefing?${query}`}
+                onClick={close}
+              >
+                {action.label}
+              </Link>
+            );
+          }
+          if (action.kind === 'open_watchlist') {
+            return (
+              <Link key={action.actionId} to="/my" onClick={close}>
+                {action.label}
+              </Link>
+            );
+          }
+          // D-GRP-05 근거 창은 지도에만 있다. 서버 동작의 근거 ID로 열고, 창이 지금 볼 수 있는지 다시 확인한다.
+          if (
+            action.kind === 'open_evidence' &&
+            target.evidenceIds?.length &&
+            onViewOnMap
+          ) {
+            const { evidenceIds } = target;
+            return (
+              <button
+                key={action.actionId}
+                type="button"
+                onClick={() => {
+                  close();
+                  useGraphUiStore.getState().openEvidence({
+                    kind: 'path',
+                    id: `answer:${evidenceIds.join(',')}`,
+                    label: action.label,
+                    evidenceIds,
+                    mapContext: {
+                      url: `${location.pathname}${location.search}`,
+                      graphVersion: target.graphVersion ?? undefined,
+                      asOf: target.asOf ?? undefined,
+                    },
+                  });
+                }}
+              >
+                {action.label}
+              </button>
+            );
+          }
+          if (
+            action.kind === 'focus_relation' &&
+            target.edgeId &&
+            onViewOnMap
+          ) {
+            const edgeId = target.edgeId;
+            return (
+              <button
+                key={action.actionId}
+                type="button"
+                onClick={() =>
+                  setUnavailable(
+                    !onViewOnMap({
+                      id: edgeId,
+                      kind: 'edge',
+                      graphVersion: target.graphVersion,
+                      asOf: target.asOf,
+                    }),
+                  )
+                }
+              >
+                {action.label}
+              </button>
+            );
+          }
+          if (
+            action.kind === 'focus_path' &&
+            target.fromId &&
+            target.toId &&
+            onViewOnMap
+          ) {
+            return (
+              <button
+                key={action.actionId}
+                type="button"
+                onClick={() =>
+                  setUnavailable(
+                    !onViewOnMap({
+                      id: `${target.fromId},${target.toId}`,
+                      kind: 'path',
+                      graphVersion: target.graphVersion,
+                      asOf: target.asOf,
+                    }),
+                  )
+                }
+              >
+                {action.label}
+              </button>
+            );
+          }
+          return null;
+        })}
+      </div>
+      {unavailable && (
+        <p className={ui.muted} role="status">
+          이 항목은 답변을 만든 그래프 기준이라 지금 지도에서 열 수 없어요.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function labelOf(result: ChatResult, id: string) {
   return (
     [...result.applied.companies, ...result.applied.issues].find(
@@ -437,7 +617,7 @@ function Citation({ n, citation }: { n: number; citation: ChatCitation }) {
           ? ` · ZOOP 문서 ${citation.docVersion ?? ''}`
           : ` · ${web ? '웹 검색 결과 · ' : ''}${citation.publisher ?? '출처 미제공'}${published ? ` · ${published}` : ''}`}
       </p>
-      <blockquote className="my-1 rounded-[3px] bg-panel-soft px-3 py-2 text-[11px] wrap-anywhere">
+      <blockquote className="my-1 rounded-[3px] bg-panel-soft px-3 py-2 text-caption wrap-anywhere">
         {citation.quote}
       </blockquote>
       {href && (

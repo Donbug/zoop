@@ -1,6 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import userEvent from '@testing-library/user-event';
 import MarketIndicators from '@/components/briefing/MarketIndicators';
 import type { MarketIndicator } from '@/types/briefing';
 
@@ -31,73 +30,32 @@ function card(label: string) {
 }
 
 describe('D-BRF-01·02 저장된 주요 시장 지표', () => {
-  it.each([false, true])(
-    'D-BRF-01·02 opens stored source links and collection time with keyboard (compact=%s)',
-    async (compact) => {
-      const user = userEvent.setup();
-      render(
-        <MarketIndicators
-          compact={compact}
-          variables={{
-            status: 'available',
-            collectedAt: '2026-10-14T07:35:00+09:00',
-            indicators: [
-              indicator({
-                source: {
-                  name: '합성 지수 출처',
-                  official: false,
-                  delayNote: '지연 가능',
-                  url: 'https://example.com/kospi',
-                },
-              }),
-            ],
-          }}
-        />,
-      );
-      const trigger = screen.getByLabelText('시장 지표 안내');
-      trigger.focus();
-      await user.keyboard('{Enter}');
-      expect(
-        screen.getByText('값을 받은 시각 2026-10-14 07:35 KST'),
-      ).toBeTruthy();
-      const link = screen.getByRole('link', {
-        name: 'KOSPI 출처 열기 (새 창)',
-      });
-      expect(link.getAttribute('href')).toBe('https://example.com/kospi');
-      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
-      expect(link.getAttribute('target')).toBe('_blank');
-      await user.keyboard('{Escape}');
-      expect(trigger.closest('details')?.open).toBe(false);
-      expect(document.activeElement).toBe(trigger);
-    },
-  );
+  it('does not render a source disclosure or comparison basis in compact mode', () => {
+    render(
+      <MarketIndicators
+        compact
+        variables={{
+          status: 'available',
+          collectedAt: '2026-10-14T07:35:00+09:00',
+          indicators: [
+            indicator({
+              source: {
+                name: '합성 지수 출처',
+                official: false,
+                delayNote: '지연 가능',
+                url: 'https://example.com/kospi',
+              },
+            }),
+          ],
+        }}
+      />,
+    );
 
-  it.each([undefined, null, 'javascript:alert(1)', 'data:text/html,fixture'])(
-    'D-BRF-01·02 does not invent missing collection times or unsafe links (%s)',
-    async (url) => {
-      render(
-        <MarketIndicators
-          variables={{
-            status: 'available',
-            indicators: [
-              indicator({
-                source: {
-                  name: '합성 지수 출처',
-                  official: true,
-                  delayNote: null,
-                  url,
-                },
-              }),
-            ],
-          }}
-        />,
-      );
-      await userEvent.click(screen.getByLabelText('시장 지표 안내'));
-      expect(screen.getByText('값을 받은 시각 확인되지 않음')).toBeTruthy();
-      expect(screen.queryByRole('link')).toBeNull();
-      expect(card('KOSPI').getByText('2,600.25 pt')).toBeTruthy();
-    },
-  );
+    expect(screen.queryByLabelText('시장 지표 안내')).toBeNull();
+    expect(screen.queryByText(/2026-10-12 대비/)).toBeNull();
+    expect(screen.queryByText(/합성 지수 출처/)).toBeNull();
+    expect(card('KOSPI').getByText('2,600.25 pt')).toBeTruthy();
+  });
 
   it('shows all three stored values, observation dates, baselines and nonzero changes', () => {
     render(

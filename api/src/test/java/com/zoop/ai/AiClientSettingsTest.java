@@ -1,6 +1,7 @@
 package com.zoop.ai;
 
 import java.time.Duration;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -19,12 +20,32 @@ class AiClientSettingsTest {
     }
 
     @Test
+    void plainHttpReachesOnlyTheExactListedHosts() {
+        Set<String> hosts = Set.of("ai");
+        assertEquals("http://ai:8000", AiClientSettings.of("http://ai:8000", TOKEN, CONNECT, REQUEST, 1 << 20, hosts)
+                .baseUri().toString());
+        assertDoesNotThrow(() -> AiClientSettings.of("http://AI:8000/ai", TOKEN, CONNECT, REQUEST, 1 << 20, hosts));
+        assertDoesNotThrow(() -> AiClientSettings.of("https://ai.internal.example", TOKEN, CONNECT, REQUEST, 1 << 20, hosts));
+        assertDoesNotThrow(() -> AiClientSettings.of("http://localhost:8797", TOKEN, CONNECT, REQUEST, 1 << 20, hosts));
+        for (String url : new String[] {"http://ai.evil.example:8000", "http://evil-ai:8000", "http://10.0.0.5:8000",
+                "http://user@ai:8000", "http://ai:8000?x=1"}) {
+            AiClientConfigurationException error = assertThrows(AiClientConfigurationException.class,
+                    () -> AiClientSettings.of(url, TOKEN, CONNECT, REQUEST, 1 << 20, hosts), url);
+            assertEquals("base-url", error.setting());
+        }
+        assertThrows(AiClientConfigurationException.class, () -> of("http://ai:8000"), "the default list is empty");
+        assertThrows(AiClientConfigurationException.class,
+                () -> AiClientSettings.of("http://ai:8000", TOKEN, CONNECT, REQUEST, 1 << 20, null));
+    }
+
+    @Test
     void acceptsHttpsAnywhereAndLoopbackHttpOnly() {
         assertDoesNotThrow(() -> of("https://ai.internal.example"));
         assertDoesNotThrow(() -> of("https://ai.internal.example:8443/ai"));
         assertDoesNotThrow(() -> of("http://localhost:8797"));
         assertDoesNotThrow(() -> of("http://127.0.0.1:8797/"));
         assertDoesNotThrow(() -> of("http://[::1]:8797"));
+        assertDoesNotThrow(() -> of("http://LOCALHOST:8797"), "host names compare case-insensitively");
         for (String url : new String[] {"http://ai.internal.example", "http://10.0.0.5:8797", "http://localhost.evil.example",
                 "http://127.0.0.1.evil.example", "ftp://127.0.0.1", "file:///etc/passwd", "127.0.0.1:8797", "//127.0.0.1",
                 "https://user:pw@ai.internal.example", "https://ai.internal.example?x=1", "https://ai.internal.example#f",

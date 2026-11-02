@@ -24,8 +24,8 @@ const SOCIAL_LABEL: Record<string, string> = {
   kakao: '카카오톡 로그인',
 };
 // D-AUT-01: 승인된 중앙 로그인 시안. 셸의 3px 모서리 규칙보다 우선한다.
-const pillInput = `h-12 w-full rounded-full! border-0 bg-zoop-soft px-5 text-[13px] text-zoop-ink placeholder:text-zoop-muted focus:bg-zoop-paper focus:ring-1 focus:ring-zoop-ink disabled:opacity-60 ${focusRing}`;
-const pillButton = `mt-2 flex h-12 w-full items-center justify-center rounded-full! bg-zoop-ink text-[13px] font-bold text-zoop-paper disabled:cursor-progress disabled:opacity-60 ${focusRing}`;
+const pillInput = `h-12 w-full rounded-full! border-0 bg-zoop-soft px-5 text-body text-zoop-ink placeholder:text-zoop-muted focus:bg-zoop-paper focus:ring-1 focus:ring-zoop-ink disabled:opacity-60 ${focusRing}`;
+const pillButton = `mt-2 flex h-12 w-full items-center justify-center rounded-full! bg-zoop-ink text-body font-bold text-zoop-paper disabled:cursor-progress disabled:opacity-60 ${focusRing}`;
 const textLink = `min-h-0! rounded! bg-transparent text-zoop-muted hover:text-zoop-ink hover:underline aria-disabled:opacity-60 disabled:opacity-60 ${focusRing}`;
 const startCircle = `group grid rounded-full! aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ${focusRing}`;
 
@@ -74,7 +74,7 @@ function StartIcon({ id }: { id: string }) {
   return (
     <span
       aria-hidden="true"
-      className={`${circle} border-[0.667px] border-zoop-line bg-zoop-paper text-sm font-bold`}
+      className={`${circle} border-[0.667px] border-zoop-line bg-zoop-paper text-body font-bold`}
     >
       {id.slice(0, 1).toUpperCase()}
     </span>
@@ -234,10 +234,10 @@ export default function LoginPage() {
     <LoginFrame>
       <section className="mx-auto flex w-full max-w-[340px] flex-col gap-6 text-zoop-ink">
         <header className="mb-5 text-center">
-          <p className="text-[30px] leading-none font-[750] tracking-[-0.045em] font-inter">
+          <p className="text-display leading-none font-[750] tracking-[-0.045em] font-heading">
             ZOOP
           </p>
-          <p className="mt-4 text-[13px] leading-6 text-zoop-muted">
+          <p className="mt-4 text-body leading-6 text-zoop-muted">
             내 종목 주변의 사건을 하나의 그래프로 봐요
           </p>
         </header>
@@ -318,7 +318,7 @@ export default function LoginPage() {
                 {flow.busy ? '로그인하고 있어요' : '로그인'}
               </button>
             )}
-            <div className="mt-1 flex items-center justify-between gap-2 px-2 text-[12px]">
+            <div className="mt-1 flex items-center justify-between gap-2 px-2 text-caption">
               <Link
                 to="/signup"
                 aria-disabled={busy}
@@ -347,7 +347,7 @@ export default function LoginPage() {
         <div className="flex flex-col gap-2.5">
           {providers.length > 0 && (
             <>
-              <div className="flex items-center gap-3 text-[11px] text-zoop-faint before:h-px before:flex-1 before:bg-zoop-line after:h-px after:flex-1 after:bg-zoop-line">
+              <div className="flex items-center gap-3 text-caption text-zoop-faint before:h-px before:flex-1 before:bg-zoop-line after:h-px after:flex-1 after:bg-zoop-line">
                 또는
               </div>
               <ul className="m-0 flex list-none justify-center gap-4 p-0">
@@ -391,7 +391,7 @@ export default function LoginPage() {
           onConfirm={() => void startAsGuest()}
           onCancel={() => setGuestConfirm(false)}
         >
-          <dl className="m-0 flex flex-col gap-3 text-[13px] leading-relaxed">
+          <dl className="m-0 flex flex-col gap-3 text-body leading-relaxed">
             <div>
               <dt className="font-bold text-zoop-ink">바로 볼 수 있어요</dt>
               <dd className="m-0 text-zoop-muted">

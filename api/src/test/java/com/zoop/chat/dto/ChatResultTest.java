@@ -31,10 +31,12 @@ class ChatResultTest {
         var notice = new ChatNotice("mcp_direct_start", List.of(), "안내");
         var written = new ChatResult("answered", "msg-1", "본문", List.of(), "none", null, List.of(), List.of(), List.of(),
                 null, List.of(), null, List.of(new ChatLimitation("not_in_member_scope", "요구", "기준점")), null,
-                "complete", List.of(notice));
+                "complete", List.of(notice), List.of(new ChatUiAction("action-1", ChatUiAction.OPEN_COMPANY, "기업 상세",
+                        List.of("r1"), ChatUiAction.Target.company("KRX:000660"))));
         ChatResult read = mapper.readValue(mapper.writeValueAsString(written), ChatResult.class);
         assertEquals("complete", read.answerStatus(), "a reference-point note leaves the answer complete");
         assertEquals(List.of(notice), read.notices());
+        assertEquals(written.uiActions(), read.uiActions());
     }
 
     private static String stored(String outcome, String limitations) {

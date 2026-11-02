@@ -15,7 +15,7 @@ from scripts.extraction_smoke import (INGESTION_SCHEMA, PROMPT, Q3, Q3B, Kit, pa
 from scripts.ingestion_smoke import exact_check
 from zoop_ai_pipeline import extraction_replay as analysis
 from zoop_ai_pipeline.extraction import Extractor, Fixtures, Store
-from zoop_ai_pipeline.extraction_contracts import ExtractionFailure
+from zoop_ai_pipeline.extraction_contracts import Catalogue, ExtractionFailure
 
 QB = "합성기업은 4분기 신규 공장 착공을 알렸다."
 QC = "합성기업은 2026년 4분기 공급 계약을 발표했다."
@@ -130,6 +130,45 @@ def test_export_store_requirement_is_opt_in_current_and_changes_nothing(world):
 
 # ---------------------------------------------------------------- identities / same event / topic -------------------
 
+@pytest.mark.parametrize("name,claimed,accepted", [
+    ("합성기업", "SYNTH-1", True), (" \t SYNTHETIC   Co\n", "SYNTH-1", True),
+    ("동명기업", "SYNTH-1", False), ("합성기업", "SYNTH-2", False), ("미등록기업", "SYNTH-1", False),
+    ("합성기업", "INVENTED", False), ("000001", "SYNTH-1", False), ("합성기업(주)", "SYNTH-1", False),
+    ("합성-기업", "SYNTH-1", False), ("", "SYNTH-1", False),
+    ("동명기업", None, True), ("미등록기업", None, True), ("합성기업", None, True)])
+def test_company_identity_requires_unique_pinned_name_or_alias_and_never_fills_null(world, name, claimed, accepted):
+    k, w = world.kit, world
+    request = k.submit("company-identity", w.refs["a1"])
+    request["catalogue"] = {"revision": "identity-1", "companies": [
+        {"companyId": "SYNTH-1", "name": "합성기업", "aliases": ["Synthetic Co", "동명기업"], "ticker": "000001"},
+        {"companyId": "SYNTH-2", "name": "합성상대", "aliases": ["동명기업"], "ticker": None}]}
+    participant = {"company_id": claimed, "name": name, "role": "issuer"}
+    mention = {**w.mentions["a1"], "participants": [participant]}
+    replay = k.replay("company-identity")
+    replay.catalogue = Catalogue.model_validate(request["catalogue"])
+    path = replay.extract(w.art["a1"], [mention]).write()
+    result = k.job("run", request, replay=path)
+    if accepted:
+        assert result["state"] == "ready"
+        assert result["eventCandidates"][0]["mention"]["participants"] == [participant]
+    else:
+        assert result["state"] == "stopped" and result["failure"]["code"] == "extraction_reply_invalid"
+        assert result["eventCandidates"] == [] and calls(k) == [("extract", "received", "extraction_reply_invalid")]
+        with sqlite3.connect(k.root / "extraction" / "extraction.sqlite3") as db:
+            saved = json.loads(db.execute("SELECT response FROM calls").fetchone()[0])
+        assert saved["mentions"][0]["participants"] == [participant]
+    assert k.job("resume", k.job_selector("company-identity")) == result
+
+
+def test_snapshot_cannot_bypass_company_identity_validation(world):
+    k, w = world.kit, world
+    bad = {**w.mentions["a1"], "participants": [{"company_id": "INVENTED", "name": "합성기업", "role": "issuer"}]}
+    request = k.submit("snapshot-identity", w.refs["a2"], [k.event("event-1", [(w.refs["a1"], bad)])])
+    with pytest.raises(ExtractionFailure, match="snapshot_member_invalid"):
+        k.job("run", request, replay=same_of(w, "a2", "a1").write())
+    assert calls(k) == []
+
+
 def test_two_documents_same_event_keep_document_mention_and_event_identities_separate(world):
     k, w = world.kit, world
     first = k.job("run", k.submit("job-a1", w.refs["a1"]), replay=k.replay("r1").extract(w.art["a1"], [w.mentions["a1"]]).write())
@@ -144,7 +183,7 @@ def test_two_documents_same_event_keep_document_mention_and_event_identities_sep
     assert {c["documentId"] for c in comparison["citations"]} == {w.refs["a1"]["documentId"], w.refs["a2"]["documentId"]}
     binding = second["binding"]["documents"][next(iter(second["binding"]["documents"]))]
     adapter, replay_binding = second["binding"]["adapter"], second["binding"]["replay"]
-    assert set(adapter) == {"version", "candidate", "fingerprint"} and adapter["version"] == "zoop-extraction-native-replay-1"
+    assert set(adapter) == {"version", "candidate", "fingerprint"} and adapter["version"] == "zoop-extraction-native-replay-3"
     assert replay_binding == {"format": "zoop-analysis-replay-1", "synthetic": True, "recordingKind": "authored-test", "promptVersion": PROMPT,
                               "analysisVersion": "authored-analysis-1", "fixtureHash": replay_binding["fixtureHash"]} and len(replay_binding["fixtureHash"]) == 64
     assert not any(name in json.dumps(second["binding"]) for name in ("pocCommit", "analysisFingerprint", "contextRevision", "settingsDigest", "modelVersion"))

@@ -39,15 +39,17 @@ const STAGES = [
   ['publish', '발행'],
 ] as const;
 
-const DD = 'text-xs';
-const DT = 'text-[11px] text-zoop-muted';
+const DD = 'text-caption';
+const DT = 'text-caption text-zoop-muted';
 
 function RoundDetailView({
   round,
   onAction,
+  readOnly,
 }: {
   round: RoundDetailData;
   onAction: (action: RoundAction) => void;
+  readOnly: boolean;
 }) {
   const items = round.published?.items ?? [];
   return (
@@ -71,14 +73,14 @@ function RoundDetailView({
           </ul>
         </dd>
         <dt className={DT}>데이터 범위</dt>
-        <dd className={`${DD} font-inter tabular-nums`}>
+        <dd className={`${DD} font-num tabular-nums`}>
           {round.dataWindow.openStart
             ? '처음부터'
             : formatKst(round.dataWindow.start)}{' '}
           ~ {formatKst(round.dataWindow.end)}
         </dd>
         <dt className={DT}>발행</dt>
-        <dd className={`${DD} font-inter tabular-nums`}>
+        <dd className={`${DD} font-num tabular-nums`}>
           {round.publishedAt ? formatKst(round.publishedAt) : '–'}
           {round.graphVersion && (
             <span className="ml-2 text-zoop-muted">
@@ -86,18 +88,28 @@ function RoundDetailView({
             </span>
           )}
         </dd>
-        <dt className={DT}>시도</dt>
-        <dd className={`${DD} tabular-nums`}>{count(round.attempts)}회</dd>
+        <dt className={DT}>기록된 생성 시도</dt>
+        <dd className={`${DD} tabular-nums`}>
+          {round.historyAvailability === 'unrecorded'
+            ? '과거 생성 시도 미기록'
+            : `${count(round.attempts)}회`}
+        </dd>
       </dl>
       {round.failureReason && (
-        <p className="rounded-2xl bg-zoop-soft px-4 py-3 text-xs text-zoop-alert">
+        <p className="rounded-2xl bg-zoop-soft px-4 py-3 text-caption text-zoop-alert">
           실패 사유: {round.failureReason}
         </p>
       )}
+      {round.reprocessState === 'completed' && !round.published && (
+        <p role="status" className="rounded-2xl bg-zoop-soft px-4 py-3 text-xs">
+          재처리 결과를 저장했습니다. 발행 대기 상태이며 기존 발행본은
+          유지됩니다.
+        </p>
+      )}
       {round.suspension && (
-        <p className="rounded-2xl bg-zoop-soft px-4 py-3 text-xs">
+        <p className="rounded-2xl bg-zoop-soft px-4 py-3 text-caption">
           제공 중단: {round.suspension.reason}{' '}
-          <span className="text-[11px] text-zoop-muted">
+          <span className="text-caption text-zoop-muted">
             ({formatKst(round.suspension.at)} · {round.suspension.adminEmail})
           </span>
         </p>
@@ -106,7 +118,7 @@ function RoundDetailView({
       <div className="flex flex-wrap items-center gap-2 border-y-[0.667px] border-zoop-line py-3">
         <button
           type="button"
-          disabled={!round.reprocessable}
+          disabled={readOnly || !round.reprocessable}
           onClick={() => onAction('reprocess')}
           className={BUTTON}
         >
@@ -114,7 +126,7 @@ function RoundDetailView({
         </button>
         <button
           type="button"
-          disabled={!round.published}
+          disabled={readOnly || !round.published}
           onClick={() => onAction('correct')}
           className={BUTTON}
         >
@@ -123,6 +135,7 @@ function RoundDetailView({
         {round.status === 'suspended' ? (
           <button
             type="button"
+            disabled={readOnly}
             onClick={() => onAction('resume')}
             className={BUTTON}
           >
@@ -131,15 +144,15 @@ function RoundDetailView({
         ) : (
           <button
             type="button"
-            disabled={!round.published}
+            disabled={readOnly || !round.published}
             onClick={() => onAction('suspend')}
             className={BUTTON}
           >
             제공 중단
           </button>
         )}
-        {!round.reprocessable && round.blockedReason && (
-          <p className="w-full text-[11px] text-zoop-muted">
+        {!readOnly && !round.reprocessable && round.blockedReason && (
+          <p className="w-full text-caption text-zoop-muted">
             재처리할 수 없어요: {round.blockedReason}
           </p>
         )}
@@ -154,7 +167,7 @@ function RoundDetailView({
               aria-label="발행 원문"
               className="flex min-w-0 flex-col gap-2"
             >
-              <h3 className="text-xs font-bold">발행 원문</h3>
+              <h3 className="text-caption font-bold">발행 원문</h3>
               {items.length === 0 ? (
                 <Empty>담긴 핵심 이슈가 없어요.</Empty>
               ) : (
@@ -164,13 +177,13 @@ function RoundDetailView({
                       key={item.eventId}
                       className="flex flex-col gap-1 border-b-[0.667px] border-zoop-line py-2"
                     >
-                      <p className="text-xs font-semibold">
+                      <p className="text-caption font-semibold">
                         <span className="text-zoop-muted tabular-nums">
                           {item.rank}.{' '}
                         </span>
                         {item.title}
                       </p>
-                      <p className="text-[11px] text-zoop-muted">
+                      <p className="text-caption text-zoop-muted">
                         {item.reason}
                       </p>
                     </li>
@@ -179,7 +192,7 @@ function RoundDetailView({
               )}
             </section>
             <section aria-label="정정" className="flex min-w-0 flex-col gap-2">
-              <h3 className="text-xs font-bold">
+              <h3 className="text-caption font-bold">
                 정정 {count(round.corrections.length)}
               </h3>
               {round.corrections.length === 0 ? (
@@ -192,12 +205,14 @@ function RoundDetailView({
                       className="flex flex-col gap-1 border-b-[0.667px] border-zoop-line py-2"
                     >
                       {correction.original && (
-                        <p className="text-[11px] text-zoop-faint line-through">
+                        <p className="text-caption text-zoop-faint line-through">
                           원문: {correction.original}
                         </p>
                       )}
-                      <p className="text-xs">정정: {correction.corrected}</p>
-                      <p className="text-[11px] text-zoop-muted">
+                      <p className="text-caption">
+                        정정: {correction.corrected}
+                      </p>
+                      <p className="text-caption text-zoop-muted">
                         사유 {correction.reason} ·{' '}
                         {formatKst(correction.createdAt)} ·{' '}
                         {correction.adminEmail}
@@ -211,6 +226,60 @@ function RoundDetailView({
         )}
       </Section>
 
+      {round.historyAvailability === 'unrecorded' && (
+        <p className="text-xs text-zoop-muted">
+          발행 결과는 보존돼 있지만 과거 생성·검증 시도 전체는 미기록입니다.
+          확인 가능한 모델 영수증은 별도로 표시하며, 미기록을 실제 호출·토큰
+          0으로 해석하지 않습니다.
+        </p>
+      )}
+      {round.aiExecutions && round.aiExecutions.length > 0 && (
+        <Section title="모델 호출 기록">
+          <Table caption="회차 모델 실행 기록">
+            <thead>
+              <tr>
+                <th className={TH}>시도</th>
+                <th className={TH}>단계 · 모델</th>
+                <th className={TH}>시작 / 종료</th>
+                <th className={TH}>실행 방식</th>
+                <th className={TH}>상태</th>
+                <th className={TH}>입력 / 출력 토큰</th>
+              </tr>
+            </thead>
+            <tbody>
+              {round.aiExecutions.map((call) => (
+                <tr key={call.id}>
+                  <td className={TD}>
+                    {call.origin === 'archive'
+                      ? '과거 영수증(원 시도 미확인)'
+                      : call.attemptNo}
+                  </td>
+                  <td className={TD}>
+                    {call.stage} · {call.model ?? '–'}
+                  </td>
+                  <td className={TD}>
+                    {formatKst(call.startedAt)} / {formatKst(call.finishedAt)}
+                  </td>
+                  <td className={TD}>
+                    {call.mode === 'live'
+                      ? '실제 호출'
+                      : call.mode === 'replay'
+                        ? '결과 재사용(호출 없음)'
+                        : '저장 복구(호출 없음)'}
+                  </td>
+                  <td className={TD}>
+                    {call.status}
+                    {call.errorCode && ` · ${call.errorCode}`}
+                  </td>
+                  <td className={TD}>
+                    {call.inputTokens ?? '–'} / {call.outputTokens ?? '–'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </Section>
+      )}
       <Section title="처리 기록">
         {round.attemptsLog.length === 0 ? (
           <Empty>아직 처리 기록이 없어요.</Empty>
@@ -220,6 +289,7 @@ function RoundDetailView({
               <tr>
                 <th className={TH}>#</th>
                 <th className={TH}>시작</th>
+                <th className={TH}>종료</th>
                 <th className={TH}>상태</th>
                 <th className={TH}>요청</th>
                 <th className={TH}>실패 사유</th>
@@ -230,10 +300,11 @@ function RoundDetailView({
                 <tr key={attempt.n}>
                   <td className={`${TD} tabular-nums`}>{attempt.n}</td>
                   <td
-                    className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                    className={`${TD} whitespace-nowrap font-num tabular-nums`}
                   >
                     {formatKst(attempt.startedAt)}
                   </td>
+                  <td className={TD}>{formatKst(attempt.finishedAt)}</td>
                   <td className={TD}>
                     {roundStatusLabel[
                       attempt.status as keyof typeof roundStatusLabel
@@ -245,7 +316,9 @@ function RoundDetailView({
                       : (attempt.adminEmail ?? '관리자')}
                   </td>
                   <td className={`${TD} text-zoop-muted`}>
-                    {attempt.failureReason ?? '–'}
+                    {[attempt.failureStage, attempt.failureReason]
+                      .filter(Boolean)
+                      .join(' · ') || '–'}
                   </td>
                 </tr>
               ))}
@@ -261,10 +334,12 @@ function RoundPanel({
   roundId,
   onClose,
   onChanged,
+  readOnly,
 }: {
   roundId: string;
   onClose: () => void;
   onChanged: () => void;
+  readOnly: boolean;
 }) {
   const load = useCallback(() => getAdminBriefingRound(roundId), [roundId]);
   const detail = useAsyncData(load);
@@ -281,12 +356,12 @@ function RoundPanel({
   return (
     <article aria-label="회차 상세" className="flex min-w-0 flex-col gap-4">
       {detail.refreshError && (
-        <p role="status" className="text-[11px] text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}
       <div className="flex items-start gap-2">
-        <h2 className="flex-1 text-sm font-bold tabular-nums">
+        <h2 className="flex-1 text-body font-bold tabular-nums">
           {round
             ? `${round.date} ${editionLabel[round.edition]} 브리핑`
             : '회차 상세'}
@@ -294,13 +369,13 @@ function RoundPanel({
         <button
           type="button"
           onClick={onClose}
-          className={`text-[11px] text-zoop-muted hover:text-zoop-ink ${FOCUS_RING}`}
+          className={`text-caption text-zoop-muted hover:text-zoop-ink ${FOCUS_RING}`}
         >
           닫기
         </button>
       </div>
       {done && (
-        <p role="status" className="text-[11px] font-semibold">
+        <p role="status" className="text-caption font-semibold">
           {done}
         </p>
       )}
@@ -314,7 +389,7 @@ function RoundPanel({
           onRetry={detail.reload}
         />
       )}
-      {round && action && (
+      {round && action && !readOnly && (
         <RoundActionForm
           key={action}
           round={round}
@@ -331,6 +406,7 @@ function RoundPanel({
       {round && (
         <RoundDetailView
           round={round}
+          readOnly={readOnly}
           onAction={(next) => {
             setDone(null);
             setAction(next);
@@ -344,7 +420,11 @@ function RoundPanel({
 // A-ADM-04 브리핑 운영 (FS070-01·02, FS071-01·02)
 // - 회차별 데이터 기준 시점·생성/검증/발행 상태·실패 사유. 조회는 재처리나 발행을 하지 않는다.
 // - 선택한 회차는 주소(?round=)에 남는다. 관리 작업은 사유를 받고, 끝나면 목록과 상세를 다시 읽는다.
-export default function BriefingOperations() {
+export default function BriefingOperations({
+  readOnly = false,
+}: {
+  readOnly?: boolean;
+}) {
   const { params, updateQuery } = useRouteQuery();
   const selectedId = params.get('round');
   const rounds = useCursorPages(listAdminBriefingRounds);
@@ -371,8 +451,19 @@ export default function BriefingOperations() {
           )
         }
       />
+      {readOnly ? (
+        <Note>
+          회차 조회만 제공됩니다. 재처리·정정·제공 중단 및 재개는 아직 지원하지
+          않습니다.
+        </Note>
+      ) : (
+        <Note>
+          정정·중단·재개는 변경 이력으로 저장됩니다. 재처리는 미발행 회차의 고정
+          입력으로 생성·검증·저장을 진행하며, 발행은 별도 승인 절차를 따릅니다.
+        </Note>
+      )}
       {rounds.refreshError && (
-        <p role="status" className="text-[11px] text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}
@@ -430,7 +521,7 @@ export default function BriefingOperations() {
                         )}
                       </td>
                       <td
-                        className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                        className={`${TD} whitespace-nowrap font-num tabular-nums`}
                       >
                         {formatKst(round.dataWindow.end)}
                       </td>
@@ -464,12 +555,13 @@ export default function BriefingOperations() {
             <RoundPanel
               key={selectedId}
               roundId={selectedId}
+              readOnly={readOnly}
               onClose={() => updateQuery({ round: null }, { replace: true })}
               onChanged={rounds.reload}
             />
           ) : (
             <div className="flex flex-col gap-1">
-              <p className="text-sm font-bold">회차를 골라 주세요</p>
+              <p className="text-body font-bold">회차를 골라 주세요</p>
               <Note>발행 원문과 정정, 처리 기록을 보여 줘요.</Note>
             </div>
           )}

@@ -11,6 +11,8 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from .country_context import VERSION as COUNTRY_CONTEXT_VERSION
+from .country_context import CountryContext
 from .relation_contracts import (CANDIDATE_VERSION, IMPACT_POLICY, IMPACT_PRODUCER, IMPACT_REQUEST, IMPACT_VERIFIER, IMPACT_VERIFY_REQUEST,
     INDIRECT_TYPES, MAX_PATH, NON_PROOF, TYPES, VERIFIER, VERIFY_REQUEST, CitationFailure, ImpactResponse, ImpactVerifierResponse, RelationResponse, ReplyInvalid,
     VerifierResponse, digest)
@@ -22,7 +24,7 @@ class View:
     companies: dict[str, list[str]]  # companyId -> display names
     events: dict[str, dict]          # ref -> {"origin", "names", "docs": {(documentId, documentVersion)}}
     topics: dict[str, dict]          # ref -> {"names", "docs"}
-    countries: set[str]
+    countries: CountryContext      # canonical codes plus verbatim/unresolved S2 geography
     cite: Callable[[dict], dict]     # camelCase citation -> exact resolved citation; raises CitationFailure
 
     def names(self, endpoint: dict) -> list[str]:
@@ -186,15 +188,19 @@ def evaluate(n: dict, view: View) -> dict:
     if validity["from"] and validity["until"] and validity["from"] > validity["until"]:
         rejects.append(_reason("validity_order_invalid"))
 
-    declared, known = n["countries"], view.countries
+    declared, geography = n["countries"], view.countries
+    known = geography.known
     market = "unknown" if not declared else "domestic" if declared == ["KR"] else "international"
     if not declared:
         country_check = "unknown"
-    elif known and not set(declared) <= known:
+    elif set(declared) <= known:
+        country_check = "pass"
+    elif not known or geography.unresolved:
+        # Missing/ambiguous geography is not a proven mismatch. The independent context claim still needs cited support.
+        country_check = "unverified"
+    else:
         country_check = "conflict"
         holds.append(_reason("country_context_conflict"))
-    else:
-        country_check = "pass" if known else "unverified"
 
     target_docs = None
     for role in ("subject", "object"):
@@ -225,7 +231,9 @@ def evaluate(n: dict, view: View) -> dict:
                "validity": {"from": validity["from"], "until": validity["until"],
                             "fromStatus": "known" if validity["from"] else "unknown", "untilStatus": "known" if validity["until"] else "unknown",
                             "citations": validity_citations},
-               "countries": declared, "context": {"market": market, "check": country_check, "knownCountries": sorted(known)},
+               "countries": declared, "context": {"market": market, "check": country_check, "knownCountries": sorted(known),
+                   "normalizationVersion": COUNTRY_CONTEXT_VERSION, "rawGeography": list(geography.raw),
+                   "unresolvedGeography": list(geography.unresolved)},
                "citations": citations, "path": path, "generatorReasons": n["reasons"], "proposalCount": n["proposalCount"],
                "precheck": {"state": state, "reasons": [*rejects, *holds]}, "approved": False,
                "facts": None, "quotes": None, "claims": None}

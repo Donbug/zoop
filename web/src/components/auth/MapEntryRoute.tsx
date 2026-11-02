@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { readSocialLinkResult } from '@/components/common/socialLinkResult';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 
 // D-AUT-01 / FS001, FS005: choose a start method before entering the map.
 export default function MapEntryRoute() {
@@ -8,9 +9,10 @@ export default function MapEntryRoute() {
   const location = useLocation();
   if (auth.checking)
     return (
-      <p role="status" className="p-6 text-sm text-zoop-muted">
-        로그인 상태를 확인하고 있어요.
-      </p>
+      <LoadingIndicator
+        label="로그인 상태를 확인하고 있어요."
+        className="flex min-h-screen w-full p-6 text-body text-zoop-muted"
+      />
     );
   if (auth.status !== 'ready' || (!auth.isAuthenticated && !auth.isGuest))
     return <Navigate to="/login" replace state={{ from: location }} />;

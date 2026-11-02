@@ -84,7 +84,7 @@ function Transcript({
   return (
     <>
       <Note>
-        <span className="font-inter">{data.user}</span> ·{' '}
+        <span className="font-num">{data.user}</span> ·{' '}
         {data.userKind === 'member' ? '회원' : '비회원'} · 시작{' '}
         {formatKst(data.startedAt)} · 질문 {data.messages.length}개
       </Note>
@@ -92,11 +92,11 @@ function Transcript({
         role="note"
         className="flex flex-col gap-0.5 border-y-[0.667px] border-zoop-line py-3"
       >
-        <p className="text-xs font-semibold">
+        <p className="text-caption font-semibold">
           개인정보를 가린 사본이에요. 저장된 원문은 바뀌지 않았고, 이 열람은
           감사 로그에 남았어요.
         </p>
-        <p className="text-[11px] text-zoop-muted">
+        <p className="text-caption text-zoop-muted">
           가리는 항목: {data.masking.rules.join(' · ')}.{' '}
           {masked.length > 0
             ? `이 대화에서 가린 것: ${masked
@@ -116,31 +116,31 @@ function Transcript({
               key={message.id}
               className="flex flex-col gap-2 border-b-[0.667px] border-zoop-line py-4"
             >
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zoop-muted">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-caption text-zoop-muted">
                 <span className="font-semibold text-zoop-ink">
                   질문 {message.seq}
                 </span>
-                <span className="font-inter tabular-nums">
+                <span className="font-num tabular-nums">
                   {formatKst(message.at)}
                 </span>
                 <span>{messageStatus[message.status] ?? message.status}</span>
                 <span>근거 인용 {message.citationCount}건</span>
               </div>
-              <p className="text-[13px] font-semibold">
+              <p className="text-body font-semibold">
                 <span className="sr-only">질문: </span>
                 {message.question}
               </p>
-              <p className="text-[13px] leading-relaxed whitespace-pre-line">
+              <p className="text-body leading-relaxed whitespace-pre-line">
                 <span className="sr-only">답변: </span>
                 {message.answer}
               </p>
               {message.contextLabels.length > 0 && (
-                <p className="text-[11px] text-zoop-muted">
+                <p className="text-caption text-zoop-muted">
                   연결한 대상: {message.contextLabels.join(' · ')}
                 </p>
               )}
               {(message.feedback.up > 0 || message.feedback.down > 0) && (
-                <div className="flex flex-col gap-1 text-[11px] text-zoop-muted">
+                <div className="flex flex-col gap-1 text-caption text-zoop-muted">
                   <p className="tabular-nums">
                     좋아요 {message.feedback.up} · 싫어요{' '}
                     {message.feedback.down}
@@ -174,7 +174,7 @@ export default function AdminTranscriptPage() {
     >
       <Link
         to={back}
-        className={`self-start text-[11px] text-zoop-muted hover:text-zoop-ink ${FOCUS_RING}`}
+        className={`self-start text-caption text-zoop-muted hover:text-zoop-ink ${FOCUS_RING}`}
       >
         ← AI 대화록
       </Link>

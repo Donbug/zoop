@@ -90,6 +90,9 @@ public class AiExecution {
     @Column(name = "output_tokens", columnDefinition = "bigint")
     private Long outputTokens;
 
+    @Column(name = "reasoning_tokens", columnDefinition = "bigint")
+    private Long reasoningTokens;
+
     @Column(name = "estimated_cost", columnDefinition = "numeric")
     private BigDecimal estimatedCost;
 

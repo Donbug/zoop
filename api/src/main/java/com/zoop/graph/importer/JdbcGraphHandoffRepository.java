@@ -32,7 +32,7 @@ public class JdbcGraphHandoffRepository implements GraphHandoffRepository {
     // DELETE holds ROW EXCLUSIVE; TRUNCATE ACCESS EXCLUSIVE) and with nothing a reader takes (ACCESS SHARE of the catalog search,
     // ROW SHARE of a foreign key check), so it is the weakest mode that fixes the rows and the absent ids this import read.
     private static final String LOCK_CATALOG = "LOCK TABLE companies IN SHARE MODE";
-    private static final String COMPANIES = "SELECT id, name FROM companies WHERE id IN (:ids)";
+    private static final String COMPANIES = "SELECT id, name, aliases FROM companies WHERE id IN (:ids)";
     private static final String FIND_EVIDENCE = """
             SELECT e.id, e.article_id, e.article_version, e.text_artifact_id, e.summary_analysis_id, e.quote, e.start_offset,
                    e.end_offset, e.offset_unit, e.input_kind, CAST(e.raw_locator_ids AS text) AS raw_locator_ids,
@@ -101,7 +101,13 @@ public class JdbcGraphHandoffRepository implements GraphHandoffRepository {
             return rows;
         }
         jdbc.query(COMPANIES, new MapSqlParameterSource("ids", ids), (result, index) -> {
-            CompanyRow row = new CompanyRow(result.getString("id"), result.getString("name"));
+            var aliases = result.getArray("aliases");
+            CompanyRow row;
+            try {
+                row = new CompanyRow(result.getString("id"), result.getString("name"), List.of((String[]) aliases.getArray()));
+            } finally {
+                aliases.free();
+            }
             rows.put(row.id(), row);
             return row;
         });

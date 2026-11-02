@@ -5,9 +5,9 @@ type Token = 'ink' | 'muted' | 'faint' | 'line' | 'paper' | 'soft' | 'up';
 export type ColorTheme = 'light' | 'dark';
 
 const LIGHT: Record<Token, string> = {
-  ink: '#1a1a1a',
-  muted: '#5f5f5b',
-  faint: '#94948f',
+  ink: '#212121',
+  muted: '#212121',
+  faint: '#212121',
   line: '#d6d6d2',
   paper: '#ffffff',
   soft: '#f2f2f0',

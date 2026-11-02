@@ -119,7 +119,7 @@ export default function MarketSummary({
       ) : (
         <div className="flex flex-col gap-5">
           <div>
-            <p className="mb-2 text-[13px] font-semibold">
+            <p className="mb-2 text-body font-semibold">
               {edition === 'morning'
                 ? '오늘 전망 갱신'
                 : '아침 예상 점검 · 다음 거래일 전망'}
@@ -134,7 +134,7 @@ export default function MarketSummary({
             {analysis.coverage.companyNames.length > 0 && (
               <details className="mt-2">
                 <summary
-                  className={`cursor-pointer text-[11px] text-zoop-muted ${FOCUS_RING}`}
+                  className={`cursor-pointer text-caption text-zoop-muted ${FOCUS_RING}`}
                 >
                   분석에 포함한 기업
                 </summary>

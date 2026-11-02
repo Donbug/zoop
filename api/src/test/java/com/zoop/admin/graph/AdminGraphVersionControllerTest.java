@@ -57,7 +57,8 @@ class AdminGraphVersionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.activeVersionId").value("gv-1"))
                 .andExpect(jsonPath("$.previousActiveVersionId").hasJsonPath());
-        verify(service).activate(eq("gv-1"), argThat(r -> r.expectedActiveVersionId() == null), eq("key-1"),
+        verify(service).activate(eq("gv-1"),
+                argThat(r -> r.expectedActiveVersionId() == null && "forward".equals(r.mode())), eq("key-1"),
                 eq(ADMIN), anyString());
     }
 
@@ -76,5 +77,24 @@ class AdminGraphVersionControllerTest {
                         .content("{\"reason\":\"go live\",\"expectedActiveVersionId\":null}"))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void rollbackReachesTheServiceAsAnExplicitMode() throws Exception {
+        when(service.activate(eq("gv-1"), any(), eq("key-1"), eq(ADMIN), anyString()))
+                .thenReturn(new ActivateResponse("gv-1", "gv-2", false));
+
+        mvc.perform(activate("{\"reason\":\"restore\",\"expectedActiveVersionId\":\"gv-2\",\"mode\":\"rollback\"}"))
+                .andExpect(status().isOk());
+        verify(service).activate(eq("gv-1"), argThat(r -> "rollback".equals(r.mode())), eq("key-1"),
+                eq(ADMIN), anyString());
+    }
+
+    @Test
+    void anUnknownActivationModeIsInvalidBeforeTheServiceRuns() throws Exception {
+        mvc.perform(activate("{\"reason\":\"go live\",\"expectedActiveVersionId\":null,\"mode\":\"replace\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        verifyNoInteractions(service);
     }
 }

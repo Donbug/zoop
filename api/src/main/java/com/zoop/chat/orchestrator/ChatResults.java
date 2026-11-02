@@ -9,6 +9,7 @@ import com.zoop.chat.dto.ChatLimitation;
 import com.zoop.chat.dto.ChatNotice;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.Citation;
+import com.zoop.chat.dto.ChatUiAction;
 import com.zoop.chat.dto.GraphTarget;
 import com.zoop.chat.executor.ChatRun;
 import com.zoop.common.response.Metadata;
@@ -33,6 +34,7 @@ final class ChatResults {
             Map.entry("ambiguous_target", "어떤 기업이나 사건에 대한 질문인지 알려 주세요."),
             Map.entry("plan_over_budget", "질문 범위가 넓어 한 번에 조회할 수 없어요. 대상이나 기간을 좁혀 주세요."),
             Map.entry("checkpoint_excess", "조건에 맞는 대상이 예상보다 많아요. 이어서 볼 대상을 골라 주세요."),
+            Map.entry("web_company_selection", "외부 자료를 더 확인할 기업이 두 곳보다 많아요. 이번에 검색할 두 기업을 골라 주세요."),
             Map.entry("clarification_limit", "확인 질문을 두 번 했는데도 범위를 정하지 못했어요. 기업 이름과 기간을 구체적으로 적어 새 질문으로 "
                     + "보내 주세요."),
             Map.entry("out_of_scope", "이 질문은 지금 답할 수 있는 범위 밖이에요. 기업과 사건의 연결이나 근거 자료에 대해 물어봐 주세요."),
@@ -69,15 +71,16 @@ final class ChatResults {
             "tool_unavailable", "이 부분은 자료 조회가 일시적으로 되지 않아 답하지 못했어요. 잠시 뒤 다시 물어봐 주세요.");
 
     /**
-     * Notice messages by code (MCP actions contract 3.5, web search design 4). Only {@code mcp_direct_start} is produced so
-     * far; the web codes are written for the server's web step, which is not wired yet.
+     * Notice messages by code (MCP actions contract 3.5, web search design 4). {@code web_not_configured} is written for a
+     * server web step that is not wired yet.
      */
     private static final Map<String, String> NOTICES = Map.of(
             "mcp_direct_start", "자료 조회 연결이 원활하지 않아 기본 조회 방식으로 답했어요. 답변 내용의 확인 절차는 같아요.",
             "web_unavailable", "보조 웹 검색이 지금 되지 않아 줍의 자료로만 답했어요.",
             "web_no_results", "보조 웹 검색에서 맞는 결과를 찾지 못해 줍의 자료로만 답했어요.",
             "web_budget_exhausted", "웹 검색 횟수 한도에 닿아 웹은 찾아보지 않았어요. 줍의 자료로만 답했어요.",
-            "web_not_configured", "웹 검색을 쓸 수 없는 상태라 줍의 자료로만 답했어요.");
+            "web_not_configured", "웹 검색을 쓸 수 없는 상태라 줍의 자료로만 답했어요.",
+            "tool_unavailable", "자료 일부를 일시적으로 읽지 못해 확인한 자료로만 답했어요.");
 
     /** {@code evidence_insufficient} messages that say why, when the server knows it; otherwise the kind's own. */
     private static final Map<String, String> INSUFFICIENT = Map.of(
@@ -177,7 +180,7 @@ final class ChatResults {
     static ChatResult answered(ChatRun run, List<ChatGeneratedAnswer.Section> sections, List<Citation> citations,
             List<GraphTarget> targets, List<ChatAppliedItem> companies, List<ChatAppliedItem> issues,
             List<ChatLimitation> limitations, boolean partial, List<ChatNotice> notices, boolean questionOverrodeContext,
-            ChatAppliedPeriod writtenPeriod, Instant now) {
+            ChatAppliedPeriod writtenPeriod, List<ChatUiAction> uiActions, Instant now) {
         List<ChatAnswerSection> publicSections = sections.stream()
                 .map(s -> new ChatAnswerSection(s.basis(), s.text(), s.evidenceIds())).toList();
         Set<String> sources = new LinkedHashSet<>();
@@ -187,7 +190,7 @@ final class ChatResults {
                 answerBasis(sections), null, List.copyOf(sources), List.copyOf(citations), List.copyOf(targets),
                 applied(run, companies, issues, questionOverrodeContext, writtenPeriod, now), List.of(), null,
                 List.copyOf(limitations),
-                metadata(run, now), partial ? "partial" : "complete", notices);
+                metadata(run, now), partial ? "partial" : "complete", notices, uiActions);
     }
 
     /** A notice about the whole run. */

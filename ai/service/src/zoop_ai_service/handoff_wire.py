@@ -1,4 +1,4 @@
-"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-7` bundle.
+"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-8` bundle.
 
 Three kinds of model live here:
   * `Hd*` models (extra forbidden) are what this service emits as status and what the generated OpenAPI documents;
@@ -16,16 +16,15 @@ The models are the structural contract the application can rely on (exact key se
 export, and the service never repeats or second-guesses them. Everything in the bundle that came from a source (titles, URLs, labels, observation
 metadata) is data, never authority: no field of it grants, extends or proves a right, and the service gates delivery only on the producer's current
 verdict and the operator's pins.
-Two exceptions: the `impacts` list (its row state table and every closure the closed models can see: one row per emitted INVOLVES source relation, endpoints, source
-approval kind, effect evidence ids and article versions, counts, policy, deterministic label) and the issue `summary` (bundle `-7`: the whole decision table of the
-producer's `issue_summary_contracts` is recomputed from the bundle, see `check_issue_summary`) are enforced here as well, so a forged row or summary never leaves.
+The receipt-only impacts and summary decision tables, public geography, raw-time precision and explicit temporal verdict closure are independently
+checked by this service. The producer and importer additionally resolve exact source text, rights and the complete referential closure.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
@@ -36,8 +35,9 @@ from .wire import ErrorBody, Reviewer, Safe
 
 SCHEMA = "zoop-ai-internal-handoff-1"
 RUNTIME_SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-7"
-POLICY = "zoop-public-projection-policy-1"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-8"
+POLICY = "zoop-public-projection-policy-2"
+BUNDLE_POLICIES = {BUNDLE_SCHEMA: POLICY, "zoop-graph-handoff-bundle-9": "zoop-public-projection-policy-3"}
 HANDOFF_ID_PATTERN = r"^[A-Za-z0-9._:-]{1,200}$"
 HASH_PATTERN = r"^[a-f0-9]{64}$"
 RC_PATTERN = r"^rc-[a-f0-9]{64}$"
@@ -107,11 +107,11 @@ class BPolicyFiles(Bx):
 
 
 class BPolicy(Bx):
-    version: Literal["zoop-public-projection-policy-1"]
+    version: Literal["zoop-public-projection-policy-2", "zoop-public-projection-policy-3"]
     files: BPolicyFiles
     evidence_id_kind: Literal["graph-body-span"]
     offset_unit: Literal["unicode_code_point"]
-    geography: Literal["operator-field-verdict"]
+    geography: Literal["operator-field-verdict", "operator-field-verdict-or-explicit-unknown"]
     structural: Literal["manual-operator-review"]
     sequence: Literal["s2-comparison-with-operator-decision"]
     source_support: Literal["origin-or-exact-text-union"]
@@ -130,14 +130,22 @@ class BUpstream(Bx):
     digest: Hash
 
 
-class BSourcePolicies(Bx):
+class BSourcePolicyVersions(Bx):
     producer: Name
     verifier: Name
     impact_producer: Name
     impact_verifier: Name
-    policy: Name
     revalidation_policy: Name
     impact_policy: Name
+
+
+class BRetainedSourcePolicies(BSourcePolicyVersions):
+    policy: Literal["zoop-relation-policy-1"]
+
+
+class BSourcePolicies(BSourcePolicyVersions):
+    policy: Literal["zoop-relation-policy-2"]
+    country_context: Literal["zoop-country-context-1"]
 
 
 class BEligibility(Bx):
@@ -201,7 +209,7 @@ class BSource(Bx):
     upstream: BUpstream
     review_digest: Hash
     provenance: BSourceProvenance
-    policies: BSourcePolicies
+    policies: Annotated[Union[BRetainedSourcePolicies, BSourcePolicies], Field(discriminator="policy")]
     review_used: Annotated[list[BReviewUse], Field(max_length=MAX_RELATIONS)]
     audit: BAudit
 
@@ -241,11 +249,34 @@ class BGeography(Bx):
     value: Literal["domestic", "international"]
     decision_ref: Id
     decision_version: Id
-    policy_version: Literal["zoop-public-projection-policy-1"]
+    policy_version: Literal["zoop-public-projection-policy-2", "zoop-public-projection-policy-3"]
     countries: Countries
     verification: Literal["operator-field-verdict"]
     evidence_ids: EvidenceIds
     basis: Annotated[list[BGeographyBasis], Field(max_length=1000)]
+
+    @model_validator(mode="after")
+    def explicit_geography(self) -> BGeography:
+        if not self.countries or any(re.fullmatch(r"[A-Z]{2}", country) is None for country in self.countries):
+            raise ValueError("public geography requires a nonempty country set")
+        expected = "domestic" if set(self.countries) == {"KR"} else "international"
+        if self.value != expected or not self.evidence_ids:
+            raise ValueError("geography classification and evidence must match the decision")
+        if any(b.countries and b.countries != self.countries for b in self.basis):
+            raise ValueError("every nonempty source country declaration must match exactly")
+        return self
+
+
+class BUnknownGeography(Bx):
+    value: None
+    decision_ref: Id
+    decision_version: Id
+    policy_version: Literal["zoop-public-projection-policy-3"]
+    countries: Annotated[list[str], Field(max_length=0)]
+    verification: Literal["not-established"]
+    reason_code: Literal["not-stated", "not-supported", "conflicting"]
+    evidence_ids: Annotated[list[str], Field(max_length=0)]
+    basis: Annotated[list[BGeographyBasis], Field(min_length=1, max_length=1000)]
 
 
 class BParticipant(Bx):
@@ -255,6 +286,38 @@ class BParticipant(Bx):
     company_id: Id | None
     name: MentionText
     role: MentionText
+
+
+_MENTION_TIME = re.compile(r"([0-9]{4})(?:-([0-9]{2})(?:-([0-9]{2})(?:T([0-9]{2}):([0-9]{2})(?::([0-9]{2})(?:\.[0-9]{1,9})?)?(Z|[+-][0-9]{2}:[0-9]{2}))?)?)?")
+
+
+def event_precision(value: str | None, *, receipt: bool = False) -> str:
+    """The shared calendar grammar; only receipts retain unsupported nonempty strings as unresolved."""
+    if value is None:
+        return "unknown"
+    try:
+        found = _MENTION_TIME.fullmatch(value)
+        if found is None:
+            raise ValueError("unsupported event time")
+        year, month, day, hour, minute, second, offset = found.groups()
+        if month is None:
+            return "year"
+        if year == "0000" or not 1 <= int(month) <= 12:
+            raise ValueError("unsupported calendar")
+        if day is None:
+            return "month"
+        date(int(year), int(month), int(day))
+        if hour is None:
+            return "day"
+        if int(hour) > 23 or int(minute) > 59 or (second is not None and int(second) > 59):
+            raise ValueError("unsupported clock")
+        if offset != "Z" and (int(offset[4:6]) > 59 or int(offset[1:3]) * 60 + int(offset[4:6]) > 18 * 60):
+            raise ValueError("unsupported offset")
+        return "datetime"
+    except ValueError:
+        if receipt and value:
+            return "unresolved"
+        raise
 
 
 class BMention(Bx):
@@ -269,13 +332,19 @@ class BMention(Bx):
     title: MentionText
     action: MentionText
     target: MentionText | None
-    event_time: Stamp | None
-    time_precision: Literal["year", "month", "day", "datetime", "unknown"]
+    event_time: MentionText | None
+    time_precision: Literal["year", "month", "day", "datetime", "unknown", "unresolved"]
     period: MentionText | None
     assertion_status: Literal["occurred", "announced", "planned", "forecast", "cancelled", "unknown"]
     background: bool
     participants: Annotated[list[BParticipant], Field(max_length=1000)]
     evidence_ids: Annotated[list[Annotated[str, StringConstraints(pattern=EVIDENCE_ID_PATTERN)]], Field(min_length=1, max_length=MAX_EVIDENCE)]
+
+    @model_validator(mode="after")
+    def original_precision(self) -> BMention:
+        if self.time_precision != event_precision(self.event_time, receipt=True):
+            raise ValueError("original mention precision must describe its exact source value")
+        return self
 
 
 class BMentionRef(Bx):
@@ -308,7 +377,7 @@ class BFieldVerdict(Bx):
     field: Literal["eventTime", "period"]
     value: MentionText
     decision: Literal["ALLOW", "HOLD", "REJECT"]
-    reason_code: Literal["stated", "unstated", "ambiguous", "contradicted"]
+    reason_code: Literal["stated", "unstated", "ambiguous", "unsupported-format", "contradicted"]
     evidence_ids: Annotated[list[Annotated[str, StringConstraints(pattern=EVIDENCE_ID_PATTERN)]], Field(max_length=20)]
     verification: Literal["operator-field-verdict"]
     reviewer: Id
@@ -320,12 +389,14 @@ class BFieldVerdict(Bx):
         allowed = {"ALLOW": ("stated", 1), "HOLD": None, "REJECT": ("contradicted", 1)}
         spans = len(self.evidence_ids)
         if self.decision == "HOLD":
-            ok = (self.reason_code == "unstated" and spans == 0) or (self.reason_code == "ambiguous" and spans >= 1)
+            ok = (self.reason_code == "unstated" and spans == 0) or (self.reason_code in ("ambiguous", "unsupported-format") and spans >= 1)
         else:
             code, minimum = allowed[self.decision]  # type: ignore[misc]
             ok = self.reason_code == code and spans >= minimum
         if not ok:
             raise ValueError("verdict decision, reasonCode and evidence count do not combine")
+        if self.reason_code == "unsupported-format" and (self.field != "eventTime" or event_precision(self.value, receipt=True) != "unresolved"):
+            raise ValueError("unsupported-format requires an unresolved eventTime")
         return self
 
 
@@ -578,7 +649,7 @@ class BIssue(Bx):
     time_precision: Literal["year", "month", "day", "datetime", "unknown"]
     period: Text | None
     assertion_status: Text | None
-    geography: BGeography
+    geography: BGeography | BUnknownGeography
     evidence_ids: EvidenceIds
     source_events: Annotated[list[BSourceEvent], Field(max_length=1000)]
     mentions: Annotated[list[BMention], Field(max_length=1000)]
@@ -588,6 +659,37 @@ class BIssue(Bx):
     field_verdicts: Annotated[list[BFieldVerdict], Field(max_length=2000)]
     source_support: BSourceSupport
     summary: Summary
+
+    @model_validator(mode="after")
+    def reviewed_source_fields(self) -> BIssue:
+        if self.time_precision != event_precision(self.event_time):
+            raise ValueError("public eventTime must match its supported precision")
+        if not any(m.time_precision == "unresolved" for m in self.mentions) and not any(v.reason_code == "unsupported-format" for v in self.field_verdicts):
+            return self
+        mentions = {(m.document_id, m.document_version, m.mention_id): m for m in self.mentions}
+        reviewed = set()
+        withheld = set()
+        rep = self.representative
+        representative = (rep.document_id, rep.document_version, rep.mention_id) if rep else None
+        for verdict in self.field_verdicts:
+            key = (verdict.document_id, verdict.document_version, verdict.mention_id)
+            mention = mentions.get(key)
+            field = "event_time" if verdict.field == "eventTime" else "period"
+            if mention is None or verdict.value != getattr(mention, field):
+                raise ValueError("field verdict must match its own original mention and exact value")
+            if verdict.decision != "ALLOW":
+                if verdict.field == "eventTime":
+                    reviewed.add(key)
+                if representative is None or key == representative:
+                    withheld.add(verdict.field)
+        if any(m.time_precision == "unresolved" and key not in reviewed for key, m in mentions.items()):
+            raise ValueError("every unresolved mention requires an explicit non-ALLOW eventTime verdict")
+        if self.field_provenance.withheld != [f for f in ("eventTime", "period") if f in withheld]:
+            raise ValueError("withheld fields must follow the selected mentions' verdicts")
+        for field in withheld:
+            if getattr(self, "event_time" if field == "eventTime" else "period") is not None:
+                raise ValueError("held or rejected headline fields must be null")
+        return self
 
 
 class BSourceRef(Bx):
@@ -929,7 +1031,7 @@ class BDigests(Bx):
 
 class Bundle(Bx):
     """The producer's artifact. Key names, order-free content and every value are the producer's; this class only says which shapes are acceptable."""
-    schema_version: Literal["zoop-graph-handoff-bundle-7"]
+    schema_version: Literal["zoop-graph-handoff-bundle-8", "zoop-graph-handoff-bundle-9"]
     handoff_id: Id
     manifest_digest: Hash
     provenance: BProvenance
@@ -947,6 +1049,38 @@ class Bundle(Bx):
     checks: BChecks
     readiness: BReadiness
     digests: BDigests
+
+    @model_validator(mode="after")
+    def metadata_policy_pair(self) -> Bundle:
+        expected = BUNDLE_POLICIES[self.schema_version]
+        unknown_policy = expected == "zoop-public-projection-policy-3"
+        if self.policy.version != expected or self.policy.geography != (
+                "operator-field-verdict-or-explicit-unknown" if unknown_policy else "operator-field-verdict"):
+            raise ValueError("bundle schema and metadata policy disagree")
+        issues = {issue.id: issue for issue in self.issues}
+        for issue in self.issues:
+            if issue.geography.policy_version != expected:
+                raise ValueError("issue geography policy must equal bundle policy")
+            basis = [{key: value for key, value in item.wire().items() if key != "countries"} for item in issue.geography.basis]
+            if basis != [event.wire() for event in issue.source_events] or not basis or not issue.evidence_ids:
+                raise ValueError("geography basis must cover original source events with core evidence")
+        if unknown_policy:
+            for relation in self.relations:
+                for basis in relation.basis:
+                    issue = issues.get(relation.source)
+                    if issue is None:
+                        raise ValueError("structural issue missing")
+                    countries = issue.geography.countries
+                    if basis.countries and (not countries or not set(countries) <= set(basis.countries)):
+                        raise ValueError("basis_countries_unprovable")
+                    if basis.valid_from is not None or basis.valid_until is not None:
+                        if issue.event_time is None or issue.time_precision not in ("day", "datetime"):
+                            raise ValueError("basis_validity_unprovable")
+                        day = date.fromisoformat(issue.event_time[:10])
+                        if (basis.valid_from is not None and day < date.fromisoformat(basis.valid_from)
+                                or basis.valid_until is not None and day > date.fromisoformat(basis.valid_until)):
+                            raise ValueError("basis_validity_outside_event_time")
+        return self
 
     @model_validator(mode="after")
     def private_path_companies_close_over_the_complete_paths(self) -> Bundle:
@@ -985,7 +1119,22 @@ class Bundle(Bx):
         articles = {(a.article_id, a.article_version): {"documentId": a.document_id, "documentVersion": a.document_version, "textSha256": a.text_sha256}
                     for a in self.articles}
         execution = (self.provenance.execution_mode, self.provenance.recording_kind)
+        by_id = {e.id: e for e in self.evidence}
         for issue in self.issues:
+            own_documents = {(s.document_id, s.document_version) for s in issue.source_events}
+            for evidence_id in issue.geography.evidence_ids:
+                row = by_id.get(evidence_id)
+                if row is None or (row.source.document_id, row.source.document_version) not in own_documents:
+                    raise ValueError("geography evidence must bind to the issue's own source document")
+            mentions = {(m.document_id, m.document_version, m.mention_id): m for m in issue.mentions}
+            for verdict in issue.field_verdicts:
+                mention = mentions.get((verdict.document_id, verdict.document_version, verdict.mention_id))
+                if verdict.field != "eventTime" or mention is None or mention.time_precision != "unresolved":
+                    continue
+                for evidence_id in verdict.evidence_ids:
+                    row = by_id.get(evidence_id)
+                    if row is None or (row.article_id, row.article_version) != (mention.article_id, mention.article_version):
+                        raise ValueError("field verdict evidence must bind to its own mention article")
             check_issue_summary(issue, evidence, articles, execution)
         return self
 
@@ -1044,7 +1193,7 @@ class HandoffManifest(Bx):
     schema_version: Literal["zoop-ai-handoff-1"]
     handoff_id: Id
     source_kind: SourceKind
-    policy_version: Literal["zoop-public-projection-policy-1"]
+    policy_version: Literal["zoop-public-projection-policy-2", "zoop-public-projection-policy-3"]
     sources: Annotated[list[BmSource], Field(min_length=1, max_length=MAX_SOURCES)]
     files: BPolicyFiles
 
@@ -1119,7 +1268,7 @@ class RtUsage(Projection):
 class RtReceipt(Projection):
     handoff_id: str
     manifest_digest: str = Field(pattern=HASH_PATTERN)
-    bundle_schema: Literal["zoop-graph-handoff-bundle-7"]
+    bundle_schema: Literal["zoop-graph-handoff-bundle-8", "zoop-graph-handoff-bundle-9"]
     bundle_digest: str = Field(pattern=HASH_PATTERN)
     content_digest: str = Field(pattern=HASH_PATTERN)
     bundle_bytes: int = Field(ge=1)

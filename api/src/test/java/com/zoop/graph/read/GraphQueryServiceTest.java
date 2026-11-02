@@ -249,7 +249,7 @@ class GraphQueryServiceTest {
             public Optional<String> activeVersionIdAt(Instant asOf) { return Optional.empty(); }
             public boolean everActivated(String id) { return false; }
             public Optional<Instant> firstActivatedAt(String id) { return Optional.empty(); }
-        }, Clock.fixed(NOW, ZoneOffset.UTC)), new FixtureGraphSnapshotStore(getClass().getClassLoader()), pinned -> exclusions), jdbc);
+        }, Clock.fixed(NOW, ZoneOffset.UTC)), new FixtureGraphSnapshotStore(getClass().getClassLoader()), pinned -> exclusions, null, null), jdbc);
         assertThrows(GraphSnapshotUnavailableException.class, () -> broken.getGraph(null, null, null, null, null, null, null, null, "r"));
     }
 

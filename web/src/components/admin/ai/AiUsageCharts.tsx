@@ -99,7 +99,7 @@ function DayBars({
     <div className="flex flex-col gap-1">
       <p
         aria-live="polite"
-        className="min-h-4 text-[11px] text-zoop-muted tabular-nums"
+        className="min-h-4 text-caption text-zoop-muted tabular-nums"
       >
         {shown >= 0 && (
           <>
@@ -147,7 +147,7 @@ function DayBars({
                 y={y(max * ratio)}
                 textAnchor="end"
                 dominantBaseline="middle"
-                className="fill-zoop-muted text-[11px] tabular-nums"
+                className="fill-zoop-muted text-caption tabular-nums"
               >
                 {tick(max * ratio)}
               </text>
@@ -189,7 +189,7 @@ function DayBars({
                     x={PAD.left + slot * index + slot / 2}
                     y={H - 6}
                     textAnchor="middle"
-                    className="fill-zoop-muted text-[11px] tabular-nums"
+                    className="fill-zoop-muted text-caption tabular-nums"
                   >
                     {shortDate(date)}
                   </text>
@@ -235,7 +235,7 @@ function DayBars({
 
 function Legend({ items }: { items: { label: string; swatch: string }[] }) {
   return (
-    <ul className="flex flex-wrap items-center gap-4 text-[11px] text-zoop-muted">
+    <ul className="flex flex-wrap items-center gap-4 text-caption text-zoop-muted">
       {items.map((item) => (
         <li key={item.label} className="flex items-center gap-1.5">
           <span
@@ -287,7 +287,7 @@ export function DailyTokenChart({
         }}
         tick={(value) => compact.format(value)}
       />
-      <details className="text-[11px]">
+      <details className="text-caption">
         <summary className="cursor-pointer text-zoop-muted">표로 보기</summary>
         <Table caption={`${title} 표`}>
           <thead>
@@ -301,7 +301,7 @@ export function DailyTokenChart({
           <tbody>
             {days.map((day) => (
               <tr key={day.date}>
-                <td className={`${TD} font-inter tabular-nums`}>{day.date}</td>
+                <td className={`${TD} font-num tabular-nums`}>{day.date}</td>
                 <td className={`${TD} text-right tabular-nums`}>
                   {count(day.calls)}
                 </td>
@@ -414,16 +414,16 @@ export function MemberRate({
     <div className="flex flex-col gap-2">
       <dl className="flex flex-wrap items-end gap-x-6 gap-y-1">
         <div className="flex flex-col gap-1">
-          <dt className="text-[11px] text-zoop-muted">
+          <dt className="text-caption text-zoop-muted">
             {subject}을 쓴 회원 비율
           </dt>
-          <dd className="text-2xl font-[750] tracking-[-0.03em] tabular-nums">
+          <dd className="text-title font-[750] tracking-[-0.03em] tabular-nums">
             {rate === null ? '–' : percent.format(rate)}
           </dd>
         </div>
         <div className="flex flex-col gap-1 pb-1">
           <dt className="sr-only">회원 수</dt>
-          <dd className="text-xs text-zoop-muted tabular-nums">
+          <dd className="text-caption text-zoop-muted tabular-nums">
             {used === null ? '측정 안 함' : `${count(used)}명`} / 전체{' '}
             {members.totalMembers === null
               ? '–'
@@ -474,7 +474,7 @@ export function FeatureShare({ features }: { features: AiFeatureUsage[] }) {
           return (
             <li
               key={feature.feature}
-              className="grid grid-cols-[8rem_minmax(0,1fr)_7rem] items-center gap-3 text-xs"
+              className="grid grid-cols-[8rem_minmax(0,1fr)_7rem] items-center gap-3 text-caption"
             >
               <span className="truncate font-semibold">{feature.label}</span>
               <Bar ratio={ratio} />

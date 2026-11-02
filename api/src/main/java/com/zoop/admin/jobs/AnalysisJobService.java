@@ -21,6 +21,7 @@ import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
 import com.zoop.admin.jobs.AnalyzePlanState.ServiceBinding;
+import com.zoop.ai.plan.PlanReference;
 import org.springframework.beans.factory.ObjectProvider;
 import java.time.Clock;
 import java.time.Duration;
@@ -45,6 +46,8 @@ public class AnalysisJobService {
     private static final int DEFAULT_LIMIT = 50;
     private static final int MAX_LIMIT = 100;
     private static final int DASHBOARD_RECENT_LIMIT = 5;
+    /** The round scheduler's actor (#55 D-R3): {@code requested_by} of its jobs and {@code actor_id} of its audit rows. */
+    public static final String SYSTEM_ACTOR = "system:scheduler";
 
     private final JdbcAnalysisJobRepository repository;
     private final AdminAuditRepository audit;
@@ -178,6 +181,66 @@ public class AnalysisJobService {
                         "queued", proposedId, reason, requestId, at);
                 return new JobCreated(get(proposedId), false);
             });
+        } catch (DataAccessException exception) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
+        }
+    }
+
+    /**
+     * The round scheduler's acceptance of an admitted plan (#55 D-R3): the same registration, command key and queue as
+     * {@link #create}, under the system actor, with no admin idempotency record (the command key is the idempotency). A job that
+     * exists for the plan is returned as it is (queued, running or finished); a failed or cancelled one whose retry the judge
+     * allows is retried once as a new job, as an admin retry would be ({@code retry_of}); one the judge refuses is
+     * {@code JOB_NOT_RETRYABLE}. {@code SOURCE_UNAVAILABLE} says the worker or the service binding is not configured.
+     */
+    @Transactional
+    public JobCreated createForSystem(PlanReference plan, String reason, String requestId) {
+        String checked = AnalyzePlanRequestParser.checkedReason(reason);
+        if (workers.getIfAvailable() == null || bindings.getIfAvailable() == null) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
+        }
+        try {
+            ServiceBinding binding = bindings.getObject();
+            plans.registrationLock(plan.planId());
+            Instant at = clock.instant();
+            plans.register(plan, binding, SYSTEM_ACTOR, at);
+            String key = "analyze-plan:" + binding.digest() + ":" + plan.planId();
+            var existing = repository.rootForCommand(key);
+            if (existing.isPresent()) {
+                // The plan's current job: the root, then its newest retry, then that retry's newest retry, and so on.
+                JobRow latest = existing.get();
+                List<JobRow> context = repository.retryContext(List.of(latest));
+                for (int depth = 0; depth < 100; depth++) {
+                    String parent = latest.id();
+                    var newer = context.stream().filter(j -> parent.equals(j.retryOf()))
+                            .max(java.util.Comparator.comparing(JobRow::requestedAt));
+                    if (newer.isEmpty()) break;
+                    latest = newer.get();
+                    context = repository.retryContext(List.of(latest));
+                }
+                if (!"failed".equals(latest.status()) && !"cancelled".equals(latest.status())) {
+                    return new JobCreated(out(latest, context), true);
+                }
+                if (!retryState(latest, errorCode(latest), context).allowed()) {
+                    throw new CustomException(ErrorCode.JOB_NOT_RETRYABLE);
+                }
+                String newId = "job-" + UUID.randomUUID();
+                repository.insertQueued(newId, latest.kind(), latest.label(), checked, SYSTEM_ACTOR, at, latest.id(),
+                        "retry:" + latest.id(), latest.input(), latest.planId());
+                audit.recordSystemAnalysisJobAction(SYSTEM_ACTOR, "analysis.job.retry", latest.id(), latest.status(), latest.status(),
+                        newId, checked, requestId, at);
+                return new JobCreated(get(newId), false);
+            }
+            String proposedId = "job-" + UUID.randomUUID();
+            ObjectNode input = StrictJson.newObject();
+            input.put("schemaVersion", "zoop-app-analyze-plan-1");
+            input.put("planId", plan.planId());
+            input.put("planDigest", plan.planDigest());
+            repository.insertQueued(proposedId, "analyze_plan", "계획 분석", checked, SYSTEM_ACTOR, at, null, key,
+                    mapper.writeValueAsString(input), plan.planId());
+            audit.recordSystemAnalysisJobAction(SYSTEM_ACTOR, "analysis.job.create", proposedId, null, "queued", proposedId, checked,
+                    requestId, at);
+            return new JobCreated(get(proposedId), false);
         } catch (DataAccessException exception) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
         }

@@ -93,7 +93,8 @@ test('D-GRP-03: the chosen company label is larger and bolder than its neighbour
   );
   expect(styleOf(chosen.id).labelFontWeight).toBe(800);
   expect(styleOf(other.id).labelFontWeight).toBe(600);
-  expect(styleOf(chosen.id).labelFill).not.toBe(styleOf(other.id).labelFill);
+  // Every light-map label uses the same #212121; the chosen one stands out by size and weight.
+  expect(styleOf(chosen.id).labelFill).toBe(styleOf(other.id).labelFill);
 });
 
 test.each([0.1, 0.37, 0.53, 1])(

@@ -49,6 +49,9 @@ import com.zoop.graph.version.GraphVersionRecord;
 import com.zoop.graph.version.GraphVersionRepository;
 import com.zoop.graph.version.GraphVersionSelector;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
+import com.zoop.graph.publication.GraphPublicationAuthority;
+import com.zoop.graph.publication.GraphPublicationReader;
+import com.zoop.graph.publication.JdbcGraphPublicationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -460,7 +463,7 @@ class GraphHandoffImporterTest {
         String versionId = built.versionId();
 
         JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId)));
-        assertEquals("zoop-graph-handoff-bundle-7", receipt.get("bundle").get("schemaVersion").stringValue());
+        assertEquals("zoop-graph-handoff-bundle-8", receipt.get("bundle").get("schemaVersion").stringValue());
         // The hand-written expectation of the issue's field provenance: the one unanimous mention states every value, and the
         // receipt says so without claiming any value was verified (selection, not fact verification).
         JsonNode provenance = receipt.get("bundle").get("issues").get(0).get("fieldProvenance");
@@ -523,40 +526,11 @@ class GraphHandoffImporterTest {
     void importedSupplyScopeReachesRelationHttpOnlyWhileItsBasisIsReadable() throws Exception {
         assertTrue(importer.run(built.request()).succeeded());
         String versionId = built.versionId();
-        ArtifactRow stored = registry.findArtifact("artifact-" + versionId).orElseThrow();
-        var version = new com.zoop.graph.version.GraphVersionRecord(versionId, 3, "snapshot", stored.id(),
-                stored.storageUri(), stored.sha256(), true);
-        var versions = org.mockito.Mockito.mock(com.zoop.graph.version.GraphVersionRepository.class);
-        org.mockito.Mockito.when(versions.find(versionId)).thenReturn(java.util.Optional.of(version));
-        org.mockito.Mockito.when(versions.everActivated(versionId)).thenReturn(true);
-        // Activated at the read time: a read of this version alone is pinned to its first publication (#88).
-        org.mockito.Mockito.when(versions.firstActivatedAt(versionId)).thenReturn(java.util.Optional.of(NOW));
-        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        var publicReader = new com.zoop.graph.read.PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(versions, clock),
-                new com.zoop.graph.snapshot.ArtifactGraphSnapshotStore(store, registry, null),
-                ignoredVersion -> com.zoop.graph.read.DisclosureExclusions.NONE);
-        var evidenceRows = org.mockito.Mockito.mock(com.zoop.document.evidence.repository.EvidenceReadRepository.class);
-        for (EvidenceRow row : graph.evidenceRows().values()) {
-            org.mockito.Mockito.when(evidenceRows.findEvidence(row.id())).thenReturn(java.util.Optional.of(
-                    new com.zoop.document.evidence.repository.EvidenceView(row.id(), row.articleId(), row.articleVersion(),
-                            row.textArtifactId(), row.quote(), row.startOffset(), row.endOffset(), "body", true, row.verificationArtifactId())));
-        }
-        Path sourceFile = temp.toRealPath().resolve("relation-read-sources.json");
-        String sources = """
-                {"schemaVersion":"zoop-ingestion-s2-1","revision":"relation-read-1","sources":[{
-                  "sourceId":"synthetic-source","adapter":"authored-files","inputRoot":"/synthetic",
-                  "allowedHosts":["example.invalid"],"scopes":[{"scopeId":"body","selection":"authored fixture",
-                    "initialCursor":null,"articleXPath":null,"timestampLimitations":["authored fixture"]}],
-                  "grant":{"grantId":"operator-grant","revision":"rights-1","sourceId":"synthetic-source",
-                    "enabled":true,"rights":"known","allowedOperations":["read","store","quote-display"],
-                    "recipients":[],"purposes":[],"evidence":["authored synthetic fixture"],"expiresAt":null}}]}
-                """;
-        Files.writeString(sourceFile, sources);
-        var evidenceService = new com.zoop.document.evidence.service.EvidenceService(evidenceRows, registry, null,
-                new com.zoop.document.evidence.service.DocumentReadSources(sourceFile),
-                new com.zoop.graph.read.GraphEvidenceSnapshotReader(publicReader),
-                new com.zoop.document.evidence.service.EvidenceArtifactReader(store), clock, transaction);
-        var pinned = publicReader.read(null, versionId, null);
+        ReadSide side = readSide(versionId);
+        PublicGraphReader publicReader = side.reader();
+        EvidenceService evidenceService = side.receipts();
+        Path sourceFile = side.sources();
+        String sources = side.sourceRegistry();
         // Resolve the display ID using its stable public formula, not the producer's full source relation ID.
         String edgeId = "edge-" + sha256(("STRUCTURALLY_RELATED_TO|" + ISSUE + "|" + COMPANY_B).getBytes(StandardCharsets.UTF_8)).substring(0, 16);
         var service = new com.zoop.graph.read.GraphRelationService(publicReader,
@@ -581,27 +555,14 @@ class GraphHandoffImporterTest {
         assertEquals(sourceRelation.get("basis").get(0).get("evidenceIds"), link.get("evidenceIds"));
         // A source grant is checked now, not only when the bundle was imported.
         Files.writeString(sourceFile, sources.replace("\"enabled\":true", "\"enabled\":false"));
-        mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.status").value("unavailable"))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.paths").isEmpty())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.partial").value(true));
+        mvc.perform(request).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
         Files.writeString(sourceFile, sources);
         mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.status").value("available"));
         Files.writeString(receiptFile(versionId), "{}");
-        mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.relationType")
-                        .value("STRUCTURALLY_RELATED_TO"))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.status")
-                        .value("unavailable"))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.reason")
-                        .value("details_not_available"))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.partial")
-                        .value(true))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.failures[0].code")
-                        .value("STRUCTURAL_DETAIL_UNAVAILABLE"))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.failures[0].retryable")
-                        .value(false));
+        mvc.perform(request).andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error.code").value("SOURCE_UNAVAILABLE"));
     }
 
 
@@ -622,8 +583,6 @@ class GraphHandoffImporterTest {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         when(versions.active()).thenReturn(Optional.of(version));
         GraphVersionSelector selector = new GraphVersionSelector(versions, clock);
-        PublicGraphReader reader = new PublicGraphReader(selector,
-                new ArtifactGraphSnapshotStore(store, registry, null), ignoredVersion -> DisclosureExclusions.NONE);
         EvidenceReadRepository evidence = mock(EvidenceReadRepository.class);
         for (EvidenceRow row : graph.evidenceRows().values()) {
             when(evidence.findEvidence(row.id())).thenReturn(Optional.of(new EvidenceView(row.id(), row.articleId(),
@@ -641,8 +600,14 @@ class GraphHandoffImporterTest {
                     "recipients":[],"purposes":[],"evidence":["authored synthetic fixture"],"expiresAt":null}}]}
                 """;
         Files.writeString(sources, sourceRegistry);
+        GraphPublicationReader publications = new GraphPublicationReader(graph, registry, store,
+                mock(JdbcGraphPublicationRepository.class));
+        PublicGraphReader reader = new PublicGraphReader(selector,
+                new ArtifactGraphSnapshotStore(store, registry, null), ignoredVersion -> DisclosureExclusions.NONE,
+                publications, new GraphPublicationAuthority(registry, new DocumentReadSources(sources),
+                        ignoredVersion -> DisclosureExclusions.NONE, clock));
         EvidenceService receipts = new EvidenceService(evidence, registry, null, new DocumentReadSources(sources),
-                new GraphEvidenceSnapshotReader(reader), new EvidenceArtifactReader(store), clock, transaction);
+                new GraphEvidenceSnapshotReader(reader), new EvidenceArtifactReader(store), clock, transaction, publications);
         return new ReadSide(reader, receipts, selector, sources, sourceRegistry);
     }
 
@@ -653,8 +618,7 @@ class GraphHandoffImporterTest {
         assertTrue(importer.run(built.request()).succeeded());
         String versionId = built.versionId();
         ReadSide side = readSide(versionId);
-        var published = new com.zoop.admin.review.PublishedCandidates(side.reader(), side.receipts(), side.selector(),
-                ignoredVersion -> DisclosureExclusions.NONE, Clock.fixed(NOW, ZoneOffset.UTC));
+        var published = new com.zoop.admin.review.PublishedCandidates(side.reader(), side.receipts());
 
         var shown = published.current("req-published").orElseThrow(() -> new AssertionError("publication state unknown"));
 
@@ -665,8 +629,7 @@ class GraphHandoffImporterTest {
 
         // Rights withdrawn now: the same receipt's items are hidden, never unknown.
         Files.writeString(side.sources(), side.sourceRegistry().replace("\"enabled\":true", "\"enabled\":false"));
-        var withdrawn = new com.zoop.admin.review.PublishedCandidates(side.reader(), side.receipts(), side.selector(),
-                ignoredVersion -> DisclosureExclusions.NONE, Clock.fixed(NOW, ZoneOffset.UTC)).current("req-withdrawn")
+        var withdrawn = new com.zoop.admin.review.PublishedCandidates(side.reader(), side.receipts()).current("req-withdrawn")
                 .orElseThrow();
         assertTrue(withdrawn.events().isEmpty());
         assertEquals(shown.events(), withdrawn.excludedEvents());
@@ -1270,7 +1233,7 @@ class GraphHandoffImporterTest {
     @Test
     void companiesMustExistWithTheBundlesLabelAndNeverShareAnIdWithAnIssue() throws Exception {
         graph = new InMemoryGraphHandoffRepository("fixture-active", 2);
-        graph.seedCompany(COMPANY_A, "다른 이름");
+        graph.seedCompany(COMPANY_A, "다른 이름", "합성기업");
         graph.seedCompany(COMPANY_B, "합성부품");
         importer = newImporter();
         assertEquals(GraphHandoffFailure.COMPANY_MISMATCH, failure(importer.run(built.request())).failure());
@@ -1826,7 +1789,7 @@ class GraphHandoffImporterTest {
             graph.seedCompany(COMPANY_A, "합성기업");
             graph.seedCompany(COMPANY_B, "합성부품");
             if (catalogued != null) {
-                graph.seedCompany(COMPANY_M, catalogued);
+                graph.seedCompany(COMPANY_M, catalogued, "합성중간");
             }
             importer = newImporter();
             InMemoryGraphHandoffRepository.State graphBefore = graph.state();

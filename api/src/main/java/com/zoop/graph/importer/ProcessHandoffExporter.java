@@ -59,15 +59,19 @@ public final class ProcessHandoffExporter implements HandoffExporter {
     }
 
     static List<String> argv(GraphHandoffImportSettings settings) {
-        return List.of(settings.handoffCli().toString(), "export",
-                "--state-dir", settings.handoffState().toString(),
-                "--relation-state-dir", settings.relationState().toString(),
-                "--extraction-state-dir", settings.extractionState().toString(),
-                "--ingestion-state-dir", settings.ingestionState().toString(),
-                "--sources", settings.ingestionSources().toString(),
-                "--canonical", settings.canonical().toString(),
-                "--decisions", settings.decisions().toString(),
-                "--bindings", settings.bindings().toString());
+        List<String> args = new ArrayList<>(List.of(settings.handoffCli().toString(), "export",
+                "--state-dir", settings.handoffState().toString()));
+        if (settings.sourceContexts() != null) {
+            args.addAll(List.of("--source-contexts", settings.sourceContexts().toString(),
+                    "--source-contexts-sha256", settings.sourceContextsSha256()));
+        } else {
+            args.addAll(List.of("--relation-state-dir", settings.relationState().toString(),
+                    "--extraction-state-dir", settings.extractionState().toString(),
+                    "--ingestion-state-dir", settings.ingestionState().toString(), "--sources", settings.ingestionSources().toString()));
+        }
+        args.addAll(List.of("--canonical", settings.canonical().toString(), "--decisions", settings.decisions().toString(),
+                "--bindings", settings.bindings().toString()));
+        return List.copyOf(args);
     }
 
     /** The complete child environment: fixed values plus the two state-ownership directories if the parent has them. */

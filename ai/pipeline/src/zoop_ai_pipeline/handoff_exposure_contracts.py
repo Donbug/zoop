@@ -18,7 +18,7 @@ from .ingestion_contracts import Wire
 __all__ = ["ExtractionFailure"]
 
 SCHEMA = "zoop-handoff-exposure-1"
-BUNDLE = "zoop-graph-handoff-bundle-7"
+BUNDLE = "zoop-graph-handoff-bundle-8"
 MAX_COMMAND = 65_536
 MAX_HANDOFFS = 20
 MAX_OUTPUT = MAX_BUNDLE

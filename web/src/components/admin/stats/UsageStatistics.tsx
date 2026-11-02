@@ -81,7 +81,7 @@ export function StatsSummaryPanel({ window }: { window: StatsWindow }) {
   return (
     <>
       {summary.refreshError && (
-        <p role="status" className="text-[11px] text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}
@@ -115,9 +115,7 @@ export function StatsSummaryPanel({ window }: { window: StatsWindow }) {
             <tbody>
               {trend.map((day) => (
                 <tr key={day.date}>
-                  <td className={`${TD} font-inter tabular-nums`}>
-                    {day.date}
-                  </td>
+                  <td className={`${TD} font-num tabular-nums`}>{day.date}</td>
                   <td className={`${TD} text-right tabular-nums`}>
                     {count(day.activeUsers)}
                   </td>
@@ -209,7 +207,7 @@ export function CompanyRankingPanel({ window }: { window: StatsWindow }) {
   return (
     <>
       {ranking.refreshError && (
-        <p role="status" className="text-[11px] text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}
@@ -245,7 +243,7 @@ export function CompanyRankingPanel({ window }: { window: StatsWindow }) {
                     {row.name}
                   </Link>
                   {row.ticker && (
-                    <span className="ml-2 font-inter text-[11px] text-zoop-faint">
+                    <span className="ml-2 font-num text-caption text-zoop-faint">
                       {row.ticker}
                     </span>
                   )}

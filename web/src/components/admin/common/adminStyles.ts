@@ -4,11 +4,12 @@ import { ApiError } from '@/apis/auth/ApiService';
 
 export const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink';
-export const BUTTON = `inline-flex min-h-9 shrink-0 items-center justify-center rounded-full bg-zoop-soft px-4 text-xs font-semibold text-zoop-ink transition-colors hover:bg-zoop-line disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS_RING}`;
+export const BUTTON = `inline-flex min-h-9 shrink-0 items-center justify-center rounded-full bg-zoop-soft px-4 text-caption font-semibold text-zoop-ink transition-colors hover:bg-zoop-line disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS_RING}`;
 export const TH =
-  'border-b-[0.667px] border-zoop-line px-2 py-2 text-left text-[11px] font-medium text-zoop-muted';
-export const TD = 'border-b-[0.667px] border-zoop-line px-2 py-2.5 text-xs';
-export const LINK = `text-xs font-semibold text-zoop-ink hover:underline hover:underline-offset-4 ${FOCUS_RING}`;
+  'border-b-[0.667px] border-zoop-line px-2 py-2 text-left text-caption font-medium text-zoop-muted';
+export const TD =
+  'border-b-[0.667px] border-zoop-line px-2 py-2.5 text-caption';
+export const LINK = `text-caption font-semibold text-zoop-ink hover:underline hover:underline-offset-4 ${FOCUS_RING}`;
 
 // 연결되지 않았거나 모르는 값(null)은 0이 아니라 '–'로 보여 준다(관리자 통계 계약의 availability).
 export const count = (value: number | null) =>
@@ -58,7 +59,7 @@ export function adminActionErrorMessage(error: Error) {
   return adminErrorMessage(error);
 }
 
-export const TEXTAREA = `min-h-20 w-full rounded-2xl border border-transparent bg-zoop-soft px-4 py-3 text-xs leading-relaxed text-zoop-ink focus:border-zoop-ink disabled:opacity-60 ${FOCUS_RING}`;
-export const SELECT = `h-10 w-full rounded-full border border-transparent bg-zoop-soft px-4 text-xs text-zoop-ink focus:border-zoop-ink disabled:opacity-60 ${FOCUS_RING}`;
-export const PRIMARY_BUTTON = `inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-zoop-ink px-5 text-xs font-bold text-zoop-paper transition-opacity hover:opacity-85 disabled:cursor-progress disabled:opacity-50 ${FOCUS_RING}`;
-export const SEARCH_INPUT = `h-10 w-full max-w-80 rounded-full border border-transparent bg-zoop-soft px-4 text-xs text-zoop-ink placeholder:text-zoop-faint focus:border-zoop-ink ${FOCUS_RING}`;
+export const TEXTAREA = `min-h-20 w-full rounded-2xl border border-transparent bg-zoop-soft px-4 py-3 text-caption leading-relaxed text-zoop-ink focus:border-zoop-ink disabled:opacity-60 ${FOCUS_RING}`;
+export const SELECT = `h-10 w-full rounded-full border border-transparent bg-zoop-soft px-4 text-caption text-zoop-ink focus:border-zoop-ink disabled:opacity-60 ${FOCUS_RING}`;
+export const PRIMARY_BUTTON = `inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-zoop-ink px-5 text-caption font-bold text-zoop-paper transition-opacity hover:opacity-85 disabled:cursor-progress disabled:opacity-50 ${FOCUS_RING}`;
+export const SEARCH_INPUT = `h-10 w-full max-w-80 rounded-full border border-transparent bg-zoop-soft px-4 text-caption text-zoop-ink placeholder:text-zoop-faint focus:border-zoop-ink ${FOCUS_RING}`;

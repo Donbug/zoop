@@ -14,7 +14,7 @@ export default function BottomNav() {
               to={menu.to}
               end={menu.to === '/'}
               className={({ isActive }) =>
-                `flex h-16 items-center justify-center text-sm ${
+                `flex h-16 items-center justify-center text-body ${
                   isActive ? 'font-semibold text-zoop-ink' : 'text-zoop-muted'
                 }`
               }

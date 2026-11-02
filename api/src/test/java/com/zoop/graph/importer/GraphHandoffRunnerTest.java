@@ -41,10 +41,11 @@ class GraphHandoffRunnerTest {
     void setUp() throws IOException {
         base = temp.toRealPath();
         artifacts = Files.createDirectory(base.resolve("artifacts"));
-        settings = new GraphHandoffImportSettings(base.resolve("request.json"), base.resolve("result.json"),
+        settings = new GraphHandoffImportSettings(GraphHandoffImportSettings.HandoffSourceKind.CLI,
+                com.zoop.document.importer.ObservationSource.CLI, base.resolve("request.json"), base.resolve("result.json"),
                 base.resolve("zoop-ai-handoff"), base.resolve("handoff"), base.resolve("relation"), base.resolve("extraction"),
                 base.resolve("zoop-ai-ingest"), base.resolve("ingestion"), base.resolve("sources.json"),
-                base.resolve("canonical.json"), base.resolve("decisions.json"), base.resolve("bindings.json"), artifacts);
+                base.resolve("canonical.json"), base.resolve("decisions.json"), base.resolve("bindings.json"), artifacts, null, null);
         ArtifactFileStore store = ArtifactFileStore.at(artifacts);
         InMemoryDocumentRegistry registry = new InMemoryDocumentRegistry();
         graph = new InMemoryGraphHandoffRepository("fixture-active", 2);

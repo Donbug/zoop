@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import { useRelationData } from '@/hooks/useRelationData';
 import type { EventContext } from '@/types/map/event';
@@ -106,9 +107,10 @@ export default function RelationDetailPanel({
       </header>
       <div className={ui.scroll} aria-busy={loading}>
         {loading && (
-          <div role="status" className={ui.state}>
-            연결선 정보를 불러오는 중입니다.
-          </div>
+          <LoadingIndicator
+            label="연결선 정보를 불러오는 중입니다."
+            className={`${ui.state} flex min-h-16 w-full`}
+          />
         )}
         {error && (
           <div role="alert" className={ui.state}>

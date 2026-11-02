@@ -12,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,12 +42,12 @@ class DocumentImportSettingsTest {
 
     private DocumentImportSettings settings() {
         return DocumentImportSettings.of(request.toString(), result.toString(), cli.toString(), state.toString(),
-                sources.toString(), artifacts.toString());
+                sources.toString(), artifacts.toString(), "cli");
     }
 
     private DocumentImportSettings settings(String requestValue, String resultValue, String cliValue, String stateValue,
             String sourcesValue, String artifactsValue) {
-        return DocumentImportSettings.of(requestValue, resultValue, cliValue, stateValue, sourcesValue, artifactsValue);
+        return DocumentImportSettings.of(requestValue, resultValue, cliValue, stateValue, sourcesValue, artifactsValue, "cli");
     }
 
     private void assertNames(String setting, Supplier<DocumentImportSettings> action) {
@@ -66,6 +67,36 @@ class DocumentImportSettingsTest {
         assertEquals(state, settings.ingestionState());
         assertEquals(sources, settings.ingestionSources());
         assertEquals(artifacts, settings.artifactRoot());
+        assertEquals(ObservationSource.CLI, settings.observationSource(), "the documented default");
+        assertEquals(ObservationSource.CLI, DocumentImportSettings.of(request.toString(),
+                result.toString(), cli.toString(), state.toString(), sources.toString(), artifacts.toString(), " ").observationSource(),
+                "a blank value is no choice");
+    }
+
+    @Test
+    void theHttpSourceLeavesTheCliSettingsNullRefusesThemWhenSetAndSkipsTheLedgerChecks() throws IOException {
+        DocumentImportSettings http = DocumentImportSettings.of(request.toString(), result.toString(), null, null, null,
+                artifacts.toString(), "HTTP");
+        assertEquals(ObservationSource.HTTP, http.observationSource());
+        assertNull(http.ingestionCli());
+        assertNull(http.ingestionState());
+        assertNull(http.ingestionSources());
+        assertEquals(artifacts, http.artifactRoot());
+
+        assertNames("ingestion-cli", () -> DocumentImportSettings.of(request.toString(), result.toString(), cli.toString(), null,
+                null, artifacts.toString(), "http"));
+        assertNames("ingestion-state-dir", () -> DocumentImportSettings.of(request.toString(), result.toString(), null,
+                state.toString(), null, artifacts.toString(), "http"));
+        assertNames("ingestion-sources", () -> DocumentImportSettings.of(request.toString(), result.toString(), null, null,
+                sources.toString(), artifacts.toString(), "http"));
+        assertNames("observation-source", () -> DocumentImportSettings.of(request.toString(), result.toString(), null, null, null,
+                artifacts.toString(), "grpc"));
+        // No ledger here, so a request next to the artifact root is fine; the root rules themselves still hold.
+        Path inside = Files.writeString(artifacts.resolve("request.json"), "{}");
+        assertEquals(inside, DocumentImportSettings.of(inside.toString(), result.toString(), null, null, null,
+                artifacts.toString(), "http").request());
+        assertNames("artifact-root", () -> DocumentImportSettings.of(request.toString(), result.toString(), null, null, null,
+                base.resolve("missing").toString(), "http"));
     }
 
     @Test

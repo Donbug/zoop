@@ -25,6 +25,7 @@ import {
 } from '@/util/briefingIssueReading';
 import { safeArticleUrl } from '@/components/graph/event-format';
 import MarketIndicators from './MarketIndicators';
+import PriorIssueFollowUps from './PriorIssueFollowUps';
 import BriefingItemDetails from './BriefingItemDetails';
 import BriefingContinuity from './BriefingContinuity';
 import BriefingRecap from './BriefingRecap';
@@ -75,7 +76,7 @@ function ReadingText({ text, compact }: { text: string; compact: boolean }) {
       <p className={`${BODY} mt-2`}>{parts[0]}</p>
       <details>
         <summary
-          className={`min-h-11 cursor-pointer content-center text-xs text-zoop-muted ${FOCUS_RING}`}
+          className={`min-h-11 cursor-pointer content-center text-caption text-zoop-muted ${FOCUS_RING}`}
         >
           전체 설명
         </summary>
@@ -113,7 +114,7 @@ function CompanyInIssue({
       aria-label={`${company.name} 관련 판단`}
       className="space-y-3 border-t border-zoop-line pt-4"
     >
-      <h5 className="flex flex-wrap items-center gap-2 text-sm font-bold">
+      <h5 className="flex flex-wrap items-center gap-2 text-body font-bold">
         {company.id ? (
           <Link
             to={`/companies/${encodeURIComponent(company.id)}`}
@@ -125,7 +126,7 @@ function CompanyInIssue({
           company.name
         )}
         {view.assessment && (
-          <span className="text-xs">
+          <span className="text-caption">
             <ImpactCue tone={view.assessment} badge>
               사업 영향 · {labels[view.assessment]}
             </ImpactCue>
@@ -156,7 +157,7 @@ function CompanyInIssue({
         label={`${company.name} 문서 판정`}
       />
       <section aria-label="한 줄 결론">
-        <h6 className="text-sm font-bold">한 줄 결론</h6>
+        <h6 className="text-body font-bold">한 줄 결론</h6>
         <ReadingText
           compact={compact}
           text={
@@ -169,7 +170,7 @@ function CompanyInIssue({
       </section>
       <div className="grid gap-3 sm:grid-cols-2">
         <section className="rounded-lg border border-zoop-positive/20 bg-zoop-positive/5 p-4">
-          <h6 className="text-sm font-bold">
+          <h6 className="text-body font-bold">
             <ImpactCue tone="positive">긍정 가능성</ImpactCue>
           </h6>
           <ReadingText
@@ -178,7 +179,7 @@ function CompanyInIssue({
           />
         </section>
         <section className="rounded-lg border border-zoop-alert/20 bg-zoop-alert/5 p-4">
-          <h6 className="text-sm font-bold">
+          <h6 className="text-body font-bold">
             <ImpactCue tone="negative">위험·불확실성</ImpactCue>
           </h6>
           <ReadingText
@@ -189,7 +190,7 @@ function CompanyInIssue({
       </div>
       {extraFacts.length > 0 && (
         <section>
-          <h6 className="text-sm font-bold">
+          <h6 className="text-body font-bold">
             <ImpactCue tone="neutral" icon="check">
               이 기업에 추가로 확인된 사실
             </ImpactCue>
@@ -199,7 +200,7 @@ function CompanyInIssue({
       )}
       {price?.status === 'available' && (
         <div className="rounded border border-zoop-line bg-zoop-wash p-3">
-          <p className="text-sm font-semibold">
+          <p className="text-body font-semibold">
             {price.sessionDate}{' '}
             {price.latest.kind === 'daily_close' ? '종가' : '완료 봉'}{' '}
             {amount(price.latest.value)} {price.currency}
@@ -247,26 +248,26 @@ function CompanyInIssue({
         view.conditions.length > 0) && (
         <details>
           <summary
-            className={`min-h-11 cursor-pointer content-center text-sm font-semibold ${FOCUS_RING}`}
+            className={`min-h-11 cursor-pointer content-center text-body font-semibold ${FOCUS_RING}`}
           >
             자세한 사업 분석·전망
           </summary>
           <div className="mt-3 space-y-4">
             {view.impact && (
               <section>
-                <h6 className="text-sm font-bold">사업상 의미</h6>
+                <h6 className="text-body font-bold">사업상 의미</h6>
                 <p className={`${BODY} mt-2`}>{view.impact.text}</p>
               </section>
             )}
             {view.outlook && (
               <section>
-                <h6 className="text-sm font-bold">현재 전망과 확인 조건</h6>
+                <h6 className="text-body font-bold">현재 전망과 확인 조건</h6>
                 <p className={`${BODY} mt-2`}>{view.outlook.text}</p>
               </section>
             )}
             {view.conditions.length > 0 && (
               <section>
-                <h6 className="text-sm font-bold">상세 확인 조건</h6>
+                <h6 className="text-body font-bold">상세 확인 조건</h6>
                 <ul className="mt-2 list-disc space-y-2 pl-4">
                   {view.conditions.map((c, i) => (
                     <li className={BODY} key={i}>
@@ -278,7 +279,7 @@ function CompanyInIssue({
             )}
             {view.risks.length > 0 && (
               <section>
-                <h6 className="text-sm font-bold">
+                <h6 className="text-body font-bold">
                   판단을 바꿀 위험·반대 조건
                 </h6>
                 <ul className="mt-2 list-disc space-y-2 pl-4">
@@ -296,7 +297,7 @@ function CompanyInIssue({
       {view.refs.length > 0 && (
         <details>
           <summary
-            className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
+            className={`min-h-11 cursor-pointer content-center text-caption ${FOCUS_RING}`}
           >
             기업 판단의 근거·배경 {view.refs.length}건
           </summary>
@@ -308,7 +309,7 @@ function CompanyInIssue({
                     href={safeArticleUrl(s.url)!}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`text-sm underline ${FOCUS_RING}`}
+                    className={`text-body underline ${FOCUS_RING}`}
                   >
                     {s.title} ↗
                   </a>
@@ -358,7 +359,7 @@ function IssueFollowUp({
                 key={c.company.id}
                 className="mb-3 rounded border border-zoop-line p-3"
               >
-                <p className="text-xs font-semibold">
+                <p className="text-caption font-semibold">
                   {c.company.name} · 같은 이슈의 이전 판단
                 </p>
                 <p className={`${BODY} mt-1`}>{c.previous!.judgment.text}</p>
@@ -372,7 +373,7 @@ function IssueFollowUp({
             </p>
           ) : changed.length ? (
             <>
-              <h4 className="text-sm font-bold">
+              <h4 className="text-body font-bold">
                 {evening
                   ? '아침 판단에서 달라진 점'
                   : '전날 판단에서 달라진 점'}
@@ -380,7 +381,9 @@ function IssueFollowUp({
               <ul className="mt-2 space-y-3">
                 {changed.map((c) => (
                   <li key={c.company.id}>
-                    <p className="text-xs font-semibold">{c.company.name}</p>
+                    <p className="text-caption font-semibold">
+                      {c.company.name}
+                    </p>
                     <p className={`${BODY} mt-1`}>{c.comparison!.text}</p>
                   </li>
                 ))}
@@ -392,7 +395,7 @@ function IssueFollowUp({
           {!result.issueIntelligence && result.aiPriceOutlooks?.historyNote && (
             <details className="mt-2">
               <summary
-                className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
+                className={`min-h-11 cursor-pointer content-center text-caption ${FOCUS_RING}`}
               >
                 비교에 사용한 판본
               </summary>
@@ -402,7 +405,7 @@ function IssueFollowUp({
         </section>
       )}
       <section>
-        <h4 className="text-sm font-bold">
+        <h4 className="text-body font-bold">
           <ImpactCue tone="neutral" icon="calendar">
             다음 확인사항
           </ImpactCue>
@@ -411,7 +414,7 @@ function IssueFollowUp({
           <ul className="mt-2 space-y-3">
             {watching.map((c) => (
               <li key={c.company.id}>
-                <p className="text-xs font-semibold">{c.company.name}</p>
+                <p className="text-caption font-semibold">{c.company.name}</p>
                 <ul className="mt-1 list-disc space-y-2 pl-4">
                   {c.nextChecks.map((condition, i) => (
                     <li className={BODY} key={i}>
@@ -509,20 +512,20 @@ function IssueCard({
         }`}
       >
         <summary
-          className={`cursor-pointer list-none p-5 sm:p-6 ${FOCUS_RING}`}
+          className={`cursor-pointer list-none p-5 transition-transform duration-150 ease-out active:scale-[0.99] motion-reduce:transition-none sm:p-6 ${FOCUS_RING}`}
         >
-          <span className="flex justify-between gap-3 text-xs text-zoop-muted">
+          <span className="flex justify-between gap-3 text-caption text-zoop-muted">
             <span>핵심 이슈 {rank}</span>
             <span aria-hidden>{open ? '접기 −' : '자세히 +'}</span>
           </span>
-          <strong className="mt-3 block text-lg font-bold leading-snug">
+          <strong className="mt-3 block text-title-sm font-bold leading-snug">
             {group.title}
           </strong>
-          <span className="mt-3 block text-sm leading-relaxed">
+          <span className="mt-3 block text-body leading-relaxed">
             <b>선정 이유 · </b>
             {selectionSummary}
           </span>
-          <span className="mt-3 block text-xs text-zoop-muted">
+          <span className="mt-3 block text-caption text-zoop-muted">
             {companies.length
               ? companies.map((c) => c.view.company.name).join(' · ')
               : '연결 기업 미확인'}{' '}
@@ -542,7 +545,7 @@ function IssueCard({
               <p className={NOTE}>함께 묶은 이유 · {group.reason}</p>
             )}
             <section>
-              <h4 className="text-sm font-bold">
+              <h4 className="text-body font-bold">
                 <ImpactCue tone="neutral" icon="check">
                   공통으로 확인된 사실
                 </ImpactCue>
@@ -585,7 +588,7 @@ function IssueCard({
             {group.members.length > 1 ? (
               <details>
                 <summary
-                  className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
+                  className={`min-h-11 cursor-pointer content-center text-caption ${FOCUS_RING}`}
                 >
                   세부 사건의 원래 분석·근거·평가
                 </summary>
@@ -595,7 +598,9 @@ function IssueCard({
                       key={member.item.eventId}
                       aria-label={`${member.item.title} 원래 분석`}
                     >
-                      <h4 className="text-sm font-bold">{member.item.title}</h4>
+                      <h4 className="text-body font-bold">
+                        {member.item.title}
+                      </h4>
                       <p className={`${NOTE} mt-2`}>
                         {member.item.reason}
                         {articleCount(member.item)}
@@ -626,7 +631,7 @@ function IssueCard({
                       />
                       <details hidden={Boolean(selectionDetails)}>
                         <summary
-                          className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
+                          className={`min-h-11 cursor-pointer content-center text-caption ${FOCUS_RING}`}
                         >
                           기업별 독립 검증·추가 근거
                         </summary>
@@ -653,7 +658,7 @@ function IssueCard({
               <>
                 <details hidden={Boolean(selectionDetails)}>
                   <summary
-                    className={`min-h-11 cursor-pointer content-center text-sm font-semibold ${FOCUS_RING}`}
+                    className={`min-h-11 cursor-pointer content-center text-body font-semibold ${FOCUS_RING}`}
                   >
                     기업별 독립 검증·추가 근거
                   </summary>
@@ -674,7 +679,7 @@ function IssueCard({
                 />
                 <details>
                   <summary
-                    className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
+                    className={`min-h-11 cursor-pointer content-center text-caption ${FOCUS_RING}`}
                   >
                     선정 이유
                   </summary>
@@ -686,7 +691,7 @@ function IssueCard({
             {group.selections.length > 0 && (
               <details>
                 <summary
-                  className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
+                  className={`min-h-11 cursor-pointer content-center text-caption ${FOCUS_RING}`}
                 >
                   선정 근거 전체
                 </summary>
@@ -838,7 +843,7 @@ export default function IssueCentricBriefing({
           {!result.issueIntelligence && !selectionDetails && (
             <Link
               to={`/?round=${encodeURIComponent(result.id)}`}
-              className={`text-xs underline ${FOCUS_RING}`}
+              className={`text-caption underline ${FOCUS_RING}`}
             >
               이슈 관계 지도 ↗
             </Link>
@@ -880,6 +885,7 @@ export default function IssueCentricBriefing({
           </p>
         )}
       </section>
+      <PriorIssueFollowUps key={result.id} result={result} />
     </div>
   );
 }

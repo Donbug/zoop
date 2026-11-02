@@ -86,7 +86,7 @@ def pinned_bundle(shared, tmp_path_factory, pinned):
 def test_an_unpinned_handoff_states_not_requested_for_every_issue_and_needs_no_summary_ledger(rig):
     bundle = rig.bundle()
     assert {i["id"]: i["summary"] for i in bundle["issues"]} == {hs.SUPPLY: NOT_REQUESTED, hs.FACTORY: NOT_REQUESTED}
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1"
     validate_bundle(bundle)
 
 

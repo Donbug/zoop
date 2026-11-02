@@ -9,6 +9,10 @@
 | 기능 | 목표 API | 경로 | 우선순위 |
 | --- | --- | --- | --- |
 | [FS058](feature-FS058.md) · [FS059](feature-FS059.md) · [FS063](feature-FS063.md) · [FS067-01](feature-FS067-01.md) | [getPipelineOverview](../../api/out/zoop-api-spec.md#getpipelineoverview) | GET /api/v1/admin/pipeline/overview | P1 |
+| [FS058](feature-FS058.md) · [FS059](feature-FS059.md) · [FS063](feature-FS063.md) · [FS067-01](feature-FS067-01.md) | [listGraphRounds](../../api/out/zoop-api-spec.md#listgraphrounds) | GET /api/v1/admin/pipeline/rounds | P1 |
+| [FS058](feature-FS058.md) · [FS059](feature-FS059.md) · [FS063](feature-FS063.md) · [FS067-01](feature-FS067-01.md) | [startGraphRound](../../api/out/zoop-api-spec.md#startgraphround) | POST /api/v1/admin/pipeline/rounds | P2 |
+| [FS058](feature-FS058.md) · [FS059](feature-FS059.md) · [FS063](feature-FS063.md) · [FS067-01](feature-FS067-01.md) | [getGraphRound](../../api/out/zoop-api-spec.md#getgraphround) | GET /api/v1/admin/pipeline/rounds/{roundId} | P1 |
+| [FS058](feature-FS058.md) · [FS059](feature-FS059.md) · [FS063](feature-FS063.md) · [FS067-01](feature-FS067-01.md) | [retryGraphRound](../../api/out/zoop-api-spec.md#retrygraphround) | POST /api/v1/admin/pipeline/rounds/{roundId}/retry | P2 |
 | [FS067-01](feature-FS067-01.md) · [FS067-02](feature-FS067-02.md) | [listAnalysisCandidates](../../api/out/zoop-api-spec.md#listanalysiscandidates) | GET /api/v1/admin/pipeline/candidates | P1 |
 | [FS067-01](feature-FS067-01.md) · [FS067-02](feature-FS067-02.md) | [getAnalysisCandidate](../../api/out/zoop-api-spec.md#getanalysiscandidate) | GET /api/v1/admin/pipeline/candidates/{candidate_id} | P1 |
 | [FS059](feature-FS059.md) · [FS067-02](feature-FS067-02.md) | [decideAnalysisCandidate](../../api/out/zoop-api-spec.md#decideanalysiscandidate) | POST /api/v1/admin/pipeline/candidates/{candidate_id}/decision | P1 |

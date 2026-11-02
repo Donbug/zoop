@@ -353,6 +353,24 @@ def _receipt(files: dict[str, bytes], expected: str) -> dict:
     return docs
 
 
+def read_plan(plan_dir: Path) -> dict:
+    """The manifest of one immutable plan directory, proven self-consistent and nothing more: the pinned leaf files are exactly the four plan files, the receipt names
+    each file's size and SHA-256, and the manifest's plan digest is recomputed. No ledger, source registry or fixture is consulted (that is `verify_plan`)."""
+    with _PlanFiles(plan_dir) as pinned:
+        docs = _receipt(pinned.files, byte_hash(pinned.files["receipt.json"]))
+        manifest, receipt = docs["manifest.json"], docs["receipt.json"]
+        try:
+            body = {key: value for key, value in manifest.items() if key != "planDigest"}
+            consistent = (manifest["schemaVersion"] == PLAN_SCHEMA and (receipt["planId"], receipt["planDigest"]) == (manifest["planId"], manifest["planDigest"])
+                          and digest(body) == manifest["planDigest"])
+        except (AttributeError, KeyError, TypeError):
+            consistent = False
+        if not consistent:
+            raise ExtractionFailure("plan_content_mismatch")
+        pinned.check()
+        return manifest
+
+
 def verify_plan(plan_dir: Path, expected_receipt_sha256: str, fixtures: Fixtures, ingestion_dir: Path, sources: Path,
                 live: LiveAccess | None = None) -> dict:
     """Reconstruct exact original bytes and current read-only source bindings. Never freeze or confer send/publication authority."""
