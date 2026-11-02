@@ -151,6 +151,8 @@ class PublicationMergerTest {
         var label = proposal.changes().stream().filter(c -> "label".equals(c.field())).findFirst().orElseThrow();
         assertEquals(3, label.values().size());
         assertEquals(2, label.values().stream().filter(v -> "incoming".equals(v.side())).count());
+        assertEquals("correction_required", assertThrows(PublicationException.class, () -> PublicationMerger.merge(List.of(published, first, second),
+                PublicationMerger.combine(PublicationMerger.emptyDecisions(), proposal.decisions()), base.issueSources().keySet(), base.issueSources())).code());
     }
 
     @Test
@@ -194,6 +196,14 @@ class PublicationMergerTest {
         var legacyBase = PublicationMerger.merge(List.of(legacy), PublicationMerger.emptyDecisions(), Set.of());
         assertEquals(0, propose(List.of(legacy, incoming), PublicationMerger.emptyDecisions(), legacyBase, incoming)
                 .decisions().objects("fieldSelections").size());
+        // A legacy group whose value changed is reported and stops like any other.
+        Contribution changed = source(4, "same", "B");
+        var legacyChange = propose(List.of(legacy, changed), PublicationMerger.emptyDecisions(), legacyBase, changed);
+        assertEquals(0, legacyChange.decisions().objects("fieldSelections").size());
+        assertTrue(legacyChange.changes().stream().anyMatch(c -> "label".equals(c.field())));
+        assertEquals("correction_required", assertThrows(PublicationException.class, () -> PublicationMerger.merge(List.of(legacy, changed),
+                PublicationMerger.combine(PublicationMerger.emptyDecisions(), legacyChange.decisions()), legacyBase.issueSources().keySet(),
+                legacyBase.issueSources())).code());
 
         // A person decided the label: that field is covered and the issue gets no automatic decision.
         Contribution published = source(2, "same", "A"); Contribution newer = source(3, "same", "B");
@@ -202,6 +212,13 @@ class PublicationMergerTest {
         assertEquals(0, proposal.decisions().objects("fieldSelections").size());
         assertTrue(proposal.changes().stream().noneMatch(c -> "label".equals(c.field())));
         assertTrue(proposal.changes().stream().anyMatch(c -> "geography".equals(c.field())));
+
+        // The inherited decision (a first47-style decisions file) keeps the person's owner when a later source only adds evidence.
+        Contribution later = sameHeadline(published, source(5, "same", "A"));
+        var kept = prepare(List.of(published, later), Obj.of(peopleLabel(published)), base, later);
+        assertEquals(0, kept.proposal().decisions().objects("fieldSelections").size());
+        assertEquals(published.issueRef("same"), kept.merged().issueSources().get("same").headlineSources().get("label"));
+        assertFalse(PublicationMerger.claimsAutomaticReviewer(kept.effective()));
     }
 
     @Test
