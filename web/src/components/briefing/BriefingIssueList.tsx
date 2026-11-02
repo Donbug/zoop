@@ -6,6 +6,7 @@ import { issueAnchor } from '@/util/briefingIssueView';
 import { eventTimeText } from '@/util/event-time';
 import BriefingReadingSection from './BriefingReadingSection';
 import BriefingItemDetails from './BriefingItemDetails';
+import BriefingEvidenceTotal from './BriefingEvidenceTotal';
 import {
   BriefingDocumentSentiments,
   IssueCorrections,
@@ -156,6 +157,7 @@ export default function BriefingIssueList({
             ))}
         </ol>
       )}
+      <BriefingEvidenceTotal items={items} />
     </section>
   );
 }

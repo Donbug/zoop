@@ -249,7 +249,7 @@ export default function PublishedBriefing({
             roundId={result.id}
             eventId={item.eventId}
             compact={compact}
-            to={`/?round=${encodeURIComponent(result.id)}&select=${encodeURIComponent(`node:${item.eventId}`)}`}
+            to={`/?round=${encodeURIComponent(result.id)}&select=${encodeURIComponent(`node:${item.eventId}`)}&focus=${encodeURIComponent(item.eventId)}&hops=1`}
             className={`self-start text-caption font-semibold underline underline-offset-4 ${FOCUS_RING}`}
           >
             이 회차 관계 그래프에서 보기
