@@ -1645,6 +1645,9 @@ function MapWorkspace({
                   id={edgeId}
                   context={eventContext}
                   logoOf={logoOf}
+                  actionOf={(issueId) =>
+                    data?.nodes.find((node) => node.id === issueId)?.action
+                  }
                   onClose={() => selectNode(null)}
                   onSelectNode={selectNode}
                   onAction={relationAction}
