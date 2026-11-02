@@ -181,7 +181,7 @@ function CandidatesSession() {
           className={SEARCH_INPUT}
         />
         {candidates.refreshError && (
-          <p role="status" className="text-[11px] text-zoop-muted">
+          <p role="status" className="text-caption text-zoop-muted">
             새로 고치지 못했어요. 이전 결과를 표시해요.
           </p>
         )}
@@ -252,7 +252,7 @@ function CandidatesSession() {
                           {row.title ?? '사건 없는 관계 후보'}
                         </button>
                         {!row.active && (
-                          <span className="mt-1 inline-block rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-[11px] text-zoop-muted">
+                          <span className="mt-1 inline-block rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-caption text-zoop-muted">
                             비활성
                           </span>
                         )}
@@ -309,8 +309,8 @@ function CandidatesSession() {
           />
         ) : (
           <div className="flex flex-col gap-2 pt-2">
-            <h2 className="text-sm font-bold">후보를 골라 주세요</h2>
-            <p className="text-[11px] text-zoop-muted">
+            <h2 className="text-body font-bold">후보를 골라 주세요</h2>
+            <p className="text-caption text-zoop-muted">
               왼쪽 목록에서 후보를 고르면 원문 인용과 판정 근거를 보여 줘요.
             </p>
           </div>

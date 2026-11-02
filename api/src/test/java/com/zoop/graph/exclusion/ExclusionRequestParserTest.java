@@ -46,6 +46,22 @@ class ExclusionRequestParserTest {
     private final ExclusionRequestParser parser = new ExclusionRequestParser();
 
     @Test
+    void publicationExclusionPinsTheReceiptAndHashesEveryExplicitTarget() {
+        ObjectNode request = StrictJson.newObject();
+        request.put("schemaVersion", ExclusionRequestParser.SCHEMA_VERSION); request.put("action", "exclude-publication");
+        request.put("requestId", "publication-exclusion-1"); request.put("operator", "operator"); request.put("reason", "withdraw selected claim");
+        request.put("graphVersionId", "gv-" + "a".repeat(64)); request.put("receiptSha256", "b".repeat(64));
+        request.putArray("targets").addObject().put("kind", "issue").put("id", "issue-a");
+        var first = assertInstanceOf(ExclusionRequest.PublicationExclude.class, parser.parse(StrictJson.write(request)));
+        assertEquals(List.of(new Target("issue", "issue-a", "")), first.targets());
+        request.put("receiptSha256", "c".repeat(64));
+        assertNotEquals(first.requestSha256(), parser.parse(StrictJson.write(request)).requestSha256());
+        request.put("humanAllow", true);
+        assertEquals(ExclusionFailure.REQUEST_INVALID,
+                assertThrows(ExclusionException.class, () -> parser.parse(StrictJson.write(request))).failure());
+    }
+
+    @Test
     void anExcludeCarriesTheReportsHandoffsPinsAndEveryProposedTarget() {
         ObjectNode report = ExposureReports.report(ExposureReports.handoff("handoff-1", List.of("issue-a"), List.of("edge-a"), true),
                 ExposureReports.handoff("handoff-2", List.of(), List.of(), false));

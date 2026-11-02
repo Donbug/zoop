@@ -21,8 +21,8 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * Strict reader for the app snapshot format (version 1). Unknown keys, broken references, unknown relation types
- * and unresolved geography are rejected as an unreadable snapshot instead of being dropped or guessed.
+ * Strict reader for retained app snapshots and format 4's explicit unknown metadata.
+ * Unknown keys, broken references and unproved geography are rejected.
  */
 public final class GraphSnapshotCodec {
     static final Set<String> RELATION_TYPES = Set.of("INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS");
@@ -35,7 +35,7 @@ public final class GraphSnapshotCodec {
         return read(bytes, expectedVersionId, false);
     }
 
-    /** Only a round-bound reconstruction may preserve unclassified geography as null. Public snapshots stay strict. */
+    /** Round-bound reconstructions have a separate, identity-bound unclassified-geography policy. */
     public static PublicGraphSnapshot readReconstruction(byte[] bytes, String expectedVersionId) {
         if (!expectedVersionId.matches("brf-reconstructed-[0-9a-f]{64}")) throw invalid("reconstruction_identity");
         return read(bytes, expectedVersionId, true);
@@ -45,9 +45,11 @@ public final class GraphSnapshotCodec {
         try {
             Obj root = StrictJson.parseObject(bytes).exactly(Set.of("snapshotFormat", "versionId", "sourceBundleId",
                     "companies", "issues", "relations", "articles", "evidence"));
-            if (root.count("snapshotFormat") != PublicGraphSnapshot.FORMAT) throw invalid("snapshot_format");
+            int format = root.count("snapshotFormat");
+            if (format != PublicGraphSnapshot.FORMAT && format != PublicGraphSnapshot.EXPLICIT_UNKNOWN_FORMAT)
+                throw invalid("snapshot_format");
             if (!root.string("versionId").equals(expectedVersionId)) throw invalid("version_mismatch");
-            PublicGraphSnapshot snapshot = new PublicGraphSnapshot(PublicGraphSnapshot.FORMAT, root.string("versionId"),
+            PublicGraphSnapshot snapshot = new PublicGraphSnapshot(format, root.string("versionId"),
                     root.stringOrNull("sourceBundleId"),
                     root.objects("companies").stream().map(GraphSnapshotCodec::company).toList(),
                     root.objects("issues").stream().map(GraphSnapshotCodec::issue).toList(),
@@ -144,12 +146,14 @@ public final class GraphSnapshotCodec {
             }
         }
         for (Issue issue : s.issues()) {
-            boolean unclassified = reconstruction && issue.geography() == null
-                    && "not_recorded".equals(issue.geographyPolicyVersion()) && issue.geographyEvidenceIds().isEmpty();
+            boolean unclassified = (reconstruction && issue.geography() == null
+                    && "not_recorded".equals(issue.geographyPolicyVersion()) && issue.geographyEvidenceIds().isEmpty())
+                    || (s.snapshotFormat() == PublicGraphSnapshot.EXPLICIT_UNKNOWN_FORMAT && issue.hasExplicitUnknownGeography());
             if (!unclassified && (issue.geography() == null || !GEOGRAPHY.contains(issue.geography()))) throw invalid("issue_geography");
             if (!unclassified && (issue.geographyEvidenceIds().isEmpty() || !evidence.containsAll(issue.geographyEvidenceIds()))) {
                 throw invalid("issue_geography_evidence");
             }
+            if (issue.hasExplicitUnknownGeography() && issue.evidenceIds().isEmpty()) throw invalid("issue_evidence_reference");
             if (!matchesPrecision(issue.eventTime(), issue.timePrecision())) throw invalid("issue_event_time");
             if (issue.latestPublishedAt() != null && !isDateOrInstant(issue.latestPublishedAt())) {
                 throw invalid("issue_published_at");

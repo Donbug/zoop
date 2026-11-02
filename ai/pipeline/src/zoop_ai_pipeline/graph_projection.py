@@ -35,10 +35,11 @@ from .graph_projection_contracts import (APPROVAL_KEYS, APPROVAL_KINDS, DEPTHS, 
     MAX_ATTEMPTS, MAX_EDGES, MAX_EVIDENCE, MAX_NODES, MAX_PLAN, MAX_REGISTRY, PLAN_VERSION, SCHEMA, STORE_SCHEMA, UNRESOLVED_SHOWN, CanonicalEntry,
     CanonicalRegistry, ExtractionFailure, Focus, Freeze, Init, Selector, Withheld, canonical, digest, entry_key, graph_digest, marker_props, normalized_props,
     plan_graph_digest, relation_id, stored_props)
-from .ingestion_contracts import Authority, IngestionFailure, copy_bounded, now, read_file, reserved_state_roots, timestamp
-from .relation import Engine
+from .ingestion_contracts import IngestionFailure, copy_bounded, now, read_file, reserved_state_roots, timestamp
+from .relation import Engine, current as relation_current
 from .relation import Store as RelationStore
 from .relation_contracts import MAX_PATH
+from .private_processing import select_authority
 
 _SQL = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -456,8 +457,9 @@ class Paths:
     relation: Path
     extraction: Path
     ingestion: Path
-    sources: Path
+    sources: Path | None
     canonical: Path
+    private_processing: Path | None = None
 
 
 class Source:
@@ -475,8 +477,13 @@ class Source:
         self.store.close()
 
     def inspect(self, job_id: str) -> dict:
-        engine = Engine(self.store, Sources(self.paths.ingestion, Authority(self.paths.sources)), self.paths.extraction, self.paths.ingestion)
+        authority = select_authority(self.paths.sources, self.paths.private_processing)
+        engine = Engine(self.store, Sources(self.paths.ingestion, authority), self.paths.extraction, self.paths.ingestion)
         return engine.inspect(job_id)
+
+    def require_current_analysis(self, job_id: str) -> None:
+        Engine(self.store, Sources(self.paths.ingestion, None), self.paths.extraction,
+               self.paths.ingestion).require_current_analysis(job_id)
 
 
 def gate(source: Source, relation: dict, pin: dict | None) -> dict:
@@ -493,6 +500,34 @@ def gate(source: Source, relation: dict, pin: dict | None) -> dict:
     if pin is not None and result["binding"]["upstream"] != pin:
         raise Withheld("upstream_changed")
     return result
+
+
+def preflight_analysis(root: Path, paths: Paths | None, request: Freeze | Selector) -> None:
+    """Current-only analysis gate before a freeze/project/recover writer is opened."""
+    if isinstance(request, Freeze):
+        with Source(paths) as source:
+            source.require_current_analysis(request.relation.job_id)
+        return
+    roots = (paths.relation, paths.extraction, paths.ingestion) if paths else ()
+    root = checked_root(root, *roots)
+    wal = root / "graph.sqlite3-wal"
+    if wal.exists() and wal.stat().st_size:
+        ours_only(root)
+        store = WalHistory(root)
+    else:
+        store = Store(root, *roots, mode="read")
+    try:
+        row = store.version(request.version_id)
+        if row is None:
+            raise ExtractionFailure("version_not_found")
+        plan = verify_plan(row)
+        if not relation_current({"versions": plan["source"]["policies"]}):
+            raise ExtractionFailure("analysis_contract_changed")
+        if paths is not None:
+            with Source(paths) as source:
+                source.require_current_analysis(plan["source"]["relation"]["jobId"])
+    finally:
+        store.close()
 
 
 def review_state(result: dict) -> list:
@@ -861,6 +896,7 @@ class Projector:
 
     def _strict(self, source: Source, plan: dict, registry: Registry) -> None:
         """The gate of a write: authority plus the WHOLE review state exactly as frozen (the ERD's `input revision == current revision` at commit)."""
+        source.require_current_analysis(plan["source"]["relation"]["jobId"])
         result = self._authority(source, plan, registry)
         if digest(review_state(result)) != plan["source"]["review"]["digest"]:
             raise ExtractionFailure("review_revision_changed")
@@ -931,6 +967,7 @@ class Projector:
             raise ExtractionFailure("graph_contract_changed")        # history: decided from the stored plan schema alone; a changed review needs a NEW version id
         registry = load_registry(paths.canonical)
         with Source(paths) as source:
+            source.require_current_analysis(relation["jobId"])
             if row is not None:
                 if row["input_digest"] != input_digest:
                     raise ExtractionFailure("version_input_conflict")
@@ -966,6 +1003,9 @@ class Projector:
         row = self._existing(request.version_id)
         if not plan_current(row):
             raise ExtractionFailure("graph_contract_changed")        # never projected, resumed or settled: an earlier contract's plan has no pinned approval basis
+        plan = verify_plan(row)
+        if not relation_current({"versions": plan["source"]["policies"]}):
+            raise ExtractionFailure("analysis_contract_changed")
         version_id, state = row["version_id"], row["state"]
         if state == "ready":
             return self.result(row)
@@ -975,10 +1015,10 @@ class Projector:
             raise ExtractionFailure("version_not_frozen", {"state": state})
         if self.store.one("SELECT COUNT(*) AS n FROM attempts WHERE version_id=?", (version_id,))["n"] >= MAX_ATTEMPTS:
             raise ExtractionFailure("attempt_limit_exceeded")
-        plan = verify_plan(row)
         binding = self.store.ready_binding()
         registry = load_registry(self.paths.canonical)
         with Source(self.paths) as source:
+            source.require_current_analysis(plan["source"]["relation"]["jobId"])
             try:
                 self._strict(source, plan, registry)
             except ExtractionFailure as exc:
@@ -1089,6 +1129,8 @@ class Projector:
         if row["state"] not in {"reserved", "unknown"}:
             raise ExtractionFailure("recovery_not_required", {"state": row["state"]})
         plan = verify_plan(row)
+        if not relation_current({"versions": plan["source"]["policies"]}):
+            raise ExtractionFailure("analysis_contract_changed")
         binding = self.store.ready_binding()
         latest = self.store.one("SELECT MAX(n) AS n FROM attempts WHERE version_id=?", (version_id,))["n"]
         graph = _open_graph(binding)

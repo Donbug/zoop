@@ -85,7 +85,7 @@ def test_the_receipt_counts_impacts_and_the_stored_artifact_is_the_exported_byte
     rig_ = Rig(rich_world, tmp_path)
     frozen = rig_.freeze()
     out = rig_.run("export", rig_.sel())
-    assert frozen["receipt"]["counts"]["impacts"] == 6 and frozen["receipt"]["bundleSchema"] == "zoop-graph-handoff-bundle-7"
+    assert frozen["receipt"]["counts"]["impacts"] == 6 and frozen["receipt"]["bundleSchema"] == "zoop-graph-handoff-bundle-8"
     assert frozen["usage"] == {"providerCalls": 0, "modelCalls": 0}
     assert hs.canonical(out["bundle"]).encode() == (rig_.state / "bundles" / f"{frozen['receipt']['bundleDigest']}.json").read_bytes()
 

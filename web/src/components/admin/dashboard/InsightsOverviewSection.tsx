@@ -30,7 +30,7 @@ export default function InsightsOverviewSection() {
       ]}
     >
       {overview.refreshError && (
-        <p role="status" className="text-[11px] text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}

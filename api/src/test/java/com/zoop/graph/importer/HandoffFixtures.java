@@ -242,6 +242,8 @@ final class HandoffFixtures {
                 "impactPolicy")) {
             policies.put(name, name + "-1");
         }
+        policies.put("policy", "zoop-relation-policy-2");
+        policies.put("countryContext", "zoop-country-context-1");
         ArrayNode used = source.putArray("reviewUsed");
         for (String usedCandidate : spec.shape().twoHop() ? List.of(candidate, candidate2) : List.of(candidate)) {
             ObjectNode usedEntry = used.addObject();

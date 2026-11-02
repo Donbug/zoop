@@ -35,7 +35,7 @@ function Statement({
       <p className={BODY}>{value.text}</p>
       <details className="mt-1">
         <summary
-          className={`min-h-11 cursor-pointer content-center text-xs text-zoop-muted ${FOCUS_RING}`}
+          className={`min-h-11 cursor-pointer content-center text-caption text-zoop-muted ${FOCUS_RING}`}
         >
           근거 인용 {refs.length}개 · 원문{' '}
           {new Set(refs.map((s) => s.documentId)).size}건
@@ -47,7 +47,7 @@ function Statement({
                 href={source.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`text-sm underline ${FOCUS_RING}`}
+                className={`text-body underline ${FOCUS_RING}`}
               >
                 {source.title} · 원문 ↗
               </a>
@@ -96,34 +96,38 @@ function SpecificReading({ company }: { company: CompanyOutlook }) {
       aria-label={`${company.companyName} 판단과 새 사실`}
     >
       <div>
-        <p className="text-xs font-semibold text-zoop-muted">한 줄 판단</p>
-        <p className="mt-1 text-base leading-relaxed font-medium">
+        <p className="text-caption font-semibold text-zoop-muted">한 줄 판단</p>
+        <p className="mt-1 text-lead leading-relaxed font-medium">
           {reading.brief?.text}
         </p>
       </div>
       <div>
-        <p className="text-xs font-semibold text-zoop-muted">새 사실</p>
-        <p className="mt-1 text-sm leading-relaxed">{reading.fact?.text}</p>
+        <p className="text-caption font-semibold text-zoop-muted">새 사실</p>
+        <p className="mt-1 text-body leading-relaxed">{reading.fact?.text}</p>
       </div>
       <div>
-        <p className="text-xs font-semibold text-zoop-muted">다음 확인 조건</p>
-        <p className="mt-1 text-sm leading-relaxed">{reading.watch?.text}</p>
+        <p className="text-caption font-semibold text-zoop-muted">
+          다음 확인 조건
+        </p>
+        <p className="mt-1 text-body leading-relaxed">{reading.watch?.text}</p>
       </div>
       <details>
         <summary
-          className={`min-h-11 cursor-pointer content-center text-sm font-semibold ${FOCUS_RING}`}
+          className={`min-h-11 cursor-pointer content-center text-body font-semibold ${FOCUS_RING}`}
         >
           배경·이전 판단과의 연결·문장 근거
         </summary>
-        <h5 className="mt-2 text-sm font-semibold">비교할 배경</h5>
+        <h5 className="mt-2 text-body font-semibold">비교할 배경</h5>
         {reading.background && (
           <Statement value={reading.background} company={company} />
         )}
-        <h5 className="mt-3 text-sm font-semibold">이전 판단에서 달라진 점</h5>
+        <h5 className="mt-3 text-body font-semibold">
+          이전 판단에서 달라진 점
+        </h5>
         {reading.change && (
           <Statement value={reading.change} company={company} />
         )}
-        <h5 className="mt-3 text-sm font-semibold">
+        <h5 className="mt-3 text-body font-semibold">
           판단·새 사실·확인 조건의 근거
         </h5>
         {statements
@@ -176,7 +180,7 @@ function CompanyAnalysis({
   return (
     <details open className="mt-3">
       <summary
-        className={`min-h-11 cursor-pointer content-center text-sm font-semibold ${FOCUS_RING}`}
+        className={`min-h-11 cursor-pointer content-center text-body font-semibold ${FOCUS_RING}`}
       >
         자세히 · 기업 전망 전문과 근거
       </summary>
@@ -186,24 +190,26 @@ function CompanyAnalysis({
           사실만으로 이 뉴스의 영향이나 전망 적중을 단정하지 않습니다.
         </p>
       )}
-      <h5 className="mt-3 text-sm font-semibold">조건부 기업 전망</h5>
+      <h5 className="mt-3 text-body font-semibold">조건부 기업 전망</h5>
       <Statement value={company.outlook} company={company} />
-      <h5 className="mt-3 text-sm font-semibold">전망이 성립하려면</h5>
+      <h5 className="mt-3 text-body font-semibold">전망이 성립하려면</h5>
       {company.conditions.map((s, i) => (
         <Statement key={i} value={s} company={company} />
       ))}
-      <h5 className="mt-3 text-sm font-semibold">확인된 사실</h5>
+      <h5 className="mt-3 text-body font-semibold">확인된 사실</h5>
       {company.facts.map((s, i) => (
         <Statement key={i} value={s} company={company} />
       ))}
-      <h5 className="mt-3 text-sm font-semibold">기업에 미치는 의미</h5>
+      <h5 className="mt-3 text-body font-semibold">기업에 미치는 의미</h5>
       <Statement value={company.impact} company={company} />
-      <h5 className="mt-3 text-sm font-semibold">반대 요인·아직 모르는 부분</h5>
+      <h5 className="mt-3 text-body font-semibold">
+        반대 요인·아직 모르는 부분
+      </h5>
       {company.risks.map((s, i) => (
         <Statement key={i} value={s} company={company} />
       ))}
       <div className="mt-3 border-t border-panel-line pt-3">
-        <h5 className="text-sm font-semibold">
+        <h5 className="text-body font-semibold">
           {edition === 'morning'
             ? '이전 기업 전망에서 달라진 점'
             : '아침 판단과 실제 사업 정보 비교'}
@@ -227,7 +233,7 @@ function CompanyAnalysis({
       {company.reading?.status === 'PASS' && (
         <details className="mt-3">
           <summary
-            className={`min-h-11 cursor-pointer content-center text-sm ${FOCUS_RING}`}
+            className={`min-h-11 cursor-pointer content-center text-body ${FOCUS_RING}`}
           >
             짧은 요약의 문장별 근거
           </summary>
@@ -264,16 +270,16 @@ function CompanyAtAGlance({
         className={`min-h-11 cursor-pointer list-none p-4 [&::-webkit-details-marker]:hidden ${FOCUS_RING}`}
       >
         <div className="flex items-center gap-2">
-          <h4 className="min-w-0 break-words text-sm font-bold">
+          <h4 className="min-w-0 break-words text-body font-bold">
             {company.companyName}
           </h4>
           {card?.topic && (
-            <span className="border-l border-panel-line pl-2 text-xs text-zoop-muted">
+            <span className="border-l border-panel-line pl-2 text-caption text-zoop-muted">
               {card.topic.text}
             </span>
           )}
           <span
-            className="ml-auto shrink-0 text-lg leading-none text-zoop-muted"
+            className="ml-auto shrink-0 text-title-sm leading-none text-zoop-muted"
             aria-hidden="true"
           >
             <span className="group-open:hidden">＋</span>
@@ -282,10 +288,10 @@ function CompanyAtAGlance({
         </div>
         {card?.title && card.description ? (
           <>
-            <p className="mt-2 break-words text-lg leading-snug font-bold">
+            <p className="mt-2 break-words text-title-sm leading-snug font-bold">
               {card.title.text}
             </p>
-            <p className="mt-2 break-words text-sm leading-relaxed text-zoop-muted">
+            <p className="mt-2 break-words text-body leading-relaxed text-zoop-muted">
               {card.description.text}
             </p>
           </>
@@ -305,7 +311,7 @@ function CompanyAtAGlance({
         {card && (
           <details className="mt-3">
             <summary
-              className={`min-h-11 cursor-pointer content-center text-sm font-semibold ${FOCUS_RING}`}
+              className={`min-h-11 cursor-pointer content-center text-body font-semibold ${FOCUS_RING}`}
             >
               한눈 카드의 문장별 근거
             </summary>
@@ -394,7 +400,9 @@ export default function CompanyOutlooks({
                 key={company.companyId}
                 className="rounded-panel border border-panel-line bg-panel-soft p-4"
               >
-                <h4 className="text-lg font-bold">{company.companyName}</h4>
+                <h4 className="text-title-sm font-bold">
+                  {company.companyName}
+                </h4>
                 <p className={`${NOTE} mt-1`}>
                   {assessments[company.assessment]}
                 </p>

@@ -38,6 +38,7 @@ final class GraphReceiptBasis {
      * @throws GraphReceiptGrants.Malformed when a referenced relation or basis is missing, duplicated or does not match
      */
     static boolean proves(Obj bundle, String evidenceId, List<BasisRef> refs) {
+        if (bundle.has("schemaVersion") && com.zoop.graph.importer.LegacyRealPackage.isBundleSchema(bundle.string("schemaVersion"))) return false;
         if (refs.isEmpty()) {
             return false;
         }

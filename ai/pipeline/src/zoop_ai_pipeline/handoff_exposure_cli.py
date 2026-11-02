@@ -24,8 +24,10 @@ from . import extraction, ingestion
 from .dependency_cli import _LEDGER_CODES
 from .dependency_contracts import matcher
 from .handoff import Store, contract_current, open_legacy_history, read_bundle, read_manifest, receipt_of
+from .handoff_contexts import Contexts, source_flags
+from .extraction_contracts import ObservationRef
 from .handoff_exposure import close, relation_seeds, source_seeds, unresolved
-from .handoff_exposure_contracts import (BASIS, BUNDLE, CAUSES, CONSISTENCY, EFFECT, MAX_COMMAND, MAX_OUTPUT, NOT_COVERED, SCHEMA, SOURCE_KINDS,
+from .handoff_exposure_contracts import (BASIS, CAUSES, CONSISTENCY, EFFECT, MAX_COMMAND, MAX_OUTPUT, NOT_COVERED, SCHEMA, SOURCE_KINDS,
     ExtractionFailure, Query)
 from .ingestion_contracts import IngestionFailure, canonical, timestamp
 
@@ -53,7 +55,8 @@ def _receipt_intact(row, bundle: dict, manifest) -> bool:
 def _report(query: Query, args, ledger: list) -> str:
     changed, ids = query.changed, sorted(query.handoff_ids)
     sourced = changed.kind in SOURCE_KINDS
-    roots = (args.extraction_state_dir, args.ingestion_state_dir) if sourced else ()
+    contexts = None
+    roots = (args.extraction_state_dir, args.ingestion_state_dir) if sourced and args.source_contexts is None else ()
     failures: dict[str, dict] = {}
 
     ledger[0] = "handoff"
@@ -72,6 +75,7 @@ def _report(query: Query, args, ledger: list) -> str:
 
     with ExitStack() as stack:
         loaded: dict[str, tuple] = {}
+        manifests = {}
         if pending:
             store = stack.enter_context(closing(Store(args.state_dir, *roots, mode="read")))
             for handoff_id in pending:
@@ -99,34 +103,66 @@ def _report(query: Query, args, ledger: list) -> str:
                     failures[handoff_id] = {"code": "handoff_state_invalid"}
                     continue
                 loaded[handoff_id] = (row, bundle)
+                manifests[handoff_id] = manifest
 
-        recorded, extracted, index = None, None, None
-        # Every opened ledger keeps its shared lock until the report is written; a writer that starts meanwhile fails busy.
+        recorded, scanned = None, {}
+        selections = {}
+        # Every opened ledger keeps its shared lock until the report is written.
         if sourced and loaded:
-            ledger[0] = "ingestion"
-            ingestion_store = stack.enter_context(closing(ingestion.Store(args.ingestion_state_dir, existing=True)))
-            ledger[0] = "extraction"
-            extraction_store = stack.enter_context(closing(extraction.Store(args.extraction_state_dir, args.ingestion_state_dir, existing=True)))
-            ledger[0] = "ingestion"
-            recorded = ingestion.recorded(ingestion_store, changed.wire())
-            ledger[0] = "extraction"
-            extracted, index = extraction.dependents(extraction_store, matcher(changed))
+            if args.source_contexts:
+                contexts = Contexts.read(args.source_contexts, args.source_contexts_sha256, Path("/"))
+                Store.guard(args.state_dir, contexts.roots())
+            selected = {}
+            for handoff_id, manifest in manifests.items():
+                for pin in manifest.sources:
+                    route = contexts.for_pin(pin) if contexts else None
+                    key = route.context_id if route else "single"
+                    selected[key] = (route.paths.extraction, route.paths.ingestion) if route else (args.extraction_state_dir, args.ingestion_state_dir)
+            recorded = False
+            for key, (extracted_root, ingested_root) in selected.items():
+                ledger[0] = "ingestion"
+                ingestion_store = stack.enter_context(closing(ingestion.Store(ingested_root, existing=True)))
+                ledger[0] = "extraction"
+                extraction_store = stack.enter_context(closing(extraction.Store(extracted_root, ingested_root, existing=True)))
+                recorded = ingestion.recorded(ingestion_store, changed.wire()) or recorded
+                extracted, index = extraction.dependents(extraction_store, matcher(changed))
+                scanned[key] = (extraction_store, extracted, index)
+            owners = {}
             for handoff_id in sorted(loaded):
-                found = unresolved(loaded[handoff_id][1], index)
+                selected_index, selected_entries = {}, {}
+                for pin in manifests[handoff_id].sources:
+                    route = contexts.for_pin(pin) if contexts else None
+                    key = route.context_id if route else "single"
+                    store, extracted, index = scanned[key]
+                    job = pin.upstream.job_id
+                    owner = (key, pin.upstream.input_digest, pin.upstream.digest)
+                    if job in owners and owners[job] != owner:
+                        raise ExtractionFailure("source_context_route_duplicate")
+                    owners[job] = owner
+                    if job in index:
+                        selected_index[job] = index[job]
+                        if contexts:
+                            row = store.one("SELECT binding FROM jobs WHERE job_id=?", (job,))
+                            for bound in json.loads(row["binding"])["documents"].values():
+                                contexts.bound(pin, ObservationRef.model_validate(bound["observation"]))
+                    for entry in extracted["jobs"]:
+                        if entry["jobId"] == job:
+                            selected_entries[job] = entry
+                found = unresolved(loaded[handoff_id][1], selected_index)
                 if found is not None:
                     failures[handoff_id] = {"code": "handoff_source_unresolved", "jobId": found[0], "reason": found[1]}
-                    del loaded[handoff_id]
+                selections[handoff_id] = ({"jobs": list(selected_entries.values())}, selected_index)
         if failures:
             raise ExtractionFailure("handoff_selection_unmappable", {"handoffs": [{"handoffId": i, **failures[i]} for i in sorted(failures)]})
 
         handoffs, bound_any = [], False
         for handoff_id in ids:
             row, bundle = loaded[handoff_id]
-            seeds = (source_seeds(bundle, extracted, index) if sourced
+            seeds = (source_seeds(bundle, *selections[handoff_id]) if sourced
                      else relation_seeds(bundle, changed.job_id, changed.relation_candidate_id))
             found = close(bundle, seeds)
             bound_any = bound_any or seeds.bound
-            handoffs.append({"handoffId": handoff_id, "bundleSchema": BUNDLE, "manifestDigest": row["input_digest"], "bundleDigest": row["bundle_digest"],
+            handoffs.append({"handoffId": handoff_id, "bundleSchema": bundle["schemaVersion"], "manifestDigest": row["input_digest"], "bundleDigest": row["bundle_digest"],
                              "contentDigest": row["content_digest"], "bound": seeds.bound,
                              "exposed": any(found[k] for k in ("articles", "issues", "relations", "evidenceIds")), **found,
                              "counts": {"articles": len(found["articles"]), "issues": len(found["issues"]), "relations": len(found["relations"]),
@@ -147,6 +183,8 @@ def _report(query: Query, args, ledger: list) -> str:
         if size > MAX_OUTPUT:
             # Never truncated: a partial list could be read as complete.
             raise ExtractionFailure("exposure_report_limit", {"bytes": size, "limit": MAX_OUTPUT})
+        if contexts:
+            contexts.unchanged()
         sys.stdout.write(line + "\n")
         sys.stdout.flush()
         return line
@@ -157,6 +195,7 @@ def main() -> int:
     parser.add_argument("--state-dir", required=True, type=Path, help="the handoff ledger (read-only)")
     parser.add_argument("--ingestion-state-dir", type=Path, help="required for a document/source/grant change, forbidden for s3-relation")
     parser.add_argument("--extraction-state-dir", type=Path, help="as --ingestion-state-dir")
+    source_flags(parser)
     args = parser.parse_args()
     ledger = ["input"]
     try:
@@ -164,7 +203,12 @@ def main() -> int:
         if len(raw) > MAX_COMMAND:
             raise ExtractionFailure("command_input_limit")
         query = Query.model_validate(json.loads(raw))
-        if not _flags_valid(query.changed, (args.ingestion_state_dir, args.extraction_state_dir)):
+        singular = (args.ingestion_state_dir, args.extraction_state_dir)
+        routed = (args.source_contexts, args.source_contexts_sha256)
+        valid = (_flags_valid(query.changed, singular) and all(value is None for value in routed))
+        if query.changed.kind in SOURCE_KINDS and all(value is None for value in singular) and all(value is not None for value in routed):
+            valid = True
+        if not valid:
             raise ExtractionFailure("input_or_configuration_invalid")
         _report(query, args, ledger)
         return 0

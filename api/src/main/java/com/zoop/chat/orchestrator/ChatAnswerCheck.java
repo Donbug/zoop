@@ -81,12 +81,18 @@ final class ChatAnswerCheck {
         Map<String, Branch> byId = new HashMap<>();
         branches.forEach(b -> byId.put(b.requirementId(), b));
         if (answer.sections().size() > MAX_SECTIONS) return Result.fail("schema");
-        for (var section : answer.sections()) {
+        for (int index = 0; index < answer.sections().size(); index++) {
+            var section = answer.sections().get(index);
             if (!BASES.contains(section.basis()) || section.text() == null || section.text().isBlank()
                     || section.requirementIds().isEmpty() || section.evidenceIds().size() > MAX_SECTION_EVIDENCE
                     || new HashSet<>(section.evidenceIds()).size() != section.evidenceIds().size()
                     || new HashSet<>(section.requirementIds()).size() != section.requirementIds().size()) {
                 return Result.fail("schema");
+            }
+            try {
+                ChatClaims.split(index, section.text());
+            } catch (IllegalArgumentException invalidClaims) {
+                return Result.fail("claims");
             }
         }
 

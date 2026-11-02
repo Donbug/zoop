@@ -135,7 +135,7 @@ export default function MarkdownContent({
       const Tag = `h${Math.min(6, level + headingOffset)}` as
         'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
       blocks.push(
-        <Tag key={index} className="font-semibold text-gray-900">
+        <Tag key={index} className="font-semibold text-zoop-ink">
           {inline(heading[2])}
         </Tag>,
       );

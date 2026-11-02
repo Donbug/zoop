@@ -79,4 +79,29 @@ class HandoffMentionTimeTest {
         assertUnsupported("2026", "hour", "an unknown precision name");
         assertUnsupported("2026", null, "a missing precision");
     }
+
+    @Test
+    void unresolvedReceiptValuesRemainOutsideTheStrictCalendarGrammar() {
+        for (String value : List.of("10.19일", "'25.8월", "2026-02-30")) {
+            assertDoesNotThrow(() -> HandoffTime.receiptEventTime(value, "unresolved"));
+            for (String precision : PRECISIONS) assertUnsupported(value, precision, value);
+        }
+        for (String value : List.of("", "2026-09-30", "2026-09", "2026")) {
+            assertThrows(GraphHandoffException.class, () -> HandoffTime.receiptEventTime(value, "unresolved"));
+        }
+        assertThrows(GraphHandoffException.class, () -> HandoffTime.receiptEventTime(null, "unresolved"));
+    }
+
+    @Test
+    void sharedGeographyAndRawTimeFixturesAgreeWithPythonAndService() throws IOException {
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream("graph-handoff/public-unknown-fields-cases.json")) {
+            JsonNode cases = HandoffFixtures.parse(in.readAllBytes());
+            for (JsonNode item : cases.get("accept").values()) {
+                assertDoesNotThrow(() -> HandoffBundleVerifier.verify(item.get("bundle")), item.get("name").stringValue());
+            }
+            for (JsonNode item : cases.get("reject").values()) {
+                assertThrows(RuntimeException.class, () -> HandoffBundleVerifier.verify(item.get("bundle")), item.get("name").stringValue());
+            }
+        }
+    }
 }

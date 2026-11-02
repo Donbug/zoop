@@ -40,4 +40,8 @@
 | [getCompanyQuote](../../api/out/zoop-api-spec.md#getcompanyquote) | GET /api/v1/companies/{id}/quote | 6.1.2, 6.11.1, 6.6.4, 6.6.23, 6.6.26, 6.7.2, 6.7.8, 6.7.10, 6.7.11, 6.5.6 | 공개 |
 | [listCompanyDocuments](../../api/out/zoop-api-spec.md#listcompanydocuments) | GET /api/v1/companies/{id}/documents | 6.1.2, 6.11.1, 6.6.5, 6.6.22, 6.7.6, 6.7.9, 6.5.2, 6.5.6, 6.5.7 | 공개 |
 | [getPipelineOverview](../../api/out/zoop-api-spec.md#getpipelineoverview) | GET /api/v1/admin/pipeline/overview | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
+| [listGraphRounds](../../api/out/zoop-api-spec.md#listgraphrounds) | GET /api/v1/admin/pipeline/rounds | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
+| [startGraphRound](../../api/out/zoop-api-spec.md#startgraphround) | POST /api/v1/admin/pipeline/rounds | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
+| [getGraphRound](../../api/out/zoop-api-spec.md#getgraphround) | GET /api/v1/admin/pipeline/rounds/{roundId} | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
+| [retryGraphRound](../../api/out/zoop-api-spec.md#retrygraphround) | POST /api/v1/admin/pipeline/rounds/{roundId}/retry | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 | 관리자(작업별 권한) |
 | [createAnalysisJob](../../api/out/zoop-api-spec.md#createanalysisjob) | POST /api/v1/admin/jobs | 6.1.2, 6.11.1, 6.5.4, 6.5.5, 6.5.6, 6.5.7 | 관리자(작업별 권한) |

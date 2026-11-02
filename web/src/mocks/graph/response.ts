@@ -1,13 +1,34 @@
 import type { GraphEdge, GraphRequest, GraphResponse } from '@/types/map/graph';
-import { companies, directEdges, follows, issues, mockMember } from './fixture';
+import {
+  companies as baseCompanies,
+  directEdges as baseDirectEdges,
+  follows,
+  issues as baseIssues,
+  largeFixture,
+  mockMember,
+} from './fixture';
 
-export type MockScenario = 'success' | 'empty' | 'no-relations' | 'error';
+export type MockScenario =
+  | 'success'
+  | 'empty'
+  | 'no-relations'
+  | 'error'
+  /** 서버 상한(500개)에 맞춘 성능 확인용 지도 */
+  | 'large';
 export function createMockGraph(
   request: GraphRequest,
   scenario: MockScenario = 'success',
   /** 내 종목 기준 회원. 개발 화면은 실제 로그인 회원의 보유·관심 종목을 넘긴다. */
   member: { holdings: string[]; watchlist: string[] } = mockMember,
 ): GraphResponse {
+  const { companies, issues, directEdges } =
+    scenario === 'large'
+      ? largeFixture()
+      : {
+          companies: baseCompanies,
+          issues: baseIssues,
+          directEdges: baseDirectEdges,
+        };
   const personal = request.mode === 'personal';
   const seeds = personal
     ? [

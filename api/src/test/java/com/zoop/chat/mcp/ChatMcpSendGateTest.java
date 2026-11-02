@@ -187,9 +187,7 @@ class ChatMcpSendGateTest {
             }
         };
         Clock clock = Clock.fixed(now, ZoneOffset.UTC);
-        var reader = new PublicGraphReader(new GraphVersionSelector(versions, clock),
-                new FixtureGraphSnapshotStore(ChatMcpSendGateTest.class.getClassLoader()),
-                pinned -> DisclosureExclusions.NONE);
+        var reader = new PublicGraphReader(new GraphVersionSelector(versions, clock), new FixtureGraphSnapshotStore(ChatMcpSendGateTest.class.getClassLoader()), pinned -> DisclosureExclusions.NONE, null, null);
         return new GraphVersionDiffTool(reader, versions, (id, version, asOf, requestId) -> true, clock);
     }
 

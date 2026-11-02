@@ -60,7 +60,7 @@ function Field({
   const id = useId();
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-[11px] text-zoop-muted">
+      <label htmlFor={id} className="text-caption text-zoop-muted">
         {label}
       </label>
       {children(id)}
@@ -150,13 +150,13 @@ export default function RoundActionForm({
       className="flex flex-col gap-3 rounded-2xl bg-zoop-soft p-5"
     >
       <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-bold">{copy.title}</p>
-        <p className="text-[11px] text-zoop-muted tabular-nums">
+        <p className="text-body font-bold">{copy.title}</p>
+        <p className="text-caption text-zoop-muted tabular-nums">
           {round.date} {editionLabel[round.edition]} 브리핑
         </p>
       </div>
       {copy.hint && (
-        <p className="text-[11px] leading-relaxed text-zoop-muted">
+        <p className="text-caption leading-relaxed text-zoop-muted">
           {copy.hint}
         </p>
       )}
@@ -208,19 +208,19 @@ export default function RoundActionForm({
           />
         )}
       </Field>
-      <p className="text-[11px] text-zoop-muted">
+      <p className="text-caption text-zoop-muted">
         사유 {reason.length}/500자
         {action === 'correct' && ` · 정정 ${body.length}/2000자`}
       </p>
       {missing && (
-        <p role="alert" className="text-[11px] text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           {action === 'correct'
             ? '정정 내용과 사유를 모두 입력해 주세요.'
             : '사유를 입력해 주세요.'}
         </p>
       )}
       {error && (
-        <p role="alert" className="text-[11px] text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           {copy.title}에 실패했어요. {adminActionErrorMessage(error)}
         </p>
       )}

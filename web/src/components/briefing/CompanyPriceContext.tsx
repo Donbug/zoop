@@ -19,7 +19,7 @@ export default function CompanyPriceContext({
       aria-label={`${c.companyName} 주가 흐름 분석`}
       className="rounded-lg border border-zoop-line p-3"
     >
-      <h4 className="text-sm font-semibold">실제 주가 흐름과 함께 읽기</h4>
+      <h4 className="text-body font-semibold">실제 주가 흐름과 함께 읽기</h4>
       <p className={`${BODY} mt-2`}>{c.summary}</p>
       <p className={`${NOTE} mt-2`}>{c.flow}</p>
       <p className={`${NOTE} mt-2`}>
@@ -33,12 +33,12 @@ export default function CompanyPriceContext({
       </p>
       {evening && (
         <div className="mt-4">
-          <h5 className="text-sm font-semibold">아침 이후 실제 가격</h5>
+          <h5 className="text-body font-semibold">아침 이후 실제 가격</h5>
           <p className={`${BODY} mt-2`}>{c.sinceMorning.observation}</p>
         </div>
       )}
       <div className="mt-4 space-y-3">
-        <h5 className="text-sm font-semibold">기사 발표 시각과 가격 관측</h5>
+        <h5 className="text-body font-semibold">기사 발표 시각과 가격 관측</h5>
         {c.news.map((n) => (
           <div key={n.evidenceId} className="border-l-2 border-zoop-line pl-3">
             <p className={NOTE}>

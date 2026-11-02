@@ -228,7 +228,8 @@ def test_country_and_context_checks_are_explicit(tmp_path, declared, known, chec
     w = build_world(tmp_path / "owned", tuple(known))
     out = converge(w, "j", [proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [c(w, SUP)], countries=declared)])
     r = out["relations"][0]
-    assert r["context"] == {"market": market, "check": check, "knownCountries": sorted(known)}
+    assert r["context"] == {"market": market, "check": check, "knownCountries": sorted(known),
+                            "normalizationVersion": "zoop-country-context-1", "rawGeography": sorted(known), "unresolvedGeography": []}
     assert r["eligibility"]["status"] == ("hold" if check == "conflict" else "eligible")
     assert (("country_context_conflict", None) in codes(r)) == (check == "conflict")
     if check != "conflict":

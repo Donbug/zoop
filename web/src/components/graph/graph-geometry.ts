@@ -1,4 +1,5 @@
 import type { NodeData } from '@antv/g6';
+import { MIN_GRAPH_ZOOM } from './graph-zoom-range';
 
 export type Rect = { x: number; y: number; width: number; height: number };
 const glyphWidth = (char: string, size: number) =>
@@ -66,7 +67,7 @@ export function fitZoom(
   const labelHeight = Math.max(...footprints.map((f) => f.labelHeight));
   const solve = (scale: number) =>
     Math.max(
-      0.01,
+      MIN_GRAPH_ZOOM,
       Math.min(
         maxZoom,
         Math.max(1, safe.width - labelWidth * scale) /

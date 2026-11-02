@@ -1,132 +1,180 @@
 package com.zoop.admin.review;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import com.zoop.admin.review.PublishedCandidates.Shown;
+import com.zoop.common.exception.CustomException;
+import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.StrictJson;
 import com.zoop.document.evidence.service.EvidenceService;
+import com.zoop.graph.importer.MentionIds;
+import com.zoop.graph.publication.GraphPublicationAuthority;
+import com.zoop.graph.publication.GraphPublicationReader;
+import com.zoop.graph.publication.GraphPublicationReader.*;
 import com.zoop.graph.read.DisclosureExclusions;
-import com.zoop.graph.read.DisplayGraph;
 import com.zoop.graph.read.PublicGraphReader;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
+import com.zoop.graph.snapshot.PublicGraphSnapshot.*;
 import com.zoop.graph.version.GraphVersionRecord;
 import com.zoop.graph.version.GraphVersionSelector;
 import com.zoop.graph.version.SelectedGraphVersion;
-import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class PublishedCandidatesTest {
-    private static final String BUNDLE = """
-            {"relations":[
-              {"id":"edge-shown","sourceRefs":[{"kind":"s3-relation","jobId":"s3-a","id":"rc-1"}]},
-              {"id":"edge-excluded","sourceRefs":[{"kind":"s3-relation","jobId":"s3-a","id":"rc-2"}]},
-              {"id":"edge-follows","sourceRefs":[{"kind":"s2-comparison","jobId":"s2-a","id":"evc-1>event-1"}]}],
-             "issues":[
-              {"id":"issue-shown","sourceEvents":[{"upstream":{"jobId":"s2-a","inputDigest":"d"},"kind":"event-candidate","ref":"evc-1"},
-                                                   {"upstream":{"jobId":"s2-a","inputDigest":"d"},"kind":"snapshot-event","ref":"event-1"}]},
-              {"id":"issue-excluded","sourceEvents":[{"upstream":{"jobId":"s2-a","inputDigest":"d"},"kind":"event-candidate","ref":"evc-2"}]}]}""";
+    private static final Instant NOW = Instant.parse("2026-10-31T00:00:00Z");
 
     @Test
-    void onlyItemsTheFilteredSnapshotStillShowsCountAndOnlyTheirCandidateSources() {
-        Shown shown = PublishedCandidates.read(BUNDLE, "v1", Set.of("edge-shown", "edge-follows"), Set.of("issue-shown"));
+    void mergedPublicIdsKeepEveryNativeCandidateAndSkipLegacyApprovalClaims() {
+        Publication publication = publication();
+        var shown = PublishedCandidates.read(publication, Set.of("public-edge"), Set.of("public-issue"), ignored -> true);
 
-        assertTrue(shown.relation("s3-a", "rc-1"));
-        assertFalse(shown.relation("s3-a", "rc-2"), "an excluded relation's source is not shown");
-        assertTrue(shown.event("s2-a", "evc-1"));
-        assertFalse(shown.event("s2-a", "evc-2"), "an excluded issue's event candidate is not shown");
-        assertFalse(shown.event("s2-a", "event-1"), "a snapshot event is not a candidate");
-        assertFalse(shown.relation("s3-b", "rc-1"), "the job is part of the key");
-        assertEquals(1, shown.relations().size(), "an s2-comparison reference is not an S3 relation");
-        assertTrue(shown.excludedRelation("s3-a", "rc-2"), "published in the version and hidden now");
-        assertTrue(shown.excludedEvent("s2-a", "evc-2"));
-        assertFalse(shown.excludedRelation("s3-a", "rc-1"));
-        assertFalse(shown.excludedRelation("s3-a", "rc-9"), "never in the version: not excluded, just not stored");
+        assertEquals(Set.of("s3-a\nrc-a", "s3-b\nrc-b"), shown.relations());
+        assertEquals(Set.of("s2-a\nevc-a", "s2-b\nevc-b"), shown.events());
+        assertEquals("public-issue", shown.publicIssueId("snapshot-a"));
+        assertEquals("public-issue", shown.publicIssueId("snapshot-b"));
+        assertNull(shown.publicIssueId("snapshot-legacy"));
+        assertFalse(shown.relation("s3-legacy", "rc-legacy"));
+        assertFalse(shown.event("s2-legacy", "evc-legacy"));
+        assertTrue(shown.excludedRelations().isEmpty());
     }
 
     @Test
-    void anAiSnapshotEventMapsToTheOneReceiptIssueThatNamesIt() {
-        String bundle = """
-                {"relations":[],"issues":[
-                  {"id":"issue:a-2026q3","sourceEvents":[{"upstream":{"jobId":"s2-a","inputDigest":"d"},"kind":"snapshot-event","ref":"event-a"},
-                                                         {"upstream":{"jobId":"s2-b","inputDigest":"d"},"kind":"snapshot-event","ref":"event-a"}]},
-                  {"id":"issue:b-2026q3","sourceEvents":[{"upstream":{"jobId":"s2-a","inputDigest":"d"},"kind":"snapshot-event","ref":"event-both"},
-                                                         {"upstream":{"jobId":"s2-a","inputDigest":"d"},"kind":"event-candidate","ref":"evc-1"}]},
-                  {"id":"issue:c-2026q3","sourceEvents":[{"upstream":{"jobId":"s2-a","inputDigest":"d"},"kind":"snapshot-event","ref":"event-both"}]}]}""";
-        Shown shown = PublishedCandidates.read(bundle, "v1", Set.of(), Set.of());
-
-        assertEquals("issue:a-2026q3", shown.publicIssueId("event-a"), "the AI event id the S2 disposition targets");
-        assertNull(shown.publicIssueId("event-both"), "two public issues: which one cannot be told");
-        assertNull(shown.publicIssueId("evc-1"), "an event candidate is not an existing event");
-        assertNull(shown.publicIssueId("event-unknown"), "not in the active version");
-        assertNull(shown.publicIssueId(null));
+    void correctedRelationPublishesOnlyTheSelectedOriginalCandidate() {
+        Publication publication = publication();
+        var selection = StrictJson.newObject().put("relationId", "public-edge");
+        selection.set("takeFrom", StrictJson.newObject().put("sourceVersionId", "source-b").put("relationId", "edge-b"));
+        ((tools.jackson.databind.node.ObjectNode) publication.effectiveDecisions().node())
+                .set("relationSelections", StrictJson.newArray().add(selection));
+        var shown = PublishedCandidates.read(publication, Set.of("public-edge"), Set.of("public-issue"), ignored -> true);
+        assertEquals(Set.of("s3-b\nrc-b"), shown.relations());
+        assertEquals(Set.of("s3-a\nrc-a"), shown.excludedRelations());
+        assertEquals(Set.of("s2-a\nevc-a", "s2-b\nevc-b"), shown.events());
     }
 
     @Test
-    void anExpiredAnswerIsServedWhileOneReaderRecomputesItButAnotherVersionIsWaitedFor() throws Exception {
-        AtomicReference<Instant> now = new AtomicReference<>(Instant.parse("2026-10-27T00:00:00Z"));
-        Clock clock = new Clock() {
-            public ZoneId getZone() { return ZoneId.of("UTC"); }
-            public Clock withZone(ZoneId zone) { return this; }
-            public Instant instant() { return now.get(); }
-        };
-        AtomicReference<String> active = new AtomicReference<>("v1");
-        GraphVersionSelector selector = mock(GraphVersionSelector.class);
-        when(selector.select(any(), any(), any(), any())).thenAnswer(call -> selected(active.get()));
-        CountDownLatch computing = new CountDownLatch(1);
-        CountDownLatch release = new CountDownLatch(1);
-        AtomicInteger reads = new AtomicInteger();
-        PublicGraphReader reader = mock(PublicGraphReader.class);
-        when(reader.read(any(), any(), any(), any())).thenAnswer(call -> {
-            if (reads.incrementAndGet() == 2) {
-                computing.countDown();
-                assertTrue(release.await(10, TimeUnit.SECONDS));
+    void visibleMergedEventDoesNotRescueAWithdrawnOriginalCandidate() {
+        var shown = PublishedCandidates.read(publication(), Set.of(), Set.of("public-issue"), id -> !id.equals("e-b"));
+        assertEquals(Set.of("s2-a\nevc-a"), shown.events());
+        assertEquals(Set.of("s2-b\nevc-b"), shown.excludedEvents());
+        assertEquals("public-issue", shown.publicIssueId("snapshot-b"));
+    }
+
+    @Test
+    void exclusionsFollowMappedPublicItemsAcrossAllOriginalLeaves() {
+        var shown = PublishedCandidates.read(publication(), Set.of(), Set.of(), ignored -> true);
+        assertTrue(shown.relations().isEmpty());
+        assertTrue(shown.events().isEmpty());
+        assertEquals(Set.of("s3-a\nrc-a", "s3-b\nrc-b"), shown.excludedRelations());
+        assertEquals(Set.of("s2-a\nevc-a", "s2-b\nevc-b"), shown.excludedEvents());
+        assertEquals("public-issue", shown.publicIssueId("snapshot-b"));
+    }
+
+    @Test
+    void currentDenialIsAppliedOnTheNextReadWithoutWaitingForACacheDeadline() {
+        Publication publication = publication();
+        var selector = mock(GraphVersionSelector.class);
+        when(selector.select(any(), any(), any(), any())).thenReturn(selected());
+        var proofs = mock(GraphPublicationReader.class);
+        when(proofs.read(eq("publication-version"), any())).thenReturn(publication);
+        var authority = mock(GraphPublicationAuthority.class);
+        AtomicReference<DisclosureExclusions> overlay = new AtomicReference<>(DisclosureExclusions.NONE);
+        when(authority.current(eq(publication), any())).thenAnswer(call -> overlay.get());
+        var reader = new PublicGraphReader(selector, ignored -> publication.snapshot(), ignored -> DisclosureExclusions.NONE,
+                proofs, authority);
+        var evidence = mock(EvidenceService.class);
+        when(evidence.graphPublication(anyString(), anyString())).thenReturn(publication);
+        when(evidence.shownNow(anyString(), anyString(), any(), anyString())).thenReturn(true);
+        var candidates = new PublishedCandidates(reader, evidence);
+
+        assertTrue(candidates.current("before").orElseThrow().event("s2-b", "evc-b"));
+        overlay.set(new DisclosureExclusions(1, Set.of("public-issue"), Set.of(), Set.of(),
+                Set.of(new DisclosureExclusions.ArticleTarget("article-a", "v1"))));
+        var denied = candidates.current("withdrawn").orElseThrow();
+        assertFalse(denied.event("s2-b", "evc-b"));
+        assertTrue(denied.excludedEvent("s2-a", "evc-a"));
+        assertTrue(denied.excludedRelation("s3-b", "rc-b"));
+        when(authority.current(eq(publication), any())).thenThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
+        assertTrue(candidates.current("outage").isEmpty());
+    }
+
+    @Test
+    void selectedOwnerDenialCannotBeRescuedByAnotherVisibleMention() {
+        Publication publication = publication();
+        var reader = mock(PublicGraphReader.class);
+        when(reader.read(any(), any(), any(), any())).thenReturn(new PublicGraphReader.Pinned(selected(),
+                com.zoop.graph.read.DisplayGraph.of(publication.snapshot())));
+        var evidence = mock(EvidenceService.class);
+        when(evidence.graphPublication(any(), any())).thenReturn(publication);
+        when(evidence.shownNow(anyString(), anyString(), any(), anyString())).thenReturn(true);
+        when(evidence.shownNow(eq("e-a"), anyString(), any(), anyString())).thenReturn(false);
+        var shown = new PublishedCandidates(reader, evidence).current("denied").orElseThrow();
+        assertTrue(shown.events().isEmpty());
+        assertEquals(Set.of("s2-a\nevc-a", "s2-b\nevc-b"), shown.excludedEvents());
+    }
+
+    private static SelectedGraphVersion selected() {
+        return new SelectedGraphVersion(new GraphVersionRecord("publication-version", 4, "snapshot", "artifact", "uri",
+                "a".repeat(64), true), NOW, false);
+    }
+
+    private static Publication publication() {
+        List<Contribution> sources = new ArrayList<>();
+        List<MentionRef> mentions = new ArrayList<>();
+        List<Article> articles = new ArrayList<>();
+        List<Evidence> evidence = new ArrayList<>();
+        List<IssueRef> members = new ArrayList<>();
+        List<RelationRef> relations = new ArrayList<>();
+        for (String suffix : List.of("a", "b", "legacy")) {
+            String article = "article-" + suffix;
+            var mention = new MentionRef(MentionIds.of(article, "v1", "m"), article, "v1");
+            var issue = issue("issue-" + suffix, List.of(mention), List.of(article), List.of("e-" + suffix));
+            var relation = new Relation("edge-" + suffix, "INVOLVES", issue.issueId(), "company", null, null,
+                    List.of("e-" + suffix), List.of());
+            var storedArticle = new Article(article, "v1", article, "https://example.invalid/" + suffix, NOW.toString());
+            var span = new Evidence("e-" + suffix, article, "v1", 0, 1);
+            var projection = new PublicGraphSnapshot(4, "source-" + suffix, "handoff-" + suffix,
+                    List.of(new Company("company", "Company", null, null)), List.of(issue), List.of(relation),
+                    List.of(storedArticle), List.of(span));
+            var bundle = StrictJson.parseObject("""
+                    {"schemaVersion":"zoop-graph-handoff-bundle-9","relations":[
+                      {"id":"edge-%1$s","sourceRefs":[{"kind":"s3-relation","jobId":"s3-%1$s","id":"rc-%1$s"}]}],
+                     "issues":[{"id":"issue-%1$s","sourceEvents":[
+                       {"kind":"event-candidate","ref":"evc-%1$s","upstream":{"jobId":"s2-%1$s"}},
+                       {"kind":"snapshot-event","ref":"snapshot-%1$s"}],
+                       "mentions":[{"articleId":"article-%1$s","articleVersion":"v1","mentionId":"m","evidenceIds":["e-%1$s"]}]}]}
+                    """.formatted(suffix));
+            if (suffix.equals("legacy")) {
+                ((tools.jackson.databind.node.ObjectNode) bundle.node()).put("schemaVersion",
+                        com.zoop.graph.importer.LegacyRealPackage.METADATA_BUNDLE_SCHEMA);
+                ((tools.jackson.databind.node.ObjectNode) bundle.objects("relations").getFirst().node()).remove("sourceRefs");
+                ((tools.jackson.databind.node.ObjectNode) bundle.objects("issues").getFirst().node()).remove("sourceEvents");
             }
-            String id = active.get();
-            return new PublicGraphReader.Pinned(selected(id),
-                    DisplayGraph.of(new PublicGraphSnapshot(1, id, "b", List.of(), List.of(), List.of(), List.of(), List.of())));
-        });
-        EvidenceService receipts = mock(EvidenceService.class);
-        when(receipts.graphImportBundle(any(), any())).thenReturn(StrictJson.parseObject("{\"relations\":[],\"issues\":[]}"));
-        PublishedCandidates published = new PublishedCandidates(reader, receipts, selector, v -> DisclosureExclusions.NONE, clock);
-
-        assertEquals("v1", published.current("r-1").orElseThrow().versionId());
-        now.set(now.get().plus(PublishedCandidates.TTL).plus(Duration.ofSeconds(1)));
-        CompletableFuture<Shown> recomputing = CompletableFuture.supplyAsync(() -> published.current("r-2").orElseThrow());
-        assertTrue(computing.await(10, TimeUnit.SECONDS));
-        // The same version and exclusion revision: the expired answer at once, never a wait on the whole-graph gate.
-        Shown meanwhile = CompletableFuture.supplyAsync(() -> published.current("r-3").orElseThrow()).get(5, TimeUnit.SECONDS);
-        assertEquals("v1", meanwhile.versionId());
-        assertEquals(2, reads.get(), "only one reader recomputes");
-
-        // Another active version is never answered from the old one: it waits for the computation.
-        active.set("v2");
-        CompletableFuture<Shown> otherVersion = CompletableFuture.supplyAsync(() -> published.current("r-4").orElseThrow());
-        Thread.sleep(200);
-        assertFalse(otherVersion.isDone(), "a new version waits instead of reading the old version's answer");
-        release.countDown();
-        recomputing.get(10, TimeUnit.SECONDS);
-        assertEquals("v2", otherVersion.get(10, TimeUnit.SECONDS).versionId());
+            var source = new Contribution("source-" + suffix, "handoff-" + suffix,
+                    suffix.equals("legacy") ? "legacy-real" : "native", null, null, projection, bundle);
+            sources.add(source); mentions.add(mention); articles.add(storedArticle); evidence.add(span);
+            members.add(source.issueRef(issue.issueId())); relations.add(new RelationRef(source.sourceVersionId(), relation.relationId()));
+        }
+        IssueRef owner = members.getFirst();
+        var issue = issue("public-issue", mentions, articles.stream().map(Article::articleId).toList(),
+                evidence.stream().map(Evidence::evidenceId).toList());
+        var relation = new Relation("public-edge", "INVOLVES", issue.issueId(), "company", null, null,
+                issue.evidenceIds(), List.of());
+        var snapshot = new PublicGraphSnapshot(4, "publication-version", "publication", sources.getFirst().projection().companies(),
+                List.of(issue), List.of(relation), articles, evidence);
+        return new Publication("publication-version", "publication", "digest", null, null, null, null, snapshot,
+                sources, StrictJson.parseObject("{\"schemaVersion\":\"zoop-graph-publication-decisions-1\",\"issueMappings\":[],\"fieldSelections\":[],\"relationSelections\":[]}"), Map.of(issue.issueId(), new IssueOwners(issue.issueId(), members,
+                        Map.of("label", owner, "action", owner, "target", owner, "assertionStatus", owner,
+                                "eventTime", owner, "period", owner, "geography", owner))),
+                Map.of(relation.relationId(), new RelationOwners(relation.relationId(), relations, issue.issueId(), "company")));
     }
 
-    private static SelectedGraphVersion selected(String id) {
-        return new SelectedGraphVersion(new GraphVersionRecord(id, 1, "snapshot", "artifact-" + id, "uri", "a".repeat(64), true),
-                Instant.parse("2026-10-27T00:00:00Z"), false);
+    private static Issue issue(String id, List<MentionRef> mentions, List<String> articles, List<String> evidence) {
+        return new Issue(id, "Selected headline", null, "unknown", null, "occurred", "action", null, null,
+                "zoop-public-projection-policy-3", List.of(), articles, evidence, mentions,
+                mentions.getFirst().mentionId(), NOW.toString());
     }
 }

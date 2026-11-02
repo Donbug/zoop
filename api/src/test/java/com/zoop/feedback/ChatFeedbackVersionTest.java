@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 class ChatFeedbackVersionTest {
     ChatJob job(String answer,String request){
-        var result=new ChatResult("answered","synthetic-message",answer,List.of(),"general_knowledge",null,List.of(),List.of(),List.of(),null,List.of(),null,List.of(),new Metadata("SYNTHETIC",Instant.now(),null,request,false,List.of()),"complete",List.of());
+        var result=new ChatResult("answered","synthetic-message",answer,List.of(),"general_knowledge",null,List.of(),List.of(),List.of(),null,List.of(),null,List.of(),new Metadata("SYNTHETIC",Instant.now(),null,request,false,List.of()),"complete",List.of(),List.of());
         return new ChatJob("synthetic-job","synthetic-session",1,"합성 질문","completed",null,"answered",Instant.now(),null,null,null,result,1,Instant.now(),Instant.now(),Instant.now());
     }
     @Test void requestMetadataDoesNotChangeResultIdentityButAnAnswerChangeDoes(){

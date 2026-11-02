@@ -106,9 +106,7 @@ export default function AuditLogTable() {
           <tbody>
             {audit.items.map((row) => (
               <tr key={row.id}>
-                <td
-                  className={`${TD} whitespace-nowrap font-inter tabular-nums`}
-                >
+                <td className={`${TD} whitespace-nowrap font-num tabular-nums`}>
                   {formatKst(row.at)}
                 </td>
                 <td className={`${TD} text-zoop-muted`}>
@@ -122,7 +120,7 @@ export default function AuditLogTable() {
                   {auditActionLabel[row.action] ?? row.action}
                 </td>
                 <td
-                  className={`${TD} max-w-72 break-all font-inter text-zoop-muted`}
+                  className={`${TD} max-w-72 break-all font-num text-zoop-muted`}
                 >
                   {row.targetType}
                   {row.targetId ? ` · ${row.targetId}` : ''}

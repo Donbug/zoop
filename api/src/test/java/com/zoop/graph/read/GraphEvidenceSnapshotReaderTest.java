@@ -138,10 +138,8 @@ class GraphEvidenceSnapshotReaderTest {
 
     private static GraphEvidenceSnapshotReader basisReader(DisclosureExclusions exclusions) {
         PublicGraphSnapshot snapshot = basisSnapshot();
-        return new GraphEvidenceSnapshotReader(new PublicGraphReader(
-                new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
-                        java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
-                version -> snapshot, pinned -> exclusions));
+        return new GraphEvidenceSnapshotReader(new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
+                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)), version -> snapshot, pinned -> exclusions, null, null));
     }
 
     @Test
@@ -236,10 +234,8 @@ class GraphEvidenceSnapshotReaderTest {
 
     private static GraphEvidenceSnapshotReader impactReader(DisclosureExclusions exclusions) {
         PublicGraphSnapshot snapshot = impactSnapshot("2026-09-01");
-        return new GraphEvidenceSnapshotReader(new PublicGraphReader(
-                new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
-                        java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
-                version -> snapshot, pinned -> exclusions));
+        return new GraphEvidenceSnapshotReader(new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
+                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)), version -> snapshot, pinned -> exclusions, null, null));
     }
 
     @Test
@@ -279,10 +275,8 @@ class GraphEvidenceSnapshotReaderTest {
     @Test
     void anAsOfBeforeThePublicationOfTheArticleMakesTheImpactOnlySpanInvisible() {
         PublicGraphSnapshot snapshot = impactSnapshot(ASSERTED);
-        GraphEvidenceSnapshotReader reader = new GraphEvidenceSnapshotReader(new PublicGraphReader(
-                new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
-                        java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
-                version -> snapshot, pinned -> DisclosureExclusions.NONE));
+        GraphEvidenceSnapshotReader reader = new GraphEvidenceSnapshotReader(new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
+                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)), version -> snapshot, pinned -> DisclosureExclusions.NONE, null, null));
 
         assertNull(reader.read(null, Instant.parse("2026-10-03T00:00:00Z"), IMPACT_ONLY).span(),
                 "the article was published after asOf, so neither the span nor the INVOLVES relation is visible");

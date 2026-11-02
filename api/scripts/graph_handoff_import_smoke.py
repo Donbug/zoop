@@ -47,14 +47,14 @@ two-relation path through a mapped but unpublished middle company (a private `pa
 `company_mismatch` with nothing written), through a published middle, and an unavailable path through an unmapped middle. The staged snapshots carry no path, no path company and no scope
 text; the receipts keep the complete bundle, the `structural_path_closed_over_involves_basis_and_catalog` check and the operator-mapped-chain note. With the evidence-read phase a FOURTH
 TEST-HARNESS activation (BACK-DATED to just after the last activation, so an asOf can fall before the structural basis was verified) serves the private-middle version: the spans only a
-structural basis cites are 200 without eventIds from the selected version's receipt, 404 before the basis was verified or the article published, under a revoked grant, a private article,
-tampered receipt bytes or another version, and no public body names the private company. This smoke does not mutate the app's disclosure exclusion store; exclusion behavior is proven by the Java tests.
+structural basis cites are 200 without eventIds from the selected version's receipt, 404 before the basis was verified or the article published, under a revoked grant, a private article
+or another version, and 503 SOURCE_UNAVAILABLE for tampered receipt bytes. No public body names the private company. This smoke does not mutate the app's disclosure exclusion store; exclusion behavior is proven by the Java tests.
 A sixth, producer-authored IMPACT world (`graph_handoff_smoke.impact_export`, replay, SYNTHETIC, handoff `handoff-impacts-1`, built after the path worlds) is imported last: the receipt retains
 the closed `impacts[]` (one row per INVOLVES source relation: a verified positive with an impact-only quote, a verifier-rejected, a verified negative of the other S3 job, a verified undetermined,
 a no-evidence and a precheck-rejected row; hand-written in `hs.expected_impacts`), while the snapshot, the import result and every public body carry no proposal, effect, label, candidate id or
 verifier digest. With the evidence-read phase a FIFTH TEST-HARNESS activation serves the impact-only quote (cited by no issue, relation or structural basis): 200 with empty eventIds from the
 selected version's receipt although the one candidate structural basis does not cite it, 404 before the version existed / the article was published, for another version, under a revoked grant, a
-private article or tampered receipt bytes. The article's publication boundary is proven with the IMPACT version itself selected on both sides: at the very end the script adds TEST-ONLY historical
+private article; tampered receipt bytes return 503 SOURCE_UNAVAILABLE. The article's publication boundary is proven with the IMPACT version itself selected on both sides: at the very end the script adds TEST-ONLY historical
 activation rows (reason `smoke history:`, reported as `historicalActivations`, never an import or harness activation) at the fixture's own publication instant, so asOf half a second before is 404 although
 graphVersion pins the impact version (a wrong pin would be 422) and half a second after is 200 with that version in metadata. Excluded edge/evidence and malformed receipt basis cases are proven
 by the Java tests (real pinned reader, real service); this script does not mutate the exclusion store or re-register receipts to claim those cases over HTTP.
@@ -62,7 +62,8 @@ The impact phase also inserts ONE explicitly SYNTHETIC published ORIGINAL briefi
 source-binding and current-grant conventions (not the replay/reconstruction path). It pins only the supply issue to the real imported impact version at a
 cutoff before all structural basis verification and before that version's actual harness activation. Real round-scoped HTTP reads must retain the impact-only
 span with null S1 summary and empty eventIds, refuse wrong pins/cutoffs, withhold the not-yet-verified basis span and the other issue's evidence, and enforce
-both current ingestion rights and current briefing-source rights. Fixture publication SQL is counted separately as syntheticBriefingRounds, never as
+both current ingestion rights and current briefing-source rights. Revocation of either required authority makes the stored round unavailable (503 SOURCE_UNAVAILABLE);
+scoped evidence denials within an authorized round remain 404 EVIDENCE_UNAVAILABLE. Fixture publication SQL is counted separately as syntheticBriefingRounds, never as
 production publication or admin activation proof. No receipt, graph snapshot or AI ledger is synthesized for this round.
 A seventh, producer-authored ISSUE-SUMMARY world (`graph_handoff_smoke.summary_world`, replay, SYNTHETIC, handoff `handoff-summary-1`: a REAL authored-replay `zoop-ai-issue-summary` job pinned by
 the decisions, frozen with `--issue-summary-state-dir`) is imported last, without any activation: four FORGED summaries (a text that is not the claims, a claim citing evidence outside the issue's mention
@@ -209,7 +210,7 @@ class Layout:
         self.requests.mkdir(mode=0o700)
         self.artifacts.mkdir(mode=0o700)
         self.root = self.work                       # the names base.Jar expects from its "world"
-        self.state = world.root / "ingestion"
+        self.state = world.native_contexts[0].paths.ingestion if hasattr(world, "native_contexts") else world.root / "ingestion"
         self.registry_path = world.kit.registry_path
 
     def ownership_env(self) -> dict:
@@ -217,6 +218,11 @@ class Layout:
 
     @property
     def ledgers(self) -> dict:
+        if hasattr(self.world, "native_contexts"):
+            return {**{f"{i}-{name}": path for i, context in enumerate(self.world.native_contexts)
+                       for name, path in (("ingestion", context.paths.ingestion), ("extraction", context.paths.extraction),
+                                          ("relation", context.paths.relation), ("metering", context.metering))},
+                    "handoff": self.world.root / "handoff"}
         return {name: self.world.root / name for name in ("ingestion", "extraction", "relation", "handoff")}
 
 
@@ -230,14 +236,21 @@ class Smoke:
     # ---------------------------------------------------------------------------------------------------- jar runs ----
     def graph_env(self, request: Path, result: Path, cli: Path | None = None) -> dict:
         root = self.world.root
-        return {**self.jar.base_env(), "ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED": "true",
-                "ZOOP_GRAPH_HANDOFF_IMPORT_REQUEST": str(request), "ZOOP_GRAPH_HANDOFF_IMPORT_RESULT": str(result),
-                "ZOOP_HANDOFF_CLI": str(cli or self.args.handoff_cli), "ZOOP_HANDOFF_STATE_DIR": str(root / "handoff"),
-                "ZOOP_RELATION_STATE_DIR": str(root / "relation"), "ZOOP_EXTRACTION_STATE_DIR": str(root / "extraction"),
-                "ZOOP_INGESTION_CLI": str(self.args.ingest_cli), "ZOOP_INGESTION_STATE_DIR": str(root / "ingestion"),
-                "ZOOP_INGESTION_SOURCES": str(self.layout.registry_path), "ZOOP_HANDOFF_CANONICAL": str(root / "canonical.json"),
-                "ZOOP_HANDOFF_DECISIONS": str(root / "decisions.json"), "ZOOP_HANDOFF_BINDINGS": str(root / "bindings.json"),
-                "ZOOP_ARTIFACT_ROOT": str(self.layout.artifacts), **hs.ownership_env()}
+        env = {**self.jar.base_env(), "ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED": "true",
+               "ZOOP_GRAPH_HANDOFF_IMPORT_REQUEST": str(request), "ZOOP_GRAPH_HANDOFF_IMPORT_RESULT": str(result),
+               "ZOOP_HANDOFF_CLI": str(cli or self.args.handoff_cli), "ZOOP_HANDOFF_STATE_DIR": str(root / "handoff"),
+               "ZOOP_INGESTION_CLI": str(self.args.ingest_cli), "ZOOP_HANDOFF_CANONICAL": str(root / "canonical.json"),
+               "ZOOP_HANDOFF_DECISIONS": str(root / "decisions.json"), "ZOOP_HANDOFF_BINDINGS": str(root / "bindings.json"),
+               "ZOOP_ARTIFACT_ROOT": str(self.layout.artifacts), **hs.ownership_env()}
+        if hasattr(self.world, "context_file"):
+            for key in ("ZOOP_RELATION_STATE_DIR", "ZOOP_EXTRACTION_STATE_DIR", "ZOOP_INGESTION_STATE_DIR", "ZOOP_INGESTION_SOURCES"):
+                env.pop(key, None)
+            env.update(ZOOP_GRAPH_HANDOFF_IMPORT_SOURCE_CONTEXTS=str(self.world.context_file),
+                       ZOOP_GRAPH_HANDOFF_IMPORT_SOURCE_CONTEXTS_SHA256=self.world.context_sha)
+        else:
+            env.update(ZOOP_RELATION_STATE_DIR=str(root / "relation"), ZOOP_EXTRACTION_STATE_DIR=str(root / "extraction"),
+                       ZOOP_INGESTION_STATE_DIR=str(root / "ingestion"), ZOOP_INGESTION_SOURCES=str(self.layout.registry_path))
+        return env
 
     def graph_import(self, label: str, request: dict | bytes, *, cli: Path | None = None) -> tuple[int, dict | None, str]:
         """One operator run of the graph handoff import; returns (exit status, parsed result file, process output). `cli`: a stand-in for the installed handoff command."""
@@ -565,7 +578,7 @@ def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tu
         receipt_path.write_bytes(receipt_original.replace(b'"activation":"none"', b'"activation":"nope"'))
         check(receipt_path.read_bytes() != receipt_original, "the receipt tamper did not change any byte")
         code, body = get(web, main_id)
-        check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE", f"tampered receipt bytes: {code} {body}")
+        check(code == 503 and error_code(body) == "SOURCE_UNAVAILABLE", f"tampered receipt bytes: {code} {body}")
         receipt_path.write_bytes(receipt_original)
         os.utime(receipt_path, ns=(receipt_info.st_atime_ns, receipt_info.st_mtime_ns))
         check(get(web, main_id)[0] == 200, "restoring the receipt did not restore the read")
@@ -578,7 +591,7 @@ def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tu
         check(fingerprint(layout.artifacts) == artifact_tree and layout.registry_path.read_bytes() == registry_bytes,
               "a failure scenario was not restored exactly (artifact tree or registry file)")
         step("failures: malformed or deleted source registry 503; an invalid expiresAt ('...00z') on the requested source or on an unrelated source 503; "
-             "tampered receipt bytes 404; a private article 404; each restored byte-for-byte")
+             "tampered receipt bytes 503 SOURCE_UNAVAILABLE; a private article 404; each restored byte-for-byte")
     check(db.scalar("SELECT count(*) FROM graph_activations WHERE reason LIKE 'smoke harness:%'") == 1,
           "the harness activation count is not exactly one")
     return {"harnessActivations": 1, "evidenceReads": reads}
@@ -733,7 +746,7 @@ def approved_world_phase(args, db, layout, scratch: Path) -> dict:
           and result["provenance"]["recordingKind"] == "authored-test" and result["provenance"]["approvalBases"] == kinds
           and result["provenance"]["structuralRelationOrigin"] == "manual-operator-review", f"provenance: {result['provenance']}")
     receipt = json.loads((layout.artifacts / "verification_receipt" / f"{vid}.json").read_text("utf-8"))
-    check(receipt["bundle"] == bundle and receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-7", "the approved receipt does not retain the producer's bundle")
+    check(receipt["bundle"] == bundle and receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-8", "the approved receipt does not retain the producer's bundle")
     check(receipt["appVerification"]["approvalBasis"] == "audit-metadata-not-a-verifier-verdict", "the receipt overclaims what an approval basis is")
     used = {(source["relation"]["jobId"], use["relationCandidateId"]): use for source in bundle["sources"] for use in source["reviewUsed"]}
     check(set(used) == set(approvals), f"the used reviews differ from the hand-written approvals: {sorted(used)} vs {sorted(approvals)}")
@@ -893,7 +906,7 @@ def path_world_phase(args, db, layout, scratch: Path) -> dict:
         decision_docs[middle] = decisions
         exports[middle] = hs.freeze_export(operator, world, f"path-{middle}-1", decisions)
         want, bundle = hs.expected_chain(middle, PATH_IDS), exports[middle]["bundle"]
-        check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7", f"{middle}: the producer's bundle is not schema 7")
+        check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8", f"{middle}: the producer's bundle is not schema 7")
         check([c["id"] for c in bundle["companies"]] == want["companies"] and bundle["pathCompanies"] == want["pathCompanies"],
               f"{middle}: companies {[c['id'] for c in bundle['companies']]} / path companies {bundle['pathCompanies']} are not the hand-written ones")
         paths = {r["target"]: r["structuralPath"] for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO"}
@@ -1086,15 +1099,17 @@ def path_read_phase(paths: dict, db, layout, previous: str) -> dict:
         receipt_path.write_bytes(receipt_original.replace(b'"activation":"none"', b'"activation":"nope"'))
         check(receipt_path.read_bytes() != receipt_original, "the receipt tamper did not change any byte")
         for eid in every:
-            withheld(web, eid, f"tampered receipt bytes must withhold {eid}")
+            code, body = get(web, eid)
+            check(code == 503 and code_of(body) == "SOURCE_UNAVAILABLE",
+                  f"tampered receipt bytes must make {eid}'s publication unavailable: {code} {body}")
         receipt_path.write_bytes(receipt_original)
         os.utime(receipt_path, ns=(receipt_info.st_atime_ns, receipt_info.st_mtime_ns))
         for eid in every:
             served(web, eid, f"restoring the receipt must restore {eid}")
         check(fingerprint(layout.artifacts) == artifact_tree and layout6.registry_path.read_bytes() == registry_bytes,
               "a failure scenario was not restored exactly (artifact tree or registry file)")
-        step("current gates: a revoked grant (store, quote-display, disabled, revision, grant id), a private article and tampered receipt bytes are 404 for basis-only AND direct evidence; "
-             "each restored byte-for-byte and served again")
+        step("current gates: a revoked grant (store, quote-display, disabled, revision, grant id) and a private article are 404 for basis-only AND direct evidence; "
+             "tampered receipt bytes are 503 SOURCE_UNAVAILABLE; each restored byte-for-byte and served again")
 
         # no public node or path data in any public body ----------------------------------------------------------------------------
         # The default read of the now active version (a read of the version alone is as of its back-dated first activation, #88).
@@ -1162,7 +1177,7 @@ def impact_world_phase(args, db, layout, scratch: Path) -> dict:
     manifest_digest, bundle_digest = hs.digest(env["manifest"]), sha256(hs.canonical(env["bundle"]).encode("utf-8"))
     bundle = env["bundle"]
     rows = hs.expected_impacts(world, PUBLIC_IDS)
-    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["impacts"] == rows and len(rows) == 6 == bundle["counts"]["impacts"]
+    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and bundle["impacts"] == rows and len(rows) == 6 == bundle["counts"]["impacts"]
           and bundle["policy"]["impacts"] == "s3-independent-verifier-quote-effect", "the producer's impacts are not the hand-written rows")
     check(sorted([(r["status"], r["code"]) for r in rows], key=repr) == sorted(hs.RICH_STATUSES, key=repr), f"the authored world does not hold every status: {rows}")
     inv = hs.evidence_id(world, "a", hs.INV)
@@ -1256,7 +1271,7 @@ def summary_world_phase(args, db, layout, scratch: Path) -> dict:
     manifest_digest, bundle_digest = hs.digest(env["manifest"]), sha256(hs.canonical(env["bundle"]).encode("utf-8"))
     bundle = env["bundle"]
     want = hs.expected_summaries_of(world, "available")
-    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1", "the producer's summary bundle is not -7")
+    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1", "the producer's summary bundle is not -7")
     for issue in bundle["issues"]:
         hs.check_summary_part(issue["summary"], want[issue["id"]])
     available = next(i for i in bundle["issues"] if i["id"] == hs.SUPPLY)["summary"]
@@ -1523,7 +1538,9 @@ def impact_read_phase(impact: dict, db, layout, previous: str) -> dict:
             smoke.set_registry(change)
             for eid in every:
                 withheld(web, eid, f"a revoked grant ({label}) must withhold {eid}")
-            withheld(web, inv, f"historical round cannot override current ingestion grant ({label})", **round_params)
+            code, body = get(web, inv, **round_params)
+            check(code == 503 and code_of(body) == "SOURCE_UNAVAILABLE",
+                  f"historical round's required ingestion authority ({label}) is unavailable: {code} {body}")
             smoke.set_registry(lambda g: (g.clear(), g.update(original)))
             for eid in every:
                 served(web, eid, f"restoring the grant ({label}) must restore {eid}")
@@ -1545,17 +1562,19 @@ def impact_read_phase(impact: dict, db, layout, previous: str) -> dict:
         receipt_path.write_bytes(receipt_original.replace(b'"activation":"none"', b'"activation":"nope"'))
         check(receipt_path.read_bytes() != receipt_original, "the receipt tamper did not change any byte")
         for eid in every:
-            withheld(web, eid, f"tampered receipt bytes must withhold {eid}")
+            code, body = get(web, eid)
+            check(code == 503 and code_of(body) == "SOURCE_UNAVAILABLE",
+                  f"tampered receipt bytes must make {eid}'s publication unavailable: {code} {body}")
         receipt_path.write_bytes(receipt_original)
         os.utime(receipt_path, ns=(receipt_info.st_atime_ns, receipt_info.st_mtime_ns))
         for eid in every:
             served(web, eid, f"restoring the receipt must restore {eid}")
         check(fingerprint(layout.artifacts) == artifact_tree and layout7.registry_path.read_bytes() == registry_bytes,
               "a failure scenario was not restored exactly (artifact tree or registry file)")
-        step("current gates: a revoked grant (store, quote-display, disabled, revision, grant id), a private article and tampered receipt bytes are 404 for the impact-only AND the direct span; "
-             "each restored byte-for-byte and served again")
-        step("historical round current rights: all five ingestion-grant revocations are 404 and restores are 200; the separate briefing-source grant "
-             "revocation is 503 SOURCE_UNAVAILABLE and its byte-for-byte restore is 200; frozen references never replace current authority")
+        step("current gates: a revoked grant (store, quote-display, disabled, revision, grant id) and a private article are 404 for the impact-only AND the direct span; "
+             "tampered receipt bytes are 503 SOURCE_UNAVAILABLE; each restored byte-for-byte and served again")
+        step("historical round current rights: all five required ingestion-grant revocations and the separate briefing-source grant revocation "
+             "make the stored round 503 SOURCE_UNAVAILABLE; each byte-for-byte restore is 200; scoped evidence denials within an authorized round remain 404")
 
         # nothing of an impact row in any public body ----------------------------------------------------------------------------------------
         code, text = web.get(f"/api/v1/graph?graphVersion={vid}")
@@ -1722,7 +1741,7 @@ def main() -> int:
     check(len(row) == 1, f"graph_versions rows for {vid}: {row}")
     row = row[0]
     check(row["kind"] == "snapshot" and row["active"] is False and row["review_revision"] == 0 and row["unpublished"] is True
-          and row["created_by"] == "operator:smoke-operator" and row["policy_version"] == "zoop-public-projection-policy-1"
+          and row["created_by"] == "operator:smoke-operator" and row["policy_version"] == "zoop-public-projection-policy-2"
           and row["source_label"] == f"graph-handoff:{hid}" and (row["issue_count"], row["relation_count"], row["article_count"]) == (2, 4, 3)
           and row["snapshot_artifact_id"] == f"artifact-{vid}" and row["rule_revision"] == 0 and row["candidate_count"] is None,
           f"version row: {row}")
@@ -1815,7 +1834,7 @@ def main() -> int:
     check(receipt_issues["issue:factory-2026q4"]["mentions"] == expected_mentions(
         world, ("b", "m-b", hs.QB, "합성 공장 착공", "공장 착공 알림", "2026-11-15", "2026Q4", DOC_B)),
           f"factory mentions: {receipt_issues['issue:factory-2026q4']['mentions']}")
-    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-7", "the retained bundle is not schema 7")
+    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-8", "the retained bundle is not schema 7")
     # The selection facts the receipt retains, hand-written from the authored world: the supply issue's operator-chosen representative (document a) states every
     # headline value, while a2 states the same value in every field but its title; the factory issue's only mention is unanimous. Which mentions state the issue's
     # value is a selection fact, never a verification (`verification` stays `none`).
@@ -2017,7 +2036,7 @@ def main() -> int:
           "a rejected or held value, or a verdict, reached the public snapshot")
     receipt4 = json.loads(receipt_file4.read_text("utf-8"))
     check(receipt4["bundle"] == verdict_env["bundle"] and receipt4["manifest"] == verdict_env["manifest"], "the verdict receipt does not retain the original")
-    check(receipt4["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-7" and receipt4["bundle"]["handoffId"] == hid4, "the verdict receipt is not bundle -7")
+    check(receipt4["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-8" and receipt4["bundle"]["handoffId"] == hid4, "the verdict receipt is not bundle -7")
     receipt_issues4 = {i["id"]: i for i in receipt4["bundle"]["issues"]}
     # The ORIGINAL mentions are untouched by every verdict: the withheld supply time and the held factory period are still stated by their mentions.
     check(receipt_issues4[supply_id]["mentions"] == expected_mentions(

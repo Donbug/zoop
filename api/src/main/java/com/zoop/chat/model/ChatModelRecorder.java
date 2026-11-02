@@ -41,6 +41,7 @@ public class ChatModelRecorder {
                        provider_sent_at = :sent_at, provider_received_at = :received_at,
                        provider = :provider, model = :model,
                        prompt_version = :prompt, input_tokens = :input, output_tokens = :output,
+                       reasoning_tokens = :reasoning,
                        error_code = :error, finished_at = :at
                 WHERE id = :id AND status = 'running'
                 """, new MapSqlParameterSource("id", id).addValue("status", status).addValue("send_state", sendState)
@@ -53,6 +54,7 @@ public class ChatModelRecorder {
                 .addValue("prompt", receipt == null ? null : receipt.promptVersion())
                 .addValue("input", receipt == null ? null : receipt.inputTokens())
                 .addValue("output", receipt == null ? null : receipt.outputTokens())
+                .addValue("reasoning", receipt == null ? null : receipt.reasoningTokens())
                 .addValue("error", errorCode).addValue("at", Timestamp.from(clock.instant())));
     }
 }

@@ -6,8 +6,8 @@ versions, purposes, receipts and failure states apart from S1):
 - `chat-router`: native Jev, typed Noul probabilities per requirement for the Q01-Q08 tags, the bound capabilities and
   prohibited advice.
 - `chat-answer`: Luna `answer-generator`, a strict JSON answer by sections over the branch context.
-- `chat-verification`: native Jev, per grounded section a support Choice over quotes and server observations, and a
-  prohibited-advice Noul for every section.
+- `chat-verification`: native Jev, per claim a support Choice over quotes and server observations plus an unsupported-causality
+  Noul, and a prohibited-advice Noul for every section.
 - `chat-agent`: one step of a Luna Responses run that calls the ZOOP MCP tools (ZOOP-AIG-001 v0.11 6.3, MCP actions contract
   3.4). Every tool call is held for the application's approval (`require_approval=always`): a step ends either at approval
   requests or with the final answer, and the application resumes the stored response with its decisions. This runtime never
@@ -26,7 +26,7 @@ from pydantic import Field, model_validator
 
 from .contracts import Wire
 
-CHAT_SCHEMA_VERSION = "zoop-ai-chat-2"
+CHAT_SCHEMA_VERSION = "zoop-ai-chat-5"
 ChatStage = Literal["chat-router", "chat-answer", "chat-verification", "chat-agent"]
 QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
 # `zoop_documented` rests on ZOOP's own approved documents (policies), `evidence_grounded` on public evidence,
@@ -37,6 +37,7 @@ WEB_RESULT_ID = r"^web-[0-9a-f]{32}$"
 
 MAX_REQUIREMENTS = 6
 MAX_SECTIONS = 12
+MAX_CLAIMS_PER_SECTION = 20
 MAX_CITATIONS = 20
 MAX_QUESTION = 4000
 MAX_TEXT = 12000
@@ -113,11 +114,19 @@ class RouterInput(Wire):
         return self
 
 
+class RouterDependency(Wire):
+    """Run this requirement on companies found by an earlier requirement when its checkpoint matches."""
+    requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
+    cardinality: Literal["exactly", "atLeast", "atMost"]
+    count: int = Field(ge=1, le=5)
+
+
 class RoutedRequirement(Wire):
     requirement_id: str
     types: dict[QueryType, float]
     capabilities: dict[str, float]
     prohibited_advice: float
+    depends_on: RouterDependency | None
 
 
 class RouterAnswer(Wire):
@@ -208,6 +217,7 @@ MAX_APPROVALS = 8
 MAX_MCP_CALLS = 16
 TOOL_NAME = r"^[A-Za-z0-9_]{1,64}$"
 PROVIDER_ID = r"^[A-Za-z0-9_-]{1,128}$"
+REQUIREMENT_ID = r"^[A-Za-z0-9_-]{1,32}$"
 
 
 class AgentRequirement(Wire):
@@ -282,10 +292,13 @@ class AgentInput(Wire):
 
 
 class ApprovalRequest(Wire):
-    """A tool call the model proposes and the provider holds until the application decides (`require_approval=always`)."""
+    """A tool call the model proposes and the provider holds until the application decides (`require_approval=always`).
+    `requirement_ids` are the requirements the model says the call serves, taken out of its `requirementIds` argument and empty
+    when that is missing or malformed: the application decides what they are worth, and `arguments` are the rest."""
     approval_request_id: str = Field(pattern=PROVIDER_ID)
     tool_name: str = Field(pattern=TOOL_NAME)
     arguments: dict[str, Any]
+    requirement_ids: list[Annotated[str, Field(pattern=REQUIREMENT_ID)]] = Field(max_length=MAX_REQUIREMENTS)
 
 
 class McpCallSummary(Wire):
@@ -451,12 +464,17 @@ ServerFact = Annotated[PortfolioFact | ComparisonFact | PublicationFact | Briefi
                        Field(discriminator="kind")]
 
 
+class VerifyClaim(Wire):
+    claim_id: str = Field(pattern=r"^s([0-9]|1[01])c([0-9]|1[0-9])$")
+    text: str = Field(min_length=1, max_length=MAX_TEXT)
+
+
 class VerifySection(Wire):
     section_id: str = Field(pattern=r"^s([0-9]|1[01])$")
     requirement_ids: list[Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")]] = Field(
         min_length=1, max_length=MAX_REQUIREMENTS)
     basis: Basis
-    text: str = Field(min_length=1, max_length=MAX_TEXT)
+    claims: list[VerifyClaim] = Field(min_length=1, max_length=MAX_CLAIMS_PER_SECTION)
     evidence_ids: list[str] = Field(max_length=MAX_CITATIONS)
     server_facts: list[ServerFact] = Field(max_length=72)
 
@@ -474,6 +492,8 @@ class VerificationInput(Wire):
         for index, section in enumerate(self.sections):
             if section.section_id != f"s{index}":
                 raise ValueError("section ids must match their ordered positions")
+            if [claim.claim_id for claim in section.claims] != [f"s{index}c{claim}" for claim in range(len(section.claims))]:
+                raise ValueError("claim ids must match their ordered positions")
             if len(set(section.requirement_ids)) != len(section.requirement_ids):
                 raise ValueError("section requirement ids must be distinct")
             if section.basis != "evidence_grounded" and section.server_facts:
@@ -503,8 +523,14 @@ class VerificationInput(Wire):
         return self
 
 
-class SectionVerdict(Wire):
+class ClaimVerdict(Wire):
+    claim_id: str = Field(pattern=r"^s([0-9]|1[01])c([0-9]|1[0-9])$")
     support: Literal["supported", "contradicted", "hold"] | None
+    unsupported_causality: Literal["no", "yes", "hold"]
+
+
+class SectionVerdict(Wire):
+    claims: list[ClaimVerdict] = Field(min_length=1, max_length=MAX_CLAIMS_PER_SECTION)
     prohibited_advice: Literal["no", "yes", "hold"]
 
 
@@ -519,7 +545,7 @@ INPUTS: dict[str, type[Wire]] = {"chat-router": RouterInput, "chat-answer": Answ
 class StageRequest(Wire):
     """What the application asks of one stage. `invocation_id` identifies the attempt's stage: the same id with the same input
     returns the stored outcome and never sends again; the same id with another input is refused."""
-    schema_version: Literal["zoop-ai-chat-2"]
+    schema_version: Literal["zoop-ai-chat-5"]
     invocation_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{8,160}$")
     stage: ChatStage
     mode: Literal["replay", "live"]
@@ -570,7 +596,7 @@ class StageFailure(Wire):
 
 
 class StageResult(Wire):
-    schema_version: Literal["zoop-ai-chat-2"]
+    schema_version: Literal["zoop-ai-chat-5"]
     invocation_id: str
     stage: ChatStage
     status: Literal["succeeded", "failed"]

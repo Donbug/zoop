@@ -21,9 +21,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionException;
 
 /**
- * ZOOP's approved documents as citable quotes ({@code Citation.sourceKind=zoop_doc}). Today these are the policies the team
- * approved and registered in {@code term_versions} (docs/legal): the terms of service ({@code policy.service}) and the privacy
- * policy ({@code policy.privacy}). Help and screen documents have no approved text yet, so nothing here serves them.
+ * ZOOP's approved documents as citable quotes ({@code Citation.sourceKind=zoop_doc}). Policies come from the approved
+ * {@code term_versions}; member help and screen guides come from immutable {@code chat_document_versions}. The help registry
+ * migration deliberately inserts no draft text. A later approval migration must register a version before its separately
+ * gated tools can start.
  *
  * <p>Each {@code ## } section of a version's body is one quote: its text and its code-point span {@code [start, end)} in that
  * body. Its id has the evidence id shape and is the SHA-256 of the document id, version, span and text, so the same section
@@ -42,6 +43,10 @@ public class ChatZoopDocs {
     private static final String POLICY = "policy.";
     /** Every policy document {@code zoopPolicy.read} reads: {@code policy.} and the term id. */
     public static final List<String> POLICIES = List.of(POLICY + "service", POLICY + "privacy");
+    public static final String HELP_GUIDE = "help.service-guide";
+    public static final String SCREEN_GUIDE = "screen.guide";
+    public static final List<String> HELP_DOCUMENTS = List.of(HELP_GUIDE);
+    public static final List<String> SCREEN_DOCUMENTS = List.of(SCREEN_GUIDE);
 
     /** One section of one document version. {@code title} is the document title and the section heading. */
     public record Quote(String evidenceId, String docId, String docVersion, String title, String text, int start, int end) { }
@@ -55,7 +60,7 @@ public class ChatZoopDocs {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final Clock clock;
-    /** Sections by {@code termId\0version}; a registered body never changes. */
+    /** Sections by {@code docId\0version}; an approved body never changes. */
     private final Map<String, List<Quote>> sections = new ConcurrentHashMap<>();
 
     public ChatZoopDocs(NamedParameterJdbcTemplate jdbc, Clock clock) {
@@ -65,39 +70,58 @@ public class ChatZoopDocs {
 
     /**
      * The version of {@code docId} in effect at {@code asOf} (now when null), or empty when none is or when it is no longer
-     * the version in effect now (replaced, or its term retired, since {@code asOf}).
+     * the version in effect now (replaced, or its document/term retired, since {@code asOf}).
      */
     public Optional<Document> inEffect(String docId, Instant asOf) {
-        if (docId == null || !docId.startsWith(POLICY)) return Optional.empty();
-        String term = docId.substring(POLICY.length());
+        if (!known(docId)) return Optional.empty();
         Instant now = clock.instant();
-        var then = versionAt(term, asOf != null ? asOf : now);
+        var then = versionAt(docId, asOf != null ? asOf : now);
         if (then.isEmpty()) return Optional.empty();
-        if (asOf != null && !versionAt(term, now).map(v -> v[0].equals(then.get()[0])).orElse(false)) {
+        if (asOf != null && !versionAt(docId, now).map(v -> v[0].equals(then.get()[0])).orElse(false)) {
             return Optional.empty();
         }
         String version = then.get()[0];
         String title = then.get()[1];
-        return Optional.of(new Document(docId, version, title, sections(term, version, title)));
+        return Optional.of(new Document(docId, version, title, sections(docId, version, title)));
     }
 
-    /** The version and title of {@code term} in effect at {@code at}. */
-    private Optional<String[]> versionAt(String term, Instant at) {
-        var rows = jdbc.query("""
+    private static boolean known(String docId) {
+        return docId != null && (docId.startsWith(POLICY) || HELP_GUIDE.equals(docId) || SCREEN_GUIDE.equals(docId));
+    }
+
+    /** The version and title of {@code docId} in effect at {@code at}. */
+    private Optional<String[]> versionAt(String docId, Instant at) {
+        List<String[]> rows;
+        if (docId.startsWith(POLICY)) {
+            rows = jdbc.query("""
                 SELECT v.version, v.title_snapshot FROM term_versions v JOIN terms t ON t.id = v.term_id
                 WHERE v.term_id = :term AND v.effective_at <= :at AND (v.retired_at IS NULL OR v.retired_at > :at)
                   AND (t.retired_at IS NULL OR t.retired_at > :at)
-                """, new MapSqlParameterSource("term", term).addValue("at", Timestamp.from(at)),
-                (rs, n) -> new String[] {rs.getString("version"), rs.getString("title_snapshot")});
+                """, new MapSqlParameterSource("term", docId.substring(POLICY.length()))
+                        .addValue("at", Timestamp.from(at)),
+                    (rs, n) -> new String[] {rs.getString("version"), rs.getString("title_snapshot")});
+        } else {
+            rows = jdbc.query("""
+                    SELECT version, title FROM chat_document_versions
+                    WHERE doc_id = :doc AND effective_at <= :at AND (retired_at IS NULL OR retired_at > :at)
+                    """, new MapSqlParameterSource("doc", docId).addValue("at", Timestamp.from(at)),
+                    (rs, n) -> new String[] {rs.getString("version"), rs.getString("title")});
+        }
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.getFirst());
     }
 
     /** The quote an id names in any registered version, or empty when it names none. */
     public Optional<Quote> byId(String evidenceId) {
         if (evidenceId == null || !evidenceId.startsWith("ev-")) return Optional.empty();
-        var versions = jdbc.query("SELECT term_id, version, title_snapshot FROM term_versions ORDER BY term_id, version",
+        List<String[]> versions = new ArrayList<>(jdbc.query(
+                "SELECT term_id, version, title_snapshot FROM term_versions ORDER BY term_id, version",
                 new MapSqlParameterSource(),
-                (rs, n) -> new String[] {rs.getString("term_id"), rs.getString("version"), rs.getString("title_snapshot")});
+                (rs, n) -> new String[] {POLICY + rs.getString("term_id"), rs.getString("version"),
+                        rs.getString("title_snapshot")}));
+        versions.addAll(jdbc.query(
+                "SELECT doc_id, version, title FROM chat_document_versions ORDER BY doc_id, version",
+                new MapSqlParameterSource(),
+                (rs, n) -> new String[] {rs.getString("doc_id"), rs.getString("version"), rs.getString("title")}));
         for (String[] v : versions) {
             for (Quote q : sections(v[0], v[1], v[2])) {
                 if (q.evidenceId().equals(evidenceId)) return Optional.of(q);
@@ -133,10 +157,17 @@ public class ChatZoopDocs {
         return quote.map(q -> readability(q, asOf));
     }
 
-    private List<Quote> sections(String term, String version, String title) {
-        return sections.computeIfAbsent(term + "\u0000" + version, key -> split(POLICY + term, version, title,
-                jdbc.queryForObject("SELECT body FROM term_versions WHERE term_id = :term AND version = :version",
-                        new MapSqlParameterSource("term", term).addValue("version", version), String.class)));
+    private List<Quote> sections(String docId, String version, String title) {
+        return sections.computeIfAbsent(docId + "\u0000" + version, key -> {
+            String body = docId.startsWith(POLICY)
+                    ? jdbc.queryForObject("SELECT body FROM term_versions WHERE term_id = :term AND version = :version",
+                            new MapSqlParameterSource("term", docId.substring(POLICY.length()))
+                                    .addValue("version", version), String.class)
+                    : jdbc.queryForObject(
+                            "SELECT body FROM chat_document_versions WHERE doc_id = :doc AND version = :version",
+                            new MapSqlParameterSource("doc", docId).addValue("version", version), String.class);
+            return split(docId, version, title, body);
+        });
     }
 
     /**

@@ -12,8 +12,10 @@ import fcntl
 import json
 import os
 import sqlite3
+import stat
 import uuid
-from contextlib import contextmanager
+import tempfile
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -21,13 +23,14 @@ from pathlib import Path
 from . import extraction_replay as analysis
 from . import extraction_topic as topics
 from . import live_prompts
+from .native_read_contracts import s2_historical, validate_s2_historical_read
 from .dependency_contracts import array, cites, invalid
 from .extraction_contracts import (ADAPTER_VERSION, CANDIDATE_VERSION, LEDGER_VERSION, LIVE_ADAPTER_VERSION, MAX_COMPARISONS, MAX_DOCUMENTS, SCHEMA, Article,
     CitationFailure, ExtractionFailure, Mention, ObservationRef, ProviderResponseUnknown, ReplyInvalid, Submit, canonical, digest)
 from .ingestion import Ingestor
 from .ingestion import Store as IngestionStore
 from .ingestion_contracts import Authority, Export, IngestionFailure, Inspect, byte_hash, now, reserved_state_roots
-from .live_runtime import LiveFailure, LiveRuntime
+from .live_runtime import LiveDeferred, LiveFailure, LiveRuntime, physical_attempts
 
 
 _SQL = """
@@ -58,7 +61,7 @@ _RELATIONS = ("SAME", "DIFFERENT", "FOLLOWS", "CONFLICT", "HOLD")
 
 
 class Store:
-    def __init__(self, root: Path, ingestion_root: Path, *, existing: bool = False):
+    def __init__(self, root: Path, ingestion_root: Path, *, existing: bool = False, inspection_job: str | None = None):
         root, ingestion_root = Path(os.path.abspath(root)), Path(os.path.abspath(ingestion_root))
         forbidden = [*reserved_state_roots(), ingestion_root]
         if any(root == p or root.is_relative_to(p) or p.is_relative_to(root) for p in forbidden):
@@ -67,7 +70,7 @@ class Store:
             if parent.exists() and parent.is_symlink():
                 raise ExtractionFailure("state_namespace_invalid")
         if existing:
-            self._open_existing(root)
+            self._open_existing(root, inspection_job)
             return
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
         if any(p.name not in _FILES or p.is_symlink() for p in root.iterdir()):
@@ -110,10 +113,9 @@ class Store:
             self.close()
             raise
 
-    def _open_existing(self, root: Path):
-        """Read-only downstream access (same policy as the ingestion consumer): shared non-blocking flock on the existing lock, no
-        mkdir/chmod/create/PRAGMA/schema/WAL write, immutable read-only SQLite. A non-empty -wal is committed data a reader must not
-        ignore or recover, so the operator runs the extraction writer (resume) first. An active writer makes the reader fail busy."""
+    def _open_existing(self, root: Path, inspection_job: str | None = None):
+        """Shared, non-blocking read access. Downstream reads require a checkpointed original; targeted current-job inspection
+        may recover a private copy while retaining the original shared lock through projection."""
         database, lock = root / "extraction.sqlite3", root / "extraction.lock"
         if not root.is_dir() or not database.is_file() or not lock.is_file():
             raise ExtractionFailure("extraction_state_missing")
@@ -128,8 +130,12 @@ class Store:
         try:
             wal = root / "extraction.sqlite3-wal"
             if wal.exists() and wal.stat().st_size > 0:
-                raise ExtractionFailure("extraction_recovery_required")
-            self.db = sqlite3.connect(database.as_uri() + "?mode=ro&immutable=1", uri=True, isolation_level=None)
+                if inspection_job is None:
+                    raise ExtractionFailure("extraction_recovery_required")
+                self._snapshot = ExitStack()
+                self.db = self._snapshot.enter_context(_current_job_snapshot(root, "extraction", inspection_job, current))
+            else:
+                self.db = sqlite3.connect(database.as_uri() + "?mode=ro&immutable=1", uri=True, isolation_level=None)
             self.db.row_factory = sqlite3.Row
             self.db.execute("PRAGMA query_only=ON")
             self.db.execute("SELECT 1 FROM jobs LIMIT 1")
@@ -144,7 +150,9 @@ class Store:
             raise
 
     def close(self):
-        if hasattr(self, "db"):
+        if hasattr(self, "_snapshot"):
+            self._snapshot.close()
+        elif hasattr(self, "db"):
             self.db.close()
         if hasattr(self, "lock"):
             os.close(self.lock)
@@ -313,11 +321,11 @@ def doc_key(ref: ObservationRef) -> str:
 
 
 def current(binding: dict) -> bool:
-    """A job is native only when its frozen adapter is this build's (replay or live). Anything else (ledger rows written before the native
-    cutover) stays readable as history but is never resumed, delivered or re-analysed: its analysis contract cannot be reproduced."""
+    """Execution eligibility for this build; historical delivery uses a separate read contract."""
     adapter = binding.get("adapter")
     version = adapter.get("version") if isinstance(adapter, dict) else None
-    return version == ADAPTER_VERSION or (version == LIVE_ADAPTER_VERSION and "live" in binding)
+    return ((version == ADAPTER_VERSION and "replay" in binding and "live" not in binding)
+            or (version == LIVE_ADAPTER_VERSION and "live" in binding and "replay" not in binding))
 
 
 def is_live(binding: dict) -> bool:
@@ -342,29 +350,85 @@ def _usd_total(receipts: list[dict], name: str) -> str | None:
 
 
 def live_usage(job_id: str, calls) -> dict:
-    """Truthful live counts from the stored receipts alone (no runtime, environment or key). `providerCalls` counts every attempt that was or may have
-    been transmitted; the token/USD totals are over received receipts and are null (unknown, never zero) when any value is unreported OR when a
-    transmitted call has no receipt, whose real usage this ledger cannot know."""
-    receipts = [json.loads(c["response"]) for c in calls if c["state"] == "received"]
-    unreceipted = sum(c["state"] == "started" for c in calls)
+    """Count physical sends, not logical invocations. Unknown attempts keep totals unknown; released reservations are not provider calls.
+    Historical single receipts are read as one attempt without changing their stored bytes or attributing a chain total to its primary account."""
+    attempts = []
+    for call in calls:
+        if call["response"] is not None:
+            attempts.extend(physical_attempts(json.loads(call["response"])))
+        else:
+            attempts.append({"state": "unknown" if call["state"] == "started" else "released", "receipt": None})
+    receipts = [a["receipt"] for a in attempts if a["state"] == "received"]
+    unreceipted = sum(a["state"] == "unknown" for a in attempts)
     totals = {} if unreceipted else {"inputTokens": _receipt_total(receipts, "usage", "inputTokens"), "outputTokens": _receipt_total(receipts, "usage", "outputTokens"),
                                      "reasoningTokens": _receipt_total(receipts, "usage", "reasoningTokens"), "estimatedUsd": _usd_total(receipts, "estimatedUsd"),
                                      "chargedUsd": _usd_total(receipts, "chargedUsd")}
     return {"executionMode": "live", "replayCalls": 0, "providerCalls": len(receipts) + unreceipted, "receivedCalls": len(receipts),
-            "startedWithoutReceipt": unreceipted, "unsentCalls": sum(c["state"] == "unsent" for c in calls),
+            "startedWithoutReceipt": unreceipted, "unsentCalls": sum(a["state"] == "released" for a in attempts),
             "paidModelCalls": sum(any(type((r.get("usage") or {}).get(n)) is int and r["usage"][n] > 0 for n in ("inputTokens", "outputTokens")) for r in receipts),
             **{name: totals.get(name) for name in ("inputTokens", "outputTokens", "reasoningTokens", "estimatedUsd", "chargedUsd")}, "creatorJobId": job_id}
 
 
+def live_physical_calls(call) -> list[dict]:
+    """Content-free physical accounting beneath an unchanged logical call identity; never expose provider bodies or prepared source text."""
+    if call["response"] is None:
+        return []
+    projected = []
+    for physical in physical_attempts(json.loads(call["response"])):
+        leaf = physical.get("receipt") or {}
+        projected.append({"attemptId": physical["attemptId"], "logicalAttemptId": call["attempt_id"],
+                          "state": physical["state"], "stage": call["stage"],
+                          "recipient": physical.get("recipient", leaf.get("recipient")),
+                          "funding": physical.get("funding", leaf.get("funding")),
+                          "error": physical.get("error"), "httpStatus": (leaf.get("http") or {}).get("status"),
+                          "model": (leaf.get("model") or {}).get("reported"), "usage": leaf.get("usage"),
+                          "cost": leaf.get("cost", physical.get("cost"))})
+    return projected
+
+
 def live_call(binding: dict, call) -> dict:
-    """One stored call as delivered: purpose/recipient come from the frozen binding, outcome facts from the stored receipt (null when there is none)."""
-    stage = binding["live"]["runtime"]["stages"][call["stage"]]
-    receipt = json.loads(call["response"]) if call["state"] == "received" else {}
+    """Historical single-call output stays unchanged. New chain bindings retain the logical row and expose each physical account separately."""
+    runtime = binding["live"]["runtime"]
+    stage = runtime["stages"][call["stage"]]
+    receipt = json.loads(call["response"]) if call["response"] is not None else {}
+    chain = receipt.get("format") == "zoop-live-chain-receipt-1"
     cost = receipt.get("cost")
-    return {"stage": call["stage"], "state": call["state"], "requestDigest": call["request_digest"], "fixtureHash": None, "responseDigest": call["response_digest"],
-            "verdict": call["verdict"], "attemptId": call["attempt_id"], "recipient": stage["recipient"], "purpose": stage["purpose"],
-            "httpStatus": (receipt.get("http") or {}).get("status"), "model": (receipt.get("model") or {}).get("reported"), "usage": receipt.get("usage"),
-            "cost": {k: cost.get(k) for k in ("usageKnown", "estimatedUsd", "chargedUsd")} if isinstance(cost, dict) else None}
+    result = {"stage": call["stage"], "state": call["state"], "requestDigest": call["request_digest"], "fixtureHash": None, "responseDigest": call["response_digest"],
+              "verdict": call["verdict"], "attemptId": call["attempt_id"], "recipient": None if chain else stage["recipient"], "purpose": stage["purpose"],
+              "httpStatus": (receipt.get("http") or {}).get("status"), "model": (receipt.get("model") or {}).get("reported"), "usage": receipt.get("usage"),
+              "cost": {k: cost.get(k) for k in ("usageKnown", "estimatedUsd", "chargedUsd")} if isinstance(cost, dict) else None}
+    if "fallback" in runtime.get("generation", {}):
+        result["physicalAttempts"] = live_physical_calls(call)
+        if chain and call["state"] == "started":
+            result["cost"] = {"usageKnown": False, "estimatedUsd": None, "chargedUsd": None}
+    return result
+
+
+def save_live_deferral(store, attempt: str, proof: dict) -> None:
+    """Persist causal pre-HTTP evidence independently of a contended monetary ledger, atomically with the native call state."""
+    with store.transaction():
+        row = store.one("SELECT state,response FROM calls WHERE attempt_id=?", (attempt,))
+        if row is None or row["state"] != "started" or row["response"] is not None or proof["attemptId"] != attempt:
+            raise ExtractionFailure("receipt_request_mismatch")
+        store.db.execute("INSERT INTO meta VALUES(?,?)", ("operating-deferral:" + attempt + ":" + uuid.uuid4().hex, canonical(proof)))
+        store.db.execute("UPDATE calls SET state='deferred' WHERE attempt_id=?", (attempt,))
+
+
+def load_live_deferral(store, attempt: str) -> dict | None:
+    row = store.one("SELECT value FROM meta WHERE key LIKE ? ORDER BY rowid DESC LIMIT 1", ("operating-deferral:" + attempt + ":%",))
+    return json.loads(row["value"]) if row else None
+
+
+def open_job_inspection(store_type, root: Path, *upstream_roots: Path, job_id: str, ledger: str):
+    """Inspect one current crash target from a private copy; validated absent/empty namespaces prove job absence."""
+    try:
+        return store_type(root, *upstream_roots, existing=True, inspection_job=job_id)
+    except ExtractionFailure as exc:
+        if exc.code != f"{ledger}_state_missing":
+            raise
+        if not os.path.lexists(root) or (root.is_dir() and not any(root.iterdir())):
+            raise ExtractionFailure("job_not_found") from exc
+        raise
 
 
 def open_legacy_history(root: Path, ingestion_root: Path, job_id: str) -> "Store | None":
@@ -384,6 +448,111 @@ def open_legacy_history(root: Path, ingestion_root: Path, job_id: str) -> "Store
         pass
     store.close()
     return None
+
+
+def _copy_ledger_snapshot(source: Path, target: Path) -> None:
+    """Stream exactly the opened regular file's observed size while its ledger lock is held."""
+    try:
+        fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError as exc:
+        raise ValueError("ledger_copy") from exc
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError("ledger_copy")
+        out = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            remaining = before.st_size
+            while remaining:
+                chunk = os.read(fd, min(1 << 20, remaining))
+                if not chunk:
+                    raise ValueError("ledger_copy")
+                remaining -= len(chunk)
+                view = memoryview(chunk)
+                while view:
+                    written = os.write(out, view)
+                    if written == 0:
+                        raise ValueError("ledger_copy")
+                    view = view[written:]
+            if os.read(fd, 1):
+                raise ValueError("ledger_copy")
+            after = os.fstat(fd)
+            named = os.stat(source, follow_symlinks=False)
+            def identity(info):
+                return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+            if identity(before) != identity(after) or identity(after) != identity(named):
+                raise ValueError("ledger_copy")
+        finally:
+            os.close(out)
+    except OSError as exc:
+        raise ValueError("ledger_copy") from exc
+    finally:
+        os.close(fd)
+
+
+@contextmanager
+def _ledger_snapshot(root: Path, ledger: str):
+    """Recover DB+WAL only in a private directory; the caller holds the original shared lock until this view closes."""
+    with tempfile.TemporaryDirectory(prefix=f"zoop-{ledger}-snapshot-") as scratch:
+        directory = Path(scratch)
+        try:
+            for suffix in (".sqlite3", ".sqlite3-wal"):
+                _copy_ledger_snapshot(root / (ledger + suffix), directory / (ledger + suffix))
+        except ValueError as exc:
+            raise ExtractionFailure(f"{ledger}_state_invalid") from exc
+        db = sqlite3.connect(directory / f"{ledger}.sqlite3", isolation_level=None)
+        try:
+            db.row_factory = sqlite3.Row
+            db.execute("PRAGMA query_only=ON")
+            yield db
+        finally:
+            db.close()
+
+
+@contextmanager
+def _current_job_snapshot(root: Path, ledger: str, job_id: str, is_current):
+    with _ledger_snapshot(root, ledger) as db:
+        row = db.execute("SELECT binding FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+        try:
+            binding = json.loads(row["binding"]) if row is not None else None
+            supported = isinstance(binding, dict) and is_current(binding)
+        except (ValueError, TypeError):
+            supported = False
+        if not supported:
+            raise ExtractionFailure(f"{ledger}_recovery_required")
+        yield db
+
+
+def mutation_job(store_type, root: Path, *upstream_roots: Path, job_id: str, ledger: str):
+    """Read a mutation target before opening its writer. Hot WALs are read only in a private copy.
+
+    This preserves explicit recovery of current jobs while refusing historical
+    mutations before chmod, DDL or checkpointing the original archive.
+    """
+    if not (root / f"{ledger}.sqlite3").exists():
+        return None
+    try:
+        store = store_type(root, *upstream_roots, existing=True)
+    except ExtractionFailure as exc:
+        if exc.code != f"{ledger}_recovery_required":
+            raise
+    else:
+        try:
+            row = store.one("SELECT * FROM jobs WHERE job_id=?", (job_id,))
+            return dict(row) if row is not None else None
+        finally:
+            store.close()
+    lock = os.open(root / f"{ledger}.lock", os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise ExtractionFailure(f"{ledger}_busy") from exc
+        with _ledger_snapshot(root, ledger) as db:
+            row = db.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+            return dict(row) if row is not None else None
+    finally:
+        os.close(lock)
 
 
 def locators_containing(document: dict, start: int, end: int) -> list[str]:
@@ -432,12 +601,13 @@ class Extractor:
             docs[key] = Doc(key, ref, export, projected, analysis.bind(export, projected))
         incoming = doc_key(request.incoming)
         groups, seen = [], set()
+        names = analysis.company_names(request.catalogue)
         for event in request.snapshot.events:
             members, keys = [], []
             for member in event.members:
                 key = doc_key(member.observation)
                 doc = docs[key]
-                mention = analysis.member_mention(member.mention, doc.article)
+                mention = analysis.member_mention(member.mention, doc.article, names)
                 identity = (doc.ref.document_version, mention.mention_id)
                 if doc.ref.document_version == docs[incoming].ref.document_version or identity in seen:
                     raise ExtractionFailure("snapshot_member_invalid")
@@ -620,7 +790,19 @@ class Extractor:
             raise ExtractionFailure(result["delivery"]["code"])
         return Submit.model_validate_json(row["request"]), result
 
+    def require_current_analysis(self, job_id: str) -> None:
+        if not current(json.loads(self._job(job_id)["binding"])):
+            raise ExtractionFailure("analysis_contract_changed")
+
+    def export_for_analysis(self, job_id: str) -> tuple[Submit, dict]:
+        """Current analysis input, distinct from export of an already frozen historical result."""
+        self.require_current_analysis(job_id)
+        return self.export(job_id)
+
     def cancel(self, job_id: str) -> dict:
+        binding = json.loads(self._job(job_id)["binding"])
+        if not current(binding) and str(binding.get("adapter", {}).get("version", "")).startswith("zoop-extraction-native-"):
+            raise ExtractionFailure("analysis_contract_changed")
         with self.store.transaction():
             row = self._job(job_id)
             if row["state"] not in {"ready", "cancelled"}:
@@ -642,7 +824,7 @@ class Extractor:
         job_id, fence = row["job_id"], row["fence"]
         if row["state"] in {"ready", "cancelled", "reconciling"}:
             return
-        if self.store.one("SELECT 1 FROM calls WHERE job_id=? AND state='started' AND response IS NULL", (job_id,)):
+        if self.store.one("SELECT 1 FROM calls WHERE job_id=? AND state='started'", (job_id,)):
             # Holding the lock proves the previous process stopped, not that its call was never sent: never auto-resend.
             code = "live_response_unknown" if is_live(json.loads(row["binding"])) else "replay_response_unknown"
             self._status(job_id, fence, "reconciling", row["phase"], code, "reconcile_only")
@@ -686,8 +868,10 @@ class Extractor:
         return attempt
 
     def _receive(self, attempt: str, raw) -> None:
-        self.db.execute("UPDATE calls SET state='received',response=?,response_digest=?,received_at=? WHERE attempt_id=? AND state='started'",
-            (canonical(raw), digest(raw), now(), attempt))
+        unknown = isinstance(raw, dict) and raw.get("format") == "zoop-live-chain-receipt-1" and any(
+            a["state"] == "unknown" for a in physical_attempts(raw))
+        self.db.execute("UPDATE calls SET state=?,response=?,response_digest=?,received_at=? WHERE attempt_id=? AND state='started' AND response IS NULL",
+            ("started" if unknown else "received", canonical(raw), digest(raw), now(), attempt))
 
     def _receipted(self, row, ctx: Context, fence: int, stage: str, ref: str, key: str, fixture_hash, lookup, fresh, saved, check=None):
         """One provider-style attempt. A saved receipt is validated/saved only; a started call without receipt is unknown.
@@ -739,7 +923,7 @@ class Extractor:
     # ------------------------------------------------------------------ live provider call ---------------------------------
 
     def _sending(self, stored: dict, stage: str, keys) -> tuple | None:
-        """(purpose, recipient, document keys) of the outbound live call of `stage`, from the FROZEN runtime. None for replay, which sends nothing anywhere."""
+        """Primary purpose/recipient and dependency closure for the final rights guard; fallback rights are checked separately for each actual send and receipt."""
         if not is_live(stored):
             return None
         decoder = self.live.frozen(stored["live"]["runtime"])
@@ -753,19 +937,20 @@ class Extractor:
         self.db.execute("UPDATE calls SET verdict=? WHERE attempt_id=? AND verdict IS NULL", (code, attempt))
 
     def _live_receipted(self, row, ctx: Context, fence: int, stage: str, ref: str, key: str, payload: dict, keys: list, parse, check=None):
-        """One provider attempt, in the only safe order: pure prepare -> current config + model-send rights -> durable reservation -> ONE send ->
-        durable raw receipt -> strict decode -> exact parse/grounding -> rights again. `keys` are the documents whose text is in `payload`.
+        """One immutable logical invocation, possibly containing primary and fallback physical attempts.
 
-        A call slot (job, stage, ref) has exactly one attempt: a reservation without a receipt is a possibly-sent request and is never resent
-        (reconciling), a reservation refused before the send is terminal `unsent`, and a received reply that cannot be used keeps its verdict and is
-        never repaired by another call. A stored receipt is decoded from the FROZEN binding, so recovery needs neither the environment nor a key."""
+        Every physical send rechecks its exact recipient's current rights; an unused optional fallback is never required. Runtime journaling makes
+        the primary durable before fallback, and this ledger stores the final or partial envelope once before decoding. Unknown physical attempts
+        leave this logical call started and the job reconciling; no resume replays either the primary or already-paid upstream stages."""
         job_id = row["job_id"]
         live = json.loads(row["binding"])["live"]
         frozen = live["runtime"]
+        payload = {**payload, "citationSources": [live_prompts.source(ctx.docs[k].export, ctx.docs[k].article) for k in sorted(set(keys))]}
         decoder = self.live.frozen(frozen)
         send = (decoder.purpose(stage), decoder.recipient(stage), frozenset(keys))
+        fallback = decoder.fallback_recipient(stage)
         call = self.store.one("SELECT * FROM calls WHERE job_id=? AND stage=? AND ref=?", (job_id, stage, ref))
-        if call is None:
+        if call is None or call["state"] == "deferred":
             sender = self.live.sender()
             if not sender.accepts(frozen):
                 raise ExtractionFailure("live_config_changed")
@@ -776,7 +961,15 @@ class Extractor:
             if (prepared["purpose"], prepared["recipient"]) != send[:2]:
                 raise ExtractionFailure("live_prepared_invalid")
             self._verify(ctx, send)
-            attempt = self._reserve(job_id, fence, stage, ref, key, live["bindingDigest"])
+            unsent_proof = None
+            if call is None:
+                attempt = self._reserve(job_id, fence, stage, ref, key, live["bindingDigest"])
+            else:
+                if call["request_digest"] != key or "funding" not in frozen:
+                    raise ExtractionFailure("receipt_request_mismatch")
+                attempt = call["attempt_id"]
+                unsent_proof = load_live_deferral(self.store, attempt)
+                self.db.execute("UPDATE calls SET state='started' WHERE attempt_id=? AND state='deferred'", (attempt,))
 
             def authorize():
                 # Runs inside send(), immediately before the one request: config, fence/cancel and every sent document's current rights.
@@ -785,16 +978,30 @@ class Extractor:
                 self._guard(job_id, fence)
                 self._verify(ctx, send)
 
+            def authorize_fallback():
+                if not sender.accepts(frozen):
+                    raise ExtractionFailure("live_config_changed")
+                self._guard(job_id, fence)
+                self._verify(ctx, (send[0], fallback, send[2]))
+
             try:
-                receipt = sender.send(prepared, attempt_id=attempt, authorize=authorize)
+                receipt = sender.send(prepared, attempt_id=attempt, authorize=authorize,
+                                      **({"unsent_proof": unsent_proof} if unsent_proof is not None else {}),
+                                      **({"authorize_fallback": authorize_fallback} if fallback is not None else {}))
+            except LiveDeferred as exc:
+                save_live_deferral(self.store, attempt, exc.proof)
+                raise ExtractionFailure(exc.code) from exc
             except ExtractionFailure as exc:
                 self._unsent(attempt, exc.code)
                 raise
             except LiveFailure as exc:
+                if exc.receipt is not None:
+                    self._receive(attempt, exc.receipt)
                 if exc.uncertain:
-                    # The request may have reached the provider: the reservation stays `started` and charged; never resent.
+                    # The unknown physical reservation stays charged, even when the primary has a known error receipt.
                     raise ProviderResponseUnknown(exc.code) from exc
-                self._unsent(attempt, exc.code)
+                if exc.receipt is None:
+                    self._unsent(attempt, exc.code)
                 raise ExtractionFailure(exc.code) from exc
             self._receive(attempt, receipt)  # durable BEFORE any parsing, for every HTTP answer
         else:
@@ -810,19 +1017,31 @@ class Extractor:
             if digest(receipt) != call["response_digest"]:
                 raise ExtractionFailure("receipt_integrity_failed")
             attempt = call["attempt_id"]
-            if (receipt.get("attemptId"), receipt.get("stage"), receipt.get("bindingIdentity")) != (attempt, stage, live["bindingDigest"]):
+        if fallback is not None and receipt.get("format") != "zoop-live-chain-receipt-1":
+            raise ExtractionFailure("receipt_binding_mismatch")
+        if receipt.get("format") == "zoop-live-chain-receipt-1":
+            expected = decoder.prepare(stage, payload)["requestDigest"]
+            if (receipt.get("attemptId"), receipt.get("logicalAttemptId"), receipt.get("stage"), receipt.get("bindingIdentity"), receipt.get("requestDigest")) != (
+                    attempt, attempt, stage, live["bindingDigest"], expected):
                 raise ExtractionFailure("receipt_binding_mismatch")
+        elif (receipt.get("attemptId"), receipt.get("stage"), receipt.get("bindingIdentity")) != (attempt, stage, live["bindingDigest"]):
+            raise ExtractionFailure("receipt_binding_mismatch")
         try:
             answer = decoder.answer(stage, receipt)
         except LiveFailure as exc:
+            if exc.uncertain:
+                raise ProviderResponseUnknown(exc.code) from exc
             self._reject(attempt, exc.code)
             raise ReplyInvalid(exc.code) from exc
         try:
-            result = parse(answer)
+            result = parse(live_prompts.expand(stage, payload, answer))
         except ReplyInvalid as exc:
             self._reject(attempt, exc.code)
             raise
         self._verify(ctx, send)
+        for physical in physical_attempts(receipt):
+            if physical["state"] == "received":
+                self._verify(ctx, (send[0], physical["receipt"]["recipient"], send[2]))
         if check is not None:
             try:
                 result = check(result)
@@ -844,7 +1063,7 @@ class Extractor:
         key = analysis.request_digest("extract", request_input, analysis_version(stored))
 
         def parse(raw):
-            return analysis.parse_extraction(raw, incoming.article)
+            return analysis.parse_extraction(raw, incoming.article, ctx.request.catalogue)
 
         if is_live(stored):
             extraction = self._live_receipted(row, ctx, fence, "extract", "incoming", key, request_input, [ctx.incoming], parse)
@@ -976,12 +1195,8 @@ class Extractor:
             return topics.candidates(request, response, cite)
 
         if is_live(stored):
-            # The model can only quote what it is shown: the LIVE payload adds each sent document's prepared text (the replay request and its digest
-            # stay as they are). Offsets the model leaves null are resolved from a unique literal quote of the cited document, never repaired otherwise.
-            texts = {(d["documentId"], d["documentVersion"]): ctx.by_document(d["documentId"], d["documentVersion"]).export["document"]["text"] for d in documents}
-            payload = {**request, "documents": [{**d, "text": texts[(d["documentId"], d["documentVersion"])]} for d in documents]}
-            found = self._live_receipted(row, ctx, fence, "topic", "topic", key, payload, sorted(doc_keys),
-                                         lambda raw: topics.parse(live_prompts.resolve_citations(raw, texts)), membership)
+            found = self._live_receipted(row, ctx, fence, "topic", "topic", key, request, sorted(doc_keys),
+                                         topics.parse, membership)
         else:
             def lookup():
                 if fixtures.topic_raw is None:
@@ -1011,7 +1226,7 @@ class Extractor:
         row = self._job(job_id)
         request = Submit.model_validate_json(row["request"])
         binding = json.loads(row["binding"])
-        live = is_live(binding)
+        live = request.provenance.execution_mode == "live"
         stages = {s["stage"]: json.loads(s["summary"]) for s in self.store.all("SELECT * FROM stages WHERE job_id=?", (job_id,))}
         calls = self.store.all("SELECT * FROM calls WHERE job_id=? ORDER BY started_at,attempt_id", (job_id,))
         events, comparisons, dispositions, topic_rows = candidate_rows(self.store, job_id)
@@ -1037,13 +1252,24 @@ class Extractor:
         if row["state"] == "cancelled":
             result["delivery"] = {"status": "withheld", "code": "job_cancelled"}
             return result
-        if not current(binding):
-            # Stored history stays inspectable verbatim, but a job frozen under another analysis contract delivers nothing and reads no source.
+        historical = s2_historical(binding)
+        if not current(binding) and not historical:
             result["delivery"] = {"status": "withheld", "code": "analysis_contract_changed"}
             return result
+        if historical and row["state"] != "ready":
+            result["delivery"] = {"status": "withheld", "code": "upstream_not_ready"}
+            return result
         try:
-            ctx = self._context(request)
-            self._check_binding(ctx, row)
+            if historical:
+                refs = {doc_key(request.incoming): request.incoming}
+                for event in request.snapshot.events:
+                    for member in event.members:
+                        refs.setdefault(doc_key(member.observation), member.observation)
+                exports = {key: self.sources.export(ref) for key, ref in refs.items()}
+                validate_s2_historical_read(row, request, exports)
+            else:
+                ctx = self._context(request)
+                self._check_binding(ctx, row)
         except ExtractionFailure as exc:
             result["delivery"] = {"status": "withheld", "code": exc.code}
             return result

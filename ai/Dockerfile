@@ -34,6 +34,16 @@ RUN uv sync \
     --no-dev \
     --no-editable
 
+# Read-only observation and handoff routes execute the installed native pipeline.
+COPY pipeline/pyproject.toml pipeline/uv.lock ./pipeline/
+COPY pipeline/src ./pipeline/src
+
+RUN uv sync \
+    --project pipeline \
+    --frozen \
+    --no-dev \
+    --no-editable
+
 FROM python:3.12-slim-trixie AS runtime
 
 RUN groupadd --system zoop \
@@ -60,6 +70,10 @@ COPY --from=builder --chown=zoop:zoop \
 COPY --from=builder --chown=zoop:zoop \
     /opt/zoop/service/.venv \
     /opt/zoop/service/.venv
+
+COPY --from=builder --chown=zoop:zoop \
+    /opt/zoop/pipeline/.venv \
+    /opt/zoop/pipeline/.venv
 
 COPY --chown=zoop:zoop \
     worker/fixtures/contracts/synthetic-document/grants.json \

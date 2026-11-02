@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 import com.zoop.artifact.storage.ArtifactFileStore;
@@ -20,9 +21,16 @@ import com.zoop.document.evidence.repository.SummaryView;
 import com.zoop.document.repository.ArtifactRow;
 import com.zoop.document.repository.VersionRow;
 import com.zoop.document.service.InMemoryDocumentRegistry;
+import com.zoop.graph.importer.GraphHandoffRepository;
+import com.zoop.graph.publication.GraphPublicationReader;
+import com.zoop.graph.publication.JdbcGraphPublicationRepository;
+import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import org.springframework.transaction.support.TransactionOperations;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * One synthetic document with one settled summary and one cited body quote. {@link #normal()} is the usual case (the analysis made
@@ -37,7 +45,8 @@ final class EvidenceWorld {
     static final String GRANT = "g1";
     static final String REVISION = "r1";
     static final String TEXT = "text-1";
-    static final String TEXT_SHA = "a".repeat(64);
+    static final String BODY = "머리말. 😀 첫째 꼬리";
+    static final String TEXT_SHA = Canonical.sha256(bytes(BODY));
     static final String INPUT_DIGEST = "b".repeat(64);
     static final String QUOTE = "\uD83D\uDE00 첫째";
     static final long START = 5;
@@ -50,19 +59,28 @@ final class EvidenceWorld {
     final Path root;
     final InMemoryDocumentRegistry registry = new InMemoryDocumentRegistry();
     final InMemoryEvidenceRead read = new InMemoryEvidenceRead();
+    final GraphHandoffRepository graphRepository = mock(GraphHandoffRepository.class);
+    final JdbcGraphPublicationRepository publicationRepository = mock(JdbcGraphPublicationRepository.class);
     final ArtifactFileStore store;
     String evidenceId;
 
     EvidenceWorld(Path directory) throws IOException {
+        this(directory, NOW.minusSeconds(3600));
+    }
+
+    EvidenceWorld(Path directory, Instant publishedAt) throws IOException {
         this.directory = directory.toRealPath();
         this.grants = this.directory.resolve("grants.json");
         this.root = Files.createDirectory(this.directory.resolve("artifacts"));
         this.store = ArtifactFileStore.at(root);
         registry.seedArticle(ARTICLE, "news", PROVIDER, null, "available");
-        registry.insertArtifactIfAbsent(new ArtifactRow(TEXT, "extracted_text", "artifact-root:extracted_text/text-1.txt", TEXT_SHA,
-                40, "text/plain", NOW));
+        try (ArtifactFileStore.Session session = store.open()) {
+            ArtifactFileStore.StoredFile text = session.put("extracted_text", "text-1.txt", bytes(BODY));
+            registry.insertArtifactIfAbsent(new ArtifactRow(TEXT, "extracted_text", text.uri(), text.sha256(),
+                    text.bytes(), "text/plain", NOW));
+        }
         registry.insertVersionIfAbsent(new VersionRow(ARTICLE, VERSION, "제목", "발행처", "https://example.invalid/a",
-                NOW.minusSeconds(3600), null, "datetime", null, TEXT, NOW.minusSeconds(60)));
+                publishedAt, null, "datetime", null, TEXT, NOW.minusSeconds(60)));
         registry.movePointer(ARTICLE, null, VERSION);
         writeGrants(grant(GRANT, REVISION, PROVIDER, true, "known", List.of("read", "store", "model-send", "quote-display"),
                 List.of("authored-replay"), List.of(SUMMARY, "document-sentiment", VERIFIER), null));
@@ -230,6 +248,45 @@ final class EvidenceWorld {
         return root.resolve("exact_receipt").resolve(id + ".json");
     }
 
+    GraphPublicationReader publications(ArtifactFileStore artifactStore) {
+        return new GraphPublicationReader(graphRepository, registry, artifactStore, publicationRepository);
+    }
+
+    void registerGraph(PublicGraphSnapshot snapshot, PublicGraphSnapshot projection) throws IOException {
+        registerGraph(snapshot, projection, List.of());
+    }
+
+    void registerGraph(PublicGraphSnapshot snapshot, PublicGraphSnapshot projection,
+            List<GraphHandoffRepository.RuleRow> rules) throws IOException {
+        String versionId = snapshot.versionId();
+        String snapshotId = "artifact-" + versionId;
+        String projectionId = "artifact-bundle-" + versionId;
+        writeGraphArtifact(snapshotId, "graph_snapshot", GraphPublicationReader.snapshotBytes(snapshot));
+        writeGraphArtifact(projectionId, "graph_bundle_snapshot", GraphPublicationReader.snapshotBytes(projection));
+        when(graphRepository.findVersion(versionId)).thenReturn(Optional.of(new GraphHandoffRepository.StagedVersion(
+                versionId, "snapshot", true, snapshotId, "operator:fixture", rules.isEmpty() ? 0L : 1L, 0)));
+        when(graphRepository.sources(versionId)).thenReturn(List.of(new GraphHandoffRepository.Source(
+                0, projection.sourceBundleId(), "artifact-receipt-" + versionId, projectionId)));
+        when(graphRepository.versionRules(versionId)).thenReturn(List.copyOf(rules));
+        when(publicationRepository.find(versionId)).thenReturn(Optional.empty());
+    }
+
+    private void writeGraphArtifact(String id, String kind, byte[] bytes) throws IOException {
+        Optional<ArtifactRow> previous = registry.findArtifact(id);
+        if (previous.isPresent()) {
+            ArtifactRow row = previous.orElseThrow();
+            Files.write(root.resolve(row.storageUri().substring("artifact-root:".length())), bytes);
+            registry.replaceArtifact(new ArtifactRow(id, kind, row.storageUri(), Canonical.sha256(bytes), bytes.length,
+                    "application/json", NOW));
+            return;
+        }
+        try (ArtifactFileStore.Session session = store.open()) {
+            ArtifactFileStore.StoredFile file = session.put(kind, id + ".json", bytes);
+            registry.insertArtifactIfAbsent(new ArtifactRow(id, kind, file.uri(), file.sha256(), file.bytes(),
+                    "application/json", NOW));
+        }
+    }
+
     // ---- the service under test ------------------------------------------------------------------------------------------
 
     EvidenceService service() {
@@ -246,7 +303,7 @@ final class EvidenceWorld {
             com.zoop.document.evidence.graph.GraphEvidenceReader graph) {
         return new EvidenceService(read, registry, new DocumentReadGrants(grantsPath), new DocumentReadSources(sourcesPath), graph,
                 new EvidenceArtifactReader(artifactStore), Clock.fixed(NOW, ZoneOffset.UTC),
-                TransactionOperations.withoutTransaction());
+                TransactionOperations.withoutTransaction(), publications(artifactStore));
     }
 
     static byte[] bytes(String text) {

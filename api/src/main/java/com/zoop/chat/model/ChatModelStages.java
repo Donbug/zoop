@@ -20,6 +20,7 @@ import com.zoop.ai.chat.ChatStageReply;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.orchestrator.ChatBranchContext;
+import com.zoop.chat.orchestrator.ChatClaims;
 import com.zoop.chat.orchestrator.ChatCitationSource;
 import com.zoop.chat.orchestrator.ChatGeneratedAnswer;
 import com.zoop.chat.orchestrator.ChatModels;
@@ -28,19 +29,21 @@ import com.zoop.chat.orchestrator.ChatPlanner;
 import com.zoop.chat.orchestrator.ChatQueryType;
 import com.zoop.chat.orchestrator.ChatRouteDecision;
 import com.zoop.chat.orchestrator.ChatSemanticVerdicts;
+import com.zoop.chat.orchestrator.OrchestratedChatEngine;
 import com.zoop.chat.service.ChatCompanyProfiles;
 import com.zoop.chat.service.ChatZoopDocs;
 import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolPath;
 import com.zoop.chat.tool.ChatToolResult;
+import com.zoop.chat.tool.ChatWebResult;
 import com.zoop.common.json.StrictJson;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-2}). The server decides what is
+ * The orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-5}). The server decides what is
  * sent: the router gets the question chain, the requirements split by {@link ChatRequirementSplitter} and the descriptions of
  * the bound capabilities; company and issue names are resolved here, never by the model. Company names
  * ({@link CompanyNameResolver}) are resolved before the router, so a name that fits several companies becomes a clarification
@@ -157,7 +160,8 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
                 probabilities(r, "capabilities").forEach((k, v) -> {
                     if (boundCapabilities.contains(k)) caps.put(k, v);
                 });
-                decided.add(requirement(piece, types, caps, targets.get(piece.id()), number(r.get("prohibitedAdvice"))));
+                decided.add(new ChatRouteDecision.Requirement(piece.id(), piece.text(), true, types, caps,
+                        targets.get(piece.id()), number(r.get("prohibitedAdvice")), unlessNamed(targets.get(piece.id()), dependency(r))));
             }
             return new ChatRouteDecision(decided, null);
         });
@@ -170,7 +174,12 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         if (named.ambiguity() != null) return new ChatRouteDecision(List.of(), named.ambiguity());
         return new ChatRouteDecision(decision.requirements().stream().map(r -> new ChatRouteDecision.Requirement(r.id(),
                 r.label(), r.explicit(), r.types(), r.capabilities(), named.targets().get(r.id()), r.prohibitedAdvice(),
-                r.dependsOn())).toList(), null);
+                unlessNamed(named.targets().get(r.id()), r.dependsOn()))).toList(), null);
+    }
+
+    /** A requirement that names its target reads it: a dependent stage would read only what its source finds. */
+    private static ChatRouteDecision.Dependency unlessNamed(List<String> targets, ChatRouteDecision.Dependency dependency) {
+        return targets.isEmpty() ? dependency : null;
     }
 
     /**
@@ -290,6 +299,19 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
                 branchEvidence.addAll(result.evidenceIds());
             }
             Set<String> sent = new HashSet<>();
+            // A web hit is quoted as the search returned it, under its provider's grant; it has no evidence record to read.
+            for (ChatToolResult result : branch.results()) {
+                for (ChatWebResult hit : result.webResults()) {
+                    if (evidence.size() >= MAX_QUOTES
+                            || !quoted.contains(hit.id()) && quoted.size() >= Math.min(MAX_QUOTES, context.maxCitations())) {
+                        break;
+                    }
+                    quote(OrchestratedChatEngine.webCitation(hit)).ifPresent(quote -> {
+                        quoted.add(hit.id());
+                        evidence.add(quote);
+                    });
+                }
+            }
             for (String id : branchEvidence) {
                 if (evidence.size() >= MAX_QUOTES) break;
                 if (!quoted.contains(id) && quoted.size() >= Math.min(MAX_QUOTES, context.maxCitations())) continue;
@@ -365,7 +387,10 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         for (int index = 0; index < sections.size(); index++) {
             var section = sections.get(index);
             ObjectNode wire = wireSections.addObject().put("sectionId", "s" + index)
-                    .put("basis", section.basis()).put("text", section.text());
+                    .put("basis", section.basis());
+            ArrayNode claims = wire.putArray("claims");
+            ChatClaims.split(index, section.text()).forEach(claim -> claims.addObject()
+                    .put("claimId", claim.id()).put("text", claim.text()));
             section.requirementIds().forEach(wire.putArray("requirementIds")::add);
             section.evidenceIds().forEach(wire.putArray("evidenceIds")::add);
             ArrayNode serverFacts = wire.putArray("serverFacts");
@@ -381,9 +406,14 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         return decode(() -> {
             List<ChatSemanticVerdicts.Verdict> verdicts = new ArrayList<>();
             for (JsonNode v : array(answer, "sections")) {
-                JsonNode support = v.get("support");
-                verdicts.add(new ChatSemanticVerdicts.Verdict(support == null || support.isNull() ? null : text(v, "support"),
-                        text(v, "prohibitedAdvice")));
+                List<ChatSemanticVerdicts.ClaimVerdict> claims = new ArrayList<>();
+                for (JsonNode claim : array(v, "claims")) {
+                    JsonNode support = claim.get("support");
+                    claims.add(new ChatSemanticVerdicts.ClaimVerdict(text(claim, "claimId"),
+                            support == null || support.isNull() ? null : text(claim, "support"),
+                            text(claim, "unsupportedCausality")));
+                }
+                verdicts.add(new ChatSemanticVerdicts.Verdict(text(v, "prohibitedAdvice"), claims));
             }
             return new ChatSemanticVerdicts(verdicts);
         });
@@ -479,7 +509,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
                 JsonNode arguments = request.get("arguments");
                 if (arguments == null || !arguments.isObject()) throw new IllegalArgumentException("arguments");
                 approvals.add(new ChatModels.ApprovalRequest(text(request, "approvalRequestId"), text(request, "toolName"),
-                        ARGUMENTS.convertValue(arguments, ARGUMENT_MAP)));
+                        ARGUMENTS.convertValue(arguments, ARGUMENT_MAP), strings(request, "requirementIds")));
             }
             JsonNode written = answer.get("answer");
             ChatGeneratedAnswer generated = null;
@@ -661,6 +691,16 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     private static double number(JsonNode value) {
         if (value == null || !value.isNumber()) throw new IllegalArgumentException("number");
         return value.doubleValue();
+    }
+
+    private static ChatRouteDecision.Dependency dependency(JsonNode requirement) {
+        JsonNode value = requirement.get("dependsOn");
+        if (value == null) throw new IllegalArgumentException("dependsOn");
+        if (value.isNull()) return null;
+        if (!value.isObject()) throw new IllegalArgumentException("dependsOn");
+        JsonNode count = value.get("count");
+        if (count == null || !count.isIntegralNumber()) throw new IllegalArgumentException("dependsOn.count");
+        return new ChatRouteDecision.Dependency(text(value, "requirementId"), text(value, "cardinality"), count.intValue());
     }
 
     private static Map<String, Double> probabilities(JsonNode node, String name) {

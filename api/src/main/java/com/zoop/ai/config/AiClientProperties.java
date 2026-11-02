@@ -20,8 +20,8 @@ public record AiClientProperties(
         @DefaultValue("30s") Duration requestTimeout,
         @DefaultValue("8388608") int maxResponseBytes) {
 
-    public AiClientSettings toSettings() {
-        return AiClientSettings.of(baseUrl, token, connectTimeout, requestTimeout, maxResponseBytes);
+    public AiClientSettings toSettings(AiTransportProperties transport) {
+        return AiClientSettings.of(baseUrl, token, connectTimeout, requestTimeout, maxResponseBytes, transport.hosts());
     }
 
     @Override

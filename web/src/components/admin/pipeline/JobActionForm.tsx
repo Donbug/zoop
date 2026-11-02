@@ -171,8 +171,8 @@ export default function JobActionForm({
       onSubmit={(event) => void submit(event)}
       className="flex flex-col gap-3 rounded-[3px] border-[0.667px] border-zoop-ink bg-zoop-paper p-4"
     >
-      <p className="text-sm font-bold">{copy.title}</p>
-      <p className="text-[11px] leading-relaxed text-zoop-muted">
+      <p className="text-body font-bold">{copy.title}</p>
+      <p className="text-caption leading-relaxed text-zoop-muted">
         {continuation
           ? '같은 계획의 고정된 S2·S3 작업 ID로 이어서 처리해요. 완료한 단위는 다시 실행하지 않으며 새 AI 실행 ID를 만들지 않아요. 기존 작업은 그대로 남아요.'
           : action === 'retry'
@@ -186,7 +186,7 @@ export default function JobActionForm({
                 : `대기 중인 ${name} 작업을 바로 취소해요.`}
       </p>
       <div className="flex flex-col gap-1">
-        <label htmlFor={reasonId} className="text-[11px] text-zoop-muted">
+        <label htmlFor={reasonId} className="text-caption text-zoop-muted">
           {copy.reasonLabel}
         </label>
         <textarea
@@ -201,7 +201,7 @@ export default function JobActionForm({
           onChange={(event) => setReason(event.target.value)}
           className={TEXTAREA}
         />
-        <p className="self-end text-[11px] text-zoop-faint tabular-nums">
+        <p className="self-end text-caption text-zoop-faint tabular-nums">
           {reason.length}/{REASON_MAX}
         </p>
       </div>
@@ -209,7 +209,7 @@ export default function JobActionForm({
         <p
           id={`${reasonId}-error`}
           role="alert"
-          className="text-[11px] text-zoop-alert"
+          className="text-caption text-zoop-alert"
         >
           사유를 입력해 주세요.
         </p>
@@ -217,7 +217,7 @@ export default function JobActionForm({
       <div
         role="status"
         aria-live="polite"
-        className="text-[11px] text-zoop-muted"
+        className="text-caption text-zoop-muted"
       >
         {pending && copy.pending}
         {unknown &&
@@ -225,7 +225,7 @@ export default function JobActionForm({
           '요청 결과를 확인하지 못했어요. 사유와 요청 키를 유지하고 있어요. 같은 요청 확인으로 결과를 확인해 주세요.'}
       </div>
       {error && !unknown && (
-        <p role="alert" className="text-[11px] text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           {jobActionErrorMessage(action, error)}
         </p>
       )}

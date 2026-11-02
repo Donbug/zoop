@@ -2373,7 +2373,7 @@ test.each([
     );
     const indicator = await region.findByText(label, { exact: true });
     expect(indicator.classList.contains(color)).toBe(true);
-    expect(indicator.classList.contains('text-[11px]')).toBe(false);
+    expect(indicator.classList.contains('text-caption')).toBe(false);
     expect(indicator.classList.contains('mt-0.5')).toBe(false);
   },
 );

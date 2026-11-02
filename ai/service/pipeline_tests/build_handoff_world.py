@@ -20,7 +20,7 @@ PIPELINE = Path(sys.argv[1]).resolve()
 ROOT = Path(sys.argv[2]).resolve()
 sys.path[:0] = [str(PIPELINE)]
 
-from scripts.graph_handoff_smoke import (PRIVATE, Operator, build_world, check_export, expected, file_hashes, manifest_doc, write_operator)  # noqa: E402
+from scripts.graph_handoff_smoke import (PRIVATE, Operator, build_context_world, build_world, check_export, expected, file_hashes, manifest_doc, write_operator)  # noqa: E402
 from zoop_ai_pipeline.handoff_contracts import validate_bundle  # noqa: E402
 from zoop_ai_pipeline.ingestion_contracts import byte_hash, canonical  # noqa: E402
 
@@ -28,6 +28,18 @@ HANDOFFS = ("handoff-1", "handoff-2")
 
 
 def main() -> dict:
+    if sys.argv[3:] == ["--contexts"]:
+        world = build_context_world(ROOT)
+        operator = Operator(world)
+        manifest = manifest_doc(world, "service-contexts", file_hashes(ROOT))
+        frozen = operator.cli("freeze", manifest)
+        exported = operator.cli("export", operator.sel("service-contexts"))
+        assert {issue["id"] for issue in exported["bundle"]["issues"]} == {"issue:context-0", "issue:context-1"}
+        return {"root": str(ROOT), "contexts": str(world.context_file), "sha256": world.context_sha,
+                "handoffState": str(operator.state), "handoffId": "service-contexts",
+                "manifestDigest": frozen["receipt"]["manifestDigest"], "bundleDigest": frozen["receipt"]["bundleDigest"],
+                "ledgerPaths": [str(operator.state), *(str(path) for context in world.native_contexts
+                                 for path in (context.paths.ingestion, context.paths.extraction, context.paths.relation, context.metering))]}
     world = build_world(ROOT)
     write_operator(world)
     operator = Operator(world)

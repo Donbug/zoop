@@ -144,7 +144,7 @@ export default function AiUsageOverview() {
         시각(KST)으로 묶습니다.
       </p>
       {usage.refreshError && (
-        <p role="status" className="text-[11px] text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}
@@ -290,7 +290,7 @@ export default function AiUsageOverview() {
             ) && (
               <ul
                 aria-label="집계 참고"
-                className="flex flex-col gap-1 text-[11px] leading-relaxed text-zoop-muted"
+                className="flex flex-col gap-1 text-caption leading-relaxed text-zoop-muted"
               >
                 {features
                   .filter(
@@ -329,16 +329,14 @@ export default function AiUsageOverview() {
                   {errors.map((error, index) => (
                     <tr key={`${error.feature.feature}-${error.at}-${index}`}>
                       <td
-                        className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                        className={`${TD} whitespace-nowrap font-num tabular-nums`}
                       >
                         {formatKst(error.at)}
                       </td>
                       <td className={`${TD} whitespace-nowrap`}>
                         {error.feature.label}
                       </td>
-                      <td className={`${TD} font-inter`}>
-                        {error.code ?? '–'}
-                      </td>
+                      <td className={`${TD} font-num`}>{error.code ?? '–'}</td>
                       <td className={TD}>{error.message ?? '–'}</td>
                     </tr>
                   ))}

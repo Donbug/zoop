@@ -47,7 +47,7 @@ class AiResultFeedbackPostgresTest {
           INSERT INTO chat_jobs(id,session_id,seq,question,request_hash,asked_at,frozen_context,frozen_selection,status,outcome,message_id,result,result_schema_version,created_at,updated_at,finished_at)
           VALUES(?,?,1,'합성 질문',repeat('a',64),now(),'{}','{"contextIds":[],"evidenceIds":[],"evidencePool":[]}','completed','answered',?,'{"answer":"합성 답변"}','synthetic-v1',now(),now(),now())
           """,job,conversation,message);
-        var result=new ChatResult("answered",message,"합성 답변",List.of(),"general_knowledge",null,List.of(),List.of(),List.of(),null,List.of(),null,List.of(),null,"complete",List.of());
+        var result=new ChatResult("answered",message,"합성 답변",List.of(),"general_knowledge",null,List.of(),List.of(),List.of(),null,List.of(),null,List.of(),null,"complete",List.of(),List.of());
         var guarded=new ChatJob(job,conversation,1,"합성 질문","completed",null,"answered",Instant.now(),null,null,null,result,1,Instant.now(),Instant.now(),Instant.now());version=guarded.feedbackVersion();
         when(chat.getJob(any(),eq(job))).thenReturn(guarded);
     }

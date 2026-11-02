@@ -1,0 +1,258 @@
+{
+  "setVersion": "chat-eval-agent-v1",
+  "description": "agent 경로 고정 평가. 실제 엔진·승인 gate·MCP 도구·원장·합성 웹 공급자를 거치고 Luna만 대본이다. 서버의 승인 결정과 답의 결말을 고정하며 답변 품질은 재지 않는다. 형식: docs/development/ai-chatbot-eval-set.md",
+  "cases": [
+    {
+      "id": "agent-concept-web-reported",
+      "question": "HBM이 뭐야",
+      "requirements": [{"id": "r1", "label": "HBM이 뭐야", "types": {"Q02": 0.9}}],
+      "agent": [
+        {"calls": [{"id": "w1", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r1"]}]},
+        {"answer": {"sections": [{"basis": "web_reported", "text": "웹 보도에 따르면 HBM은 D램을 쌓은 메모리입니다.", "requirementIds": ["r1"], "evidenceIds": ["$web"]}]}}
+      ],
+      "expect": {
+        "path": "agent",
+        "decisions": ["w1:approved"],
+        "tools": ["web.search"],
+        "outcome": "answered",
+        "answerBasis": "web_reported",
+        "citationKinds": ["web_result"],
+        "notices": [],
+        "coverage": ["r1:answered"]
+      }
+    },
+    {
+      "id": "agent-concept-no-web-results",
+      "question": "ZZZ가 뭐야",
+      "requirements": [{"id": "r1", "label": "ZZZ가 뭐야", "types": {"Q02": 0.9}}],
+      "agent": [
+        {"calls": [{"id": "w1", "tool": "web_search", "targets": ["없는 검색어"], "requirementIds": ["r1"]}]},
+        {"answer": {"sections": [{"basis": "general_knowledge", "text": "일반적인 개념 설명입니다.", "requirementIds": ["r1"], "evidenceIds": []}]}}
+      ],
+      "expect": {
+        "decisions": ["w1:approved"],
+        "outcome": "answered",
+        "answerBasis": "general_knowledge",
+        "notices": ["web_no_results"],
+        "coverage": ["r1:answered"]
+      }
+    },
+    {
+      "id": "agent-concept-web-down",
+      "question": "ZZZ가 뭐야",
+      "requirements": [{"id": "r1", "label": "ZZZ가 뭐야", "types": {"Q02": 0.9}}],
+      "agent": [
+        {"calls": [{"id": "w1", "tool": "web_search", "targets": ["장애 시험"], "requirementIds": ["r1"]}]},
+        {"answer": {"sections": [{"basis": "general_knowledge", "text": "일반적인 개념 설명입니다.", "requirementIds": ["r1"], "evidenceIds": []}]}}
+      ],
+      "expect": {
+        "decisions": ["w1:approved"],
+        "outcome": "answered",
+        "answerStatus": "complete",
+        "notices": ["web_unavailable"],
+        "coverage": ["r1:answered"]
+      }
+    },
+    {
+      "id": "agent-fact-enough-no-web",
+      "question": "SK하이닉스는 어떤 회사야",
+      "requirements": [{"id": "r1", "label": "SK하이닉스는 어떤 회사야", "types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "targets": ["KRX:000660"]}],
+      "agent": [
+        {"calls": [
+          {"id": "w1", "tool": "web_search", "targets": ["SK하이닉스"], "requirementIds": ["r1"]},
+          {"id": "c1", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": ["r1"]}
+        ]},
+        {"calls": [{"id": "w2", "tool": "web_search", "targets": ["SK하이닉스"], "requirementIds": ["r1"]}]},
+        {"answer": {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 메모리 반도체를 만듭니다.", "requirementIds": ["r1"], "evidenceIds": ["$reads"]}], "graphTargetIds": ["KRX:000660"]}}
+      ],
+      "expect": {
+        "path": "agent",
+        "decisions": ["w1:denied", "c1:approved", "w2:denied"],
+        "tools": ["company.read"],
+        "outcome": "answered",
+        "answerBasis": "evidence_grounded",
+        "notices": [],
+        "coverage": ["r1:answered"]
+      }
+    },
+    {
+      "id": "agent-fact-gap-then-web",
+      "question": "카카오 소식 알려줘",
+      "requirements": [{"id": "r1", "label": "카카오 소식 알려줘", "types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "targets": ["KRX:035720"]}],
+      "agent": [
+        {"calls": [{"id": "c1", "tool": "company_read", "targets": ["KRX:035720"], "requirementIds": ["r1"]}]},
+        {"calls": [{"id": "w1", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r1"]}]},
+        {"answer": {"sections": [{"basis": "web_reported", "text": "웹 보도에 따른 내용입니다.", "requirementIds": ["r1"], "evidenceIds": ["$web"]}]}}
+      ],
+      "expect": {
+        "decisions": ["c1:approved", "w1:approved"],
+        "tools": ["company.read", "web.search"],
+        "outcome": "answered",
+        "answerBasis": "web_reported",
+        "citationKinds": ["web_result"],
+        "coverage": ["r1:answered"]
+      }
+    },
+    {
+      "id": "agent-mixed-concept-and-fact",
+      "question": "HBM이 뭐야? SK하이닉스는 어떤 회사야?",
+      "requirements": [
+        {"id": "r1", "label": "HBM이 뭐야", "types": {"Q02": 0.9}},
+        {"id": "r2", "label": "SK하이닉스는 어떤 회사야", "types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "targets": ["KRX:000660"]}
+      ],
+      "agent": [
+        {"calls": [
+          {"id": "w1", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r1"]},
+          {"id": "w2", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r1", "r2"]},
+          {"id": "c1", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": ["r2"]}
+        ]},
+        {"answer": {"sections": [
+          {"basis": "web_reported", "text": "웹 보도에 따르면 HBM은 D램을 쌓은 메모리입니다.", "requirementIds": ["r1"], "evidenceIds": ["$web"]},
+          {"basis": "evidence_grounded", "text": "SK하이닉스는 메모리 반도체를 만듭니다.", "requirementIds": ["r2"], "evidenceIds": ["$reads"]}
+        ]}}
+      ],
+      "expect": {
+        "decisions": ["w1:approved", "w2:denied", "c1:approved"],
+        "tools": ["company.read", "web.search"],
+        "outcome": "answered",
+        "answerStatus": "complete",
+        "coverage": ["r1:answered", "r2:answered"]
+      }
+    },
+    {
+      "id": "agent-rule-and-fact-web",
+      "question": "탈퇴하면 기록은 어떻게 돼? 카카오 소식 알려줘",
+      "requirements": [
+        {"id": "r1", "label": "탈퇴하면 기록은 어떻게 돼", "types": {"Q01": 0.9}, "capabilities": {"zoopPolicy.read": 0.9}},
+        {"id": "r2", "label": "카카오 소식 알려줘", "types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "targets": ["KRX:035720"]}
+      ],
+      "agent": [
+        {"calls": [
+          {"id": "p1", "tool": "zoopPolicy_read", "requirementIds": ["r1"]},
+          {"id": "c1", "tool": "company_read", "targets": ["KRX:035720"], "requirementIds": ["r2"]}
+        ]},
+        {"calls": [
+          {"id": "w1", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r1"]},
+          {"id": "w2", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r1", "r2"]},
+          {"id": "w3", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r2"]}
+        ]},
+        {"answer": {"sections": [
+          {"basis": "zoop_documented", "text": "탈퇴하면 정해진 기간 뒤 질문 기록을 지웁니다.", "requirementIds": ["r1"], "evidenceIds": ["$reads"]},
+          {"basis": "web_reported", "text": "웹 보도에 따른 내용입니다.", "requirementIds": ["r2"], "evidenceIds": ["$web"]}
+        ]}}
+      ],
+      "expect": {
+        "decisions": ["p1:approved", "c1:approved", "w1:denied", "w2:denied", "w3:approved"],
+        "outcome": "answered",
+        "citationKinds": ["web_result", "zoop_doc"],
+        "coverage": ["r1:answered", "r2:answered"]
+      }
+    },
+    {
+      "id": "agent-rule-never-searches",
+      "question": "탈퇴하면 기록은 어떻게 돼",
+      "requirements": [{"id": "r1", "label": "탈퇴하면 기록은 어떻게 돼", "types": {"Q01": 0.9}, "capabilities": {"zoopPolicy.read": 0.9}}],
+      "agent": [
+        {"calls": [{"id": "p1", "tool": "zoopPolicy_read", "requirementIds": ["r1"]}]},
+        {"calls": [{"id": "w1", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r1"]}]},
+        {"answer": {"sections": [{"basis": "zoop_documented", "text": "탈퇴하면 정해진 기간 뒤 질문 기록을 지웁니다.", "requirementIds": ["r1"], "evidenceIds": ["$reads"]}]}}
+      ],
+      "expect": {
+        "decisions": ["p1:approved", "w1:denied"],
+        "tools": ["zoopPolicy.read"],
+        "outcome": "answered",
+        "citationKinds": ["zoop_doc"]
+      }
+    },
+    {
+      "id": "agent-call-names-no-requirement",
+      "question": "SK하이닉스는 어떤 회사야",
+      "requirements": [{"id": "r1", "label": "SK하이닉스는 어떤 회사야", "types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "targets": ["KRX:000660"]}],
+      "agent": [
+        {"calls": [
+          {"id": "c1", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": []},
+          {"id": "c2", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": ["r9"]}
+        ]},
+        {"answer": {"sections": [], "insufficientRequirementIds": ["r1"]}}
+      ],
+      "expect": {
+        "decisions": ["c1:denied", "c2:denied"],
+        "tools": [],
+        "outcome": "insufficient_evidence",
+        "coverage": ["r1:limited"]
+      }
+    },
+    {
+      "id": "agent-unreachable-target-denied",
+      "question": "SK하이닉스는 어떤 회사야",
+      "requirements": [{"id": "r1", "label": "SK하이닉스는 어떤 회사야", "types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "targets": ["KRX:000660"]}],
+      "agent": [
+        {"calls": [
+          {"id": "c1", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": ["r1"]},
+          {"id": "c2", "tool": "company_read", "targets": ["KRX:005930"], "requirementIds": ["r1"]}
+        ]},
+        {"answer": {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 메모리 반도체를 만듭니다.", "requirementIds": ["r1"], "evidenceIds": ["$reads"]}]}}
+      ],
+      "expect": {
+        "decisions": ["c1:approved", "c2:denied"],
+        "tools": ["company.read"],
+        "outcome": "answered"
+      }
+    },
+    {
+      "id": "agent-forged-evidence",
+      "question": "SK하이닉스는 어떤 회사야",
+      "requirements": [{"id": "r1", "label": "SK하이닉스는 어떤 회사야", "types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "targets": ["KRX:000660"]}],
+      "agent": [
+        {"calls": [{"id": "c1", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": ["r1"]}]},
+        {"answer": {"sections": [{"basis": "evidence_grounded", "text": "지어낸 내용입니다.", "requirementIds": ["r1"], "evidenceIds": ["ev-forged"]}]}}
+      ],
+      "expect": {
+        "outcome": "failed",
+        "failure": {"kind": "validation_failed", "reason": null, "rerunnable": false}
+      }
+    },
+    {
+      "id": "agent-cites-another-requirement",
+      "question": "SK하이닉스는? 삼성전자는?",
+      "requirements": [
+        {"id": "r1", "label": "SK하이닉스는", "types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "targets": ["KRX:000660"]},
+        {"id": "r2", "label": "삼성전자는", "types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "targets": ["KRX:005930"]}
+      ],
+      "agent": [
+        {"calls": [
+          {"id": "c1", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": ["r1"]},
+          {"id": "c2", "tool": "company_read", "targets": ["KRX:005930"], "requirementIds": ["r2"]}
+        ]},
+        {"answer": {"sections": [{"basis": "evidence_grounded", "text": "삼성전자의 근거로 SK하이닉스를 설명합니다.", "requirementIds": ["r1"], "evidenceIds": ["$reads:r2"]}], "insufficientRequirementIds": ["r2"]}}
+      ],
+      "expect": {
+        "decisions": ["c1:approved", "c2:approved"],
+        "outcome": "failed",
+        "failure": {"kind": "validation_failed", "reason": null, "rerunnable": false}
+      }
+    },
+    {
+      "id": "agent-read-fails-in-part",
+      "question": "SK하이닉스는? 삼성전자는?",
+      "unavailableTools": ["issue.read"],
+      "requirements": [
+        {"id": "r1", "label": "SK하이닉스는", "types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9, "issue.read": 0.9}, "targets": ["KRX:000660"]}
+      ],
+      "agent": [
+        {"calls": [
+          {"id": "c1", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": ["r1"]},
+          {"id": "i1", "tool": "issue_read", "targets": ["KRX:000660"], "requirementIds": ["r1"]}
+        ]},
+        {"answer": {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 메모리 반도체를 만듭니다.", "requirementIds": ["r1"], "evidenceIds": ["$reads"]}]}}
+      ],
+      "expect": {
+        "decisions": ["c1:approved", "i1:approved"],
+        "outcome": "answered",
+        "answerStatus": "complete",
+        "notices": ["tool_unavailable"],
+        "coverage": ["r1:answered"]
+      }
+    }
+  ]
+}

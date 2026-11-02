@@ -21,9 +21,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Read authority for an immutable briefing, using the existing document registry and the CURRENT operator grant file.
- * Missing/changed/expired/revoked authority fails closed. Database/registry failures propagate as unavailable, never an
- * empty successful briefing. No fixture switch, cached grant or publication-time boolean can authorize a response.
+ * Read authority for an immutable briefing, using the current document registry AND original graph-source authority
+ * for imported publications. Stored comparisons and prior-round content are checked against their own graph versions.
+ * Missing/changed/expired/revoked authority fails closed; fixture-only rounds retain their document-grant behavior.
  */
 @Component
 public class DocumentBriefingContentAccess implements BriefingContentAccess {
@@ -34,18 +34,16 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
     private final DocumentReadGrants grants;
     private final Clock clock;
     private final BriefingReplayReadPolicy replay;
-
-    public DocumentBriefingContentAccess(JdbcTemplate jdbc, DocumentReadProperties properties, Clock clock) {
-        this(jdbc, properties, clock, BriefingReplayReadPolicy.disabled());
-    }
+    private final BriefingGraphContentAuthority graph;
 
     @Autowired
     public DocumentBriefingContentAccess(JdbcTemplate jdbc, DocumentReadProperties properties, Clock clock,
-            BriefingReplayReadPolicy replay) {
+            BriefingReplayReadPolicy replay, BriefingGraphContentAuthority graph) {
         this.jdbc = jdbc;
         this.grants = new DocumentReadGrants(properties.grantsPath());
         this.clock = clock;
         this.replay = replay;
+        this.graph = graph;
     }
 
     @Override
@@ -55,7 +53,7 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
         GrantRegistry current = grants.registry(requestId);
         Instant now = clock.instant();
         try {
-            if (!sources(round.payload(), round.publicSnapshot(), current, now)) return false;
+            if (!sources(round.payload(), round.publicSnapshot(), current, now, requestId)) return false;
             JsonNode comparison = round.comparisonSnapshot();
             if (comparison != null && "available".equals(StrictJson.Obj.of(comparison).string("status"))) {
                 // Comparison can disclose morning-only issues. Authorize that stored morning original as well.
@@ -68,7 +66,7 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
                             AND m.payload_sha256=encode(sha256(convert_to(m.published_payload::text,'UTF8')),'hex')
                         """, (rs, index) -> new Prior(StrictJson.parseObject(rs.getString("published_payload")).node(),
                                 StrictJson.parseObject(rs.getString("public_snapshot")).node()), round.id(), morningId);
-                if (prior.size() != 1 || !sources(prior.get(0).payload(), prior.get(0).snapshot(), current, now)) return false;
+                if (prior.size() != 1 || !sources(prior.get(0).payload(), prior.get(0).snapshot(), current, now, requestId)) return false;
             }
             JsonNode previous = round.publicSnapshot().get("previousComparison");
             if (previous != null && !previous.isNull() && "available".equals(StrictJson.Obj.of(previous).string("status"))) {
@@ -83,7 +81,7 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
                                 StrictJson.parseObject(rs.getString("public_snapshot")).node()),
                         nonBlank(fixed.string("previousRoundId")), round.id(), java.sql.Timestamp.from(round.scheduledAt()),
                         fixed.string("previousPublishedAt"), fixed.string("previousDataAsOf"));
-                if (prior.size() != 1 || !sources(prior.get(0).payload(), prior.get(0).snapshot(), current, now)) return false;
+                if (prior.size() != 1 || !sources(prior.get(0).payload(), prior.get(0).snapshot(), current, now, requestId)) return false;
             }
             return true;
         } catch (StrictJson.Malformed malformed) {
@@ -91,7 +89,7 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
         }
     }
 
-    private boolean sources(JsonNode publishedPayload, JsonNode publicSnapshot, GrantRegistry current, Instant now) {
+    private boolean sources(JsonNode publishedPayload, JsonNode publicSnapshot, GrantRegistry current, Instant now, String requestId) {
         try {
             List<StrictJson.Obj> bindings = StrictJson.Obj.of(publicSnapshot).objects("sourceBindings");
             // Even an honestly empty selected issue set must retain the real sources used to decide it was empty.
@@ -147,7 +145,8 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
                         """, (rs, index) -> new DocumentVersion(rs.getString("article_id"), rs.getString("article_version")), id);
                 if (source.size() != 1 || !authorized.containsKey(source.get(0))) return false;
             }
-            return true;
+            return graph.context(payload.raw("graphVersion").isNull() ? null : payload.string("graphVersion"), requestId)
+                    .allowsRound(publishedPayload, disclosedEvidence);
         } catch (StrictJson.Malformed malformed) {
             return false;
         }

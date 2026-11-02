@@ -67,6 +67,7 @@ public final class GraphSnapshotFilter {
 
     static PublicGraphSnapshot apply(PublicGraphSnapshot s, Instant asOf, DisclosureExclusions exclusions, boolean reconstruction) {
         Set<String> articles = s.articles().stream()
+                .filter(a -> !exclusions.articleTargets().contains(new DisclosureExclusions.ArticleTarget(a.articleId(), a.version())))
                 .filter(a -> asOf == null || publishedBy(a.publishedAt(), asOf))
                 .map(GraphSnapshotFilter::articleKey).collect(Collectors.toSet());
         List<Evidence> evidence = s.evidence().stream()
@@ -75,12 +76,16 @@ public final class GraphSnapshotFilter {
         Set<String> evidenceIds = evidence.stream().map(Evidence::evidenceId).collect(Collectors.toSet());
         Set<String> articleIds = s.articles().stream().filter(a -> articles.contains(articleKey(a)))
                 .map(Article::articleId).collect(Collectors.toSet());
+        var byEvidence = evidence.stream().collect(Collectors.toMap(Evidence::evidenceId, java.util.function.Function.identity()));
+        var byArticle = s.articles().stream().filter(a -> articles.contains(articleKey(a)))
+                .collect(Collectors.toMap(GraphSnapshotFilter::articleKey, java.util.function.Function.identity()));
 
         List<Issue> issues = s.issues().stream()
                 .filter(i -> !exclusions.issueIds().contains(i.issueId()))
                 .filter(i -> asOf == null || (publishedBy(i.latestPublishedAt(), asOf) && articleIds.containsAll(i.articleIds())))
-                .map(i -> withEvidence(i, evidenceIds))
-                .filter(i -> !i.evidenceIds().isEmpty() && (!i.geographyEvidenceIds().isEmpty() || (reconstruction && i.geography() == null)))
+                .map(i -> withEvidence(i, evidenceIds, articles, articleIds, byEvidence, byArticle))
+                .filter(i -> !i.evidenceIds().isEmpty() && (!i.geographyEvidenceIds().isEmpty()
+                        || i.hasExplicitUnknownGeography() || (reconstruction && i.geography() == null)))
                 .toList();
         Set<String> kept = issues.stream().map(Issue::issueId).collect(Collectors.toCollection(HashSet::new));
 
@@ -88,6 +93,8 @@ public final class GraphSnapshotFilter {
                 .filter(r -> !exclusions.relationIds().contains(r.relationId()))
                 .filter(r -> kept.contains(r.source()) && (!"FOLLOWS".equals(r.relationType()) || kept.contains(r.target())))
                 .filter(r -> evidenceIds.containsAll(r.evidenceIds()))
+                .filter(r -> r.basis().stream().flatMap(b -> b.articles().stream())
+                        .allMatch(a -> articles.contains(a.articleId() + "@" + a.articleVersion())))
                 .map(r -> verifiedBasisOnly(r, asOf))
                 .filter(r -> !"STRUCTURALLY_RELATED_TO".equals(r.relationType()) || !r.basis().isEmpty())
                 .toList();
@@ -122,12 +129,19 @@ public final class GraphSnapshotFilter {
         return !Instant.parse(value).isAfter(asOf);
     }
 
-    private static Issue withEvidence(Issue i, Set<String> evidenceIds) {
+    private static Issue withEvidence(Issue i, Set<String> evidenceIds, Set<String> articles, Set<String> articleIds,
+            java.util.Map<String, Evidence> byEvidence, java.util.Map<String, Article> byArticle) {
+        var mentions = i.mentions().stream().filter(m -> articles.contains(m.articleId() + "@" + m.articleVersion())).toList();
+        String representative = mentions.stream().anyMatch(m -> m.mentionId().equals(i.representativeMentionId()))
+                ? i.representativeMentionId() : null;
+        Iterable<String> published = () -> i.evidenceIds().stream().filter(evidenceIds::contains).map(byEvidence::get)
+                .map(e -> byArticle.get(e.articleId() + "@" + e.articleVersion()).publishedAt()).iterator();
         return new Issue(i.issueId(), i.label(), i.eventTime(), i.timePrecision(), i.period(), i.assertionStatus(),
                 i.action(), i.target(), i.geography(), i.geographyPolicyVersion(),
-                i.geographyEvidenceIds().stream().filter(evidenceIds::contains).toList(), i.articleIds(),
-                i.evidenceIds().stream().filter(evidenceIds::contains).toList(), i.mentions(),
-                i.representativeMentionId(), i.latestPublishedAt());
+                i.geographyEvidenceIds().stream().filter(evidenceIds::contains).toList(),
+                i.articleIds().stream().filter(articleIds::contains).toList(),
+                i.evidenceIds().stream().filter(evidenceIds::contains).toList(), mentions,
+                representative, com.zoop.graph.importer.HandoffSnapshotWriter.latestPublished(published));
     }
 
     private static String articleKey(Article a) {

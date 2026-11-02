@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom';
 import { ApiError } from '@/apis/auth/ApiService';
 import { getBriefingGraphBasis } from '@/apis/briefing/briefing';
 import { useAsyncData } from '@/hooks/useAsyncData';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { briefingTime } from '@/util/briefingTime';
 
 const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink';
-const BUTTON = `inline-flex h-8 items-center rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3 text-xs font-semibold text-zoop-ink hover:bg-zoop-wash ${FOCUS_RING}`;
-const PRIMARY = `inline-flex h-8 items-center rounded-[3px] bg-zoop-ink px-3 text-xs font-semibold text-zoop-paper ${FOCUS_RING}`;
+const BUTTON = `inline-flex h-8 items-center rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3 text-caption font-semibold text-zoop-ink hover:bg-zoop-wash ${FOCUS_RING}`;
+const PRIMARY = `inline-flex h-8 items-center rounded-[3px] bg-zoop-ink px-3 text-caption font-semibold text-zoop-paper ${FOCUS_RING}`;
 
 const editionLabel = { morning: '출근', evening: '퇴근' } as const;
 
@@ -67,22 +68,29 @@ export default function BriefingSnapshotBanner({
       className="mx-4 mt-3 flex flex-wrap items-center gap-3 rounded-[5px] border-[0.667px] border-zoop-line bg-zoop-wash px-4 py-3 text-zoop-ink"
     >
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-bold">{title}</p>
-        <p
-          role={
-            basis.status === 'error' ||
-            (data &&
-              data.status !== 'available' &&
-              data.unavailableReason !== 'snapshot_not_recorded')
-              ? 'alert'
-              : 'status'
-          }
-          className="mt-0.5 text-[11px] break-words text-zoop-muted"
-        >
-          {detail}
-        </p>
+        <p className="text-body font-bold">{title}</p>
+        {basis.status === 'loading' ? (
+          <LoadingIndicator
+            label="회차 기준을 확인하고 있어요."
+            className="mt-0.5 flex min-h-7 w-full text-caption text-zoop-muted"
+          />
+        ) : (
+          <p
+            role={
+              basis.status === 'error' ||
+              (data &&
+                data.status !== 'available' &&
+                data.unavailableReason !== 'snapshot_not_recorded')
+                ? 'alert'
+                : 'status'
+            }
+            className="mt-0.5 text-caption break-words text-zoop-muted"
+          >
+            {detail}
+          </p>
+        )}
         {data?.graphOrigin === 'reconstructed' && (
-          <p className="mt-1 text-[11px] text-zoop-muted">
+          <p className="mt-1 text-caption text-zoop-muted">
             {data.message} 재구성 시각{' '}
             {briefingTime(data.reconstructedAt ?? null)}
           </p>

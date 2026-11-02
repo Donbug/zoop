@@ -50,7 +50,7 @@ function Statement({
       {value.evidenceIds.length > 0 && (
         <details className="mt-1">
           <summary
-            className={`min-h-11 cursor-pointer content-center text-xs text-zoop-muted ${FOCUS_RING}`}
+            className={`min-h-11 cursor-pointer content-center text-caption text-zoop-muted ${FOCUS_RING}`}
           >
             근거 {value.evidenceIds.length}건 · 원문 보기
           </summary>
@@ -60,7 +60,7 @@ function Statement({
               return (
                 <li key={id}>
                   <a
-                    className={`text-sm underline ${FOCUS_RING}`}
+                    className={`text-body underline ${FOCUS_RING}`}
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -72,7 +72,7 @@ function Statement({
                   {s.fullBody ? (
                     <details>
                       <summary
-                        className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
+                        className={`min-h-11 cursor-pointer content-center text-caption ${FOCUS_RING}`}
                       >
                         전체 보존 원문
                       </summary>
@@ -119,23 +119,27 @@ function CompanyCard({
     >
       <summary className={`cursor-pointer list-none ${FOCUS_RING}`}>
         <span className="flex flex-wrap gap-2">
-          <strong className="text-base">{c.companyName}</strong>
-          <span className="text-xs text-zoop-muted">{stances[c.stance]}</span>
+          <strong className="text-lead">{c.companyName}</strong>
+          <span className="text-caption text-zoop-muted">
+            {stances[c.stance]}
+          </span>
           {ai && (
-            <span className="text-xs text-zoop-accent">
+            <span className="text-caption text-zoop-accent">
               AI 전망 v5 · 검증 통과
             </span>
           )}
-          <span className="ml-auto text-xs text-zoop-muted">자세히</span>
+          <span className="ml-auto text-caption text-zoop-muted">자세히</span>
         </span>
-        <span className="mt-2 block text-lg font-bold">{c.title.text}</span>
-        <span className="mt-2 block text-sm text-zoop-muted">
+        <span className="mt-2 block text-title-sm font-bold">
+          {c.title.text}
+        </span>
+        <span className="mt-2 block text-body text-zoop-muted">
           {ai
             ? c.takeaway.text
             : (priceContext?.outlook?.takeaway ?? c.takeaway.text)}
         </span>
         {evening && (
-          <span className="mt-2 block text-xs">
+          <span className="mt-2 block text-caption">
             사업 조건: {businessResult(c)}
             {c.price.comparisonStatus === 'no_new_session'
               ? ' · 가격: 아침 이후 새 관측 없음'
@@ -143,7 +147,7 @@ function CompanyCard({
           </span>
         )}
         {priceContext?.status === 'available' && (
-          <span className="mt-2 block text-xs text-zoop-muted">
+          <span className="mt-2 block text-caption text-zoop-muted">
             {priceContext.sessionDate} · 토스{' '}
             {priceContext.latest.kind === 'daily_close' ? '종가' : '관측가'}{' '}
             {Number(priceContext.latest.value).toLocaleString('ko-KR')}{' '}
@@ -162,7 +166,7 @@ function CompanyCard({
       <div className="mt-4 space-y-4 border-t border-zoop-line pt-3">
         {(ai?.previous.status === 'available' || (!ai && c.previous)) && (
           <div>
-            <h4 className="text-sm font-semibold">
+            <h4 className="text-body font-semibold">
               {evening ? '아침의 실제 판단' : '전날의 실제 판단'}
             </h4>
             <p className={`${NOTE} mt-2`}>
@@ -174,13 +178,13 @@ function CompanyCard({
           </div>
         )}
         <div>
-          <h4 className="text-sm font-semibold">
+          <h4 className="text-body font-semibold">
             {c.role === 'selected' ? '새 정보' : '연결 자료의 확인 범위'}
           </h4>
           <Statement value={c.newInformation} review={review} />
         </div>
         <div>
-          <h4 className="text-sm font-semibold">
+          <h4 className="text-body font-semibold">
             {ai
               ? 'AI 기업 전망 · 사업 판단과 실제 가격'
               : priceContext?.outlook
@@ -200,11 +204,11 @@ function CompanyCard({
         {ai && (
           <div className="space-y-4">
             <div>
-              <h4 className="text-sm font-semibold">사업상 의미</h4>
+              <h4 className="text-body font-semibold">사업상 의미</h4>
               <Statement value={ai.impact} review={review} />
             </div>
             <div>
-              <h4 className="text-sm font-semibold">
+              <h4 className="text-body font-semibold">
                 {evening
                   ? '아침 AI 판단과 비교'
                   : '직전 퇴근 AI 판단에서 달라진 점'}
@@ -212,7 +216,7 @@ function CompanyCard({
               <Statement value={ai.comparison} review={review} />
             </div>
             <div>
-              <h4 className="text-sm font-semibold">
+              <h4 className="text-body font-semibold">
                 {evening ? '다음 거래일 확인 조건' : '오늘 확인할 조건'}
               </h4>
               {ai.conditions.map((s, i) => (
@@ -220,7 +224,7 @@ function CompanyCard({
               ))}
             </div>
             <div>
-              <h4 className="text-sm font-semibold">판단을 약화시킬 요인</h4>
+              <h4 className="text-body font-semibold">판단을 약화시킬 요인</h4>
               {ai.risks.map((s, i) => (
                 <Statement key={i} value={s} review={review} />
               ))}
@@ -236,7 +240,7 @@ function CompanyCard({
           (priceContext.outlook ? (
             <details>
               <summary
-                className={`min-h-11 cursor-pointer content-center text-xs text-zoop-muted ${FOCUS_RING}`}
+                className={`min-h-11 cursor-pointer content-center text-caption text-zoop-muted ${FOCUS_RING}`}
               >
                 가격 계산·기사 시각 자세히
               </summary>
@@ -248,7 +252,7 @@ function CompanyCard({
         <details open={!ai}>
           {ai && (
             <summary
-              className={`min-h-11 cursor-pointer content-center text-xs text-zoop-muted ${FOCUS_RING}`}
+              className={`min-h-11 cursor-pointer content-center text-caption text-zoop-muted ${FOCUS_RING}`}
             >
               기존 편집 판단·조건·발행 시세 보존본
             </summary>
@@ -256,14 +260,14 @@ function CompanyCard({
           <div className="space-y-4">
             {c.previous && (
               <div>
-                <h4 className="text-sm font-semibold">
+                <h4 className="text-body font-semibold">
                   {evening ? '아침 확인 과제 점검' : '전날 확인 과제의 갱신'}
                 </h4>
                 <ul className="mt-2 space-y-3">
                   {c.checks.map((s, i) => (
                     <li key={`${s.condition}-${i}`}>
-                      <p className="text-sm font-medium">{s.condition}</p>
-                      <p className="mt-1 text-xs font-semibold">
+                      <p className="text-body font-medium">{s.condition}</p>
+                      <p className="mt-1 text-caption font-semibold">
                         {conditionLabels[s.status]}
                       </p>
                       <Statement value={s.observation} review={review} />
@@ -273,7 +277,7 @@ function CompanyCard({
               </div>
             )}
             <div>
-              <h4 className="text-sm font-semibold">
+              <h4 className="text-body font-semibold">
                 {priceContext
                   ? '기존 발행본 시세·비교 기준'
                   : '실제 가격 관측 · 사업 조건 평가와 구분'}
@@ -293,7 +297,7 @@ function CompanyCard({
               )}
             </div>
             <div>
-              <h4 className="text-sm font-semibold">
+              <h4 className="text-body font-semibold">
                 {evening ? '다음 거래일 확인 조건' : '오늘 확인할 조건'}
               </h4>
               {c.watch.map((s, i) => (
@@ -301,11 +305,11 @@ function CompanyCard({
               ))}
             </div>
             <div>
-              <h4 className="text-sm font-semibold">판단을 높일 조건</h4>
+              <h4 className="text-body font-semibold">판단을 높일 조건</h4>
               <Statement value={c.positive} review={review} />
             </div>
             <div>
-              <h4 className="text-sm font-semibold">반대 시나리오</h4>
+              <h4 className="text-body font-semibold">반대 시나리오</h4>
               <Statement value={c.negative} review={review} />
             </div>
           </div>
@@ -367,11 +371,11 @@ export default function EditionReview({
           표시합니다.
         </p>
       )}
-      <p className="mt-3 text-lg font-bold leading-snug">{r.headline}</p>
+      <p className="mt-3 text-title-sm font-bold leading-snug">{r.headline}</p>
       <Statement value={r.summary} review={r} />
       {!evening && current.length > 0 && (
         <>
-          <h3 className="mt-5 mb-3 text-sm font-bold">
+          <h3 className="mt-5 mb-3 text-body font-bold">
             오늘 우선 볼 핵심 기업
           </h3>
           <div className="space-y-3">
@@ -395,10 +399,10 @@ export default function EditionReview({
         </>
       )}
       <div className="mt-5 rounded-lg border border-zoop-line p-3">
-        <h3 className="text-sm font-bold">
+        <h3 className="text-body font-bold">
           {evening ? '오늘 장 평가' : '시장 참고 기준'}
         </h3>
-        <p className="mt-2 text-sm font-medium">{coverage.label}</p>
+        <p className="mt-2 text-body font-medium">{coverage.label}</p>
         {prices?.marketReference ? (
           <PriceMarketReference reference={prices.marketReference} />
         ) : (
@@ -432,13 +436,13 @@ export default function EditionReview({
       </div>
       {!evening && (
         <div className="mt-5">
-          <h3 className="text-sm font-bold">전날 판단에서 달라진 점</h3>
+          <h3 className="text-body font-bold">전날 판단에서 달라진 점</h3>
           <Statement value={r.comparison} review={r} />
         </div>
       )}
       {evening && (
         <div className="mt-5">
-          <h3 className="text-sm font-bold">아침 기업 판단 점검</h3>
+          <h3 className="text-body font-bold">아침 기업 판단 점검</h3>
           <Statement value={r.comparison} review={r} />
           <p className={`${NOTE} mt-2`}>
             {r.previousReview
@@ -469,7 +473,7 @@ export default function EditionReview({
       )}
       {evening && current.length > 0 && (
         <>
-          <h3 className="mt-5 mb-3 text-sm font-bold">
+          <h3 className="mt-5 mb-3 text-body font-bold">
             {evening
               ? '새 핵심 기업의 사업·가격 평가'
               : '오늘 우선 볼 핵심 기업'}
@@ -497,7 +501,7 @@ export default function EditionReview({
       {!evening && tracked.length > 0 && (
         <details className="mt-4">
           <summary
-            className={`min-h-11 cursor-pointer content-center text-sm font-semibold ${FOCUS_RING}`}
+            className={`min-h-11 cursor-pointer content-center text-body font-semibold ${FOCUS_RING}`}
           >
             이전 기업 확인 과제 {tracked.length}개 이어보기
           </summary>
@@ -522,7 +526,7 @@ export default function EditionReview({
         </details>
       )}
       <div className="mt-5 border-t border-zoop-line pt-4">
-        <h3 className="text-sm font-bold">
+        <h3 className="text-body font-bold">
           {evening
             ? '다음 거래일 전망·확인 조건'
             : '오늘 확인할 사건·판단 변경 조건'}
@@ -536,7 +540,7 @@ export default function EditionReview({
       </div>
       <details className="mt-3">
         <summary
-          className={`min-h-11 cursor-pointer content-center text-xs text-zoop-muted ${FOCUS_RING}`}
+          className={`min-h-11 cursor-pointer content-center text-caption text-zoop-muted ${FOCUS_RING}`}
         >
           자료·작성 범위
         </summary>

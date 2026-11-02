@@ -43,7 +43,7 @@ describe('local preview feedback storage boundary', () => {
     );
     await user.clear(screen.getByRole('textbox'));
     await user.type(screen.getByRole('textbox'), '  근거를 더 알고 싶어요.  ');
-    await user.click(screen.getByRole('button', { name: '사유 저장' }));
+    await user.click(screen.getByRole('button', { name: '확인' }));
     await waitFor(() => expect(saved.reason).toBe('근거를 더 알고 싶어요.'));
     const put = fetcher.mock.calls.find(
       (call) => call[1]?.method === 'PUT',

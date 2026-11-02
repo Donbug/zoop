@@ -11,9 +11,10 @@ public final class PipelineOverviewResponse {
     private PipelineOverviewResponse() {
     }
 
+    /** {@code rounds} (#55): the periodic round scheduler's state and the most recent rounds; see {@link GraphRoundAdminResponse}. */
     public record Overview(String asOf, LedgerRef ledger, PolicyInfo policy, CandidateCounts candidates, IssueCounts issues,
             ReviewCounts review, GraphDbStatus projection, PublicationState publication, OverviewJobs jobs,
-            List<PastRun> runs) {
+            List<PastRun> runs, GraphRoundAdminResponse.GraphRoundsSection rounds) {
     }
 
     public record LedgerRef(String database, String checkedAt) {

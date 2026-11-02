@@ -11,11 +11,14 @@ from test_briefing_issue_intelligence import frozen, assess, checks
 from test_briefing_review_regressions import draft_for
 
 
-def fixture():
-    baseline = {'id': 'r', 'date': '2026-10-22', 'edition': 'morning',
-                'items': [], 'metadata': {'selection': {}}, 'graphVersion': None}
+def fixture(*, round_id='r', cutoff='2026-10-22T09:20:00+09:00',
+            edition='morning', issue_prefix='', condition_text=None):
+    baseline = {'id': round_id, 'date': cutoff[:10], 'edition': edition,
+                'dataAsOf': cutoff, 'items': [], 'metadata': {'selection': {}}, 'graphVersion': None}
     source = frozen(3)
+    source.update(roundId=round_id, cutoff=cutoff, date=cutoff[:10], edition=edition)
     for candidate in source['candidates']:
+        candidate['issueId'] = issue_prefix + candidate['issueId']
         candidate['companies'][0]['role'] = 'manufacturer'
         # Equal companies/documents still contain distinct, independent quotes.
         next(iter(candidate['sources'].values()))['documentId'] = 'shared-doc'
@@ -24,7 +27,12 @@ def fixture():
         request = json.loads(raw); data = json.loads(request['input']); stage = request['text']['format']['name']
         if stage == 'selection': answer = assess(data['frozen'])
         elif stage == 'selection-verification': answer = checks(data['frozen'])
-        elif stage == 'analysis': answer = draft_for(data['issues'])
+        elif stage == 'analysis':
+            answer = draft_for(data['issues'])
+            if condition_text is not None:
+                for issue in answer['issues'].values():
+                    for company in issue['companies']:
+                        company['conditions'][0]['text'] = condition_text
         else: answer = {'checks': {i['issueId']: {'supported': True, 'reason': 'Synthetic check'} for i in data['issues']}}
         return 200, m.base.canonical({'id': 'synthetic-' + stage, 'status': 'completed',
             'usage': {'input_tokens': 1, 'output_tokens': 1},

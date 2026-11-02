@@ -33,7 +33,7 @@ class BriefingRoundScopeTest {
                 source.companies(), issues, relations, source.articles(), source.evidence());
         var basis = new BriefingGraphLookup.Basis("round", source.versionId(), NOW, Map.of(HBM_SUPPLY, List.of(HYNIX, NVDA)));
         return new PublicGraphReader(new GraphVersionSelector(repository(), Clock.fixed(NOW, ZoneOffset.UTC),
-                (id, request) -> basis), version -> snapshot, pinned -> DisclosureExclusions.NONE);
+                (id, request) -> basis), version -> snapshot, pinned -> DisclosureExclusions.NONE, null, null);
     }
 
     @Test void derivedRelationsCompanyAndEvidenceUseTheSameClosedScope() {

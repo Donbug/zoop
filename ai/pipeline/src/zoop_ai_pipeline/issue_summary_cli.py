@@ -29,6 +29,7 @@ from pydantic import ValidationError
 
 from .extraction_contracts import ExtractionFailure
 from .handoff import HandoffPaths, plan_summary_input
+from .handoff_contexts import configured, source_flags
 from .ingestion_contracts import IngestionFailure, read_file
 from .issue_summary import MAX_COMMAND, MAX_FIXTURE, Engine, Fixtures, Selector, Store, Submit
 from .issue_summary_contracts import SCHEMA, canonical, digest
@@ -64,6 +65,7 @@ def main() -> int:
     parser.add_argument("--extraction-state-dir", type=Path)
     parser.add_argument("--ingestion-state-dir", type=Path)
     parser.add_argument("--sources", type=Path, help="S1/S2 source and grant registry, consumed only through the owner seams")
+    source_flags(parser)
     parser.add_argument("--canonical", type=Path, help="server-owned canonical decision registry (zoop-graph-canonical-1)")
     parser.add_argument("--decisions", type=Path, help="operator public-projection decisions (read through the planner; its summary pins are ignored)")
     parser.add_argument("--bindings", type=Path, help="server-owned app document bindings (zoop-app-document-bindings-1)")
@@ -80,7 +82,8 @@ def main() -> int:
             return 0
         sourced = args.command in SOURCED
         flags = (args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources, args.canonical, args.decisions, args.bindings)
-        if args.state_dir is None or (any(f is not None for f in flags) and not sourced) or (sourced and any(f is None for f in flags)):
+        if args.state_dir is None or not configured(args, sourced=sourced) \
+                or (sourced and any(f is None for f in flags[4:])) or (not sourced and any(f is not None for f in flags[4:])):
             raise ExtractionFailure("input_or_configuration_invalid")
         if args.fixture is not None and args.command not in EXECUTING:
             raise ExtractionFailure("fixture_not_allowed")
@@ -95,16 +98,16 @@ def main() -> int:
             store = Store(args.state_dir)         # releases a queued/stopped job: no source, key or call
             print(canonical(Engine(store, None).cancel(request.job_id)))
             return 0
-        paths = HandoffPaths(*flags)
+        paths = HandoffPaths(*flags, source_contexts=args.source_contexts, source_contexts_sha256=args.source_contexts_sha256)
         plan = lambda manifest, issue_id: plan_summary_input(paths, manifest, issue_id)  # noqa: E731
         if args.command in READERS:
             # Read-only ledger + a fresh read-only plan: the stored result is shown only while its source rights and frozen basis still prove (see Engine._delivery).
-            store = Store(args.state_dir, paths.relation, paths.extraction, paths.ingestion, mode="read")
+            store = Store(args.state_dir, *paths.roots(), mode="read")
             result = Engine(store, plan).inspect(request.job_id)
             out = _exported(result) if args.command == "export" else result
         else:
             fixtures = Fixtures(read_file(args.fixture, MAX_FIXTURE) if args.fixture else None)
-            store = Store(args.state_dir, paths.relation, paths.extraction, paths.ingestion)
+            store = Store(args.state_dir, *paths.roots())
             factory = lambda need_send: LiveRuntime.from_env(need_send=need_send, family=ISSUE_SUMMARY)  # noqa: E731 - built lazily, only for a live job
             engine = Engine(store, plan, factory)
             if args.command == "run":

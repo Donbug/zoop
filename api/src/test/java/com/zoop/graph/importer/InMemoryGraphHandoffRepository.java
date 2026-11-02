@@ -79,8 +79,8 @@ final class InMemoryGraphHandoffRepository implements GraphHandoffRepository {
         return writes;
     }
 
-    void seedCompany(String id, String name) {
-        companies.put(id, new CompanyRow(id, name));
+    void seedCompany(String id, String name, String... aliases) {
+        companies.put(id, new CompanyRow(id, name, List.of(aliases)));
     }
 
     /**

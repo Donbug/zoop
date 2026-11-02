@@ -54,7 +54,7 @@ def article(export: dict, synthetic: bool) -> Article:
     """Authorized ingestion export -> analysed text. No publisher or language claim and no model transmission is authorized."""
     o, d = export["observation"], export["document"]
     return Article(article_id=o["documentId"], url=o["url"], title=o["title"], body=d["text"], publisher="", published_at=o["publishedAt"],
-                   language="ko", input_kind=d["inputKind"], origin_id=None, withdrawn=False, allow_model_send=False, synthetic=synthetic)
+                   language=o.get("language") or "und", input_kind=d["inputKind"], origin_id=None, withdrawn=False, allow_model_send=False, synthetic=synthetic)
 
 
 def bind(export: dict, projected: Article) -> dict:
@@ -100,14 +100,31 @@ def event_candidate_id(mention_candidate: str) -> str:
 
 # ---------------------------------------------------------------- strict parsing / grounding -----------------------
 
-def member_mention(raw: dict, projected: Article) -> Mention:
-    """Snapshot member: strict Mention bound to the exact Article.version and literal body evidence."""
+def company_names(catalogue: Catalogue) -> dict[str, set[str]]:
+    """Only explicit names/aliases, casefolded with whitespace collapsed; punctuation and legal suffixes remain significant."""
+    names: dict[str, set[str]] = {}
+    for company in catalogue.companies:
+        for name in (company.name, *company.aliases):
+            key = " ".join(name.casefold().split())
+            if key:
+                names.setdefault(key, set()).add(company.company_id)
+    return names
+
+
+def participants_valid(mention: Mention, names: dict[str, set[str]]) -> bool:
+    """A supplied ID needs exactly one matching master. Null remains unresolved, even when a unique alias exists."""
+    return all(p.company_id is None or names.get(" ".join(p.name.casefold().split())) == {p.company_id}
+               for p in mention.participants)
+
+
+def member_mention(raw: dict, projected: Article, names: dict[str, set[str]]) -> Mention:
+    """Snapshot member: exact source evidence and the same pinned-catalogue identity rule as a new extraction."""
     try:
         mention = Mention.model_validate(raw, strict=True)
     except ValidationError as exc:
         raise ExtractionFailure("snapshot_member_invalid") from exc
     if (mention.article_id, mention.article_version) != (projected.article_id, projected.version) or not mention.mention_id \
-            or not mention.evidence or not all(e.matches(projected) for e in mention.evidence):
+            or not mention.evidence or not all(e.matches(projected) for e in mention.evidence) or not participants_valid(mention, names):
         raise ExtractionFailure("snapshot_member_invalid")
     return mention
 
@@ -149,9 +166,10 @@ def _resolve_quotes(value: Any, articles: list[Article]) -> Any:
     return result
 
 
-def parse_extraction(raw: Any, projected: Article) -> Extraction:
+def parse_extraction(raw: Any, projected: Article, catalogue: Catalogue) -> Extraction:
     try:
         extraction = Extraction.model_validate(_resolve_quotes(raw, [projected]), strict=True)
+        names = company_names(catalogue)
         ids: set[str] = set()
         for mention in extraction.mentions:
             if (mention.article_id, mention.article_version) != (projected.article_id, projected.version):
@@ -161,6 +179,8 @@ def parse_extraction(raw: Any, projected: Article) -> Extraction:
             if not mention.mention_id or mention.mention_id in ids:
                 raise _Unresolvable("mention ids must be nonempty and unique")
             ids.add(mention.mention_id)
+            if not participants_valid(mention, names):
+                raise _Unresolvable("participant identity is not a unique name or alias in the pinned catalogue")
         return extraction
     except (ValidationError, _Unresolvable) as exc:
         raise ReplyInvalid("extraction_reply_invalid") from exc

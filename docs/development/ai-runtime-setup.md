@@ -158,13 +158,13 @@ ai/worker/.venv/bin/python ai/worker/scripts/native_jev_smoke.py
 
 ## 11. 챗봇 모델 단계 (`zoop-ai-chat`, 구현됨, 기본 꺼짐, 호출 승인 아님)
 
-챗봇 오케스트레이터(`api` `com.zoop.chat.orchestrator`)의 모델 단계 셋을 한 번에 하나씩 실행하는 CLI다. S1·파이프라인과 계약·게이트·원장·grant를 공유하지 않는다(정책 6.3.2).
+챗봇 오케스트레이터(`api` `com.zoop.chat.orchestrator`)의 모델 단계 넷을 한 번에 하나씩 실행하는 CLI다. S1·파이프라인과 계약·게이트·원장·grant를 공유하지 않는다(정책 6.3.2).
 
 | stage | provider | 요청 | 시간 상한 |
 | --- | --- | --- | --- |
 | `chat-router` | 네이티브 Jev `/systemone`, `ZOOP_AI_CHAT_JEV_MODEL=jev-1.14.0` | 요구별 Q01~Q08·연결 기능·투자 판단 Noul | 4초 |
 | `chat-answer` | OpenAI 호환 `chat/completions`, `ZOOP_AI_CHAT_ANSWER_MODEL`은 정확히 `gpt-6-luna`, `_REASONING_EFFORT`는 `high`(생략 시 `high`, 다른 값 거절) | 엄격 JSON 구간별 답변 | 25초 |
-| `chat-verification` | 네이티브 Jev `/systemone` | 근거 구간 지지 Choice(인용문과 앱이 만든 서버 조회 사실 `serverFacts` 기준), 모든 구간 투자 판단 Noul | 6초 |
+| `chat-verification` | 네이티브 Jev `/systemone` | 근거 claim 지지 Choice(인용문과 앱이 만든 서버 조회 사실 `serverFacts` 기준), claim별 미지원 인과 Noul, 모든 구간 투자 판단 Noul | 6초 |
 | `chat-agent` | OpenAI 호환 `responses`, `ZOOP_AI_CHAT_AGENT_MODEL`은 정확히 `gpt-6-luna`, `_REASONING_EFFORT`는 `medium`(생략 시 `medium`, 다른 값 거절), `store=true`, MCP 서버 URL은 운영자 설정 `ZOOP_AI_CHAT_MCP_SERVER_URL`만(HTTPS·기본 포트·userinfo/query/fragment 없음, 요청으로 지정 불가, 없으면 live 송신 안 함), grant는 MCP 도구의 `authorization`으로 매 단계 전송 | ZOOP MCP 도구(`require_approval=always`) 한 단계: 승인 요청에서 멈추거나 `chat-answer`와 같은 schema의 최종 답변. 승인은 앱이 결정하고 다음 단계(`continuation`)로 전달 | 30초 |
 
 - **MCP preflight**: `zoop-ai-chat probe-mcp`는 모델 단계와 별개로 운영자 설정 URL에 grant 없는 JSON-RPC `ping`을 보낸다. endpoint 자체의 `401` Bearer challenge만 exit 0 `reachable`; timeout·연결 실패·앞단 gateway의 502/503/504(`mcp_unavailable`)·다른 응답은 exit 2 `unreachable`과 닫힌 reason이며 redirect를 따르지 않는다. URL 설정 오류는 exit 64다. 원장·모델·live 예산을 쓰지 않으며 ai/service의 `GET /internal/v1/chat-mcp-health`가 같은 `chat.invoke` scope로 노출한다. 이는 Java가 Responses 시작 전 경로를 선택하기 위한 관측이고 circuit 상태나 direct 전환을 자체 관리하지 않는다.
@@ -179,7 +179,7 @@ ai/worker/.venv/bin/python ai/worker/scripts/native_jev_smoke.py
   - 응답 모델은 설정 모델과 같아야 한다(Luna는 `gpt-6-luna-…` snapshot 허용). 영수증에는 실제로 답한 모델을 기록한다.
 - **grant**: 인용문(`Quote.sourceId`)이 있는 stage는 운영자 챗봇 grant registry(`zoop-ai-chat-1`, S1 registry와 별도)에서 같은 source의 활성·`rights=known`·`model-send`·해당 stage 목적·정확한 수신자(`openai-compatible:<rev>` 또는 `typesafe-native:<rev>`, replay는 `authored-replay`) grant가 있어야 한다. 없으면 보내지 않는다. `chat-agent` 단계의 도구 결과는 이 런타임을 거치지 않고 앱 `/mcp`에서 공급자로 바로 가므로, 앱이 **같은 레지스트리 파일**(`ZOOP_CHAT_MCP_SEND_GRANTS`)을 읽어 같은 규칙(목적 `chat-agent`, 수신자 `ZOOP_CHAT_MCP_SEND_RECIPIENT`)으로 결과마다 확인한다. 앱은 그 수신자를 단계 입력 `mcp.recipient`로 보내고, 이 런타임은 그것이 단계의 실제 수신자와 다르면 `mcp_recipient_mismatch`로 보내지 않는다(앱이 검사한 수신자와 받는 수신자가 어긋나지 않게). 이 목적은 Responses 저장(`store=true`)·continuation 재개를 포함하며, 사건 제목·관계·경로는 source `zoop-graph`로 등록한다([챗봇 MCP 엔드포인트](../../api/docs/chat-mcp.md) 3장).
 - **잠정 결정(2026-10-22, 미보정)**: Jev 판정 임계치는 S1 잠정값(Choice ≥ 0.90·confidence ≥ 0.80, Noul ≥ 0.90 / ≤ 0.10)을 재사용하고 라우터 확률은 앱이 0.70/0.35·투자 판단 > 0.10으로 적용한다. 질문 집합·임계치는 실제 호출 전 챗봇 평가 세트로 보정해야 한다.
-- **정책 적용 범위(명시)**: 이 CLI는 ZOOP-AIG-001 6.3.2의 단계 분리와 6.3.3의 질문 집합 중 **구간 단위** 판정을 구현한다. 근거 구간은 지지 Choice와 투자 판단 Noul, 일반 개념 구간은 투자 판단 Noul만 판정한다. 6.3.3과 구현 계획 5단계가 목표로 적은 **claim별 독립 판정(`unsupportedCausality` 포함)과 Luna 입력 24,000·출력 2,000 토큰 상한은 아직 적용하지 않는다.** 두 항목은 거버넌스상 '팀 검토와 책임자 승인 후 적용' 대상이고 별도 승인 근거가 없기 때문이다. 채택이 확정되면 다음을 함께 바꾼다: 질문 집합·정책 버전(`prompt_version`)을 올리고, `max_completion_tokens`와 입력 token guard 및 그 실패 코드를 추가하고, 앱의 `ChatSemanticVerdicts` 결과 신호를 연결한다.
+- **정책 적용 범위(명시)**: `zoop-ai-chat-5`는 ZOOP-AIG-001 6.3.2의 단계 분리와 6.3.3의 claim별 판정을 구현한다. 앱이 구간 문장을 순서가 고정된 claim으로 나누고, 근거 claim은 지지 Choice와 `unsupportedCausality` Noul, 일반 개념 claim은 `unsupportedCausality` Noul, 모든 구간은 투자 판단 Noul을 판정한다. 지원되지 않거나 인과가 확인되지 않은 claim만 공개 답변에서 제외한다. Luna 누적 입력 24,000·최종 답변 2,000 토큰 상한도 적용한다. 질문 집합·임계치는 합성 회귀만 통과했으며 실제 챗봇 데이터로 보정하지 않았다.
 - **replay**: `--replay`의 authored fixture(`recordingKind=authored-test`)를 요청 identity digest로 정확히 찾는다. 없으면 `replay_input_mismatch`이며 보낸 것으로 기록하지 않는다. replay 응답에도 `model`(`authored-synthetic-<stage>`)이 있어야 한다.
 
 ## 10. S2/S3 live 파이프라인 런타임 (구현됨, 기본 꺼짐, 호출 승인 아님)
@@ -194,7 +194,9 @@ ai/worker/.venv/bin/python ai/worker/scripts/native_jev_smoke.py
 | `relation`, `impact` | S3 | 위와 같음 | 위와 같음 |
 | `verify-relation`, `verify-impact` | S3 | 네이티브 TypeSafe Jev `POST {TYPESAFE_BASE_URL}/systemone`, 모델 정확히 `jev-1.14.0` | 인용문 텍스트와 고정 사실만 보내는 Choice 질문(문서 본문·내부 id는 보내지 않는다) |
 
-provider는 stage가 정한다. endpoint나 모델 이름에서 권한을 추론하지 않는다. 생성 JSON schema는 기존 Pydantic 계약에서 만들되 OpenAI strict 제약에 맞게(모든 속성 required, 추가 속성 금지, 검증 키워드 제거, 인용 `start`/`end`는 null 허용) 변환한다. 검증 키워드를 뺀 만큼 **디코딩 뒤 기존 native 계약 검증이 그대로 소유**하고 응답은 보정하지 않는다. 모델이 문자 위치를 세지 않도록 인용 offset은 null로 받고, 소유자가 `live_prompts.resolve_citations`(유일한 literal quote에서만 offset 채움)로 채운 뒤 기존 정확 인용 검사를 한다.
+provider는 stage가 정한다. 다섯 생성 stage의 live 인용 형식은 `zoop-live-source-segments-1`이다. 소유자가 정확한 문서 버전의 mapped run과 줄바꿈 경계에서 최대 20,000자(Unicode code point) 구간을 만들고 요청별 `segmentId`를 부여한다. 본문은 `sources[].segments`에 한 번만 보내며, 매핑되지 않은 문맥의 ID는 null이다. 모델은 인용 위치에 `{"segmentId":"…"}`만 반환한다. 소유자는 raw receipt를 저장한 뒤 참조를 정확한 원문·문서 식별자·좌표로 확장하고 기존 native parser와 source mapping 검사를 실행한다. 미지·다른 요청의 ID, 추가 필드, 구형 인용 형식은 해당 단계를 실패시킨다. prompt revision은 `zoop-live-prompts-2`, S2 live adapter는 `zoop-extraction-native-live-2`로 고정되며 이전 runtime binding과 섞을 수 없다. 과거 replay는 기존 native 계약을 따른다.
+
+관계 검증에서 null scope는 미지정이다. `businessScope`와 `productScope` 중 명시된 값만 검증하며, 둘 다 null이면 scope claim을 만들지 않는다. 판단 임계치(확률 ≥ 0.90, confidence ≥ 0.80)는 그대로다. topic 관계는 기업 역할·주제 연결·scope·확장 주장에 필요한 최소한의 완전한 근거 구간을 선택하도록 지시한다. 향후 추출은 원문에 명시된 국가만 ISO alpha-2로, 사건 시점은 근거가 있는 ISO 정밀도 또는 null로 반환하도록 지시한다. 오프라인 검증은 정확한 참조 확장을 증명하며, 모델의 선택 품질이나 실제 수율·비용 개선은 별도 측정이 필요하다.
 
 ### 10.2 환경변수 (프로세스 환경만, dotenv 없음)
 

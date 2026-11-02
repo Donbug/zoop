@@ -67,7 +67,7 @@ public record HandoffBundle(String handoffId, String manifestDigest, String sour
      * @param eventTime        as the source states it, or {@code null} when an operator verdict withheld it (then the precision is
      *                         {@code unknown}); its precision is {@code timePrecision} (never widened)
      * @param assertionStatus  the producer's issue-level field; the snapshot carries it as given (null when not given)
-     * @param geography        {@code domestic} or {@code international} by an operator field verdict
+     * @param geography        {@code domestic}/{@code international} by a field verdict, or explicit P3 unknown {@code null}
      */
     public record Issue(String id, String title, String action, String target, String eventTime, String timePrecision,
             String assertionStatus, String geography, String geographyPolicyVersion, List<String> geographyEvidenceIds,

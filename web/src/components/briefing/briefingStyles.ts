@@ -4,15 +4,15 @@ export const CARD =
   'mt-[18px] rounded-[5px] border-[0.667px] border-zoop-line bg-zoop-paper p-6 max-sm:p-4';
 export const SECTION =
   'border-b-[0.667px] border-[#e7e7e4] py-[22px] last:border-b-0 last:pb-0';
-export const SECTION_TITLE = 'mb-3 text-xs font-bold';
+export const SECTION_TITLE = 'mb-3 text-caption font-bold';
 export const EMPTY =
-  'rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash p-[18px] text-[11px] leading-relaxed text-zoop-muted';
+  'rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash p-[18px] text-caption leading-relaxed text-zoop-muted';
 export const NOTE =
-  'text-[11px] leading-relaxed text-zoop-muted [overflow-wrap:anywhere]';
+  'text-caption leading-relaxed text-zoop-muted [overflow-wrap:anywhere]';
 export const BODY =
-  'text-[13px] leading-[1.7] whitespace-pre-wrap [overflow-wrap:anywhere]';
+  'text-body leading-[1.7] whitespace-pre-wrap [overflow-wrap:anywhere]';
 export const STATUS_PILL =
-  'shrink-0 rounded-full border-[0.667px] border-zoop-line px-2 py-[3px] text-[11px] font-semibold text-zoop-muted';
+  'shrink-0 rounded-full border-[0.667px] border-zoop-line px-2 py-[3px] text-caption font-semibold text-zoop-muted';
 export const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink';
-export const PRIMARY_BUTTON = `mt-4 rounded-[3px] bg-zoop-ink px-4 py-2.5 text-xs font-semibold text-zoop-paper ${FOCUS_RING}`;
+export const PRIMARY_BUTTON = `mt-4 rounded-[3px] bg-zoop-ink px-4 py-2.5 text-caption font-semibold text-zoop-paper ${FOCUS_RING}`;

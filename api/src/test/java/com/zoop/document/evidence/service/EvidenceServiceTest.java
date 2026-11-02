@@ -476,7 +476,7 @@ class EvidenceServiceTest {
                     public <T> T execute(org.springframework.transaction.support.TransactionCallback<T> action) {
                         throw new CannotCreateTransactionException("no connection");
                     }
-                });
+                }, world.publications(world.store));
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, failure(() -> get(failingTransaction, world.evidenceId)));
     }
 

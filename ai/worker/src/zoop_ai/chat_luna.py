@@ -11,7 +11,7 @@ from typing import Any
 from .chat_contracts import MAX_OUTPUT_TOKENS, AnswerInput, ChatAnswer, estimated_tokens
 from .contracts import canonical, digest
 
-PROMPT_REVISION = "zoop-chat-answer-2026-10-30-1"
+PROMPT_REVISION = "zoop-chat-answer-2026-11-01-1"
 # Pinned like the pipeline (cost and behaviour are only known for it); a live configuration naming another is refused.
 MODEL = "gpt-6-luna"
 REASONING_EFFORT = "high"
@@ -23,6 +23,10 @@ PROMPT = (
     "sourceId가 zoop-docs인 인용문은 ZOOP이 승인한 서비스 문서(이용약관·개인정보 처리방침)다. 그 인용문으로 서비스 이용 "
     "방법이나 정책을 설명하는 구간은 ZOOP 문서 구간(zoop_documented)으로 두고 그 인용문만 근거로 쓴다. ZOOP 문서 구간과 "
     "근거 기반 구간을 한 구간에 섞지 않는다. "
+    "sourceId가 web-search:로 시작하는 인용문은 웹 검색 결과다. 그 인용문으로 답하는 내용은 웹 보도 구간(web_reported)으로 두고 "
+    "그 인용문만 근거로 쓴다. 웹 보도 구간은 snippet에 적힌 것만 쓰고 줍이 확인한 사실처럼 쓰지 않으며, 근거 기반·ZOOP 문서 "
+    "구간과 섞지 않는다. noneFound=true여도 웹 보도 구간을 쓸 수 있지만 줍 자료에서 찾지 못했다는 사실은 함께 밝힌다. 웹 보도를 "
+    "줍의 변경·선정 이유나 지도의 관계로 연결하지 않고, 발행 내용이나 공개 기록을 웹으로 대신하지 않는다. "
     "general=true인 branch만 일반 개념 구간(general_knowledge)으로 설명할 수 있고, 그 구간에는 근거를 넣지 않으며 최신 "
     "기업·시장 사실, 수치, 날짜, 가격, 전망을 쓰지 않는다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다. "
     "label이 '— 개념 설명'으로 끝나는 branch는 서버가 같은 질문의 다른 요구에서 떼어 낸 개념 부분이다. 그 구간에는 "

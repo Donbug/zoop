@@ -146,7 +146,7 @@ def test_the_http_bundle_is_the_real_cli_export_of_a_two_job_world_and_the_produ
             assert expected and provenance["sameValueMentions"][name] == expected, (issue["id"], name)
             assert issue[name] == (None if name in suppressed else selected)
         assert issue["timePrecision"] == ("unknown" if "eventTime" in suppressed else issue["timePrecision"])
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8" and bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1"
     # no decision of the default world pins a summary and no verdict holds any field: every issue states `not-requested` (never an absent summary, never a guess)
     assert [i["summary"] for i in bundle["issues"]] == [NOT_REQUESTED] * len(bundle["issues"]) and bundle["issues"]
     assert (bundle["readiness"], wire["verification"]["provenance"]) == ({"app": "import-pending", "evidenceRegistration": "not-registered", "publicActivation": "none",
@@ -367,7 +367,7 @@ def test_the_http_bundle_carries_the_operators_real_field_verdicts_with_the_supp
     wire = response.json()
     assert response.status_code == 200 and wire["delivery"]["state"] == "current", response.text[:300]
     bundle = wire["bundle"]
-    assert bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7"
+    assert bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8"
     # the reviewed world holds a REJECT on the supply representative's event time and a HOLD on the factory's period: ANY HOLD/REJECT leaves the issue exactly
     # `temporal-review-pending` (no job, no source, no summary text) - a hand-written expectation, never derived from the bundle or the service
     assert {i["id"]: i["summary"] for i in bundle["issues"]} == {"issue:supply-2026q3": TEMPORAL_PENDING, "issue:factory-2026q4": TEMPORAL_PENDING}
@@ -442,7 +442,7 @@ def test_the_http_bundle_carries_the_pinned_available_summary_the_real_producer_
     wire = response.json()
     assert response.status_code == 200 and wire["delivery"]["state"] == "current", response.text[:300]
     bundle = wire["bundle"]
-    assert bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7"
+    assert bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and bundle["schemaVersion"] == "zoop-graph-handoff-bundle-8"
     assert digest_of(bundle) == pins["bundleDigest"] == wire["verification"]["bundleDigest"] == oracle["receipt"]["bundleDigest"]
     assert bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1" and producer_accepts(response.content)
     assert summary_problems(bundle, world) == []
@@ -551,3 +551,46 @@ def test_the_summary_follows_the_current_rights_and_the_pinned_operator_files_an
         ws.restore("decisions")
     again = get(service, bundle_url(SUMMARY_HANDOFF)).json()
     assert again["delivery"]["state"] == "current" and canonical(again["bundle"]) == canonical(first["bundle"])       # restored: the very same summary bytes come back
+
+
+def test_historical_native_golden_status_bundle_and_rights_use_installed_pipeline(tmp_path):
+    import base64
+    from real_handoff_support import HandoffWorld
+    from support import ServiceProcess
+
+    golden = json.loads((PIPELINE / "tests/fixtures/native_historical/golden.json").read_text())["replay"]
+    root = tmp_path / "historical-archive"
+    root.mkdir()
+    for name, entry in golden["files"].items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(base64.b64decode(entry["base64"]))
+        path.chmod(entry["mode"])
+    bundle, receipt = golden["export"]["bundle"], golden["export"]["receipt"]
+    world = HandoffWorld(root, root / "relation", root / "extraction", root / "ingestion", root / "sources.json",
+                         root / "canonical.json", root / "decisions.json", root / "bindings.json", root / "handoff",
+                         {"h1": receipt}, bundle["counts"], [e["id"] for e in bundle["evidence"]], [i["id"] for i in bundle["issues"]],
+                         [], bundle["exclusions"]["counts"], [], [a["articleId"] for a in bundle["articles"]])
+    ws = RealWorkspace(tmp_path / "historical-service", world, [pin_entry(world, PRINCIPAL, "h1")])
+    before = world.ledgers()
+    service = ServiceProcess(ws, env=ws.env())
+    try:
+        service.start()
+        status = get(service, status_url("h1"))
+        assert status.status_code == 200 and status.json()["state"] == "ready"
+        assert status.json()["delivery"]["state"] == "current"
+        response = get(service, bundle_url("h1"))
+        assert response.status_code == 200 and response.json()["delivery"]["state"] == "current"
+        assert canonical(response.json()["bundle"]) == canonical(bundle)
+        assert response.json()["verification"]["bundleDigest"] == receipt["bundleDigest"]
+        assert response.json()["verification"]["manifestDigest"] == receipt["manifestDigest"]
+        registry = json.loads(ws.sources.read_text())
+        registry["sources"][0]["grant"]["enabled"] = False
+        ws.sources.write_text(canonical(registry))
+        for url in (status_url("h1"), bundle_url("h1")):
+            withheld = get(service, url)
+            assert withheld.status_code == 200 and withheld.json()["delivery"]["state"] == "withheld"
+            assert withheld.json().get("bundle") is None
+    finally:
+        service.close()
+    assert world.ledgers() == before

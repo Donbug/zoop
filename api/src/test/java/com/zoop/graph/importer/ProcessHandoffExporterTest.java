@@ -38,11 +38,12 @@ class ProcessHandoffExporterTest {
     void setUp() throws IOException {
         Path base = temp.toRealPath();
         work = Files.createDirectory(base.resolve("work"));
-        settings = new GraphHandoffImportSettings(base.resolve("request.json"), base.resolve("result.json"),
+        settings = new GraphHandoffImportSettings(GraphHandoffImportSettings.HandoffSourceKind.CLI,
+                com.zoop.document.importer.ObservationSource.CLI, base.resolve("request.json"), base.resolve("result.json"),
                 base.resolve("zoop-ai-handoff"), base.resolve("handoff"), base.resolve("relation"), base.resolve("extraction"),
                 base.resolve("zoop-ai-ingest"), base.resolve("ingestion"), base.resolve("sources.json"),
                 base.resolve("canonical.json"), base.resolve("decisions.json"), base.resolve("bindings.json"),
-                base.resolve("artifacts"));
+                base.resolve("artifacts"), null, null);
     }
 
     private Path script(String body) throws IOException {

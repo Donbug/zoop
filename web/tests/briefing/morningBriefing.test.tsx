@@ -433,12 +433,7 @@ describe('mobile reading layout', () => {
         .getAllByRole('heading')
         .map((x) => x.textContent)
         .slice(-4),
-    ).toEqual([
-      '출근 브리핑',
-      '주요 시장 지표',
-      '핵심 이슈',
-      '이 브리핑은 어땠나요?',
-    ]);
+    ).toEqual(['출퇴근 브리핑', '출근 브리핑', '주요 시장 지표', '핵심 이슈']);
     expect(screen.queryByText('합성 시장 요약')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '전체 보기' }));
     expect(screen.getByText('합성 시장 요약')).toBeTruthy();

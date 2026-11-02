@@ -4,6 +4,7 @@ A request can never choose a path, command, environment value, provider URL, mod
 come from here, and none of the values is ever printed or logged.
 """
 from __future__ import annotations
+import ipaddress
 
 import json
 import os
@@ -14,7 +15,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from . import extraction_access, graph_access, grants, handoff_access, relation_access
+from . import extraction_access, graph_access, grants, handoff_access, handoff_contexts, relation_access
 
 ANALYSIS_SCOPES = ("analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover")
 RELATION_SCOPES = ("relation.submit", "relation.read", "relation.cancel", "relation.recover", "relation.review")
@@ -23,7 +24,8 @@ GRAPH_SCOPES = ("graph.read",)
 HANDOFF_SCOPES = ("handoff.read", "handoff.exposure")
 CHAT_SCOPES = ("chat.invoke",)
 PLAN_SCOPES = ("plan.admit", "plan.read", "plan.policy")
-SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES, *GRAPH_SCOPES, *HANDOFF_SCOPES, *CHAT_SCOPES, *PLAN_SCOPES)
+OBSERVATION_SCOPES = ("observation.read",)
+SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES, *GRAPH_SCOPES, *HANDOFF_SCOPES, *CHAT_SCOPES, *PLAN_SCOPES, *OBSERVATION_SCOPES)
 PRINCIPAL = re.compile(r"[a-z][a-z0-9-]{0,62}")
 DIGEST = re.compile(r"[0-9a-f]{64}")
 HOST = "127.0.0.1"
@@ -51,6 +53,9 @@ RELATION_OWN = tuple(name for name in RELATION_VARS if name not in SHARED_VARS)
 EXTRACTION_OWN = ("ZOOP_AI_SERVICE_EXTRACTION_COMMAND", "ZOOP_AI_SERVICE_EXTRACTION_REPLAY", "ZOOP_AI_SERVICE_EXTRACTION_APPROVALS")
 EXTRACTION_TOPIC = "ZOOP_AI_SERVICE_EXTRACTION_TOPIC_REPLAY"
 EXTRACTION_VARS = (*EXTRACTION_OWN, *SHARED_VARS)
+OBSERVATION_COMMAND = "ZOOP_AI_SERVICE_INGESTION_COMMAND"
+OBSERVATION_VARS = (OBSERVATION_COMMAND, "ZOOP_AI_INGESTION_STATE_DIR", "ZOOP_AI_SERVICE_SOURCES")
+OBSERVATION_CONTEXT_VARS = ("ZOOP_AI_SERVICE_OBSERVATION_SOURCE_CONTEXTS", "ZOOP_AI_SERVICE_OBSERVATION_SOURCE_CONTEXTS_SHA256")
 # The read-only graph door is a third, separate all-or-nothing group. It names its OWN source roots and registry (they are not the S2/S3 group's
 # variables, so setting them never switches those groups on); when an S2/S3 group is configured they must be exactly the same paths, because the
 # graph reads the very ledgers those groups write. `ZOOP_GRAPH_AUTH` alone never switches the group on (an operator shell may export it for the
@@ -69,6 +74,8 @@ HANDOFF_VARS = ("ZOOP_AI_SERVICE_HANDOFF_COMMAND", "ZOOP_AI_HANDOFF_STATE_DIR", 
 HANDOFF_EXPOSURE_VARS = ("ZOOP_AI_SERVICE_HANDOFF_EXPOSURE_COMMAND", "ZOOP_AI_HANDOFF_EXPOSURE_STATE_DIR",
                          "ZOOP_AI_HANDOFF_EXPOSURE_EXTRACTION_STATE_DIR", "ZOOP_AI_HANDOFF_EXPOSURE_INGESTION_STATE_DIR",
                          "ZOOP_AI_SERVICE_HANDOFF_EXPOSURE_EXPORTS")
+HANDOFF_CONTEXT_VARS = ("ZOOP_AI_SERVICE_HANDOFF_SOURCE_CONTEXTS", "ZOOP_AI_SERVICE_HANDOFF_SOURCE_CONTEXTS_SHA256")
+EXPOSURE_CONTEXT_VARS = ("ZOOP_AI_SERVICE_HANDOFF_EXPOSURE_SOURCE_CONTEXTS", "ZOOP_AI_SERVICE_HANDOFF_EXPOSURE_SOURCE_CONTEXTS_SHA256")
 # Live S2/S3 children. ONE service-side switch AND the pipeline's own gate are both required; neither alone forwards anything. The names below are
 # the complete set the pipeline's live runtime reads (`zoop_ai_pipeline.live_runtime`): nothing else of the service environment ever reaches a
 # pipeline child, and replay, dependency, graph, handoff and S1 children never receive any of it. A job-registering child (`submit`) gets only the
@@ -166,27 +173,33 @@ class GraphConfig:
 class HandoffConfig:
     command: Path
     state_dir: Path             # the handoff ledger (handoff.sqlite3 + artifacts): operator-written by `freeze`/`recover`, the pipeline opens it read-only
-    relation_state_dir: Path    # S3 ledger the handoff was frozen from: read-only here
-    extraction_state_dir: Path
-    ingestion_state_dir: Path
-    sources_path: Path
+    relation_state_dir: Path | None
+    extraction_state_dir: Path | None
+    ingestion_state_dir: Path | None
+    sources_path: Path | None
     canonical_path: Path        # operator files pinned by their sha256 in every manifest; the pipeline re-reads and compares them on every export
     decisions_path: Path
     bindings_path: Path
     exports_path: Path          # server-owned per-principal pin allowlist (zoop-ai-handoff-exports-1), re-read on every request
     shared_gate: bool           # an S2/S3 group of this process writes ledgers the handoff reads: serialize behind their gate (static, never guessed)
     child_env: Mapping[str, str]
+    source_contexts: Path | None = None
+    source_contexts_sha256: str | None = None
+    context_paths: tuple[tuple[Path, Path, Path, Path], ...] = ()
 
 
 @dataclass(frozen=True)
 class HandoffExposureConfig:
     command: Path
     state_dir: Path
-    extraction_state_dir: Path
-    ingestion_state_dir: Path
+    extraction_state_dir: Path | None
+    ingestion_state_dir: Path | None
     exports_path: Path
     shared_gate: bool
     child_env: Mapping[str, str]
+    source_contexts: Path | None = None
+    source_contexts_sha256: str | None = None
+    context_paths: tuple[tuple[Path, Path, Path, Path], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -197,6 +210,16 @@ class ChatConfig:
     replay_path: Path | None    # authored replay fixture; without it a replay request answers 409 execution_unavailable
     live_available: bool        # the chat gate is open: the child may send to a provider
     child_env: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class ObservationConfig:
+    command: Path
+    ingestion_state_dir: Path | None
+    sources_path: Path | None
+    child_env: Mapping[str, str]
+    source_contexts: Path | None = None
+    source_contexts_sha256: str | None = None
 
 
 @dataclass(frozen=True)
@@ -218,6 +241,8 @@ class ServiceConfig:
     handoff_exposure: HandoffExposureConfig | None = None
     chat: ChatConfig | None = None
     plan_root: Path | None = None
+    observation: ObservationConfig | None = None
+    host: str = HOST
 
     @property
     def transport_dir(self) -> Path:
@@ -491,89 +516,104 @@ def _graph(environ: Mapping[str, str], principals: tuple[Principal, ...], state_
                        {**_child_env(app_state, worker_state), "ZOOP_GRAPH_AUTH": mode, **secrets})
 
 
+def _context_routes(environ, names, singular, *, need_sources=True):
+    routed = any(name in environ for name in names)
+    if not routed:
+        return None, None, ()
+    if any(name not in environ for name in names) or any(name in environ for name in singular):
+        raise ConfigError(names[0], "source_contexts_group_invalid")
+    path = _file(environ[names[0]], names[0])
+    sha = environ[names[1]]
+    try:
+        routes = handoff_contexts.load(path, sha)
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, RecursionError):
+        raise ConfigError(names[0], "source_contexts_invalid") from None
+    for route in routes:
+        for root in route[:3]:
+            _existing_dir(str(root), names[0])
+            if path.is_relative_to(root) or any(other[3].is_relative_to(root) for other in routes):
+                raise ConfigError(names[0], "source_contexts_invalid")
+        if need_sources:
+            _file(str(route[3]), names[0])
+    return path, sha, routes
+
+
 def _handoff(environ: Mapping[str, str], principals: tuple[Principal, ...], state_dir: Path, worker_state: Path, relation: RelationConfig | None,
              extraction: ExtractionConfig | None, graph: GraphConfig | None) -> HandoffConfig | None:
-    """All-or-nothing, like the other groups, and without any credential. Every root and file is validated here; the allowlist is validated completely
-    (the same strict rules apply again on every request). The handoff root must exist: only the operator's `zoop-ai-handoff freeze` creates it."""
-    if not any(name in environ for name in HANDOFF_VARS):
+    if not any(name in environ for name in (*HANDOFF_VARS, *HANDOFF_CONTEXT_VARS)):
         return None
+    singular = HANDOFF_VARS[2:6]
+    context_file, context_sha, routes = _context_routes(environ, HANDOFF_CONTEXT_VARS, singular)
     for name in HANDOFF_VARS:
-        if name not in environ:
+        if name not in environ and not (context_file and name in singular):
             raise ConfigError(name, "handoff_group_incomplete")
-    command = _file(environ["ZOOP_AI_SERVICE_HANDOFF_COMMAND"], "ZOOP_AI_SERVICE_HANDOFF_COMMAND", executable=True)
+    command = _file(environ[HANDOFF_VARS[0]], HANDOFF_VARS[0], executable=True)
     app_state = _absolute(environ.get("ZOOP_STATE_DIR"), "ZOOP_STATE_DIR")
-    roots = {name: _existing_dir(environ[name], name) for name in ("ZOOP_AI_HANDOFF_STATE_DIR", "ZOOP_AI_HANDOFF_RELATION_STATE_DIR",
-                                                                   "ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR", "ZOOP_AI_HANDOFF_INGESTION_STATE_DIR")}
-    _disjoint({"ZOOP_AI_SERVICE_STATE_DIR": state_dir, "ZOOP_AI_WORKER_STATE_DIR": worker_state, "ZOOP_STATE_DIR": app_state, **roots}, "handoff_roots_overlap")
-    if graph is not None and _overlaps(roots["ZOOP_AI_HANDOFF_STATE_DIR"], graph.state_dir):
-        raise ConfigError("ZOOP_AI_HANDOFF_STATE_DIR", "handoff_roots_overlap")
-    sources = _file(environ["ZOOP_AI_SERVICE_HANDOFF_SOURCES"], "ZOOP_AI_SERVICE_HANDOFF_SOURCES")
-    files = {name: _file(environ[name], name) for name in ("ZOOP_AI_SERVICE_HANDOFF_CANONICAL", "ZOOP_AI_SERVICE_HANDOFF_DECISIONS",
-                                                           "ZOOP_AI_SERVICE_HANDOFF_BINDINGS")}
-    exports = _file(environ["ZOOP_AI_SERVICE_HANDOFF_EXPORTS"], "ZOOP_AI_SERVICE_HANDOFF_EXPORTS")
-    try:
-        handoff_access.load(exports, [p.name for p in principals])
-    except handoff_access.AccessError as error:
-        raise ConfigError("ZOOP_AI_SERVICE_HANDOFF_EXPORTS", error.code) from None
-    same: list[tuple[str, Path, Path]] = []
+    root = _existing_dir(environ[HANDOFF_VARS[1]], HANDOFF_VARS[1])
+    if context_file is None:
+        routes = ((*(_existing_dir(environ[name], name) for name in singular[:3]), _file(environ[singular[3]], singular[3])),)
+    roots = {f"context-{i}-{j}": value for i, route in enumerate(routes) for j, value in enumerate(route[:3])}
+    _disjoint({"ZOOP_AI_SERVICE_STATE_DIR": state_dir, "ZOOP_AI_WORKER_STATE_DIR": worker_state, "ZOOP_STATE_DIR": app_state,
+               HANDOFF_VARS[1]: root, **roots}, "handoff_roots_overlap")
+    if graph is not None and any(_overlaps(path, graph.state_dir) for path in (root, *roots.values())):
+        raise ConfigError(HANDOFF_VARS[1], "handoff_roots_overlap")
     if relation is not None:
-        same += [("ZOOP_AI_HANDOFF_RELATION_STATE_DIR", roots["ZOOP_AI_HANDOFF_RELATION_STATE_DIR"], relation.state_dir),
-                 ("ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR", roots["ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR"], relation.extraction_state_dir),
-                 ("ZOOP_AI_HANDOFF_INGESTION_STATE_DIR", roots["ZOOP_AI_HANDOFF_INGESTION_STATE_DIR"], relation.ingestion_state_dir),
-                 ("ZOOP_AI_SERVICE_HANDOFF_SOURCES", sources, relation.sources_path)]
+        expected = (relation.state_dir, relation.extraction_state_dir, relation.ingestion_state_dir, relation.sources_path)
+        if expected not in routes:
+            field = next(name for name, mine, theirs in zip(singular, routes[0], expected) if mine != theirs) if context_file is None else HANDOFF_CONTEXT_VARS[0]
+            raise ConfigError(field, "handoff_source_inconsistent")
     if extraction is not None:
-        same += [("ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR", roots["ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR"], extraction.state_dir),
-                 ("ZOOP_AI_HANDOFF_INGESTION_STATE_DIR", roots["ZOOP_AI_HANDOFF_INGESTION_STATE_DIR"], extraction.ingestion_state_dir),
-                 ("ZOOP_AI_SERVICE_HANDOFF_SOURCES", sources, extraction.sources_path)]
-    for name, mine, theirs in same:
-        if mine != theirs:
-            raise ConfigError(name, "handoff_source_inconsistent")
-    # The child environment is the plain ownership environment: no graph credential, provider key or token digest is ever copied into it.
-    return HandoffConfig(command, roots["ZOOP_AI_HANDOFF_STATE_DIR"], roots["ZOOP_AI_HANDOFF_RELATION_STATE_DIR"], roots["ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR"],
-                         roots["ZOOP_AI_HANDOFF_INGESTION_STATE_DIR"], sources, files["ZOOP_AI_SERVICE_HANDOFF_CANONICAL"],
-                         files["ZOOP_AI_SERVICE_HANDOFF_DECISIONS"], files["ZOOP_AI_SERVICE_HANDOFF_BINDINGS"], exports,
-                         relation is not None or extraction is not None, _child_env(app_state, worker_state))
+        expected = (extraction.state_dir, extraction.ingestion_state_dir, extraction.sources_path)
+        if not any(route[1:] == expected for route in routes):
+            field = next(name for name, mine, theirs in zip(singular[1:], routes[0][1:], expected) if mine != theirs) if context_file is None else HANDOFF_CONTEXT_VARS[0]
+            raise ConfigError(field, "handoff_source_inconsistent")
+    files = [_file(environ[name], name) for name in HANDOFF_VARS[6:10]]
+    try:
+        handoff_access.load(files[3], [p.name for p in principals])
+    except handoff_access.AccessError as error:
+        raise ConfigError(HANDOFF_VARS[9], error.code) from None
+    paths = routes[0] if context_file is None else (None, None, None, None)
+    return HandoffConfig(command, root, *paths, *files, relation is not None or extraction is not None, _child_env(app_state, worker_state),
+                         context_file, context_sha, routes)
 
 
 def _handoff_exposure(environ: Mapping[str, str], principals: tuple[Principal, ...], state_dir: Path, worker_state: Path,
                       relation: RelationConfig | None, extraction: ExtractionConfig | None, graph: GraphConfig | None,
                       handoff: HandoffConfig | None) -> HandoffExposureConfig | None:
-    if not any(name in environ for name in HANDOFF_EXPOSURE_VARS):
+    if not any(name in environ for name in (*HANDOFF_EXPOSURE_VARS, *EXPOSURE_CONTEXT_VARS)):
         return None
+    singular = HANDOFF_EXPOSURE_VARS[2:4]
+    context_file, context_sha, routes = _context_routes(environ, EXPOSURE_CONTEXT_VARS, singular, need_sources=False)
     for name in HANDOFF_EXPOSURE_VARS:
-        if name not in environ:
+        if name not in environ and not (context_file and name in singular):
             raise ConfigError(name, "handoff_exposure_group_incomplete")
     command = _file(environ[HANDOFF_EXPOSURE_VARS[0]], HANDOFF_EXPOSURE_VARS[0], executable=True)
     app_state = _absolute(environ.get("ZOOP_STATE_DIR"), "ZOOP_STATE_DIR")
-    roots = {name: _existing_dir(environ[name], name) for name in HANDOFF_EXPOSURE_VARS[1:4]}
-    _disjoint({"ZOOP_AI_SERVICE_STATE_DIR": state_dir, "ZOOP_AI_WORKER_STATE_DIR": worker_state, "ZOOP_STATE_DIR": app_state, **roots},
-              "handoff_exposure_roots_overlap")
-    root, extracted, ingested = (roots[name] for name in HANDOFF_EXPOSURE_VARS[1:4])
-    for group in (relation, graph):
-        if group is not None and any(_overlaps(path, group.state_dir) for path in roots.values()):
-            raise ConfigError(HANDOFF_EXPOSURE_VARS[1], "handoff_exposure_roots_overlap")
+    root = _existing_dir(environ[HANDOFF_EXPOSURE_VARS[1]], HANDOFF_EXPOSURE_VARS[1])
+    extracted, ingested = (None, None) if context_file else tuple(_existing_dir(environ[name], name) for name in singular)
+    roots = {f"context-{i}-{j}": value for i, route in enumerate(routes) for j, value in enumerate(route[:3])} if context_file else dict(zip(singular, (extracted, ingested)))
+    _disjoint({"ZOOP_AI_SERVICE_STATE_DIR": state_dir, "ZOOP_AI_WORKER_STATE_DIR": worker_state, "ZOOP_STATE_DIR": app_state,
+               HANDOFF_EXPOSURE_VARS[1]: root, **roots}, "handoff_exposure_roots_overlap")
     exports = _file(environ[HANDOFF_EXPOSURE_VARS[4]], HANDOFF_EXPOSURE_VARS[4])
     try:
         handoff_access.load(exports, [p.name for p in principals])
     except handoff_access.AccessError as error:
         raise ConfigError(HANDOFF_EXPOSURE_VARS[4], error.code) from None
-    same: list[tuple[str, Path, Path]] = []
-    for group in (relation, graph, handoff):
-        if group is not None:
-            same += [(HANDOFF_EXPOSURE_VARS[2], extracted, group.extraction_state_dir),
-                     (HANDOFF_EXPOSURE_VARS[3], ingested, group.ingestion_state_dir)]
-    if extraction is not None:
-        same += [(HANDOFF_EXPOSURE_VARS[2], extracted, extraction.state_dir),
-                 (HANDOFF_EXPOSURE_VARS[3], ingested, extraction.ingestion_state_dir)]
+    pairs = {route[1:3] for route in routes} if context_file else {(extracted, ingested)}
+    for group in (relation, graph):
+        if group is not None and (group.extraction_state_dir, group.ingestion_state_dir) not in pairs:
+            raise ConfigError(HANDOFF_EXPOSURE_VARS[2], "handoff_exposure_source_inconsistent")
+    if extraction is not None and (extraction.state_dir, extraction.ingestion_state_dir) not in pairs:
+        raise ConfigError(HANDOFF_EXPOSURE_VARS[2], "handoff_exposure_source_inconsistent")
     if handoff is not None:
-        same += [(HANDOFF_EXPOSURE_VARS[1], root, handoff.state_dir), (HANDOFF_EXPOSURE_VARS[4], exports, handoff.exports_path)]
-        if any(_overlaps(path, handoff.relation_state_dir) for path in roots.values()):
-            raise ConfigError(HANDOFF_EXPOSURE_VARS[1], "handoff_exposure_roots_overlap")
-    for name, mine, theirs in same:
-        if mine != theirs:
-            raise ConfigError(name, "handoff_exposure_source_inconsistent")
+        if (root != handoff.state_dir or exports != handoff.exports_path
+                or (context_file, context_sha) != (handoff.source_contexts, handoff.source_contexts_sha256)
+                or pairs != {route[1:3] for route in handoff.context_paths}):
+            raise ConfigError(HANDOFF_EXPOSURE_VARS[1], "handoff_exposure_source_inconsistent")
+    if graph is not None and any(_overlaps(path, graph.state_dir) for path in (root, *roots.values())):
+        raise ConfigError(HANDOFF_EXPOSURE_VARS[1], "handoff_exposure_roots_overlap")
     return HandoffExposureConfig(command, root, extracted, ingested, exports, relation is not None or extraction is not None,
-                                 _child_env(app_state, worker_state))
+                                 _child_env(app_state, worker_state), context_file, context_sha, routes)
 
 
 def _pipeline_live(environ: Mapping[str, str], state_dir: Path, relation: RelationConfig | None, extraction: ExtractionConfig | None) -> PipelineLive | None:
@@ -632,6 +672,9 @@ def _chat(environ: Mapping[str, str], state_dir: Path, worker_state: Path, *,
             root = getattr(group, name, None)
             if root is not None and _overlaps(chat_state, root):
                 raise ConfigError("ZOOP_AI_CHAT_STATE_DIR", "chat_roots_overlap")
+    for group in (handoff, exposure):
+        if group is not None and any(_overlaps(chat_state, root) for route in group.context_paths for root in route[:3]):
+            raise ConfigError("ZOOP_AI_CHAT_STATE_DIR", "chat_roots_overlap")
     _prepare_chat_state(chat_state)
     grants_path = _file(environ["ZOOP_AI_SERVICE_CHAT_GRANTS"], "ZOOP_AI_SERVICE_CHAT_GRANTS")
     try:
@@ -656,6 +699,52 @@ def _chat(environ: Mapping[str, str], state_dir: Path, worker_state: Path, *,
             if name in environ:
                 child[name] = environ[name]
     return ChatConfig(command, chat_state, grants_path, replay, live, child)
+
+
+def _observation(environ: Mapping[str, str], state_dir: Path, worker_state: Path, *,
+                 relation: RelationConfig | None, extraction: ExtractionConfig | None,
+                 graph: GraphConfig | None, handoff: HandoffConfig | None) -> ObservationConfig | None:
+    if OBSERVATION_COMMAND not in environ:
+        if any(name in environ for name in OBSERVATION_CONTEXT_VARS):
+            raise ConfigError(OBSERVATION_COMMAND, "observation_group_incomplete")
+        return None
+    command = _file(environ[OBSERVATION_COMMAND], OBSERVATION_COMMAND, executable=True)
+    context_file, context_sha, routes = _context_routes(environ, OBSERVATION_CONTEXT_VARS, OBSERVATION_VARS[1:])
+    app_state = _absolute(environ.get("ZOOP_STATE_DIR"), "ZOOP_STATE_DIR")
+    if context_file:
+        roots = {f"context-{i}-{j}": value for i, route in enumerate(routes) for j, value in enumerate(route[:3])}
+        ingestion = sources = None
+        pairs = {route[2:] for route in routes}
+    else:
+        for name in OBSERVATION_VARS[1:]:
+            if name not in environ:
+                raise ConfigError(name, "observation_group_incomplete")
+        ingestion = _existing_dir(environ[OBSERVATION_VARS[1]], OBSERVATION_VARS[1])
+        sources = _file(environ[OBSERVATION_VARS[2]], OBSERVATION_VARS[2])
+        roots = {OBSERVATION_VARS[1]: ingestion}
+        pairs = {(ingestion, sources)}
+    _disjoint({"ZOOP_AI_SERVICE_STATE_DIR": state_dir, "ZOOP_AI_WORKER_STATE_DIR": worker_state,
+               "ZOOP_STATE_DIR": app_state, **roots}, "observation_roots_overlap")
+    for group in (relation, extraction, graph):
+        if group is not None and (group.ingestion_state_dir, group.sources_path) not in pairs:
+            raise ConfigError(OBSERVATION_COMMAND, "observation_sources_disagree")
+    if handoff is not None:
+        if handoff.source_contexts is not None:
+            if (context_file, context_sha) != (handoff.source_contexts, handoff.source_contexts_sha256):
+                raise ConfigError(OBSERVATION_CONTEXT_VARS[0], "observation_sources_disagree")
+        elif pairs != {(handoff.ingestion_state_dir, handoff.sources_path)}:
+            raise ConfigError(OBSERVATION_COMMAND, "observation_sources_disagree")
+    return ObservationConfig(command, ingestion, sources, _child_env(app_state, worker_state), context_file, context_sha)
+
+
+def _host(value: str) -> str:
+    try:
+        address = ipaddress.ip_address(value)
+        if "%" in value or address.is_multicast:
+            raise ValueError("invalid bind")
+    except ValueError:
+        raise ConfigError("ZOOP_AI_SERVICE_HOST", "literal_bind_address_required") from None
+    return str(address)
 
 
 def load(environ: Mapping[str, str]) -> ServiceConfig:
@@ -683,6 +772,7 @@ def load(environ: Mapping[str, str]) -> ServiceConfig:
         raise ConfigError("ZOOP_AI_SERVICE_GRANTS", error.code) from None
     replay = _file(environ["ZOOP_AI_SERVICE_REPLAY"], "ZOOP_AI_SERVICE_REPLAY") if environ.get("ZOOP_AI_SERVICE_REPLAY") else None
     port = _port(environ.get("ZOOP_AI_SERVICE_PORT"))
+    host = _host(environ.get("ZOOP_AI_SERVICE_HOST", HOST))
     live = _live(environ)
     _prepare_state_dir(state_dir)
     child = dict(CHILD_BASE_ENV)
@@ -690,9 +780,9 @@ def load(environ: Mapping[str, str]) -> ServiceConfig:
         if key in environ:
             child[key] = environ[key]
     extraction_enabled = any(name in environ for name in (*EXTRACTION_OWN, EXTRACTION_TOPIC))
-    # The S3 group is on when any variable of its own is set, or (as before this group existed) when only the shared ones are set and the
-    # S2 group does not claim them.
-    relation_enabled = any(name in environ for name in RELATION_OWN) or (not extraction_enabled and any(name in environ for name in SHARED_VARS))
+    # Shared settings alone retain the legacy S3 incomplete-group refusal unless S2 or observation export claims them.
+    relation_enabled = any(name in environ for name in RELATION_OWN) or (
+        not extraction_enabled and OBSERVATION_COMMAND not in environ and any(name in environ for name in SHARED_VARS))
     relation = _relation(environ, principals, state_dir, worker_state, relation_enabled)
     extraction = _extraction(environ, principals, state_dir, worker_state)
     if plan_root is not None:
@@ -702,8 +792,9 @@ def load(environ: Mapping[str, str]) -> ServiceConfig:
             raise ConfigError("ZOOP_AI_SERVICE_PLAN_ROOT", "plan_roots_overlap")
     graph = _graph(environ, principals, state_dir, worker_state, relation, extraction)
     handoff = _handoff(environ, principals, state_dir, worker_state, relation, extraction, graph)
+    observation = _observation(environ, state_dir, worker_state, relation=relation, extraction=extraction, graph=graph, handoff=handoff)
     pipeline_live = _pipeline_live(environ, state_dir, relation, extraction)
     exposure = _handoff_exposure(environ, principals, state_dir, worker_state, relation, extraction, graph, handoff)
     chat = _chat(environ, state_dir, worker_state, relation=relation, extraction=extraction, graph=graph, handoff=handoff, exposure=exposure)
     return ServiceConfig(principals, state_dir, worker_state, command, grants_path, replay, port, live, child, relation, extraction, graph, handoff,
-                         pipeline_live, handoff_exposure=exposure, chat=chat, plan_root=plan_root)
+                         pipeline_live, handoff_exposure=exposure, chat=chat, plan_root=plan_root, observation=observation, host=host)

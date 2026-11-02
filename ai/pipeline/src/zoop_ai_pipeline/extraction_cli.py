@@ -9,11 +9,13 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .extraction import Extractor, Fixtures, Sources, Store, open_legacy_history
+from .extraction import Extractor, Fixtures, LiveAccess, Sources, Store, current, mutation_job, open_job_inspection, open_legacy_history
 from .extraction_contracts import MAX_COMMAND, MAX_REPLAY, SCHEMA, EnqueueRound, ExtractionFailure, Selector, Submit, canonical
 from .extraction_enqueue import enqueue_round
 from .extraction_plan import plan_round, strict_json, verify_plan
-from .ingestion_contracts import Authority, IngestionFailure, read_file
+from .ingestion_contracts import IngestionFailure, read_file
+from .private_processing import runtime_factory, select_authority
+from .native_read_contracts import s2_historical
 
 
 def enqueue(args, incoming) -> int:
@@ -68,7 +70,9 @@ def main() -> int:
     parser.add_argument("command", choices=("run", "submit", "resume", "inspect", "cancel", "enqueue-round", "plan-round", "verify-plan"))
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--ingestion-state-dir", required=True, type=Path)
-    parser.add_argument("--sources", required=True, type=Path)
+    authority_options = parser.add_mutually_exclusive_group(required=True)
+    authority_options.add_argument("--sources", type=Path)
+    authority_options.add_argument("--private-processing", type=Path)
     parser.add_argument("--replay", type=Path)
     parser.add_argument("--topic-replay", type=Path)
     parser.add_argument("--principal", help="plan-round only: the service principal the plan is written for")
@@ -81,6 +85,8 @@ def main() -> int:
         parser.error("--state-dir is required, and --principal/--output belong to plan-round only")
     store = None
     try:
+        if args.private_processing is not None and args.command in {"enqueue-round", "plan-round", "verify-plan"}:
+            raise IngestionFailure("private_processing_not_public")
         raw = sys.stdin.buffer.read(MAX_COMMAND + 1)
         if len(raw) > MAX_COMMAND:
             raise ExtractionFailure("command_input_limit")
@@ -107,28 +113,41 @@ def main() -> int:
         if args.command == "submit" and args.topic_replay:
             # The topic fixture is not part of the frozen job; only its stage-time `resume` may name it.
             raise ExtractionFailure("fixture_not_allowed")
+        if args.command != "inspect":
+            row = mutation_job(Store, args.state_dir, args.ingestion_state_dir, job_id=request.job_id, ledger="extraction")
+            if row is not None:
+                binding = json.loads(row["binding"])
+                native = str(binding.get("adapter", {}).get("version", "")).startswith("zoop-extraction-native-")
+                if not current(binding) and (native or args.command != "cancel"):
+                    raise ExtractionFailure("analysis_contract_changed")
         legacy = open_legacy_history(args.state_dir, args.ingestion_state_dir, request.job_id)
         if legacy is not None:
-            # A stored pre-cutover job is history. Decide that from the ledger alone, BEFORE any fixture is required or parsed, any source authority is
-            # read, or a writer is opened: inspect and the refusals use the read-only store, cancel (the one allowed change) takes the writer lock and
-            # re-checks the identity there. No fixture, registry or source is consulted on this path.
+            store = legacy
+            binding = json.loads(store.one("SELECT binding FROM jobs WHERE job_id=?", (request.job_id,))["binding"])
             fixtures = Fixtures(None, None)
-            if args.command == "cancel":
+            if s2_historical(binding):
+                if args.command != "inspect":
+                    raise ExtractionFailure("analysis_contract_changed")
+                authority = select_authority(args.sources, args.private_processing)
+                extractor = Extractor(store, Sources(args.ingestion_state_dir, authority))
+            elif args.command == "cancel":
                 legacy.close()
+                store = None
                 store = Store(args.state_dir, args.ingestion_state_dir)
                 extractor = Extractor(store, Sources(args.ingestion_state_dir, None))
                 extractor.require_legacy(request.job_id)
             else:
-                store = legacy
                 extractor = Extractor(store, Sources(args.ingestion_state_dir, None))
         else:
             if args.command in {"run", "submit"} and args.replay is None and not live:
                 raise ExtractionFailure("replay_fixture_required")
             fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None,
                                 read_file(args.topic_replay, MAX_REPLAY) if args.topic_replay else None)
-            authority = Authority(args.sources)
-            store = Store(args.state_dir, args.ingestion_state_dir)
-            extractor = Extractor(store, Sources(args.ingestion_state_dir, authority))
+            authority = select_authority(args.sources, args.private_processing)
+            store = (open_job_inspection(Store, args.state_dir, args.ingestion_state_dir, job_id=request.job_id, ledger="extraction")
+                     if args.command == "inspect" else Store(args.state_dir, args.ingestion_state_dir))
+            extractor = Extractor(store, Sources(args.ingestion_state_dir, authority),
+                                  LiveAccess(from_env=runtime_factory(authority)))
         if args.command == "run":
             result = extractor.run(request, fixtures, initial_only=args.initial_only)
         elif args.command == "submit":

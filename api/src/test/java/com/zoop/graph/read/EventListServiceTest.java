@@ -125,7 +125,7 @@ class EventListServiceTest {
             public Instant instant() { return NOW.plusSeconds(ticks.incrementAndGet()); }
         };
         var reader = new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
-                clock), version -> snapshot, pinned -> DisclosureExclusions.NONE);
+                clock), version -> snapshot, pinned -> DisclosureExclusions.NONE, null, null);
         NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
         var paged = new EventListService(reader, jdbc, JsonMapper.builder().build());
 
@@ -173,8 +173,7 @@ class EventListServiceTest {
             public java.util.Optional<Instant> firstActivatedAt(String id) { return fixtures.firstActivatedAt(id); }
         };
         var reader = new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(versions,
-                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
-                new com.zoop.graph.snapshot.FixtureGraphSnapshotStore(getClass().getClassLoader()), pinned -> DisclosureExclusions.NONE);
+                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)), new com.zoop.graph.snapshot.FixtureGraphSnapshotStore(getClass().getClassLoader()), pinned -> DisclosureExclusions.NONE, null, null);
         var paged = new EventListService(reader, mock(NamedParameterJdbcTemplate.class), JsonMapper.builder().build());
         String asOf = "2026-10-05T00:00:00Z";
 
@@ -214,7 +213,7 @@ class EventListServiceTest {
         var snapshot = new com.zoop.graph.snapshot.PublicGraphSnapshot(base.snapshotFormat(), base.versionId(),
                 base.sourceBundleId(), base.companies(), base.issues(), base.relations(), articles, base.evidence());
         var reader = new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
-                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)), version -> snapshot, pinned -> DisclosureExclusions.NONE);
+                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)), version -> snapshot, pinned -> DisclosureExclusions.NONE, null, null);
         var paged = new EventListService(reader, mock(NamedParameterJdbcTemplate.class), JsonMapper.builder().build());
         var whole = paged.list(null, null, null, null, null, null, null, null);
         var pinnedWhole = paged.list(null, null, null, null, null, null, "fixture-2026-10-08", null);

@@ -21,7 +21,7 @@ from neo4j.exceptions import DriverError, Neo4jError
 from pydantic import ValidationError
 
 from . import graph_neo4j as neo
-from .graph_projection import Paths, Projector, Store, open_legacy_history, preflight
+from .graph_projection import Paths, Projector, Store, open_legacy_history, preflight, preflight_analysis
 from .graph_projection_contracts import MAX_COMMAND, SCHEMA, ExtractionFailure, Focus, Freeze, Init, Selector, canonical
 from .ingestion_contracts import IngestionFailure
 
@@ -43,14 +43,16 @@ def main() -> int:
     parser.add_argument("--relation-state-dir", type=Path)
     parser.add_argument("--extraction-state-dir", type=Path)
     parser.add_argument("--ingestion-state-dir", type=Path)
-    parser.add_argument("--sources", type=Path, help="S1/S2 source and grant registry, consumed only through the S3 owner seam")
+    authority_options = parser.add_mutually_exclusive_group()
+    authority_options.add_argument("--sources", type=Path, help="public source/grant registry")
+    authority_options.add_argument("--private-processing", type=Path, help="private execution receipt; never public handoff authority")
     parser.add_argument("--canonical", type=Path, help="server-owned canonical decision registry (zoop-graph-canonical-1)")
     parser.add_argument("--graph-uri", help="init and preflight only: bolt://<loopback>:<port> or bolt+s://<host>:<port>")
     args = parser.parse_args()
     store = None
     try:
         sourced = args.command in SOURCED
-        flags = (args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources, args.canonical)
+        flags = (args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources or args.private_processing, args.canonical)
         if (any(f is not None for f in flags) and not sourced) or (sourced and any(f is None for f in flags)) or (args.graph_uri is not None) != (args.command in TARGETED):
             raise ExtractionFailure("input_or_configuration_invalid")
         raw = sys.stdin.buffer.read(MAX_COMMAND + 1)
@@ -63,11 +65,14 @@ def main() -> int:
             # Before any Store: this command must never create, open, lock or chmod a ledger.
             print(canonical(preflight(request, uri, args.state_dir)))
             return 0
-        paths = Paths(args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources, args.canonical) if sourced else None
+        paths = Paths(args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir,
+                      args.sources, args.canonical, args.private_processing) if sourced else None
         roots = (paths.relation, paths.extraction, paths.ingestion) if paths else ()
         # A version frozen under an earlier plan contract is history: decided from the ledger alone, read-only, BEFORE any writer (chmod, WAL checkpoint, DDL)
         # is opened. `init` has no version yet.
         legacy = None if args.command == "init" else open_legacy_history(args.state_dir, *roots, version_id=request.version_id)
+        if legacy is None and args.command in {"freeze", "project", "recover"}:
+            preflight_analysis(args.state_dir, paths, request)
         store = legacy if legacy is not None else Store(args.state_dir, *roots, mode=WRITERS.get(args.command, "read"))
         projector = Projector(store, paths)
         if args.command == "init":

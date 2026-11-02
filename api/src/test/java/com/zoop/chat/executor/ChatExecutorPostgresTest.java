@@ -172,16 +172,17 @@ class ChatExecutorPostgresTest {
         String id = recorder.start(jobId, 2, "chat-router", "replay");
         assertEquals("running", jdbc.queryForObject("SELECT status FROM ai_executions WHERE id = ?", String.class, id));
         recorder.finish(id, "succeeded", "sent", new com.zoop.ai.chat.ChatStageReply.Receipt("typesafe", "systemone-v1", "jev",
-                "chat-router-1", "replay", 12L, null, Instant.now(), Instant.now()), null);
+                "chat-router-1", "replay", 12L, null, 5L, Instant.now(), Instant.now()), null);
         recorder.finish(id, "failed", "not_sent", null, "late");
         var row = jdbc.queryForMap("SELECT feature, execution_mode, status, chat_job_id, stage, model, input_tokens, "
-                + "output_tokens, error_code, finished_at, attempt_no, provider_send_state, provider_revision, "
+                + "output_tokens, reasoning_tokens, error_code, finished_at, attempt_no, provider_send_state, provider_revision, "
                 + "receipt_execution_mode, provider_sent_at, provider_received_at FROM ai_executions WHERE id = ?", id);
         assertEquals("chatbot", row.get("feature"));
         assertEquals("replay", row.get("execution_mode"));
         assertEquals("succeeded", row.get("status"), "an ended execution is not rewritten");
         assertEquals(jobId, row.get("chat_job_id"));
         assertEquals("chat-router", row.get("stage"));
+        assertEquals(5L, ((Number) row.get("reasoning_tokens")).longValue());
         assertEquals(2, ((Number) row.get("attempt_no")).intValue());
         assertEquals("sent", row.get("provider_send_state"));
         assertEquals("systemone-v1", row.get("provider_revision"));

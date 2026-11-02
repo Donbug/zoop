@@ -24,7 +24,7 @@ final class ExposureReports {
     static ObjectNode handoff(String handoffId, List<String> issues, List<String> relations, boolean withArticleAndEvidence) {
         ObjectNode handoff = StrictJson.newObject();
         handoff.put("handoffId", handoffId);
-        handoff.put("bundleSchema", "zoop-graph-handoff-bundle-7");
+        handoff.put("bundleSchema", "zoop-graph-handoff-bundle-8");
         handoff.put("manifestDigest", DIGEST_M);
         handoff.put("bundleDigest", DIGEST_B);
         handoff.put("contentDigest", DIGEST_C);

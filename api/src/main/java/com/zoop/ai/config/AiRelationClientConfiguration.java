@@ -14,11 +14,11 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = AiRelationClientProperties.PREFIX, name = "enabled", havingValue = "true")
-@EnableConfigurationProperties(AiRelationClientProperties.class)
+@EnableConfigurationProperties({AiRelationClientProperties.class, AiTransportProperties.class})
 public class AiRelationClientConfiguration {
 
     @Bean
-    HttpRelationClient aiRelationClient(AiRelationClientProperties properties) {
-        return new HttpRelationClient(properties.toSettings());
+    HttpRelationClient aiRelationClient(AiRelationClientProperties properties, AiTransportProperties transport) {
+        return new HttpRelationClient(properties.toSettings(transport));
     }
 }

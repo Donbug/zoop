@@ -35,7 +35,7 @@ function Statement({
       <p className={BODY}>{value.text}</p>
       <details className="mt-1">
         <summary
-          className={`min-h-11 cursor-pointer content-center text-xs text-zoop-muted ${FOCUS_RING}`}
+          className={`min-h-11 cursor-pointer content-center text-caption text-zoop-muted ${FOCUS_RING}`}
         >
           출처·검증에 사용한 원문 문맥 {value.evidenceIds.length}건
         </summary>
@@ -48,7 +48,7 @@ function Statement({
                   href={source.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`text-sm underline ${FOCUS_RING}`}
+                  className={`text-body underline ${FOCUS_RING}`}
                 >
                   {source.title} · 원문 ↗
                 </a>
@@ -56,7 +56,7 @@ function Statement({
                 {source.fullBody ? (
                   <details>
                     <summary
-                      className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
+                      className={`min-h-11 cursor-pointer content-center text-caption ${FOCUS_RING}`}
                     >
                       보존 원문 보기
                     </summary>
@@ -103,22 +103,22 @@ function Company({
     >
       <summary className={`cursor-pointer list-none ${FOCUS_RING}`}>
         <span className="flex flex-wrap items-center gap-2">
-          <strong className="text-base">{c.companyName}</strong>
-          <span className="text-xs text-zoop-muted">{c.topic.text}</span>
-          <span className="ml-auto text-xs text-zoop-muted">
+          <strong className="text-lead">{c.companyName}</strong>
+          <span className="text-caption text-zoop-muted">{c.topic.text}</span>
+          <span className="ml-auto text-caption text-zoop-muted">
             {decisions[c.decision]} · 펼치기
           </span>
         </span>
-        <span className="mt-2 block text-lg font-bold leading-snug">
+        <span className="mt-2 block text-title-sm font-bold leading-snug">
           {c.title.text}
         </span>
-        <span className="mt-2 block text-sm text-zoop-muted">
+        <span className="mt-2 block text-body text-zoop-muted">
           {c.description.text}
         </span>
       </summary>
       <div className="mt-4 space-y-4 border-t border-zoop-line pt-3">
         <div>
-          <h4 className="text-sm font-semibold">이전 실제 판단</h4>
+          <h4 className="text-body font-semibold">이전 실제 판단</h4>
           {c.previousJudgment ? (
             <>
               <p className={`${NOTE} mt-2`}>
@@ -137,21 +137,23 @@ function Company({
           )}
         </div>
         <div>
-          <h4 className="text-sm font-semibold">
+          <h4 className="text-body font-semibold">
             {c.role === 'watch' ? '이번 확인 범위' : '새 근거'}
           </h4>
           <Statement value={c.newEvidence} update={update} />
         </div>
         <div>
-          <h4 className="text-sm font-semibold">이번 판단의 이유</h4>
+          <h4 className="text-body font-semibold">이번 판단의 이유</h4>
           <Statement value={c.reason} update={update} />
         </div>
         <div>
-          <h4 className="text-sm font-semibold">무엇이 확인되면 강화하나요?</h4>
+          <h4 className="text-body font-semibold">
+            무엇이 확인되면 강화하나요?
+          </h4>
           <Statement value={c.strengthenIf} update={update} />
         </div>
         <div>
-          <h4 className="text-sm font-semibold">무엇이 확인되면 낮추나요?</h4>
+          <h4 className="text-body font-semibold">무엇이 확인되면 낮추나요?</h4>
           <Statement value={c.weakenIf} update={update} />
         </div>
         {price && <CompanyPrice company={price} cutoff={update.cutoff} />}
@@ -188,13 +190,13 @@ export default function JudgmentUpdate({
       </p>
       <details open={!compact} className="my-3">
         <summary
-          className={`min-h-11 cursor-pointer content-center text-sm font-semibold ${FOCUS_RING}`}
+          className={`min-h-11 cursor-pointer content-center text-body font-semibold ${FOCUS_RING}`}
         >
           이전 자료에서 무엇이 달라졌나요?
         </summary>
         <Statement value={update.industryChange!} update={update} />
       </details>
-      <h3 className="my-3 text-sm font-semibold">이번 핵심 기업 한눈에</h3>
+      <h3 className="my-3 text-body font-semibold">이번 핵심 기업 한눈에</h3>
       <div className="space-y-3">
         {update
           .companies!.filter((c) => c.role === 'selected')
@@ -210,7 +212,7 @@ export default function JudgmentUpdate({
       </div>
       {update.companies!.some((c) => c.role === 'watch') && (
         <>
-          <h3 className="mt-5 mb-2 text-sm font-semibold">
+          <h3 className="mt-5 mb-2 text-body font-semibold">
             이전 기업의 미해결 조건 추적
           </h3>
           <p className={`${NOTE} mb-3`}>
@@ -234,7 +236,7 @@ export default function JudgmentUpdate({
       )}
       <details className="mt-4">
         <summary
-          className={`min-h-11 cursor-pointer content-center text-xs text-zoop-muted ${FOCUS_RING}`}
+          className={`min-h-11 cursor-pointer content-center text-caption text-zoop-muted ${FOCUS_RING}`}
         >
           해석·검토 범위
         </summary>

@@ -1,0 +1,48 @@
+/* D-BRF-01/02: keep the briefing content and navigation, using D-AUT-01's
+   quiet monochrome page palette as requested. */
+.service-surface.briefing-login-surface {
+  background: var(--color-zoop-paper);
+}
+
+.briefing-login-surface .relationship-header,
+.briefing-login-surface .service-page-main,
+.briefing-login-surface .service-bottom-nav {
+  background-color: var(--color-zoop-paper);
+}
+
+:root[data-theme='dark'] .service-surface.briefing-login-surface {
+  --color-zoop-paper: #171717;
+  --color-zoop-wash: #171717;
+  --color-zoop-soft: #262626;
+  --color-zoop-ink: #fafafa;
+  --color-zoop-muted: #d4d4d4;
+  --color-zoop-faint: #a3a3a3;
+  --color-zoop-line: #373737;
+  --color-white: #171717;
+  --zoop-paper: var(--color-zoop-paper);
+  --zoop-wash: var(--color-zoop-wash);
+  --zoop-soft: var(--color-zoop-soft);
+  --zoop-ink: var(--color-zoop-ink);
+  --zoop-muted: var(--color-zoop-muted);
+  --zoop-faint: var(--color-zoop-faint);
+  --zoop-line: var(--color-zoop-line);
+}
+
+.briefing-login-surface .service-page-main {
+  color: var(--zoop-ink);
+}
+
+/* D-STK-01 adopts D-AUT-01's quiet paper surface while retaining the service navigation. */
+.service-surface.stocks-login-surface {
+  background: var(--color-zoop-paper);
+}
+
+.stocks-login-surface .relationship-header,
+.stocks-login-surface .service-page-main,
+.stocks-login-surface .service-bottom-nav {
+  background-color: var(--color-zoop-paper);
+}
+
+.stocks-login-surface .service-page-main {
+  color: var(--zoop-ink);
+}

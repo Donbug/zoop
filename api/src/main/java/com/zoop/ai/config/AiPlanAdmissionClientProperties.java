@@ -1,6 +1,7 @@
 package com.zoop.ai.config;
 
 import java.time.Duration;
+import java.util.Set;
 
 import com.zoop.ai.AiClientConfigurationException;
 import com.zoop.ai.AiClientSettings;
@@ -18,9 +19,11 @@ public record AiPlanAdmissionClientProperties(
         @DefaultValue("16000000") int maxResponseBytes) {
     static final String PREFIX = "zoop.ai.plan-admission-client";
 
-    public AiClientSettings toSettings() {
+    public AiClientSettings toSettings(AiTransportProperties transport) {
+        // Outside the try: a bad host list is reported under zoop.ai, not under this client's prefix.
+        Set<String> plaintextHttpHosts = transport.hosts();
         try {
-            return AiClientSettings.of(baseUrl, token, connectTimeout, requestTimeout, maxResponseBytes);
+            return AiClientSettings.of(baseUrl, token, connectTimeout, requestTimeout, maxResponseBytes, plaintextHttpHosts);
         } catch (AiClientConfigurationException error) {
             throw error.under(PREFIX);
         }

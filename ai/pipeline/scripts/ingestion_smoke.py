@@ -34,7 +34,10 @@ def ownership_env() -> dict[str, str]:
                 atexit.register(shutil.rmtree, value, True)
             if value:
                 _OWNERSHIP[key] = value
-    return dict(_OWNERSHIP)
+    result = dict(_OWNERSHIP)
+    if (PIPELINE / "src").is_dir():
+        result["PYTHONPATH"] = os.pathsep.join(str(path) for path in (PIPELINE / "src", PIPELINE.parent / "worker/src"))
+    return result
 
 
 os.environ.update(ownership_env())
@@ -115,13 +118,18 @@ class OfflineFixture:
 
     def cli(self, command, request, *, state="state", manifest=None, crash=None, sources=True, expected=0, extra=()):
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1", **ownership_env()}
+        guard = ("import os, sys, runpy\n"
+                 "def _guard(event, args):\n"
+                 " if event in {'socket.connect', 'socket.getaddrinfo', 'socket.gethostbyname', 'socket.bind'}:\n"
+                 "  raise RuntimeError('network attempted')\n"
+                 "sys.addaudithook(_guard)\n")
         if crash:
             # Kill the actual process at a durable stage, not a fake CLI result.
             hooks = {"receipt": "Ingestor._discover=lambda *a: os._exit(75)", "raw": "parsers.prepare=lambda *a: os._exit(75)", "version": "Ingestor._complete_page=lambda *a: os._exit(75)", "checkpoint": "original=Ingestor._complete_page\ndef stop(*a):\n original(*a)\n os._exit(75)\nIngestor._complete_page=stop"}
-            code = "import os\nfrom zoop_ai_pipeline.ingestion import Ingestor, parsers\nfrom zoop_ai_pipeline.ingestion_cli import main\n" + hooks[crash] + "\nraise SystemExit(main())"
-            argv = [sys.executable, "-c", code, command]
+            code = guard + "from zoop_ai_pipeline.ingestion import Ingestor, parsers\nfrom zoop_ai_pipeline.ingestion_cli import main\n" + hooks[crash] + "\nraise SystemExit(main())"
         else:
-            argv = [sys.executable, "-m", "zoop_ai_pipeline.ingestion_cli", command]
+            code = guard + "runpy.run_module('zoop_ai_pipeline.ingestion_cli', run_name='__main__')"
+        argv = [sys.executable, "-c", code, command]
         argv += ["--state-dir", str(self.root / state)]
         if sources:
             argv += ["--sources", str(self.registry_path)]

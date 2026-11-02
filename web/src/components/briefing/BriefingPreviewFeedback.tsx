@@ -30,7 +30,7 @@ function loadRating(wanted: Target, signal: AbortSignal) {
   readQueue = request.catch(() => undefined);
   return request;
 }
-const BUTTON = `inline-flex min-h-11 items-center gap-2 rounded-md border border-zoop-line px-3 text-xs font-semibold hover:bg-zoop-wash aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper disabled:opacity-50 ${FOCUS_RING}`;
+const BUTTON = `inline-flex min-h-11 items-center gap-2 rounded-md border border-zoop-line px-3 text-caption font-semibold hover:bg-zoop-wash aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper disabled:opacity-50 ${FOCUS_RING}`;
 
 function Thumb({ down = false }: { down?: boolean }) {
   return (
@@ -48,7 +48,9 @@ function Thumb({ down = false }: { down?: boolean }) {
 }
 
 /** D-BRF-01/02: local preview votes never impersonate a member or rate another revision. */
-type Props = Target & { subject: string; showNote?: boolean };
+type Props = Target & {
+  subject: string;
+};
 export default function BriefingPreviewFeedback(props: Props) {
   return (
     <PreviewFeedbackForm
@@ -62,7 +64,7 @@ export default function BriefingPreviewFeedback(props: Props) {
     />
   );
 }
-function PreviewFeedbackForm({ subject, showNote = false, ...target }: Props) {
+function PreviewFeedbackForm({ subject, ...target }: Props) {
   const identity = JSON.stringify(target);
   const [saved, setSaved] = useState<Rating | null>(null);
   const [pending, setPending] = useState(false);
@@ -145,12 +147,6 @@ function PreviewFeedbackForm({ subject, showNote = false, ...target }: Props) {
 
   return (
     <div className="flex flex-col gap-2" aria-label={`${subject} 평가`}>
-      {showNote && (
-        <p className={NOTE}>
-          이 브라우저의 미리보기 평가로 저장됩니다. 같은 버튼을 다시 누르면
-          취소돼요.
-        </p>
-      )}
       <div
         role="group"
         aria-label={`${subject} 평가 선택`}
@@ -180,18 +176,14 @@ function PreviewFeedbackForm({ subject, showNote = false, ...target }: Props) {
       <p role="status" aria-live="polite" className={NOTE}>
         {pending
           ? '평가를 저장하고 있어요.'
-          : saved?.value === 'up'
-            ? '도움이 됐다고 남겼어요.'
-            : saved?.value === 'down'
-              ? '아쉬운 점을 남겼어요.'
-              : !saved && !error
-                ? '내 평가를 확인하고 있어요.'
-                : ''}
+          : !saved && !error
+            ? '내 평가를 확인하고 있어요.'
+            : ''}
       </p>
       {reasonOpen && saved?.value === 'down' && (
         <form onSubmit={submit} className="flex flex-col gap-2">
           <label
-            className="text-xs font-semibold"
+            className="text-caption font-semibold"
             htmlFor={`preview-reason-${target.feature}-${target.targetId}`}
           >
             어떤 점이 아쉬웠나요?{' '}
@@ -205,7 +197,7 @@ function PreviewFeedbackForm({ subject, showNote = false, ...target }: Props) {
             disabled={pending}
             onChange={(event) => setReason(event.target.value)}
             placeholder="예: 선정 이유를 더 자세히 알고 싶어요."
-            className={`w-full rounded-md border border-zoop-line bg-zoop-paper p-3 text-xs ${FOCUS_RING}`}
+            className={`w-full rounded-md border border-zoop-line bg-zoop-paper p-3 text-caption ${FOCUS_RING}`}
           />
           <div className="flex items-center justify-between gap-2">
             <span className={NOTE}>{reason.length}/200자</span>
@@ -214,7 +206,7 @@ function PreviewFeedbackForm({ subject, showNote = false, ...target }: Props) {
               disabled={pending || !saved}
               className={BUTTON}
             >
-              사유 저장
+              확인
             </button>
           </div>
         </form>
@@ -222,7 +214,7 @@ function PreviewFeedbackForm({ subject, showNote = false, ...target }: Props) {
       {error && (
         <div
           role={error.vote ? 'alert' : 'status'}
-          className={`text-xs ${error.vote ? 'text-zoop-alert' : 'text-zoop-muted'}`}
+          className={`text-caption ${error.vote ? 'text-zoop-alert' : 'text-zoop-muted'}`}
         >
           <p>{error.message}</p>
           {error.vote && saved && (
