@@ -108,7 +108,11 @@ function renderEvidence(evidence: EvidenceResponse) {
     evidenceIds: [evidence.id],
     mapContext: { ...context, url: '/' },
   });
-  render(<EvidenceDrawer />);
+  render(
+    <MemoryRouter>
+      <EvidenceDrawer />
+    </MemoryRouter>,
+  );
   return server;
 }
 
@@ -463,17 +467,29 @@ describe('D-GRP-03 · document judgements retain company/event context', () => {
       }),
     );
     await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
-    await screen.findByLabelText('일치 문서 · 혼재 판정 근거 보기');
+    await screen.findAllByLabelText('일치 문서 · 혼재 판정 근거 보기');
+    // 사건 줄에는 그 사건·이 기업의 판정만 붙는다.
+    const issues = within(
+      screen.getByText('직접 관련 사건').closest('section')!,
+    );
     expect(
-      screen.queryByLabelText('다른 기업 문서 · 혼재 판정 근거 보기'),
+      issues.queryByLabelText('다른 기업 문서 · 혼재 판정 근거 보기'),
     ).toBeNull();
     expect(
-      screen.queryByLabelText('다른 사건 문서 · 혼재 판정 근거 보기'),
+      issues.queryByLabelText('다른 사건 문서 · 혼재 판정 근거 보기'),
+    ).toBeNull();
+    // M7 뉴스·공시 목록은 문서마다 이 기업의 판정을 보이고, 다른 기업 판정은 보이지 않는다.
+    const news = within(screen.getByText('뉴스·공시').closest('section')!);
+    expect(
+      news.getByLabelText('다른 사건 문서 · 혼재 판정 근거 보기'),
+    ).toBeTruthy();
+    expect(
+      news.queryByLabelText('다른 기업 문서 · 혼재 판정 근거 보기'),
     ).toBeNull();
     await userEvent.click(
-      screen.getByLabelText('일치 문서 · 혼재 판정 근거 보기'),
+      issues.getByLabelText('일치 문서 · 혼재 판정 근거 보기'),
     );
-    expect(screen.getByText('합성 문서 판정 사유')).toBeTruthy();
-    expect(screen.getByText('프롬프트 버전')).toBeTruthy();
+    expect(issues.getByText('합성 문서 판정 사유')).toBeTruthy();
+    expect(issues.getByText('프롬프트 버전')).toBeTruthy();
   });
 });

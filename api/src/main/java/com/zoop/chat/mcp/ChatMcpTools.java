@@ -133,10 +133,12 @@ public final class ChatMcpTools {
         Set<String> bound = registry.bound();
         boolean web = registry.bind(ChatCapability.WEB_SEARCH.id()).isPresent();
         return java.util.Arrays.stream(ChatCapability.values())
-                // A briefing read's round comes from the requirement's words, which the agent's arguments cannot carry.
+                // A document search's terms and a briefing read's round come from the requirement's words, which the
+                // agent's arguments cannot carry without making the model authoritative for server retrieval scope.
                 // A selection read's round comes from those words too, and its records are not sent to the agent.
                 .filter(c -> c != ChatCapability.PORTFOLIO_SCOPE_READ && c != ChatCapability.BRIEFING_READ
                         && c != ChatCapability.BRIEFING_EVIDENCE && c != ChatCapability.SELECTION_RULE_READ
+                        && c != ChatCapability.DOCUMENT_SEARCH
                         && bound.contains(c.id())
                         || c == ChatCapability.WEB_SEARCH && web).toList();
     }

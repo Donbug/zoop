@@ -72,7 +72,7 @@
         "outcome": "guidance",
         "reason": "out_of_scope"
       },
-      "gap": "help.search·screenSpec.read가 연결되지 않아 화면 사용법 질문은 범위 밖 안내로 끝난다. 도움말·화면 명세 초안(docs/help/drafts)의 팀 승인 대기."
+      "gap": "이 세트는 승인 문서 플래그를 켜지 않아 화면 사용법 질문이 범위 밖 안내로 끝난다. 승인본은 docs/help/approved에 있고 플래그는 환경별로 켠다."
     },
     {
       "id": "q02-concept",

@@ -139,6 +139,20 @@ class ChatToolRunnerTest {
     }
 
     @Test
+    void documentSearchTextIsRecordedAndSeparatesOtherwiseIdenticalRequests() {
+        var control = new RecordingControl(Duration.ofSeconds(60));
+        var runner = runner(Map.of(ChatCapability.DOCUMENT_SEARCH, (scope, request) -> output("v1", List.of())));
+        var hbm = new ChatToolRequest("document.search", List.of("KRX:000660"), 20, null, null, "HBM 공급");
+        var battery = new ChatToolRequest("document.search", List.of("KRX:000660"), 20, null, null, "배터리 수주");
+
+        runner.runStage(run("v1", null), control, 1, List.of(hbm, battery));
+
+        assertEquals(2, control.reserved.size());
+        assertTrue(control.reserved.getFirst().requestMeta().contains("\"searchText\":\"HBM 공급\""));
+        assertNotEquals(control.reserved.get(0).inputDigest(), control.reserved.get(1).inputDigest());
+    }
+
+    @Test
     void aSlowCallTimesOutAndTheOthersStillEnd() {
         var control = new RecordingControl(Duration.ofSeconds(60));
         var release = new CountDownLatch(1);

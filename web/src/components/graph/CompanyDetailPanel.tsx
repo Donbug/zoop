@@ -7,9 +7,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { setWatchlistCompany } from '@/apis/graph/companies';
 import { useCompanyData } from '@/hooks/useCompanyData';
-import type { GraphNode } from '@/types/map/graph';
+import type { GraphNode, GraphResponse } from '@/types/map/graph';
+import type { CompanyIssue } from '@/types/map/company';
+import { relationHelp } from './relation-help';
+import { edgeSwatchClass } from './edge-swatch';
+import DocumentSentiment from './DocumentSentiment';
 import type { WatchSync } from '@/types/map';
 import IssueDocumentSentiments from './IssueDocumentSentiments';
+import { visibleSentiment } from './visible-sentiment';
 import { eventTimeText } from '@/util/event-time';
 
 type RelatedCompany = { id: string; name: string; sharedIssueCount: number };
@@ -32,7 +37,98 @@ type Props = {
   onFocus: () => void;
   onSelectRelation?: (companyId: string) => void;
   onAskAi: () => void;
+  /** 지금 지도 그래프: 직접 사건의 앞뒤 사건(FOLLOWS), 관련 기업 로고, 사건 근거, 중심 버튼 조건에 쓴다. */
+  graph?: Pick<GraphResponse, 'nodes' | 'edges'> | null;
+  /** 지금 지도의 중심 노드. 이 기업이 이미 중심이면 [기업 중심 그래프]를 숨긴다. */
+  focusId?: string | null;
+  /** 사건 줄의 [근거 보기]: 지도에서 찾은 그 사건의 근거로 근거 창을 연다. */
+  onIssueEvidence?: (issue: {
+    id: string;
+    title: string;
+    evidenceIds: string[];
+  }) => void;
 };
+
+/** 패널 사건 목록 한 줄: 기업 API 사건 또는 지도에서 찾은 직접 사건의 앞뒤 사건. */
+type PanelIssue = Pick<
+  CompanyIssue,
+  'title' | 'eventTime' | 'timePrecision' | 'role'
+> & {
+  issueId: string;
+  evidenceCount: number | null;
+  /** 간접 사건이 이어진 이유(구조적 관련, 앞선·이어진 사건) */
+  why?: string;
+};
+
+const VISIBLE_ISSUES = 3;
+const VISIBLE_DOCUMENTS = 3;
+
+/** 섹션 머리 옆 정보 아이콘: 관계 유형의 뜻(prototype node-panel.tsx RelationHint). */
+function RelationHint({ label, text }: { label: string; text: string }) {
+  return (
+    <details className="company-source">
+      <summary aria-label={`${label} 설명`}>i</summary>
+      <p className="right-auto! left-0!">{text}</p>
+    </details>
+  );
+}
+
+/**
+ * D-GRP-03 · prototype node-panel.tsx:185-204: 간접 사건은 구조적 관련 사건과, 지도에서 FOLLOWS 선으로 이어진 직접 사건의
+ * 앞뒤 사건이다. FOLLOWS는 나중 사건에서 앞선 사건으로 향한다.
+ */
+function indirectIssues(
+  direct: CompanyIssue[],
+  structural: CompanyIssue[],
+  graph: Props['graph'],
+): PanelIssue[] {
+  const directIds = new Set(direct.map((issue) => issue.issueId));
+  const seen = new Set(directIds);
+  const list: PanelIssue[] = structural
+    .filter((issue) => !seen.has(issue.issueId) && seen.add(issue.issueId))
+    .map((issue) => ({ ...issue, why: '구조적 관련' }));
+  for (const edge of graph?.edges ?? []) {
+    if (edge.relationType !== 'FOLLOWS') continue;
+    const [anchor, other, why] = directIds.has(edge.target)
+      ? [edge.target, edge.source, '이어진 사건']
+      : directIds.has(edge.source)
+        ? [edge.source, edge.target, '앞선 사건']
+        : [];
+    const node = graph?.nodes.find((item) => item.id === other);
+    if (!anchor || !node || node.kind !== 'issue' || seen.has(node.id))
+      continue;
+    seen.add(node.id);
+    const title = direct.find((issue) => issue.issueId === anchor)?.title;
+    list.push({
+      issueId: node.id,
+      title: node.label,
+      eventTime: node.eventTime,
+      timePrecision: node.timePrecision,
+      evidenceCount: node.evidenceCount,
+      why: title ? `${why} · ${title}` : why,
+    });
+  }
+  return list;
+}
+
+/** 지도에서 이 기업과 사건을 잇는 선의 근거. 그런 선이 없으면 그 사건에 닿은 선(공유 선 제외)의 근거. */
+function issueEvidence(
+  graph: Props['graph'],
+  companyId: string,
+  issueId: string,
+) {
+  const touching = (graph?.edges ?? []).filter(
+    (edge) =>
+      edge.relationType !== 'SHARES_ISSUE' &&
+      (edge.source === issueId || edge.target === issueId),
+  );
+  const own = touching.filter(
+    (edge) => edge.source === companyId || edge.target === companyId,
+  );
+  return [
+    ...new Set((own.length ? own : touching).flatMap((e) => e.evidenceIds)),
+  ];
+}
 
 function number(value: number | null, currency?: string) {
   if (value === null) return '—';
@@ -141,6 +237,129 @@ export default function CompanyDetailPanel(props: Props) {
   );
   const currency = quote?.quote.currency;
   const changePositive = (quote?.quote.change ?? 0) >= 0;
+  // D-GRP-03 · prototype node-panel.tsx:285-290: 관련 기업 줄에 로고와 사건 공유 선 견본을 둔다.
+  const relatedItem = (related: RelatedCompany) => {
+    const node = props.graph?.nodes.find((item) => item.id === related.id);
+    return (
+      <li key={related.id}>
+        <button
+          className="flex-row! items-center! gap-3!"
+          onClick={() => props.onSelectRelation?.(related.id)}
+        >
+          <CompanyLogo
+            name={related.name}
+            logoUrl={companyLogo(related.id, node?.logoUrl ?? null)}
+            className="grid! size-8 rounded-full border border-zoop-line bg-zoop-paper p-0! text-caption font-bold"
+          />
+          <div className="min-w-0 flex-1">
+            <b>{related.name}</b>
+            <span>공유 사건 {related.sharedIssueCount}건</span>
+          </div>
+          <b
+            aria-hidden="true"
+            className={`${edgeSwatchClass('SHARES_ISSUE')} shrink-0`}
+          />
+        </button>
+      </li>
+    );
+  };
+  // M9 · prototype node-panel.tsx:110-111: 연결이 없거나 이미 이 기업이 중심이면 중심 보기를 숨긴다.
+  const canFocus =
+    props.focusId !== props.companyId &&
+    (!props.graph ||
+      props.graph.edges.some(
+        (edge) =>
+          edge.source === props.companyId || edge.target === props.companyId,
+      ));
+  const issueRow = (issue: PanelIssue, indirect: boolean) => {
+    const tutorial = props.tutorialIssueId === issue.issueId;
+    const evidenceIds = props.onIssueEvidence
+      ? issueEvidence(props.graph, props.companyId, issue.issueId)
+      : [];
+    const time =
+      eventTimeText(issue.eventTime, issue.timePrecision) ?? '시각 미상';
+    return (
+      <li key={issue.issueId}>
+        <button
+          className={tutorial ? 'tutorial-target' : undefined}
+          data-tutorial-action={tutorial ? 'issue' : undefined}
+          onClick={() => props.onSelectIssue(issue.issueId)}
+        >
+          <b>{issue.title}</b>
+          <span>
+            {indirect ? `${time} · ${issue.why}` : time}
+            {issue.evidenceCount !== null && ` · 근거 ${issue.evidenceCount}건`}
+          </span>
+          {issue.role && (
+            <span>
+              역할 · {issue.role === 'participant' ? '참여 기업' : issue.role}
+            </span>
+          )}
+        </button>
+        {evidenceIds.length > 0 && (
+          <div className="px-3 pb-2">
+            <button
+              type="button"
+              className="w-auto! rounded-panel border border-zoop-line bg-zoop-paper px-2.5! py-1! text-caption font-semibold text-zoop-ink hover:bg-zoop-soft"
+              onClick={() =>
+                props.onIssueEvidence?.({
+                  id: issue.issueId,
+                  title: issue.title,
+                  evidenceIds,
+                })
+              }
+            >
+              근거 {evidenceIds.length}건 보기
+            </button>
+          </div>
+        )}
+        <IssueDocumentSentiments
+          documents={data?.documents?.items ?? []}
+          companyId={props.companyId}
+          issueId={issue.issueId}
+        />
+      </li>
+    );
+  };
+  // M2 · prototype node-panel.tsx:255-256,275: 사건은 3건만 펼치고 나머지는 접는다. 튜토리얼 대상이 접힌 쪽이면 펼친다.
+  const issueList = (
+    issues: PanelIssue[],
+    indirect: boolean,
+    label: string,
+  ) => {
+    const rest = issues.slice(VISIBLE_ISSUES);
+    return (
+      <>
+        <ul className="company-list">
+          {issues.slice(0, VISIBLE_ISSUES).map((i) => issueRow(i, indirect))}
+        </ul>
+        {rest.length > 0 && (
+          <details
+            className="company-aliases"
+            open={
+              rest.some((issue) => issue.issueId === props.tutorialIssueId) ||
+              undefined
+            }
+          >
+            <summary>
+              {label} {rest.length}건 더 보기
+            </summary>
+            <ul className="company-list mt-2">
+              {rest.map((issue) => issueRow(issue, indirect))}
+            </ul>
+          </details>
+        )}
+      </>
+    );
+  };
+  const indirect = company
+    ? indirectIssues(
+        company.directIssues,
+        company.structuralIssues,
+        props.graph,
+      )
+    : [];
+  const documents = data?.documents?.items ?? [];
 
   return (
     <aside
@@ -282,7 +501,9 @@ export default function CompanyDetailPanel(props: Props) {
                 로그인 후 관심 추가
               </Link>
             )}
-            <button onClick={props.onFocus}>기업 중심 그래프</button>
+            {canFocus && (
+              <button onClick={props.onFocus}>기업 중심 그래프</button>
+            )}
             <button
               className={`bg-panel-ink! text-white! ${props.tutorialAi ? 'tutorial-target tutorial-ai-target' : ''}`}
               disabled={props.tutorialSaving}
@@ -420,78 +641,31 @@ export default function CompanyDetailPanel(props: Props) {
           )}
           <section className={ui.sectionFrame}>
             <div className="company-section-title">
-              <h3>직접 관련 사건</h3>
+              <div className="flex items-center gap-1.5">
+                <h3>직접 관련 사건</h3>
+                <RelationHint label="직접 관련" text={relationHelp.INVOLVES} />
+              </div>
               <span>{company.directIssues.length}</span>
             </div>
             {company.directIssues.length ? (
-              <ul className="company-list">
-                {company.directIssues.map((issue) => (
-                  <li key={issue.issueId}>
-                    <button
-                      className={
-                        props.tutorialIssueId === issue.issueId
-                          ? 'tutorial-target'
-                          : undefined
-                      }
-                      data-tutorial-action={
-                        props.tutorialIssueId === issue.issueId
-                          ? 'issue'
-                          : undefined
-                      }
-                      onClick={() => props.onSelectIssue(issue.issueId)}
-                    >
-                      <b>{issue.title}</b>
-                      <span>
-                        {eventTimeText(issue.eventTime, issue.timePrecision) ??
-                          '시각 미상'}{' '}
-                        · 근거 {issue.evidenceCount}건
-                      </span>
-                    </button>
-                    <IssueDocumentSentiments
-                      documents={data.documents?.items ?? []}
-                      companyId={company.id}
-                      issueId={issue.issueId}
-                    />
-                  </li>
-                ))}
-              </ul>
+              issueList(company.directIssues, false, '직접 관련 사건')
             ) : (
               <p className="company-unavailable">직접 관련 사건이 없습니다.</p>
             )}
           </section>
           <section className={ui.sectionFrame}>
             <div className="company-section-title">
-              <h3>간접 관련 사건</h3>
-              <span>{company.structuralIssues.length}</span>
+              <div className="flex items-center gap-1.5">
+                <h3>간접 관련 사건</h3>
+                <RelationHint
+                  label="간접 관련"
+                  text={`기사에 이 기업이 직접 나오지는 않지만 데이터로 이어진 사건입니다. ${relationHelp.STRUCTURALLY_RELATED_TO} ${relationHelp.FOLLOWS}`}
+                />
+              </div>
+              <span>{indirect.length}</span>
             </div>
-            {company.structuralIssues.length ? (
-              <ul className="company-list">
-                {company.structuralIssues.map((issue) => (
-                  <li key={issue.issueId}>
-                    <button
-                      className={
-                        props.tutorialIssueId === issue.issueId
-                          ? 'tutorial-target'
-                          : undefined
-                      }
-                      data-tutorial-action={
-                        props.tutorialIssueId === issue.issueId
-                          ? 'issue'
-                          : undefined
-                      }
-                      onClick={() => props.onSelectIssue(issue.issueId)}
-                    >
-                      <b>{issue.title}</b>
-                      <span>구조적 연관 · 근거 {issue.evidenceCount}건</span>
-                    </button>
-                    <IssueDocumentSentiments
-                      documents={data.documents?.items ?? []}
-                      companyId={company.id}
-                      issueId={issue.issueId}
-                    />
-                  </li>
-                ))}
-              </ul>
+            {indirect.length ? (
+              issueList(indirect, true, '간접 관련 사건')
             ) : (
               <p className="company-unavailable">
                 확인된 간접 관련 사건이 없습니다.
@@ -500,22 +674,32 @@ export default function CompanyDetailPanel(props: Props) {
           </section>
           <section className={ui.sectionFrame}>
             <div className="company-section-title">
-              <h3>관련 기업</h3>
+              <div className="flex items-center gap-1.5">
+                <h3>관련 기업</h3>
+                <RelationHint
+                  label="사건 공유"
+                  text={relationHelp.SHARES_ISSUE}
+                />
+              </div>
               <span>{props.relatedCompanies.length}</span>
             </div>
             {props.relatedCompanies.length ? (
-              <ul className="company-list company-related-companies">
-                {props.relatedCompanies.slice(0, 5).map((related) => (
-                  <li key={related.id}>
-                    <button
-                      onClick={() => props.onSelectRelation?.(related.id)}
-                    >
-                      <b>{related.name}</b>
-                      <span>공유 사건 {related.sharedIssueCount}건</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="company-list company-related-companies">
+                  {props.relatedCompanies.slice(0, 5).map(relatedItem)}
+                </ul>
+                {/* 6곳부터는 접어 두고, 펼치면 나머지를 같은 목록으로 보여 준다. */}
+                {props.relatedCompanies.length > 5 && (
+                  <details className="company-aliases">
+                    <summary>
+                      관련 기업 {props.relatedCompanies.length - 5}곳 더 보기
+                    </summary>
+                    <ul className="company-list company-related-companies">
+                      {props.relatedCompanies.slice(5).map(relatedItem)}
+                    </ul>
+                  </details>
+                )}
+              </>
             ) : (
               <p className="company-unavailable">
                 확인된 관련 기업이 없습니다.
@@ -527,9 +711,10 @@ export default function CompanyDetailPanel(props: Props) {
               <h3>뉴스·공시</h3>
               <span>{data.documents?.items.length ?? '—'}</span>
             </div>
-            {data.documents?.items.length ? (
+            {documents.length ? (
               <ul className="company-list">
-                {data.documents.items.map((document) => (
+                {/* M7 · prototype company-summary.tsx:76-81: 최근 3건과 문서별 판정만 보이고, 전체는 기업 상세 문서 탭으로 보낸다. */}
+                {documents.slice(0, VISIBLE_DOCUMENTS).map((document) => (
                   <li key={document.id}>
                     {document.url ? (
                       <a href={document.url} target="_blank" rel="noreferrer">
@@ -549,6 +734,10 @@ export default function CompanyDetailPanel(props: Props) {
                         </span>
                       </div>
                     )}
+                    <DocumentSentimentLine
+                      document={document}
+                      companyId={company.id}
+                    />
                   </li>
                 ))}
               </ul>
@@ -557,6 +746,21 @@ export default function CompanyDetailPanel(props: Props) {
                 표시할 뉴스·공시가 없습니다.
               </p>
             ) : null}
+            {documents.length > VISIBLE_DOCUMENTS && (
+              <p className="company-unavailable mt-2">
+                최근 {VISIBLE_DOCUMENTS}건만 보여요. 전체 뉴스·공시는{' '}
+                <Link
+                  className="underline"
+                  to={documentsHref(
+                    props.companyDetailHref?.(company.id) ??
+                      `/companies/${encodeURIComponent(company.id)}`,
+                  )}
+                >
+                  기업 상세 문서
+                </Link>
+                에서 볼 수 있어요.
+              </p>
+            )}
             <SectionError
               message={errors.documents}
               retry={() => setRetry((value) => value + 1)}
@@ -565,5 +769,32 @@ export default function CompanyDetailPanel(props: Props) {
         </div>
       )}
     </aside>
+  );
+}
+
+/** 기업 상세 주소에 문서 탭을 더한다(이미 있는 쿼리는 그대로). */
+function documentsHref(href: string) {
+  const [path, query = ''] = href.split('?');
+  const params = new URLSearchParams(query);
+  params.set('tab', 'documents');
+  return `${path}?${params}`;
+}
+
+function DocumentSentimentLine({
+  document,
+  companyId,
+}: {
+  document: import('@/types/map/company').CompanyDocument;
+  companyId: string;
+}) {
+  const sentiment = visibleSentiment(document, companyId);
+  if (!sentiment) return null;
+  return (
+    <div className="px-3 pb-2 text-zoop-muted">
+      <DocumentSentiment
+        value={sentiment}
+        name={document.title ?? '뉴스·공시 문서'}
+      />
+    </div>
   );
 }

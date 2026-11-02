@@ -185,6 +185,7 @@ def contracts() -> None:
     from openapi_spec_validator import validate
     from jsonschema.validators import validator_for
     from jsonschema import FormatChecker
+    from referencing import Registry, Resource
     contract = yaml.safe_load((ROOT / "docs/api/openapi.yaml").read_text())
     validate(contract)
     internal = ROOT / "docs/api/internal-ai-openapi.json"
@@ -221,9 +222,33 @@ def contracts() -> None:
             validator({"$defs": schema["$defs"], "$ref": f"#/$defs/{definition}"},
                       format_checker=FormatChecker()).validate(value)
             records_checked += 1
+    chat_schema_paths = {
+        "requests": ROOT / "docs/api/chat-tool-request.schema.json",
+        "results": ROOT / "docs/api/chat-tool-result.schema.json",
+        "routeSummaries": ROOT / "docs/api/chat-route-summary.schema.json",
+    }
+    chat_schemas = {kind: json.loads(path.read_text(encoding="utf-8"))
+                    for kind, path in chat_schema_paths.items()}
+    chat_registry = Registry().with_resources(
+        (value["$id"], Resource.from_contents(value)) for value in chat_schemas.values())
+    chat_fixtures = json.loads((ROOT / "docs/api/fixtures/chat-internal-contracts.json")
+                               .read_text(encoding="utf-8"))
+    if set(chat_fixtures) != set(chat_schema_paths):
+        raise ValueError("Chat internal contract fixture groups differ from the three schemas.")
+    chat_records_checked = 0
+    for kind, values in chat_fixtures.items():
+        if not isinstance(values, list) or not values:
+            raise ValueError(f"Chat internal contract fixture group {kind} must be a non-empty list.")
+        chat_schema = chat_schemas[kind]
+        validator_class = validator_for(chat_schema)
+        chat_validator = validator_class(chat_schema, format_checker=FormatChecker(), registry=chat_registry)
+        for value in values:
+            chat_validator.validate(value)
+            chat_records_checked += 1
     for path in (*ROOT.glob("prototype/*/pyproject.toml"), *ROOT.glob("ai/*/pyproject.toml")):
         tomllib.loads(path.read_text(encoding="utf-8"))
-    print(f"OpenAPI (public target + internal AI transport, YAML equals JSON), {len(paths)} JSON documents/schemas, {records_checked} portable fixture records with format checks, app TOML: passed.")
+    print(f"OpenAPI (public target + internal AI transport, YAML equals JSON), {len(paths)} JSON documents/schemas, "
+          f"{records_checked} AI and {chat_records_checked} chat portable fixture records with format checks, app TOML: passed.")
 
 
 def copy_file(root: Path, target: Path, relative: str) -> None:

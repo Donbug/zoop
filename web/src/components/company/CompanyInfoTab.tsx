@@ -2,6 +2,8 @@ import type { Resource } from '@/hooks/useCompanyResource';
 import type { Company } from '@/types/company/detail';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import LoadingIndicator from '@/components/common/LoadingIndicator';
+import { useColorTheme } from '@/util/theme-color';
+import { formatKst } from '@/util/format';
 
 const fields = [
   ['legalName', '정식 법인명'],
@@ -32,6 +34,8 @@ export default function CompanyInfoTab({
 }: {
   resource: Resource<Company>;
 }) {
+  // 기업 상세 라이트는 #491 이전 모양을 유지하고, 다크만 지도 개선 테마 표면을 쓴다.
+  const dark = useColorTheme() === 'dark';
   const company = resource.data;
   const href = website(company?.websiteUrl ?? null);
   const permission =
@@ -81,19 +85,37 @@ export default function CompanyInfoTab({
         </div>
       ) : company ? (
         <>
-          {!fields.some(([key]) => provided(company[key])) && !href && (
-            <p role="status">확인된 기업 기준정보가 없습니다.</p>
-          )}
+          {!fields.some(([key]) => provided(company[key])) &&
+            !href &&
+            !company.aliases?.length && (
+              <p role="status">확인된 기업 기준정보가 없습니다.</p>
+            )}
           <dl className="grid grid-cols-2 gap-x-4 text-caption max-sm:grid-cols-1">
+            {/* D-COM-03 D18: aliases are supplied by getCompany, never inferred. */}
+            <div
+              className={`min-w-0 border-b py-4 ${dark ? 'border-zoop-border' : 'border-zoop-line'}`}
+            >
+              <dt className="text-zoop-muted">다른 이름</dt>
+              <dd className="mt-1 font-semibold wrap-anywhere">
+                {company.aliases?.length
+                  ? company.aliases.join(' · ')
+                  : '미제공'}
+              </dd>
+            </div>
             {fields.map(([key, label]) => (
-              <div key={key} className="min-w-0 border-b border-zoop-line py-4">
+              <div
+                key={key}
+                className={`min-w-0 border-b py-4 ${dark ? 'border-zoop-border' : 'border-zoop-line'}`}
+              >
                 <dt className="text-zoop-muted">{label}</dt>
                 <dd className="mt-1 font-semibold wrap-anywhere">
                   {provided(company[key]) ?? '미제공'}
                 </dd>
               </div>
             ))}
-            <div className="min-w-0 border-b border-zoop-line py-4">
+            <div
+              className={`min-w-0 border-b py-4 ${dark ? 'border-zoop-border' : 'border-zoop-line'}`}
+            >
               <dt className="text-zoop-muted">홈페이지</dt>
               <dd className="mt-1 wrap-anywhere">
                 {href ? (
@@ -134,8 +156,10 @@ export default function CompanyInfoTab({
           )}
           <p className="mt-4 wrap-anywhere">
             조회 출처 {company.metadata.source} · 관계·요약 자료 기준{' '}
-            {company.metadata.asOf} · 공개 버전{' '}
-            {company.metadata.graphVersion ?? '미제공'}
+            <time dateTime={company.metadata.asOf ?? undefined}>
+              {formatKst(company.metadata.asOf)}
+            </time>{' '}
+            · 공개 버전 {company.metadata.graphVersion ?? '미제공'}
           </p>
           <p>기업 기준정보의 별도 갱신 시각은 제공되지 않았습니다.</p>
         </>

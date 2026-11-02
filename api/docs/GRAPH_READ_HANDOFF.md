@@ -57,11 +57,21 @@ DB 연결은 기존 `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`를 사용하며 `.env
 
 ### 관리자 활성화 HTTP의 합성 검증 경계
 
-`api/scripts/graph_handoff_activation_smoke.py`는 기존 SQL 활성화 harness와 별도로 실행합니다([실행 명령과 전제](../README.md#관리자-http-활성화의-별도-합성-smoke)). 설치된 CLI의 합성 bundle `-7`을 Spring으로 비활성 수입한 뒤, 공개 제외 저장소가 연결된 기본 설정에서 현재 권리 철회로 활성화가 409 `REVISION_CONFLICT`로 거절되고 포인터·review revision·이력·감사·멱등 기록이 바뀌지 않는지 확인합니다. 권리를 복구한 뒤 같은 JVM에서 개발용 우회 플래그 없이 실제 관리자 HTTP 활성화, 멱등·stale 조건, 같은 공개 버전의 graph·event·evidence HTTP와 현재 권리 철회·복구를 검사합니다. 공개 제외 저장소의 읽기 실패에 따른 503 `SOURCE_UNAVAILABLE` 계약은 Java 시험의 범위입니다.
+`api/scripts/graph_handoff_activation_smoke.py`는 기존 SQL 활성화 harness와 별도로 실행합니다([실행 명령과 전제](../README.md#관리자-http-활성화의-별도-합성-smoke)). 설치된 CLI의 합성 bundle `-8`을 Spring으로 비활성 수입한 뒤, 공개 제외 저장소가 연결된 기본 설정에서 현재 권리 철회로 활성화가 409 `REVISION_CONFLICT`로 거절되고 포인터·review revision·이력·감사·멱등 기록이 바뀌지 않는지 확인합니다. 권리를 복구한 뒤 같은 JVM에서 개발용 우회 플래그 없이 실제 관리자 HTTP 활성화, 멱등·stale 조건, 같은 공개 버전의 graph·event·evidence HTTP와 현재 권리 철회·복구를 검사합니다. 공개 제외 저장소의 읽기 실패에 따른 503 `SOURCE_UNAVAILABLE` 계약은 Java 시험의 범위입니다.
 
 합성 관리자 세션은 소유한 임시 DB에만 준비하며 실제 세션 조회·CSRF·Origin 검사를 통과합니다. 비밀번호 로그인·OAuth·운영 계정 발급, 제외 명령의 변경·해제나 운영 공개 준비는 증명하지 않습니다. 모델 호출은 없으며, SQL로 활성 포인터를 움직여 HTTP 성공으로 간주하지 않습니다. 기존 `graph_handoff_import_smoke.py`의 `harnessActivations`는 계속 **SQL 시험 활성화**를 뜻하고, 새 명령의 `adminHttpActivations`·`httpPointerChanges` 및 fixture seed 이력과 구분합니다.
 
-최초 smoke에서는 bundle `-7`의 사건 상세가 503 `SOURCE_UNAVAILABLE`로 거절됐습니다. 이후 `EventDetailService`가 소비 필드의 의미가 같은 정확한 bundle `-5`·`-6`·`-7` receipt를 읽도록 수정했고, 새 수입은 계속 `-7`만 허용합니다. 당시 수정 후 새 jar의 실제 HTTP 28단계에서 활성화·graph·event·evidence 조회와 현재 권리 철회/복원을 확인했으며, 공개 제외 저장소 통합 후 기본 설정 경로의 재검증과는 별개입니다. 미지원 과거·미래 버전과 접두어 유사값은 거절하며, 요약의 미제공 상태는 바꾸지 않았습니다. 이 로컬 검증은 운영 배포나 수령자의 실행 확인을 뜻하지 않습니다.
+최초 smoke에서는 bundle `-7`의 사건 상세가 503 `SOURCE_UNAVAILABLE`로 거절됐습니다. 이후 `EventDetailService`가 소비 필드의 의미가 같은 정확한 bundle `-5`·`-6`·`-7` receipt를 읽도록 수정했고, 당시 신규 수입은 `-7`만 허용했습니다. 당시 수정 후 새 jar의 실제 HTTP 28단계에서 활성화·graph·event·evidence 조회와 현재 권리 철회/복원을 확인했으며, 공개 제외 저장소 통합 후 기본 설정 경로의 재검증과는 별개입니다. 미지원 과거·미래 버전과 접두어 유사값은 거절하며, 요약의 미제공 상태는 바꾸지 않았습니다. 이 로컬 검증은 운영 배포나 수령자의 실행 확인을 뜻하지 않습니다.
+
+### 생산자 exposure에서 공개 제외·해제까지의 합성 검증
+
+`api/scripts/graph_handoff_exclusion_smoke.py`는 설치된 exposure CLI → 실제 비웹 운영자 제외·해제 명령 → PostgreSQL → 공개 graph·event·evidence HTTP를 연결합니다([전제·실행 명령·정리 방법](../README.md#공개-제외-왕복의-별도-합성-smoke)). 현재 bundle `-8` builder와 import helper, 관리자 HTTP 활성화, 소유 DB 정리 경로를 재사용합니다. 비교용 원본을 먼저 공개하고, 기존 publication composer로 그 원본과 검사 대상 원본을 합친 구성본을 만든 뒤 현재 포인터 CAS로 공개합니다. 보고서·제외·해제는 검사 대상 원본의 receipt·버전에 고정하며, 공개 대상 조회에는 구성본 ID를 사용합니다.
+
+버전 고정 조회의 과거 시점 필터를 만족하도록 이 시나리오의 공장 기사에는 수집 전 합성 발행 시각을 명시하고, 동결된 bundle에서 같은 시각과 정밀도를 확인합니다. 전체 생산자 보고서와 공개 전후의 가시성 기준은 그대로 검사합니다.
+
+같은 버전의 공개 → 제외 → 해제 → 재제외, 다른 원본 handoff 버전의 독립성, 두 번째 receipt의 세 pin 불일치에 따른 원자적 거절, 실제 빈 보고서·작은 보고서의 기존 제외 유지, 동일 명령 재실행, 오래된 해제 명령과 새 제외의 충돌 방지를 검사합니다. 관계는 생산자 ID가 가리키는 bundle의 `(type, source, target)`과 공개 표시 간선을 대조합니다. source registry 권리·원장·artifact·공개 포인터의 불변도 결과 JSON에 기록합니다.
+
+이 시나리오의 source-change는 합성 검토 입력이고 `lift`는 지정 원본의 앱 제외만 해제합니다. 실제 원문 권리 복구나 재공개 승인은 별도의 판단입니다. 실행 통과 여부는 해당 실행의 결과 JSON과 종료 코드로 확인합니다.
 
 
 ## 수집·분석 실행과 공개 스케줄의 책임

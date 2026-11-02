@@ -217,13 +217,16 @@ function headersOf(pathEnd: string) {
     .map(([, init]) => new Headers(init?.headers));
 }
 
-function open(path: string) {
+function open(path: string, readOnly = false) {
   return renderRoutes(
     [
       {
         element: <AdminProtectedRoute />,
         children: [
-          { path: '/admin/briefings', element: <AdminBriefingsPage /> },
+          {
+            path: '/admin/briefings',
+            element: <AdminBriefingsPage readOnly={readOnly} />,
+          },
           { path: '/admin/ai', element: <AdminAiPage /> },
         ],
       },
@@ -309,18 +312,14 @@ describe('A-ADM-04 브리핑 운영 (FS070·FS071)', () => {
     await user.click(within(panel).getByRole('button', { name: '재처리' }));
     const form = within(panel).getByRole('form', { name: '브리핑 재처리' });
     expect(
-      within(form).getByText(/무료\(모델을 다시 부르지 않아요\)/),
+      within(form).getByText(/서버에서 승인한 실행 방식과 호출 상한/),
     ).toBeTruthy();
-    await user.click(
-      within(form).getByRole('button', { name: '재처리 요청(무료)' }),
-    );
+    await user.click(within(form).getByRole('button', { name: '재처리 요청' }));
     expect(within(form).getByText('사유를 입력해 주세요.')).toBeTruthy();
     expect(server.calls('POST', REPROCESS)).toHaveLength(0);
 
     await user.type(within(form).getByLabelText('재처리 사유'), '원장 복구됨');
-    await user.click(
-      within(form).getByRole('button', { name: '재처리 요청(무료)' }),
-    );
+    await user.click(within(form).getByRole('button', { name: '재처리 요청' }));
 
     expect(await within(panel).findByText('재처리를 요청했어요.')).toBeTruthy();
     expect(server.calls('POST', REPROCESS)[0].body).toEqual({
@@ -344,9 +343,7 @@ describe('A-ADM-04 브리핑 운영 (FS070·FS071)', () => {
     const form = within(panel).getByRole('form', { name: '브리핑 재처리' });
     await user.type(within(form).getByLabelText('재처리 사유'), reason);
     const submit = () =>
-      user.click(
-        within(form).getByRole('button', { name: '재처리 요청(무료)' }),
-      );
+      user.click(within(form).getByRole('button', { name: '재처리 요청' }));
     await submit();
     return { user, panel, form, submit };
   }
@@ -909,7 +906,7 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
       screen.getByRole('meter', { name: 'AI 기능을 쓴 회원 비율' }),
     ).toBeTruthy();
     const tokens = screen.getByRole('group', {
-      name: '전체 날짜별 토큰 사용량 (←→로 날짜 이동)',
+      name: '전체 기록된 날짜별 토큰 사용량 (←→로 날짜 이동)',
     });
     // 날짜는 오래된 것부터 그린다.
     const bars = within(tokens).getAllByRole('img');
@@ -941,7 +938,7 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
 
     // 실제 청구액이 있는 기능(브리핑)과 추정만 있는 기능(챗봇)을 함께 더한다.
     const allCost = screen.getByRole('group', {
-      name: '전체 날짜별 AI 비용 (←→로 날짜 이동)',
+      name: '전체 기록된 날짜별 AI 비용 (←→로 날짜 이동)',
     });
     expect(
       within(allCost).getAllByRole('img')[1].getAttribute('aria-label'),
@@ -951,14 +948,14 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     expect(location()).toBe('/admin/ai?view=briefing');
     expect(screen.getByText('측정 안 함 / 전체 200명')).toBeTruthy();
     const briefing = screen.getByRole('group', {
-      name: '브리핑 날짜별 토큰 사용량 (←→로 날짜 이동)',
+      name: '브리핑 기록된 날짜별 토큰 사용량 (←→로 날짜 이동)',
     });
     const briefingBars = within(briefing).getAllByRole('img');
     expect(briefingBars[0].getAttribute('aria-label')).toBe(
       '10월 23일 입력 자료 없음, 출력 자료 없음, 모델 호출 자료 없음',
     );
     const cost = screen.getByRole('group', {
-      name: '브리핑 날짜별 AI 비용 (←→로 날짜 이동)',
+      name: '브리핑 기록된 날짜별 AI 비용 (←→로 날짜 이동)',
     });
     expect(within(cost).getAllByRole('img')[1].getAttribute('aria-label')).toBe(
       '10월 24일 실제 0.01 USD',
@@ -972,7 +969,7 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     await user.click(screen.getByRole('tab', { name: 'AI 챗봇' }));
     expect(screen.getByText('15%')).toBeTruthy();
     const chatCost = screen.getByRole('group', {
-      name: 'AI 챗봇 날짜별 AI 비용 (←→로 날짜 이동)',
+      name: 'AI 챗봇 기록된 날짜별 AI 비용 (←→로 날짜 이동)',
     });
     expect(
       within(chatCost).getAllByRole('img')[0].getAttribute('aria-label'),
@@ -1023,5 +1020,44 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     expect(share.textContent).toContain('1천');
     expect(share.textContent).toContain('자료 없음');
     expect(share.textContent).not.toContain('%');
+  });
+});
+
+// The actual route defaults to the DB-backed read-only surface. Legacy form tests above
+// explicitly enable their isolated mock write API; no real mutation route is implied.
+describe('DB 연결 관리자 조회 화면', () => {
+  test('회차 상세는 읽되 연결되지 않은 쓰기는 요청하지 않는다', async () => {
+    server.on('GET', ROUND, () =>
+      json(
+        detail({
+          ...round(),
+          stages: {
+            generate: { status: 'done', at: null },
+            verify: { status: 'unknown', at: null },
+            publish: { status: 'done', at: null },
+          },
+        }),
+      ),
+    );
+    const { user } = open('/admin/briefings', true);
+    await user.click(
+      await screen.findByRole('button', { name: '2026-10-06 출근' }),
+    );
+    expect(await screen.findByText('검증 기록 없음')).toBeTruthy();
+    expect(screen.getByText(/회차 조회만 제공됩니다/)).toBeTruthy();
+    for (const label of ['재처리', '정정 등록', '제공 중단']) {
+      const button = screen.getByRole('button', {
+        name: label,
+      }) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      await user.click(button);
+    }
+    expect(screen.queryByRole('textbox', { name: /사유/ })).toBeNull();
+    const calls = (
+      globalThis.fetch as unknown as {
+        mock: { calls: [unknown, RequestInit | undefined][] };
+      }
+    ).mock.calls;
+    expect(calls.some(([, init]) => init?.method === 'POST')).toBe(false);
   });
 });

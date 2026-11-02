@@ -20,6 +20,7 @@ export default function CompanyPathPanel({
   onRetry,
   onEvidence,
   onSelectCompany,
+  onSelectNode,
 }: {
   graph: GraphResponse | null;
   from: string;
@@ -33,6 +34,7 @@ export default function CompanyPathPanel({
   onRetry: () => void;
   onEvidence: (id: string) => void;
   onSelectCompany?: (id: string) => void;
+  onSelectNode?: (id: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const edgeType = (id: string) =>
@@ -45,6 +47,11 @@ export default function CompanyPathPanel({
   const source = companies.find((n) => n.id === from);
   const target = companies.find((n) => n.id === to);
   const path = graph && to ? companyPath(graph, from, to) : null;
+  const matches = companies.filter(
+    (n) =>
+      n.id !== from &&
+      n.label.toLowerCase().includes(query.trim().toLowerCase()),
+  );
   return (
     <aside
       className={ui.shell}
@@ -109,23 +116,29 @@ export default function CompanyPathPanel({
               />
             </label>
             <ul className={ui.list}>
-              {companies
-                .filter(
-                  (n) =>
-                    n.id !== from &&
-                    n.label.toLowerCase().includes(query.toLowerCase()),
-                )
-                .map((n) => (
-                  <li key={n.id}>
-                    <button
-                      className="w-full py-2 text-left"
-                      onClick={() => onPick(n.id)}
-                    >
-                      {n.label}
-                    </button>
-                  </li>
-                ))}
+              {matches.map((n) => (
+                <li key={n.id}>
+                  <button
+                    className="flex w-full items-center gap-2 py-2 text-left"
+                    onClick={() => onPick(n.id)}
+                  >
+                    <CompanyLogo
+                      name={n.label}
+                      logoUrl={n.logoUrl}
+                      className={ui.avatar}
+                    />
+                    {n.label}
+                  </button>
+                </li>
+              ))}
             </ul>
+            {!matches.length && (
+              <p role="status">
+                {query.trim()
+                  ? `‘${query.trim()}’와 맞는 기업이 없어요.`
+                  : '고를 수 있는 기업이 없어요.'}
+              </p>
+            )}
           </section>
         ) : !target ? (
           <p className={ui.state}>
@@ -175,9 +188,14 @@ export default function CompanyPathPanel({
                     </button>
                   ) : (
                     <>
-                      <strong className="block text-caption">
+                      <button
+                        type="button"
+                        className="block text-left text-caption font-semibold underline underline-offset-4 focus-visible:outline-2"
+                        disabled={!onSelectNode}
+                        onClick={() => onSelectNode?.(node.id)}
+                      >
                         {node.label}
-                      </strong>
+                      </button>
                       <p className={ui.muted}>
                         {formatEventTime(
                           node.eventTime,

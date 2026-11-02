@@ -22,6 +22,9 @@ interface Props {
   geography: GraphNode['geography'];
   /** 지도에 있는 기업 노드의 로고 */
   logoOf?: (companyId: string) => string | null | undefined;
+  nodeIds?: ReadonlySet<string>;
+  onSelectNode?: (id: string) => void;
+  canFocus?: boolean;
   onClose: () => void;
   onAction: (action: EventAction, event: EventDetail) => void;
 }
@@ -33,6 +36,9 @@ export default function EventDetailPanel({
   context,
   geography,
   logoOf,
+  nodeIds,
+  onSelectNode,
+  canFocus = true,
   onClose,
   onAction,
 }: Props) {
@@ -78,15 +84,25 @@ export default function EventDetailPanel({
               className={ui.avatar}
             />
             <div>
-              <Link
-                to={
-                  companyDetailHref?.(company.id) ??
-                  `/companies/${encodeURIComponent(company.id)}`
-                }
-                className="text-zoop-ink underline underline-offset-4 focus-visible:outline-2"
-              >
-                <strong>{company.name}</strong>
-              </Link>
+              {nodeIds?.has(company.id) && onSelectNode ? (
+                <button
+                  type="button"
+                  onClick={() => onSelectNode(company.id)}
+                  className="text-left text-zoop-ink underline underline-offset-4 focus-visible:outline-2"
+                >
+                  <strong>{company.name}</strong>
+                </button>
+              ) : (
+                <Link
+                  to={
+                    companyDetailHref?.(company.id) ??
+                    `/companies/${encodeURIComponent(company.id)}`
+                  }
+                  className="text-zoop-ink underline underline-offset-4 focus-visible:outline-2"
+                >
+                  <strong>{company.name}</strong>
+                </Link>
+              )}
               <p>
                 {company.roleUnconfirmed
                   ? '역할 미확인'
@@ -184,10 +200,12 @@ export default function EventDetailPanel({
                   ? '근거 조회 실패'
                   : `근거 ${evidenceCount}건 보기`}
               </button>
-              <button onClick={() => action('focus')}>
-                <GraphIcon name="fit" size={14} />
-                이슈 중심 그래프
-              </button>
+              {canFocus && (
+                <button onClick={() => action('focus')}>
+                  <GraphIcon name="fit" size={14} />
+                  이슈 중심 그래프
+                </button>
+              )}
               <button onClick={() => action('ai')}>
                 <GraphIcon name="ai" size={14} />
                 AI에게 묻기
@@ -329,7 +347,11 @@ export default function EventDetailPanel({
                 기업별 영향 해석은 제공되지 않았습니다.
               </p>
             </section>
-            <EventLinkedDetails event={data} />
+            <EventLinkedDetails
+              event={data}
+              nodeIds={nodeIds}
+              onSelectNode={onSelectNode}
+            />
             <footer className={ui.footer}>
               <p>{data.metadata.source}</p>
               <p>

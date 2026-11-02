@@ -646,6 +646,24 @@ function MapWorkspace({
     graphVersion: data?.metadata.graphVersion ?? undefined,
     asOf: data?.metadata.asOf ?? undefined,
   };
+  // D-GRP-02/06/07 M10–M14: panel rows reuse map selection and centering.
+  const panelNodeIds = new Set(data?.nodes.map((node) => node.id) ?? []);
+  function selectPanelNode(id: string) {
+    if (tutorialOpen) {
+      selectNode(id);
+      return;
+    }
+    updateQuery({
+      select: `node:${id}`,
+      id: null,
+      path: null,
+      impact: null,
+      focus: null,
+      hops: null,
+    });
+    track({ type: 'graph_node_select', targetId: id, viewId });
+    setCenterRequest((request) => ({ id, seq: (request?.seq ?? 0) + 1 }));
+  }
   const impact = useImpactPath(
     data && !loading && !error ? impactCompanyId : null,
     data && !loading && !error ? impactIssueId : null,
@@ -1033,9 +1051,10 @@ function MapWorkspace({
               aria-controls="holdings-sidebar"
               onClick={() => changeSidebar(!sidebarOpen)}
               title="보유·관심 종목 목록 보기"
-              aria-label="내 종목 목록"
+              aria-label="보유·관심 목록"
             >
-              <GraphIcon name="sidebar" inheritColor />내 종목
+              <GraphIcon name="sidebar" inheritColor />
+              보유·관심
             </button>
             <div className="relationship-mode" aria-label="그래프 모드">
               <button
@@ -1127,6 +1146,7 @@ function MapWorkspace({
                 <HoldingsSidebar
                   key={memoryOwner}
                   member={Boolean(token)}
+                  selectedId={selectedId}
                   graph={!loading && !error ? data : null}
                   watchSync={watchSync}
                   onWatchChanged={watchSaved}
@@ -1429,7 +1449,10 @@ function MapWorkspace({
             >
               {isolatedOpen && data && (
                 <IsolatedIssuesPanel
+                  key={`${memoryOwner}:${JSON.stringify(eventContext)}`}
                   issues={isolatedIssues(data)}
+                  context={eventContext}
+                  onEvidence={(event) => eventAction('evidence', event)}
                   onClose={() => selectNode(null)}
                   onSelect={(id) => {
                     selectNode(id);
@@ -1447,6 +1470,17 @@ function MapWorkspace({
                   context={round || tutorialOpen ? eventContext : undefined}
                   fallback={companyNode}
                   relatedCompanies={relatedCompanies}
+                  graph={data}
+                  focusId={focusId}
+                  onIssueEvidence={(issue) =>
+                    useGraphUiStore.getState().openEvidence({
+                      kind: 'issue',
+                      id: issue.id,
+                      label: issue.title,
+                      evidenceIds: issue.evidenceIds,
+                      mapContext: { ...eventContext, url: `/?${params}` },
+                    })
+                  }
                   token={token}
                   watchSync={watchSync}
                   onWatchSaved={watchSaved}
@@ -1511,14 +1545,8 @@ function MapWorkspace({
                       select: null,
                     })
                   }
-                  onSelectCompany={(id) =>
-                    updateQuery({
-                      path: null,
-                      focus: null,
-                      hops: null,
-                      select: `node:${id}`,
-                    })
-                  }
+                  onSelectCompany={selectPanelNode}
+                  onSelectNode={selectPanelNode}
                   onEvidence={(id) => {
                     const node = data?.nodes.find((n) => n.id === id);
                     const evidenceIds = [
@@ -1545,6 +1573,7 @@ function MapWorkspace({
                   context={eventContext}
                   graph={data}
                   impact={impact.data}
+                  onSelectNode={selectPanelNode}
                   loading={impact.loading}
                   error={impact.error}
                   errorCode={impact.errorCode}
@@ -1596,6 +1625,17 @@ function MapWorkspace({
                     context={eventContext}
                     geography={selectedNode?.geography ?? null}
                     logoOf={logoOf}
+                    nodeIds={panelNodeIds}
+                    onSelectNode={selectPanelNode}
+                    canFocus={
+                      focusId !== eventId &&
+                      Boolean(
+                        data?.edges.some(
+                          (edge) =>
+                            edge.source === eventId || edge.target === eventId,
+                        ),
+                      )
+                    }
                     onClose={() => selectNode(null)}
                     onAction={eventAction}
                   />
@@ -1687,10 +1727,12 @@ function MapWorkspace({
                   <p>지도를 확인한 뒤 종목을 다시 선택해 주세요.</p>
                 )}
                 {notice === 'info' && (
+                  // D-GRP-01 지도 읽는 법: prototype graph-legend.tsx 안내를 실제 표시 방식(이름 아래 보유·관심 표기)에 맞춘다.
                   <p>
                     기업·공유 사건과 관계를 표시합니다. 개별 사건은 ϟ 숫자로
-                    접어 표시합니다. MOCK 표시는 실제 시장 정보가 아닌 개발용
-                    가상 데이터입니다.
+                    접어 표시합니다. 보유·관심 종목은 이름 아래에
+                    보유·관심이라고 적습니다. 노드 크기와 거리는 인과 관계나
+                    중요도를 뜻하지 않습니다.
                   </p>
                 )}
                 {data?.metadata.partial && (

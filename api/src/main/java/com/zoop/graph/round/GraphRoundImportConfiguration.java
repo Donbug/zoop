@@ -2,15 +2,23 @@ package com.zoop.graph.round;
 
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFileAttributes;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Clock;
+import java.util.Set;
 
 import javax.sql.DataSource;
 
 import com.zoop.ai.handoff.HandoffReadClient;
+import com.zoop.ai.observation.ObservationExportClient;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.artifact.storage.ArtifactStoreException;
 import com.zoop.document.importer.IngestionExportParser;
+import com.zoop.document.importer.IngestionExporter;
+import com.zoop.document.importer.IngestionExporters;
+import com.zoop.document.importer.ObservationSource;
 import com.zoop.document.importer.ProcessIngestionExporter;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.graph.importer.GraphHandoffImporter;
@@ -35,9 +43,10 @@ import org.springframework.transaction.support.TransactionOperations;
  *     (the auto-activation loads them), so the bridge writes into {@code zoop.graph.snapshot.artifact-root} and nowhere else;
  *     {@code fixture} is refused because its seeder activates versions;</li>
  * <li>{@code zoop.ai.handoff-read-client} is not enabled: there is no other way to read a handoff here;</li>
- * <li>{@code import-source=cli} and the S2-1 CLI, ledger directory or source registry is missing: the observation re-check still
- *     runs the installed {@code zoop-ai-ingest export --require-store} (local, single-instance operation); {@code http} is
- *     refused until the AI side's observation export route exists (#387 ③).</li>
+ * <li>{@code import-source=cli} and the S2-1 CLI, ledger directory or source registry is missing: the observation re-check runs
+ *     the installed {@code zoop-ai-ingest export --require-store} (local, single-instance operation);</li>
+ * <li>{@code import-source=http} and the observation export client is missing: an ECS deployment cannot re-check an AI-owned
+ *     observation without {@code zoop.ai.observation-export-client.enabled=true}.</li>
  * </ul>
  */
 @Configuration(proxyBeanMethods = false)
@@ -45,17 +54,22 @@ import org.springframework.transaction.support.TransactionOperations;
 @ConditionalOnProperty(prefix = "zoop.graph.round", name = "enabled", havingValue = "true")
 @EnableConfigurationProperties(GraphRoundProperties.class)
 public class GraphRoundImportConfiguration {
+    static final String STORE_ID_FILE = ".zoop-artifact-store-id";
+    private static final Set<java.nio.file.attribute.PosixFilePermission> OWNER_FILE =
+            PosixFilePermissions.fromString("rw-------");
 
     @Bean
     GraphRoundImportBridge graphRoundImportBridge(GraphRoundProperties properties, Environment environment,
-            ObjectProvider<HandoffReadClient> handoffReads, DocumentRegistryRepository registry, GraphHandoffRepository graph,
-            GraphRoundRepository rounds, TransactionOperations transaction, DataSource dataSource, Clock clock) {
+            ObjectProvider<HandoffReadClient> handoffReads, ObjectProvider<ObservationExportClient> observationExports,
+            DocumentRegistryRepository registry, GraphHandoffRepository graph, GraphRoundRepository rounds,
+            TransactionOperations transaction, DataSource dataSource, Clock clock) {
         Path root = artifactRoot(environment);
         HandoffReadClient client = handoffReads.getIfAvailable();
         if (client == null) {
             throw new GraphRoundConfigurationException("enabled", "requires zoop.ai.handoff-read-client.enabled=true");
         }
-        ProcessIngestionExporter ingestion = ingestionExporter(properties);
+        IngestionExporter ingestion = ingestionExporter(properties, observationExports);
+        requireArtifactStoreIdentity(root, properties, environment);
         ArtifactFileStore store;
         try {
             store = ArtifactFileStore.at(root);
@@ -87,14 +101,53 @@ public class GraphRoundImportConfiguration {
         }
     }
 
-    private static ProcessIngestionExporter ingestionExporter(GraphRoundProperties properties) {
-        if ("http".equalsIgnoreCase(properties.importSource())) {
-            throw new GraphRoundConfigurationException("import-source",
-                    "http is not available yet (the AI side's observation export route is pending); use cli");
+    /**
+     * An HTTP round is the shared-nothing ECS path, but its public snapshot files still need one shared POSIX serving root.
+     * Every task must be configured with the same opaque store id and see an owner-only marker containing it. This cannot
+     * prove an EFS implementation, but it fails startup for an absent/wrong mount instead of silently writing task-local data.
+     */
+    private static void requireArtifactStoreIdentity(Path root, GraphRoundProperties properties, Environment environment) {
+        String expected = environment.getProperty("zoop.graph.round.artifact-store-id", "").strip();
+        if (!expected.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,63}")) {
+            if ("http".equalsIgnoreCase(properties.importSource())) {
+                throw new GraphRoundConfigurationException("artifact-store-id",
+                        "is required with import-source=http and must be an opaque id");
+            }
+            if (!expected.isEmpty()) {
+                throw new GraphRoundConfigurationException("artifact-store-id", "must be an opaque id");
+            }
+            return;
         }
-        if (!"cli".equalsIgnoreCase(properties.importSource())) {
-            throw new GraphRoundConfigurationException("import-source", "must be cli or http");
+        try {
+            PosixFileAttributes rootAttributes = Files.readAttributes(root, PosixFileAttributes.class,
+                    LinkOption.NOFOLLOW_LINKS);
+            Path marker = root.resolve(STORE_ID_FILE);
+            PosixFileAttributes markerAttributes = Files.readAttributes(marker, PosixFileAttributes.class,
+                    LinkOption.NOFOLLOW_LINKS);
+            if (!markerAttributes.isRegularFile() || !OWNER_FILE.equals(markerAttributes.permissions())
+                    || !rootAttributes.owner().equals(markerAttributes.owner())
+                    || !expected.equals(Files.readString(marker).strip())) {
+                throw new GraphRoundConfigurationException("artifact-store-id",
+                        "does not match the owner-only marker in the artifact root");
+            }
+        } catch (GraphRoundConfigurationException error) {
+            throw error;
+        } catch (Exception error) {
+            throw new GraphRoundConfigurationException("artifact-store-id",
+                    "requires a readable owner-only marker in the artifact root");
         }
+    }
+
+    private static IngestionExporter ingestionExporter(GraphRoundProperties properties,
+            ObjectProvider<ObservationExportClient> observationExports) {
+        ObservationSource source = ObservationSource.parse(properties.importSource()).orElseThrow(
+                () -> new GraphRoundConfigurationException("import-source", "must be cli or http"));
+        return IngestionExporters.forSource(source, () -> cliIngestionExporter(properties), observationExports,
+                () -> new GraphRoundConfigurationException("import-source",
+                        "http requires zoop.ai.observation-export-client.enabled=true"));
+    }
+
+    private static ProcessIngestionExporter cliIngestionExporter(GraphRoundProperties properties) {
         Path cli = absolute("ingestion-cli", properties.ingestionCli());
         Path state = absolute("ingestion-state-dir", properties.ingestionStateDir());
         Path sources = absolute("ingestion-sources", properties.ingestionSources());

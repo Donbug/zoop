@@ -161,8 +161,8 @@ class AdminDashboardPostgresTest {
             assertTrue(historical.get(field).isNull(), field);
         }
         assertTrue(dashboard.get("candidates").isNull());
-        assertTrue(dashboard.get("ai").isNull());
-        assertTrue(dashboard.get("briefings").isNull());
+        assertTrue(dashboard.get("ai").isObject());
+        assertTrue(dashboard.get("briefings").get("latest").isArray());
         for (JsonNode failure : dashboard.get("metadata").get("failures")) {
             assertFalse("jobs".equals(failure.get("section").stringValue()));
         }

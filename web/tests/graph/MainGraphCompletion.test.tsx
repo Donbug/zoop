@@ -150,11 +150,25 @@ it('D-GRP-01 opens the sidebar on wide screens and remembers an explicit close',
     initialEntries: ['/'],
   });
   const rendered = render(<RouterProvider router={router} />);
+  const sidebarToggle = screen.getByRole('button', { name: '보유·관심 목록' });
+  expect(sidebarToggle.textContent).toBe('보유·관심');
+  expect(sidebarToggle.getAttribute('title')).toBe('보유·관심 종목 목록 보기');
   expect(
-    await screen.findByRole('complementary', { name: '내 종목' }),
+    within(screen.getByLabelText('그래프 모드')).getByRole('button', {
+      name: '내 종목',
+    }),
+  ).toBeTruthy();
+  expect(
+    await screen.findByRole('complementary', { name: '보유·관심' }),
+  ).toBeTruthy();
+  expect(
+    within(screen.getByRole('complementary', { name: '보유·관심' })).getByRole(
+      'heading',
+      { name: '보유·관심' },
+    ),
   ).toBeTruthy();
   await userEvent.click(
-    screen.getByRole('button', { name: '내 종목 사이드바 닫기' }),
+    screen.getByRole('button', { name: '보유·관심 사이드바 닫기' }),
   );
   expect(localStorage.getItem('zoop:sidebar-open')).toBe('0');
   rendered.unmount();
@@ -163,7 +177,7 @@ it('D-GRP-01 opens the sidebar on wide screens and remembers an explicit close',
   });
   render(<RouterProvider router={second} />);
   await screen.findByTestId('graph-canvas');
-  expect(screen.queryByRole('complementary', { name: '내 종목' })).toBeNull();
+  expect(screen.queryByRole('complementary', { name: '보유·관심' })).toBeNull();
   localStorage.removeItem('zoop:sidebar-open');
   vi.unstubAllGlobals();
 });
@@ -555,6 +569,23 @@ it('D-GRP-01 keeps event focus and map information controls without the extra he
     expect(button.classList.contains('max-md:min-w-10')).toBe(true);
   }
   expect(screen.queryByRole('button', { name: '조작 도움말' })).toBeNull();
+});
+
+it('D-GRP-01 지도 안내는 개발용 MOCK 문구 없이 보유·관심 표기와 크기·거리의 뜻을 알린다', async () => {
+  anonymous();
+  vi.mocked(getGraph).mockResolvedValue(
+    createMockGraph({ mode: 'all', personalFilter: 'all' }),
+  );
+  setup();
+  await userEvent.click(
+    await screen.findByRole('button', { name: '지도 데이터 안내' }),
+  );
+  const info = await screen.findByText(/개별 사건은 ϟ 숫자로/);
+  expect(info.textContent).toContain('이름 아래에 보유·관심이라고');
+  expect(info.textContent).toContain(
+    '노드 크기와 거리는 인과 관계나 중요도를 뜻하지',
+  );
+  expect(info.textContent).not.toMatch(/MOCK|개발용/);
 });
 
 it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도로 복귀한다', async () => {

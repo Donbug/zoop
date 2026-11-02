@@ -15,6 +15,7 @@ import java.util.Map;
 import javax.sql.DataSource;
 
 import com.zoop.ai.config.AiHandoffReadClientConfiguration;
+import com.zoop.ai.config.AiObservationExportClientConfiguration;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.graph.importer.GraphHandoffRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,7 +69,8 @@ class GraphRoundImportConfigurationTest {
                 .withBean(TransactionOperations.class, TransactionOperations::withoutTransaction)
                 .withBean(DataSource.class, () -> Mockito.mock(DataSource.class))
                 .withBean(Clock.class, Clock::systemUTC)
-                .withUserConfiguration(AiHandoffReadClientConfiguration.class, GraphRoundImportConfiguration.class);
+                .withUserConfiguration(AiHandoffReadClientConfiguration.class, AiObservationExportClientConfiguration.class,
+                        GraphRoundImportConfiguration.class);
     }
 
     private String[] with(String... extra) {
@@ -109,6 +111,31 @@ class GraphRoundImportConfigurationTest {
     }
 
     @Test
+    void httpObservationExportCreatesTheBridgeWithoutLocalCliState() {
+        Path root = Path.of(valid.get("ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT"));
+        Path marker = root.resolve(GraphRoundImportConfiguration.STORE_ID_FILE);
+        try {
+            Files.writeString(marker, "shared-test-store\n");
+            Files.setPosixFilePermissions(marker, PosixFilePermissions.fromString("rw-------"));
+        } catch (IOException error) {
+            throw new AssertionError(error);
+        }
+        runner().withPropertyValues(with(
+                "ZOOP_GRAPH_ROUND_IMPORT_SOURCE", "http",
+                "ZOOP_GRAPH_ROUND_ARTIFACT_STORE_ID", "shared-test-store",
+                "ZOOP_GRAPH_ROUND_INGESTION_CLI", null,
+                "ZOOP_GRAPH_ROUND_INGESTION_STATE_DIR", null,
+                "ZOOP_GRAPH_ROUND_INGESTION_SOURCES", null,
+                "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED", "true",
+                "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL", "https://ai.internal.example",
+                "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_TOKEN", "observation-token-0123456789abcdefghijklmnopqrstuvwxyz"))
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertNotNull(context.getBean(GraphRoundImportBridge.class));
+                });
+    }
+
+    @Test
     void aMissingSnapshotSourceReadClientOrCliSettingFailsStartupNamingTheSetting() {
         String[][] cases = {
                 {"ZOOP_GRAPH_SNAPSHOT_SOURCE", "fixture", "zoop.graph.round.enabled "},
@@ -118,7 +145,6 @@ class GraphRoundImportConfigurationTest {
                 {"ZOOP_GRAPH_ROUND_INGESTION_CLI", temp.resolve("missing").toString(), "zoop.graph.round.ingestion-cli "},
                 {"ZOOP_GRAPH_ROUND_INGESTION_STATE_DIR", "", "zoop.graph.round.ingestion-state-dir "},
                 {"ZOOP_GRAPH_ROUND_INGESTION_SOURCES", "relative.json", "zoop.graph.round.ingestion-sources "},
-                {"ZOOP_GRAPH_ROUND_IMPORT_SOURCE", "http", "zoop.graph.round.import-source "},
                 {"ZOOP_GRAPH_ROUND_IMPORT_SOURCE", "grpc", "zoop.graph.round.import-source "},
                 {"ZOOP_GRAPH_ROUND_OPERATOR", "operator:x", "zoop.graph.round.operator "},
         };
@@ -130,5 +156,63 @@ class GraphRoundImportConfigurationTest {
                 assertTrue(!failure.getMessage().contains(temp.toString()), failure.getMessage());
             });
         }
+    }
+
+    @Test
+    void httpObservationExportWithoutItsClientFailsStartupNamingTheSetting() {
+        runner().withPropertyValues(with(
+                "ZOOP_GRAPH_ROUND_IMPORT_SOURCE", "http",
+                "ZOOP_GRAPH_ROUND_INGESTION_CLI", null,
+                "ZOOP_GRAPH_ROUND_INGESTION_STATE_DIR", null,
+                "ZOOP_GRAPH_ROUND_INGESTION_SOURCES", null,
+                "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED", "false"))
+                .run(context -> {
+                    Throwable failure = configurationFailure(context.getStartupFailure());
+                    assertNotNull(failure);
+                    assertTrue(failure.getMessage().startsWith("zoop.graph.round.import-source "), failure.getMessage());
+                    assertTrue(failure.getMessage().contains("observation-export-client.enabled"), failure.getMessage());
+                });
+    }
+
+    @Test
+    void httpObservationExportRequiresTheStoreIdAndItsMatchingMarker() throws IOException {
+        String[] withoutStoreId = with(
+                "ZOOP_GRAPH_ROUND_IMPORT_SOURCE", "http",
+                "ZOOP_GRAPH_ROUND_INGESTION_CLI", null,
+                "ZOOP_GRAPH_ROUND_INGESTION_STATE_DIR", null,
+                "ZOOP_GRAPH_ROUND_INGESTION_SOURCES", null,
+                "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED", "true",
+                "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL", "https://ai.internal.example",
+                "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_TOKEN", "observation-token-0123456789abcdefghijklmnopqrstuvwxyz");
+        runner().withPropertyValues(withoutStoreId).run(context -> {
+            Throwable failure = configurationFailure(context.getStartupFailure());
+            assertNotNull(failure);
+            assertTrue(failure.getMessage().startsWith("zoop.graph.round.artifact-store-id "), failure.getMessage());
+        });
+
+        String[] withStoreId = with(
+                "ZOOP_GRAPH_ROUND_IMPORT_SOURCE", "http",
+                "ZOOP_GRAPH_ROUND_ARTIFACT_STORE_ID", "shared-test-store",
+                "ZOOP_GRAPH_ROUND_INGESTION_CLI", null,
+                "ZOOP_GRAPH_ROUND_INGESTION_STATE_DIR", null,
+                "ZOOP_GRAPH_ROUND_INGESTION_SOURCES", null,
+                "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED", "true",
+                "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL", "https://ai.internal.example",
+                "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_TOKEN", "observation-token-0123456789abcdefghijklmnopqrstuvwxyz");
+        runner().withPropertyValues(withStoreId).run(context -> {
+            Throwable failure = configurationFailure(context.getStartupFailure());
+            assertNotNull(failure);
+            assertTrue(failure.getMessage().startsWith("zoop.graph.round.artifact-store-id "), failure.getMessage());
+        });
+
+        Path marker = Path.of(valid.get("ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT"))
+                .resolve(GraphRoundImportConfiguration.STORE_ID_FILE);
+        Files.writeString(marker, "other-store\n");
+        Files.setPosixFilePermissions(marker, PosixFilePermissions.fromString("rw-------"));
+        runner().withPropertyValues(withStoreId).run(context -> {
+            Throwable failure = configurationFailure(context.getStartupFailure());
+            assertNotNull(failure);
+            assertTrue(failure.getMessage().startsWith("zoop.graph.round.artifact-store-id "), failure.getMessage());
+        });
     }
 }

@@ -34,7 +34,6 @@ import graph_handoff_import_smoke as handoff
 import local_graph_dev as local
 
 REPO = Path(__file__).resolve().parents[2]
-LABEL = "com.zoop.graph-activation-smoke"
 ORIGIN = "http://127.0.0.1:5173"
 DISABLED = {key: "false" for key in (
     "ZOOP_AI_CLIENT_ENABLED", "ZOOP_AI_EXTRACTION_CLIENT_ENABLED",
@@ -257,6 +256,16 @@ def scenario(args, db, scratch, evidence, layouts):
         check(quote["metadata"]["graphVersion"] == vid and quote["quote"] == hs.EVT_A and quote["quoteVerified"] is True
               and quote["start"] == span["start"] and quote["end"] == span["end"]
               and quote["articleId"] == span["documentId"] and quote["articleVersion"] == span["documentVersion"], "evidence span/version mismatch")
+        company = handoff.PUBLIC_IDS["KRX:005930"]
+        documents_path = "/api/v1/companies/" + urllib.parse.quote(company, safe="") + "/documents?" + urllib.parse.urlencode(
+            {"graphVersion": vid, "limit": 20})
+        documents = expect(web, "chat-document-search-source", documents_path, 200)
+        check(documents["metadata"]["graphVersion"] == vid and documents["items"],
+              "company documents did not read the activated non-fixture version")
+        check(any(q["evidenceId"] == eid for item in documents["items"] for q in item["quotes"]),
+              "company documents did not expose the same currently-readable evidence")
+        evidence["steps"].append({"step": "chat-public-data-path", "status": "passed", "graphVersion": vid,
+                                  "company": company, "documents": len(documents["items"]), "evidence": "same-version"})
         for label, change in (
             ("disabled", lambda g: g.update({"enabled": False})),
             ("quote-display-revoked", lambda g: g.update({"allowedOperations": [op for op in g["allowedOperations"] if op != "quote-display"]})),
@@ -272,7 +281,8 @@ def scenario(args, db, scratch, evidence, layouts):
         evidence.update({"adminHttpActivations": 2, "httpPointerChanges": 1,
                          "currentRights": {"activation": "passed", "evidence": "passed", "event": "unverified"},
                          "publicReads": {"graph": "same-version", "event": "unverified",
-                                         "evidence": "same-version-exact-span-current-rights"},
+                                         "evidence": "same-version-exact-span-current-rights",
+                                         "chatDocumentSource": "same-version-current-rights"},
                          "idempotency": "replay-no-write; changed-body-conflict; new-key-active-audited-noop",
                          "stalePointer": "409 REVISION_CONFLICT; unchanged publication state"})
         check({name: handoff.fingerprint(path) for name, path in layout.ledgers.items()} == ledgers_before, "source ledgers changed")
@@ -325,12 +335,14 @@ def scenario(args, db, scratch, evidence, layouts):
     evidence["ledgerReadOnly"] = True
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+def run_smoke(scenario_runner=scenario, *, smoke_name="activation", description=__doc__, not_proven=None):
+    """Run a synthetic scenario inside the owned DB/process/artifact lifecycle."""
+    parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--jar", type=Path, default=local.DEFAULT_JAR)
     parser.add_argument("--java")
     parser.add_argument("--result", type=Path, help="new JSON evidence file; existing files are never overwritten")
-    parser.add_argument("--unknown-fields", action="store_true", help="exercise grounded unknown geography and explicitly held raw times")
+    if smoke_name == "activation":
+        parser.add_argument("--unknown-fields", action="store_true", help="exercise grounded unknown geography and explicitly held raw times")
     args = parser.parse_args()
     args.jar = args.jar.resolve()
     args.result = args.result.resolve() if args.result else None
@@ -342,15 +354,17 @@ def main():
     os.environ.update(START_ENV)
     args.java = local.find_java(args.java)
     # No user .env / Spring config or borrowed database can be read from the child cwd.
-    scratch = Path(tempfile.mkdtemp(prefix="zoop-http-activation-")).resolve()
+    scratch = Path(tempfile.mkdtemp(prefix=f"zoop-http-{smoke_name}-")).resolve()
     original_cwd = Path.cwd()
     layouts = []
-    owned = "zoop-activation-smoke-" + secrets.token_hex(8)
+    owned = f"zoop-{smoke_name}-smoke-" + secrets.token_hex(8)
+    label = f"com.zoop.graph-{smoke_name}-smoke"
     network_created = container_created = False
     evidence = {"status": "failed", "steps": [], "providerCalls": 0, "modelCalls": 0,
                 "exclusionStoreAuthoritative": True, "developmentOptInOnly": False,
-                "notProven": ["production publication readiness", "exclusion command mutations", "real-source rights",
-                              "password login/OAuth/operator provisioning", "external AI/model path"],
+                "notProven": not_proven if not_proven is not None else [
+                    "production publication readiness", "exclusion command mutations", "real-source rights",
+                    "password login/OAuth/operator provisioning", "external AI/model path"],
                 "cleanup": {"container": False, "network": False, "processes": False, "temporaryState": False}}
     def stop(signum, frame):
         raise InterruptedError("smoke interrupted")
@@ -372,11 +386,12 @@ def main():
         image = local.docker("image", "inspect", local.DEFAULT_IMAGE, "--format", "{{.Id}}")
         handoff.check(image.returncode == 0, "cached project image unavailable")
         evidence["postgresImage"] = {"name": local.DEFAULT_IMAGE, "id": image.stdout.strip()}
-        created = local.docker("network", "create", "--label", LABEL + "=1", owned)
+        evidence["resources"] = {"container": owned, "network": owned, "label": label + "=1"}
+        created = local.docker("network", "create", "--label", label + "=1", owned)
         handoff.check(created.returncode == 0, "owned bridge network creation failed")
         network_created = True
         password = secrets.token_urlsafe(32)
-        started = local.docker("run", "-d", "--pull", "never", "--name", owned, "--label", LABEL + "=1",
+        started = local.docker("run", "-d", "--pull", "never", "--name", owned, "--label", label + "=1",
                                "--network", owned, "--tmpfs", "/var/lib/postgresql/data",
                                "-e", "POSTGRES_DB=" + local.DB_NAME, "-e", "POSTGRES_USER=" + local.DB_USER,
                                "-e", "POSTGRES_PASSWORD", "-p", "127.0.0.1::5432", local.DEFAULT_IMAGE,
@@ -394,7 +409,7 @@ def main():
         db = handoff.base.Database(os.environ["DB_URL"], local.DB_USER, password, local.DB_NAME, owned, None)
         handoff.check(not db.tables_exist(), "owned database is unexpectedly nonempty")
         os.chdir(scratch)
-        scenario(args, db, scratch, evidence, layouts)
+        scenario_runner(args, db, scratch, evidence, layouts)
         evidence["phase"] = "complete"
         evidence["status"] = "passed"
     except (Exception, KeyboardInterrupt) as error:
@@ -403,7 +418,7 @@ def main():
                                "message": "scenario did not complete; see failed/last step"}
         if evidence.get("blockers"):
             evidence["status"] = "blocked"
-        print("activation smoke failed: " + type(error).__name__, file=sys.stderr)
+        print(f"{smoke_name} smoke failed: " + type(error).__name__, file=sys.stderr)
         if isinstance(error, AssertionError):
             # Helpers can contain raw process output; retain only our short assertion labels.
             print(str(error).split("\n", 1)[0][:160].replace(os.environ.get("DB_PASSWORD") or "\0", "***"), file=sys.stderr)
@@ -437,6 +452,10 @@ def main():
                 result_file.write(text + "\n")
         print(text)
     return 0 if evidence["status"] == "passed" else 1
+
+
+def main():
+    return run_smoke()
 
 
 START_ENV = isolated_environment(dict(os.environ))

@@ -1,8 +1,9 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useThemeToggle } from '@/util/theme-color';
+import { useColorTheme, useThemeToggle } from '@/util/theme-color';
 import GraphIcon from '@/components/graph/GraphIcon';
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import AccountMenu from './AccountMenu';
+import ThemeSunIcon from './ThemeSunIcon';
 import './service-shell.css';
 
 const menus = [
@@ -20,6 +21,9 @@ export default function ServiceHeader({
 }) {
   const navigate = useNavigate();
   const toggleTheme = useThemeToggle();
+  const theme = useColorTheme();
+  const themeLabel =
+    theme === 'dark' ? '라이트 모드로 바꾸기' : '다크 모드로 바꾸기';
   const { pathname } = useLocation();
   /** D-AI-01: the AI drawer lives on the map. Elsewhere, go to the map first; the selected target is kept as it is. */
   function openAiChat() {
@@ -45,11 +49,18 @@ export default function ServiceHeader({
       </nav>
       <div className="relationship-user-tools">
         <button
-          aria-label="화면 모드"
-          title="라이트·다크 화면 전환"
+          type="button"
+          aria-label={themeLabel}
+          title={themeLabel}
+          className="max-md:grid max-md:size-10 max-md:place-items-center"
           onClick={toggleTheme}
         >
-          <GraphIcon name="moon" size={16} />
+          {/* D-GRP-01 G1/G2: the next theme action remains available on mobile. */}
+          {theme === 'dark' ? (
+            <ThemeSunIcon />
+          ) : (
+            <GraphIcon name="moon" size={16} />
+          )}
         </button>
         <AccountMenu />
       </div>

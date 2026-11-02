@@ -3206,6 +3206,13 @@
     },
     "response:200:application/json.editionReview.verificationMode:required": true,
     "response:200:application/json.editionReview:required": false,
+    "response:200:application/json.feedbackVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.feedbackVersion:required": false,
     "response:200:application/json.items[].summary<anyOf:0>": {
       "type": "object"
     },

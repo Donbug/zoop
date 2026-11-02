@@ -1,4 +1,5 @@
 import type { ChartPeriod } from './index';
+import type { EventCompany } from '@/types/map/event';
 export type Meta = {
   source: string;
   asOf: string;
@@ -18,6 +19,7 @@ export type Company = {
   id: string;
   name: string;
   ticker: string | null;
+  aliases?: string[];
   logoUrl?: string | null;
   legalName: string | null;
   market: string | null;
@@ -58,6 +60,7 @@ export type Quote =
         fiftyTwoWeekLow: number | null;
         fiftyTwoWeekHigh: number | null;
         marketCap?: number | null;
+        derived?: string[];
       };
     };
 export type PricePoint = {
@@ -99,9 +102,16 @@ export type Events = {
   items: Event[];
   unknownTimeItems: Event[];
   nextCursor: string | null;
-  metadata: Meta & { total: number; excludedUnknownTime: number };
+  metadata: Meta & {
+    total: number;
+    excludedUnknownTime: number;
+    latestEventTime?: string | null;
+    latestReportedAt?: string | null;
+  };
 };
 export type EventDetail = Event & {
+  period?: string | null;
+  companies?: EventCompany[];
   articles: {
     id: string;
     title: string | null;
@@ -128,7 +138,7 @@ export type Portfolio = {
     avgPriceCurrency: string | null;
     marketValue: number | null;
     weight: number | null;
-    quote: { status: string; currency?: string };
+    quote: { status: string; currency?: string; price?: number | null };
   }[];
   mockAsOf: string | null;
   valuation: {

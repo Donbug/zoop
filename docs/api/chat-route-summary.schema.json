@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zoop.example/internal/chat-route-summary.schema.json",
+  "title": "ChatRouteSummary v1",
+  "description": "The server-owned, reasoning-free routing and requirement coverage record stored with a completed chat job.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["outcome", "coverage"],
+  "properties": {
+    "requirements": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/plannedRequirement"}
+    },
+    "path": {"enum": ["direct", "agent"]},
+    "agentPreflight": {"const": "unavailable"},
+    "agentSteps": {"type": "integer", "minimum": 0},
+    "approvedCalls": {"type": "integer", "minimum": 0},
+    "deniedCalls": {"type": "integer", "minimum": 0},
+    "webAfterReads": {"enum": ["searched", "unavailable", "failed", "no_time"]},
+    "webSteps": {"type": "integer", "minimum": 0},
+    "webApproved": {"type": "integer", "minimum": 0},
+    "webDenied": {"type": "integer", "minimum": 0},
+    "limited": {
+      "type": "object",
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "toolFaults": {"$ref": "#/$defs/uniqueIds"},
+    "partialFaults": {"$ref": "#/$defs/uniqueIds"},
+    "droppedGeneral": {"$ref": "#/$defs/uniqueIds"},
+    "heldRequirements": {"$ref": "#/$defs/uniqueIds"},
+    "droppedClaims": {"$ref": "#/$defs/uniqueIds"},
+    "deterministicCheck": {"type": "string", "minLength": 1},
+    "outcome": {"enum": ["answered", "insufficient_evidence", "guidance", "clarification"]},
+    "reason": {"type": "string", "minLength": 1},
+    "coverage": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/coverage"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"outcome": {"const": "answered"}}},
+      "then": {"not": {"required": ["reason"]}},
+      "else": {"required": ["reason"]}
+    },
+    {
+      "if": {"required": ["path"]},
+      "then": {"required": ["requirements"]}
+    },
+    {
+      "if": {"properties": {"path": {"const": "agent"}}, "required": ["path"]},
+      "then": {"required": ["agentSteps", "approvedCalls", "deniedCalls"]}
+    },
+    {
+      "if": {"properties": {"webAfterReads": {"const": "searched"}}, "required": ["webAfterReads"]},
+      "then": {"required": ["webSteps", "webApproved", "webDenied"]}
+    }
+  ],
+  "$defs": {
+    "uniqueIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "plannedRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "mode", "stage", "types", "capabilities"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "mode": {"enum": ["general", "tools", "limited"]},
+        "stage": {"type": "integer", "minimum": 1, "maximum": 3},
+        "types": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]}
+        },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "chat-tool-request.schema.json#/$defs/capabilityId"}
+        },
+        "limitation": {"type": "string", "minLength": 1},
+        "origin": {"enum": ["concept", "scope"]},
+        "parent": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {"required": ["parent"]},
+          "then": {"required": ["origin"]}
+        },
+        {
+          "if": {"properties": {"mode": {"const": "limited"}}},
+          "then": {"required": ["limitation"]}
+        }
+      ]
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requirementId", "explicit", "status", "toolCallIds"],
+      "properties": {
+        "requirementId": {"type": "string", "minLength": 1},
+        "explicit": {"type": "boolean"},
+        "status": {"enum": ["answered", "limited", "clarify"]},
+        "toolCallIds": {"$ref": "#/$defs/uniqueIds"},
+        "reason": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "answered"}}},
+          "then": {"not": {"required": ["reason"]}},
+          "else": {"required": ["reason"]}
+        }
+      ]
+    }
+  }
+}

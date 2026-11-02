@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { useThemeToggle } from '@/util/theme-color';
+import { useColorTheme, useThemeToggle } from '@/util/theme-color';
+import ThemeSunIcon from './ThemeSunIcon';
 import './service-shell.css';
 
 // D-AUT-01/02 · D-ONB-01/02 · D-WAT-01/01b, Figma 619:1087.
@@ -9,6 +10,9 @@ export default function SlimHeader({
   themeSwitch?: boolean;
 }) {
   const toggleTheme = useThemeToggle();
+  const dark = useColorTheme() === 'dark';
+  // G1: same next-action label and icon as ServiceHeader, also shown on hover.
+  const themeLabel = dark ? '라이트 모드로 바꾸기' : '다크 모드로 바꾸기';
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-zoop-line bg-white px-5 text-zoop-ink">
       <Link
@@ -34,18 +38,22 @@ export default function SlimHeader({
         {themeSwitch ? (
           <button
             type="button"
-            aria-label="화면 테마 전환"
-            title="밝은 모드 / 어두운 모드 전환"
+            aria-label={themeLabel}
+            title={themeLabel}
             onClick={toggleTheme}
             className="grid size-8 place-items-center rounded-full hover:bg-zoop-soft focus-visible:outline-2 focus-visible:outline-offset-2"
           >
-            <img
-              src="/graph-assets/slim-moon.svg"
-              width="16"
-              height="16"
-              alt=""
-              data-icon
-            />
+            {dark ? (
+              <ThemeSunIcon />
+            ) : (
+              <img
+                src="/graph-assets/slim-moon.svg"
+                width="16"
+                height="16"
+                alt=""
+                data-icon
+              />
+            )}
           </button>
         ) : (
           <span className="grid size-8 place-items-center" aria-hidden="true">

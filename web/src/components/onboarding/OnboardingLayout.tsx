@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import SlimHeader from '@/components/common/SlimHeader';
+import SkipLink from '@/components/common/SkipLink';
 import {
   readSocialLinkResult,
   socialLinkMessage,
@@ -11,8 +12,13 @@ export default function OnboardingLayout() {
   const social = readSocialLinkResult(useLocation().search);
   return (
     <div className="service-surface">
+      <SkipLink />
       <SlimHeader />
-      <main className="mx-auto min-h-[calc(100dvh-48px)] w-full max-w-[688px] px-6 py-4">
+      <main
+        id="service-main"
+        tabIndex={-1}
+        className="mx-auto min-h-[calc(100dvh-48px)] w-full max-w-[688px] px-6 py-4"
+      >
         {social && (
           <p
             role="status"

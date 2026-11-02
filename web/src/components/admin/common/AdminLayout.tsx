@@ -9,7 +9,8 @@ import { adminMenus } from '@/constants/navigation';
 import { logoutAdmin } from '@/apis/admin/auth';
 import { useAdminSessionStore } from '@/stores/useAdminSessionStore';
 import { BUTTON, FOCUS_RING } from './adminStyles';
-import { useThemeToggle } from '@/util/theme-color';
+import { useColorTheme, useThemeToggle } from '@/util/theme-color';
+import ThemeSunIcon from '@/components/common/ThemeSunIcon';
 
 function SidebarChevron({ direction }: { direction: 'left' | 'right' }) {
   return (
@@ -29,6 +30,8 @@ function SidebarChevron({ direction }: { direction: 'left' | 'right' }) {
 export default function AdminLayout() {
   const navigate = useNavigate();
   const toggleTheme = useThemeToggle();
+  const dark = useColorTheme() === 'dark';
+  const themeLabel = dark ? '라이트 모드로 바꾸기' : '다크 모드로 바꾸기';
   const admin = useAdminSessionStore((state) => state.admin);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -115,16 +118,20 @@ export default function AdminLayout() {
           type="button"
           className={`mt-4 grid size-8 place-items-center rounded-full text-zoop-muted hover:bg-zoop-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink`}
           onClick={toggleTheme}
-          aria-label="화면 테마 전환"
-          title="밝은 모드 / 어두운 모드 전환"
+          aria-label={themeLabel}
+          title={themeLabel}
         >
-          <img
-            src="/graph-assets/slim-moon.svg"
-            width="16"
-            height="16"
-            alt=""
-            data-icon
-          />
+          {dark ? (
+            <ThemeSunIcon />
+          ) : (
+            <img
+              src="/graph-assets/slim-moon.svg"
+              width="16"
+              height="16"
+              alt=""
+              data-icon
+            />
+          )}
         </button>
         {admin && (
           <div className="mt-8 flex flex-col gap-2 border-t-[0.667px] border-zoop-line pt-4">

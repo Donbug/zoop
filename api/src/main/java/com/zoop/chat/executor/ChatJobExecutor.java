@@ -60,13 +60,13 @@ import tools.jackson.databind.node.ObjectNode;
  * call and outside the run limit.</li>
  * </ul>
  *
- * <p>The run deadline is the policy maximum until the orchestrator plans per-route deadlines (ZOOP-AIG-001 6.3.3); the lease
- * adds a grace period for storing the result.
+ * <p>The run deadline is the policy maximum for every route (ZOOP-AIG-001 6.3.3); the lease adds a grace period for storing
+ * the result.
  */
 @Component
 public class ChatJobExecutor {
-    /** The run deadline of every job; the agent path keeps to its own 45 s inside it (OrchestratedChatEngine.AGENT_JOB). */
-    public static final Duration MAX_DEADLINE = Duration.ofSeconds(60);
+    /** Running to terminal-state commit is bounded to 45 s on both the direct and agent paths. */
+    public static final Duration MAX_DEADLINE = Duration.ofSeconds(45);
     static final Duration LEASE_GRACE = Duration.ofSeconds(15);
     static final String RESULT_SCHEMA_VERSION = "chat-result/v1";
     static final String ROUTE_SCHEMA_VERSION = "chat-route/v1";
@@ -159,7 +159,7 @@ public class ChatJobExecutor {
                 log.warn("chat engine failed for job {}", claim.job().id(), unexpected);
                 outcome = new ChatEngineOutcome.Failed("internal", null, false);
             }
-            // The deadline the run kept to, brought forward when its path has a shorter one (the agent path's 45 s).
+            // The deadline the run kept to, possibly brought forward by a path-specific policy.
             deadline = control.deadline;
         }
         boolean kept = saveOnly ? outcome instanceof ChatEngineOutcome.Completed : keep(claim, outcome);

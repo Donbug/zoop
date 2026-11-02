@@ -59,7 +59,7 @@ export default function PriorIssueFollowUps({
             {[...groups].map(([key, entries]) => (
               <section
                 key={key}
-                className="rounded-xl border border-zoop-line p-4"
+                className="rounded-xl border border-zoop-border p-4"
                 aria-label={`${entries[0].title} · ${entries[0].companyName}`}
               >
                 <h4 className="font-semibold">{entries[0].title}</h4>
@@ -98,7 +98,7 @@ export default function PriorIssueFollowUps({
                           const url = safeArticleUrl(source.url);
                           return (
                             <div
-                              className="mt-2 border-l-2 border-zoop-line pl-3"
+                              className="mt-2 border-l-2 border-zoop-border pl-3"
                               key={source.evidenceId}
                             >
                               <blockquote className={BODY}>
@@ -141,7 +141,7 @@ export default function PriorIssueFollowUps({
 
 function FollowUpOutcome({ entry }: { entry: FollowUpReviewEntry }) {
   return (
-    <div className="my-3 rounded-lg bg-zoop-wash p-3">
+    <div className="my-3 rounded-lg bg-zoop-card p-3">
       <p className="text-sm font-semibold">
         {entry.status === 'fulfilled'
           ? '✓ 조건 충족 확인'
@@ -181,7 +181,10 @@ function FollowUpOutcome({ entry }: { entry: FollowUpReviewEntry }) {
             const url = safeArticleUrl(s.url);
             const facts = entry.facts.filter((f) => f.sourceIds.includes(s.id));
             return (
-              <div key={s.id} className="mt-3 border-l-2 border-zoop-line pl-3">
+              <div
+                key={s.id}
+                className="mt-3 border-l-2 border-zoop-border pl-3"
+              >
                 <p className={NOTE}>
                   {s.period === 'after_condition'
                     ? '조건 제시 이후 공개'

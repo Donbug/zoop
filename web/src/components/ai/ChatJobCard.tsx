@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import SavedResultFeedback from '@/components/common/SavedResultFeedback';
 import { Link, useLocation } from 'react-router-dom';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import { LoadingSpinner } from '@/components/common/LoadingIndicator';
@@ -65,6 +66,8 @@ type Props = {
   onCancel: (job: ChatJob) => void;
   /** 답변의 그래프 버전 기준으로 지도에 연다. 그 버전으로 열 수 없으면 false. */
   onViewOnMap?: (target: AnswerMapTarget) => boolean;
+  /** 취소했거나 다시 처리할 수 없는 질문을 입력칸으로 되돌려 고쳐 보내게 한다. */
+  onRewrite?: (question: string) => void;
 };
 
 function formatTime(value: string | null) {
@@ -102,9 +105,24 @@ export default function ChatJobCard(props: Props) {
               )
               .join(', ')
           : '없음'}
+        {/* D-AI-01 · prototype chat-job-view.tsx:294-298: 질문에 묶인 근거 수와 기간 */}
+        {job.context.evidenceCount > 0 &&
+          ` · 근거 ${job.context.evidenceCount}건`}
+        {job.context.period &&
+          ` · ${job.context.period.start} ~ ${job.context.period.end}`}
       </p>
       <div className="mt-3">
         <JobState {...props} />
+        {job.status === 'completed' &&
+          job.result?.outcome === 'answered' &&
+          job.feedbackVersion && (
+            <SavedResultFeedback
+              feature="chatbot_answer"
+              targetId={job.result.messageId}
+              targetVersion={job.feedbackVersion}
+              subject="이 AI 답변"
+            />
+          )}
       </div>
     </article>
   );
@@ -118,6 +136,7 @@ function JobState({
   onRetry,
   onCancel,
   onViewOnMap,
+  onRewrite,
 }: Props) {
   if (job.status === 'queued' || job.status === 'running') {
     const current = job.status === 'running' ? job.phase : null;
@@ -158,9 +177,20 @@ function JobState({
   }
   if (job.status === 'cancelled') {
     return (
-      <p className={ui.secondary}>
-        취소한 질문이에요. 다시 물으려면 새로 보내 주세요.
-      </p>
+      <div className="flex flex-col items-start gap-2">
+        <p className={ui.secondary}>
+          취소한 질문이에요. 다시 물으려면 새로 보내 주세요.
+        </p>
+        {onRewrite && (
+          <button
+            type="button"
+            className={ui.button}
+            onClick={() => onRewrite(job.question)}
+          >
+            질문 다시 쓰기
+          </button>
+        )}
+      </div>
     );
   }
   if (job.status === 'failed' && job.failure) {
@@ -179,7 +209,16 @@ function JobState({
           </button>
         )}
         {failure.retry === null && (
-          <p className={ui.muted}>문의할 때 작업 ID {job.id}를 알려 주세요.</p>
+          <>
+            {onRewrite && (
+              <button type="button" onClick={() => onRewrite(job.question)}>
+                질문 고쳐서 새로 보내기
+              </button>
+            )}
+            <p className={ui.muted}>
+              문의할 때 작업 ID {job.id}를 알려 주세요.
+            </p>
+          </>
         )}
       </div>
     );
@@ -385,6 +424,7 @@ function Answer({
           </ol>
         </section>
       )}
+      {onViewOnMap && <SourceEvidence job={job} result={result} />}
       {result.graphTargets.length > 0 && onViewOnMap && (
         <MapTargets job={job} result={result} onViewOnMap={onViewOnMap} />
       )}
@@ -578,6 +618,48 @@ function UiActions({
           이 항목은 답변을 만든 그래프 기준이라 지금 지도에서 열 수 없어요.
         </p>
       )}
+    </div>
+  );
+}
+
+// D-GRP-05 · prototype chat-job-view.tsx:241-246: 서버의 sources는 기사 ID라 근거 창에는 그 기사 인용의 근거 ID를 넘긴다.
+// 서버가 근거 열기 동작을 이미 준 답변에는 같은 버튼을 두 번 두지 않는다.
+function SourceEvidence({ job, result }: { job: ChatJob; result: ChatResult }) {
+  const location = useLocation();
+  const close = useAiChatStore((state) => state.close);
+  const evidenceIds = result.citations
+    .filter(
+      (citation) =>
+        citation.articleId !== null &&
+        result.sources.includes(citation.articleId),
+    )
+    .map((citation) => citation.evidenceId);
+  if (
+    evidenceIds.length === 0 ||
+    result.uiActions.some((action) => action.kind === 'open_evidence')
+  )
+    return null;
+  return (
+    <div className={ui.textActions}>
+      <button
+        type="button"
+        onClick={() => {
+          close();
+          useGraphUiStore.getState().openEvidence({
+            kind: 'path',
+            id: `answer:${evidenceIds.join(',')}`,
+            label: job.question,
+            evidenceIds,
+            mapContext: {
+              url: `${location.pathname}${location.search}`,
+              graphVersion: result.applied.graphVersion ?? undefined,
+              asOf: job.context.asOf ?? undefined,
+            },
+          });
+        }}
+      >
+        근거 문서 열기
+      </button>
     </div>
   );
 }

@@ -23,6 +23,7 @@ export type PersonalIssue = {
 };
 export type PersonalBriefingSelection = {
   roundId: string;
+  edition?: 'morning' | 'evening';
   dataAsOf: string;
   policyVersion: string;
   basisObservedAt: string;
@@ -36,6 +37,7 @@ export type PersonalBriefingSelection = {
     | 'no_matching_issues'
     | 'sources_unavailable';
   message: string | null;
+  aiAnalysis?: PersonalAiAnalysis;
   eligibleCount: number;
   matchingCount: number;
   excludedByCurrentAccess: number;
@@ -51,5 +53,40 @@ export type PersonalBriefingSelection = {
     message: string;
     nextCheck: string | null;
     basis: string;
+    personalAiNextCheck?: string;
+    personalAiResultVersion?: string;
   }[];
 };
+
+export type PersonalAiStatement = { text: string; evidenceIds: string[] };
+export type PersonalAiCompany = {
+  direction: 'positive' | 'negative' | 'mixed' | 'watch';
+  keyPoint: PersonalAiStatement;
+  confirmedFact: PersonalAiStatement;
+  businessImpact: PersonalAiStatement;
+  forMyStocks: PersonalAiStatement;
+  priceObservation: PersonalAiStatement | null;
+  previousChange: PersonalAiStatement & {
+    status: 'unavailable' | 'maintained' | 'strengthened' | 'weakened';
+  };
+  nextCheck: PersonalAiStatement;
+};
+export type PersonalAiAnalysis =
+  | { status: 'unavailable'; reason: string }
+  | {
+      status: 'available';
+      roundId: string;
+      cutoff: string;
+      model: string;
+      promptVersion: string;
+      resultVersion: string;
+      generatedAt: string;
+      verificationMode: 'separate_request_same_model';
+      draft: {
+        overview: PersonalAiStatement;
+        issues: Record<
+          string,
+          { companies: Record<string, PersonalAiCompany> }
+        >;
+      };
+    };

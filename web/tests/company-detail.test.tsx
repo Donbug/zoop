@@ -35,6 +35,13 @@ import {
 import type { Event, Impact } from '@/types/company/detail';
 import type { GraphResponse } from '@/types/map/graph';
 import { renderRoutes } from './support/renderRoutes';
+import * as companyApi from '@/apis/graph/companies';
+import { call } from '@/apis/auth/ApiService';
+import type { CompanyMetrics } from '@/types/map/company';
+import {
+  eventRangeDate,
+  widerCompanyPeriod,
+} from '@/components/company/company-event-period';
 vi.mock('@/components/graph/GraphCanvas', () => ({
   default: ({ highlightedEdgeIds = [] }: { highlightedEdgeIds: string[] }) => (
     <output data-testid="map-highlight">{highlightedEdgeIds.join(',')}</output>
@@ -332,6 +339,569 @@ function open(query = '') {
 }
 const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
 
+test.each([120, 80, 100, 0])(
+  'D-COM-01 gap6 D6 holding profit uses the holding price %s',
+  async (price) => {
+    useAuthStore.getState().setSession({
+      authenticated: true,
+      kind: 'member',
+      user: {
+        id: 'gap6-member',
+        email: 'gap6@example.invalid',
+        displayName: '합성 회원',
+      },
+      setup: { completed: true, tutorialCompleted: false },
+      csrfToken: 'fixture',
+      expiresAt: null,
+    });
+    server.on('GET', '/api/v1/portfolio', () =>
+      json({
+        connected: true,
+        holdings: [
+          {
+            companyId: id,
+            quantity: 2,
+            avgPrice: 100,
+            avgPriceCurrency: 'KRW',
+            marketValue: price * 2,
+            weight: 1,
+            quote: { status: 'available', price, currency: 'KRW' },
+          },
+        ],
+        mockAsOf: time,
+        valuation: null,
+        metadata,
+      }),
+    );
+    open(pinned);
+    const panel = within(
+      await screen.findByRole('region', { name: '가상 계좌 보유' }),
+    );
+    await panel.findByText('평가 손익');
+    const value = panel.getByText('평가 손익').nextElementSibling!;
+    expect(value.textContent).toContain(`${Math.abs((price - 100) * 2)}원`);
+    expect(value.textContent).toContain(`${Math.abs(price - 100).toFixed(2)}%`);
+    expect(value.querySelector('span')?.className).toContain(
+      price > 100
+        ? 'text-zoop-up'
+        : price < 100
+          ? 'text-zoop-down'
+          : 'text-zoop-muted',
+    );
+  },
+);
+
+test.each([
+  ['USD', 120, 100, '통화가'],
+  [null, 120, 100, '통화가'],
+  ['KRW', null, 100, '시세가'],
+  ['KRW', 120, 0, '계산 불가'],
+] as const)(
+  'D-COM-01 gap6 D6 does not invent a return for %s/%s/%s',
+  async (currency, price, avgPrice, reason) => {
+    useAuthStore.getState().setSession({
+      authenticated: true,
+      kind: 'member',
+      user: {
+        id: 'gap6-member',
+        email: 'gap6@example.invalid',
+        displayName: '합성 회원',
+      },
+      setup: { completed: true, tutorialCompleted: false },
+      csrfToken: 'fixture',
+      expiresAt: null,
+    });
+    server.on('GET', '/api/v1/portfolio', () =>
+      json({
+        connected: true,
+        holdings: [
+          {
+            companyId: id,
+            quantity: 2,
+            avgPrice,
+            avgPriceCurrency: currency,
+            marketValue: null,
+            weight: null,
+            quote: { status: 'available', price, currency: 'KRW' },
+          },
+        ],
+        mockAsOf: null,
+        valuation: null,
+        metadata,
+      }),
+    );
+    open(pinned);
+    const panel = within(
+      await screen.findByRole('region', { name: '가상 계좌 보유' }),
+    );
+    await panel.findByText(new RegExp(reason));
+    if (currency !== 'KRW' || price === null)
+      expect(panel.queryByText('평가 손익')).toBeNull();
+  },
+);
+
+test.each([0, 120, null, 'unavailable'] as const)(
+  'D-COM-01 gap6 D15 metrics marketValue visibility when cap=%s',
+  async (cap) => {
+    vi.spyOn(companyApi, 'getCompanyMetrics').mockImplementation(() =>
+      call<CompanyMetrics>(
+        `/api/v1/companies/${encodeURIComponent(id)}/metrics`,
+        'GET',
+        undefined,
+        { skipAuth: true },
+      ),
+    );
+    server.on('GET', '/api/v1/companies/:id/quote', () =>
+      json(
+        cap === 'unavailable'
+          ? { status: 'unavailable', reason: '합성 미제공' }
+          : {
+              status: 'available',
+              companyId: id,
+              source,
+              quote: {
+                price: 120,
+                currency: 'KRW',
+                asOf: time,
+                change: 0,
+                changeRate: 0,
+                marketCap: cap,
+              },
+            },
+      ),
+    );
+    server.on('GET', '/api/v1/companies/:id/metrics', () =>
+      json({
+        status: 'available',
+        companyId: id,
+        source: { ...source, provider: 'yahoo' },
+        asOf: time,
+        items: [
+          {
+            code: 'marketValue',
+            label: '시가총액',
+            value: '합성 시총',
+            basis: null,
+          },
+        ],
+      }),
+    );
+    open(pinned);
+    await screen.findByText(/주요 지표 · 합성 공급자/);
+    const metrics = within(screen.getByRole('region', { name: '주요 지표' }));
+    expect(metrics.queryByText('합성 시총') !== null).toBe(
+      cap === null || cap === 'unavailable',
+    );
+  },
+);
+
+test('D-COM-02/05 gap6 D17 evidence labels hide raw IDs and keep request identity', async () => {
+  open(`${pinned}&event=issue-a`);
+  const button = await screen.findByRole('button', { name: '근거 1 보기' });
+  expect(button.textContent).not.toContain('ev-a');
+  await userEvent.click(button);
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).toContain(
+      'evidence=ev-a',
+    ),
+  );
+});
+
+test('D-COM-06 gap6 D19 chart table preserves zero and missing volume', async () => {
+  server.on('GET', '/api/v1/companies/:id/prices', () =>
+    json({
+      status: 'available',
+      companyId: id,
+      period: '1m',
+      interval: '1d',
+      source,
+      currency: 'KRW',
+      points: [
+        { time: old, open: 1, high: 1, low: 1, close: 1, volume: 0 },
+        { time, open: 2, high: 2, low: 2, close: 2, volume: null },
+      ],
+    }),
+  );
+  open(pinned);
+  await userEvent.click(await screen.findByText('표로 보기'));
+  const table = within(screen.getByRole('table'));
+  expect(table.getByRole('columnheader', { name: '거래량' })).toBeTruthy();
+  expect(table.getByRole('cell', { name: '0' }).className).toContain(
+    'text-right',
+  );
+  expect(table.getByRole('cell', { name: '—' })).toBeTruthy();
+});
+
+test('D-COM-06 gap6 D11 pointer and click leave asOf and graphAsOf unchanged', async () => {
+  vi.stubGlobal('PointerEvent', MouseEvent);
+  open(pinned);
+  const chart = await screen.findByRole('group', { name: '공급된 종가 차트' });
+  vi.spyOn(chart, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    width: 600,
+  } as DOMRect);
+  const before = screen.getByTestId('address').textContent;
+  fireEvent.pointerDown(chart, { clientX: 200 });
+  fireEvent.pointerMove(chart, { clientX: 600 });
+  fireEvent.click(chart);
+  expect(screen.getByTestId('address').textContent).toBe(before);
+});
+
+test('D-COM-05 C38 filters timeline, unknown events and chart markers with one URL parameter', async () => {
+  server.on('GET', '/api/v1/events', () =>
+    json({
+      items: events,
+      unknownTimeItems: [
+        {
+          ...events[0],
+          id: 'unknown',
+          title: '시점 미상 합성 사건',
+          eventTime: null,
+          timePrecision: 'unknown',
+          relationTypes: [],
+        },
+      ],
+      nextCursor: null,
+      metadata: { ...metadata, total: 3, excludedUnknownTime: 1 },
+    }),
+  );
+  open(`${pinned}&depth=2`);
+  await screen.findByText('시점 미상 사건 1건');
+  const toolbar = within(screen.getByRole('group', { name: '관계로 거르기' }));
+  await userEvent.click(toolbar.getByRole('button', { name: '직접 관련' }));
+  const timeline = within(
+    screen.getByRole('region', { name: '사건 타임라인' }),
+  );
+  expect(timeline.queryByText('합성 사건 B')).toBeNull();
+  expect(screen.queryByText('시점 미상 사건 1건')).toBeNull();
+  expect(
+    within(screen.getByRole('region', { name: '시세 차트' })).getByRole(
+      'button',
+      { name: /차트 사건 .*사건 1건/ },
+    ),
+  ).toBeTruthy();
+  expect(screen.getByTestId('address').textContent).toContain(
+    'relation=INVOLVES',
+  );
+  expect(screen.getByTestId('address').textContent).toContain('depth=2');
+  await userEvent.click(toolbar.getByRole('button', { name: '구조적 관련' }));
+  expect(timeline.queryByText('합성 사건 A')).toBeNull();
+  expect(timeline.getByText('합성 사건 B')).toBeTruthy();
+});
+
+test('D-COM-05 C38 shows a relation-specific empty state and restores all without changing asOf', async () => {
+  server.on('GET', '/api/v1/events', () =>
+    json({
+      items: [events[1]],
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: { ...metadata, total: 1, excludedUnknownTime: 0 },
+    }),
+  );
+  open(`${pinned}&relation=INVOLVES`);
+  await screen.findByText('이 관계의 사건이 없어요');
+  await userEvent.click(
+    within(screen.getByRole('region', { name: '사건 타임라인' })).getByRole(
+      'button',
+      { name: '전체 보기' },
+    ),
+  );
+  await within(
+    screen.getByRole('region', { name: '사건 타임라인' }),
+  ).findByRole('button', { name: '합성 사건 B' });
+  const query = new URL(
+    screen.getByTestId('address').textContent!,
+    'http://localhost',
+  ).searchParams;
+  expect(query.get('relation')).toBeNull();
+  expect(query.get('asOf')).toBe(time);
+});
+
+test('D-COM-05 C39 widens an empty period using the contracted latest event date', async () => {
+  server.on('GET', '/api/v1/events', () =>
+    json({
+      items: [],
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: {
+        ...metadata,
+        total: 0,
+        excludedUnknownTime: 0,
+        latestEventTime: '2026-09-20',
+        latestReportedAt: null,
+      },
+    }),
+  );
+  open(`${pinned}&period=1w`);
+  await screen.findByText('가장 최근 사건은 2026-09-20에 일어났어요.');
+  await userEvent.click(
+    screen.getByRole('button', { name: '1개월로 넓혀 보기' }),
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).toContain('period=1m'),
+  );
+  expect(
+    new URL(
+      screen.getByTestId('address').textContent!,
+      'http://localhost',
+    ).searchParams.get('asOf'),
+  ).toBe(time);
+});
+
+test('D-COM-05 C39 widens to the latest event date when a newer report date exists', async () => {
+  server.on('GET', '/api/v1/events', () =>
+    json({
+      items: [],
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: {
+        ...metadata,
+        total: 0,
+        excludedUnknownTime: 0,
+        latestEventTime: '2026-09-20',
+        latestReportedAt: old,
+      },
+    }),
+  );
+  open(`${pinned}&period=1w`);
+  await userEvent.click(
+    await screen.findByRole('button', { name: '1개월로 넓혀 보기' }),
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).toContain('period=1m'),
+  );
+  expect(
+    new URL(
+      screen.getByTestId('address').textContent!,
+      'http://localhost',
+    ).searchParams.get('asOf'),
+  ).toBe(time);
+});
+
+test('D-COM-05 C새6 keeps a graph-picked unknown-time event by widening to 1y', async () => {
+  const unknown = {
+    ...events[0],
+    id: 'issue-u',
+    title: '시점 미상 합성 사건',
+    eventTime: null,
+    timePrecision: 'unknown',
+  };
+  server.on('GET', '/api/v1/companies/:id/graph', (r) =>
+    json({
+      ...graph,
+      nodes: [
+        ...graph.nodes,
+        {
+          ...graph.nodes[1],
+          id: 'issue-u',
+          label: '시점 미상 합성 사건',
+          eventTime: null,
+          timePrecision: 'unknown',
+        },
+      ],
+      metadata: { ...graph.metadata, asOf: r.query.get('asOf') ?? time },
+    }),
+  );
+  server.on('GET', '/api/v1/events', (r) =>
+    json({
+      items: [],
+      unknownTimeItems:
+        Date.parse(r.query.get('from')!) <= Date.parse('2026-09-20T03:00:00Z')
+          ? [unknown]
+          : [],
+      nextCursor: null,
+      metadata: { ...metadata, total: 0, excludedUnknownTime: 1 },
+    }),
+  );
+  server.on('GET', '/api/v1/events/:id', () =>
+    json({
+      ...unknown,
+      period: null,
+      companies: [],
+      articles: [],
+      relations: [],
+      evidenceIds: [],
+      metadata,
+    }),
+  );
+  open(`${pinned}&period=1d`);
+  await userEvent.click(
+    await within(
+      await screen.findByRole('list', { name: '기업 관계 그래프 노드 목록' }),
+    ).findByRole('button', { name: '사건 · 시점 미상 합성 사건' }),
+  );
+  await screen.findByText('시점 미상 사건 1건');
+  const query = new URL(
+    screen.getByTestId('address').textContent!,
+    'http://localhost',
+  ).searchParams;
+  expect(query.get('period')).toBe('1y');
+  expect(query.get('event')).toBe('issue-u');
+  expect(query.get('asOf')).toBe(time);
+  expect(screen.queryByText(/선택을 풀었어요/)).toBeNull();
+});
+
+test.each([null, '2020-01-01'])(
+  'D-COM-05 C39 does not invent a wider range for %s',
+  async (latestEventTime) => {
+    server.on('GET', '/api/v1/events', () =>
+      json({
+        items: [],
+        unknownTimeItems: [],
+        nextCursor: null,
+        metadata: {
+          ...metadata,
+          total: 0,
+          excludedUnknownTime: 0,
+          latestEventTime,
+          latestReportedAt: null,
+        },
+      }),
+    );
+    open(`${pinned}&period=1m`);
+    await screen.findByText('해당 기간에 공개·유효한 사건이 없어요.');
+    expect(screen.queryByRole('button', { name: /넓혀 보기/ })).toBeNull();
+  },
+);
+
+test('D-COM-05 C새6 widens a selected out-of-period event while preserving event and chart time', async () => {
+  const outside = { ...events[0], eventTime: '2026-09-20T03:00:00Z' };
+  server.on('GET', '/api/v1/events', (r) =>
+    json({
+      items:
+        Date.parse(r.query.get('from')!) <= Date.parse(outside.eventTime)
+          ? [outside]
+          : [],
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: { ...metadata, total: 1, excludedUnknownTime: 0 },
+    }),
+  );
+  server.on('GET', '/api/v1/events/:id', () =>
+    json({
+      ...outside,
+      period: null,
+      companies: [],
+      articles: [],
+      relations: [],
+      evidenceIds: [],
+      metadata,
+    }),
+  );
+  open(`${pinned}&period=1d&event=issue-a`);
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).toContain('period=1m'),
+  );
+  const query = new URL(
+    screen.getByTestId('address').textContent!,
+    'http://localhost',
+  ).searchParams;
+  expect(query.get('event')).toBe('issue-a');
+  expect(query.get('asOf')).toBe(time);
+  expect(query.get('graphAsOf')).toBeNull();
+});
+
+test('D-COM-05 C40 shows precision, period, linked companies, document verdict and named impact steps', async () => {
+  server.on('GET', '/api/v1/events/:id', () =>
+    json({
+      ...events[0],
+      eventTime: '2026-10-05',
+      timePrecision: 'day',
+      period: '2026년 3분기',
+      companies: [
+        {
+          id: 'NASDAQ:OTHER',
+          name: '연결 합성 기업',
+          relationType: 'STRUCTURALLY_RELATED_TO',
+          role: '공급자',
+          roleUnconfirmed: true,
+        },
+      ],
+      articles: [
+        {
+          id: 'doc-a',
+          title: '합성 문서',
+          publisher: '합성 발행처',
+          url: null,
+          publishedAt: old,
+        },
+      ],
+      relations: [],
+      evidenceIds: ['ev-a'],
+      metadata,
+    }),
+  );
+  server.on('GET', '/api/v1/evidence/:id', (r) =>
+    json({
+      id: r.params.id,
+      articleId: 'doc-a',
+      eventIds: ['issue-a'],
+      sentiment: {
+        label: 'negative',
+        companyId: 'NASDAQ:OTHER',
+        rationale: '합성 판정 근거',
+        quotes: ['합성 원문'],
+        judgedAt: old,
+        model: 'fixture-model',
+        promptVersion: 'fixture-prompt',
+      },
+      metadata,
+    }),
+  );
+  server.on('GET', '/api/v1/companies/:id/issues/:issueId/impact', () =>
+    json({
+      companyId: id,
+      issueId: 'issue-a',
+      steps: [
+        {
+          id,
+          kind: 'company',
+          reason: '합성 기업 경로',
+          evidenceIds: ['ev-a'],
+        },
+        {
+          id: 'unresolved-step',
+          kind: 'issue',
+          reason: '이름 미제공',
+          evidenceIds: [],
+        },
+      ],
+      metadata,
+    }),
+  );
+  open(`${pinned}&event=issue-a`);
+  await screen.findByText(/대상 기간 2026년 3분기/);
+  expect(
+    screen.getByRole('link', { name: '연결 합성 기업' }).getAttribute('href'),
+  ).toBe('/companies/NASDAQ%3AOTHER');
+  expect(screen.getByText(/공급자.*역할 미확인/)).toBeTruthy();
+  await userEvent.click(
+    await screen.findByLabelText('합성 문서 · 부정 판정 근거 보기'),
+  );
+  await screen.findByText('fixture-prompt');
+  expect(screen.getByText(/합성 기업 · 합성 기업 경로/)).toBeTruthy();
+  expect(screen.getByText(/unresolved-step · 이름 미제공/)).toBeTruthy();
+});
+
+test.each([
+  ['2026-09-29T03:00:00Z', '1w', null],
+  ['2026-09-29T02:59:59Z', '1w', '1m'],
+  ['2026-09-06T03:00:00Z', '1w', '1m'],
+  ['2025-10-06T03:00:00Z', '1m', '1y'],
+  ['2025-10-06T02:59:59Z', '1m', null],
+  [null, '1m', null],
+] as const)(
+  'D-COM-05 C39 period boundary %s (%s)',
+  (value, current, expected) => {
+    expect(widerCompanyPeriod(value, current, time)).toBe(expected);
+  },
+);
+test('D-COM-05 C39 preserves partial date range selection without fabricating displayed timestamps', () => {
+  expect(eventRangeDate('2024-02')).toBe('2024-02-29');
+  expect(eventRangeDate('2026')).toBe('2026-12-31');
+  expect(eventRangeDate(null)).toBeNull();
+});
+
 test('D-COM-01 48 normalizes a missing tab and announces the prototype notice', async () => {
   open(`${pinned}&tab=gone&depth=2`);
   await screen.findByText('요청한 탭이 없어 사건 탭을 보여 드려요');
@@ -384,6 +954,11 @@ test.each(['events', 'documents', 'info'])(
     expect(screen.getAllByRole('main')).toHaveLength(1);
     const main = screen.getByRole('main');
     expect(main.id).toBe('service-main');
+    // D-COM-01: 라이트는 #491 이전 표면(흰 카드, rounded-2xl)을 유지하고 본문 랜드마크도 그대로다.
+    expect(main.parentElement?.classList.contains('bg-zoop-page!')).toBe(false);
+    const catalog = screen.getByRole('complementary', { name: '기업 선택' });
+    expect(catalog.classList.contains('bg-white')).toBe(true);
+    expect(catalog.classList.contains('rounded-2xl')).toBe(true);
     await view.user.click(
       screen.getByRole('link', { name: '본문으로 건너뛰기' }),
     );
@@ -392,6 +967,53 @@ test.each(['events', 'documents', 'info'])(
     expect(view.router.state.location.search).toContain(`tab=${tab}`);
   },
 );
+
+test.each([
+  ['/stocks', false],
+  ['/briefing', true],
+] as const)(
+  'D-COM-01 · D-BRF-01 theme page surface is correctly scoped for %s',
+  (path, themed) => {
+    renderRoutes(
+      [
+        {
+          element: <AppLayout />,
+          children: [{ path, element: <h1>합성 화면</h1> }],
+        },
+      ],
+      path,
+    );
+    expect(
+      screen
+        .getByRole('main')
+        .parentElement?.classList.contains('bg-zoop-page!'),
+    ).toBe(themed);
+  },
+);
+test('D-COM-01 다크에서만 지도 개선 테마 표면을 쓴다', async () => {
+  document.documentElement.dataset.theme = 'dark';
+  try {
+    renderRoutes(
+      [
+        {
+          element: <AppLayout />,
+          children: [
+            { path: '/companies/:id', element: <CompanyDetailPage /> },
+          ],
+        },
+      ],
+      `/companies/${encodeURIComponent(id)}${pinned}&tab=events`,
+    );
+    await screen.findByRole('heading', { name: '합성 기업', level: 1 });
+    const main = screen.getByRole('main');
+    expect(main.parentElement?.classList.contains('bg-zoop-page!')).toBe(true);
+    const catalog = screen.getByRole('complementary', { name: '기업 선택' });
+    expect(catalog.classList.contains('bg-zoop-surface')).toBe(true);
+    expect(catalog.classList.contains('rounded-xl')).toBe(true);
+  } finally {
+    document.documentElement.dataset.theme = 'light';
+  }
+});
 
 function openHistory() {
   return renderRoutes(

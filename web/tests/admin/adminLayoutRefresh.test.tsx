@@ -10,7 +10,11 @@ import { renderRoutes } from '../support/renderRoutes';
 
 vi.mock('@/util/theme-color', () => {
   const toggleTheme = vi.fn();
-  return { toggleTheme, useThemeToggle: () => toggleTheme };
+  return {
+    toggleTheme,
+    useThemeToggle: () => toggleTheme,
+    useColorTheme: () => 'light',
+  };
 });
 const session: AdminSession = {
   authenticated: true,
@@ -61,7 +65,7 @@ test('A-ADM-01~05 본문 건너뛰기와 일반 화면의 테마 전환을 연�
   expect(document.activeElement).toBe(skip);
   await user.keyboard('{Enter}');
   expect(document.activeElement).toBe(screen.getByRole('main'));
-  await user.click(screen.getByRole('button', { name: '화면 테마 전환' }));
+  await user.click(screen.getByRole('button', { name: '다크 모드로 바꾸기' }));
   expect(toggleTheme).toHaveBeenCalledOnce();
 });
 
