@@ -395,7 +395,136 @@ class PdfBodyProjection(Wire):
         return self
 
 
-ScopeTextProjection = Annotated[TextProjection | PdfBodyProjection, Field(discriminator="profile")]
+class HtmlSourceSpan(Wire):
+    dom_path: str = Field(pattern=r"^/html/")
+    slot: Literal["text", "tail"]
+    source_start: int = Field(ge=0)
+    source_end: int = Field(gt=0)
+    text_utf8_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+    @model_validator(mode="after")
+    def positive(self):
+        if self.source_start >= self.source_end:
+            raise ValueError("positive source interval required")
+        return self
+
+
+class HtmlReviewUnit(Wire):
+    unit_id: str = Field(min_length=1, max_length=200)
+    dom_path: str = Field(pattern=r"^/html/")
+    classification: Literal["commission-narrative", "original-dateline", "public-official-statement"]
+    spans: list[HtmlSourceSpan] = Field(min_length=1, max_length=1000)
+    text_utf8_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class HtmlBaselineProfile(Wire):
+    parser: Literal["zoop-native-parsers-1"]
+    lxml: str = Field(min_length=1, max_length=200)
+    pypdf: str = Field(min_length=1, max_length=200)
+    mapping_version: Literal["unicode-copy-segments-1"]
+    html_decoding: Literal["utf-8-strict"]
+    html_scope: Literal["native-article-scope-1"]
+    pdf_extraction: Literal["page-text-bounded-1"]
+    article_xpath: str | None = Field(alias="articleXPath")
+
+
+class HtmlRepresentation(Wire):
+    source_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    representation_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    mapping_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    parser_profile: HtmlBaselineProfile
+
+
+class JsonHtmlRepresentation(HtmlRepresentation):
+    decoder: Literal["ec-presscorner-json-html-1"]
+    json_pointer: Literal["/docuLanguageResource/htmlContent"]
+    decoded_html_utf8_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    expected_reference: str = Field(min_length=1, max_length=200)
+    expected_language: str = Field(min_length=2, max_length=35)
+
+
+class HtmlRawParent(Wire):
+    document_id: str = Field(min_length=1)
+    raw_version: str = Field(pattern=r"^[a-f0-9]{64}$")
+    raw_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    collection_receipt_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class HtmlBoundaryDecision(Wire):
+    revision: str = Field(min_length=1, max_length=200)
+    status: Literal["approved", "proposal", "hold"]
+    retained_scope: Literal["selected-complete-commission-narrative-units"]
+    selection_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    evidence: list[str] = Field(min_length=1, max_length=20)
+
+    @model_validator(mode="after")
+    def evidence_present(self):
+        if any(not value.strip() for value in self.evidence):
+            raise ValueError("boundary evidence required")
+        return self
+
+
+class HtmlBodyMember(Wire):
+    parent: HtmlRawParent
+    representation: HtmlRepresentation
+    parent_binding_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    selected_units: list[HtmlReviewUnit] = Field(min_length=1, max_length=1000)
+    rights_receipt: ProjectionRightsReceipt
+    boundary_decision: HtmlBoundaryDecision
+
+    @model_validator(mode="after")
+    def bindings(self):
+        if self.parent_binding_hash != digest({"parent": self.parent.wire(), "representation": self.representation.wire()}):
+            raise ValueError("exact raw parent binding required")
+        if digest([unit.wire() for unit in self.selected_units]) != self.boundary_decision.selection_hash:
+            raise ValueError("exact selection hash required")
+        if len({unit.unit_id for unit in self.selected_units}) != len(self.selected_units):
+            raise ValueError("unique review units required")
+        return self
+
+
+class JsonHtmlBodyMember(HtmlBodyMember):
+    representation: JsonHtmlRepresentation
+
+
+class HtmlBodyProjection(Wire):
+    profile: Literal["eu-commission-html-body-ranges-1"]
+    members: list[HtmlBodyMember] = Field(min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def exact_members(self):
+        keys = [(m.parent.document_id, m.parent.raw_version) for m in self.members]
+        if len(keys) != len(set(keys)):
+            raise ValueError("unique document/raw members required")
+        return self
+
+
+class JsonHtmlBodyProjection(HtmlBodyProjection):
+    profile: Literal["eu-commission-json-html-body-ranges-1"]
+    members: list[JsonHtmlBodyMember] = Field(min_length=1, max_length=100)
+
+
+class HtmlRightsReceipt(Wire):
+    schema_version: Literal["zoop-eu-html-body-rights-1"]
+    body_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    parent_binding_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    selection_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    license: Literal["CC-BY-4.0-qualified-commission-content"]
+    applicability_assessment: str = Field(min_length=1, max_length=8000)
+    notice: str = Field(min_length=1, max_length=8000)
+    evidence: list[ProjectionRightsReceipt] = Field(min_length=1, max_length=20)
+    attribution: str = Field(min_length=1, max_length=4000)
+    changes_notice: str = Field(min_length=1, max_length=4000)
+
+    @model_validator(mode="after")
+    def explicit_rights(self):
+        if any(not value.strip() for value in
+               (self.applicability_assessment, self.notice, self.attribution, self.changes_notice)):
+            raise ValueError("explicit rights evidence and attribution required")
+        return self
+
+
+ScopeTextProjection = Annotated[TextProjection | PdfBodyProjection | JsonHtmlBodyProjection | HtmlBodyProjection, Field(discriminator="profile")]
 
 
 class Scope(Wire):
@@ -567,7 +696,7 @@ class Receipt(Wire):
     redirects: list[str] = Field(max_length=10)
     http_status: int
     content_type: str
-    media_type: Literal["text/html", "application/pdf"]
+    media_type: Literal["text/html", "application/pdf", "application/json"]
     content_length: str | None
     etag: str | None
     last_modified: str | None
@@ -611,7 +740,7 @@ class Item(Declared):
     supplier_document_id: str | None = Field(default=None, min_length=1, max_length=500)
     url: str = Field(min_length=1, max_length=4000)
     body_ref: str = Field(min_length=1, max_length=200)
-    media_type: Literal["text/html", "application/pdf", "text/markdown"]
+    media_type: Literal["text/html", "application/pdf", "application/json", "text/markdown"]
     title: str = Field(max_length=2000)
     published_at: str | None
     modified_at: str | None
