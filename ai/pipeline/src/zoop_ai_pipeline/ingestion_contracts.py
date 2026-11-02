@@ -250,12 +250,169 @@ class Grant(Wire):
         return self
 
 
+class ProjectionRightsReceipt(Wire):
+    path: str = Field(min_length=1, max_length=4000)
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+    @model_validator(mode="after")
+    def absolute(self):
+        if not Path(self.path).is_absolute():
+            raise ValueError("absolute item rights receipt required")
+        return self
+
+
+class ProjectionParent(Wire):
+    document_id: str = Field(min_length=1)
+    raw_version: str = Field(pattern=r"^[a-f0-9]{64}$")
+    document_version: str = Field(pattern=r"^[a-f0-9]{64}$")
+    raw_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    source_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    representation_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    mapping_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    parser_profile: dict[str, str | None]
+
+
+class CaptionBoundaryDecision(Wire):
+    revision: str = Field(min_length=1, max_length=200)
+    status: Literal["approved", "proposal", "hold"]
+    retained_scope: Literal["article-prose-only"]
+    reviewed_caption_paths: list[str] = Field(min_length=1, max_length=100)
+    evidence: list[str] = Field(min_length=1, max_length=20)
+
+    @model_validator(mode="after")
+    def explicit_evidence(self):
+        if any(not value.strip() for value in self.evidence):
+            raise ValueError("boundary evidence required")
+        return self
+
+
+class TextProjection(Wire):
+    profile: Literal["korea-kogl1-caption-boundary-1"]
+    parent: ProjectionParent
+    excluded_caption_paths: list[str] = Field(min_length=1, max_length=100)
+    rights_receipt: ProjectionRightsReceipt
+    boundary_decision: CaptionBoundaryDecision
+
+    @model_validator(mode="after")
+    def exact_boundaries(self):
+        paths = self.excluded_caption_paths
+        if (len(set(paths)) != len(paths) or any(not path.startswith("/html/") for path in paths)
+                or sorted(paths) != sorted(self.boundary_decision.reviewed_caption_paths)):
+            raise ValueError("exact reviewed caption boundaries required")
+        return self
+
+
+class PdfSourceSpan(Wire):
+    page_number: int = Field(gt=0)
+    page_text_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    source_start: int = Field(ge=0)
+    source_end: int = Field(gt=0)
+    text_utf8_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+    @model_validator(mode="after")
+    def positive(self):
+        if self.source_start >= self.source_end:
+            raise ValueError("positive source interval required")
+        return self
+
+
+class PdfAllowedRange(PdfSourceSpan):
+    review_unit_id: str = Field(min_length=1, max_length=200)
+
+
+class PdfReviewUnit(Wire):
+    unit_id: str = Field(min_length=1, max_length=200)
+    classification: Literal["original-dateline", "commission-narrative", "public-official-statement",
+                            "press-contact", "unrelated-digest", "other-excluded"]
+    spans: list[PdfSourceSpan] = Field(min_length=1, max_length=100)
+    review_basis: str = Field(min_length=1, max_length=4000)
+
+
+class PdfRightsReceipt(Wire):
+    schema_version: Literal["zoop-eu-pdf-body-rights-1"]
+    body_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    parent_document_version: str = Field(pattern=r"^[a-f0-9]{64}$")
+    selection_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    license: Literal["CC-BY-4.0-qualified-commission-content"]
+    applicability_assessment: str = Field(min_length=1, max_length=8000)
+    notice: str = Field(min_length=1, max_length=8000)
+    evidence: list[ProjectionRightsReceipt] = Field(min_length=1, max_length=20)
+    attribution: str = Field(min_length=1, max_length=4000)
+    changes_notice: str = Field(min_length=1, max_length=4000)
+    review_units: list[PdfReviewUnit] = Field(min_length=1, max_length=10000)
+
+    @model_validator(mode="after")
+    def explicit_rights(self):
+        if any(not value.strip() for value in
+               (self.applicability_assessment, self.notice, self.attribution, self.changes_notice)):
+            raise ValueError("explicit rights evidence and attribution required")
+        return self
+
+
+class PdfBoundaryDecision(Wire):
+    revision: str = Field(min_length=1, max_length=200)
+    status: Literal["approved", "proposal", "hold"]
+    retained_scope: Literal["commission-narrative-and-original-dateline"]
+    selection_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    evidence: list[str] = Field(min_length=1, max_length=20)
+
+    @model_validator(mode="after")
+    def explicit_evidence(self):
+        if any(not value.strip() for value in self.evidence):
+            raise ValueError("boundary evidence required")
+        return self
+
+
+class PdfBodyMember(Wire):
+    parent: ProjectionParent
+    collection_receipt_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    allowed_ranges: list[PdfAllowedRange] = Field(min_length=1, max_length=10000)
+    rights_receipt: ProjectionRightsReceipt
+    boundary_decision: PdfBoundaryDecision
+
+    @model_validator(mode="after")
+    def ordered_selection(self):
+        previous = None
+        for span in self.allowed_ranges:
+            if previous and (span.page_number < previous.page_number or
+                    (span.page_number == previous.page_number and span.source_start < previous.source_end)):
+                raise ValueError("disjoint source-ordered ranges required")
+            previous = span
+        if digest([span.wire() for span in self.allowed_ranges]) != self.boundary_decision.selection_hash:
+            raise ValueError("exact selection hash required")
+        return self
+
+
+class PdfBodyProjection(Wire):
+    profile: Literal["eu-commission-pdf-body-ranges-1"]
+    members: list[PdfBodyMember] = Field(min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def exact_members(self):
+        keys = [(m.parent.document_id, m.parent.raw_version) for m in self.members]
+        if len(keys) != len(set(keys)):
+            raise ValueError("unique document/raw members required")
+        return self
+
+
+ScopeTextProjection = Annotated[TextProjection | PdfBodyProjection, Field(discriminator="profile")]
+
+
 class Scope(Wire):
     scope_id: str = Field(min_length=1)
     selection: str = Field(min_length=1, max_length=2000)
     initial_cursor: str | None
     article_xpath: str | None = Field(alias="articleXPath")
     timestamp_limitations: list[str] = Field(min_length=1, max_length=20)
+    text_projection: ScopeTextProjection | None = None
+
+    @model_serializer(mode="wrap")
+    def _without_unspecified_projection(self, handler):
+        value = handler(self)
+        if self.text_projection is None:
+            value.pop("textProjection", None)
+            value.pop("text_projection", None)
+        return value
 
 
 class Source(Wire):
@@ -283,6 +440,8 @@ class Source(Wire):
             raise ValueError("absolute operator namespace required")
         if any(h != h.lower().rstrip(".") or any(c in h for c in "/:@* ") for h in self.allowed_hosts):
             raise ValueError("exact hosts required")
+        if self.adapter != "collected-http" and any(scope.text_projection is not None for scope in self.scopes):
+            raise ValueError("text projection requires collected HTTP")
         if self.adapter == "retained-private":
             if (not self.retained_roots or any(not Path(root).is_absolute() for root in self.retained_roots)
                     or self.grant.enabled or self.grant.rights not in {"unknown", "denied"}

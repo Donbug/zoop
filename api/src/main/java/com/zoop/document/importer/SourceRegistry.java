@@ -42,7 +42,7 @@ import tools.jackson.databind.JsonNode;
  * <p>The file is read fresh by every caller (nothing is cached), never written, locked or created. Under the operator-only
  * path ownership contract, symlinks and non-regular files are refused and the file is bounded to {@value #MAX_BYTES} bytes.
  * POSIX group/other-writable files are refused where that attribute view exists; privileged concurrent local replacement
- * is outside the path-check guarantee. Registry validation is at parity with the Python model or stricter, never looser:
+ * is outside the path-check guarantee. Base registry validation follows the Python model or is stricter:
  * closed key sets, duplicate JSON keys refused (Python keeps the last), the Python length limits, unique source and scope
  * ids, {@code grant.sourceId == sourceId}, an absolute {@code inputRoot}, exact lower-case hosts. An {@code expiresAt}
  * must first match the explicit extended ISO syntax subset accepted by Python's {@code datetime.fromisoformat}; the
@@ -52,6 +52,11 @@ import tools.jackson.databind.JsonNode;
  * <p>Only the use this app makes is decided: the fixed operations {@code read}, {@code store} and {@code quote-display}.
  * Displaying a quote sends nothing to a model, so {@code model-send}, purposes and recipients are never part of the rule (the
  * S2-1 CLI evaluates none of them). Scopes, adapters, hosts and the input root are validated but play no part in the decision.
+ *
+ * <p>An optional {@code textProjection} recognizes the closed envelopes of the caption-boundary and PDF-body-ranges
+ * version-1 profiles on collected HTTP sources. Native preparation validates descriptor contents, parent pins and item
+ * rights. This reader leaves the complete descriptor in the original registry; native configuration equality and receipt
+ * hashes continue to bind every member.
  */
 public final class SourceRegistry {
     public static final int MAX_BYTES = 2_000_000;
@@ -193,7 +198,7 @@ public final class SourceRegistry {
         }
         Set<String> scopeIds = new HashSet<>();
         for (JsonNode node : scopes.values()) {
-            StrictJson.Obj scope = StrictJson.Obj.of(node).exactly(SCOPE);
+            StrictJson.Obj scope = StrictJson.Obj.of(node).keys(SCOPE, Set.of("textProjection"));
             if (!scopeIds.add(nonEmpty(scope.string("scopeId")))) {
                 throw invalid();
             }
@@ -204,6 +209,10 @@ public final class SourceRegistry {
             scope.stringOrNull("initialCursor");
             scope.stringOrNull("articleXPath");
             bounded(scope.strings("timestampLimitations"), 1, MAX_LIMITATIONS);
+            if (scope.has("textProjection") && !scope.isNull("textProjection")) {
+                if (!"collected-http".equals(source.string("adapter"))) throw invalid();
+                projection(scope.object("textProjection"));
+            }
         }
         StrictJson.Obj grant = source.object("grant").exactly(GRANT);
         String grantId = nonEmpty(grant.string("grantId"));
@@ -223,6 +232,35 @@ public final class SourceRegistry {
         }
         return new SourceGrant(grantId, revision, enabled, rights, Set.copyOf(operations), List.copyOf(evidence),
                 expiresAt == null ? null : expiry(expiresAt), Set.copyOf(source.strings("allowedHosts")));
+    }
+
+    /** Preparation owns descriptor contents and parent/rights bindings; this reader recognizes their versioned envelope. */
+    private static void projection(StrictJson.Obj value) {
+        switch (value.string("profile")) {
+            case "korea-kogl1-caption-boundary-1" -> {
+                value.exactly(Set.of("profile", "parent", "excludedCaptionPaths", "rightsReceipt", "boundaryDecision"));
+                value.object("parent");
+                bounded(value.strings("excludedCaptionPaths"), 1, 100);
+                value.object("rightsReceipt");
+                value.object("boundaryDecision");
+            }
+            case "eu-commission-pdf-body-ranges-1" -> {
+                value.exactly(Set.of("profile", "members"));
+                List<StrictJson.Obj> members = value.objects("members");
+                if (members.isEmpty() || members.size() > MAX_LIST) throw invalid();
+                for (StrictJson.Obj member : members) {
+                    member.exactly(Set.of("parent", "collectionReceiptSha256", "allowedRanges", "rightsReceipt",
+                            "boundaryDecision"));
+                    member.object("parent");
+                    if (!StrictJson.SHA256.matcher(member.string("collectionReceiptSha256")).matches()) throw invalid();
+                    List<StrictJson.Obj> ranges = member.objects("allowedRanges");
+                    if (ranges.isEmpty() || ranges.size() > 10_000) throw invalid();
+                    member.object("rightsReceipt");
+                    member.object("boundaryDecision");
+                }
+            }
+            default -> throw invalid();
+        }
     }
 
     private static Instant expiry(String value) {

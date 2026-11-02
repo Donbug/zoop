@@ -20873,6 +20873,55 @@
         ],
         "title": "McpCallSummary"
       },
+      "NativeCaptionProjection": {
+        "properties": {
+          "profile": {
+            "type": "string",
+            "const": "korea-kogl1-caption-boundary-1",
+            "title": "Profile"
+          },
+          "descriptorHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Descriptorhash"
+          },
+          "parentDocumentVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Parentdocumentversion"
+          },
+          "boundaryDecisionRevision": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Boundarydecisionrevision"
+          },
+          "rightsReceiptHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Rightsreceipthash"
+          },
+          "excludedSourceSlots": {
+            "items": {
+              "$ref": "#/components/schemas/NativeExcludedSlot"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Excludedsourceslots"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "profile",
+          "descriptorHash",
+          "parentDocumentVersion",
+          "boundaryDecisionRevision",
+          "rightsReceiptHash",
+          "excludedSourceSlots"
+        ],
+        "title": "NativeCaptionProjection"
+      },
       "NativeCollection": {
         "properties": {
           "provenance": {
@@ -20951,6 +21000,30 @@
           "published"
         ],
         "title": "NativeCollection"
+      },
+      "NativeExcludedSlot": {
+        "properties": {
+          "domPath": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Dompath"
+          },
+          "slot": {
+            "type": "string",
+            "enum": [
+              "text",
+              "tail"
+            ],
+            "title": "Slot"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "domPath",
+          "slot"
+        ],
+        "title": "NativeExcludedSlot"
       },
       "NativeFileRef": {
         "properties": {
@@ -21082,6 +21155,31 @@
               }
             ],
             "title": "Emptypagecount"
+          },
+          "textProjection": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NativeCaptionProjection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NativePdfProjection"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "profile",
+                  "mapping": {
+                    "eu-commission-pdf-body-ranges-1": "#/components/schemas/NativePdfProjection",
+                    "korea-kogl1-caption-boundary-1": "#/components/schemas/NativeCaptionProjection"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Textprojection"
           }
         },
         "additionalProperties": false,
@@ -21315,6 +21413,16 @@
               }
             ],
             "title": "Articlexpath"
+          },
+          "textProjection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NativeProjectionDescriptor"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -21330,6 +21438,74 @@
           "articleXPath"
         ],
         "title": "NativeParserProfile"
+      },
+      "NativePdfProjection": {
+        "properties": {
+          "profile": {
+            "type": "string",
+            "const": "eu-commission-pdf-body-ranges-1",
+            "title": "Profile"
+          },
+          "descriptorHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Descriptorhash"
+          },
+          "parentDocumentVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Parentdocumentversion"
+          },
+          "boundaryDecisionRevision": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Boundarydecisionrevision"
+          },
+          "rightsReceiptHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Rightsreceipthash"
+          },
+          "parentDocumentId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Parentdocumentid"
+          },
+          "parentRawVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Parentrawversion"
+          },
+          "selectionHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Selectionhash"
+          },
+          "retainedSourceRanges": {
+            "items": {
+              "$ref": "#/components/schemas/NativeRetainedRange"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Retainedsourceranges"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "profile",
+          "descriptorHash",
+          "parentDocumentVersion",
+          "boundaryDecisionRevision",
+          "rightsReceiptHash",
+          "parentDocumentId",
+          "parentRawVersion",
+          "selectionHash",
+          "retainedSourceRanges"
+        ],
+        "title": "NativePdfProjection"
       },
       "NativeProjection": {
         "properties": {
@@ -21398,6 +21574,30 @@
         ],
         "title": "NativeProjection"
       },
+      "NativeProjectionDescriptor": {
+        "properties": {
+          "profile": {
+            "type": "string",
+            "enum": [
+              "korea-kogl1-caption-boundary-1",
+              "eu-commission-pdf-body-ranges-1"
+            ],
+            "title": "Profile"
+          },
+          "descriptorHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Descriptorhash"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "profile",
+          "descriptorHash"
+        ],
+        "title": "NativeProjectionDescriptor"
+      },
       "NativePublished": {
         "properties": {
           "raw": {
@@ -21448,6 +21648,52 @@
           "basis"
         ],
         "title": "NativePublished"
+      },
+      "NativeRetainedRange": {
+        "properties": {
+          "pageNumber": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Pagenumber"
+          },
+          "pageTextHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Pagetexthash"
+          },
+          "sourceStart": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Sourcestart"
+          },
+          "sourceEnd": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Sourceend"
+          },
+          "textUtf8Sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Textutf8Sha256"
+          },
+          "reviewUnitId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reviewunitid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pageNumber",
+          "pageTextHash",
+          "sourceStart",
+          "sourceEnd",
+          "textUtf8Sha256",
+          "reviewUnitId"
+        ],
+        "title": "NativeRetainedRange"
       },
       "ObservationExport": {
         "properties": {

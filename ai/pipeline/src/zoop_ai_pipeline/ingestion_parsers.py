@@ -13,7 +13,8 @@ import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError, version
 
-from .ingestion_contracts import MAX_RAW, MAX_TEXT, IngestionFailure
+from .ingestion_contracts import (MAX_RAW, MAX_TEXT, IngestionFailure, TextProjection, ScopeTextProjection,
+    PdfBodyProjection, PdfBodyMember, PdfRightsReceipt, byte_hash, digest)
 from .ingestion_url import canonical_url
 
 PARSER = "zoop-native-parsers-1"
@@ -30,15 +31,18 @@ _RESTRICTED_TITLE = re.compile(r"access denied|just a moment|verify (?:you are|y
 _RESTRICTED_MARKER = re.compile(r"(?:^|[\s_-])(?:paywall|login-required|subscription-required|captcha|challenge-form)(?:$|[\s_-])", re.IGNORECASE)
 
 
-def profile(article_xpath: str | None = None) -> dict:
+def profile(article_xpath: str | None = None, projection: ScopeTextProjection | None = None) -> dict:
     try:
         lxml_version, pypdf_version = version("lxml"), version("pypdf")
     except PackageNotFoundError as exc:
         raise IngestionFailure("input_or_configuration_invalid") from exc
     if any(not isinstance(value, str) or not value.strip() or len(value) > 200 for value in (lxml_version, pypdf_version)):
         raise IngestionFailure("input_or_configuration_invalid")
-    return {"parser": PARSER, "lxml": lxml_version, "pypdf": pypdf_version, "mappingVersion": MAPPING,
-            "htmlDecoding": "utf-8-strict", "htmlScope": HTML_SCOPE, "pdfExtraction": PDF_EXTRACTION, "articleXPath": article_xpath}
+    result = {"parser": PARSER, "lxml": lxml_version, "pypdf": pypdf_version, "mappingVersion": MAPPING,
+              "htmlDecoding": "utf-8-strict", "htmlScope": HTML_SCOPE, "pdfExtraction": PDF_EXTRACTION, "articleXPath": article_xpath}
+    if projection is not None:
+        result["textProjection"] = {"profile": projection.profile, "descriptorHash": digest(projection.wire())}
+    return result
 
 
 def normalize_url(value: str, hosts: list[str]) -> str:
@@ -143,7 +147,7 @@ def _scope(tree, xpath: str | None):
     return outermost, "semantic_article"
 
 
-def _html(raw: bytes, xpath: str | None) -> dict:
+def _html(raw: bytes, xpath: str | None, projection: TextProjection | None = None) -> dict:
     from lxml import etree, html
     try:
         tree = html.document_fromstring(raw.decode("utf-8", errors="strict"), parser=html.HTMLParser(no_network=True, recover=True))
@@ -163,6 +167,7 @@ def _html(raw: bytes, xpath: str | None) -> dict:
         if sum(len(s["text"]) for s in sources) > MAX_TEXT:
             raise IngestionFailure("source_representation_limit")
         parts = []
+        excluded = set()
 
         def copy(node, slot):
             if (node, slot) in indices:
@@ -172,6 +177,9 @@ def _html(raw: bytes, xpath: str | None) -> dict:
         def visit(node):
             tag = node.tag if isinstance(node.tag, str) else ""
             label = f"{node.get('id', '')} {node.get('class', '')}" if tag else ""
+            if node in excluded:
+                parts.append(None)
+                return
             if not tag or tag in _REMOVED_TAGS or _NOISE.search(label):
                 parts.append(None)
                 return
@@ -185,12 +193,42 @@ def _html(raw: bytes, xpath: str | None) -> dict:
                 parts.append(None)
 
         visit(scope)
-        return _mapped(parts, sources, ["decoded HTML text-node coordinates, not markup byte offsets", f"static {kind}; no JavaScript or image/OCR coverage"])
+        limitations = ["decoded HTML text-node coordinates, not markup byte offsets", f"static {kind}; no JavaScript or image/OCR coverage"]
+        baseline = _mapped(parts, sources, limitations)
+        if projection is None:
+            return baseline
+        parent = projection.parent
+        representation_hash = digest(sources)
+        mapping_hash = digest({"representationHash": representation_hash, "segments": baseline["segments"], "runs": baseline["runs"]})
+        if (digest(baseline["text"]), representation_hash, mapping_hash) != (parent.source_hash, parent.representation_hash, parent.mapping_hash):
+            raise IngestionFailure("projection_parent_mismatch")
+        paths = set(projection.excluded_caption_paths)
+        captions = list(scope.iter("figcaption"))
+        if {original.getpath(node) for node in captions} != paths:
+            raise IngestionFailure("projection_caption_boundary_incomplete")
+        for node in captions:
+            # Compare canonical original paths, never execute descriptor text as XPath.
+            figure = node.getparent()
+            if (figure is None or figure.tag != "figure" or not figure.xpath(".//img")
+                    or figure.xpath(".//video | .//audio | .//object | .//embed | .//iframe")
+                    or not any(child.text or (child is not node and child.tail) for child in node.iter())):
+                raise IngestionFailure("projection_caption_boundary_unsupported")
+            excluded.add(node)
+        parts.clear()
+        visit(scope)
+        projected = _mapped(parts, sources, limitations)
+        projected["textProjection"] = {"profile": projection.profile, "descriptorHash": digest(projection.wire()),
+            "parentDocumentVersion": parent.document_version, "boundaryDecisionRevision": projection.boundary_decision.revision,
+            "rightsReceiptHash": projection.rights_receipt.sha256,
+            "excludedSourceSlots": [{k: source[k] for k in ("domPath", "slot")} for source in sources
+                if any(source["domPath"].startswith(path + "/") or (source["domPath"] == path and source["slot"] == "text") for path in paths)]}
+        return projected
     except (UnicodeError, etree.LxmlError, ValueError, RecursionError) as exc:
         raise IngestionFailure("html_extraction_failed") from exc
 
 
-def _pdf(raw: bytes) -> dict:
+def _pdf(raw: bytes, projection: PdfBodyProjection | None = None, member: PdfBodyMember | None = None,
+         rights: PdfRightsReceipt | None = None) -> dict:
     # Only this supervised child touches PdfReader. Its trusted output is bounded by page and aggregate
     # character limits; it emits no raw parser exception and inherits no credentials from this process.
     environment = {k: os.environ[k] for k in ("PATH", "PYTHONPATH", "LANG", "LC_ALL") if k in os.environ}
@@ -221,6 +259,75 @@ def _pdf(raw: bytes) -> dict:
             exc.preparation.update(counts)
         raise
     output.update(counts)
+    if projection is not None:
+        if member is None or rights is None or member not in projection.members:
+            raise IngestionFailure("projection_member_missing")
+        parent = member.parent
+        representation = digest(sources)
+        mapping = digest({"representationHash": representation, "segments": output["segments"], "runs": output["runs"]})
+        if ((digest(output["text"]), representation, mapping) !=
+                (parent.source_hash, parent.representation_hash, parent.mapping_hash)):
+            raise IngestionFailure("projection_parent_mismatch")
+        if ((rights.body_sha256, rights.parent_document_version, rights.selection_hash) !=
+                (byte_hash(raw), parent.document_version, member.boundary_decision.selection_hash)):
+            raise IngestionFailure("projection_rights_receipt_invalid")
+        pages = {source["pageNumber"]: (i, source) for i, source in enumerate(sources)}
+        coverage = {number: [] for number in pages}
+        units = {}
+        for unit in rights.review_units:
+            if unit.unit_id in units or not unit.review_basis.strip():
+                raise IngestionFailure("projection_review_units_invalid")
+            units[unit.unit_id] = unit
+            previous = None
+            for span in unit.spans:
+                page = pages.get(span.page_number)
+                if page is None:
+                    raise IngestionFailure("projection_review_units_invalid")
+                _, source = page
+                if (span.source_end > len(source["text"]) or span.page_text_hash != source["pageTextHash"]
+                        or byte_hash(source["text"][span.source_start:span.source_end].encode("utf-8")) != span.text_utf8_sha256
+                        or (previous is not None and (span.page_number, span.source_start) < previous)):
+                    raise IngestionFailure("projection_review_units_invalid")
+                previous = (span.page_number, span.source_end)
+                coverage[span.page_number].append((span.source_start, span.source_end))
+        for number, intervals in coverage.items():
+            text = pages[number][1]["text"]
+            end = 0
+            for start, stop in sorted(intervals):
+                if start < end or text[end:start].strip():
+                    raise IngestionFailure("projection_review_coverage_invalid")
+                end = stop
+            if text[end:].strip():
+                raise IngestionFailure("projection_review_coverage_invalid")
+        selected = {}
+        for span in member.allowed_ranges:
+            selected.setdefault(span.review_unit_id, []).append({k: v for k, v in span.wire().items() if k != "reviewUnitId"})
+        for uid, spans in selected.items():
+            unit = units.get(uid)
+            if (unit is None or unit.classification not in
+                    {"original-dateline", "commission-narrative", "public-official-statement"}
+                    or spans != [span.wire() for span in unit.spans]):
+                raise IngestionFailure("projection_whole_positive_unit_required")
+        parts = []
+        previous = None
+        for span in member.allowed_ranges:
+            index, source = pages[span.page_number]
+            if not any(segment["sourceIndex"] == index and
+                    segment["sourceStart"] <= span.source_start < span.source_end <= segment["sourceEnd"]
+                    for segment in output["segments"]):
+                raise IngestionFailure("projection_range_outside_parent_mapping")
+            if previous != (index, span.source_start):
+                parts.append(None)
+            parts.append((index, span.source_start, span.source_end))
+            previous = (index, span.source_end)
+        projected = _mapped(parts, sources, output["limitations"])
+        projected.update(counts)
+        projected["textProjection"] = {"profile": projection.profile, "descriptorHash": digest(projection.wire()),
+            "parentDocumentId": parent.document_id, "parentRawVersion": parent.raw_version,
+            "parentDocumentVersion": parent.document_version, "selectionHash": member.boundary_decision.selection_hash,
+            "boundaryDecisionRevision": member.boundary_decision.revision, "rightsReceiptHash": member.rights_receipt.sha256,
+            "retainedSourceRanges": [span.wire() for span in member.allowed_ranges]}
+        return projected
     return output
 
 
@@ -245,13 +352,19 @@ def _markdown(raw: bytes, *, official: bool = False) -> dict:
             "limitations": limitations}
 
 
-def prepare(raw: bytes, media_type: str, xpath: str | None, *, retained_schema: str | None = None) -> dict:
+def prepare(raw: bytes, media_type: str, xpath: str | None, *, retained_schema: str | None = None,
+            projection: ScopeTextProjection | None = None, pdf_member: PdfBodyMember | None = None,
+            pdf_rights: PdfRightsReceipt | None = None) -> dict:
     if len(raw) > MAX_RAW:
         raise IngestionFailure("raw_byte_limit")
+    if projection is not None:
+        expected = "application/pdf" if isinstance(projection, PdfBodyProjection) else "text/html"
+        if media_type != expected or (expected == "application/pdf" and xpath is not None):
+            raise IngestionFailure("projection_media_unsupported")
     if media_type == "text/markdown":
         return _markdown(raw, official=retained_schema == "zoop-official-source-record-1")
     if media_type == "text/html":
-        return _html(raw, xpath)
+        return _html(raw, xpath, projection)
     if media_type == "application/pdf":
-        return _pdf(raw)
+        return _pdf(raw, projection, pdf_member, pdf_rights)
     raise IngestionFailure("media_type_unsupported")

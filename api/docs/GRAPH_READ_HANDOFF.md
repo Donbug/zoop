@@ -44,6 +44,8 @@ client는 비-loopback 주소에 HTTPS를 요구하고 proxy·redirect·자동 �
 3. allowlist와 요청에 canonical manifest·bundle digest를 지정하고 graph를 비활성 수입합니다. 입력 native bundle 한도는 source 20개·6 MiB입니다. bundle8/P2/decisions4와 bundle9/P3/decisions5를 각각 검증하며, exact tuple별 `zoop-source-authority-set-1` 읽기는 두 조합에 동일하게 적용합니다.
 4. 앱 공개 reader에는 현재 registry authority set과 대상 artifact root를 제공합니다. 수입 성공과 별도로 기존 활성 포인터·CAS를 확인하고 승인된 활성화 절차를 수행합니다.
 
+현재 권리 reader는 `collected-http` scope의 선택 필드 `textProjection`에서 `korea-kogl1-caption-boundary-1`과 `eu-commission-pdf-body-ranges-1`의 닫힌 객체 구조를 인식합니다. 생략하거나 `null`이면 기존 scope와 같은 권리 규칙을 적용하며, 알 수 없는 profile·scope 설정과 잘못된 객체 타입은 거절합니다. Java는 현재 grant의 `read`·`store`·`quote-display`를 판단하고, 부모 문서·범위·개별 권리 영수증의 의미 검증은 native preparation이 담당합니다. 원본 registry와 전체 descriptor는 그대로 보존되므로 Python `Source.configuration(scope)`의 정확한 구성 비교와 모든 member를 포함한 canonical hash가 계속 적용됩니다.
+
 ### 합성 종단 smoke
 
 이미 설치된 pipeline·service·worker 환경, 최신 API jar와 비어 있는 전용 loopback PostgreSQL을 준비합니다. 아래 변수는 운영자가 해당 로컬 검증 환경에서 지정합니다.
