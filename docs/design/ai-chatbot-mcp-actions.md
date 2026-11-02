@@ -161,7 +161,7 @@ answerStatus·notices는 DTO·저장·OpenAPI·웹 타입·재열람 guard에 �
 | --- | --- | --- |
 | Q01 | help.search, screenSpec.read, zoopPolicy.read | 승인된 서비스 화면·도움말 열기 |
 | Q02 | 웹 보조 근거 + Luna 설명, 실패 시 제한된 일반 지식 | 기본 화면 이동 없음, 검색한 경우 외부 출처 링크 |
-| Q03 | company.read, issue.read, document.search, evidence.resolve | 기업 상세, 이슈·근거 열기 |
+| Q03 | company.read, issue.read, document.search, evidence.resolve | 기업 상세, 이슈·근거 열기. `document.search`는 요구 문장에서 서버가 본문 검색어를 정하므로 direct server-only |
 | Q04 | graph.path.read, evidence.resolve | 실제 간선·경로 포커스, 관계 상세·근거 열기 |
 | Q05 | graph.version.diff, period.compare | 실제 지원되는 버전/기간 비교 화면 열기 |
 | Q06 | briefing.read, briefing.evidence | 해당 회차 브리핑·근거 열기 |
