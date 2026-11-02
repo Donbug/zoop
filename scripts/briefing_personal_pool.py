@@ -16,7 +16,7 @@ def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
 
 
-def compile_pool(frozen, row, calls, registry, previous_id=None):
+def compile_pool(frozen, row, calls, registry, previous_id=None, baseline=None):
     intelligence.check_seal(frozen)
     assessed, checked, proof = view.reuse_candidate_assessments(frozen, row, calls)
     intelligence.validate_assessments(assessed, frozen)
@@ -54,15 +54,35 @@ def compile_pool(frozen, row, calls, registry, previous_id=None):
                 for relation in companies:
                     if relation['companyId'] == t['companyId']: relation['nextCheck'] = '\n'.join(conditions) or None
             next_check = '\n'.join(checks) or None
+        selected_entry = {'issueId': iid, 'candidate': c, 'assessment': a,
+            'priceSignal': intelligence.price_signal(c),
+            'relationSignal': {'value': min(3, len({r['companyId'] for r in a['relations'] if r['directness'] == 'direct'}))},
+            'policyVersion': frozen['policyVersion'], 'cutoff': frozen['cutoff']}
+        generation_input = intelligence.analysis_inputs(frozen, {'selected': [selected_entry]}, [])[0]
         candidates.append({'issueId': iid, 'eventKey': iid, 'title': passed[iid]['draft']['headline']['text'] if iid in passed else c['title'], 'importance': a['businessImportance'],
             'informationChange': a['informationChange'], 'verified': checked['checks'][iid]['supported'],
             'whyImportant': a['whyImportant']['text'], 'whyNow': a['whyNow']['text'],
-            'companies': companies, 'sources': sources, 'analysis': analysis, 'nextCheck': next_check})
-    version = hashlib.sha256(canonical({'frozen': frozen['inputSha256'], 'assessments': assessed, 'checks': checked, 'compilerVersion': 'personal-pool-compiler-v2', 'candidates': candidates})).hexdigest()
+            'companies': companies, 'sources': sources, 'analysis': analysis, 'nextCheck': next_check,
+            'analysisInput': generation_input,
+            'priceSignal': intelligence.price_signal(c),
+            'relationSignal': {'value': min(3, len({r['companyId'] for r in a['relations'] if r['directness'] == 'direct'}))}})
+    shared_meta = None
+    if baseline is not None:
+        projected = view.project(baseline, frozen, row, calls)
+        shared = projected['response']['issueIntelligence']
+        shared_meta = {k: copy.deepcopy(v) for k,v in shared.items() if k != 'issues'}
+        for candidate in candidates:
+            iid = candidate['issueId']
+            item = next((i for i in projected['response']['items'] if i['eventId'] == iid), None)
+            if item is not None:
+                candidate['sharedView'] = {'item': copy.deepcopy(item),
+                    'analysis': copy.deepcopy(next(i for i in shared['issues'] if i['issueId'] == iid)),
+                    'detail': copy.deepcopy(projected['details'][iid])}
+    version = hashlib.sha256(canonical({'frozen': frozen['inputSha256'], 'assessments': assessed, 'checks': checked, 'compilerVersion': 'personal-pool-compiler-v5', 'candidates': candidates, 'sharedMeta': shared_meta})).hexdigest()
     return {'schemaVersion': 'personal-candidate-pool-v1', 'roundId': frozen['roundId'], 'cutoff': frozen['cutoff'],
         'scope': frozen['scope'], 'complete': True, 'candidateCount': len(candidates), 'candidates': candidates,
         'inputSha256': version, 'selectionPolicyVersion': frozen['policyVersion'], 'previousRoundId': previous_id,
-        'proof': {'sourceInputSha256': frozen['inputSha256'], 'baselineResponseSha256': frozen['baselineResponseSha256'],
+        'sharedMeta': shared_meta, 'proof': {'sourceInputSha256': frozen['inputSha256'], 'baselineResponseSha256': frozen['baselineResponseSha256'],
                   'receipts': proof, 'newAiCalls': 0}}
 
 
@@ -82,6 +102,7 @@ def main():
     p.add_argument('--executed', type=Path, required=True)
     p.add_argument('--registry', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--baselines', type=Path, help='Previously frozen common responses; enables receipt-proven shared analysis reuse')
     args = p.parse_args()
     registry = {(r['documentId'], r['documentVersion']): r for r in json.loads(args.registry.read_text())}
     calls = view.verified_calls(args.executed)
@@ -93,7 +114,8 @@ def main():
         name = f['date'] + '-' + f['edition']; row = json.loads((args.executed / (name + '.json')).read_text())
         # Only attach a truly adjacent predecessor. Never jump over a missing/held round.
         prior_id = previous['roundId'] if previous and intelligence.aware(previous['cutoff']) == intelligence.aware(f['window']['from']) else None
-        pool = compile_pool(f, row, calls, registry, prior_id)
+        baseline = json.loads((args.baselines / (name + '.json')).read_text()) if args.baselines else None
+        pool = compile_pool(f, row, calls, registry, prior_id, baseline)
         dest = args.output / (name + '.sql')
         if dest.exists(): raise ValueError('output_exists')
         dest.write_text(sql(pool)); (args.output / (name + '.json')).write_bytes(canonical(pool))

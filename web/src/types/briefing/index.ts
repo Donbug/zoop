@@ -201,6 +201,8 @@ export type BriefingContinuity = {
 
 /** Consumer fields of getBriefing; publication snapshots are never recalculated. */
 export type BriefingResponse = {
+  /** Immutable feedback result version; graphVersion or publication digest when graph-less. */
+  feedbackVersion?: string | null;
   id: string;
   date: string;
   edition: BriefingEdition;
@@ -214,6 +216,8 @@ export type BriefingResponse = {
   continuity?: BriefingContinuity;
   editionReview?: import('./editionReview').EditionReview;
   companyPriceContext?: import('./priceContext').BriefingPriceContext;
+  /** Fixed original review used only to authenticate reused price observations in an explicit selection. */
+  companyPriceBasis?: import('./editionReview').EditionReview;
   aiPriceOutlooks?: import('./aiPriceOutlook').AiPriceOutlooks;
   preservedPublication?: {
     sha256: string;

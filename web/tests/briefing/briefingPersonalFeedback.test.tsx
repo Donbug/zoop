@@ -311,6 +311,115 @@ describe('FS066-01 브리핑 평가', () => {
     expect(server.calls('PUT', '/api/v1/feedback')).toHaveLength(1);
   });
 
+  it('graphVersion 없는 발행본도 feedbackVersion으로 저장하고 남긴 이유를 복원·수정한다', async () => {
+    signInMember();
+    ({ server } = setup('/briefing', {
+      ...briefing(),
+      graphVersion: null,
+      feedbackVersion: 'publication:verified-sha',
+    }));
+    server.on('GET', '/api/v1/feedback', (request) =>
+      json({
+        items:
+          request.query.get('feature') === 'briefing_round'
+            ? [
+                {
+                  feature: 'briefing_round',
+                  targetId: ROUND,
+                  targetVersion: 'publication:verified-sha',
+                  value: 'down',
+                  reason: '기존 저장 이유',
+                },
+              ]
+            : [],
+        nextCursor: null,
+      }),
+    );
+    server.on('PUT', '/api/v1/feedback', (request) => json(request.body));
+    const user = userEvent.setup();
+    expect(await screen.findByText('남긴 이유: 기존 저장 이유')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: '이유 수정' }));
+    const reason = screen.getByPlaceholderText('어떤 점이 아쉬웠나요? (선택)');
+    expect((reason as HTMLTextAreaElement).value).toBe('기존 저장 이유');
+    await user.clear(reason);
+    await user.type(reason, '기업별 비교를 보강해주세요');
+    await user.click(screen.getByRole('button', { name: '이유 보내기' }));
+    expect(
+      await screen.findByText('남긴 이유: 기업별 비교를 보강해주세요'),
+    ).toBeTruthy();
+    expect(server.calls('PUT', '/api/v1/feedback')[0].body).toMatchObject({
+      targetId: ROUND,
+      targetVersion: 'publication:verified-sha',
+      value: 'down',
+      reason: '기업별 비교를 보강해주세요',
+    });
+  });
+
+  it.each([false, true])(
+    'D-BRF-01 기존 사유를 비워 저장하고 실패 시 보존·재시도한다 (실패=%s)',
+    async (failFirst) => {
+      signInMember();
+      ({ server } = setup('/briefing'));
+      let storedReason: string | null = '기존 저장 이유';
+      let failed = false;
+      server.on('GET', '/api/v1/feedback', (request) =>
+        json({
+          items:
+            request.query.get('feature') === 'briefing_round'
+              ? [
+                  {
+                    feature: 'briefing_round',
+                    targetId: ROUND,
+                    targetVersion: 'v7',
+                    value: 'down',
+                    reason: storedReason,
+                  },
+                ]
+              : [],
+          nextCursor: null,
+        }),
+      );
+      server.on('PUT', '/api/v1/feedback', (request) => {
+        if (failFirst && !failed) {
+          failed = true;
+          return apiError(503, 'SOURCE_UNAVAILABLE');
+        }
+        storedReason = (request.body as { reason: string | null }).reason;
+        return json(request.body);
+      });
+      const user = userEvent.setup();
+      expect(await screen.findByText('남긴 이유: 기존 저장 이유')).toBeTruthy();
+      await user.click(screen.getByRole('button', { name: '이유 수정' }));
+      await user.clear(
+        screen.getByPlaceholderText('어떤 점이 아쉬웠나요? (선택)'),
+      );
+      await user.click(screen.getByRole('button', { name: '이유 보내기' }));
+      if (failFirst) {
+        expect(
+          await screen.findByText(
+            '평가를 저장하지 못했어요. 이전 평가는 그대로예요.',
+          ),
+        ).toBeTruthy();
+        expect(storedReason).toBe('기존 저장 이유');
+        expect(
+          screen.getByRole('button', { name: '이유 보내기' }),
+        ).toBeTruthy();
+        await user.click(screen.getByRole('button', { name: '다시 시도' }));
+      }
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('button', { name: '이유 보내기' }),
+        ).toBeNull(),
+      );
+      expect(screen.queryByText('남긴 이유: 기존 저장 이유')).toBeNull();
+      expect(screen.getByRole('button', { name: '이유 추가' })).toBeTruthy();
+      expect(storedReason).toBeNull();
+      expect(
+        server.calls('PUT', '/api/v1/feedback').at(-1)?.body,
+      ).toMatchObject({ value: 'down', reason: null });
+    },
+  );
+
   it('결과 버전이 없는 회차는 평가를 읽거나 보내지 않고 이유를 알린다', async () => {
     signInMember();
     ({ server } = setup('/briefing', { ...briefing(), graphVersion: null }));

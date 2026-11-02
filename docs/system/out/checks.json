@@ -1915,7 +1915,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getBriefing",
       "severity": "difference",
-      "message": "목표만 1857 · BFF만 60 · 형식/필수/권한 변경 21",
+      "message": "목표만 1859 · BFF만 60 · 형식/필수/권한 변경 21",
       "source": ""
     },
     {
@@ -2006,7 +2006,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getConversation",
       "severity": "difference",
-      "message": "목표만 229 · BFF만 32 · 형식/필수/권한 변경 23",
+      "message": "목표만 232 · BFF만 32 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2027,7 +2027,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCurrentConversation",
       "severity": "difference",
-      "message": "목표만 229 · BFF만 32 · 형식/필수/권한 변경 23",
+      "message": "목표만 232 · BFF만 32 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2041,7 +2041,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "submitQuestion",
       "severity": "difference",
-      "message": "목표만 403 · BFF만 34 · 형식/필수/권한 변경 42",
+      "message": "목표만 409 · BFF만 34 · 형식/필수/권한 변경 42",
       "source": ""
     },
     {
@@ -2055,7 +2055,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getQuestionJob",
       "severity": "difference",
-      "message": "목표만 246 · BFF만 23 · 형식/필수/권한 변경 23",
+      "message": "목표만 249 · BFF만 23 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2069,7 +2069,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "retryQuestionJob",
       "severity": "difference",
-      "message": "목표만 393 · BFF만 34 · 형식/필수/권한 변경 39",
+      "message": "목표만 399 · BFF만 34 · 형식/필수/권한 변경 39",
       "source": ""
     },
     {
@@ -2083,7 +2083,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "cancelQuestionJob",
       "severity": "difference",
-      "message": "목표만 277 · BFF만 23 · 형식/필수/권한 변경 23",
+      "message": "목표만 280 · BFF만 23 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -2139,7 +2139,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAdminDashboard",
       "severity": "difference",
-      "message": "목표만 1082 · BFF만 633 · 형식/필수/권한 변경 7",
+      "message": "목표만 1084 · BFF만 633 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2405,7 +2405,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listAdminBriefingRounds",
       "severity": "difference",
-      "message": "목표만 120 · BFF만 21 · 형식/필수/권한 변경 12",
+      "message": "목표만 122 · BFF만 21 · 형식/필수/권한 변경 15",
       "source": ""
     },
     {
@@ -2419,7 +2419,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAdminBriefingRound",
       "severity": "difference",
-      "message": "목표만 309 · BFF만 37 · 형식/필수/권한 변경 27",
+      "message": "목표만 350 · BFF만 37 · 형식/필수/권한 변경 30",
       "source": ""
     },
     {
@@ -2433,7 +2433,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "reprocessBriefingRound",
       "severity": "difference",
-      "message": "목표만 162 · BFF만 12 · 형식/필수/권한 변경 13",
+      "message": "목표만 164 · BFF만 12 · 형식/필수/권한 변경 16",
       "source": ""
     },
     {
@@ -2461,7 +2461,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "setBriefingSuspension",
       "severity": "difference",
-      "message": "목표만 162 · BFF만 12 · 형식/필수/권한 변경 13",
+      "message": "목표만 164 · BFF만 12 · 형식/필수/권한 변경 16",
       "source": ""
     },
     {
@@ -2489,7 +2489,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getMyFeedback",
       "severity": "difference",
-      "message": "목표만 120 · BFF만 21 · 형식/필수/권한 변경 7",
+      "message": "목표만 120 · BFF만 21 · 형식/필수/권한 변경 10",
       "source": ""
     },
     {
@@ -2503,7 +2503,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "setFeedback",
       "severity": "difference",
-      "message": "목표만 160 · BFF만 12 · 형식/필수/권한 변경 10",
+      "message": "목표만 160 · BFF만 12 · 형식/필수/권한 변경 12",
       "source": ""
     },
     {
@@ -2573,7 +2573,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getFeedbackSummary",
       "severity": "difference",
-      "message": "목표만 114 · BFF만 21 · 형식/필수/권한 변경 8",
+      "message": "목표만 114 · BFF만 21 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -2690,6 +2690,13 @@
     },
     {
       "code": "TARGET_ONLY_API",
+      "target": "getPersonalizedBriefingIssues",
+      "severity": "difference",
+      "message": "GET /api/v1/briefings/{id}/personalized/issues: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
       "target": "getPersonalizedBriefing",
       "severity": "difference",
       "message": "GET /api/v1/briefings/{id}/personalized: 직접 대응 BFF 없음",
@@ -2707,6 +2714,76 @@
       "target": "getCompanyGraphAsOf",
       "severity": "difference",
       "message": "목표만 124 · BFF만 41 · 형식/필수/권한 변경 7",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "getBriefingPersonalizationOptions",
+      "severity": "difference",
+      "message": "GET /api/v1/briefings/personalization/options: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "selectPersonalBriefingIssues",
+      "severity": "difference",
+      "message": "POST /api/v1/briefings/{id}/personalized/selection: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "createPersonalBriefingGeneration",
+      "severity": "difference",
+      "message": "POST /api/v1/briefings/{id}/personalized/generations: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "getPersonalBriefingGeneration",
+      "severity": "difference",
+      "message": "GET /api/v1/briefings/{id}/personalized/generations/{jobId}: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "retryPersonalBriefingGeneration",
+      "severity": "difference",
+      "message": "POST /api/v1/briefings/{id}/personalized/generations/{jobId}/retry: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "getPersonalBriefingSettings",
+      "severity": "difference",
+      "message": "GET /api/v1/briefings/personalization/settings: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "savePersonalBriefingSettings",
+      "severity": "difference",
+      "message": "PUT /api/v1/briefings/personalization/settings: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "initializePersonalBriefingSettings",
+      "severity": "difference",
+      "message": "POST /api/v1/briefings/personalization/settings/initialize: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "getPersonalBriefingDelivery",
+      "severity": "difference",
+      "message": "GET /api/v1/briefings/{id}/personalized/delivery: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "createPersonalBriefingDemo",
+      "severity": "difference",
+      "message": "POST /api/v1/briefings/{id}/personalized/demo: 직접 대응 BFF 없음",
       "source": ""
     },
     {
@@ -2752,28 +2829,28 @@
     "BFF_CACHED_OBSERVATION": 1,
     "BFF_PATH_DIFFERENCE": 81,
     "BFF_FIELD_DIFFERENCE": 81,
-    "TARGET_ONLY_API": 15,
+    "TARGET_ONLY_API": 26,
     "PROTOTYPE_ONLY_API": 3
   },
   "severityCounts": {
     "warning": 210,
-    "difference": 180
+    "difference": 191
   },
   "xlsxReadback": {
     "status": "passed",
     "sheetDataRows": {
-      "추적표": 728,
-      "화면→기능→API": 1529,
+      "추적표": 794,
+      "화면→기능→API": 1727,
       "기능→WBS→구현 상태": 500,
-      "API 목록": 96,
+      "API 목록": 107,
       "오류 코드": 28,
-      "경고": 390,
+      "경고": 401,
       "원문 WBS": 173,
       "원문 제안·유효 기준": 8,
       "범위 예외·상세 권한": 34,
       "수용 기준": 121
     },
-    "cells": 50923
+    "cells": 54707
   },
   "acceptanceCoverage": {
     "status": "passed",
@@ -2818,15 +2895,15 @@
       "BE": 82,
       "FE": 33
     },
-    "targetOperations": 96
+    "targetOperations": 107
   },
   "sheetDataRows": {
-    "추적표": 728,
-    "화면→기능→API": 1529,
+    "추적표": 794,
+    "화면→기능→API": 1727,
     "기능→WBS→구현 상태": 500,
-    "API 목록": 96,
+    "API 목록": 107,
     "오류 코드": 28,
-    "경고": 390,
+    "경고": 401,
     "원문 WBS": 173,
     "원문 제안·유효 기준": 8,
     "범위 예외·상세 권한": 34,

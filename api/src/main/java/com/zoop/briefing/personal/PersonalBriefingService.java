@@ -1,8 +1,8 @@
 package com.zoop.briefing.personal;
 
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
-import com.zoop.briefing.query.BriefingGraphContentAuthority;
 import com.zoop.briefing.query.BriefingQueryService;
+import com.zoop.briefing.query.BriefingGraphContentAuthority;
 import com.zoop.briefing.storage.BriefingRound;
 import com.zoop.briefing.storage.BriefingRoundRepository;
 import com.zoop.common.exception.CustomException;
@@ -27,13 +27,12 @@ public class PersonalBriefingService {
     private final BriefingQueryService publicReads;
     private final PersonalCompanies companies;
     private final PersonalCandidateAccess access;
+    private final PersonalAiRead ai;
     private final BriefingGraphContentAuthority graph;
     private final JsonMapper json=JsonMapper.builder().build();
     public PersonalBriefingService(PersonalBriefingRepository pools, BriefingRoundRepository rounds,
-            BriefingQueryService publicReads, PersonalCompanies companies, PersonalCandidateAccess access,
-            BriefingGraphContentAuthority graph) {
-        this.pools=pools; this.rounds=rounds; this.publicReads=publicReads; this.companies=companies; this.access=access;
-        this.graph=graph;
+            BriefingQueryService publicReads, PersonalCompanies companies, PersonalCandidateAccess access, BriefingGraphContentAuthority graph, PersonalAiRead ai) {
+        this.pools=pools; this.rounds=rounds; this.publicReads=publicReads; this.companies=companies; this.access=access; this.ai=ai; this.graph=graph;
     }
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=10)
     public ObjectNode get(String roundId, MemberPrincipal member, String requestId) {
@@ -46,11 +45,11 @@ public class PersonalBriefingService {
             if (!roundId.equals(common.path("id").asString()) || !"published".equals(common.path("status").asString()))
                 throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
             var ids=companies.of(member);
-            var out=json.createObjectNode().put("roundId",roundId).put("dataAsOf",round.windowTo().toString())
+            var out=json.createObjectNode().put("roundId",roundId).put("edition",round.edition()).put("dataAsOf",round.windowTo().toString())
                     .put("policyVersion",POLICY).put("basisObservedAt",Instant.now().toString());
             var basis=out.putObject("basis"); basis.set("holdings",json.valueToTree(ids.holdings()));
             basis.set("watchlist",json.valueToTree(ids.watchlist())); basis.put("holdingsKind","connected_mock_portfolio");
-            out.putArray("items"); out.putArray("tracking"); out.putNull("poolVersion"); out.putNull("previousRoundId");
+            out.putArray("items"); out.putObject("aiAnalysis").put("status","unavailable").put("reason","not_generated_for_current_selection"); out.putArray("tracking"); out.putNull("poolVersion"); out.putNull("previousRoundId");
             out.put("eligibleCount",0).put("matchingCount",0).put("excludedByCurrentAccess",0);
             Set<String> scope=new LinkedHashSet<>(ids.holdings()); scope.addAll(ids.watchlist());
             if (scope.isEmpty()) return state(out,"no_companies","보유·관심 종목을 등록해 주세요.");
@@ -82,7 +81,8 @@ public class PersonalBriefingService {
                 }
                 out.withArray("items").add(item);
             }
-            track(out,round,scope,requestId,pool,graphContext);
+            track(out,round,scope,requestId,pool,member.memberId(),graphContext);
+            out.set("aiAnalysis",ai.read(member.memberId(),out));
             return state(out,selected.isEmpty()?(blocked>0?"sources_unavailable":"no_matching_issues"):"available",
                     selected.isEmpty()?"이번 회차에서 현재 제공 가능한 적격 관련 이슈가 없습니다.":null);
         } catch (DataAccessException | IllegalArgumentException | com.zoop.common.json.StrictJson.Malformed error) {
@@ -150,8 +150,7 @@ public class PersonalBriefingService {
         }
         return selected;
     }
-    private void track(ObjectNode out,BriefingRound round,Set<String> scope,String requestId,JsonNode pool,
-            BriefingGraphContentAuthority.Context graphContext) {
+    private void track(ObjectNode out,BriefingRound round,Set<String> scope,String requestId,JsonNode pool,String memberId,BriefingGraphContentAuthority.Context graphContext) {
         // Fixed predecessor; never substitute the latest successful round or match by company alone.
         String priorId=pool.path("previousRoundId").asString("");
         if(priorId.isBlank()) {out.put("trackingStatus","previous_not_recorded");return;}
@@ -173,6 +172,14 @@ public class PersonalBriefingService {
         var allowed=new ArrayList<JsonNode>();
         for(var c:eligible(priorPool,previous))if(!matched(c,scope).isEmpty() && access.readable(c,priorGraph,requestId))allowed.add(c);
         out.put("previousRoundId",priorId).put("trackingStatus","available");
+        var priorSelection=json.createObjectNode().put("roundId",priorId).put("poolVersion",priorPool.path("inputSha256").asString());
+        priorSelection.set("basis",out.path("basis").deepCopy());
+        var priorItems=priorSelection.putArray("items");
+        for(var old:select(allowed,scope)) {
+            var item=priorItems.addObject().put("issueId",old.path("issueId").asString());
+            item.set("matches",json.valueToTree(matched(old,scope)));
+        }
+        var priorAi=ai.read(memberId,priorSelection);
         for(var old:select(allowed,scope))for(var relation:matched(old,scope)) {
             String company=relation.path("companyId").asString();
             var now=pool.path("candidates").valueStream().filter(c->c.path("eventKey").equals(old.path("eventKey"))
@@ -184,6 +191,11 @@ public class PersonalBriefingService {
                     .put("message",now==null?"이번 회차에 같은 사건의 후속 근거가 없습니다. 확인 완료를 뜻하지 않습니다.":"같은 이슈·기업의 후속 자료가 있습니다. 조건 충족 여부는 별도 확인이 필요합니다.")
                     .put("basis","current_companies_replayed_on_fixed_previous_pool");
             row.set("nextCheck",relation.path("nextCheck").isMissingNode()?json.nullNode():relation.path("nextCheck").deepCopy());
+            if("available".equals(priorAi.path("status").asString())) {
+                var personal=priorAi.path("draft").path("issues").path(old.path("issueId").asString()).path("companies").path(company).path("nextCheck");
+                if(!personal.path("text").asString().isBlank())row.put("personalAiNextCheck",personal.path("text").asString())
+                    .put("personalAiResultVersion",priorAi.path("resultVersion").asString());
+            }
         }
     }
     private ObjectNode state(ObjectNode out,String status,String message){return out.put("status",status).put("message",message);}

@@ -6,6 +6,7 @@ import { validEditionReview } from '@/util/editionReview';
 import type {
   BriefingDocumentSentiment,
   BriefingItem,
+  BriefingItemDetail,
   BriefingResponse,
 } from '@/types/briefing';
 import {
@@ -111,7 +112,7 @@ function CompanyInIssue({
   return (
     <section
       aria-label={`${company.name} 관련 판단`}
-      className="space-y-3 border-t border-zoop-line pt-4"
+      className="space-y-3 border-t border-zoop-border pt-4"
     >
       <h5 className="flex flex-wrap items-center gap-2 text-body font-bold">
         {company.id ? (
@@ -198,7 +199,7 @@ function CompanyInIssue({
         </section>
       )}
       {price?.status === 'available' && (
-        <div className="rounded border border-zoop-line bg-zoop-wash p-3">
+        <div className="rounded-md border border-zoop-border bg-zoop-card p-3">
           <p className="text-body font-semibold">
             {price.sessionDate}{' '}
             {price.latest.kind === 'daily_close' ? '종가' : '완료 봉'}{' '}
@@ -317,7 +318,7 @@ function CompanyInIssue({
                 )}
                 <p className={NOTE}>{briefingTime(s.publishedAt)}</p>
                 <blockquote
-                  className={`${NOTE} mt-2 border-l-2 border-zoop-line pl-3`}
+                  className={`${NOTE} mt-2 border-l-2 border-zoop-border pl-3`}
                 >
                   {s.quote}
                 </blockquote>
@@ -356,7 +357,7 @@ function IssueFollowUp({
             .map((c) => (
               <div
                 key={c.company.id}
-                className="mb-3 rounded border border-zoop-line p-3"
+                className="mb-3 rounded-md border border-zoop-border p-3"
               >
                 <p className="text-caption font-semibold">
                   {c.company.name} · 같은 이슈의 이전 판단
@@ -441,6 +442,7 @@ function IssueCard({
   comparisonState,
   result,
   renderExtra,
+  selectionDetails,
   corrections,
 }: {
   corrections: Correction[];
@@ -450,6 +452,7 @@ function IssueCard({
   compact: boolean;
   result: BriefingResponse;
   renderExtra?: (item: BriefingItem) => ReactNode;
+  selectionDetails?: Record<string, BriefingItemDetail>;
 }) {
   const [open, setOpen] = useState(false);
   const item = group.members[0].item;
@@ -504,8 +507,8 @@ function IssueCard({
           if (next && !open) recordOpen();
           setOpen(next);
         }}
-        className={`scroll-mt-4 overflow-hidden border border-zoop-line bg-zoop-paper ${
-          corrections.length ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'
+        className={`scroll-mt-4 overflow-hidden border border-zoop-border bg-zoop-surface ${
+          corrections.length ? 'rounded-t-xl border-b-0' : 'rounded-xl'
         }`}
       >
         <summary
@@ -531,7 +534,7 @@ function IssueCard({
           </span>
         </summary>
         {open && (
-          <div className="space-y-6 border-t border-zoop-line p-5 sm:p-6">
+          <div className="space-y-6 border-t border-zoop-border p-5 sm:p-6">
             <p className={NOTE}>
               시장 관측 ·{' '}
               {newsObserved
@@ -626,18 +629,24 @@ function IssueCard({
                         result={result}
                         comparisonState={comparisonState}
                       />
-                      <details>
+                      <details hidden={Boolean(selectionDetails)}>
                         <summary
                           className={`min-h-11 cursor-pointer content-center text-caption ${FOCUS_RING}`}
                         >
                           기업별 독립 검증·추가 근거
                         </summary>
-                        <BriefingS3Impacts round={result} item={member.item} />
+                        {!selectionDetails && (
+                          <BriefingS3Impacts
+                            round={result}
+                            item={member.item}
+                          />
+                        )}
                       </details>
                       <BriefingItemDetails
                         roundId={result.id}
                         graphVersion={result.graphVersion}
                         item={member.item}
+                        initialDetail={selectionDetails?.[member.item.eventId]}
                         evidenceOnly
                       />
                       {renderExtra?.(member.item)}
@@ -647,22 +656,25 @@ function IssueCard({
               </details>
             ) : (
               <>
-                <details>
+                <details hidden={Boolean(selectionDetails)}>
                   <summary
                     className={`min-h-11 cursor-pointer content-center text-body font-semibold ${FOCUS_RING}`}
                   >
                     기업별 독립 검증·추가 근거
                   </summary>
-                  <BriefingS3Impacts
-                    key={`${result.id}:${item.eventId}:${result.graphVersion}`}
-                    round={result}
-                    item={item}
-                  />
+                  {!selectionDetails && (
+                    <BriefingS3Impacts
+                      key={`${result.id}:${item.eventId}:${result.graphVersion}`}
+                      round={result}
+                      item={item}
+                    />
+                  )}
                 </details>
                 <BriefingItemDetails
                   roundId={result.id}
                   graphVersion={result.graphVersion}
                   item={displayedItem}
+                  initialDetail={selectionDetails?.[item.eventId]}
                   evidenceOnly
                 />
                 <details>
@@ -707,7 +719,7 @@ function IssueCard({
       </details>
       {corrections.length > 0 && (
         // 접힌 카드에서도 정정이 보이도록 카드 아래쪽 테두리 안에 붙여 둔다.
-        <div className="rounded-b-2xl border border-t-0 border-zoop-line bg-zoop-paper px-5 pb-5 sm:px-6">
+        <div className="rounded-b-xl border border-t-0 border-zoop-border bg-zoop-surface px-5 pb-5 sm:px-6">
           <IssueCorrections corrections={corrections} />
         </div>
       )}
@@ -720,6 +732,7 @@ export default function IssueCentricBriefing({
   result,
   items = result.items,
   renderExtra,
+  selectionDetails,
   compact = true,
   issueCorrections,
   beforeIssues,
@@ -731,6 +744,7 @@ export default function IssueCentricBriefing({
   issueCorrections?: Map<string, Correction[]>;
   compact?: boolean;
   renderExtra?: (item: BriefingItem) => ReactNode;
+  selectionDetails?: Record<string, BriefingItemDetail>;
 }) {
   const [history, setHistory] = useState<{
     key: string;
@@ -792,7 +806,8 @@ export default function IssueCentricBriefing({
       {result.items.length === 0 &&
         result.emptyReason === 'no_issues_in_window' &&
         !result.issueIntelligence &&
-        !result.continuity && (
+        !result.continuity &&
+        !selectionDetails && (
           <BriefingRecap
             key={`${result.id}:${result.graphVersion}:${result.dataAsOf}`}
             round={result}
@@ -825,7 +840,7 @@ export default function IssueCentricBriefing({
           <h3 className={SECTION_TITLE}>
             {beforeIssues ? '공통 핵심 이슈' : '핵심 이슈'}
           </h3>
-          {!result.issueIntelligence && (
+          {!result.issueIntelligence && !selectionDetails && (
             <Link
               to={`/?round=${encodeURIComponent(result.id)}`}
               className={`text-caption underline ${FOCUS_RING}`}
@@ -855,6 +870,7 @@ export default function IssueCentricBriefing({
                 compact={compact}
                 result={result}
                 renderExtra={renderExtra}
+                selectionDetails={selectionDetails}
                 corrections={group.members.flatMap(
                   (m) => issueCorrections?.get(m.item.eventId) ?? [],
                 )}
@@ -863,8 +879,9 @@ export default function IssueCentricBriefing({
           </ol>
         ) : (
           <p className={EMPTY}>
-            이 회차에 새로 선정된 핵심 이슈가 없습니다. 복기·수집 상태는 위
-            안내를 확인하세요.
+            {selectionDetails
+              ? '선택한 종목에서 현재 제공 가능한 적격 핵심 이슈가 없습니다. 이전 확인사항은 아래에서 볼 수 있어요.'
+              : '이 회차에 새로 선정된 핵심 이슈가 없습니다. 복기·수집 상태는 위 안내를 확인하세요.'}
           </p>
         )}
       </section>

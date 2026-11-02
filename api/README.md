@@ -250,7 +250,7 @@ console.log(response.status); // 활성 회원 세션이 정상 폐기되면 204
 | `/api/v1/briefings/{id}/graph` | 발행 당시 스냅샷 또는 명시적으로 등록한 재구성본의 기준. 없으면 unavailable이며 최신 그래프로 대체하지 않음 |
 | `/api/v1/briefings/{id}/recap` | 새 핵심이 없는 정상 발행 회차의 고정된 과거 발행본 복기. 현재 권한·정정/중단 상태를 다시 확인 |
 
-Swagger `/v3/api-docs`의 위 5개 operation과 목표 정본 [`docs/api/openapi.yaml`](../docs/api/openapi.yaml)을 구분합니다. 개인화·관리자 정정/중단 등 목표 경로 전체가 구현된 것은 아닙니다. 권한 파일·출처·저장 해시를 확인할 수 없으면 503으로 닫고, 빈 회차·수집 부족·검증 실패를 같은 상태로 바꾸지 않습니다.
+Swagger `/v3/api-docs`의 위 5개 operation과 목표 정본 [`docs/api/openapi.yaml`](../docs/api/openapi.yaml)을 구분합니다. 목표 경로 전체가 구현된 것은 아닙니다. 개인화의 현재 지원 범위는 아래 전용 절을 참고하세요. 권한 파일·출처·저장 해시를 확인할 수 없으면 503으로 닫고, 빈 회차·수집 부족·검증 실패를 같은 상태로 바꾸지 않습니다.
 
 | 시작할 작업 | 안내 |
 |---|---|
@@ -600,3 +600,16 @@ JVM은 보존 응답의 SHA·기업·통화·해상도·요청 마감·완료 �
 새 입력은 명령당 1–20개입니다. 누적 원본 수에는 20개 제한을 적용하지 않습니다. 전체 보존 참조는 artifact당 16 MiB와 실제 전송 closure의 1,003개 파일·256 MiB 경계를 따릅니다. 기존 원본의 규칙 적용 전 projection을 합친 뒤 현재 공개 규칙을 한 번 적용하며, 입력에서 빠진 기존 이슈도 보존합니다. 충돌은 명시적 근거·필드 선택으로 해결하거나 후보 전체를 거절합니다.
 
 `staged` 또는 `unchanged` 결과의 `graphVersionId`와 `receiptSha256`을 다음 전송·수동 활성화 단계에 사용합니다. 실패 코드가 `outcome_unknown`이면 같은 요청과 새 결과 경로로 상태를 대조합니다. 자세한 결정 파일·원본별 제외·권한 계약은 [누적 발행](docs/GRAPH_READ_HANDOFF.md#누적-발행과-원본별-현재-권한)을 따릅니다.
+
+### 개인화 브리핑
+
+최초 이용 시 회원의 보유·관심 종목으로 기본 설정을 저장하며, 둘 다 없으면 개인화 생성은 시작하지 않습니다. 이후 종목 설정 변경은 다음 09:20/17:30 회차부터 적용하고, 이미 확정한 발행본은 유지합니다. 회차 전체 적격 후보에서 핵심 최대3개를 선정하고, 누락 분석은 공통 AI 생성·별도 검증 경로에 연결합니다. 설정 저장·조회에는 AI 호출이 없습니다.
+
+정식 모드는 서버 dispatcher와 별도 워커가 처리합니다. 이슈 수 추가 설정은 제공하지 않으며 수동 실행은 기본 비활성화된 데모에서만 허용합니다. [설정·회차 고정 및 운영 플래그](../docs/development/briefing-personal-preferences.md), [생성·검증과 저장/재사용](../docs/development/briefing-selected-generation.md), [후보 원장](../docs/development/briefing-personal-selection.md)을 참고하세요.
+
+
+개인화 정식 실행은 페이지의 데모 버튼이 아니라 서버09:20/17:30 KST 슬롯을 사용합니다. 기본 설정은 최초 보유·관심 종목으로 한 번만 초기화하며, 정시 종목이 없는 회원은 생성하지 않습니다. 변경은 다음 슬롯부터, 기존 발행본은 불변입니다. 공통 예약 큐·별도 생성 소비자·배포 플래그와 필수 운영 실행기 연결은 [개인화 설정/서버 실행 안내](../docs/development/briefing-personal-preferences.md#서버의-공통-정시-예약과-배포-연결)를 참고하세요.
+
+### 브리핑 회원 평가·관리자 선호도
+
+`/api/v1/feedback`의 회원별 회차/이슈 도움 됨·안 됨·사유를 PostgreSQL에 저장하며, `/api/v1/admin/feedback/summary`와 `/dislikes`가 관리자 화면에 집계·사유를 제공합니다. 세션·CSRF·현재 발행 버전과 읽기 권한을 검증하고 취소도 보존합니다. 기존 익명 미리보기 SQLite와 구분합니다. [저장·집계·보존 및 검증](../docs/development/briefing-member-feedback.md)을 참고하세요.
