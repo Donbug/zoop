@@ -1,6 +1,6 @@
 # ZOOP AI 챗봇 구현 준비·개발 계획
 
-최초 기준일: 2026년 10월 21일 / 구현 상태 갱신: 2026년 11월 1일
+최초 기준일: 2026년 10월 21일 / 구현 상태 갱신: 2026년 11월 2일
 
 기준 정책: `ZOOP-AIG-001 v0.11` / 목표 설계 갱신: 2026-10-28 (날짜별 구현 기록과 구분)
 
@@ -63,6 +63,8 @@ Q08 `selectionRule.read`(2026-10-30, `chat-tools/v8`, 사용자 결정): 질문�
 
 Q01 `help.search`·`screenSpec.read`(2026-11-01, `chat-tools/v11`): `chat_document_versions`에 승인 근거·승인/시행 시각과 함께 등록한 불변 도움말(`help.service-guide`)·화면 설명(`screen.guide`)만 읽는다. 각 `##` 절은 결정적 `zoop_doc` 인용이며 과거 시점 조회도 현재 같은 버전이 시행 중일 때만 허용한다. 현재 migration은 저장소만 만들고 미승인 초안을 넣지 않는다. 두 어댑터는 `ZOOP_CHAT_APPROVED_DOCS_ENABLED=false`로 기본 비활성이며, 켤 때 두 현재 문서가 모두 존재하고 20절·절당 2,000자 계약을 지키지 않으면 기동을 거절한다. 따라서 구현 완료는 승인·출시 완료를 뜻하지 않는다.
 
+Q03 `document.search` 본문 검색(2026-11-02, `chat-tools/v12`): 서버가 요구 문장에서 일반적인 요청어·기간 숫자를 뺀 검색어를 결정하고, 공개 그래프의 고정 버전·asOf·현재 source grant를 통과한 기업 문서만 정확한 `article_id + document_version`의 검증된 `extracted_text` 본문과 제목에서 검색한다. 원문을 DB에 복제하거나 모델에 새로 보내지 않고 매치 여부만 사용하며, 인스턴스 로컬 색인은 검증된 artifact SHA별 총 32 MiB LRU다. 기업별 최신 100문서까지만 확인하고 뒤 페이지가 있으면 `truncated`로 남긴다. 의미 있는 검색어가 없는 "최근 소식"은 기존 최신순 읽기다. 요구 문장을 입력으로 갖지 않는 원격 MCP에서는 같은 요청을 재현할 수 없으므로 이 도구는 server-only direct 경로다.
+
 아래는 이미 구현된 direct 경로(`chat-tools/v5`)의 사용자 승인 결정이다. MCP 전환 뒤에도 같은 Tool Service의 동작 기준으로 유지하며, 목표 변경(예: Q07 `portfolio.scope.read`의 Java server-only 실행)은 2026-10-28 절을 따른다.
 
 Q05 기간 비교의 잠정 결정(2026-10-27, 사용자 승인, 평가 세트로 보정 전): (7) 비교 기준은 질문에 적힌 기간이다. 정해진 한국어 표현(오늘·어제·그제, 이번 주·지난주, 이번 달·지난달, N일·N주·N달 전, 최근 N일·N주, `YYYY-MM-DD`, `M월 D일`)만 서버가 KST로 결정론적으로 해석하고(`ChatPeriods`), 여러 표현은 가장 이른 시작부터 가장 늦은 끝까지 한 기간으로 묶는다. 기간 시작 시각(KST 자정)에 공개돼 있던 지도와 작업이 고정한 지도를 비교한다. 질문에 기간이 없으면 회원이 고른 기간, 그것도 없으면 고정 지도 직전에 공개됐던 지도와 비교한다. 해석한 기간은 결과의 `applied.period`(`basis=question`, `expression`)로 보인다. (8) `graph.version.diff`는 대상(기업·사건)을 지목하면 그와 관련된 변화만, 아니면 지도 전체 변화를 최대 40건 돌려주고, 추가된 항목만 지금 고정 지도의 근거를 싣는다. 비교할 이전 공개 지도가 없으면 "변화 없음"이 아니라 잘린 조회(`truncated`)다. 레지스트리는 `chat-tools/v3`다.
@@ -103,7 +105,7 @@ flowchart LR
 | 1 저장·job 수명주기 | 구현 | 복구본을 DB에 두므로 DB 장애 자체는 복구 대상이 아님 |
 | 2 오케스트레이터 | 구현(합성 회귀) | direct·agent 공통 45초와 서버 requirement coverage 구현. 단계 최소 예약·상한은 live p95로 보정 |
 | 3 router·Luna agent | 부분 구현 | Jev router·Luna Responses MCP·Java 승인 루프는 구현(합성 replay로만 확인). 라우터 wire `dependsOn`도 구현(2026-10-30, `zoop-ai-chat-3`, 확신이 낮거나 요구가 대상을 지목하면 의존 없음). 승인 요청의 요구 매핑도 구현(2026-10-30, `zoop-ai-chat-4`). live 확인 |
-| 4 읽기 도구 | 부분 구현 | Q03(`document.search`는 기업별 문서 읽기, 2026-10-31. 본문 검색 색인은 없음), Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`·`briefing.evidence`, 2026-10-31), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 공급자), Q01 승인 저장소·기본 비활성 어댑터 구현. Q01 승인본·활성화와 실제 웹 공급자 미정 |
+| 4 읽기 도구 | 부분 구현 | Q03 기업별 문서·검증 본문 검색(`document.search`, 2026-11-02), Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`·`briefing.evidence`, 2026-10-31), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 공급자), Q01 승인 저장소·기본 비활성 어댑터 구현. Q01 승인본·활성화와 실제 웹 공급자 미정 |
 | 5 생성·출력 검증 | 구현(합성 회귀) | 서버 claim 분할과 claim별 support·`unsupportedCausality`, 입력 24k·답변 2k 구현. 실제 모델 보정은 단계 7 |
 | 6 웹 | 부분 구현(합성 회귀) | 합성 공급자·예산·요구별 gate·웹 인용, 대상·기간·필수 필드·인용 coverage, Q07 웹 대상 2개 초과 선택 확인, 인스턴스 로컬 공급자 요청 캐시·single-flight 구현. 실제 공급자·인스턴스 공유 캐시·금액 상한·snapshot 저장은 미정 |
 | 7 평가·출시 | 부분 구현 | 고정 평가 세트 v1(대본 실행)만 있음. 실제 모델·데이터 평가와 임계값 보정, 보안·종단·배포 증명 |
