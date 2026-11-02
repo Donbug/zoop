@@ -87,14 +87,10 @@ public final class PublicationMerger {
     public static Merged merge(List<Contribution> contributions, Obj decisions, Set<String> alreadyPublicIds,
             Map<String, IssueOwners> previousOwners) {
         validateRoot(decisions);
-        Map<String, Contribution> sources = new HashMap<>();
-        Map<IssueRef, Issue> originals = new HashMap<>();
-        Map<RelationRef, Relation> originalRelations = new HashMap<>();
-        for (Contribution source : contributions) {
-            if (sources.put(source.sourceVersionId(), source) != null) throw failure("source_conflict");
-            for (Issue issue : source.projection().issues()) originals.put(source.issueRef(issue.issueId()), issue);
-            for (Relation relation : source.projection().relations()) originalRelations.put(new RelationRef(source.sourceVersionId(), relation.relationId()), relation);
-        }
+        Index index = index(contributions);
+        Map<String, Contribution> sources = index.sources();
+        Map<IssueRef, Issue> originals = index.originals();
+        Map<RelationRef, Relation> originalRelations = index.relations();
         Map<IssueRef, IssueRef> mappings = new HashMap<>();
         for (Obj mapping : decisions.objects("issueMappings")) {
             mapping.exactly(Set.of("from", "to", "decision", "evidenceRefs", "reviewer", "decisionRef", "decisionVersion"));
@@ -135,8 +131,7 @@ public final class PublicationMerger {
             Map<String, IssueRef> owners = new TreeMap<>();
             for (String field : FIELDS) {
                 Obj choice = fields.get(publicId + "\n" + field);
-                IssueRef owner = members.stream().filter(r -> r.issueId().equals(publicId) && !mappings.containsKey(r))
-                        .findFirst().orElse(members.getFirst());
+                IssueRef owner = defaultOwner(publicId, members, mappings);
                 IssueOwners previous = previousOwners.get(publicId);
                 if (previous != null) {
                     owner = previous.headlineSources().get(field);
@@ -184,12 +179,9 @@ public final class PublicationMerger {
         Map<String, RelationOwners> relationOwners = new TreeMap<>(); List<Relation> relations = new ArrayList<>();
         Map<RelationRef, Relation> projectedRelations = new HashMap<>();
         originalRelations.forEach((ref, relation) -> {
-            String source = publicIds.get(new IssueRef(ref.sourceVersionId(), relation.source()));
-            String target = "FOLLOWS".equals(relation.relationType())
-                    ? publicIds.get(new IssueRef(ref.sourceVersionId(), relation.target())) : relation.target();
-            if (source == null || target == null || source.equals(target)) throw failure("identity_conflict");
-            projectedRelations.put(ref, new Relation(relation.relationId(), relation.relationType(), source, target,
-                    relation.role(), relation.assertionStatus(), relation.evidenceIds(), relation.basis()));
+            Relation projected = project(relation, ref, publicIds);
+            if (projected.source() == null || projected.target() == null || projected.source().equals(projected.target())) throw failure("identity_conflict");
+            projectedRelations.put(ref, projected);
         });
         Map<String, Issue> byPublicIssue = new HashMap<>();
         issues.forEach(issue -> byPublicIssue.put(issue.issueId(), issue));
@@ -237,6 +229,226 @@ public final class PublicationMerger {
         Set<String> companyIds = companies.stream().map(PublicGraphSnapshot.Company::companyId).collect(java.util.stream.Collectors.toSet());
         if (issues.stream().anyMatch(i -> companyIds.contains(i.issueId()))) throw failure("identity_conflict");
         return new Merged(companies, List.copyOf(issues), List.copyOf(relations), articles, evidence, Map.copyOf(issueOwners), Map.copyOf(relationOwners));
+    }
+
+    /** The reviewer recorded on decisions the automatic preparation proposes; people's decisions use any other reviewer. */
+    public static final String AUTO_REVIEWER = "graph-publication-prepare";
+    private static final String AUTO_DECISION_REF = "graph-publication-prepare:newest-native";
+    private static final String AUTO_DECISION_VERSION = "1";
+
+    /** The incoming sources of a prepared composition, oldest first. */
+    public record Automatic(List<String> incomingOldestFirst) {
+        public Automatic {
+            incomingOldestFirst = List.copyOf(incomingOldestFirst);
+            if (incomingOldestFirst.isEmpty() || Set.copyOf(incomingOldestFirst).size() != incomingOldestFirst.size()) throw failure("request_invalid");
+        }
+    }
+
+    /** One published value the proposal replaces: {@code field} is null for a relation; digests are of the value before and after. */
+    public record AutoResolution(String kind, String id, String field, String sourceVersionId, List<String> replacedSourceVersionIds,
+            String previousValueDigest, String valueDigest) {
+        public AutoResolution { replacedSourceVersionIds = List.copyOf(replacedSourceVersionIds); }
+    }
+
+    /** Decisions to compose with (a closed decisions document) and the published values they change. */
+    public record Proposal(Obj decisions, List<AutoResolution> resolutions) {
+        public Proposal { resolutions = List.copyOf(resolutions); }
+    }
+
+    /** True when an operator-supplied decisions document claims the automatic reviewer, which only the preparation may write. */
+    public static boolean claimsAutomaticReviewer(Obj decisions) {
+        for (String collection : List.of("issueMappings", "fieldSelections", "relationSelections"))
+            for (Obj item : decisions.objects(collection))
+                if (item.has("reviewer") && AUTO_REVIEWER.equals(item.string("reviewer"))) return true;
+        return false;
+    }
+
+    /**
+     * The decisions a prepared composition adds, so that {@link #merge} (and every later read of the publication) applies them like any
+     * other decision. A public issue whose members are all native, that has an incoming member, whose incoming records agree with each
+     * other, that has no issue mapping and none of whose headline fields a person decided takes the newest incoming value. A relation
+     * takes the newest incoming record under the same conditions when no person selected it and neither endpoint issue was left to
+     * people. Everything else gets no proposal and keeps the operator rules ({@code correction_required} where it disagrees): sources
+     * admitted together have no order, and a legacy package, a mapping or a person's decision (reviewer other than
+     * {@link #AUTO_REVIEWER}) is never overridden. An earlier automatic decision is replaced when newer incoming records disagree with
+     * it. {@code expectedValueDigest} is the value published before, as the composer requires of every new decision.
+     */
+    public static Proposal propose(List<Contribution> contributions, Obj inherited, Map<String, IssueOwners> previousOwners, Automatic automatic) {
+        validateRoot(inherited);
+        Index index = index(contributions);
+        Map<String, Integer> order = new HashMap<>();
+        for (String id : automatic.incomingOldestFirst()) {
+            if (!index.sources().containsKey(id)) throw failure("request_invalid");
+            order.put(id, order.size());
+        }
+        Map<IssueRef, IssueRef> mappings = new HashMap<>();
+        for (Obj mapping : inherited.objects("issueMappings")) mappings.put(issueRef(mapping.object("from")), issueRef(mapping.object("to")));
+        Map<IssueRef, String> publicIds = new HashMap<>();
+        Map<String, List<IssueRef>> groups = new TreeMap<>();
+        for (IssueRef ref : index.originals().keySet()) {
+            String id = resolve(ref, mappings).issueId();
+            publicIds.put(ref, id); groups.computeIfAbsent(id, ignored -> new ArrayList<>()).add(ref);
+        }
+        groups.values().forEach(list -> list.sort(ISSUE_ORDER));
+        Map<String, Obj> fields = indexed(inherited.objects("fieldSelections"), o -> o.string("issueId") + "\n" + o.string("field"));
+        Map<String, Obj> selections = indexed(inherited.objects("relationSelections"), o -> o.string("relationId"));
+        Map<IssueRef, Map<String, JsonNode>> values = new HashMap<>();
+        Function<IssueRef, Map<String, JsonNode>> valuesOf = ref -> values.computeIfAbsent(ref, r -> {
+            Map<String, JsonNode> fieldValues = new HashMap<>();
+            for (String field : FIELDS) fieldValues.put(field, field(index.originals().get(r), field));
+            return fieldValues;
+        });
+        ObjectNode root = (ObjectNode) emptyDecisions().node().deepCopy();
+        var fieldOut = (tools.jackson.databind.node.ArrayNode) root.get("fieldSelections");
+        var relationOut = (tools.jackson.databind.node.ArrayNode) root.get("relationSelections");
+        List<AutoResolution> resolutions = new ArrayList<>();
+        Set<String> leftToPeople = new HashSet<>();
+        for (var group : groups.entrySet()) {
+            String publicId = group.getKey(); List<IssueRef> members = group.getValue();
+            if (members.stream().noneMatch(r -> order.containsKey(r.sourceVersionId()))) continue;
+            IssueRef newest = newestAgreeing(members, order, index.sources(), IssueRef::sourceVersionId, index.originals()::get);
+            boolean peopleDecided = FIELDS.stream().map(f -> fields.get(publicId + "\n" + f))
+                    .anyMatch(choice -> choice != null && !AUTO_REVIEWER.equals(choice.string("reviewer")));
+            if (newest == null || peopleDecided || members.stream().anyMatch(r -> mappings.containsKey(r) || mappings.containsValue(r))) {
+                leftToPeople.add(publicId); continue;
+            }
+            if (members.stream().allMatch(r -> order.containsKey(r.sourceVersionId()))) continue;
+            IssueOwners previous = previousOwners.get(publicId);
+            Map<String, IssueRef> owners = new HashMap<>();
+            for (String field : FIELDS) {
+                Obj choice = fields.get(publicId + "\n" + field);
+                IssueRef owner = choice != null ? issueRef(choice.object("takeFrom"))
+                        : previous != null ? previous.headlineSources().get(field) : defaultOwner(publicId, members, mappings);
+                if (owner == null || !index.originals().containsKey(owner)) owner = null;
+                owners.put(field, owner);
+            }
+            if (owners.containsValue(null)) { leftToPeople.add(publicId); continue; }
+            ObjectNode newestEvidence = issueEvidence(newest, index);
+            List<ObjectNode> proposed = new ArrayList<>();
+            for (String field : FIELDS) {
+                boolean inheritedChoice = fields.containsKey(publicId + "\n" + field);
+                IssueRef owner = owners.get(field);
+                JsonNode before = valuesOf.apply(owner).get(field), after = valuesOf.apply(newest).get(field);
+                boolean fieldDiffers = members.stream().anyMatch(r -> !valuesOf.apply(r).get(field).equals(after));
+                if (before.equals(after) && (inheritedChoice || !fieldDiffers)) continue;
+                if (newestEvidence == null) { proposed = null; break; }
+                proposed.add(selection(publicId, field, Canonical.digest(before), newest, newestEvidence));
+                if (!before.equals(after)) resolutions.add(new AutoResolution("issue", publicId, field, newest.sourceVersionId(),
+                        replaced(members, r -> valuesOf.apply(r).get(field), after, IssueRef::sourceVersionId), Canonical.digest(before), Canonical.digest(after)));
+            }
+            if (proposed == null) { leftToPeople.add(publicId); resolutions.removeIf(r -> "issue".equals(r.kind()) && r.id().equals(publicId)); continue; }
+            Issue newestIssue = index.originals().get(newest);
+            boolean recordsDiffer = members.stream().anyMatch(r -> !index.originals().get(r).equals(newestIssue));
+            if (recordsDiffer && proposed.isEmpty() && FIELDS.stream().noneMatch(f -> fields.containsKey(publicId + "\n" + f))) {
+                // Records that differ only outside the headline fields (evidence, mentions) still need one decision to be merged; it
+                // keeps the published owner, so nothing published changes except the union of the parts' evidence.
+                IssueRef owner = owners.get("label");
+                ObjectNode ownerEvidence = issueEvidence(owner, index);
+                if (ownerEvidence == null) { leftToPeople.add(publicId); continue; }
+                proposed.add(selection(publicId, "label", Canonical.digest(valuesOf.apply(owner).get("label")), owner, ownerEvidence));
+            }
+            proposed.forEach(fieldOut::add);
+        }
+        Map<String, List<RelationRef>> relationGroups = new TreeMap<>();
+        index.relations().keySet().forEach(r -> relationGroups.computeIfAbsent(r.relationId(), ignored -> new ArrayList<>()).add(r));
+        for (var group : relationGroups.entrySet()) {
+            List<RelationRef> members = group.getValue(); members.sort(RELATION_ORDER);
+            Obj choice = selections.get(group.getKey());
+            if (choice != null && !AUTO_REVIEWER.equals(choice.string("reviewer"))) continue;
+            RelationRef newest = newestAgreeing(members, order, index.sources(), RelationRef::sourceVersionId, index.relations()::get);
+            if (newest == null) continue;
+            Function<RelationRef, Relation> projected = r -> project(index.relations().get(r), r, publicIds);
+            Relation chosenProjection = projected.apply(newest);
+            if (chosenProjection.source() == null || leftToPeople.contains(chosenProjection.source())
+                    || ("FOLLOWS".equals(chosenProjection.relationType()) && leftToPeople.contains(chosenProjection.target()))) continue;
+            RelationRef previous = choice != null ? relationRef(choice.object("takeFrom"))
+                    : members.stream().filter(r -> !order.containsKey(r.sourceVersionId())).findFirst().orElse(null);
+            if (previous == null || !index.relations().containsKey(previous)) continue;
+            JsonNode before = GraphPublicationReader.json(projected.apply(previous)), after = GraphPublicationReader.json(chosenProjection);
+            Relation chosen = index.relations().get(newest);
+            boolean differs = members.stream().anyMatch(r -> !index.relations().get(r).equals(chosen));
+            if (before.equals(after) && (choice != null || !differs)) continue;
+            IssueRef owner = new IssueRef(newest.sourceVersionId(), chosen.source());
+            Issue issue = index.originals().get(owner);
+            Set<String> known = index.evidence().get(owner.sourceVersionId());
+            String evidenceId = issue == null ? null
+                    : chosen.evidenceIds().stream().filter(e -> issue.evidenceIds().contains(e) && known.contains(e)).findFirst().orElse(null);
+            if (evidenceId == null) continue;
+            ObjectNode out = relationOut.addObject();
+            out.put("relationId", group.getKey()); out.put("expectedValueDigest", Canonical.digest(before));
+            out.set("takeFrom", GraphPublicationReader.json(newest));
+            ObjectNode ref = out.putArray("evidenceRefs").addObject();
+            ref.put("sourceVersionId", owner.sourceVersionId()); ref.put("issueId", owner.issueId()); ref.put("evidenceId", evidenceId);
+            autoAudit(out);
+            if (!before.equals(after)) resolutions.add(new AutoResolution("relation", group.getKey(), null, newest.sourceVersionId(),
+                    replaced(members, r -> GraphPublicationReader.json(projected.apply(r)), after, RelationRef::sourceVersionId),
+                    Canonical.digest(before), Canonical.digest(after)));
+        }
+        resolutions.sort(Comparator.comparing(AutoResolution::kind).thenComparing(AutoResolution::id)
+                .thenComparing(r -> r.field() == null ? "" : r.field()));
+        return new Proposal(Obj.of(root), resolutions);
+    }
+
+    private record Index(Map<String, Contribution> sources, Map<IssueRef, Issue> originals, Map<RelationRef, Relation> relations,
+            Map<String, Set<String>> evidence) {}
+
+    private static Index index(List<Contribution> contributions) {
+        Map<String, Contribution> sources = new HashMap<>();
+        Map<IssueRef, Issue> originals = new HashMap<>();
+        Map<RelationRef, Relation> relations = new HashMap<>();
+        Map<String, Set<String>> evidence = new HashMap<>();
+        for (Contribution source : contributions) {
+            if (sources.put(source.sourceVersionId(), source) != null) throw failure("source_conflict");
+            for (Issue issue : source.projection().issues()) originals.put(source.issueRef(issue.issueId()), issue);
+            for (Relation relation : source.projection().relations()) relations.put(new RelationRef(source.sourceVersionId(), relation.relationId()), relation);
+            Set<String> ids = new HashSet<>();
+            source.projection().evidence().forEach(e -> ids.add(e.evidenceId()));
+            evidence.put(source.sourceVersionId(), ids);
+        }
+        return new Index(sources, originals, relations, evidence);
+    }
+
+    /** The headline owner of a group nobody decided: the member that carries the public id itself, else the first member. */
+    private static IssueRef defaultOwner(String publicId, List<IssueRef> members, Map<IssueRef, IssueRef> mappings) {
+        return members.stream().filter(r -> r.issueId().equals(publicId) && !mappings.containsKey(r)).findFirst().orElse(members.getFirst());
+    }
+
+    /** A relation with its issue endpoints renamed to public ids; an endpoint outside the merge is null. */
+    private static Relation project(Relation relation, RelationRef ref, Map<IssueRef, String> publicIds) {
+        String source = publicIds.get(new IssueRef(ref.sourceVersionId(), relation.source()));
+        String target = "FOLLOWS".equals(relation.relationType()) ? publicIds.get(new IssueRef(ref.sourceVersionId(), relation.target())) : relation.target();
+        return new Relation(relation.relationId(), relation.relationType(), source, target, relation.role(), relation.assertionStatus(),
+                relation.evidenceIds(), relation.basis());
+    }
+
+    private static <R, V> R newestAgreeing(List<R> members, Map<String, Integer> order, Map<String, Contribution> sources,
+            Function<R, String> sourceOf, Function<R, V> value) {
+        List<R> incoming = members.stream().filter(r -> order.containsKey(sourceOf.apply(r)))
+                .sorted(Comparator.comparing(r -> order.get(sourceOf.apply(r)))).toList();
+        if (incoming.isEmpty() || members.stream().anyMatch(r -> !"native".equals(sources.get(sourceOf.apply(r)).sourceKind()))) return null;
+        V agreed = value.apply(incoming.getFirst());
+        return incoming.stream().allMatch(r -> agreed.equals(value.apply(r))) ? incoming.getLast() : null;
+    }
+    private static <R> List<String> replaced(List<R> members, Function<R, JsonNode> value, JsonNode after, Function<R, String> sourceOf) {
+        return members.stream().filter(r -> !value.apply(r).equals(after)).map(sourceOf).distinct().sorted().toList();
+    }
+    private static ObjectNode issueEvidence(IssueRef ref, Index index) {
+        Set<String> known = index.evidence().get(ref.sourceVersionId());
+        String id = index.originals().get(ref).evidenceIds().stream().filter(known::contains).findFirst().orElse(null);
+        if (id == null) return null;
+        ObjectNode node = StrictJson.newObject();
+        node.put("sourceVersionId", ref.sourceVersionId()); node.put("issueId", ref.issueId()); node.put("evidenceId", id);
+        return node;
+    }
+    private static ObjectNode selection(String issueId, String field, String expected, IssueRef takeFrom, ObjectNode evidence) {
+        ObjectNode out = StrictJson.newObject();
+        out.put("issueId", issueId); out.put("field", field); out.put("expectedValueDigest", expected);
+        out.set("takeFrom", GraphPublicationReader.json(takeFrom)); out.putArray("evidenceRefs").add(evidence.deepCopy());
+        autoAudit(out);
+        return out;
+    }
+    private static void autoAudit(ObjectNode node) {
+        node.put("reviewer", AUTO_REVIEWER); node.put("decisionRef", AUTO_DECISION_REF); node.put("decisionVersion", AUTO_DECISION_VERSION);
     }
 
     public static JsonNode field(Issue issue, String field) {
