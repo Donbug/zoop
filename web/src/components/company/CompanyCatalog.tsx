@@ -6,6 +6,7 @@ import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuthStore, selectMemberId } from '@/stores/useAuthStore';
 import type { GraphResponse } from '@/types/map/graph';
 import CompanyCatalogRow, { type CatalogCompany } from './CompanyCatalogRow';
+import { useColorTheme } from '@/util/theme-color';
 
 // D-COM-01 · Figma 637:2286. Member lists never use another session's result.
 export default function CompanyCatalog({
@@ -24,6 +25,8 @@ export default function CompanyCatalog({
     retry: () => void;
   };
 }) {
+  // 기업 상세 라이트는 #491 이전 모양을 유지하고, 다크만 지도 개선 테마 표면을 쓴다.
+  const dark = useColorTheme() === 'dark';
   const { id = '' } = useParams();
   const graph = graphResource?.data;
   const location = useLocation();
@@ -148,7 +151,11 @@ export default function CompanyCatalog({
   return (
     <aside
       aria-label="기업 선택"
-      className="min-w-0 rounded-xl border border-zoop-border bg-zoop-surface p-4 font-panel shadow-sm max-md:max-h-[320px] max-md:overflow-auto [&_section]:py-3!"
+      className={
+        dark
+          ? 'min-w-0 rounded-xl border border-zoop-border bg-zoop-surface p-4 font-panel shadow-sm max-md:max-h-[320px] max-md:overflow-auto [&_section]:py-3!'
+          : 'min-w-0 rounded-2xl bg-white p-4 font-panel shadow-sm max-md:max-h-[320px] max-md:overflow-auto [&_section]:py-3!'
+      }
     >
       <CompanyCatalogRow
         id={id}
@@ -180,7 +187,9 @@ export default function CompanyCatalog({
             onChange={(e) => setInput(e.target.value)}
             className="min-w-0 flex-1 text-caption"
           />
-          <button className="shrink-0 bg-zoop-ink! px-2! text-caption! text-zoop-on-ink">
+          <button
+            className={`shrink-0 bg-zoop-ink! px-2! text-caption! ${dark ? 'text-zoop-on-ink' : 'text-white'}`}
+          >
             검색
           </button>
         </div>

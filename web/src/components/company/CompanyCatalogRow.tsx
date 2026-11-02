@@ -4,6 +4,7 @@ import { LoadingSpinner } from '@/components/common/LoadingIndicator';
 import { useCompanyResource } from '@/hooks/useCompanyResource';
 import StockQuote from '@/components/stocks/StockQuote';
 import type { Company } from '@/types/company/detail';
+import { useColorTheme } from '@/util/theme-color';
 
 export type CatalogCompany = {
   id: string;
@@ -25,6 +26,8 @@ export default function CompanyCatalogRow({
   to: string;
   quote?: boolean;
 }) {
+  // 기업 상세 라이트는 #491 이전 모양을 유지하고, 다크만 지도 개선 테마 표면을 쓴다.
+  const dark = useColorTheme() === 'dark';
   const detail = useCompanyResource<Company>(
     company ? null : `/api/v1/companies/${encodeURIComponent(id)}`,
   );
@@ -33,12 +36,12 @@ export default function CompanyCatalogRow({
     <Link
       to={to}
       aria-current={selected ? 'page' : undefined}
-      className={`flex! min-w-0 items-center gap-2 rounded-md border p-2! no-underline ${selected ? 'border-zoop-border bg-zoop-selected' : 'border-transparent hover:bg-zoop-control'}`}
+      className={`flex! min-w-0 items-center gap-2 ${dark ? 'rounded-md' : 'rounded-[3px]'} border p-2! no-underline ${dark ? (selected ? 'border-zoop-border bg-zoop-selected' : 'border-transparent hover:bg-zoop-control') : selected ? 'border-zoop-ink bg-white' : 'border-transparent hover:bg-white'}`}
     >
       <CompanyLogo
         name={row?.name ?? id}
         logoUrl={row?.logoUrl}
-        className="size-7 rounded-full border border-zoop-muted bg-zoop-surface text-caption font-bold"
+        className={`size-7 rounded-full border border-zoop-muted ${dark ? 'bg-zoop-surface' : 'bg-white'} text-caption font-bold`}
       />
       <span className="min-w-0 flex-1">
         <strong className="block truncate text-caption font-semibold text-zoop-ink">

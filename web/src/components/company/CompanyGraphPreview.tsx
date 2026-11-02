@@ -1,6 +1,7 @@
 import { useRef, useState, type PointerEvent } from 'react';
 import type { GraphResponse } from '@/types/map/graph';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import { useColorTheme } from '@/util/theme-color';
 
 /** getCompanyGraphAsOf의 emptyReason 코드를 사용자 문구로 바꾼다. 모르는 코드는 기본 문구를 쓴다. */
 const EMPTY_REASON: Record<string, string> = {
@@ -19,6 +20,8 @@ export default function CompanyGraphPreview({
   selectedId?: string | null;
   onSelect?: (id: string, kind: 'company' | 'issue') => void;
 }) {
+  // 기업 상세 라이트는 #491 이전 모양을 유지하고, 다크만 지도 개선 테마 표면을 쓴다.
+  const dark = useColorTheme() === 'dark';
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
   const drag = useRef<{
     x: number;
@@ -93,7 +96,7 @@ export default function CompanyGraphPreview({
         viewBox={`${view.x} ${view.y} ${320 / view.scale} ${300 / view.scale}`}
         role="img"
         aria-label="기준 시점 기업 관계 그래프"
-        className="h-auto w-full touch-none rounded-lg bg-zoop-card"
+        className={`h-auto w-full touch-none ${dark ? 'rounded-lg bg-zoop-card' : 'rounded-[3px] bg-zoop-line'}`}
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={(event) => {

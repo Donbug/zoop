@@ -110,7 +110,10 @@ Black `/graph-assets` icons with `data-icon` are inverted in dark; company logos
 ### Company and briefing surfaces (D-COM-01/02 · D-BRF-01/02)
 
 Company and briefing routes share `bg-zoop-page` for the page and
-`bg-zoop-surface` for the header and bottom navigation. Apply company section
+`bg-zoop-surface` for the header and bottom navigation. Exception: the light
+company detail keeps its earlier look (white `rounded-2xl` panels, divider
+sections, `rounded-full` buttons); only dark company detail uses these surfaces.
+Components pick the class set with `useColorTheme()`. Apply company section
 surfaces only to direct sections of each workspace column so nested document
 quotes and evidence do not receive a second card background and padding.
 Shared `FeedbackButtons` use `rounded-md border border-zoop-border

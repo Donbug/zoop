@@ -3,6 +3,7 @@ import BottomNav from './BottomNav';
 import ServiceHeader from './ServiceHeader';
 import SkipLink from './SkipLink';
 import './briefing-login-surface.css';
+import { useColorTheme } from '@/util/theme-color';
 
 export default function AppLayout() {
   const { pathname } = useLocation();
@@ -10,9 +11,11 @@ export default function AppLayout() {
   // 같은 메뉴 안 이동(/companies/A → /companies/B)까지 다시 만들면 화면 상태와 그래프를 잃는다.
   const section = pathname.split('/')[1] ?? '';
   const isStocks = pathname === '/stocks';
-  // D-COM-01 · D-BRF-01/02: 페이지와 탐색 바의 표면 역할을 공유한다.
+  const dark = useColorTheme() === 'dark';
+  // D-BRF-01/02와 다크 D-COM-01: 페이지와 탐색 바의 표면 역할을 공유한다.
+  // 기업 상세 라이트는 #491 이전 바탕을 유지한다.
   const pageSurface =
-    section === 'companies' || section === 'briefing'
+    section === 'briefing' || (section === 'companies' && dark)
       ? ' bg-zoop-page! [&_.relationship-header]:bg-zoop-surface! [&_.service-bottom-nav]:bg-zoop-surface!'
       : '';
   return (

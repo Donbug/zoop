@@ -8,7 +8,10 @@ const css = readFileSync('src/index.css', 'utf8');
 
 test('D-BRF-01/02 theme: briefing uses the shared page and navigation surfaces', () => {
   const layout = readFileSync('src/components/common/AppLayout.tsx', 'utf8');
-  expect(layout).toMatch(/section === 'companies' \|\| section === 'briefing'/);
+  // 브리핑은 두 테마 모두, 기업 상세는 다크에서만 같은 표면을 쓴다.
+  expect(layout).toMatch(
+    /section === 'briefing' \|\| \(section === 'companies' && dark\)/,
+  );
   expect(layout).toContain('bg-zoop-page!');
   expect(layout).toContain('[&_.relationship-header]:bg-zoop-surface!');
   expect(layout).toContain('[&_.service-bottom-nav]:bg-zoop-surface!');

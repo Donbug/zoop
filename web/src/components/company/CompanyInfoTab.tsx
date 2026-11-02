@@ -2,6 +2,7 @@ import type { Resource } from '@/hooks/useCompanyResource';
 import type { Company } from '@/types/company/detail';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import LoadingIndicator from '@/components/common/LoadingIndicator';
+import { useColorTheme } from '@/util/theme-color';
 
 const fields = [
   ['legalName', '정식 법인명'],
@@ -32,6 +33,8 @@ export default function CompanyInfoTab({
 }: {
   resource: Resource<Company>;
 }) {
+  // 기업 상세 라이트는 #491 이전 모양을 유지하고, 다크만 지도 개선 테마 표면을 쓴다.
+  const dark = useColorTheme() === 'dark';
   const company = resource.data;
   const href = website(company?.websiteUrl ?? null);
   const permission =
@@ -88,7 +91,7 @@ export default function CompanyInfoTab({
             {fields.map(([key, label]) => (
               <div
                 key={key}
-                className="min-w-0 border-b border-zoop-border py-4"
+                className={`min-w-0 border-b py-4 ${dark ? 'border-zoop-border' : 'border-zoop-line'}`}
               >
                 <dt className="text-zoop-muted">{label}</dt>
                 <dd className="mt-1 font-semibold wrap-anywhere">
@@ -96,7 +99,9 @@ export default function CompanyInfoTab({
                 </dd>
               </div>
             ))}
-            <div className="min-w-0 border-b border-zoop-border py-4">
+            <div
+              className={`min-w-0 border-b py-4 ${dark ? 'border-zoop-border' : 'border-zoop-line'}`}
+            >
               <dt className="text-zoop-muted">홈페이지</dt>
               <dd className="mt-1 wrap-anywhere">
                 {href ? (
