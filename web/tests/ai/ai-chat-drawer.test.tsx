@@ -1183,6 +1183,222 @@ describe('D-AI-02 · job states and stored results', () => {
   });
 });
 
+describe('D-AI-01 · D-AI-02 prototype chat gaps (C1, C5-C9)', () => {
+  const citation = {
+    sourceKind: 'article' as const,
+    evidenceId: 'ev-9',
+    quote: '인용문',
+    articleId: 'art-1',
+    articleVersion: 'v1',
+    docId: null,
+    docVersion: null,
+    start: 0,
+    end: 3,
+    articleTitle: '기사',
+    publisher: '언론사',
+    publishedAt: null,
+    url: null,
+  };
+
+  it('C1 offers suggested questions in an empty conversation and sends one with the linked target', async () => {
+    server.on('GET', CURRENT, () => json({ conversation: null }));
+    server.on('PUT', SESSION, (request) =>
+      json(
+        { id: request.params.id, createdAt: '2026-10-21T00:00:00Z', jobs: 0 },
+        201,
+      ),
+    );
+    server.on('POST', JOBS, (request) => {
+      const body = request.body as { jobId: string; question: string };
+      return json(
+        job({
+          id: body.jobId,
+          sessionId: request.params.id,
+          question: body.question,
+          status: 'queued',
+          outcome: null,
+          result: null,
+          finishedAt: null,
+        }),
+        202,
+      );
+    });
+    server.on('GET', JOB, () => json(job({ status: 'queued', result: null })));
+    const { user } = await open();
+    const suggestions = await screen.findByRole('region', {
+      name: '추천 질문',
+    });
+    const first = within(suggestions).getByRole('button', {
+      name: '함께 언급된 기업은 어디인가요?',
+    });
+    expect(within(suggestions).getAllByRole('button')).toHaveLength(3);
+    await waitFor(() => expect(first.hasAttribute('disabled')).toBe(false));
+    await user.click(first);
+
+    await waitFor(() => expect(server.calls('POST', JOBS)).toHaveLength(1));
+    const body = server.calls('POST', JOBS)[0].body as {
+      question: string;
+      context: unknown;
+    };
+    expect(body.question).toBe('함께 언급된 기업은 어디인가요?');
+    expect(body.context).toEqual({
+      contextIds: ['KRX:005930'],
+      graphVersion: 'gv-1',
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: '추천 질문' })).toBeNull(),
+    );
+  });
+
+  it('C1 keeps suggested questions off until a target is linked', async () => {
+    server.on('GET', CURRENT, () => json({ conversation: null }));
+    await open(null);
+    const suggestions = await screen.findByRole('region', {
+      name: '추천 질문',
+    });
+    for (const button of within(suggestions).getAllByRole('button'))
+      expect(button.hasAttribute('disabled')).toBe(true);
+    expect(
+      within(suggestions).getByText(/대상을 고른 뒤 보낼 수 있어요/),
+    ).toBeTruthy();
+  });
+
+  it('C5 scrolls to the end of the conversation when its jobs arrive', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    server.on('GET', CURRENT, () => json(conversation([job()])));
+    await open();
+    await screen.findByRole('article', { name: 'HBM이 뭐야?' });
+    await waitFor(() => expect(scroll).toHaveBeenCalled());
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  });
+
+  it('C6·C7 puts a cancelled or unrecoverable question back in the input to rewrite', async () => {
+    const cancelled = job({
+      id: 'job-cancel01',
+      question: '취소한 질문',
+      status: 'cancelled',
+      outcome: null,
+      result: null,
+    });
+    const lost = job({
+      id: 'job-lost0001',
+      seq: 2,
+      question: '응답 불명 질문',
+      status: 'failed',
+      outcome: null,
+      result: null,
+      failure: {
+        kind: 'transient',
+        reason: 'response_unknown',
+        message: '처리 결과를 확인하지 못했어요.',
+        retry: null,
+      },
+    });
+    server.on('GET', CURRENT, () => json(conversation([cancelled, lost])));
+    const { user } = await open();
+    const box = screen.getByLabelText('질문') as HTMLTextAreaElement;
+
+    await user.click(
+      within(
+        await screen.findByRole('article', { name: '취소한 질문' }),
+      ).getByRole('button', { name: '질문 다시 쓰기' }),
+    );
+    expect(box.value).toBe('취소한 질문');
+    expect(document.activeElement).toBe(box);
+
+    const failed = screen.getByRole('article', { name: '응답 불명 질문' });
+    await user.click(
+      within(failed).getByRole('button', { name: '질문 고쳐서 새로 보내기' }),
+    );
+    expect(box.value).toBe('응답 불명 질문');
+    expect(within(failed).getByText(/작업 ID job-lost0001/)).toBeTruthy();
+    expect(server.calls('POST', JOBS)).toHaveLength(0);
+  });
+
+  it('C8 shows the evidence count and period the question was asked with', async () => {
+    server.on('GET', CURRENT, () =>
+      json(
+        conversation([
+          job({
+            context: {
+              items: [{ id: 'KRX:005930', kind: 'company', label: '삼성전자' }],
+              evidenceCount: 3,
+              period: { start: '2026-10-01', end: '2026-10-21' },
+              asOf: null,
+              graphVersion: 'gv-1',
+            },
+          }),
+        ]),
+      ),
+    );
+    await open();
+    const card = await screen.findByRole('article', { name: 'HBM이 뭐야?' });
+    expect(
+      within(card).getByText(
+        '연결한 대상: 삼성전자(기업) · 근거 3건 · 2026-10-01 ~ 2026-10-21',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('C9 opens the evidence of the cited articles in sources on the map', async () => {
+    useGraphUiStore.setState({ evidenceTarget: null });
+    const answered = job({
+      result: result({
+        sections: [
+          { basis: 'evidence_grounded', text: '본문', evidenceIds: ['ev-9'] },
+        ],
+        answerBasis: 'evidence_grounded',
+        sources: ['art-1'],
+        citations: [citation],
+      }),
+    });
+    server.on('GET', CURRENT, () => json(conversation([answered])));
+    const { user } = await open();
+    await user.click(
+      await screen.findByRole('button', { name: '근거 문서 열기' }),
+    );
+    expect(useGraphUiStore.getState().evidenceTarget).toMatchObject({
+      evidenceIds: ['ev-9'],
+      mapContext: { graphVersion: 'gv-1' },
+    });
+    expect(useAiChatStore.getState().isOpen).toBe(false);
+    useGraphUiStore.setState({ evidenceTarget: null });
+  });
+
+  it('C9 does not add a second evidence button beside a server open_evidence action', async () => {
+    const answered = job({
+      result: result({
+        sources: ['art-1'],
+        citations: [citation],
+        uiActions: [
+          {
+            actionId: 'action-1',
+            kind: 'open_evidence',
+            label: '근거 보기 · 1건',
+            requirementIds: ['r1'],
+            target: {
+              companyId: null,
+              fromId: null,
+              toId: null,
+              date: null,
+              edition: null,
+              graphVersion: 'gv-1',
+              asOf: null,
+              edgeId: null,
+              evidenceIds: ['ev-9'],
+            },
+          },
+        ],
+      }),
+    });
+    server.on('GET', CURRENT, () => json(conversation([answered])));
+    await open();
+    await screen.findByRole('button', { name: '근거 보기 · 1건' });
+    expect(screen.queryByRole('button', { name: '근거 문서 열기' })).toBeNull();
+  });
+});
+
 describe('D-AI-02b · conversation read failure', () => {
   it('shows the error with its code and request id, rechecks by reading only and keeps sending off', async () => {
     let fail = true;

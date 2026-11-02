@@ -35,6 +35,13 @@ const TARGET_KIND: Record<GraphTarget['kind'], string> = {
   path: '영향 경로',
 };
 
+// D-AI-01 · prototype chat-drawer.tsx:41: 빈 대화의 추천 질문. 세 번째는 예측을 묻는 질문이라 서버가 답을 지어내지 않고 보류하는지 보여 준다.
+const SUGGESTIONS = [
+  '함께 언급된 기업은 어디인가요?',
+  '이 사건은 언제, 어떤 보도로 알려졌나요?',
+  '이 사건 이후 주가 전망은 어떤가요?',
+];
+
 type Props = {
   /** 답변이 가리키는 대상을 답변의 그래프 버전 기준으로 지도에 연다. 열 수 없으면 false. */
   onViewOnMap?: (target: AnswerMapTarget) => boolean;
@@ -183,6 +190,7 @@ function ChatPanel({
   const [replyTo, setReplyTo] = useState<ChatJob | null>(null);
   const [view, setView] = useState<'chat' | 'history'>('chat');
   const input = useRef<HTMLTextAreaElement>(null);
+  const end = useRef<HTMLDivElement>(null);
 
   const useTarget = linked && target !== null;
   const targetLabel = target ? (target.label ?? target.id) : null;
@@ -194,6 +202,23 @@ function ChatPanel({
     chat.pending !== null;
   const sendable = isSendable(draft) && !locked;
   const length = questionLength(draft);
+
+  // D-AI-02 · prototype chat-drawer.tsx:108-112: 새 질문·답변이 생기면 목록 끝으로 스크롤한다.
+  const count = chat.jobs.length + (chat.pending ? 1 : 0);
+  useEffect(() => {
+    if (count > 0) end.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [count]);
+
+  async function suggest(question: string) {
+    if (locked || !useTarget) return;
+    await chat.ask(question, contextFromTarget(target));
+  }
+
+  function rewrite(question: string) {
+    setReplyTo(null);
+    setDraft(question);
+    input.current?.focus();
+  }
 
   async function submit() {
     if (!sendable) return;
@@ -334,6 +359,35 @@ function ChatPanel({
                 기업”처럼 대상을 가리키는 질문은 어떤 대상인지 되물을 수 있어요.
               </p>
             )}
+            {chat.load.kind === 'ready' &&
+              chat.jobs.length === 0 &&
+              !chat.pending && (
+                <section
+                  className={ui.section}
+                  aria-labelledby="ai-chat-suggestions"
+                >
+                  <h3 id="ai-chat-suggestions">추천 질문</h3>
+                  <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                    {SUGGESTIONS.map((question) => (
+                      <li key={question}>
+                        <button
+                          type="button"
+                          className={`${ui.button} w-full justify-start text-left`}
+                          disabled={locked || !useTarget}
+                          onClick={() => void suggest(question)}
+                        >
+                          {question}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {!useTarget && (
+                    <p className={ui.muted}>
+                      추천 질문은 질문에 연결할 대상을 고른 뒤 보낼 수 있어요.
+                    </p>
+                  )}
+                </section>
+              )}
             {chat.jobs.map((job) => (
               <ChatJobCard
                 key={job.id}
@@ -352,6 +406,7 @@ function ChatPanel({
                 onRetry={(job) => void chat.retry(job)}
                 onCancel={(job) => void chat.cancel(job)}
                 onViewOnMap={onViewOnMap}
+                onRewrite={rewrite}
               />
             ))}
             {chat.pollError && (
@@ -376,6 +431,7 @@ function ChatPanel({
             {chat.notice && (
               <NoticeBox notice={chat.notice} onDismiss={chat.dismissNotice} />
             )}
+            <div ref={end} aria-hidden="true" />
           </div>
 
           <form
