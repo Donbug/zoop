@@ -83,7 +83,7 @@ export default function BriefingIssueList({
               <li
                 key={item.eventId}
                 id={issueAnchor(item)}
-                className="scroll-mt-4 flex flex-col gap-1.5 border-t-[0.667px] border-zoop-border pt-5 first:border-t-0 first:pt-0 [&+li]:mt-5"
+                className="scroll-mt-4 flex flex-col gap-1.5 border-t border-zoop-border pt-5 first:border-t-0 first:pt-0 [&+li]:mt-5"
               >
                 <BriefingReadingSection
                   compact={compact}

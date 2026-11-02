@@ -58,9 +58,9 @@ import {
   requestTime,
   versionOnlyAddress,
 } from './detail-model';
+import { useColorTheme } from '@/util/theme-color';
 
 // D-COM-01 B1: 백엔드 financials 컨트롤러가 생기면 계약을 확인하고 다시 켠다.
-import { useColorTheme } from '@/util/theme-color';
 const COMPANY_FINANCIALS_ENABLED = false;
 
 // 기업 상세 라이트는 #491 이전 모양을 유지하고, 다크만 지도 개선 테마 표면을 쓴다.
@@ -966,7 +966,7 @@ export default function CompanyWorkspace() {
           <h2 className="sr-only">시세 차트·기준 시점</h2>
           <nav aria-label="차트 기간" className="items-center gap-3!">
             <div
-              className={`inline-flex overflow-hidden border border-zoop-line ${dark ? 'rounded-md' : 'rounded-[3px]'}`}
+              className={`inline-flex overflow-hidden border ${dark ? 'rounded-md border-zoop-border' : 'rounded-[3px] border-zoop-line'}`}
             >
               {periods.map((p) => (
                 <button

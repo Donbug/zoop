@@ -1,28 +1,3 @@
-test('D-COM-01 다크에서만 지도 개선 테마 표면을 쓴다', async () => {
-  document.documentElement.dataset.theme = 'dark';
-  try {
-    renderRoutes(
-      [
-        {
-          element: <AppLayout />,
-          children: [
-            { path: '/companies/:id', element: <CompanyDetailPage /> },
-          ],
-        },
-      ],
-      `/companies/${encodeURIComponent(id)}${pinned}&tab=events`,
-    );
-    await screen.findByRole('heading', { name: '합성 기업', level: 1 });
-    const main = screen.getByRole('main');
-    expect(main.parentElement?.classList.contains('bg-zoop-page!')).toBe(true);
-    const catalog = screen.getByRole('complementary', { name: '기업 선택' });
-    expect(catalog.classList.contains('bg-zoop-surface')).toBe(true);
-    expect(catalog.classList.contains('rounded-xl')).toBe(true);
-  } finally {
-    document.documentElement.dataset.theme = 'light';
-  }
-});
-
 import {
   act,
   fireEvent,
@@ -445,6 +420,31 @@ test.each([
     ).toBe(themed);
   },
 );
+test('D-COM-01 다크에서만 지도 개선 테마 표면을 쓴다', async () => {
+  document.documentElement.dataset.theme = 'dark';
+  try {
+    renderRoutes(
+      [
+        {
+          element: <AppLayout />,
+          children: [
+            { path: '/companies/:id', element: <CompanyDetailPage /> },
+          ],
+        },
+      ],
+      `/companies/${encodeURIComponent(id)}${pinned}&tab=events`,
+    );
+    await screen.findByRole('heading', { name: '합성 기업', level: 1 });
+    const main = screen.getByRole('main');
+    expect(main.parentElement?.classList.contains('bg-zoop-page!')).toBe(true);
+    const catalog = screen.getByRole('complementary', { name: '기업 선택' });
+    expect(catalog.classList.contains('bg-zoop-surface')).toBe(true);
+    expect(catalog.classList.contains('rounded-xl')).toBe(true);
+  } finally {
+    document.documentElement.dataset.theme = 'light';
+  }
+});
+
 function openHistory() {
   return renderRoutes(
     [
