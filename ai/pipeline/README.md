@@ -152,6 +152,25 @@ raw receipt와 비용 정산은 같은 운영 원장 transaction에 저장합니
 
 **live 원천 인용 프로토콜(2026-10-30).** 다섯 생성 단계는 요청 안의 원천 구간 `segmentId`를 선택합니다(`zoop-live-source-segments-1`, prompt revision 2, live S2 adapter 3). 매핑된 구간과 줄바꿈 문맥은 한 번 전달하고, 원시 응답을 영수증에 보존한 뒤 소유 어댑터가 선택을 기존 exact native citation으로 확장합니다. relation의 null scope는 미기재이며 non-null scope를 각각 검증합니다(기존 0.90/0.80 게이트 유지). 추출 프롬프트는 원문에 명시된 국가의 ISO alpha-2 표기, 원문이 뒷받침하는 ISO 시각 정밀도 또는 null을 요구합니다. 합성 loopback 검증 명령은 `PYTHONPATH=ai/pipeline/src <pipeline-python> ai/pipeline/scripts/extraction_smoke.py --live-loopback`입니다.
 
+**선택형 인용 enum 출력 계약.** `ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT=citation-enum-1`을 명시하면 extract·compare·topic·relation·impact의 응답 스키마를 요청별로 구체화합니다. 기존 카탈로그의 null이 아닌 `segmentId`를 원래 순서대로 단일 공유 citation `$def`의 enum에 넣습니다. 기본 계약은 revision 2의 프롬프트·카탈로그·좌표·확장 규칙과 기존 바이트를 유지하며, 선택하지 않은 binding에는 `outputContract`가 없습니다.
+
+새 binding 버전은 `zoop-live-runtime-1-citation-enum-1`이며, 자금 프로필의 기존 접미사가 뒤에 붙습니다. `generation.outputContract`에는 계약 이름·컴파일러 버전·제한 정책을 고정하고, 단계별 `templateSchemaDigest`에는 변경하지 않은 템플릿 digest를 고정합니다. prepared의 `schemaDigest`는 실제 요청별 스키마의 digest이고 `requestDigest`는 그 스키마를 포함한 전체 body의 digest입니다. 생성 receipt는 해당 `prepared`를 담습니다. S2/S3 소유자는 원시 receipt를 먼저 영속화한 뒤 동결된 native 입력으로 prepared를 다시 만들고 정확히 대조합니다. 이 과정을 거친 `answer(..., prepared=expected)`만 구체 스키마 검증과 기존 native 인용 확장으로 진행하며, operating 프로필에도 같은 규칙을 적용합니다.
+
+지원 경로는 pipeline family의 OpenAI-compatible `gpt-6-luna` strict `json_schema`입니다. Go JSON-object·직접 DeepSeek·다른 family에 이 출력 계약을 선택하면 admission 전에 `live_output_route_unsupported`로 거절합니다. 이 계약을 선택한 capped OpenAI 실행은 Standard 단일 경로를 사용합니다. 기존 계약의 실행·읽기 의미와 summary·S1·독립 typed Choice verifier 계약은 그대로 유지합니다.
+
+| 구체 스키마·요청 제한 | 상한 |
+|---|---:|
+| 도메인 enum을 포함한 전체 enum 값 | 1,000 |
+| 문자열 enum 값이 250개를 초과할 때 해당 값들의 총 문자 수 | 15,000 |
+| 속성명·정의명·enum 문자열 값의 총 문자 수 | 120,000 |
+| 전체 속성 수 / 참조를 해석한 object·array 중첩 | 5,000 / 10 |
+| 전체 canonical 요청의 UTF-8 바이트 수 | 300,000 |
+
+준비 단계와 prepared 소비 경계가 전체 구체 스키마를 검사합니다. 제한 초과는 `live_output_schema_limits` 또는 `live_request_too_large`, 지원하지 않는 스키마 구조는 `live_output_schema_unsupported`로 전송·예약 전에 거절합니다. 빈 카탈로그에서는 모든 인용 배열에 `maxItems:0`을 적용하고, 빈 enum이나 대체 ID는 만들지 않습니다. 추출·주제의 빈 결과, 근거 없는 비교·관계의 HOLD, impact의 `undetermined`·빈 인용 처리는 기존 native 정책이 결정합니다.
+
+오프라인 회귀 검증은 `tests/test_citation_output_contract.py`에서 실행합니다. enum은 요청에 제공된 ID의 소속만 제한하며, 원문과 주장을 연결하는 grounding·member 문서 제한·독립 검증은 계속 필요합니다. 검증 범위는 합성 입력의 native S2/S3 경로와 동결된 응답의 오프라인 계약 검사입니다. 별도 승인된 공급자 합성 probe 2건은 enum·빈 배열 구조를 수용했지만 실제 데이터의 근거 선택 품질이나 운영 적용을 입증하지는 않습니다. 새 유료 probe와 실패 사례 재분석은 각각 별도 승인이 필요합니다.
+
+
 
 **원본 mention(bundle `-2`부터).** 각 이슈의 `mentions[]`는 그 이슈의 source event가 가리키는 S2 mention을 있는 그대로 담습니다. 신원은 (문서 ID, 문서 버전, 로컬 mention ID)이며(로컬 ID는 문서 버전 안에서만 유일), 앱 article·version은 운영자 binding에서 옵니다. 한 mention을 두 upstream(event candidate와 snapshot member)이 싣더라도 기록은 하나입니다. `title`·`action`·`target`·`eventTime`·`period`·`assertionStatus`·`background`와 참여자의 `sourceCompanyId`·`name`·`role`은 S2 후보/snapshot 값 그대로(순서 포함)이고 `verification`은 항상 `"none"`입니다. `timePrecision`은 형식으로만 계산하며 넓히지 않습니다. 참여자의 `companyId`는 이 mention을 싣는 **모든** upstream이 같은 공개 회사로 매핑하고 그 회사를 bundle이 `companies`로 게시할 때만 채우며, 아니면 null입니다(참여자 자체는 항상 보존; 역할은 확인된 역할도 `INVOLVES`도 아닙니다). mention의 `evidenceIds`는 그 mention 자신의 정확한 인용 근거이고 이슈의 `evidenceIds`는 mention 근거와 geography 근거의 합집합입니다. 같은 신원을 싣는 member들이 값을 다르게 말하면 `mention_values_conflict`, mention 시각을 추측 없이 분류할 수 없으면 `mention_event_time_unsupported`로 **이슈 전체**를 보이게 제외합니다(병합·마지막 값 우선 없음; `-1`이면 공개됐을 수 있는 이슈입니다). field decision·support·approval·publisher·impact 값은 만들지 않으며, source event·counts·digest 공식·`policy`는 `-1`과 같아 운영자 attestation digest가 그대로 유효합니다.
 

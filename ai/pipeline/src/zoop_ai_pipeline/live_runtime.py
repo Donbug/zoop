@@ -24,8 +24,10 @@ proxy from the environment) and returns a receipt for ANY HTTP response, includi
 error or timeout raises `LiveFailure(uncertain=True)`: the budget reservation then stays charged. Nothing in this module reads a
 `.env`, a grant, a ledger or a document, and no secret ever appears in a binding, a prepared request, a receipt or an error.
 
-`answer` and `usage` decode purely from the receipt (it embeds the decode context), so a stored receipt is recoverable without
-keys and with a drifted environment; `accepts(binding)` is the separate "may a NEW call still use this frozen configuration" test.
+`answer` and `usage` recover without keys or a live environment. The explicit `citation-enum-1` output contract additionally
+requires `answer(..., prepared=expected)`: the owner reconstructs that expected request from its frozen native input before decoding.
+Its distinct binding pins the unchanged template, enum compiler and limits; default bindings and receipts retain their exact bytes.
+`accepts(binding)` is the separate "may a NEW call still use this frozen configuration" test.
 """
 from __future__ import annotations
 
@@ -61,6 +63,7 @@ FINISH_FUNDED_SUFFIX = "-funded-3"
 SET_FUNDED_PREPARED = "zoop-live-prepared-3"
 SET_FUNDED_RECEIPT = "zoop-live-receipt-3"
 CHAIN_RECEIPT = "zoop-live-chain-receipt-1"
+OUTPUT_SUFFIX = "-citation-enum-1"
 
 GENERATION_STAGES = ("extract", "compare", "topic", "relation", "impact")
 VERIFY_STAGES = ("verify-relation", "verify-impact")
@@ -85,6 +88,7 @@ BUDGET_DIR_VAR = "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"
 MAX_USD_VAR = "ZOOP_AI_PIPELINE_LIVE_MAX_USD"
 MAX_CALLS_VAR = "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS"
 PROFILE_VAR = "ZOOP_AI_PIPELINE_LIVE_PROFILE"
+OUTPUT_VAR = "ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT"
 POLICY_VAR = "ZOOP_AI_PIPELINE_OPERATING_POLICY"
 SET_VAR = "ZOOP_AI_PIPELINE_OPERATING_SET"
 OWNER_VAR = "ZOOP_AI_PIPELINE_OPERATING_OWNER"
@@ -284,8 +288,13 @@ class LiveRuntime:
 
     def __init__(self, *, model: str, effort: str, max_output: int, timeout: int, openai_url: str, jev_url: str, jev_model: str,
                  budget_identity: str, send: dict[str, Any] | None, send_code: str, family: Family = PIPELINE,
-                 funding: dict | None = None, finish_by: str | None = None):
+                 funding: dict | None = None, finish_by: str | None = None, output_contract: str | None = None):
         self._operating = isinstance(funding, dict) and funding.get("mode") == MODE
+        if output_contract not in (None, live_prompts.OUTPUT_CONTRACT):
+            raise LiveFailure("live_output_contract_unsupported")
+        if output_contract is not None and (family is not PIPELINE or model != MODEL):
+            raise LiveFailure("live_output_route_unsupported")
+        self._output_contract = output_contract
         self._funded = funding is not None and not self._operating
         try:
             self._funding = (operating_policy(funding) if self._operating else
@@ -302,7 +311,7 @@ class LiveRuntime:
         self._prepared_format = SET_FUNDED_PREPARED if self._set_funding else FUNDED_PREPARED if self._funded else PREPARED
         self._receipt_format = SET_FUNDED_RECEIPT if self._set_funding else FUNDED_RECEIPT if self._funded else RECEIPT
         self._direct = self._set_funding and model == direct_deepseek.MODEL
-        self._chain = self._set_funding and model == MODEL
+        self._chain = self._set_funding and model == MODEL and self._output_contract is None
         go = self._funded and not self._set_funding and model == live_funding.GO_MODEL
         if model != MODEL and not go and not self._direct:
             raise LiveFailure("live_model_unsupported")
@@ -386,7 +395,7 @@ class LiveRuntime:
                    openai_url=env.get(OPENAI_URL_VAR, "").strip() or DEFAULT_OPENAI_URL,
                    jev_url=env.get(JEV_URL_VAR, "").strip() or DEFAULT_JEV_URL, jev_model=env.get(JEV_MODEL_VAR, "").strip(),
                    budget_identity=identity, send={**send, "directory": directory}, send_code="live_send_unavailable", family=family,
-                   funding=funding, finish_by=finish_by)
+                   funding=funding, finish_by=finish_by, output_contract=env.get(OUTPUT_VAR) or None)
 
     @staticmethod
     def _budget_identity(directory: str) -> str:
@@ -450,7 +459,8 @@ class LiveRuntime:
             version = binding["version"]
             suffix = next((suffix for suffix in (FUNDED_SUFFIX, SET_FUNDED_SUFFIX, FINISH_FUNDED_SUFFIX) if version.endswith(suffix)), "")
             funded = bool(suffix)
-            family = FAMILIES[version.removesuffix(suffix) if funded else version]
+            base_version = version.removesuffix(suffix) if funded else version
+            family = FAMILIES[base_version.removesuffix(OUTPUT_SUFFIX)]
             generation, verifier = binding["generation"], binding["verifier"]
             funding = binding.get("funding")
             runtime = cls(model=generation["model"], effort=generation["reasoningEffort"], max_output=generation["maxOutputTokens"],
@@ -458,7 +468,8 @@ class LiveRuntime:
                           openai_url=generation["endpoint"], jev_url=verifier["endpoint"],
                           jev_model=verifier["model"], budget_identity=binding["budget"]["directoryIdentity"], send=None,
                           send_code="live_send_unavailable", family=family, funding=funding,
-                          finish_by=binding["finishPolicy"]["finishBy"] if suffix == FINISH_FUNDED_SUFFIX else None)
+                          finish_by=binding["finishPolicy"]["finishBy"] if suffix == FINISH_FUNDED_SUFFIX else None,
+                          output_contract=generation.get("outputContract", {}).get("name"))
         except (KeyError, TypeError, ValueError, AttributeError, LiveFailure):
             raise LiveFailure("live_binding_mismatch") from None
         if runtime.binding() != binding:
@@ -501,9 +512,11 @@ class LiveRuntime:
         family = self._family
         if stage in family.generation_stages:
             spec = family.generation[stage]
-            return {"purpose": f"pipeline:{stage}", "recipient": "openai-compatible:" + digest({"endpoint": self._openai_url}),
-                    "provider": "openai-compatible", "promptVersion": spec.prompt_version, "schemaDigest": spec.schema_digest,
-                    "maxOutputTokens": self._max_output}
+            entry = {"purpose": f"pipeline:{stage}", "recipient": "openai-compatible:" + digest({"endpoint": self._openai_url}),
+                     "provider": "openai-compatible", "promptVersion": spec.prompt_version,
+                     "maxOutputTokens": self._max_output}
+            entry["templateSchemaDigest" if self._output_contract else "schemaDigest"] = spec.schema_digest
+            return entry
         verifier = family.verifier
         return {"purpose": f"pipeline:{stage}", "recipient": "typesafe-native:" + digest({"api": verifier.api, "endpoint": self._jev_url}),
                 "provider": "typesafe-native", "promptVersion": verifier.prompt_prefix + verifier.identity()[:16],
@@ -523,10 +536,14 @@ class LiveRuntime:
                 "budget": {"scope": "directory", "directoryIdentity": self._budget_identity_value, "unit": "nanoUsd"},
                 "limits": {"maxRequestBytes": MAX_REQUEST_BYTES, "maxVerifierRequestBytes": MAX_VERIFIER_REQUEST_BYTES,
                            "maxResponseBytes": MAX_RESPONSE_BYTES, "inputOverheadTokens": INPUT_OVERHEAD_TOKENS}}
+        if self._output_contract:
+            body["version"] += OUTPUT_SUFFIX
+            body["generation"]["outputContract"] = {"name": self._output_contract, "compiler": live_prompts.OUTPUT_COMPILER,
+                                                     "limits": live_prompts.OUTPUT_LIMITS}
         if self._operating:
             body["funding"] = self._funding
         if self._funded:
-            body["version"] = family.version + (FINISH_FUNDED_SUFFIX if self._finish else SET_FUNDED_SUFFIX if self._set_funding else FUNDED_SUFFIX)
+            body["version"] += FINISH_FUNDED_SUFFIX if self._finish else SET_FUNDED_SUFFIX if self._set_funding else FUNDED_SUFFIX
             body["funding"] = self._funding
             body["pricing"] = self._pricing
             if self._finish:
@@ -594,8 +611,14 @@ class LiveRuntime:
         try:
             if stage in self._family.generation_stages:
                 spec = self._family.generation[stage]
-                body = {"model": self._model, "messages": spec.messages(payload),
-                        "response_format": {"type": "json_schema", "json_schema": {"name": spec.schema_name, "strict": True, "schema": spec.schema}},
+                if self._output_contract:
+                    shown, references = live_prompts.catalogue(stage, payload)
+                    schema = live_prompts.citation_schema(stage, list(references))
+                    messages = [{"role": "system", "content": spec.system}, {"role": "user", "content": canonical(shown)}]
+                else:
+                    schema, messages = spec.schema, spec.messages(payload)
+                body = {"model": self._model, "messages": messages,
+                        "response_format": {"type": "json_schema", "json_schema": {"name": spec.schema_name, "strict": True, "schema": schema}},
                         "max_completion_tokens": self._max_output, "reasoning_effort": self._effort}
                 if self._funded and self._model == live_funding.GO_MODEL:
                     # The provider documents max_tokens and JSON-object mode, not strict JSON-schema mode.
@@ -607,19 +630,22 @@ class LiveRuntime:
                     body = direct_deepseek.build_body(spec.messages(payload), spec.schema, self._max_output, self._effort)
                 elif self._funded:
                     body["service_tier"] = "default"  # explicit Standard pricing, never the project's implicit auto/Fast setting
-                path, limit, schema_digest = "chat/completions", MAX_REQUEST_BYTES, entry["schemaDigest"]
+                path, limit = "chat/completions", MAX_REQUEST_BYTES
+                schema_digest = digest(schema) if self._output_contract else entry["schemaDigest"]
             else:
                 body, expect = self._family.verifier.build[stage](payload, self._family.verifier.model)
                 path, limit, schema_digest = "systemone", MAX_VERIFIER_REQUEST_BYTES, entry["questionsDigest"]
             size = len(canonical(body).encode("utf-8"))
-        except (KeyError, TypeError, ValueError, AttributeError):
-            raise LiveFailure("live_payload_invalid") from None
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            raise LiveFailure(str(exc) if isinstance(exc, ValueError) and str(exc).startswith("live_output_") else "live_payload_invalid") from None
         if size > limit:
             raise LiveFailure("live_request_too_large")
         prepared = {"format": self._prepared_format, "stage": stage, "provider": entry["provider"], "purpose": entry["purpose"],
                     "recipient": entry["recipient"], "path": path, "body": body, "requestDigest": digest(body), "requestBytes": size,
                     "bindingIdentity": self._identity, "promptVersion": entry["promptVersion"], "schemaDigest": schema_digest,
                     "expect": expect, "reservation": self._worst_case(stage, size, self._questions(stage, body))}
+        if self._output_contract and stage in self._family.generation_stages:
+            prepared["templateSchemaDigest"] = entry["templateSchemaDigest"]
         if self._chain and stage in self._family.generation_stages:
             prepared["fallback"] = self._fallback_runtime().prepare(stage, payload)
         return {**prepared, "digest": digest(prepared)}
@@ -637,7 +663,22 @@ class LiveRuntime:
                      and prepared["provider"] == entry["provider"] and prepared["recipient"] == entry["recipient"]
                      and prepared["purpose"] == entry["purpose"] and prepared["reservation"] == self._worst_case(stage, size, self._questions(stage, body))
                      and prepared["path"] == ("chat/completions" if stage in self._family.generation_stages else "systemone"))
-            if self._funded:
+            if self._output_contract and stage in self._family.generation_stages:
+                spec = self._family.generation[stage]
+                messages = body["messages"]
+                shown = json.loads(messages[1]["content"])
+                ids = [segment["segmentId"] for src in shown["sources"] for segment in src["segments"] if segment["segmentId"] is not None]
+                schema = live_prompts.citation_schema(stage, ids)
+                expected_body = {"model": self._model, "messages": [{"role": "system", "content": spec.system},
+                                  {"role": "user", "content": canonical(shown)}],
+                                 "response_format": {"type": "json_schema", "json_schema": {"name": spec.schema_name, "strict": True, "schema": schema}},
+                                 "max_completion_tokens": self._max_output, "reasoning_effort": self._effort}
+                if self._funded:
+                    expected_body["service_tier"] = "default"
+                sound &= (body == expected_body and shown["stage"] == stage and shown["citationFormat"] == live_prompts.CITATION_FORMAT
+                          and prepared["schemaDigest"] == digest(schema) and prepared["templateSchemaDigest"] == spec.schema_digest
+                          and prepared["promptVersion"] == spec.prompt_version and size <= MAX_REQUEST_BYTES)
+            if self._funded and not (self._output_contract and stage in self._family.generation_stages):
                 if stage in self._family.generation_stages:
                     go = self._model == live_funding.GO_MODEL
                     spec = self._family.generation[stage]
@@ -660,7 +701,7 @@ class LiveRuntime:
                         sound &= fallback["body"]["messages"][1] == body["messages"][1]
                 else:
                     sound &= body["model"] == self._family.verifier.model
-        except (KeyError, IndexError, TypeError, AttributeError):
+        except (KeyError, IndexError, TypeError, AttributeError, ValueError):
             raise LiveFailure("live_prepared_invalid") from None
         if not sound:
             raise LiveFailure("live_binding_mismatch" if isinstance(prepared, dict) and prepared.get("bindingIdentity") != self._identity
@@ -940,6 +981,8 @@ class LiveRuntime:
                          "settled": settled, "estimatedUsd": usd(actual) if actual is not None else None, "chargedUsd": usd(charged),
                          "reservedUsd": usd(reserved)},
                 "expect": prepared["expect"]}
+        if self._output_contract and stage in self._family.generation_stages:
+            receipt["prepared"] = prepared
         if self._operating:
             fault = None
             if stage in self._family.verify_stages:
@@ -1054,11 +1097,19 @@ class LiveRuntime:
             if self._funded and (receipt["bindingIdentity"] != self._identity or receipt["funding"] != self._funding_entry(stage)
                                  or receipt["recipient"] != self.recipient(stage) or receipt["purpose"] != self.purpose(stage)):
                 raise LiveFailure("live_receipt_invalid")
+            if self._output_contract and stage in self._family.generation_stages:
+                prepared = self._check_prepared(receipt["prepared"])
+                if (receipt["bindingIdentity"] != self._identity or receipt["requestDigest"] != prepared["requestDigest"]
+                        or prepared["stage"] != stage or receipt["recipient"] != self.recipient(stage) or receipt["purpose"] != self.purpose(stage)):
+                    raise LiveFailure("live_receipt_invalid")
         except (KeyError, TypeError):
             raise LiveFailure("live_receipt_invalid") from None
         return receipt, http
 
-    def _decode(self, stage: str, receipt: Any) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    def _decode(self, stage: str, receipt: Any, *, prepared: dict | None = None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        if self._output_contract and stage in self._family.generation_stages:
+            if prepared is None or not isinstance(receipt, dict) or receipt.get("prepared") != self._check_prepared(prepared):
+                raise LiveFailure("live_receipt_request_mismatch")
         if isinstance(receipt, dict) and receipt.get("format") == CHAIN_RECEIPT:
             return self._decode_chain(stage, receipt)
         receipt, http = self._receipt(stage, receipt)
@@ -1118,25 +1169,27 @@ class LiveRuntime:
             raise LiveFailure("live_reply_not_json") from None
         if not isinstance(answer, dict):
             raise LiveFailure("live_reply_not_json")
-        if self._funded:
+        if self._output_contract or self._funded:
             try:
-                valid = live_funding.schema_matches(answer, self._family.generation[stage].schema)
+                schema = (receipt["prepared"]["body"]["response_format"]["json_schema"]["schema"]
+                          if self._output_contract else self._family.generation[stage].schema)
+                valid = live_funding.schema_matches(answer, schema)
             except (KeyError, TypeError, ValueError, RecursionError):
                 valid = False
             if not valid:
                 raise LiveFailure("live_answers_invalid")
         return answer, []
 
-    def answer(self, stage: str, receipt: dict) -> dict[str, Any]:
+    def answer(self, stage: str, receipt: dict, *, prepared: dict | None = None) -> dict[str, Any]:
         """Pure strict decode of a stored receipt into the stage's native response JSON. Raises LiveFailure (never uncertain) for a
         non-2xx, an oversize, a refusal, a truncation, a non-JSON reply or a Jev answer that breaks the question contract. Output
         of the generation stages is the decoded JSON untouched; Jev stages go through the explicit question/rubric policy."""
-        return self._decode(stage, receipt)[0]
+        return self._decode(stage, receipt, prepared=prepared)[0]
 
-    def audit(self, stage: str, receipt: dict) -> list[dict[str, Any]]:
+    def audit(self, stage: str, receipt: dict, *, prepared: dict | None = None) -> list[dict[str, Any]]:
         """Per-question Jev distributions, confidences and the generated policy notes for the owner's audit record ([] for the
         generation stages). Same strict decode as `answer`."""
-        return self._decode(stage, receipt)[1]
+        return self._decode(stage, receipt, prepared=prepared)[1]
 
     def usage(self, receipt: dict) -> dict[str, Any]:
         """Model-reported model/tokens and the estimated and charged USD from the receipt; null where unknown, never fabricated."""
