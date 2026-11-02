@@ -182,7 +182,11 @@ function JobState({
           취소한 질문이에요. 다시 물으려면 새로 보내 주세요.
         </p>
         {onRewrite && (
-          <button type="button" onClick={() => onRewrite(job.question)}>
+          <button
+            type="button"
+            className={ui.button}
+            onClick={() => onRewrite(job.question)}
+          >
             질문 다시 쓰기
           </button>
         )}
