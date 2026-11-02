@@ -867,6 +867,40 @@ Keep the original source/scope/inputRoot, acquisition grant revision, manifest, 
 
 Projected registries require a feature-aware pipeline/CLI reader. Pre-feature readers reject `textProjection`; the unchanged Java export shape does not establish compatibility with an older AI service image. Integrate and release the feature-aware runtime before operating projected inputs. Preparation approval, provider transmission and public publication remain separate gates.
 
+### Reviewed Commission JSON-member and direct HTML bodies
+
+Two independent opt-in profiles retain complete positive DOM units:
+
+| Profile | Acquired representation | Scope |
+| --- | --- | --- |
+| `eu-commission-json-html-body-ranges-1` | Original `application/json` response | `/html/body` within the fixed `/docuLanguageResource/htmlContent` member |
+| `eu-commission-html-body-ranges-1` | Original `text/html` response | One explicit enclosing canonical DOM path |
+
+The JSON decoder `ec-presscorner-json-html-1` requires strict UTF-8, unique object keys, finite numbers, valid Unicode strings, and the member's exact expected reference/language. The raw artifact and collection body hash identify the original response. The decoded HTML UTF-8 hash identifies a derived representation. HTML entities are subsequently decoded by the pinned native parser. DOM `text`/`tail` offsets count Unicode code points, including one position per astral character; they are neither raw JSON byte offsets nor markup offsets.
+
+Each closed descriptor member binds a raw `parent` (`documentId`, `rawVersion`, `rawHash`, `collectionReceiptSha256`), a `representation` containing baseline source/representation/mapping hashes and the baseline parser profile, and complete `selectedUnits`. JSON representations additionally bind the fixed decoder/pointer, decoded HTML hash, expected reference and expected language. `parentBindingHash` is `digest({parent, representation})`; it represents a raw-parent binding rather than a previously prepared parent document version.
+
+Units identify an original paragraph, heading or list item, classification, ordered exact DOM-slot spans and prepared-text UTF-8 hash. Their own root tail is outside the unit. Preparation reproduces the member-wide baseline, checks whole-unit coverage, source order and disjointness, and copies original spans through the native mapper. Unsafe children refuse preparation. Unit boundaries and omissions create citation barriers. `boundaryDecision.selectionHash` is `digest(selectedUnits)` in source order. Only `status: approved` with retained scope `selected-complete-commission-narrative-units` is executable.
+
+Selected unit roots must be independent: duplicate roots and ancestor/descendant selections are refused. Ordering follows the baseline's rendered clean intervals, while original source-slot intervals must remain disjoint. Final preparation maps only the approved trimmed spans, retaining original source indices and explicit unit/internal barriers.
+
+The hash-pinned item receipt uses `zoop-eu-html-body-rights-1`: original `bodySha256`, `parentBindingHash`, `selectionHash`, qualified Commission CC BY applicability, notice, bounded hash-pinned evidence, attribution and changes notice. Current source authority, exact observation inventory routing, model purpose/recipient permission and public publication remain separate gates.
+
+The collector accepts JSON only when policy explicitly includes `application/json` in `allowedMediaTypes` and `jsonBodyProfile: eu-commission-json-html-body-ranges-1`. Other policies retain their original wire and Accept header. Acquisition still requests identity encoding and rejects compressed responses. Previously retained client-decompressed captures remain offline review evidence until genuine native acquisition and item rights bind them.
+
+Use the offline review command on retained bytes before authoring a native descriptor:
+
+```sh
+PYTHONPATH=ai/pipeline/src ai/pipeline/.venv/bin/python ai/pipeline/scripts/ec_body_review.py \
+  --raw /absolute/review/response.bin --media-type application/json \
+  --article-xpath /html/body --expected-reference IP/08/426 --expected-language EN \
+  --unit-path /html/body/h2 --unit-path '/html/body/p[8]'
+```
+
+Its `status: review`, raw/decoded pins, baseline hashes, complete units and selection hash are review evidence. Native identities and acquisition/rights bindings are supplied only by the authorized native flow. Direct HTML uses the same command with `--media-type text/html`, its own enclosing path and selected unit paths. Preserve that page's independent publication evidence.
+
+`inspect` resolves selected DOM spans with their JSON-member/raw/decoded binding; `export` exposes the same representation and retained coordinates under typed `locatorMetadata.textProjection`. Observation media stays JSON for JSON inputs. The existing document/raw-version/sourceHash formulas and omitted default projection serialization stay unchanged. Feature-aware service and Java readers recognize both profiles; deploy those readers together with the preparing runtime.
+
 ## 정기 회차 컨트롤러 (S2-1 `tick`, FS058·요구 70의 오프라인 일부)
 
 `zoop-ai-ingest tick`은 시계 한 번의 읽기를 **가장 최근에 도래한 slot 하나**로 바꾸고, 그 slot의 회차를 기존 engine으로 **최대 한 번** 진행한다. 새 DB·table·column·migration·console script가 없고 기존 engine 동작도 바꾸지 않으며 새 서비스·모델·provider·네트워크·cron·AWS도 없다. **이 명령은 trigger를 배포하지 않는다.** 누가 언제 `tick`을 부를지(cron·AWS 등)는 이 저장소에 없고 FS058은 완료되지 않았다(아래 "하지 않는 일").

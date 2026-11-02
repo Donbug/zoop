@@ -34,7 +34,8 @@ class Policy(Wire):
     max_response_bytes: int = Field(ge=1, le=MAX_RAW)
     max_total_bytes: int = Field(ge=1, le=200_000_000)
     min_interval_seconds: float = Field(ge=0, le=60)
-    allowed_media_types: list[Literal["text/html", "application/pdf"]] = Field(min_length=1, max_length=2)
+    allowed_media_types: list[Literal["text/html", "application/pdf", "application/json"]] = Field(min_length=1, max_length=3)
+    json_body_profile: Literal["eu-commission-json-html-body-ranges-1"] | None = None
     # Explicit synthetic-test switch: http and non-default ports are allowed ONLY for localhost/127.0.0.1 resolving to loopback.
     synthetic_loopback: bool = False
 
@@ -66,6 +67,8 @@ class Policy(Wire):
         dumped = handler(self)
         if self.contact_url is None:
             dumped.pop("contactUrl" if "contactUrl" in dumped else "contact_url", None)
+        if self.json_body_profile is None:
+            dumped.pop("jsonBodyProfile" if "jsonBodyProfile" in dumped else "json_body_profile", None)
         return dumped
 
     @property
@@ -74,6 +77,8 @@ class Policy(Wire):
 
     @model_validator(mode="after")
     def ordered(self):
+        if ("application/json" in self.allowed_media_types) != (self.json_body_profile is not None):
+            raise ValueError("JSON collection requires its explicit EC body profile")
         if self.max_response_bytes > self.max_total_bytes or self.timeout_seconds > self.max_total_seconds:
             raise ValueError("per-item limits exceed the run limits")
         if self.contact_url is not None:

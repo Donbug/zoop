@@ -295,7 +295,10 @@ class Fetcher:
             time.sleep(wait)
         target = httpx.URL(url)
         pinned = target.copy_with(host=self._pin(target, host, deadline))
-        headers = {"User-Agent": self.policy.effective_user_agent, "Accept": "text/html, application/pdf;q=0.9", "Accept-Encoding": "identity",
+        accept = "text/html, application/pdf;q=0.9"
+        if self.policy.json_body_profile is not None:
+            accept += ", application/json"
+        headers = {"User-Agent": self.policy.effective_user_agent, "Accept": accept, "Accept-Encoding": "identity",
                    "Host": target.netloc.decode("ascii")}
         extensions = {"sni_hostname": host, "timeout": dict.fromkeys(("connect", "read", "write", "pool"), self._remaining(deadline))}
 

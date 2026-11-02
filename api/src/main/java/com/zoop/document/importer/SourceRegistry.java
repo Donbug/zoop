@@ -53,8 +53,8 @@ import tools.jackson.databind.JsonNode;
  * Displaying a quote sends nothing to a model, so {@code model-send}, purposes and recipients are never part of the rule (the
  * S2-1 CLI evaluates none of them). Scopes, adapters, hosts and the input root are validated but play no part in the decision.
  *
- * <p>An optional {@code textProjection} recognizes the closed envelopes of the caption-boundary and PDF-body-ranges
- * version-1 profiles on collected HTTP sources. Native preparation validates descriptor contents, parent pins and item
+ * <p>An optional {@code textProjection} recognizes the closed envelopes of caption-boundary, PDF-body-ranges and EC
+ * JSON-member/direct-HTML body profiles on collected HTTP sources. Native preparation validates descriptor contents, parent pins and item
  * rights. This reader leaves the complete descriptor in the original registry; native configuration equality and receipt
  * hashes continue to bind every member.
  */
@@ -255,6 +255,22 @@ public final class SourceRegistry {
                     if (!StrictJson.SHA256.matcher(member.string("collectionReceiptSha256")).matches()) throw invalid();
                     List<StrictJson.Obj> ranges = member.objects("allowedRanges");
                     if (ranges.isEmpty() || ranges.size() > 10_000) throw invalid();
+                    member.object("rightsReceipt");
+                    member.object("boundaryDecision");
+                }
+            }
+            case "eu-commission-html-body-ranges-1", "eu-commission-json-html-body-ranges-1" -> {
+                value.exactly(Set.of("profile", "members"));
+                List<StrictJson.Obj> members = value.objects("members");
+                if (members.isEmpty() || members.size() > MAX_LIST) throw invalid();
+                for (StrictJson.Obj member : members) {
+                    member.exactly(Set.of("parent", "representation", "parentBindingHash", "selectedUnits",
+                            "rightsReceipt", "boundaryDecision"));
+                    member.object("parent").exactly(Set.of("documentId", "rawVersion", "rawHash", "collectionReceiptSha256"));
+                    member.object("representation");
+                    if (!StrictJson.SHA256.matcher(member.string("parentBindingHash")).matches()) throw invalid();
+                    List<StrictJson.Obj> units = member.objects("selectedUnits");
+                    if (units.isEmpty() || units.size() > 1000) throw invalid();
                     member.object("rightsReceipt");
                     member.object("boundaryDecision");
                 }

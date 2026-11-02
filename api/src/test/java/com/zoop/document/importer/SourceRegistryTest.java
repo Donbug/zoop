@@ -154,7 +154,19 @@ class SourceRegistryTest {
                 {"profile":"eu-commission-pdf-body-ranges-1","members":[
                  {"parent":{},"collectionReceiptSha256":"%s","allowedRanges":[{}],
                   "rightsReceipt":{},"boundaryDecision":{}}]}
-                """.formatted("a".repeat(64)))) {
+                """.formatted("a".repeat(64)),
+                """
+                {"profile":"eu-commission-json-html-body-ranges-1","members":[
+                 {"parent":{"documentId":"doc-synthetic","rawVersion":"%s","rawHash":"%s","collectionReceiptSha256":"%s"},
+                  "representation":{},"parentBindingHash":"%s","selectedUnits":[{}],
+                  "rightsReceipt":{},"boundaryDecision":{}}]}
+                """.formatted("a".repeat(64), "b".repeat(64), "c".repeat(64), "d".repeat(64)),
+                """
+                {"profile":"eu-commission-html-body-ranges-1","members":[
+                 {"parent":{"documentId":"doc-synthetic","rawVersion":"%s","rawHash":"%s","collectionReceiptSha256":"%s"},
+                  "representation":{},"parentBindingHash":"%s","selectedUnits":[{}],
+                  "rightsReceipt":{},"boundaryDecision":{}}]}
+                """.formatted("a".repeat(64), "b".repeat(64), "c".repeat(64), "d".repeat(64)))) {
             ObjectNode root = valid();
             source(root).put("adapter", "collected-http");
             scope(root).set("textProjection", JSON.readTree(descriptor));
@@ -184,6 +196,16 @@ class SourceRegistryTest {
                 """, """
                 {"profile":"korea-kogl1-caption-boundary-1","parent":false,
                  "excludedCaptionPaths":[],"rightsReceipt":{},"boundaryDecision":{}}
+                """, """
+                {"profile":"eu-commission-json-html-body-ranges-1","members":[]}
+                """, """
+                {"profile":"eu-commission-html-body-ranges-1","members":"all"}
+                """, """
+                {"profile":"eu-commission-json-html-body-ranges-1","members":[false]}
+                """, """
+                {"profile":"eu-commission-json-html-body-ranges-2","members":[]}
+                """, """
+                {"profile":"eu-commission-html-body-ranges-1","members":[],"mediaType":"application/json"}
                 """)) {
             scope(root).set("textProjection", JSON.readTree(descriptor));
             assertInvalid(bytes(root));

@@ -21068,6 +21068,351 @@
         ],
         "title": "NativeGrant"
       },
+      "NativeHtmlBodyProjection": {
+        "properties": {
+          "profile": {
+            "type": "string",
+            "const": "eu-commission-html-body-ranges-1",
+            "title": "Profile"
+          },
+          "descriptorHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Descriptorhash"
+          },
+          "parent": {
+            "$ref": "#/components/schemas/NativeHtmlParent"
+          },
+          "representation": {
+            "$ref": "#/components/schemas/NativeHtmlRepresentation"
+          },
+          "parentBindingHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Parentbindinghash"
+          },
+          "boundaryDecisionRevision": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Boundarydecisionrevision"
+          },
+          "rightsReceiptHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Rightsreceipthash"
+          },
+          "selectionHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Selectionhash"
+          },
+          "retainedUnits": {
+            "items": {
+              "$ref": "#/components/schemas/NativeHtmlUnit"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Retainedunits"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "profile",
+          "descriptorHash",
+          "parent",
+          "representation",
+          "parentBindingHash",
+          "boundaryDecisionRevision",
+          "rightsReceiptHash",
+          "selectionHash",
+          "retainedUnits"
+        ],
+        "title": "NativeHtmlBodyProjection"
+      },
+      "NativeHtmlParent": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Documentid"
+          },
+          "rawVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Rawversion"
+          },
+          "rawHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Rawhash"
+          },
+          "collectionReceiptSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Collectionreceiptsha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "documentId",
+          "rawVersion",
+          "rawHash",
+          "collectionReceiptSha256"
+        ],
+        "title": "NativeHtmlParent"
+      },
+      "NativeHtmlRepresentation": {
+        "properties": {
+          "sourceHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Sourcehash"
+          },
+          "representationHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Representationhash"
+          },
+          "mappingHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Mappinghash"
+          },
+          "parserProfile": {
+            "$ref": "#/components/schemas/NativeParserProfile"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sourceHash",
+          "representationHash",
+          "mappingHash",
+          "parserProfile"
+        ],
+        "title": "NativeHtmlRepresentation"
+      },
+      "NativeHtmlSpan": {
+        "properties": {
+          "domPath": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Dompath"
+          },
+          "slot": {
+            "type": "string",
+            "enum": [
+              "text",
+              "tail"
+            ],
+            "title": "Slot"
+          },
+          "sourceStart": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Sourcestart"
+          },
+          "sourceEnd": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Sourceend"
+          },
+          "textUtf8Sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Textutf8Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "domPath",
+          "slot",
+          "sourceStart",
+          "sourceEnd",
+          "textUtf8Sha256"
+        ],
+        "title": "NativeHtmlSpan"
+      },
+      "NativeHtmlUnit": {
+        "properties": {
+          "unitId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Unitid"
+          },
+          "domPath": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Dompath"
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "commission-narrative",
+              "original-dateline",
+              "public-official-statement"
+            ],
+            "title": "Classification"
+          },
+          "spans": {
+            "items": {
+              "$ref": "#/components/schemas/NativeHtmlSpan"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Spans"
+          },
+          "textUtf8Sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Textutf8Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "unitId",
+          "domPath",
+          "classification",
+          "spans",
+          "textUtf8Sha256"
+        ],
+        "title": "NativeHtmlUnit"
+      },
+      "NativeJsonHtmlBodyProjection": {
+        "properties": {
+          "profile": {
+            "type": "string",
+            "const": "eu-commission-json-html-body-ranges-1",
+            "title": "Profile"
+          },
+          "descriptorHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Descriptorhash"
+          },
+          "parent": {
+            "$ref": "#/components/schemas/NativeHtmlParent"
+          },
+          "representation": {
+            "$ref": "#/components/schemas/NativeJsonHtmlRepresentation"
+          },
+          "parentBindingHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Parentbindinghash"
+          },
+          "boundaryDecisionRevision": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Boundarydecisionrevision"
+          },
+          "rightsReceiptHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Rightsreceipthash"
+          },
+          "selectionHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Selectionhash"
+          },
+          "retainedUnits": {
+            "items": {
+              "$ref": "#/components/schemas/NativeHtmlUnit"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Retainedunits"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "profile",
+          "descriptorHash",
+          "parent",
+          "representation",
+          "parentBindingHash",
+          "boundaryDecisionRevision",
+          "rightsReceiptHash",
+          "selectionHash",
+          "retainedUnits"
+        ],
+        "title": "NativeJsonHtmlBodyProjection"
+      },
+      "NativeJsonHtmlRepresentation": {
+        "properties": {
+          "sourceHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Sourcehash"
+          },
+          "representationHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Representationhash"
+          },
+          "mappingHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Mappinghash"
+          },
+          "parserProfile": {
+            "$ref": "#/components/schemas/NativeParserProfile"
+          },
+          "decoder": {
+            "type": "string",
+            "const": "ec-presscorner-json-html-1",
+            "title": "Decoder"
+          },
+          "jsonPointer": {
+            "type": "string",
+            "const": "/docuLanguageResource/htmlContent",
+            "title": "Jsonpointer"
+          },
+          "decodedHtmlUtf8Sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Decodedhtmlutf8Sha256"
+          },
+          "expectedReference": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Expectedreference"
+          },
+          "expectedLanguage": {
+            "type": "string",
+            "maxLength": 35,
+            "minLength": 2,
+            "title": "Expectedlanguage"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sourceHash",
+          "representationHash",
+          "mappingHash",
+          "parserProfile",
+          "decoder",
+          "jsonPointer",
+          "decodedHtmlUtf8Sha256",
+          "expectedReference",
+          "expectedLanguage"
+        ],
+        "title": "NativeJsonHtmlRepresentation"
+      },
       "NativeLocator": {
         "properties": {
           "locatorId": {
@@ -21165,11 +21510,19 @@
                   },
                   {
                     "$ref": "#/components/schemas/NativePdfProjection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NativeHtmlBodyProjection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NativeJsonHtmlBodyProjection"
                   }
                 ],
                 "discriminator": {
                   "propertyName": "profile",
                   "mapping": {
+                    "eu-commission-html-body-ranges-1": "#/components/schemas/NativeHtmlBodyProjection",
+                    "eu-commission-json-html-body-ranges-1": "#/components/schemas/NativeJsonHtmlBodyProjection",
                     "eu-commission-pdf-body-ranges-1": "#/components/schemas/NativePdfProjection",
                     "korea-kogl1-caption-boundary-1": "#/components/schemas/NativeCaptionProjection"
                   }
@@ -21292,7 +21645,8 @@
             "type": "string",
             "enum": [
               "text/html",
-              "application/pdf"
+              "application/pdf",
+              "application/json"
             ],
             "title": "Mediatype"
           },
@@ -21580,7 +21934,9 @@
             "type": "string",
             "enum": [
               "korea-kogl1-caption-boundary-1",
-              "eu-commission-pdf-body-ranges-1"
+              "eu-commission-pdf-body-ranges-1",
+              "eu-commission-json-html-body-ranges-1",
+              "eu-commission-html-body-ranges-1"
             ],
             "title": "Profile"
           },

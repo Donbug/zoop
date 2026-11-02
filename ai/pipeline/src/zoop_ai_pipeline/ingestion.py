@@ -13,7 +13,8 @@ from pydantic import ValidationError
 
 from . import ingestion_parsers as parsers
 from .ingestion_contracts import (SCHEMA, reserved_state_roots, MAX_INPUT, Authority, Export, IngestionFailure, Inspect, Item,
-    Manifest, Receipt, Registry, Run, PdfBodyProjection, PdfRightsReceipt, byte_hash, canonical, digest, now, read_file, timestamp)
+    Manifest, Receipt, Registry, Run, PdfBodyProjection, PdfRightsReceipt, HtmlBodyProjection, JsonHtmlBodyProjection,
+    HtmlRightsReceipt, byte_hash, canonical, digest, now, read_file, timestamp)
 
 PROVENANCE = {"authored-files": "authored_control", "collected-http": "collected_http", "retained-private": "retained_private"}
 
@@ -357,11 +358,12 @@ class Ingestor:
             raise IngestionFailure("parser_profile_changed")
         projection = scope.text_projection
         member = None
-        if isinstance(projection, PdfBodyProjection):
+        if isinstance(projection, (PdfBodyProjection, HtmlBodyProjection)):
             member = next((m for m in projection.members if
                 (m.parent.document_id, m.parent.raw_version) == (raw_record["document"], raw_version)), None)
             if (member is not None and item.collection is not None
-                    and member.collection_receipt_sha256 != item.collection.receipt.sha256):
+                    and (member.parent.collection_receipt_sha256 if isinstance(projection, HtmlBodyProjection)
+                         else member.collection_receipt_sha256) != item.collection.receipt.sha256):
                 self._authorize(row)
                 with self.store.transaction(lambda: self._authorize(row)):
                     self.db.execute("UPDATE candidates SET hold=?,failure=NULL WHERE round=? AND source=? AND page=? AND ordinal=?",
@@ -380,19 +382,28 @@ class Ingestor:
             if not item.supplier_document_id and current["ambiguity"] == "source_identity_ambiguous":
                 raise IngestionFailure("source_identity_ambiguous")
             if scope.text_projection is not None:
-                if isinstance(projection, PdfBodyProjection) and member is None:
+                if isinstance(projection, (PdfBodyProjection, HtmlBodyProjection)) and member is None:
                     raise IngestionFailure("projection_member_missing")
                 selected = member if member is not None else projection
                 parent = selected.parent
                 baseline_profile = parsers.profile(scope.article_xpath)
-                parent_version = digest([raw_record["document"], raw_version, baseline_profile,
-                    json.loads(row["request"])["cleanerVersion"], parent.source_hash, parent.mapping_hash])
-                if ((parent.document_id, parent.raw_version, parent.raw_hash, parent.parser_profile, parent.document_version)
-                        != (raw_record["document"], raw_version, raw_record["raw_hash"], baseline_profile, parent_version)):
-                    raise IngestionFailure("projection_parent_mismatch")
+                if isinstance(projection, HtmlBodyProjection):
+                    if ((parent.document_id, parent.raw_version, parent.raw_hash, selected.representation.parser_profile.wire())
+                            != (raw_record["document"], raw_version, raw_record["raw_hash"], baseline_profile)):
+                        raise IngestionFailure("projection_parent_mismatch")
+                else:
+                    parent_version = digest([raw_record["document"], raw_version, baseline_profile,
+                        json.loads(row["request"])["cleanerVersion"], parent.source_hash, parent.mapping_hash])
+                    if ((parent.document_id, parent.raw_version, parent.raw_hash, parent.parser_profile, parent.document_version)
+                            != (raw_record["document"], raw_version, raw_record["raw_hash"], baseline_profile, parent_version)):
+                        raise IngestionFailure("projection_parent_mismatch")
                 if item.collection is None:
                     raise IngestionFailure("projection_media_unsupported")
-                if member is not None:
+                if isinstance(projection, HtmlBodyProjection):
+                    expected_media = "application/json" if isinstance(projection, JsonHtmlBodyProjection) else "text/html"
+                    if item.media_type != expected_media:
+                        raise IngestionFailure("projection_media_unsupported")
+                elif member is not None:
                     if item.media_type != "application/pdf" or scope.article_xpath is not None:
                         raise IngestionFailure("projection_media_unsupported")
                 elif item.media_type != "text/html":
@@ -411,14 +422,19 @@ class Ingestor:
                     raise IngestionFailure("projection_rights_receipt_invalid") from exc
                 if member is not None:
                     try:
-                        rights = PdfRightsReceipt.model_validate(rights)
+                        rights = (HtmlRightsReceipt if isinstance(projection, HtmlBodyProjection) else PdfRightsReceipt).model_validate(rights)
                         for evidence in rights.evidence:
                             if byte_hash(read_file(Path(evidence.path), MAX_INPUT)) != evidence.sha256:
                                 raise IngestionFailure("projection_rights_evidence_mismatch")
                     except (ValidationError, OSError, ValueError) as exc:
                         raise IngestionFailure("projection_rights_receipt_invalid") from exc
-                    if ((rights.body_sha256, rights.parent_document_version, rights.selection_hash) !=
-                            (parent.raw_hash, parent.document_version, selected.boundary_decision.selection_hash)):
+                    if isinstance(projection, HtmlBodyProjection):
+                        binding = (rights.body_sha256, rights.parent_binding_hash, rights.selection_hash)
+                        expected_binding = (parent.raw_hash, selected.parent_binding_hash, selected.boundary_decision.selection_hash)
+                    else:
+                        binding = (rights.body_sha256, rights.parent_document_version, rights.selection_hash)
+                        expected_binding = (parent.raw_hash, parent.document_version, selected.boundary_decision.selection_hash)
+                    if binding != expected_binding:
                         raise IngestionFailure("projection_rights_receipt_invalid")
                 elif (not isinstance(rights, dict) or rights.get("bodySha256") != raw_record["raw_hash"]
                         or rights.get("license") != "KOGL-type-1-text-only"
@@ -426,7 +442,9 @@ class Ingestor:
                     raise IngestionFailure("projection_rights_receipt_invalid")
             if scope.text_projection is not None:
                 parsed = parsers.prepare(raw, item.media_type, scope.article_xpath, projection=projection,
-                    pdf_member=member, pdf_rights=rights if member is not None else None)
+                    pdf_member=member if isinstance(projection, PdfBodyProjection) else None,
+                    pdf_rights=rights if isinstance(projection, PdfBodyProjection) else None,
+                    html_member=member if isinstance(projection, HtmlBodyProjection) else None)
             elif item.private is not None and item.private.record_schema == "zoop-official-source-record-1":
                 parsed = parsers.prepare(raw, item.media_type, scope.article_xpath, retained_schema=item.private.record_schema)
             else:
