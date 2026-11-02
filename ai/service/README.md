@@ -69,6 +69,8 @@ ai/service/.venv/bin/python -m zoop_ai_service.main   # 또는 zoop-ai-service (
 
 서버는 매 요청에서 설치된 `zoop-ai-ingest export --require-store`만 실행합니다. CLI가 현재 `read`·`store`·`quote-display`, 고정된 source 설정과 관측 버전을 검사하며, 서비스는 응답의 selector 일치, 본문의 `sourceHash`, document version과 locator hash를 검증합니다. 성공 응답은 **CLI의 정확한 JSON**이며 `document.text`, locator와 선택적 publisher·language·collection 필드를 보존합니다. `language`는 native가 선언한 2~35자 문자열만 받고, 미지정 필드는 추가하지 않습니다. 별도 wrapper나 상태 조회 경로는 없습니다. 한 요청은 관측 하나를 동기 200으로 돌려주며, 묶음 조회와 비동기(202) 전달은 #407에서 정할 열린 항목입니다. 요청은 2,000,000바이트, stdout·응답은 16 MiB, child 실행은 45초, 동시 export는 2개로 제한합니다. 모든 응답에 `Cache-Control: no-store`가 붙습니다.
 
+`locatorMetadata.parserProfile.textProjection`과 `locatorMetadata.textProjection`은 선택적이며 함께 제공됩니다. HTML의 `korea-kogl1-caption-boundary-1`은 제외된 DOM text/tail slot을, PDF의 `eu-commission-pdf-body-ranges-1`은 보존한 페이지·원문 범위와 review unit을 닫힌 타입으로 검증합니다. descriptor·권리 영수증 hash, 부모 문서 버전, boundary revision을 그대로 보존하며 PDF selection hash와 범위 순서·부모 신원도 검사합니다. 영수증은 hash로만 전달하고 파일 경로나 내용은 응답 계약에 포함하지 않습니다. projection이 없는 기존 응답은 원래 필드와 document version 계산식을 유지합니다.
+
 여러 context에서는 전체 7-field selector에 정확히 대응하는 원장 하나만 읽습니다. 다른 원장을 검색해 대신 제공하지 않습니다. 중복 route는 시작 때 거절하고, 파일 hash를 export 전후에 다시 확인합니다. 현재 registry 내용은 inventory hash에 고정하지 않으므로 권리 철회는 다음 조회부터 적용됩니다.
 
 | 결과 | HTTP |
