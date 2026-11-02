@@ -1447,6 +1447,17 @@ function MapWorkspace({
                   context={round || tutorialOpen ? eventContext : undefined}
                   fallback={companyNode}
                   relatedCompanies={relatedCompanies}
+                  graph={data}
+                  focusId={focusId}
+                  onIssueEvidence={(issue) =>
+                    useGraphUiStore.getState().openEvidence({
+                      kind: 'issue',
+                      id: issue.id,
+                      label: issue.title,
+                      evidenceIds: issue.evidenceIds,
+                      mapContext: { ...eventContext, url: `/?${params}` },
+                    })
+                  }
                   token={token}
                   watchSync={watchSync}
                   onWatchSaved={watchSaved}

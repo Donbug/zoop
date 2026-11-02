@@ -14,6 +14,8 @@ export type CompanyIssue = {
   eventTime: string | null;
   /** API CompanyIssueRef.timePrecision. 예전 응답·mock에는 없을 수 있다. */
   timePrecision?: TimePrecision | null;
+  /** API CompanyIssueRef.role: 기업이 사건에서 맡은 역할의 표시 이름. 없으면 null·생략. */
+  role?: string | null;
   evidenceCount: number;
 };
 
