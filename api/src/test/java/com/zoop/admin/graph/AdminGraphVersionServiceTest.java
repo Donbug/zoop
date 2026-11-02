@@ -20,6 +20,7 @@ import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.document.evidence.graph.GraphEvidence;
 import com.zoop.document.evidence.service.EvidenceService;
+import com.zoop.graph.exclusion.DisclosureExclusionCarry;
 import com.zoop.graph.publication.GraphPublicationAuthority;
 import com.zoop.graph.publication.GraphPublicationReader;
 import com.zoop.graph.publication.GraphPublicationReader.Contribution;
@@ -48,6 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -71,6 +73,7 @@ class AdminGraphVersionServiceTest {
     @Mock GraphPublicationReader publications;
     @Mock GraphPublicationAuthority authority;
     @Mock AdminAuditRepository audit;
+    @Mock DisclosureExclusionCarry carry;
 
     @Test
     void importedVersionIsCheckedUnderTheLockAndAuditedAtTheActivationTime() {
@@ -556,7 +559,108 @@ class AdminGraphVersionServiceTest {
         org.mockito.Mockito.lenient()
                 .doAnswer(invocation -> exclusions.current(invocation.<Publication>getArgument(0).versionId()))
                 .when(authority).current(any(), anyString());
-        return new AdminGraphVersionService(repository, versions, snapshots, exclusions, evidence, publications, authority,
-                audit, JsonMapper.builder().build(), Clock.fixed(NOW, ZoneOffset.UTC), allowWithoutStore, snapshotSource);
+        return new AdminGraphVersionService(repository, versions, snapshots, exclusions, carry, evidence, publications,
+                authority, audit, JsonMapper.builder().build(), Clock.fixed(NOW, ZoneOffset.UTC), allowWithoutStore,
+                snapshotSource);
+    }
+
+    // ---- the carry of the public version's exclusions (#55 A-14) -----------------------------------------------------------
+
+    @Test
+    void anActivationCarriesThePublicVersionsExclusionsBeforeItReadsTheNewOverlay() {
+        claim("gv-1", ACTIVE, "go live");
+        when(versions.find("gv-1")).thenReturn(Optional.of(IMPORTED));
+        when(versions.active()).thenReturn(Optional.of(new GraphVersionRecord(ACTIVE, 2, "snapshot", "artifact-active",
+                "artifact://active.json", "c".repeat(64), true)));
+        when(snapshots.load(IMPORTED)).thenReturn(fixtureSnapshot());
+        activating("gv-1", ACTIVE, "go live", new Activation(ACTIVE, true, LATER));
+        when(evidence.prepareGraphActivation(eq("gv-1"), anyMap(), eq("r"))).thenReturn(at -> { });
+        List<String> order = new java.util.ArrayList<>();
+        when(carry.carry(List.of(ACTIVE), List.of("gv-1"), "admin:admin-1")).thenAnswer(invocation -> {
+            order.add("carry");
+            return 3;
+        });
+        DisclosureExclusionReader reads = pinned -> {
+            order.add("read " + pinned);
+            return DisclosureExclusions.NONE;
+        };
+
+        service(reads, false).activate("gv-1", request("go live", ACTIVE), "key-1", ADMIN, "r");
+
+        assertEquals(List.of("carry", "read gv-1"), order, "carried first, so the pre-activation checks see the carried targets");
+    }
+
+    @Test
+    void aFixtureInBetweenDoesNotCutTheChainTheLastPublicImportedVersionIsTheBaseThen() {
+        when(versions.active()).thenReturn(Optional.of(new GraphVersionRecord(ACTIVE, 2, "fixture", "artifact-active",
+                "classpath:a", "c".repeat(64), true)));
+        when(versions.lastActivatedImported()).thenReturn(Optional.of("gv-0"));
+        when(snapshots.load(IMPORTED)).thenReturn(fixtureSnapshot());
+        when(evidence.prepareGraphActivation(eq("gv-1"), anyMap(), eq("auto-1"))).thenReturn(at -> { });
+        when(versions.activateBySystem(eq("gv-1"), eq(ACTIVE), eq(NOW), eq(AdminGraphVersionService.AUTO_REASON), any()))
+                .thenAnswer(invocation -> {
+                    invocation.<Supplier<Consumer<Instant>>>getArgument(4).get().accept(LATER);
+                    return Optional.of(new Activation(ACTIVE, true, LATER));
+                });
+
+        service(storeExists(), false, "artifact").activateImported(IMPORTED, NOW, "auto-1");
+
+        verify(carry).carry(List.of("gv-0"), List.of("gv-1"), "system");
+    }
+
+    @Test
+    void aCumulativePublicationCarriesBetweenOriginalVersionsNeverToItsOwnId() {
+        when(versions.active()).thenReturn(Optional.of(new GraphVersionRecord(ACTIVE, 2, "snapshot", "artifact-active",
+                "artifact://active.json", "c".repeat(64), true)));
+        when(snapshots.load(IMPORTED)).thenReturn(fixtureSnapshot());
+        when(evidence.prepareGraphActivation(eq("gv-1"), anyMap(), eq("auto-1"))).thenReturn(at -> { });
+        when(versions.activateBySystem(eq("gv-1"), eq(ACTIVE), eq(NOW), eq(AdminGraphVersionService.AUTO_REASON), any()))
+                .thenAnswer(invocation -> {
+                    invocation.<Supplier<Consumer<Instant>>>getArgument(4).get().accept(LATER);
+                    return Optional.of(new Activation(ACTIVE, true, LATER));
+                });
+        AdminGraphVersionService service = service(storeExists(), false, "artifact");
+        when(publications.read(ACTIVE)).thenReturn(composed(ACTIVE, "gv-legacy", "gv-native-1"));
+        when(publications.read("gv-1")).thenReturn(composed("gv-1", "gv-legacy", "gv-native-1", "gv-native-2"));
+
+        service.activateImported(IMPORTED, NOW, "auto-1");
+
+        // The base's sources and the target's sources, as original versions: the carry writes only to gv-native-2.
+        verify(carry).carry(List.of("gv-legacy", "gv-native-1"), List.of("gv-legacy", "gv-native-1", "gv-native-2"), "system");
+    }
+
+    private static Publication composed(String versionId, String... sources) {
+        var snapshot = fixtureSnapshot();
+        List<Contribution> contributions = java.util.Arrays.stream(sources)
+                .map(source -> new Contribution(source, "source-" + source, "native", null, null, snapshot, null)).toList();
+        return new Publication(versionId, "pub-" + versionId, null, null, null, null, null, snapshot, contributions, null,
+                Map.of(), Map.of());
+    }
+
+    @Test
+    void theSystemActivationCarriesUnderItsOwnActorAndAFixtureOrAMissingStoreCarriesNothing() {
+        when(versions.active()).thenReturn(Optional.of(new GraphVersionRecord(ACTIVE, 2, "snapshot", "artifact-active",
+                "artifact://active.json", "c".repeat(64), true)));
+        when(snapshots.load(IMPORTED)).thenReturn(fixtureSnapshot());
+        when(evidence.prepareGraphActivation(eq("gv-1"), anyMap(), eq("auto-1"))).thenReturn(at -> { });
+        when(versions.activateBySystem(eq("gv-1"), eq(ACTIVE), eq(NOW), eq(AdminGraphVersionService.AUTO_REASON), any()))
+                .thenAnswer(invocation -> {
+                    invocation.<Supplier<Consumer<Instant>>>getArgument(4).get().accept(LATER);
+                    return Optional.of(new Activation(ACTIVE, true, LATER));
+                });
+        service(storeExists(), false, "artifact").activateImported(IMPORTED, NOW, "auto-1");
+        verify(carry).carry(List.of(ACTIVE), List.of("gv-1"), "system");
+
+        // Without a store (operator opt-in) there is nothing to carry from or to.
+        service(noStore(), true, "artifact").activateImported(IMPORTED, NOW, "auto-1");
+        verify(carry, times(1)).carry(any(), any(), any());
+
+        // A fixture gets no rights checks and no carry.
+        claim("fixture-2026-10-01", ACTIVE, "rollback");
+        when(versions.find("fixture-2026-10-01")).thenReturn(Optional.of(FIXTURE));
+        when(snapshots.load(FIXTURE)).thenReturn(fixtureSnapshot());
+        activating("fixture-2026-10-01", ACTIVE, "rollback", new Activation(ACTIVE, true, LATER));
+        service(storeExists(), false).activate("fixture-2026-10-01", request("rollback", ACTIVE), "key-1", ADMIN, "r");
+        verify(carry, times(1)).carry(any(), any(), any());
     }
 }

@@ -3,6 +3,8 @@ package com.zoop.graph.config;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.artifact.storage.ArtifactStoreException;
 import com.zoop.document.repository.DocumentRegistryRepository;
+import com.zoop.graph.exclusion.DisclosureExclusionCarry;
+import com.zoop.graph.exclusion.JdbcDisclosureExclusionRepository;
 import com.zoop.graph.read.DisclosureExclusionReader;
 import com.zoop.graph.read.JdbcDisclosureExclusionReader;
 import com.zoop.graph.snapshot.ArtifactGraphSnapshotStore;
@@ -76,6 +78,20 @@ public class GraphSnapshotConfiguration {
     @ConditionalOnMissingBean(DisclosureExclusionReader.class)
     DisclosureExclusionReader disclosureExclusions(NamedParameterJdbcTemplate jdbc) {
         return new JdbcDisclosureExclusionReader(jdbc);
+    }
+
+    /** The store's write side, shared by the activation's carry and the operator exclusion command. */
+    @Bean
+    @ConditionalOnMissingBean(JdbcDisclosureExclusionRepository.class)
+    JdbcDisclosureExclusionRepository disclosureExclusionRepository(NamedParameterJdbcTemplate jdbc) {
+        return new JdbcDisclosureExclusionRepository(jdbc);
+    }
+
+    /** The activation's carry of the public version's exclusions to the next one (#55 A-14), over the same store. */
+    @Bean
+    @ConditionalOnMissingBean(DisclosureExclusionCarry.class)
+    DisclosureExclusionCarry disclosureExclusionCarry(JdbcDisclosureExclusionRepository repository) {
+        return new DisclosureExclusionCarry(repository);
     }
 
     /** No source configured: a registered version cannot be read, which is 503 and never an empty graph. */

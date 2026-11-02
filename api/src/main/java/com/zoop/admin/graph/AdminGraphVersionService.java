@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -23,6 +24,7 @@ import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
 import com.zoop.document.evidence.graph.GraphEvidence;
 import com.zoop.document.evidence.service.EvidenceService;
+import com.zoop.graph.exclusion.DisclosureExclusionCarry;
 import com.zoop.graph.publication.GraphPublicationAuthority;
 import com.zoop.graph.publication.GraphPublicationReader;
 import com.zoop.graph.publication.PublicationException;
@@ -63,6 +65,7 @@ public class AdminGraphVersionService {
     private final JdbcGraphVersionRepository versions;
     private final GraphSnapshotStore snapshots;
     private final DisclosureExclusionReader exclusions;
+    private final DisclosureExclusionCarry carry;
     private final EvidenceService evidence;
     private final GraphPublicationReader publications;
     private final GraphPublicationAuthority authority;
@@ -73,8 +76,8 @@ public class AdminGraphVersionService {
     private final String snapshotSource;
 
     public AdminGraphVersionService(JdbcAdminGraphVersionRepository repository, JdbcGraphVersionRepository versions,
-            GraphSnapshotStore snapshots, DisclosureExclusionReader exclusions, EvidenceService evidence,
-            GraphPublicationReader publications, GraphPublicationAuthority authority,
+            GraphSnapshotStore snapshots, DisclosureExclusionReader exclusions, DisclosureExclusionCarry carry,
+            EvidenceService evidence, GraphPublicationReader publications, GraphPublicationAuthority authority,
             AdminAuditRepository audit, ObjectMapper mapper, Clock clock,
             @Value("${zoop.graph.activation.allow-without-exclusion-store:false}") boolean allowWithoutExclusionStore,
             @Value("${zoop.graph.snapshot.source:none}") String snapshotSource) {
@@ -82,6 +85,7 @@ public class AdminGraphVersionService {
         this.versions = versions;
         this.snapshots = snapshots;
         this.exclusions = exclusions;
+        this.carry = carry;
         this.evidence = evidence;
         this.publications = publications;
         this.authority = authority;
@@ -164,7 +168,7 @@ public class AdminGraphVersionService {
             refuseFixtureOutsideFixtureSource(version, requestId);
             PublicGraphSnapshot snapshot = snapshots.load(version);
             var activation = versions.activateByAdmin(versionId, expected, admin.adminId(), admin.email(), reason,
-                    request.mode(), () -> publishableNow(version, snapshot, requestId));
+                    request.mode(), () -> publishableNow(version, snapshot, "admin:" + admin.adminId(), requestId));
             audit.recordGraphActivation(admin.adminId(), admin.email(), versionId, activation.previousVersionId(),
                     activation.pointerChanged(), reason, request.mode(), requestId, activation.activatedAt());
             ActivateResponse result = new ActivateResponse(versionId, activation.previousVersionId(),
@@ -197,7 +201,7 @@ public class AdminGraphVersionService {
             String expected = versions.active().map(GraphVersionRecord::id).orElse(null);
             PublicGraphSnapshot snapshot = snapshots.load(candidate);
             return versions.activateBySystem(candidate.id(), expected, since, AUTO_REASON,
-                    () -> publishableNow(candidate, snapshot, requestId));
+                    () -> publishableNow(candidate, snapshot, "system", requestId));
         } catch (DataAccessException exception) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
         }
@@ -220,18 +224,37 @@ public class AdminGraphVersionService {
      * Runs under the publication lock, before the pointer moves (graph read contract section 0: current rights, exclusions and
      * read readiness right before the switch). Fixtures carry no rights and no stored evidence (and were already refused
      * outside the fixture source), so only imported versions get the rights checks.
-     * Without an exclusion store "nothing excluded" is unknown: refused unless the operator opted in. Returns the last check,
+     * Without an exclusion store "nothing excluded" is unknown: refused unless the operator opted in. With one, the exclusions
+     * of the version public until now are first carried to this version (#55 A-14, {@link DisclosureExclusionCarry}), so the
+     * overlay read next already holds them and a refusal below rolls them back. Returns the last check,
      * which the repository runs at the activation time: grant pins are judged at the moment the version becomes public.
      */
-    private Consumer<Instant> publishableNow(GraphVersionRecord version, PublicGraphSnapshot snapshot, String requestId) {
+    private Consumer<Instant> publishableNow(GraphVersionRecord version, PublicGraphSnapshot snapshot, String activatedBy,
+            String requestId) {
         if (!IMPORTED.equals(version.kind())) return at -> { };
-        if (!exclusions.authoritative() && !allowWithoutExclusionStore) {
-            log.info("Graph activation refused (graphVersion={}, reason=exclusion_store_unavailable, requestId={})",
-                    version.id(), requestId);
-            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        if (!exclusions.authoritative()) {
+            if (!allowWithoutExclusionStore) {
+                log.info("Graph activation refused (graphVersion={}, reason=exclusion_store_unavailable, requestId={})",
+                        version.id(), requestId);
+                throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            }
         }
         try {
             var publication = publications.read(version.id());
+            if (exclusions.authoritative()) {
+                // The version public until now; when that is a synthetic fixture (a dev rollback), the imported version public
+                // before it, so the chain of exclusions is not cut by a fixture in between. Its exclusions belong to its
+                // original versions, and so do the carried copies (never the cumulative publication's own id).
+                String base = versions.active().filter(active -> IMPORTED.equals(active.kind())).map(GraphVersionRecord::id)
+                        .or(versions::lastActivatedImported).orElse(null);
+                if (base != null && !base.equals(version.id())) {
+                    int carried = carry.carry(sources(publications.read(base)), sources(publication), activatedBy);
+                    if (carried > 0) {
+                        log.info("Graph activation carried {} exclusion targets (graphVersion={}, from={}, requestId={})",
+                                carried, version.id(), base, requestId);
+                    }
+                }
+            }
             Set<String> articles = new TreeSet<>();
             for (var contribution : publication.contributions()) {
                 for (var article : contribution.projection().articles()) articles.add(article.articleId());
@@ -257,6 +280,11 @@ public class AdminGraphVersionService {
         } catch (PublicationException exception) {
             throw publicationFailure(exception);
         }
+    }
+
+    /** The original versions a version's read retains, in contribution order: the version itself when it is not composed. */
+    private static List<String> sources(GraphPublicationReader.Publication publication) {
+        return publication.contributions().stream().map(GraphPublicationReader.Contribution::sourceVersionId).toList();
     }
 
     private static CustomException publicationFailure(PublicationException exception) {

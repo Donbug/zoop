@@ -25,7 +25,7 @@ import tools.jackson.databind.JsonNode;
  * whole. Nothing is read from the AI side here: the report is the operator's input. An {@code exclude-query} names the change and
  * the versions instead, and the command reads the report from the AI service ({@link #report(JsonNode)} checks it the same way).
  * {@code requestId} names the command (a re-run of the same request returns the recorded result); a {@code lift} also names the
- * {@code expectedRevision} it was decided on.
+ * {@code expectedRevision} it was decided on and may ask for {@code laterVersions} (optional boolean, default false).
  */
 public final class ExclusionRequestParser {
     public static final String SCHEMA_VERSION = "zoop-disclosure-exclusion-1";
@@ -74,8 +74,8 @@ public final class ExclusionRequestParser {
                         match(DIGEST, root.string("receiptSha256")), targets);
             }
             if ("lift".equals(action)) {
-                root.exactly(Set.of("schemaVersion", "requestId", "action", "operator", "reason", "graphVersionId",
-                        "expectedRevision", "targets"));
+                root.keys(Set.of("schemaVersion", "requestId", "action", "operator", "reason", "graphVersionId",
+                        "expectedRevision", "targets"), Set.of("laterVersions"));
                 List<Target> targets = new ArrayList<>();
                 for (Obj target : root.objects("targets")) {
                     targets.add(target(target));
@@ -83,8 +83,9 @@ public final class ExclusionRequestParser {
                 if (targets.isEmpty() || targets.size() > MAX_LIFT_TARGETS || new LinkedHashSet<>(targets).size() != targets.size()) {
                     throw new StrictJson.Malformed();
                 }
+                boolean laterVersions = root.has("laterVersions") && root.bool("laterVersions");
                 return new Lift(requestId, Canonical.digest(root.node()), operator, reason, id(root.string("graphVersionId")),
-                        root.count("expectedRevision"), targets);
+                        root.count("expectedRevision"), targets, laterVersions);
             }
             if ("exclude-query".equals(action)) {
                 root.exactly(Set.of("schemaVersion", "requestId", "action", "operator", "reason", "changed", "graphVersionIds"));

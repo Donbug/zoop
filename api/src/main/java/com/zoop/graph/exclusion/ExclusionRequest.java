@@ -49,10 +49,11 @@ public sealed interface ExclusionRequest {
 
     /**
      * Lifts these targets of one version: the only way an exclusion ends (an empty or smaller report never lifts). Refused when a
-     * target changed after {@code expectedRevision}, the exclusion revision the operator decided on.
+     * target changed after {@code expectedRevision}, the exclusion revision the operator decided on. {@code laterVersions} lifts
+     * the same targets in every imported version after {@code graphVersionId} too (default false: the named version only).
      */
     record Lift(String requestId, String requestSha256, String operator, String reason, String graphVersionId,
-            long expectedRevision, List<Target> targets) implements ExclusionRequest {
+            long expectedRevision, List<Target> targets, boolean laterVersions) implements ExclusionRequest {
         public Lift {
             targets = List.copyOf(targets);
         }
