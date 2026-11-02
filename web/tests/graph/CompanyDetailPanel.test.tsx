@@ -523,8 +523,14 @@ describe('D-GRP-03 prototype company panel gaps (M1-M7, M9)', () => {
   });
 
   it('M3 shows the role and opens the evidence the map has for the issue', async () => {
-    const [first, ...rest] = company.directIssues;
-    withCompany({ directIssues: [{ ...first, role: '공급사' }, ...rest] });
+    const [first, second, ...rest] = company.directIssues;
+    withCompany({
+      directIssues: [
+        { ...first, role: '공급사' },
+        { ...second, role: 'participant' },
+        ...rest,
+      ],
+    });
     const onIssueEvidence = vi.fn();
     renderWith({
       onIssueEvidence,
@@ -538,6 +544,7 @@ describe('D-GRP-03 prototype company panel gaps (M1-M7, M9)', () => {
     });
     const direct = sectionOf('직접 관련 사건');
     expect(direct.getByText('역할 · 공급사')).toBeTruthy();
+    expect(direct.getByText('역할 · 참여 기업')).toBeTruthy();
     await userEvent.click(
       direct.getByRole('button', { name: '근거 2건 보기' }),
     );

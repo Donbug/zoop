@@ -290,7 +290,11 @@ export default function CompanyDetailPanel(props: Props) {
             {indirect ? `${time} · ${issue.why}` : time}
             {issue.evidenceCount !== null && ` · 근거 ${issue.evidenceCount}건`}
           </span>
-          {issue.role && <span>역할 · {issue.role}</span>}
+          {issue.role && (
+            <span>
+              역할 · {issue.role === 'participant' ? '참여 기업' : issue.role}
+            </span>
+          )}
         </button>
         {evidenceIds.length > 0 && (
           <div className="px-3 pb-2">
