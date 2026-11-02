@@ -133,21 +133,25 @@ export default function PriceChart({
 
   return (
     <figure className="flex flex-col gap-1">
-      {pointed && (
-        <p className="text-caption tabular-nums" aria-live="off">
-          <time dateTime={pointed.time}>{formatKst(pointed.time)}</time> · 종가{' '}
-          {currency
-            ? formatMoney(pointed.close, currency)
-            : won.format(pointed.close)}
-        </p>
-      )}
+      {/* The pointer row keeps its height so the chart never moves under the pointer. */}
+      <p className="min-h-7 text-caption tabular-nums" aria-live="off">
+        {pointed && (
+          <>
+            <time dateTime={pointed.time}>{formatKst(pointed.time)}</time> ·
+            종가{' '}
+            {currency
+              ? formatMoney(pointed.close, currency)
+              : won.format(pointed.close)}
+          </>
+        )}
+      </p>
       {period === '1d' && suppliedRange?.sessionDate && (
         <p className="text-caption text-zoop-muted">
           {suppliedRange.sessionDate} 장 · 거래소 현지 거래일 · 시간 표시는 KST
         </p>
       )}
       <svg
-        className="h-auto w-full"
+        className="h-auto w-full touch-pan-y"
         viewBox="0 0 600 205"
         role="group"
         aria-label="공급된 종가 차트"
