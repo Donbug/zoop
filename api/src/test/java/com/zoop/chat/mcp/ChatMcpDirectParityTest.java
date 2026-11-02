@@ -11,11 +11,15 @@ import com.zoop.chat.executor.MemoryChatStore;
 import com.zoop.chat.executor.NoChatTransactions;
 import com.zoop.chat.model.ChatEvalSetTest;
 import com.zoop.chat.repository.ChatJobRow;
+import com.zoop.chat.service.ChatZoopDocs;
 import com.zoop.chat.tool.ChatCapability;
+import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRequest;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.chat.tool.ChatToolRunner;
 import com.zoop.chat.tool.ChatToolRunners;
+import com.zoop.chat.tool.HelpSearchTool;
+import com.zoop.chat.tool.ScreenSpecReadTool;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.spec.McpSchema;
 import java.nio.file.Path;
@@ -25,6 +29,7 @@ import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +69,10 @@ class ChatMcpDirectParityTest {
 
     @BeforeEach
     void setUp() {
-        var registry = ChatEvalSetTest.world().registry();
+        use(ChatEvalSetTest.world().registry());
+    }
+
+    private void use(ChatToolRegistry registry) {
         store = new MemoryChatStore();
         runner = ChatToolRunners.withAmpleTime(registry);
         executor = new ChatJobExecutor(store, store,
@@ -127,8 +135,7 @@ class ChatMcpDirectParityTest {
                 Arguments.of(ChatCapability.ISSUE_READ, List.of(ISSUE)),
                 Arguments.of(ChatCapability.ISSUE_READ, List.of(HYNIX)),
                 Arguments.of(ChatCapability.EVIDENCE_RESOLVE, List.of(EVIDENCE)),
-                Arguments.of(ChatCapability.GRAPH_PATH_READ, List.of(NVIDIA, HYNIX)),
-                Arguments.of(ChatCapability.DOCUMENT_SEARCH, List.of(HYNIX)));
+                Arguments.of(ChatCapability.GRAPH_PATH_READ, List.of(NVIDIA, HYNIX)));
     }
 
     @ParameterizedTest
@@ -208,6 +215,32 @@ class ChatMcpDirectParityTest {
 
         assertSameRead(direct("job-direct1", new ChatToolRequest(policy.id(), policy.documents(), LIMIT)),
                 viaMcp("job-mcp0001", policy, Map.of()));
+    }
+
+    @Test
+    void theApprovedHelpAndScreenDocumentsAreTheSameOnBothPaths() {
+        var docs = new ChatZoopDocs(null, clock) {
+            @Override
+            public Optional<Document> inEffect(String docId, Instant asOf) {
+                String evidenceId = "ev-" + (HELP_GUIDE.equals(docId) ? "a" : "b").repeat(64);
+                return Optional.of(new Document(docId, "synthetic-v1", "합성 승인 문서", List.of(new Quote(evidenceId, docId,
+                        "synthetic-v1", "합성 승인 문서 · 사용법", "## 사용법\n\n합성 본문입니다.", 0, 16))));
+            }
+        };
+        runner.close();
+        use(ChatEvalSetTest.world().registryWith(new HelpSearchTool(docs), new ScreenSpecReadTool(docs)));
+        int job = 0;
+        for (var document : List.of(ChatCapability.HELP_SEARCH, ChatCapability.SCREEN_SPEC_READ)) {
+            String directJob = "job-direct" + job;
+            String mcpJob = "job-mcp000" + job++;
+            running(directJob, NO_SELECTION);
+            running(mcpJob, NO_SELECTION);
+            assertTrue(tools.exposed().contains(document), document.id());
+
+            var direct = direct(directJob, new ChatToolRequest(document.id(), document.documents(), LIMIT));
+            assertSameRead(direct, viaMcp(mcpJob, document, Map.of()));
+            assertEquals(1, direct.evidenceIds().size());
+        }
     }
 
     @Test

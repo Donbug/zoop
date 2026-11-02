@@ -202,7 +202,7 @@ export default function MarketSummary({
                 {analysis.forecastEvaluations.map((evaluation) => (
                   <li
                     key={evaluation.evaluationId}
-                    className="rounded-[3px] bg-zoop-wash p-3"
+                    className="rounded-md bg-zoop-card p-3"
                   >
                     <TargetBasis target={evaluation.target} />
                     {evaluation.status === 'evaluated' &&

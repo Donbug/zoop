@@ -6,6 +6,8 @@ import { useAsyncData } from '@/hooks/useAsyncData';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import { briefingTime } from '@/util/briefingTime';
 import { EMPTY, FOCUS_RING, NOTE } from './briefingStyles';
+import PersonalAiJudgment from './PersonalAiJudgment';
+import { personalAiOverview } from '@/util/personalAiOverview';
 
 /** D-BRF-01/02: personal candidates have their own evidence, not shared-publication feedback/detail IDs. */
 export default function PersonalizedIssueSelection({
@@ -68,10 +70,17 @@ export default function PersonalizedIssueSelection({
     );
   const result = query.data;
   if (!result) return null;
+  const ai =
+    result.aiAnalysis?.status === 'available' &&
+    result.aiAnalysis.roundId === roundId &&
+    Date.parse(result.aiAnalysis.cutoff) === Date.parse(dataAsOf ?? '')
+      ? result.aiAnalysis
+      : null;
+  const overview = ai ? personalAiOverview(ai, result.edition) : null;
   return (
     <section
       aria-label="내 종목 핵심 이슈"
-      className="my-6 space-y-4 border-b border-zoop-line pb-6"
+      className="my-6 space-y-4 border-b border-zoop-border pb-6"
     >
       <div>
         <h2 className="text-lg font-bold">내 종목 핵심 이슈</h2>
@@ -93,6 +102,22 @@ export default function PersonalizedIssueSelection({
           </p>
         )}
       </div>
+      {ai && (
+        <div className="rounded-panel bg-zoop-card p-4">
+          <p className="text-sm font-semibold">내 종목 영향 요약</p>
+          <p className="mt-2 text-sm leading-relaxed">{overview?.text}</p>
+          {overview?.comparisonNote && (
+            <p className={`${NOTE} mt-2`}>{overview.comparisonNote}</p>
+          )}
+        </div>
+      )}
+      {result.aiAnalysis?.status === 'unavailable' &&
+        result.items.length > 0 && (
+          <p className={NOTE}>
+            현재 종목 기준의 새 AI 설명은 아직 제공되지 않습니다. 아래에서
+            확인된 선정·연결 근거를 볼 수 있어요.
+          </p>
+        )}
       {result.status !== 'available' && (
         <p role="status" className={EMPTY}>
           {result.message}
@@ -115,7 +140,7 @@ export default function PersonalizedIssueSelection({
       {result.items.map((item, i) => (
         <article
           key={item.issueId}
-          className="rounded-panel border border-panel-line p-4"
+          className="rounded-panel border border-zoop-border p-4"
         >
           <p className={NOTE}>관련 이슈 {i + 1}</p>
           <h3 className="mt-1 text-base font-bold">{item.title}</h3>
@@ -140,6 +165,19 @@ export default function PersonalizedIssueSelection({
               </li>
             ))}
           </ul>
+          {ai &&
+            item.matches.map((match) => {
+              const value =
+                ai.draft.issues[item.issueId]?.companies[match.companyId];
+              return value ? (
+                <PersonalAiJudgment
+                  key={match.companyId}
+                  name={match.name}
+                  kinds={match.kinds}
+                  value={value}
+                />
+              ) : null;
+            })}
           <details className="mt-3">
             <summary
               className={`cursor-pointer text-sm font-semibold ${FOCUS_RING}`}
@@ -158,7 +196,7 @@ export default function PersonalizedIssueSelection({
             {item.sources.map((s) => (
               <blockquote
                 key={s.evidenceId}
-                className="mt-3 border-l-2 border-panel-line pl-3 text-sm"
+                className="mt-3 border-l-2 border-zoop-border pl-3 text-sm"
               >
                 {s.quote}
                 <p className={NOTE}>
@@ -197,16 +235,32 @@ export default function PersonalizedIssueSelection({
         {result.tracking.map((t) => (
           <div
             key={`${t.issueId}:${t.companyId}`}
-            className="mt-3 border-t border-panel-line pt-3 text-sm"
+            className="mt-3 border-t border-zoop-border pt-3 text-sm"
           >
             <strong>
               {t.title} · {t.companyName}
             </strong>
             <p>{t.message}</p>
-            {t.nextCheck && <p>기존 확인사항: {t.nextCheck}</p>}
+            {t.personalAiNextCheck ? (
+              <p>개인화 분석의 확인사항: {t.personalAiNextCheck}</p>
+            ) : t.nextCheck ? (
+              <p>기존 확인사항: {t.nextCheck}</p>
+            ) : null}
           </div>
         ))}
       </details>
+      {ai && (
+        <details>
+          <summary className="cursor-pointer text-xs text-zoop-muted">
+            AI 분석 기준
+          </summary>
+          <p className={NOTE}>
+            선정된 이슈·연결 기업·저장 시세로 새로 작성하고 별도 AI 요청에서
+            근거를 대조한 설명입니다. {ai.model} · {ai.promptVersion} ·{' '}
+            {briefingTime(ai.generatedAt)}
+          </p>
+        </details>
+      )}
       <p className={NOTE}>
         아래 공통 브리핑의 시세·원문·평가는 그대로 유지됩니다.
       </p>

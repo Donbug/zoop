@@ -199,14 +199,16 @@ public class ChatToolRunner implements AutoCloseable {
         if (!run.jobId().equals(kept.jobId()) || !run.memberId().equals(kept.memberId())
                 || run.attemptNo() != kept.attemptNo()) throw invalidKept();
         var meta = StrictJson.parseObject(kept.requestMeta()).keys(
-                Set.of("via", "targets", "limit", "graphVersion", "asOf"), Set.of("evidenceScope", "since", "requirementIds"));
+                Set.of("via", "targets", "limit", "graphVersion", "asOf"),
+                Set.of("evidenceScope", "since", "searchText", "requirementIds"));
         if (!"mcp".equals(meta.string("via"))
                 || !Objects.equals(run.graphVersionId(), meta.stringOrNull("graphVersion"))
                 || !Objects.equals(run.context().asOf() == null ? null : run.context().asOf().toString(),
                         meta.stringOrNull("asOf"))) throw invalidKept();
         ChatToolRequest query = new ChatToolRequest(kept.capabilityId(), meta.strings("targets"), meta.count("limit"),
                 meta.has("evidenceScope") ? meta.strings("evidenceScope") : null,
-                meta.has("since") ? Instant.parse(meta.string("since")) : null);
+                meta.has("since") ? Instant.parse(meta.string("since")) : null,
+                meta.has("searchText") ? meta.string("searchText") : null);
         if (!reservation(run, query, "mcp").inputDigest().equals(kept.inputDigest())) throw invalidKept();
         var result = StrictJson.parseObject(kept.result()).keys(Set.of("schemaVersion", "toolCallId", "capabilityId",
                 "dataVersion", "items", "evidenceIds", "truncated", "nextAllowed", "error"),
@@ -501,6 +503,7 @@ public class ChatToolRunner implements AutoCloseable {
             call.evidenceScope().forEach(evidence::add);
         }
         if (call.since() != null) meta.put("since", call.since().toString());
+        if (call.searchText() != null) meta.put("searchText", call.searchText());
         ObjectNode input = StrictJson.newObject();
         input.put("capabilityId", binding.capability().id());
         input.set("request", meta);

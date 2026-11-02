@@ -5,7 +5,9 @@ import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.executor.ChatRunSuperseded;
 import com.zoop.chat.orchestrator.ChatAgentPath;
+import com.zoop.chat.orchestrator.ChatCitationSource;
 import com.zoop.chat.orchestrator.ChatModels;
+import com.zoop.chat.orchestrator.ChatWebDemand;
 import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.chat.repository.ChatKeptToolResult;
 import com.zoop.chat.tool.ChatCapability;
@@ -13,6 +15,7 @@ import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolPath;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.chat.tool.ChatToolRunner;
+import com.zoop.chat.tool.ChatToolUnavailable;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -39,8 +42,11 @@ import tools.jackson.databind.json.JsonMapper;
  * <li>A web search (web search design 1 and 2) names a query, not ids, so reachability does not apply. It is approved when
  * the web is open for every requirement it names. A requirement the web may not serve (a service rule, Q01) never opens it. A
  * general requirement (Q02) has one search from the first round: the web is a concept's first support. Any other requirement
- * has it from a round after an approved internal read serving it came back empty or cut: the web is the last resort of what
- * ZOOP's own data left unmet, never the first look, and another requirement's gap opens nothing. Its query must pass
+ * has it from a round after an approved internal read serving it came back empty or cut, or after any such read when its own
+ * words ask for a source outside ZOOP: the web is the last resort of what ZOOP's own data left unmet, never the first look,
+ * and another requirement's gap opens nothing. A read cut by the send grant is no gap: no search stands in for what was
+ * refused. A requirement the server's own reads already left unmet ({@link ChatModels.AgentRequirement#readByServer}) has it
+ * from the first round. Its query must pass
  * {@link com.zoop.chat.tool.ChatWebQueryPolicy} and it takes the job's and the day's web budgets when it is reserved; a spent
  * budget denies it and is reported as {@code web_budget_exhausted}.</li>
  * <li>The final answer is returned with the results of the calls that ran, read back from {@code chat_tool_calls.result}:
@@ -68,11 +74,19 @@ public final class ChatMcpAgent implements ChatAgentPath {
     private final String recipient;
     private final ChatExecutionRepository runs;
     private final ChatToolRunner runner;
+    /** Pinned internal evidence used only to decide whether a requested date or field is still missing. */
+    private final ChatCitationSource citations;
     /** The MCP preflight and circuit of live runs; null for replay runs, which reach no MCP endpoint. */
     private final ChatMcpCircuitBreaker circuit;
 
     public ChatMcpAgent(ChatModels.Agent agent, ChatMcpTools tools, ChatMcpGrants grants, String recipient,
             ChatExecutionRepository runs, ChatToolRunner runner, ChatMcpCircuitBreaker circuit) {
+        this(agent, tools, grants, recipient, runs, runner, circuit, null);
+    }
+
+    public ChatMcpAgent(ChatModels.Agent agent, ChatMcpTools tools, ChatMcpGrants grants, String recipient,
+            ChatExecutionRepository runs, ChatToolRunner runner, ChatMcpCircuitBreaker circuit,
+            ChatCitationSource citations) {
         this.agent = agent;
         this.tools = tools;
         this.grants = grants;
@@ -80,6 +94,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
         this.runs = runs;
         this.runner = runner;
         this.circuit = circuit;
+        this.citations = citations;
     }
 
     @Override
@@ -118,6 +133,10 @@ public final class ChatMcpAgent implements ChatAgentPath {
         // The concepts that had their search: a search binds to the requirements it names, so it spends only theirs.
         Set<String> searched = new LinkedHashSet<>();
         Set<String> searches = new LinkedHashSet<>();
+        Set<String> external = new LinkedHashSet<>();
+        requirements.stream().filter(ChatModels.AgentRequirement::externalSource).forEach(r -> external.add(r.id()));
+        Set<String> openFromStart = new LinkedHashSet<>();
+        requirements.stream().filter(ChatModels.AgentRequirement::readByServer).forEach(r -> openFromStart.add(r.id()));
         for (int step = 1, rounds = 0; ; step++) {
             var input = new ChatModels.AgentInput(requirements, token, names, recipient, maxCitations, previous,
                     decisions);
@@ -154,7 +173,9 @@ public final class ChatMcpAgent implements ChatAgentPath {
             List<ChatToolResult> done = closing ? List.of() : kept(run);
             done.forEach(result -> served.getOrDefault(result.toolCallId(), List.of())
                     .forEach(id -> reachable.get(id).addAll(reached(result))));
-            Set<String> webOpen = webOpen(unmet(done, served), concepts, searched, searchable);
+            Set<String> gaps = unmet(done, served, withheldReads(run), external, requirements, run, citations);
+            gaps.addAll(openFromStart);
+            Set<String> webOpen = webOpen(gaps, concepts, searched, searchable);
             List<ChatModels.Decision> next = new ArrayList<>();
             int round = 0;
             for (ChatModels.ApprovalRequest request : outcome.approvals()) {
@@ -201,14 +222,66 @@ public final class ChatMcpAgent implements ChatAgentPath {
 
     /**
      * The requirements ZOOP's own reads left something for: those served by an approved internal read that found nothing
-     * within its scope or was cut by a limit.
+     * within its scope or was cut by a limit, and those asking for a source outside ZOOP once such a read ran. A read the send
+     * grant cut opens nothing, and a requirement with one does not reach past it by asking for an outside source: no search
+     * stands in for refused data (web search design 2).
      */
-    static Set<String> unmet(List<ChatToolResult> done, Map<String, List<String>> served) {
+    static Set<String> unmet(List<ChatToolResult> done, Map<String, List<String>> served, Set<String> withheld,
+            Set<String> external) {
         Set<String> unmet = new LinkedHashSet<>();
-        done.stream().filter(r -> !ChatCapability.WEB_SEARCH.id().equals(r.capabilityId())
-                        && (r.items().isEmpty() || Boolean.TRUE.equals(r.truncated())))
-                .forEach(r -> unmet.addAll(served.getOrDefault(r.toolCallId(), List.of())));
+        Set<String> looked = new LinkedHashSet<>();
+        Set<String> refused = new LinkedHashSet<>();
+        for (ChatToolResult read : done) {
+            if (ChatCapability.WEB_SEARCH.id().equals(read.capabilityId())) continue;
+            List<String> requirements = served.getOrDefault(read.toolCallId(), List.of());
+            if (withheld.contains(read.toolCallId())) {
+                refused.addAll(requirements);
+                continue;
+            }
+            looked.addAll(requirements);
+            if (read.items().isEmpty() || Boolean.TRUE.equals(read.truncated())) unmet.addAll(requirements);
+        }
+        looked.retainAll(external);
+        looked.removeAll(refused);
+        unmet.addAll(looked);
         return unmet;
+    }
+
+    /** The same gate with target, requested period, requested field and citation coverage for live agent runs. */
+    static Set<String> unmet(List<ChatToolResult> done, Map<String, List<String>> served, Set<String> withheld,
+            Set<String> external, List<ChatModels.AgentRequirement> requirements, ChatRun run,
+            ChatCitationSource citations) {
+        if (citations == null) return unmet(done, served, withheld, external);
+        Map<String, List<ChatToolResult>> reads = new LinkedHashMap<>();
+        Set<String> refused = new LinkedHashSet<>();
+        for (ChatToolResult read : done) {
+            if (ChatCapability.WEB_SEARCH.id().equals(read.capabilityId())) continue;
+            List<String> owners = served.getOrDefault(read.toolCallId(), List.of());
+            if (withheld.contains(read.toolCallId())) {
+                refused.addAll(owners);
+                continue;
+            }
+            owners.forEach(id -> reads.computeIfAbsent(id, ignored -> new ArrayList<>()).add(read));
+        }
+        Set<String> gaps = new LinkedHashSet<>();
+        for (ChatModels.AgentRequirement requirement : requirements) {
+            List<ChatToolResult> own = reads.getOrDefault(requirement.id(), List.of());
+            if (own.isEmpty() || refused.contains(requirement.id())) continue;
+            if (external.contains(requirement.id()) || ChatWebDemand.coverage(requirement.label(), run.askedAt(),
+                    requirement.targets(), own, id -> citation(citations, run, id)).incomplete()) {
+                gaps.add(requirement.id());
+            }
+        }
+        return gaps;
+    }
+
+    private static java.util.Optional<com.zoop.chat.dto.Citation> citation(ChatCitationSource citations, ChatRun run,
+            String evidenceId) {
+        try {
+            return citations.cite(evidenceId, run.graphVersionId(), run.context().asOf(), run.jobId());
+        } catch (ChatToolUnavailable unavailable) {
+            return java.util.Optional.empty();
+        }
     }
 
     /** The requirements a search may name now: facts with a gap, concepts yet to search, of those the web may serve. */
@@ -248,6 +321,16 @@ public final class ChatMcpAgent implements ChatAgentPath {
         }
         notices.addAll(refused);
         return List.copyOf(notices);
+    }
+
+    /** Internal reads the model-send grant cut. */
+    private Set<String> withheldReads(ChatRun run) {
+        Set<String> withheld = new LinkedHashSet<>();
+        for (ChatKeptToolResult kept : runs.keptToolResults(run.jobId(), run.attemptNo())) {
+            if (ChatCapability.WEB_SEARCH.id().equals(kept.capabilityId())) continue;
+            if (JSON.readTree(kept.result()).has("withheld")) withheld.add(kept.toolCallId());
+        }
+        return withheld;
     }
 
     /** Web calls whose provider returned hits but the model-send grant withheld them all. */

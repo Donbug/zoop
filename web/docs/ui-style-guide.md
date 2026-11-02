@@ -97,7 +97,51 @@ Light-theme text is one ink, `#212121` (`zoop-ink/muted/faint`, `panel-*`); show
 
 ### Dark theme
 
-`:root[data-theme='dark']` in `src/index.css` gives every `zoop-*` and `panel-*` token a dark value; light values stay in `@theme`. Dark text avoids pure white: `#ededed` body (`ink`, about 15:1 on `#171717`, close to light's 16:1), `#a0a0a0` secondary (`muted`/`panel-secondary`), `#8f8f8f` faint (`faint`/`panel-muted`, still 4.5:1 on `#262626` panels). The improved map's dark overrides in `map-appearance-styles.ts` and `appearanceColors()` use the same three values. Use tokens instead of hex so both themes follow. The Tailwind `white` and `gray-*` scale is inverted in dark for screens not yet on tokens. G6 canvas colors cannot read CSS, so graph code calls `themeColor()` from `src/util/theme-color.ts`; the header moon button (`toggleTheme`) reloads so the canvas redraws. Black line icons from `/graph-assets` carry `data-icon` and are inverted in dark; company logos are not.
+`:root[data-theme='dark']` in `src/index.css` supplies the shared dark palette:
+`#fafafa` body (`zoop-ink`/`panel-ink`), `#d4d4d4` secondary
+(`zoop-muted`/`panel-secondary`) and `#a3a3a3` faint (`zoop-faint`/`panel-muted`).
+On `#171717` their contrast ratios are 17.18:1 / 12.09:1 / 7.11:1;
+on `#262626` they are 14.50:1 / 10.21:1 / 6.00:1. Light text remains `#212121`.
+The login, improved map and G6 `appearanceColors()` follow the same values.
+Use tokens instead of per-screen hex. The Tailwind white/gray scale remains inverted.
+Theme changes update the root and notify mounted canvases without reloading.
+Black `/graph-assets` icons with `data-icon` are inverted in dark; company logos are not.
+
+### Company and briefing surfaces (D-COM-01/02 · D-BRF-01/02)
+
+Company and briefing routes share `bg-zoop-page` for the page and
+`bg-zoop-surface` for the header and bottom navigation. Exception: the light
+company detail keeps its earlier look (white `rounded-2xl` panels, divider
+sections, `rounded-full` buttons); only dark company detail uses these surfaces.
+Components pick the class set with `useColorTheme()`. Apply company section
+surfaces only to direct sections of each workspace column so nested document
+quotes and evidence do not receive a second card background and padding.
+Shared `FeedbackButtons` use `rounded-md border border-zoop-border
+bg-zoop-control`, `hover:bg-zoop-selected`, and pressed `bg-zoop-ink
+text-zoop-on-ink`; reason inputs use `bg-zoop-surface`. The same recipe applies
+to briefing, evidence analysis and AI chat results.
+
+These opt-in tokens follow the existing improved map; they do not change login,
+tutorial or map background values. Keep the existing briefing section order,
+content, data state and action semantics.
+
+| Token           | Light     | Dark      |
+| --------------- | --------- | --------- |
+| `zoop-page`     | `#f7f7f5` | `#171717` |
+| `zoop-surface`  | `#ffffff` | `#262626` |
+| `zoop-card`     | `#f5f5f4` | `#2b2b2d` |
+| `zoop-control`  | `#efefed` | `#303032` |
+| `zoop-border`   | `#d9d9d6` | `#414144` |
+| `zoop-selected` | `#ededeb` | `#363638` |
+| `zoop-on-ink`   | `#ffffff` | `#171717` |
+
+Use `rounded-xl border border-zoop-border bg-zoop-surface shadow-sm` for outer
+panels, `rounded-lg bg-zoop-card` for inner sections and `rounded-md` for controls.
+Briefing uses the `CARD`/`SECTION`/`EMPTY`/`PRIMARY_BUTTON` recipes from
+`components/briefing/briefingStyles.ts` for common, scheduled and explicit flows.
+The page scopes input/select treatments to briefing; it does not style other routes.
+Faint text on the darkest selected surface still reaches 4.78:1.
+Dependency assumptions and validation evidence belong in the pull request.
 
 ## Behavior checklist
 
@@ -214,3 +258,13 @@ Use `ImpactCue` from `@/components/common/ImpactCue` for business-impact labels 
 `issueReading` is an optional, source-bound reading review, separate from verified model output. Only explicitly reviewed dependent event components may share a compact card; same company or document alone never triggers grouping. Bind round/result/cutoff and exact citations; invalid metadata restores original cards with a reliability warning. Full reading and the grouped card's archive preserve original events, evidence, assessments and feedback targets. Partial personal views cannot acquire hidden members through grouping.
 
 Show selection importance and what is new beneath each title. Place recorded direct event parties before related companies and show each connection's verified reason. Display common facts once in neutral colors. Compact positive/risk sections show a complete existing sentence with the remaining text expandable; do not invent a balanced pair. Use `다음 확인사항` for undated/longer-term conditions. Retain price baselines and causality limits. Both reading modes use a 1040px maximum desktop content width; retain the mobile layout padding and single issue column. Keep original response selection/versions in the preserved-publication subtree. Previous-round loading and error states must not be rendered as missing history. See `docs/development/briefing-issue-reading.md`.
+
+## Personal briefing selection
+
+D-BRF-01/02 uses `PersonalizedIssueSelection` in `/briefing?view=personal`. It reads the member-scoped whole-pool selection endpoint, renders related-company reasons and expandable stored evidence, and keeps common publication feedback attached to the original shared round. Do not reuse shared item feedback/detail URLs for newly selected personal candidates. Member/session changes immediately clear the old private response; missing pools, no companies, no matching qualified issues and current source restrictions have distinct messages.
+
+## Scheduled personal briefing (D-BRF-01/02)
+
+Use `ScheduledPersonalBriefing` in the personal route: prospective settings at the top, saved per-round content below. Open the stock chooser only from the labelled search input, preserve its keyboard close action and use shared CompanyLogo with catalogue logoUrl/fallback. Saving settings must never regenerate the selected published round. The round content keeps its frozen company chips even when the next setting changes. Operator-enabled demo previews live in a separate disclosure and are labelled as demos; hide manual generation entirely when demoEnabled is false. Never make model requests from page reads.
+
+Personal briefing first-use defaults come from the member's own holdings/watchlist through the CSRF-protected initialize POST. Keep existing saved settings. Empty portfolios/watchlists must not fabricate a default or start generation. Do not show issue-count controls; the maximum-three/common qualification policy is fixed. Manual stock editing remains a separate explicit action.

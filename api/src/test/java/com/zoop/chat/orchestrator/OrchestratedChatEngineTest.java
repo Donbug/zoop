@@ -17,6 +17,7 @@ import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.dto.GraphTarget;
 import com.zoop.chat.executor.ChatEngineOutcome;
+import com.zoop.chat.executor.ChatJobExecutor;
 import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.executor.ChatToolCallReservation;
@@ -755,18 +756,21 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
-    void aModelStageStartsOnlyWhenTheTimeLeftCoversItAndEverythingAfterIt() {
+    void directStagesKeepTheirMinimumsInsideTheJobWideDeadline() {
         decision = ChatPlannerTest.decision(req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
                 List.of(HYNIX)));
-        var tooLate = new Control(Duration.ofSeconds(52));
+        // Router ceiling 9 + tools 10 + answer minimum 10 + verification minimum 6 + server 3 = 38.
+        var tooLate = new Control(Duration.ofSeconds(37));
         assertFailed("transient", "deadline_guard", true, engine().answer(run(), tooLate));
         assertEquals(0, tooLate.modelCalls);
 
-        // Enough for router + generation + verification + server (53 s), not for tools + generation + verification + server (54 s).
-        var noTools = new Control(Duration.ofSeconds(53));
-        assertFailed("transient", "deadline_guard", true, engine().answer(run(), noTools));
-        assertEquals(1, noTools.modelCalls);
-        assertTrue(noTools.reserved.isEmpty());
+        answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r2"), evidence(HYNIX))),
+                List.of(), List.of(HYNIX));
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+        var bounded = new Control(ChatJobExecutor.MAX_DEADLINE);
+        assertInstanceOf(ChatEngineOutcome.Completed.class, engine().answer(run(), bounded));
+        assertEquals(3, bounded.modelCalls, "router, answer and verification all fit the 45 s budget");
+        assertFalse(bounded.reserved.isEmpty());
     }
 
     @Test

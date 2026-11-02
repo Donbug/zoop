@@ -35,6 +35,7 @@ import type {
   Prices,
   Portfolio,
   Events,
+  Event,
   EventDetail,
   Financials,
   Impact,
@@ -46,6 +47,8 @@ import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import CompanyCatalog from './CompanyCatalog';
 import CompanyDocumentPanel from './CompanyDocumentPanel';
 import CompanyGraphPreview from './CompanyGraphPreview';
+import CompanyEventDetails from './CompanyEventDetails';
+import { eventRangeDate, widerCompanyPeriod } from './company-event-period';
 import {
   periods,
   exactTime,
@@ -58,12 +61,16 @@ import {
   requestTime,
   versionOnlyAddress,
 } from './detail-model';
+import { useColorTheme } from '@/util/theme-color';
 
 // D-COM-01 B1: 백엔드 financials 컨트롤러가 생기면 계약을 확인하고 다시 켠다.
 const COMPANY_FINANCIALS_ENABLED = false;
 
-const workspaceClasses =
+// 기업 상세 라이트는 #491 이전 모양을 유지하고, 다크만 지도 개선 테마 표면을 쓴다.
+const workspaceLightClasses =
   'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-3 m-0 overflow-visible text-zoop-ink max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-zoop-line [&_section]:py-4 [&_h1]:text-display [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-body [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-caption [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-full [&_button]:border [&_button]:border-zoop-line [&_button]:bg-white [&_button]:min-h-[36px] [&_button]:px-4 [&_button]:py-2 [&_button]:text-caption! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-caption [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1.5 [&_article]:border-b [&_article]:border-zoop-line [&_article]:py-3 [&_table]:w-full [&_table]:text-caption [&_table]:wrap-anywhere [&_[role=alert]]:text-zoop-alert [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-zoop-line [&_input]:bg-white [&_input]:px-3 [&_input]:py-2 [&_input]:min-h-[38px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
+const workspaceDarkClasses =
+  'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-3 m-0 overflow-visible text-zoop-ink max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&>div>section]:my-3 [&>aside>section]:my-3 [&>div>section]:rounded-lg [&>aside>section]:rounded-lg [&>div>section]:border-0 [&>aside>section]:border-0 [&>div>section]:bg-zoop-card [&>aside>section]:bg-zoop-card [&>div>section]:p-4 [&>aside>section]:p-4 [&_h1]:text-display [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-body [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-caption [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-md [&_button]:border [&_button]:border-zoop-border [&_button]:bg-zoop-control [&_button]:min-h-[36px] [&_button]:px-4 [&_button]:py-2 [&_button]:text-caption! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-zoop-on-ink [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-caption [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1.5 [&_article]:border-b [&_article]:border-zoop-border [&_article]:py-3 [&_table]:w-full [&_table]:text-caption [&_table]:wrap-anywhere [&_[role=alert]]:text-zoop-alert [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-md [&_input]:border [&_input]:border-zoop-border [&_input]:bg-zoop-surface [&_input]:px-3 [&_input]:py-2 [&_input]:min-h-[38px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
 
 function Status<T>({
   resource,
@@ -242,6 +249,7 @@ const sameInstant = (a: string | null, b: string | null) =>
   !!a && !!b && Date.parse(a) === Date.parse(b);
 
 export default function CompanyWorkspace() {
+  const dark = useColorTheme() === 'dark';
   const { id = '' } = useParams();
   const { params, updateQuery } = useRouteQuery();
   const location = useLocation();
@@ -505,6 +513,18 @@ export default function CompanyWorkspace() {
       ![...events.data.items, ...events.data.unknownTimeItems].some(
         (item) => item.id === eventId,
       );
+    const wider = outside
+      ? widerCompanyPeriod(
+          event.data?.eventTime,
+          period,
+          asOf,
+          eventsQuery.get('from'),
+        )
+      : null;
+    if (wider) {
+      updateQuery({ period: wider, bucket: null }, { replace: true });
+      return;
+    }
     if (!unknownTab && !gone && !outside) return;
     const messages = [];
     if (unknownTab) messages.push('요청한 탭이 없어 사건 탭을 보여 드려요');
@@ -539,9 +559,31 @@ export default function CompanyWorkspace() {
     event.data,
     events.data,
     events.loading,
+    period,
   ]);
+  const relation = ['INVOLVES', 'STRUCTURALLY_RELATED_TO'].includes(
+    params.get('relation') ?? '',
+  )
+    ? params.get('relation')!
+    : 'all';
+  const keepRelation = (item: Event) =>
+    relation === 'all' || item.relationTypes.includes(relation);
+  const visibleItems = (events.data?.items ?? []).filter(keepRelation);
+  const visibleUnknown = (events.data?.unknownTimeItems ?? []).filter(
+    keepRelation,
+  );
+  // latestReportedAt also covers dated events; it only stands in when no event date is known.
+  const latestEventTime = events.data?.metadata.latestEventTime;
+  const widerEmptyPeriod = widerCompanyPeriod(
+    eventRangeDate(latestEventTime)
+      ? latestEventTime
+      : events.data?.metadata.latestReportedAt,
+    period,
+    asOf,
+    eventsQuery.get('from'),
+  );
   const groups = new Map<string, Events['items']>();
-  for (const item of events.data?.items ?? []) {
+  for (const item of visibleItems) {
     const key = bucketKey(item, period);
     groups.set(key, [...(groups.get(key) ?? []), item]);
   }
@@ -640,7 +682,10 @@ export default function CompanyWorkspace() {
   }
   if (invalid)
     return (
-      <div className={workspaceClasses} role="alert">
+      <div
+        className={dark ? workspaceDarkClasses : workspaceLightClasses}
+        role="alert"
+      >
         기준 시점은 오프셋이 포함된 정확한 시각이어야 해요.
         <button
           onClick={() =>
@@ -675,7 +720,10 @@ export default function CompanyWorkspace() {
       </section>
     );
   return (
-    <div className={workspaceClasses} data-screen-id="D-COM-01 D-COM-01b">
+    <div
+      className={dark ? workspaceDarkClasses : workspaceLightClasses}
+      data-screen-id="D-COM-01 D-COM-01b"
+    >
       {canLoadSections && (
         <CompanyCatalog
           graph={graph}
@@ -684,7 +732,9 @@ export default function CompanyWorkspace() {
           settings={settings}
         />
       )}
-      <div className="min-w-0 rounded-2xl bg-white p-6 shadow-sm max-md:p-4">
+      <div
+        className={`min-w-0 p-6 shadow-sm max-md:p-4 ${dark ? 'rounded-xl border border-zoop-border bg-zoop-surface' : 'rounded-2xl bg-white'}`}
+      >
         {routeNotice?.companyId === id && (
           <div role="status">
             {routeNotice.messages.map((message) => (
@@ -952,7 +1002,36 @@ export default function CompanyWorkspace() {
         <section aria-label="시세 차트" data-screen-id="D-COM-06">
           <h2 className="sr-only">시세 차트·기준 시점</h2>
           <nav aria-label="차트 기간" className="items-center gap-3!">
-            <div className="inline-flex overflow-hidden rounded-[3px] border border-zoop-line">
+            <div
+              role="group"
+              aria-label="관계로 거르기"
+              className={`inline-flex overflow-hidden border ${dark ? 'rounded-md border-zoop-border' : 'rounded-[3px] border-zoop-line'}`}
+            >
+              {(
+                [
+                  ['all', '전체'],
+                  ['INVOLVES', '직접 관련'],
+                  ['STRUCTURALLY_RELATED_TO', '구조적 관련'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  aria-pressed={relation === value}
+                  className="min-w-14 rounded-none! border-0! border-r! border-zoop-line! last:border-r-0!"
+                  onClick={() =>
+                    updateQuery({
+                      relation: value === 'all' ? null : value,
+                      bucket: null,
+                    })
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div
+              className={`inline-flex overflow-hidden border ${dark ? 'rounded-md border-zoop-border' : 'rounded-[3px] border-zoop-line'}`}
+            >
               {periods.map((p) => (
                 <button
                   key={p.value}
@@ -1104,13 +1183,58 @@ export default function CompanyWorkspace() {
                 ))}
                 <p className="text-caption text-zoop-muted">
                   {periods.find((p) => p.value === period)?.label} · 사건{' '}
-                  {events.data.items.length}건 · 시점 미상 제외{' '}
+                  {visibleItems.length}건 · 시점 미상 제외{' '}
                   {events.data.metadata.excludedUnknownTime ?? 0}건
                 </p>
-                {!groups.size && (
-                  <p className="text-caption text-zoop-muted">
-                    해당 기간에 공개·유효한 사건이 없어요.
-                  </p>
+                {!groups.size && !visibleUnknown.length && (
+                  <div role="status">
+                    <p className="text-caption text-zoop-muted">
+                      {relation === 'all'
+                        ? '해당 기간에 공개·유효한 사건이 없어요.'
+                        : '이 관계의 사건이 없어요'}
+                    </p>
+                    {relation !== 'all' ? (
+                      <button onClick={() => updateQuery({ relation: null })}>
+                        전체 보기
+                      </button>
+                    ) : (
+                      <>
+                        {events.data.metadata.latestEventTime ? (
+                          <p>
+                            가장 최근 사건은{' '}
+                            {eventRangeDate(
+                              events.data.metadata.latestEventTime,
+                            )}
+                            에 일어났어요.
+                          </p>
+                        ) : (
+                          events.data.metadata.latestReportedAt && (
+                            <p>
+                              일어난 때를 확인한 사건은 없고, 가장 최근 보도는{' '}
+                              {eventRangeDate(
+                                events.data.metadata.latestReportedAt,
+                              )}
+                              이에요.
+                            </p>
+                          )
+                        )}
+                        {widerEmptyPeriod && (
+                          <button
+                            onClick={() =>
+                              updateQuery({ period: widerEmptyPeriod })
+                            }
+                          >
+                            {
+                              periods.find((p) => p.value === widerEmptyPeriod)!
+                                .label
+                            }
+                            {widerEmptyPeriod === '1y' ? '으로' : '로'} 넓혀
+                            보기
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 )}
                 {/* FS041: 시간 버킷마다 사건 수를 보이고 사건 카드를 나열한다. 차트 ⚡ 표식이나 버킷을 고르면 그 버킷을 강조한다. */}
                 <ol className="flex flex-col">
@@ -1215,12 +1339,10 @@ export default function CompanyWorkspace() {
                     {sortedGroups.length - shownGroups.length}개 날짜)
                   </button>
                 )}
-                {events.data.unknownTimeItems.length > 0 && (
+                {visibleUnknown.length > 0 && (
                   <details>
-                    <summary>
-                      시점 미상 사건 {events.data.unknownTimeItems.length}건
-                    </summary>
-                    {events.data.unknownTimeItems.map((item) => (
+                    <summary>시점 미상 사건 {visibleUnknown.length}건</summary>
+                    {visibleUnknown.map((item) => (
                       <p key={item.id}>
                         <button onClick={() => selectEvent(item)}>
                           {item.title}
@@ -1240,6 +1362,12 @@ export default function CompanyWorkspace() {
                 {event.data && (
                   <article>
                     <h3>{event.data.title}</h3>
+                    <CompanyEventDetails
+                      event={event.data}
+                      owner={owner}
+                      asOf={asOf}
+                      graphVersion={version}
+                    />
                     <p>
                       근거 인용 {event.data.evidenceIds.length}건 · 문서{' '}
                       {
@@ -1318,7 +1446,7 @@ export default function CompanyWorkspace() {
           1000px 이하에서는 본문 아래로 옮겨 넓게 본다. */}
       <aside
         ref={graphPanel}
-        className="min-w-0 self-start rounded-2xl bg-white p-4 shadow-sm min-[1001px]:sticky min-[1001px]:top-4 min-[1001px]:max-h-[calc(100vh-2rem)] min-[1001px]:overflow-y-auto max-[1000px]:col-start-2 [&_li]:text-caption [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-line max-md:w-full"
+        className={`min-w-0 self-start p-4 shadow-sm ${dark ? 'rounded-xl border border-zoop-border bg-zoop-surface [&_svg]:bg-zoop-card' : 'rounded-2xl bg-white [&_svg]:bg-zoop-line'} min-[1001px]:sticky min-[1001px]:top-4 min-[1001px]:max-h-[calc(100vh-2rem)] min-[1001px]:overflow-y-auto max-[1000px]:col-start-2 [&_li]:text-caption [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full max-md:w-full`}
         aria-label="시점 기반 관계 그래프"
         data-screen-id="D-COM-04"
       >
@@ -1333,7 +1461,11 @@ export default function CompanyWorkspace() {
             <button
               key={d}
               aria-pressed={depth === d}
-              className="rounded-none! first:rounded-l-[3px]! last:rounded-r-[3px]!"
+              className={
+                dark
+                  ? 'rounded-none! first:rounded-l-md! last:rounded-r-md!'
+                  : 'rounded-none! first:rounded-l-[3px]! last:rounded-r-[3px]!'
+              }
               onClick={() => updateQuery({ depth: String(d), bucket: null })}
             >
               {d}단계
@@ -1370,8 +1502,20 @@ export default function CompanyWorkspace() {
               data={graph.data}
               highlighted={highlighted}
               onSelect={(node, kind) => {
-                if (kind === 'issue')
+                if (kind === 'issue') {
+                  const eventTime = graph.data?.nodes.find(
+                    (item) => item.id === node,
+                  )?.eventTime;
                   updateQuery({
+                    // prototype pickGraphIssue: an issue without a known time falls back to 1y.
+                    period: eventTime
+                      ? (widerCompanyPeriod(
+                          eventTime,
+                          period,
+                          asOf,
+                          eventsQuery.get('from'),
+                        ) ?? period)
+                      : '1y',
                     event: node,
                     document: null,
                     evidence: null,
@@ -1382,7 +1526,7 @@ export default function CompanyWorkspace() {
                         )
                       : null,
                   });
-                else {
+                } else {
                   const next = new URLSearchParams(params);
                   next.delete('event');
                   next.delete('bucket');
@@ -1435,8 +1579,19 @@ export default function CompanyWorkspace() {
                 <ol>
                   {impact.data.steps.map((step, i) => (
                     <li key={`${step.id}:${i}`}>
-                      {step.id} · {step.reason} · 근거 {step.evidenceIds.length}
-                      건
+                      {graph.data?.nodes.find((node) => node.id === step.id)
+                        ?.label ??
+                        event.data?.companies?.find(
+                          (company) => company.id === step.id,
+                        )?.name ??
+                        (step.id === id
+                          ? company.data?.name
+                          : step.id === event.data?.id
+                            ? event.data.title
+                            : null) ??
+                        RELATION_LABEL[step.id] ??
+                        step.id}{' '}
+                      · {step.reason} · 근거 {step.evidenceIds.length}건
                     </li>
                   ))}
                 </ol>

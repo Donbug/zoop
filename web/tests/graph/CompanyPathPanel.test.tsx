@@ -17,6 +17,35 @@ const props = {
   onEvidence: vi.fn(),
 };
 
+it('D-GRP-07 M13 shows candidate logos and an explicit empty search', async () => {
+  render(<CompanyPathPanel {...props} to={null} />);
+  const candidate = screen.getByRole('button', { name: 'NVIDIA' });
+  expect(candidate.querySelector('img')).toBeTruthy();
+  await userEvent.type(screen.getByLabelText('기업 검색'), '없는기업');
+  expect(screen.getByRole('status').textContent).toContain('없는기업');
+  expect(screen.queryByRole('button', { name: 'NVIDIA' })).toBeNull();
+});
+
+it('D-GRP-07 M13 does not quote an empty search when no other company exists', () => {
+  const only = {
+    ...graph,
+    nodes: graph.nodes.filter(
+      (node) => node.kind !== 'company' || node.id === props.from,
+    ),
+  };
+  render(<CompanyPathPanel {...props} graph={only} to={null} />);
+  expect(screen.getByRole('status').textContent).toBe(
+    '고를 수 있는 기업이 없어요.',
+  );
+});
+
+it('D-GRP-07 M14 selects the actual issue node from the path', async () => {
+  const select = vi.fn();
+  render(<CompanyPathPanel {...props} onSelectNode={select} />);
+  await userEvent.click(screen.getByRole('button', { name: 'HBM4 공급 계약' }));
+  expect(select).toHaveBeenCalledWith('mock-issue-1');
+});
+
 it('D-GRP-07 does not show a previous successful path while loading or after a failed graph read', async () => {
   const onRetry = vi.fn();
   const { rerender } = render(<CompanyPathPanel {...props} loading />);

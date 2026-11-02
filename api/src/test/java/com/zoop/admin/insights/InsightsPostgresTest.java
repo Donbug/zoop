@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 @EnabledIfEnvironmentVariable(named = "DB_URL", matches = "jdbc:postgresql:.*")
 @Tag("auth-postgres")
+@org.springframework.transaction.annotation.Transactional
 class InsightsPostgresTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper mapper;
@@ -72,7 +73,7 @@ class InsightsPostgresTest {
     }
 
     @Test
-    void summaryUsesDistinctViewRatesAndOverviewKeepsUnavailableFeedbackNull() throws Exception {
+    void summaryUsesDistinctViewRatesAndOverviewConnectsCurrentFeedback() throws Exception {
         String view = "view-" + UUID.randomUUID().toString().substring(0, 12);
         var body = mapper.readValue("""
                 {"events":[
@@ -95,9 +96,9 @@ class InsightsPostgresTest {
                 summary.asOf().atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate()))
                 .findFirst().orElseThrow().edgeSelections());
         var overview = insights.overview("overview-request");
-        assertEquals("unavailable", overview.feedback().availability());
-        assertEquals("not_integrated", overview.feedback().unavailableReason());
-        assertEquals(null, overview.feedback().up());
+        assertEquals("available", overview.feedback().availability());
+        assertEquals(null, overview.feedback().unavailableReason());
+        assertEquals(0L, overview.feedback().up());
     }
 
     @Test

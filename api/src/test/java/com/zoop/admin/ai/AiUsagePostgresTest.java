@@ -77,6 +77,8 @@ class AiUsagePostgresTest {
     @Test
     void aggregatesBriefingGenerationAndOutlookSeparately() throws Exception {
         Cookie admin = login();
+        long existingRequests=jdbc.queryForObject("SELECT count(*) FROM briefing_attempts WHERE purpose='generation' AND started_at>=clock_timestamp()-interval '24 hours'",Long.class);
+        long existingSucceeded=jdbc.queryForObject("SELECT count(*) FROM briefing_attempts WHERE purpose='generation' AND started_at>=clock_timestamp()-interval '24 hours' AND status='completed' AND stages->>'outcome'='available'",Long.class);
         seedBriefingUsage();
         boolean hasUnrecordedPublications = jdbc.queryForObject("""
                 SELECT EXISTS (SELECT 1 FROM briefing_rounds r
@@ -88,19 +90,19 @@ class AiUsagePostgresTest {
         var result = mvc.perform(get("/api/v1/admin/ai-usage").param("window", "24h").cookie(admin))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.features[2].feature").value("briefing"))
-                .andExpect(jsonPath("$.features[2].usage.modelCalls").value(2))
-                .andExpect(jsonPath("$.features[2].usage.retries").value(1))
-                .andExpect(jsonPath("$.features[2].usage.inputTokens").value(30))
+                .andExpect(jsonPath("$.features[2].usage.modelCalls").value(hasUnrecordedPublications ? (Object)null : 2))
+                .andExpect(jsonPath("$.features[2].usage.retries").value(hasUnrecordedPublications ? (Object)null : 1))
+                .andExpect(jsonPath("$.features[2].usage.inputTokens").value(hasUnrecordedPublications ? (Object)null : 30))
                 .andExpect(jsonPath("$.features[4].feature").value("briefing-outlook"))
-                .andExpect(jsonPath("$.features[4].usage.modelCalls").value(1))
-                .andExpect(jsonPath("$.features[4].usage.inputTokens").value(11));
+                .andExpect(jsonPath("$.features[4].usage.modelCalls").value(hasUnrecordedPublications ? (Object)null : 1))
+                .andExpect(jsonPath("$.features[4].usage.inputTokens").value(hasUnrecordedPublications ? (Object)null : 11));
         if (hasUnrecordedPublications) {
             result.andExpect(jsonPath("$.features[2].requests").doesNotExist())
                     .andExpect(jsonPath("$.features[2].unavailableMetrics").isArray())
                     .andExpect(jsonPath("$.features[4].requests").doesNotExist());
         } else {
-            result.andExpect(jsonPath("$.features[2].requests").value(1))
-                    .andExpect(jsonPath("$.features[2].succeeded").value(1))
+            result.andExpect(jsonPath("$.features[2].requests").value((int)existingRequests+1))
+                    .andExpect(jsonPath("$.features[2].succeeded").value((int)existingSucceeded+1))
                     .andExpect(jsonPath("$.features[4].requests").value(1));
         }
     }

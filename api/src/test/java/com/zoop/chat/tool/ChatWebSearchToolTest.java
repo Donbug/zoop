@@ -1,11 +1,17 @@
 package com.zoop.chat.tool;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -123,11 +129,96 @@ class ChatWebSearchToolTest {
         assertFalse(ChatCapability.COMPANY_READ.web());
     }
 
+    @Test
+    void aSuccessfulNormalizedRequestIsCachedUntilItsShortTtlExpires() {
+        var clock = new MutableClock(NOW);
+        var provider = new Scripted(List.of(new ChatWebSearchProvider.Hit(
+                "https://news.example.com/cache", "캐시 기사", "같은 결과", null)));
+        var tool = new ChatWebSearchTool(provider, clock, Duration.ofSeconds(1), 2);
+        var spaced = new ChatToolRequest("web.search", List.of("HBM  공급"), 5);
+        var normalized = new ChatToolRequest("web.search", List.of("HBM 공급"), 5);
+
+        var first = tool.read(SCOPE, spaced);
+        clock.advance(Duration.ofMillis(500));
+        var cached = tool.read(SCOPE, normalized);
+
+        assertEquals(List.of("HBM 공급"), provider.queries, "the normalized request reaches the provider once");
+        assertEquals(first.webResults(), cached.webResults());
+        assertEquals(NOW, cached.webResults().getFirst().searchedAt(), "a hit keeps the actual provider search time");
+
+        clock.advance(Duration.ofMillis(600));
+        var refreshed = tool.read(SCOPE, normalized);
+        assertEquals(2, provider.queries.size(), "an expired entry is fetched again");
+        assertEquals(NOW.plusMillis(1_100), refreshed.webResults().getFirst().searchedAt());
+    }
+
+    @Test
+    void overlappingProviderRequestsJoinOneFlight() throws Exception {
+        var provider = new Scripted(List.of());
+        provider.gate = new CountDownLatch(1);
+        var tool = new ChatWebSearchTool(provider, CLOCK, Duration.ofMinutes(1), 10);
+        var request = new ChatToolRequest("web.search", List.of("HBM"), 5);
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var first = pool.submit(() -> tool.read(SCOPE, request));
+            assertTrue(provider.started.await(5, TimeUnit.SECONDS));
+            var second = pool.submit(() -> tool.read(SCOPE, request));
+            Thread.sleep(100);
+            provider.gate.countDown();
+
+            assertEquals(first.get(5, TimeUnit.SECONDS).webResults(), second.get(5, TimeUnit.SECONDS).webResults());
+            assertEquals(1, provider.queries.size(), "one provider call serves both callers");
+        } finally {
+            provider.gate.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void aProviderFailureIsNeverCached() {
+        var provider = new Scripted(List.of());
+        provider.failures = 1;
+        var tool = new ChatWebSearchTool(provider, CLOCK, Duration.ofMinutes(1), 10);
+        var request = new ChatToolRequest("web.search", List.of("HBM"), 5);
+
+        assertThrows(ChatToolUnavailable.class, () -> tool.read(SCOPE, request));
+        assertDoesNotThrow(() -> tool.read(SCOPE, request));
+        assertEquals(2, provider.queries.size(), "the next caller retries after a failed flight");
+    }
+
+    @Test
+    void theCacheEvictsTheLeastRecentlyUsedRequestAtItsBound() {
+        var provider = new Scripted(List.of());
+        var tool = new ChatWebSearchTool(provider, CLOCK, Duration.ofMinutes(1), 2);
+
+        tool.read(SCOPE, new ChatToolRequest("web.search", List.of("검색 A"), 5));
+        tool.read(SCOPE, new ChatToolRequest("web.search", List.of("검색 B"), 5));
+        tool.read(SCOPE, new ChatToolRequest("web.search", List.of("검색 A"), 5));
+        tool.read(SCOPE, new ChatToolRequest("web.search", List.of("검색 C"), 5));
+        tool.read(SCOPE, new ChatToolRequest("web.search", List.of("검색 B"), 5));
+
+        assertEquals(List.of("검색 A", "검색 B", "검색 C", "검색 B"), provider.queries);
+    }
+
+    @Test
+    void unsafeCacheBoundsAreRefused() {
+        var provider = new Scripted(List.of());
+        assertThrows(IllegalArgumentException.class,
+                () -> new ChatWebSearchTool(provider, CLOCK, Duration.ZERO, 10));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ChatWebSearchTool(provider, CLOCK, Duration.ofHours(2), 10));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ChatWebSearchTool(provider, CLOCK, Duration.ofMinutes(1), 0));
+    }
+
     /** A provider that records what it was asked and returns fixed hits. */
     private static final class Scripted implements ChatWebSearchProvider {
         final List<ChatWebSearchProvider.Hit> hits;
-        final List<String> queries = new ArrayList<>();
-        final List<Integer> limits = new ArrayList<>();
+        final List<String> queries = Collections.synchronizedList(new ArrayList<>());
+        final List<Integer> limits = Collections.synchronizedList(new ArrayList<>());
+        final CountDownLatch started = new CountDownLatch(1);
+        volatile CountDownLatch gate;
+        volatile int failures;
         boolean more;
 
         Scripted(List<ChatWebSearchProvider.Hit> hits) {
@@ -143,7 +234,36 @@ class ChatWebSearchToolTest {
         public Page search(String query, int limit) {
             queries.add(query);
             limits.add(limit);
+            started.countDown();
+            if (gate != null) {
+                try {
+                    gate.await();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new ChatToolUnavailable("interrupted", interrupted);
+                }
+            }
+            if (failures > 0) {
+                failures--;
+                throw new ChatToolUnavailable("scripted failure");
+            }
             return new Page(hits, more);
         }
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant now;
+
+        MutableClock(Instant now) {
+            this.now = now;
+        }
+
+        void advance(Duration duration) {
+            now = now.plus(duration);
+        }
+
+        @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(ZoneId zone) { return this; }
+        @Override public Instant instant() { return now; }
     }
 }

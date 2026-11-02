@@ -39,7 +39,7 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 
 ## 3. 도구 (`ChatMcpTools`)
 
-노출: 레지스트리에 바인딩된 기능 중 `portfolio.scope.read`, `briefing.read`, `selectionRule.read`를 뺀 전부(서버가 회원 범위·요구 문구로 입력을 정하는 도구). MCP 이름은 기능 ID의 `.`을 `_`로 바꾼 것(`company.read` → `company_read`)이며 `tools/list`는 grant가 허용한 도구만 보여 준다. 모든 도구는 `readOnlyHint=true`다. Q01 `help.search`·`screenSpec.read`는 `ZOOP_CHAT_APPROVED_DOCS_ENABLED=true`일 때만 레지스트리에 들어오며, 두 승인 문서가 모두 현재 시행 중이지 않으면 애플리케이션 기동 자체를 거절한다.
+노출: 레지스트리에 바인딩된 기능 중 `portfolio.scope.read`, `document.search`, `briefing.read`, `briefing.evidence`, `selectionRule.read`를 뺀 전부다. 이들은 회원 범위나 요구 문구로 입력을 정하는 server-only 도구다. MCP 이름은 기능 ID의 `.`을 `_`로 바꾼 것(`company.read` → `company_read`)이며 `tools/list`는 grant가 허용한 도구만 보여 준다. 모든 도구는 `readOnlyHint=true`다. Q01 `help.search`·`screenSpec.read`는 `ZOOP_CHAT_APPROVED_DOCS_ENABLED=true`일 때만 레지스트리에 들어오며, 두 승인 문서가 모두 현재 시행 중이지 않으면 애플리케이션 기동 자체를 거절한다.
 
 모델이 정하는 인자는 조회 인자 둘과 요구 지목(`requirementIds`)뿐이고 나머지는 서버가 job의 고정 문맥에서 넣는다.
 
@@ -114,7 +114,7 @@ MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 상태(예약 → 실
 
 `zoop.chat.mcp.agent-enabled=true`(`ZOOP_CHAT_AGENT_ENABLED`)이고 `/mcp`, 챗봇 모델 단계(`zoop.ai.chat-client.enabled`)가 모두 있을 때만 `ChatMcpAgent`가 등록된다. 하나라도 없으면 기동을 거절한다(`/mcp`가 꺼진 채 agent만 켜도 `ChatAgentFlagCheck`가 거절해 direct 경로로 조용히 떨어지지 않는다). 공급자가 이 엔드포인트에 닿는 HTTPS 주소는 Java가 보내지 않고 AI runtime 운영자 설정 `ZOOP_AI_CHAT_MCP_SERVER_URL`로만 정한다(요청으로 지정 불가: grant가 다른 호스트로 가지 않게).
 
-**어느 run이 타는가.** 라우터·계획은 그대로다. 계획의 읽기가 모두 **독립 1단계 읽기**이고 그 기능이 모두 MCP로 노출될 때만 agent 경로다. Q07 본인 범위(server-only `portfolio.scope.read` 선행), Q06 브리핑·Q08 선정 기록(`briefing.read`·`selectionRule.read`는 회차를 요구 문구에서 서버가 정하므로 MCP에 노출하지 않음), 의존 단계·체크포인트가 있는 계획, 읽기가 없는 계획(일반 개념·제한만)은 기존 direct 경로(서버가 읽고 Luna는 쓰기만)다.
+**어느 run이 타는가.** 라우터·계획은 그대로다. 계획의 읽기가 모두 **독립 1단계 읽기**이고 그 기능이 모두 MCP로 노출될 때만 agent 경로다. Q07 본인 범위(server-only `portfolio.scope.read` 선행), Q03 본문 검색(`document.search`는 요구 문장에서 검색어 결정), Q06 브리핑·Q08 선정 기록(`briefing.read`·`briefing.evidence`·`selectionRule.read`는 회차를 요구 문구에서 결정), 의존 단계·체크포인트가 있는 계획, 읽기가 없는 계획(일반 개념·제한만)은 기존 direct 경로(서버가 읽고 Luna는 쓰기만)다.
 
 **preflight·circuit.** agent에 맞는 계획은 첫 `chat-agent` 단계 전에 Java가 AI service의 `GET /internal/v1/chat-mcp-health`를 한 번 호출한다. `reachable`일 때만 agent를 시작하고, `unreachable` 또는 probe/service 오류면 그 run은 처음부터 기존 direct 조회·생성 경로를 쓴다. `reachable` probe는 circuit이 닫혀 있고 그 뒤 연결 실패가 없는 동안 10초 재사용한다(연속 run마다 worker 프로세스와 공개 URL 왕복을 반복하지 않음). replay 모드 run은 MCP endpoint에 닿지 않으므로 preflight를 하지 않는다. 최근 연결 관측 5회 중 timeout·connect 실패·앞단 gateway의 502/503/504(`mcp_unavailable`)/실행 중 `mcp_unreachable`가 3회면 endpoint별 인스턴스 circuit을 30초 열며, 그동안 probe 없이 direct로 시작한다. 30초 뒤에는 동시 요청 중 하나만 half-open probe를 보내고 나머지는 direct로 시작한다. 성공하면 창을 비우고 닫고, 실패·probe 오류면 다시 30초 연다. 그 밖의 예상 밖 HTTP 상태(401/403 포함), 정책·grant·schema 거부, DB 오류, AI service probe 오류는 연결 실패 창에 넣지 않는다. route 요약은 읽기가 있는 run마다 `path`(`agent`·`direct`)를 남기고, agent 후보였지만 preflight가 막은 run에는 `agentPreflight=unavailable`을 더한다.
 
@@ -126,7 +126,7 @@ agent 단계가 하나라도 시작된 뒤의 `mcp_unreachable`는 **같은 run�
 3. 승인 라운드는 최대 3회이고, 한 라운드에 최대 4건만 승인한다(나머지는 거부, Luna는 다음 라운드에 다시 요청 가능). 공급자는 라운드의 승인 호출을 마친 뒤 단계를 답하므로 job의 동시 실행이 4개를 넘지 않는다. 다음 단계 하나만 할 시간이 남거나 라운드를 다 쓰면 남은 요청을 모두 거부해 그 단계가 답을 쓰게 한다. 그 뒤에도 묻는 run은 실패한 모델 단계다.
 4. 최종 답은 **실행된 호출의 결과로** 검사한다. `/mcp`는 성공 호출의 결과 봉투를 모델에 보낸 것과 같은 JSON으로 `chat_tool_calls.result`(jsonb, 256 KiB 이하, migration `V20261028140000`)에 남기고, Java는 그 결과로 branch를 만들어 기존 결정론 검사·인용·Jev 검증·결과 생성을 그대로 거친다. 어느 인스턴스가 `/mcp` 호출을 받았든 같은 PostgreSQL에서 읽는다. 읽은 결과는 `ChatToolRunner.restore`가 job·회원·시도·tool call·capability·고정 버전·asOf·입력 digest를 예약 기록과 대조한 뒤에만 이 run의 조회로 되살리고(다르면 run은 `internal`로 끝난다), 모델 전송 gate가 항목을 뺀 결과는 잘린 결과로 되살린다. 같은 결과가 Jev 검증의 서버 사실(`graph_comparison`)이 된다([AI 연동](AI_INTEGRATION.md#챗봇-모델-단계-클라이언트)). 결과는 승인 때 지목한 요구에만 속한다. 구간은 자기 요구의 결과만 인용할 수 있어, 다른 요구용 호출의 근거를 인용하면 기존 `evidence_section`/`web_section` 검사로 `validation_failed`다. 일반 개념 요구는 자기 요구를 지목한 웹 결과만 받는다. 지목은 `chat_tool_calls.request_meta.requirementIds`에 남지만 digest에는 들어가지 않으므로, 같은 조회를 다른 요구로 다시 승인받으면 호출 한 건으로 세고 결과를 재사용한다(`cachedFrom`).
 
-**시간.** agent run은 job 시작부터 **45초** 안에 검증·저장까지 끝낸다. agent 경로가 시작되면 run의 기한 자체를 시작 + 45초로 앞당긴다(`ChatRunControl.shortenDeadline`, DB `deadline_at`도 owner fence로 함께, 늦추지는 않음). 그래서 남은 시간 계산, 기록 대기, `/mcp`로 붙는 요청, 최종 저장의 지연 판정이 모두 45초를 따르며, 45초를 넘긴 결과는 60초 안이어도 완료로 저장하지 않는다(`deadline_guard`, 모델을 부른 뒤면 `response_unknown`). Luna 단계 전체(MCP 왕복·승인 continuation·도구·최종 답)는 `min(35초, 45초 중 남은 시간 − 검증·서버 예약 14초)`이고, 각 단계는 그 남은 예산까지만 기다린다. 예산이 답 작성용 10초보다 작으면 시작하지 않고 `deadline_guard`, 남은 예산이 20초 미만이면 마지막 단계로 보고 새 도구를 승인하지 않는다(마지막 10초 신규 도구 금지). direct 경로는 router·도구·답 작성·검증 단계 한도(합 63초)가 45초에 들어가지 않아, 실측으로 다시 정할 때까지 job 기한 60초를 그대로 쓴다.
+**시간.** direct와 agent의 모든 run은 job 시작부터 **45초** 안에 검증·저장까지 끝낸다. DB `deadline_at`, 남은 시간 계산, 기록 대기, `/mcp` 요청과 최종 저장의 지연 판정이 같은 기한을 따르며, 45초를 넘긴 결과는 완료로 저장하지 않는다(`deadline_guard`, 모델을 부른 뒤면 `response_unknown`). Luna 단계 전체(MCP 왕복·승인 continuation·도구·최종 답)는 `min(35초, 남은 시간 − 검증 6초 − 서버 3초)`이고, 예산이 답 작성용 10초보다 작으면 시작하지 않는다. direct 경로의 기존 단계 값은 최대 대기 상한으로 유지하되, 내부 조회 전에는 생성 10초·검증 6초·서버 3초를 예약하고 생성·검증 단계는 앞 단계가 실제로 남긴 시간만 사용한다. 그래서 느린 앞 단계는 뒤 단계를 시작하기 전에 `deadline_guard`로 끝나며 45초 밖에서 새 모델 호출을 시작하지 않는다. 이 최소값과 상한은 live latency spike의 p95로 다시 보정한다.
 
 **fan-out.** 대상이 5개(한 호출의 `targets` 상한)를 넘는 요구가 있는 계획은 agent 경로를 타지 않고 direct 경로에서 서버가 5개씩 나눠 읽는다. route 요약에 `path=agent`, `agentSteps`, `approvedCalls`, `deniedCalls`를 남긴다.
 
@@ -135,7 +135,7 @@ agent 단계가 하나라도 시작된 뒤의 `mcp_unreachable`는 **같은 run�
 같은 질문은 어느 경로로 읽어도 같은 자료를 읽어야 한다. `ChatMcpDirectParityTest`가 실제 읽기 도구와 합성 그래프로 도구별 결과(항목, 근거, 버전, 경로, 잘림)를 비교한다. MCP 인자는 대상과 개수뿐이라, 요구의 문구나 대상의 출처에 달린 읽기는 agent로 보내지 않고 direct로 둔다(`OrchestratedChatEngine.agentReadsLikeDirect`).
 
 - 질문에 적힌 기간이 있는 `graph.version.diff`
-- 기간이 있는 `document.search`
+- `document.search`(기간뿐 아니라 요구 문장에서 서버가 만든 본문 검색어도 요청에 결속되므로 항상 direct)
 - 회원이 근거를 좁혀 선택했는데 요구가 자기 대상을 지목한 읽기
 
 ## 5. 켜기 전에 남은 조건
@@ -143,7 +143,7 @@ agent 단계가 하나라도 시작된 뒤의 `mcp_unreachable`는 **같은 run�
 아래가 끝나기 전에는 로컬 합성 시험 밖에서 `ZOOP_CHAT_MCP_ENABLED`·`ZOOP_CHAT_AGENT_ENABLED`를 켜지 않는다.
 
 1. ~~**model-send grant 검사.**~~ 구현(3장 "모델 전송 gate"). 켜기 전에 운영자가 레지스트리에 `chat-agent` 목적·agent 수신자 grant와 `zoop-graph` source를 등록하고, OpenAI 보유 조건을 거버넌스 10장에 기록해야 한다.
-2. **예산**(단계 2): job 단위 호출 상한 6회(내부 몫, 웹 2회는 따로 센다. rerun은 남은 호출만 쓰고, 계획에 모자라면 `budget_exceeded`로 재실행 불가), agent 라운드당 승인 4건(동시 4개), fan-out 5, agent run 45초(검증·저장까지)·Luna 35초는 구현했다. 요청 캐시·single-flight(인스턴스 안)·재사용 시 gate 재검사·job당 결과 1 MiB도 구현했다(3장). 도구별 시간은 일반 읽기 3초·그래프 계산(`zoop-graph-read`: `graph.path.read`·`graph.version.diff`) 5초로 구현했다(단계 10초와 run 기한으로 줄어듦). 웹 검색 도구의 호출당 7초, job당 웹 2회(내부 6회와 별도), 회원 하루 20회·프로젝트 하루 500회 원자 예약도 구현했다([챗봇 보조 웹 검색 도구](chat-web-search.md)). 남은 것: direct 경로 45초(단계 한도 실측 후), 인스턴스를 넘는 single-flight(필요하면). rate limit은 인스턴스별이다.
+2. **예산**(단계 2): job 단위 호출 상한 6회(내부 몫, 웹 2회는 따로 센다. rerun은 남은 호출만 쓰고, 계획에 모자라면 `budget_exceeded`로 재실행 불가), agent 라운드당 승인 4건(동시 4개), fan-out 5, 모든 run 45초(검증·저장까지)·Luna 35초를 구현했다. 요청 캐시·single-flight(인스턴스 안)·재사용 시 gate 재검사·job당 결과 1 MiB도 구현했다(3장). 도구별 시간은 일반 읽기 3초·그래프 계산(`zoop-graph-read`: `graph.path.read`·`graph.version.diff`) 5초로 구현했다(단계 10초와 run 기한으로 줄어듦). 웹 검색 도구의 호출당 7초, job당 웹 2회(내부 6회와 별도), 회원 하루 20회·프로젝트 하루 500회 원자 예약도 구현했다([챗봇 보조 웹 검색 도구](chat-web-search.md)). 남은 것은 live p95에 따른 direct 최소 예약·단계 상한 보정과, 필요할 경우 인스턴스를 넘는 single-flight다. rate limit은 인스턴스별이다.
 3. ~~**preflight·circuit breaker.**~~ 구현. AI runtime의 무과금 health probe와 Java의 5회/3실패·30초·단일 half-open probe, 시작 전 direct 선택, 실행 중 무대체를 적용했다.
 4. ~~**승인 요청의 요구 매핑.**~~ 구현(`zoop-ai-chat-4`, 4장 흐름 2·4). 웹 검색 gate도 요구별이다([챗봇 보조 웹 검색 도구](chat-web-search.md) 5장).
 5. **네트워크·운영**: HTTPS 인바운드 노출 범위, 공급자 출발지 제한 여부(IP allowlist만으로 인증하지 않음), 승인된 소량 live latency spike(실제 Responses·MCP 응답 형태 확인 포함). Spike의 승인·합성 데이터·무내용 증거·통과 gate는 [챗봇 MCP live latency spike](../../docs/development/chat-live-spike.md)에 고정했다. HTTPS·출발지 제한 선택, model-send grant, `store=true` 보유 조건·외부 처리 고지, 키 회전, 사고·증거 보존 책임은 [운영 readiness gate](../../docs/development/chat-operations-readiness.md)가 같은 후보 commit의 통과한 spike와 함께 검사한다. 이 검사는 배포나 플래그 변경을 하지 않는다. 총 8회 시나리오(내부 6 + 웹 2)는 상한으로는 가능하지만 실행해 확인하지 않았고, 실제 웹 공급자가 없어 합성 공급자로만 측정할 수 있다(조건은 spike 문서). 그 시나리오가 통과하기 전에는 gate를 통과로 기록하지 않는다.

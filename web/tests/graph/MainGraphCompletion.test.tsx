@@ -557,6 +557,23 @@ it('D-GRP-01 keeps event focus and map information controls without the extra he
   expect(screen.queryByRole('button', { name: '조작 도움말' })).toBeNull();
 });
 
+it('D-GRP-01 지도 안내는 개발용 MOCK 문구 없이 보유·관심 표기와 크기·거리의 뜻을 알린다', async () => {
+  anonymous();
+  vi.mocked(getGraph).mockResolvedValue(
+    createMockGraph({ mode: 'all', personalFilter: 'all' }),
+  );
+  setup();
+  await userEvent.click(
+    await screen.findByRole('button', { name: '지도 데이터 안내' }),
+  );
+  const info = await screen.findByText(/개별 사건은 ϟ 숫자로/);
+  expect(info.textContent).toContain('이름 아래에 보유·관심이라고');
+  expect(info.textContent).toContain(
+    '노드 크기와 거리는 인과 관계나 중요도를 뜻하지',
+  );
+  expect(info.textContent).not.toMatch(/MOCK|개발용/);
+});
+
 it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도로 복귀한다', async () => {
   anonymous();
   vi.mocked(getGraph).mockImplementation(async (request) =>
@@ -1210,6 +1227,11 @@ describe('D-GRP-06 · 기업 영향 경로', () => {
       name: '기업 패널 너비 조절',
     });
     expect(separator.getAttribute('aria-valuenow')).toBe('320');
+    // 패널은 열릴 때 제목으로 포커스를 옮긴다. 그 뒤에 조절 손잡이로 옮겨야 키 입력이 빗나가지 않는다.
+    const heading = await within(panel).findByRole('heading', {
+      name: '삼성전자',
+    });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
     separator.focus();
     await userEvent.keyboard('{ArrowLeft}');
     expect(separator.getAttribute('aria-valuenow')).toBe('336');

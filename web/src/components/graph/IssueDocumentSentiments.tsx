@@ -1,5 +1,6 @@
 import type { CompanyDocument } from '@/types/map/company';
 import DocumentSentiment from './DocumentSentiment';
+import { visibleSentiment } from './visible-sentiment';
 
 // D-GRP-03 · gap 25. Retain document identity; never aggregate judgements.
 export default function IssueDocumentSentiments({
@@ -12,14 +13,10 @@ export default function IssueDocumentSentiments({
   issueId: string;
 }) {
   return documents.map((document) => {
-    const sentiment = document.sentiment;
+    const sentiment = visibleSentiment(document, companyId);
     if (
       !sentiment ||
-      sentiment.companyId !== companyId ||
-      !document.events?.some((event) => event.eventId === issueId) ||
-      (document.analysisStatus &&
-        document.analysisStatus.sentiment.status !== 'available') ||
-      document.analysisProvenance?.recordingKind === 'authored-test'
+      !document.events?.some((event) => event.eventId === issueId)
     )
       return null;
     return (

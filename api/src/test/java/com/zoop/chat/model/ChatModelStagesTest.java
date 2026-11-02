@@ -391,6 +391,27 @@ class ChatModelStagesTest {
     }
 
     @Test
+    void theGeneratorGetsAWebHitAsAQuoteUnderItsProvidersGrant() {
+        answer = call -> succeeded(call, """
+                {"sections":[],"insufficientRequirementIds":["r1"],"graphTargetIds":[]}""");
+        String id = "web-" + "c".repeat(32);
+        var hit = new com.zoop.chat.tool.ChatWebResult(id, "https://news.example.com/hbm", "news.example.com", "[합성] HBM이란",
+                "[합성 자료] HBM은 D램을 쌓은 메모리다.", null, "synthetic", java.time.Instant.parse("2026-10-30T01:00:00Z"));
+        var search = new ChatToolResult("chat-tool/v1", "tc-1", "web.search", "web:synthetic",
+                List.of(new ChatToolItem(id, "web_result", hit.title(), List.of(), List.of())), List.of(), false, false, null,
+                List.of(), List.of(hit), null);
+        var branch = new ChatBranchContext.Branch("r1", "HBM 소식", Set.of(ChatQueryType.Q03), false, List.of(search), true);
+
+        stages.generate(run(root("HBM 소식")), new ChatBranchContext(List.of(), null, List.of(branch), 20));
+
+        JsonNode sent = calls.getFirst().input().get("branches").get(0);
+        assertEquals(id, sent.get("evidence").get(0).get("evidenceId").stringValue());
+        assertEquals("web-search:synthetic", sent.get("evidence").get(0).get("sourceId").stringValue());
+        assertEquals(0, sent.get("items").size(), "a web hit is no graph item");
+        assertTrue(sent.get("noneFound").booleanValue(), "ZOOP's own empty read stays said");
+    }
+
+    @Test
     void aWebHitIsSentUnderItsProvidersGrant() {
         answer = call -> succeeded(call, """
                 {"sections":[{"claims":[{"claimId":"s0c0","support":"supported","unsupportedCausality":"no"}],

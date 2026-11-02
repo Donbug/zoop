@@ -9,7 +9,7 @@ export function validPriceContext(
 ): BriefingPriceContext | null {
   try {
     const p = result.companyPriceContext;
-    const r = result.editionReview;
+    const r = result.companyPriceBasis ?? result.editionReview;
     if (
       !p ||
       !r ||

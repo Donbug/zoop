@@ -199,6 +199,10 @@ class AiUsageServiceTest {
         assertNull(briefing.requests());
         assertNull(briefing.succeeded());
         assertNull(briefing.failed());
+        assertNull(briefing.usage().modelCalls());
+        assertNull(briefing.usage().inputTokens());
+        assertNull(briefing.usage().outputTokens());
+        assertNull(briefing.usage().retries());
         org.junit.jupiter.api.Assertions.assertTrue(briefing.unavailableMetrics().contains("requests"));
     }
 

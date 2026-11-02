@@ -12,17 +12,18 @@ import type {
 
 const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink';
-const TOGGLE = `inline-flex h-8 items-center gap-1 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-caption font-semibold text-zoop-muted hover:bg-zoop-wash aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper disabled:opacity-60 ${FOCUS_RING}`;
+const TOGGLE = `inline-flex h-8 items-center gap-1 rounded-md border border-zoop-border bg-zoop-control px-2.5 text-caption font-semibold text-zoop-muted hover:bg-zoop-selected aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-on-ink disabled:opacity-60 ${FOCUS_RING}`;
 
 type Props = {
   feature: FeedbackFeature;
   targetId: string;
-  /** 사용자가 본 결과 버전(브리핑은 graphVersion). 서버와 다르면 저장하지 않는다(409). */
+  /** 사용자가 본 결과 버전(브리핑은 feedbackVersion, 구버전 API는 graphVersion). 서버와 다르면 저장하지 않는다(409). */
   targetVersion?: string | null;
   /** 접근 가능한 이름에 쓰는 대상 이름(예: "이 브리핑", "핵심 이슈 1") */
   subject: string;
   /** 서버에 저장된 내 평가. 아직 모르면 undefined */
   saved?: FeedbackValue;
+  savedReason?: string | null;
   /** 저장이 확인되면 부모의 상태를 바꾼다. */
   onSaved?: (item: FeedbackItem) => void;
 };
@@ -73,6 +74,7 @@ function MemberFeedback({
   targetVersion,
   subject,
   saved,
+  savedReason,
   onSaved,
 }: Props) {
   const revision = useAuthStore((s) => s.sessionRevision);
@@ -93,6 +95,11 @@ function MemberFeedback({
   } | null>(null);
   const [reasonOpen, setReasonOpen] = useState(false);
   const [reason, setReason] = useState('');
+  const [storedReason, setStoredReason] = useState<string | null | undefined>(
+    undefined,
+  );
+  const currentReason =
+    storedReason !== undefined ? storedReason : (savedReason ?? null);
   const current = value ?? saved ?? 'none';
 
   async function send(next: FeedbackValue, withReason?: string) {
@@ -112,7 +119,7 @@ function MemberFeedback({
         targetId,
         value: next,
         targetVersion: targetVersion ?? null,
-        reason: next === 'down' ? (withReason ?? null) : null,
+        reason: next === 'down' ? withReason?.trim() || null : null,
       });
       if (
         !active.current ||
@@ -127,8 +134,10 @@ function MemberFeedback({
       )
         throw new Error('평가 저장 응답이 요청과 일치하지 않아요.');
       setValue(item.value);
+      setStoredReason(item.reason);
+      setReason(item.reason ?? '');
       onSaved?.(item);
-      setReasonOpen(item.value === 'down' && !withReason);
+      setReasonOpen(item.value === 'down' && withReason === undefined);
       if (item.value !== 'down') setReason('');
     } catch (error) {
       if (
@@ -145,8 +154,7 @@ function MemberFeedback({
   function submitReason(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = reason.trim();
-    if (text) void send('down', text);
-    else setReasonOpen(false);
+    void send('down', text);
   }
 
   const toggle = (kind: 'up' | 'down', label: string) => (
@@ -172,6 +180,22 @@ function MemberFeedback({
         {toggle('up', '도움이 됐어요')}
         {toggle('down', '도움이 안 됐어요')}
       </div>
+      {!reasonOpen && current === 'down' && (
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-zoop-muted">
+          {currentReason && <p>남긴 이유: {currentReason}</p>}
+          <button
+            type="button"
+            className={TOGGLE}
+            disabled={pending}
+            onClick={() => {
+              setReason(currentReason ?? '');
+              setReasonOpen(true);
+            }}
+          >
+            {currentReason ? '이유 수정' : '이유 추가'}
+          </button>
+        </div>
+      )}
       {reasonOpen && current === 'down' && (
         <form
           onSubmit={submitReason}
@@ -187,7 +211,7 @@ function MemberFeedback({
             maxLength={200}
             placeholder="어떤 점이 아쉬웠나요? (선택)"
             onChange={(event) => setReason(event.target.value)}
-            className={`h-8 min-w-0 flex-1 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-caption text-zoop-ink ${FOCUS_RING}`}
+            className={`h-8 min-w-0 flex-1 rounded-md border border-zoop-border bg-zoop-surface px-2.5 text-caption text-zoop-ink ${FOCUS_RING}`}
           />
           <button
             type="submit"

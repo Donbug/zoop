@@ -91,14 +91,14 @@ export type Dashboard = {
   } | null;
   ai: {
     window: string;
-    requests: number;
-    succeeded: number;
-    failed: number;
+    requests: number | null;
+    succeeded: number | null;
+    failed: number | null;
     features: {
       feature: string;
       label: string;
-      requests: number;
-      failed: number;
+      requests: number | null;
+      failed: number | null;
     }[];
   } | null;
   briefings: { latest: DashboardRound[]; delayedOrFailed: number } | null;

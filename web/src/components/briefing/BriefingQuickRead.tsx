@@ -78,7 +78,7 @@ export default function BriefingQuickRead({
             </p>
           )}
           {change && (
-            <details className="mt-4 rounded-panel border border-panel-line bg-zoop-wash p-3">
+            <details className="mt-4 rounded-panel border border-zoop-border bg-zoop-card p-3">
               <summary
                 className={`min-h-11 cursor-pointer content-center text-body font-semibold ${FOCUS_RING}`}
               >

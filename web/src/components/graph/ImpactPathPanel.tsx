@@ -29,6 +29,7 @@ type Props = {
   onViewIssue: () => void;
   onEvidence: (evidenceIds: string[]) => void;
   onAskAi: () => void;
+  onSelectNode?: (id: string) => void;
 };
 
 const unique = (items: string[]) => [...new Set(items)];
@@ -51,6 +52,7 @@ export default function ImpactPathPanel({
   onViewIssue,
   onEvidence,
   onAskAi,
+  onSelectNode,
 }: Props) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -262,12 +264,35 @@ export default function ImpactPathPanel({
                         className={ui.avatar}
                       />
                       <div className="min-w-0">
-                        <strong className={ui.itemTitle}>
+                        <button
+                          type="button"
+                          className={`${ui.itemTitle} text-left underline underline-offset-4 focus-visible:outline-2`}
+                          disabled={!onSelectNode}
+                          onClick={() =>
+                            connected && onSelectNode?.(connected.id)
+                          }
+                        >
                           {connected?.label}
-                        </strong>
+                        </button>
                         <p className={ui.muted}>
-                          {edge.summary || '공개 그래프 연결'}
+                          {edge.relationType === 'INVOLVES'
+                            ? '직접 관련'
+                            : '구조적 관련'}{' '}
+                          ·{' '}
+                          {(edge.role === 'participant'
+                            ? '참여 기업'
+                            : edge.role) ||
+                            edge.summary ||
+                            '공개 그래프 연결'}
                         </p>
+                        <button
+                          type="button"
+                          className={`${ui.button} mt-1`}
+                          disabled={!edge.evidenceIds.length}
+                          onClick={() => onEvidence(unique(edge.evidenceIds))}
+                        >
+                          근거 {unique(edge.evidenceIds).length}건
+                        </button>
                       </div>
                     </li>
                   ))}

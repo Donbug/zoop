@@ -15,6 +15,53 @@ const directEdge = graph.edges.find(
 )!;
 const issue = graph.nodes.find((node) => node.id === directEdge.source)!;
 const company = graph.nodes.find((node) => node.id === directEdge.target)!;
+
+it('D-GRP-06 M12 selects a connected company and opens only that relation evidence', async () => {
+  const other = graph.nodes.find(
+    (node) => node.kind === 'company' && node.id !== company.id,
+  )!;
+  const edge = {
+    ...directEdge,
+    id: 'other-edge',
+    source: issue.id,
+    target: other.id,
+    role: 'participant',
+    evidenceIds: ['specific-evidence', 'specific-evidence'],
+  };
+  const select = vi.fn();
+  const evidence = vi.fn();
+  render(
+    <ImpactPathPanel
+      companyId={company.id}
+      issueId={issue.id}
+      context={{}}
+      graph={{ ...graph, edges: [directEdge, edge] }}
+      impact={{
+        companyId: company.id,
+        issueId: issue.id,
+        steps: [],
+        metadata: {
+          source: 'synthetic',
+          asOf: graph.metadata.asOf,
+          graphVersion: graph.metadata.graphVersion,
+        },
+      }}
+      loading={false}
+      error={null}
+      onRetry={vi.fn()}
+      onClose={vi.fn()}
+      onViewIssue={vi.fn()}
+      onEvidence={evidence}
+      onAskAi={vi.fn()}
+      onSelectNode={select}
+    />,
+  );
+  await userEvent.click(screen.getByRole('button', { name: other.label }));
+  expect(select).toHaveBeenCalledWith(other.id);
+  expect(screen.getByText('직접 관련 · 참여 기업')).toBeTruthy();
+  await userEvent.click(screen.getByRole('button', { name: /^근거 1건$/ }));
+  expect(evidence).toHaveBeenCalledWith(['specific-evidence']);
+});
 const structuralEdge = {
   ...directEdge,
   id: 'structural-issue-company',

@@ -1,4 +1,5 @@
 import type { ChartPeriod } from './index';
+import type { EventCompany } from '@/types/map/event';
 export type Meta = {
   source: string;
   asOf: string;
@@ -99,9 +100,16 @@ export type Events = {
   items: Event[];
   unknownTimeItems: Event[];
   nextCursor: string | null;
-  metadata: Meta & { total: number; excludedUnknownTime: number };
+  metadata: Meta & {
+    total: number;
+    excludedUnknownTime: number;
+    latestEventTime?: string | null;
+    latestReportedAt?: string | null;
+  };
 };
 export type EventDetail = Event & {
+  period?: string | null;
+  companies?: EventCompany[];
   articles: {
     id: string;
     title: string | null;
