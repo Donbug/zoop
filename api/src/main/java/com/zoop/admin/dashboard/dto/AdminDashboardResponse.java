@@ -3,7 +3,7 @@ package com.zoop.admin.dashboard.dto;
 import java.time.Instant;
 import java.util.List;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.zoop.admin.jobs.AnalysisJobResponse.JobOut;
 import com.zoop.common.response.Metadata;
 import com.zoop.common.response.SectionFailure;

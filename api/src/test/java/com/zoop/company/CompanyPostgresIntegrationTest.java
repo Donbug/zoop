@@ -405,9 +405,10 @@ class CompanyPostgresIntegrationTest {
                 "UPDATE companies SET ticker='ACME' WHERE id='short'",
                 // PostgreSQL rejects TRUNCATE of a table referenced by a foreign key unless every referencing table is
                 // truncated in the same statement. member_watchlist references companies; document_analyses
-                // references companies; evidence and ai_executions reference document_analyses. Listed explicitly
+                // references companies; evidence and ai_executions reference document_analyses; ai_result_feedback
+                // references evidence. Listed explicitly
                 // (no CASCADE) so a new dependent fails loudly here.
-                "TRUNCATE member_watchlist, companies, document_analyses, evidence, ai_executions")) {
+                "TRUNCATE member_watchlist, companies, document_analyses, ai_result_feedback, evidence, ai_executions")) {
             String cursor = service.search("acme", null, 1, null, null).nextCursor();
             assertNotNull(cursor);
             jdbc.execute(mutation);

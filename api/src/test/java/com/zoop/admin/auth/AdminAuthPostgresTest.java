@@ -253,8 +253,8 @@ class AdminAuthPostgresTest {
                 .andExpect(jsonPath("$.jobs.failed24h").isNumber())
                 .andExpect(jsonPath("$.jobs.recent").isArray())
                 .andExpect(jsonPath("$.candidates").value(org.hamcrest.Matchers.nullValue()))
-                .andExpect(jsonPath("$.ai").value(org.hamcrest.Matchers.nullValue()))
-                .andExpect(jsonPath("$.briefings").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.ai.features").isArray())
+                .andExpect(jsonPath("$.briefings.latest").isArray())
                 .andReturn();
 
         Instant asOf = Instant.parse(com.jayway.jsonpath.JsonPath.read(

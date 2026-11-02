@@ -600,3 +600,7 @@ JVM은 보존 응답의 SHA·기업·통화·해상도·요청 마감·완료 �
 새 입력은 명령당 1–20개입니다. 누적 원본 수에는 20개 제한을 적용하지 않습니다. 전체 보존 참조는 artifact당 16 MiB와 실제 전송 closure의 1,003개 파일·256 MiB 경계를 따릅니다. 기존 원본의 규칙 적용 전 projection을 합친 뒤 현재 공개 규칙을 한 번 적용하며, 입력에서 빠진 기존 이슈도 보존합니다. 충돌은 명시적 근거·필드 선택으로 해결하거나 후보 전체를 거절합니다.
 
 `staged` 또는 `unchanged` 결과의 `graphVersionId`와 `receiptSha256`을 다음 전송·수동 활성화 단계에 사용합니다. 실패 코드가 `outcome_unknown`이면 같은 요청과 새 결과 경로로 상태를 대조합니다. 자세한 결정 파일·원본별 제외·권한 계약은 [누적 발행](docs/GRAPH_READ_HANDOFF.md#누적-발행과-원본별-현재-권한)을 따릅니다.
+
+### 브리핑 회원 평가·관리자 선호도
+
+`/api/v1/feedback`의 회원별 회차/이슈 도움 됨·안 됨·사유를 PostgreSQL에 저장하며, `/api/v1/admin/feedback/summary`와 `/dislikes`가 관리자 화면에 집계·사유를 제공합니다. 세션·CSRF·현재 발행 버전과 읽기 권한을 검증하고 취소도 보존합니다. 기존 익명 미리보기 SQLite와 구분합니다. [저장·집계·보존 및 검증](../docs/development/briefing-member-feedback.md)을 참고하세요.
