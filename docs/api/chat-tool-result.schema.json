@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zoop.example/internal/chat-tool-result.schema.json",
+  "title": "ChatToolResult v1",
+  "description": "The normalized result envelope recorded in chat_tool_calls and delivered to the approved MCP consumer. A failed call is never represented as an empty successful result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "toolCallId",
+    "capabilityId",
+    "dataVersion",
+    "items",
+    "evidenceIds",
+    "truncated",
+    "nextAllowed",
+    "error"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "chat-tool/v1"},
+    "toolCallId": {"type": "string", "minLength": 1},
+    "capabilityId": {"$ref": "chat-tool-request.schema.json#/$defs/capabilityId"},
+    "dataVersion": {"type": ["string", "null"], "minLength": 1},
+    "items": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/item"}
+    },
+    "evidenceIds": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "truncated": {"type": ["boolean", "null"]},
+    "nextAllowed": {"type": ["boolean", "null"]},
+    "error": {"type": ["string", "null"], "minLength": 1},
+    "paths": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/path"}
+    },
+    "webResults": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/webResult"}
+    },
+    "cachedFrom": {"type": "string", "minLength": 1},
+    "withheld": {"$ref": "#/$defs/withheld"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"error": {"type": "null"}}},
+      "then": {
+        "properties": {
+          "dataVersion": {"type": "string", "minLength": 1},
+          "truncated": {"type": "boolean"},
+          "nextAllowed": {"type": "boolean"}
+        }
+      },
+      "else": {
+        "properties": {
+          "dataVersion": {"type": "null"},
+          "items": {"maxItems": 0},
+          "evidenceIds": {"maxItems": 0},
+          "truncated": {"type": "null"},
+          "nextAllowed": {"type": "null"}
+        },
+        "not": {
+          "anyOf": [
+            {"required": ["cachedFrom"]},
+            {"required": ["withheld"]},
+            {"required": ["webResults"]},
+            {"required": ["paths"]}
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "label", "companyIds", "evidenceIds"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "kind": {"type": "string", "minLength": 1},
+        "label": {"type": "string"},
+        "companyIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "evidenceIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "pathStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edgeId", "sourceId", "targetId", "relation", "role", "evidenceIds"],
+      "properties": {
+        "edgeId": {"type": "string", "minLength": 1},
+        "sourceId": {"type": "string", "minLength": 1},
+        "targetId": {"type": "string", "minLength": 1},
+        "relation": {"type": "string", "minLength": 1},
+        "role": {"type": "string", "minLength": 1},
+        "evidenceIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fromId", "toId", "status", "steps"],
+      "properties": {
+        "fromId": {"type": "string", "minLength": 1},
+        "toId": {"type": "string", "minLength": 1},
+        "status": {"enum": ["found", "none", "cut"]},
+        "steps": {"type": "array", "items": {"$ref": "#/$defs/pathStep"}}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "found"}}},
+          "then": {"properties": {"steps": {"minItems": 1}}},
+          "else": {"properties": {"steps": {"maxItems": 0}}}
+        }
+      ]
+    },
+    "webResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "url", "domain", "title", "snippet", "publishedAt", "provider", "searchedAt"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^web-"},
+        "url": {"type": "string", "format": "uri", "pattern": "^https?://"},
+        "domain": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1, "maxLength": 300},
+        "snippet": {"type": "string", "maxLength": 500},
+        "publishedAt": {"type": ["string", "null"], "format": "date-time"},
+        "provider": {"type": "string", "minLength": 1},
+        "searchedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "withheld": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "items", "evidenceIds", "paths"],
+      "properties": {
+        "reason": {"const": "source_grant_denied"},
+        "items": {"type": "integer", "minimum": 0},
+        "evidenceIds": {"type": "integer", "minimum": 0},
+        "paths": {"type": "integer", "minimum": 0},
+        "webResults": {"type": "integer", "minimum": 1}
+      },
+      "anyOf": [
+        {"properties": {"items": {"minimum": 1}}},
+        {"properties": {"evidenceIds": {"minimum": 1}}},
+        {"properties": {"paths": {"minimum": 1}}},
+        {"required": ["webResults"]}
+      ]
+    }
+  }
+}

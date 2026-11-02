@@ -63,6 +63,17 @@ final class ChatRetrieval {
                 ChatPlan.Stop stop, ChatToolResult failed) {
             this(results, limitations, noneFound, stop, failed, Set.of(), Map.of(), null, Set.of());
         }
+
+        /** The same reads with further results of some requirements after their own. */
+        Outcome withResults(Map<String, List<ChatToolResult>> further) {
+            Map<String, List<ChatToolResult>> all = new LinkedHashMap<>(results);
+            further.forEach((id, more) -> {
+                List<ChatToolResult> joined = new ArrayList<>(all.getOrDefault(id, List.of()));
+                joined.addAll(more);
+                all.put(id, List.copyOf(joined));
+            });
+            return new Outcome(all, limitations, noneFound, stop, failed, cut, outside, faulted, partial);
+        }
     }
 
     /**
@@ -161,14 +172,17 @@ final class ChatRetrieval {
                     List<String> scope = fixed ? null : p.evidenceScope();
                     Instant since = capability == ChatCapability.GRAPH_VERSION_DIFF
                             || capability == ChatCapability.DOCUMENT_SEARCH ? since(run, p).orElse(null) : null;
+                    String searchText = capability == ChatCapability.DOCUMENT_SEARCH ? p.label() : null;
                     for (List<String> chunk : batches(capability, read)) {
                         String key = capability.id() + "\u0000" + String.join("\u0000", chunk) + "\u0001"
-                                + (scope == null ? "*" : String.join("\u0000", scope)) + "\u0001" + since;
+                                + (scope == null ? "*" : String.join("\u0000", scope)) + "\u0001" + since + "\u0001"
+                                + searchText;
                         Integer index = callIndex.get(key);
                         if (index == null) {
                             index = calls.size();
                             callIndex.put(key, index);
-                            calls.add(new ChatToolRequest(capability.id(), chunk, ChatToolRequest.MAX_LIMIT, scope, since));
+                            calls.add(new ChatToolRequest(capability.id(), chunk, ChatToolRequest.MAX_LIMIT, scope, since,
+                                    searchText));
                         }
                         owned.computeIfAbsent(p.id(), k -> new ArrayList<>()).add(index);
                     }

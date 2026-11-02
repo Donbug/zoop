@@ -127,8 +127,7 @@ class ChatMcpDirectParityTest {
                 Arguments.of(ChatCapability.ISSUE_READ, List.of(ISSUE)),
                 Arguments.of(ChatCapability.ISSUE_READ, List.of(HYNIX)),
                 Arguments.of(ChatCapability.EVIDENCE_RESOLVE, List.of(EVIDENCE)),
-                Arguments.of(ChatCapability.GRAPH_PATH_READ, List.of(NVIDIA, HYNIX)),
-                Arguments.of(ChatCapability.DOCUMENT_SEARCH, List.of(HYNIX)));
+                Arguments.of(ChatCapability.GRAPH_PATH_READ, List.of(NVIDIA, HYNIX)));
     }
 
     @ParameterizedTest

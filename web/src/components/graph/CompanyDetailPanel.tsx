@@ -141,6 +141,14 @@ export default function CompanyDetailPanel(props: Props) {
   );
   const currency = quote?.quote.currency;
   const changePositive = (quote?.quote.change ?? 0) >= 0;
+  const relatedItem = (related: RelatedCompany) => (
+    <li key={related.id}>
+      <button onClick={() => props.onSelectRelation?.(related.id)}>
+        <b>{related.name}</b>
+        <span>공유 사건 {related.sharedIssueCount}건</span>
+      </button>
+    </li>
+  );
 
   return (
     <aside
@@ -504,18 +512,22 @@ export default function CompanyDetailPanel(props: Props) {
               <span>{props.relatedCompanies.length}</span>
             </div>
             {props.relatedCompanies.length ? (
-              <ul className="company-list company-related-companies">
-                {props.relatedCompanies.slice(0, 5).map((related) => (
-                  <li key={related.id}>
-                    <button
-                      onClick={() => props.onSelectRelation?.(related.id)}
-                    >
-                      <b>{related.name}</b>
-                      <span>공유 사건 {related.sharedIssueCount}건</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="company-list company-related-companies">
+                  {props.relatedCompanies.slice(0, 5).map(relatedItem)}
+                </ul>
+                {/* 6곳부터는 접어 두고, 펼치면 나머지를 같은 목록으로 보여 준다. */}
+                {props.relatedCompanies.length > 5 && (
+                  <details className="company-aliases">
+                    <summary>
+                      관련 기업 {props.relatedCompanies.length - 5}곳 더 보기
+                    </summary>
+                    <ul className="company-list company-related-companies">
+                      {props.relatedCompanies.slice(5).map(relatedItem)}
+                    </ul>
+                  </details>
+                )}
+              </>
             ) : (
               <p className="company-unavailable">
                 확인된 관련 기업이 없습니다.

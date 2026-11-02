@@ -81,8 +81,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      * stage 3 s after that (its deadline per stage, for process start and ledger writes). A model stage here also covers what
      * comes outside that deadline: up to 1 s waiting for a free slot before it starts, and the reply's transport and decoding.
      * A limit equal to the service's would discard answers the service delivered in time, with their cost spent.
-     * Without tools the worst case (9 + 30 + 11 + 3 = 53 s) fits the 60 s job deadline. With tools it would not (63 s): a run
-     * whose router took more than 6 s ends as {@code deadline_guard} before any tool or further model call.
+     * The values remain per-stage ceilings, not time reservations. Direct stages shrink to the time left after the minimum
+     * answer, verification and terminal-write reservations below, so every route remains inside the 45 s job deadline.
      */
     record StageLimits(Duration router, Duration tools, Duration generate, Duration verify, Duration server) {
         /** The AI service's slot wait (1 s) and 1 s for transport and decoding, beyond its own stage deadline. */
@@ -91,6 +91,10 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 Duration.ofSeconds(28).plus(SERVICE_HEADROOM), Duration.ofSeconds(9).plus(SERVICE_HEADROOM),
                 Duration.ofSeconds(3));
     }
+    /** Minimum direct answer window kept after reads (and after an optional search-only step). */
+    static final Duration MIN_DIRECT_GENERATE = Duration.ofSeconds(10);
+    /** Minimum semantic-verification window kept before the terminal write. */
+    static final Duration MIN_VERIFY = Duration.ofSeconds(6);
     private static final Set<String> SUPPORT = Set.of("supported", "contradicted", "hold");
     private static final Set<String> ADVICE = Set.of("no", "yes", "hold");
 
@@ -114,13 +118,14 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     /** The least an agent step is given: the time to write the answer (MCP actions contract 3.2). */
     static final Duration MIN_AGENT_STEP = Duration.ofSeconds(10);
     /**
-     * An agent run ends within 45 s of its start, verification and saving included (MCP actions contract 3.2), inside the
-     * job's own deadline ({@link ChatJobExecutor#MAX_DEADLINE}, kept for the direct path until its stage limits are re-set
-     * from measured p95: router, tools, answer and verification do not fit 45 s).
+     * An agent run ends within 45 s of its start, verification and saving included (MCP actions contract 3.2). This equals
+     * the job-wide deadline and remains named here because the agent budget is part of the external execution contract.
      */
     static final Duration AGENT_JOB = Duration.ofSeconds(45);
     /** All agent steps together (MCP round trips, approvals, tool calls and the final answer): at most 35 s. */
     static final Duration AGENT_TOTAL = Duration.ofSeconds(35);
+    /** The web search after the server's own reads: at most this, and never the time the answer still needs. */
+    static final Duration WEB_AFTER_READS = Duration.ofSeconds(20);
     /**
      * A rerun whose job has fewer calls left than its plan needs: the same input always would, so it is not rerun and the
      * member is asked to narrow the question ({@code budget_exceeded}, chat failure contract).
@@ -203,7 +208,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     private ChatEngineOutcome run(ChatRun run, ChatRunControl control, ObjectNode route) {
         Set<String> bound = registry.bound();
         ChatRouteDecision decision = model(control, limits.router(),
-                limits.generate().plus(limits.verify()).plus(limits.server()),
+                limits.tools().plus(MIN_DIRECT_GENERATE).plus(MIN_VERIFY).plus(limits.server()),
                 () -> router.route(run, bound));
         ChatPlan plan = planner.plan(run, decision, bound);
         var coverage = new ChatRequirementCoverage(decision);
@@ -231,30 +236,16 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             // checked below against exactly the results of the calls that ran, each requirement against its own.
             control.phase("retrieving");
             if (control.toolCallsLeft() < 1) throw new Stop(TOOL_BUDGET_SPENT);
-            // The run's deadline becomes 45 s from the job's start: verification and the final store keep to it too.
+            // Idempotently keep the agent path on the same 45 s deadline as every other route.
             control.shortenDeadline(run.deadline().minus(ChatJobExecutor.MAX_DEADLINE.minus(AGENT_JOB)));
-            Duration after = limits.verify().plus(limits.server());
+            Duration after = MIN_VERIFY.plus(limits.server());
             // Luna has min(35 s, what is left of it before verification and saving): never 35 s on top.
             Duration luna = min(AGENT_TOTAL, control.remaining().minus(after));
             if (luna.compareTo(MIN_AGENT_STEP) < 0) throw new DeadlineGuard();
-            Instant lunaEnd = clock.instant().plus(luna);
             ChatAgentPath.Outcome ran = agent.run(run, control, agentRequirements(confirmed), agentTools,
-                    ChatAnswerCheck.MAX_CITATIONS, new ChatAgentPath.Steps() {
-                        @Override
-                        public ChatModels.AgentStep run(Supplier<ChatModels.AgentStep> step) {
-                            // Each step waits at most what is left of the Luna budget, and never less than the time an
-                            // answer needs.
-                            Duration limit = min(AGENT_STEP, Duration.between(clock.instant(), lunaEnd));
-                            if (limit.compareTo(MIN_AGENT_STEP) < 0) throw new DeadlineGuard();
-                            return model(control, limit, after, step);
-                        }
-
-                        @Override
-                        public boolean closing() {
-                            // The last 10 s write the answer: no new tool starts in them.
-                            return Duration.between(clock.instant(), lunaEnd).compareTo(MIN_AGENT_STEP.multipliedBy(2)) < 0;
-                        }
-                    });
+                    // The last 10 s write the answer: no new tool starts in them.
+                    ChatAnswerCheck.MAX_CITATIONS, steps(control, clock.instant().plus(luna), after,
+                            MIN_AGENT_STEP.multipliedBy(2)));
             Map<String, List<ChatToolResult>> results = new LinkedHashMap<>();
             confirmed.requirements().stream().filter(p -> p.mode() == Mode.TOOLS)
                     .forEach(p -> results.put(p.id(), ran.resultsOf(p.id())));
@@ -275,7 +266,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             control.phase("retrieving");
             // A rerun reads within what is left of the job's calls, never a new budget.
             if (ChatPlanner.worstCaseCalls(confirmed) > control.toolCallsLeft()) throw new Stop(TOOL_BUDGET_SPENT);
-            guard(control, limits.tools().plus(limits.generate()).plus(limits.verify()).plus(limits.server()));
+            guard(control, limits.tools().plus(MIN_DIRECT_GENERATE).plus(MIN_VERIFY).plus(limits.server()));
             retrieved = retrieval.run(run, control, confirmed);
             if (retrieved.failed() != null) throw new Stop(toolFailure(retrieved.failed()));
             coverage.read(confirmed, retrieved.results());
@@ -283,6 +274,17 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             if (retrieved.faulted() != null) {
                 route.putArray("toolFaults").addAll(strings(retrieved.limitations().entrySet().stream()
                         .filter(e -> ChatRetrieval.TOOL_UNAVAILABLE.equals(e.getValue())).map(Map.Entry::getKey).toList()));
+            }
+            ChatPlan.Stop webScope = webScopeStop(run, confirmed, retrieved);
+            if (webScope != null) return stopped(run, route, webScope, coverage);
+            List<ChatModels.AgentRequirement> gaps = webGaps(run, confirmed, retrieved);
+            if (!gaps.isEmpty()) {
+                WebAfterReads web = webAfterReads(run, control, gaps, directStart, route);
+                agentNotices = web.notices();
+                if (!web.hits().isEmpty()) {
+                    retrieved = retrieved.withResults(web.hits());
+                    coverage.read(confirmed, retrieved.results());
+                }
             }
         }
 
@@ -326,7 +328,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         } else {
             control.phase("writing");
             var context = new ChatBranchContext(run.turns(), run.context(), branches, ChatAnswerCheck.MAX_CITATIONS);
-            generated = model(control, limits.generate(), limits.verify().plus(limits.server()),
+            generated = modelAtLeast(control, limits.generate(), MIN_DIRECT_GENERATE,
+                    MIN_VERIFY.plus(limits.server()),
                     () -> generator.generate(run, context));
         }
         var checked = ChatAnswerCheck.check(branches, generated);
@@ -362,7 +365,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         control.phase("verifying");
         List<Citation> allCited = List.copyOf(cited.values());
         ChatModels.ServerFacts facts = ChatModels.ServerFacts.capture(run, passed.sections(), branches);
-        ChatSemanticVerdicts verdicts = model(control, limits.verify(), limits.server(),
+        ChatSemanticVerdicts verdicts = modelAtLeast(control, limits.verify(), MIN_VERIFY, limits.server(),
                 () -> verifier.verify(run, passed.sections(), allCited, facts));
         Verified verified = verified(passed.sections(), verdicts);
         if (verified == null) return validationFailed();
@@ -576,6 +579,21 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      */
     private <T> T model(ChatRunControl control, Duration stage, Duration after, Supplier<T> call) {
         guard(control, stage.plus(after));
+        return awaitModel(control, stage, call);
+    }
+
+    /**
+     * A direct model stage with a fixed minimum and a larger provisional ceiling. It uses slack left by faster earlier stages
+     * but never consumes the minimum reserved for the stages and terminal write after it.
+     */
+    private <T> T modelAtLeast(ChatRunControl control, Duration ceiling, Duration minimum, Duration after,
+            Supplier<T> call) {
+        guard(control, minimum.plus(after));
+        Duration available = control.remaining().minus(after);
+        return awaitModel(control, min(ceiling, available), call);
+    }
+
+    private <T> T awaitModel(ChatRunControl control, Duration stage, Supplier<T> call) {
         control.beforeModelCall();
         Future<T> pending = models.submit(call::get);
         try {
@@ -633,18 +651,136 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
 
     /**
      * Whether an MCP call would read what the plan reads. Its arguments are targets and a limit, and the server fills in the
-     * rest from the run, which knows neither the requirement's own words nor where its targets came from. So a period read from
-     * the question (or any period of a document read) and a requirement that names its own targets while the member
-     * narrowed the selection to chosen evidence stay on the direct path.
+     * rest from the run, which knows neither the requirement's own words nor where its targets came from. A document search
+     * always needs those words for its server-owned full-text terms. A graph comparison period read from the question and a
+     * requirement that names its own targets while the member narrowed the selection to chosen evidence also stay direct.
      */
     private static boolean agentReadsLikeDirect(ChatRun run, Planned p) {
-        boolean dated = p.capabilities().contains(ChatCapability.DOCUMENT_SEARCH)
-                ? ChatRetrieval.period(run, p).isPresent()
-                : p.capabilities().contains(ChatCapability.GRAPH_VERSION_DIFF)
-                        && ChatPeriods.parse(p.label(), run.askedAt()).isPresent();
+        if (p.capabilities().contains(ChatCapability.DOCUMENT_SEARCH)) return false;
+        boolean dated = p.capabilities().contains(ChatCapability.GRAPH_VERSION_DIFF)
+                && ChatPeriods.parse(p.label(), run.askedAt()).isPresent();
         boolean scopeDiffers = !run.selection().evidenceIds().isEmpty() && p.evidenceScope() == null
                 && p.capabilities().stream().anyMatch(c -> c.documents().isEmpty());
         return !dated && !scopeDiffers;
+    }
+
+    private ChatAgentPath.Steps steps(ChatRunControl control, Instant end, Duration after, Duration closingAt) {
+        return new ChatAgentPath.Steps() {
+            @Override
+            public ChatModels.AgentStep run(Supplier<ChatModels.AgentStep> step) {
+                // Each step waits at most what is left of the budget, and never less than the time an answer needs.
+                Duration limit = min(AGENT_STEP, Duration.between(clock.instant(), end));
+                if (limit.compareTo(MIN_AGENT_STEP) < 0) throw new DeadlineGuard();
+                return model(control, limit, after, step);
+            }
+
+            @Override
+            public boolean closing() {
+                return Duration.between(clock.instant(), end).compareTo(closingAt) < 0;
+            }
+        };
+    }
+
+    private record WebAfterReads(Map<String, List<ChatToolResult>> hits, List<String> notices) { }
+
+    /**
+     * The web search of a run the server read itself (Q05 with a period, Q06, Q07, Q08 and the other plans the agent cannot
+     * read): Luna is offered the search alone, for the requirements {@link #webGaps} found unmet, and the server's gate decides
+     * it as on the agent path. Only the hits come back; the answer is written by the generator from the reads and the hits, so
+     * Luna's own closing answer is dropped. A fault here is a notice and never fails a run that has its reads.
+     */
+    private WebAfterReads webAfterReads(ChatRun run, ChatRunControl control, List<ChatModels.AgentRequirement> gaps,
+            boolean agentRefused, ObjectNode route) {
+        Duration after = MIN_DIRECT_GENERATE.plus(MIN_VERIFY).plus(limits.server());
+        Duration budget = min(WEB_AFTER_READS, control.remaining().minus(after));
+        if (budget.compareTo(MIN_AGENT_STEP) < 0) {
+            route.put("webAfterReads", "no_time");
+            return new WebAfterReads(Map.of(), List.of(WEB_BUDGET_EXHAUSTED));
+        }
+        if (agentRefused || !agent.available()) {
+            route.put("webAfterReads", "unavailable");
+            return new WebAfterReads(Map.of(), List.of(WEB_UNAVAILABLE));
+        }
+        ChatAgentPath.Outcome ran;
+        try {
+            ran = agent.run(run, control, gaps, List.of(ChatCapability.WEB_SEARCH), ChatAnswerCheck.MAX_CITATIONS,
+                    steps(control, clock.instant().plus(budget), after, MIN_AGENT_STEP));
+        } catch (ChatModels.Failure | DeadlineGuard fault) {
+            route.put("webAfterReads", "failed");
+            return new WebAfterReads(Map.of(), List.of(WEB_UNAVAILABLE));
+        }
+        Map<String, List<ChatToolResult>> hits = new LinkedHashMap<>();
+        for (var gap : gaps) {
+            List<ChatToolResult> found = ran.resultsOf(gap.id()).stream().filter(r -> !r.webResults().isEmpty()).toList();
+            if (!found.isEmpty()) hits.put(gap.id(), found);
+        }
+        route.put("webAfterReads", "searched").put("webSteps", ran.steps()).put("webApproved", ran.approved())
+                .put("webDenied", ran.denied());
+        return new WebAfterReads(hits, ran.notices());
+    }
+
+    /**
+     * The requirements of a server-read run the web may still add to (web search design 2). Their own reads ended, none failed
+     * and none was bound to evidence the member chose. A public fact (Q03, Q04, Q07) with nothing found or a cut read qualifies.
+     * What only ZOOP's records can say (the comparison, the published round, the selection of Q05, Q06, Q08) is never replaced
+     * by the web, so an empty read opens nothing there; only words asking for an outside source do, for background beside it.
+     */
+    private List<ChatModels.AgentRequirement> webGaps(ChatRun run, ChatPlan.Run plan, ChatRetrieval.Outcome retrieved) {
+        if (agent == null || !agent.tools().contains(ChatCapability.WEB_SEARCH)) return List.of();
+        List<ChatModels.AgentRequirement> gaps = new ArrayList<>();
+        for (Planned p : plan.requirements()) {
+            if (p.mode() != Mode.TOOLS || p.origin() == ChatPlan.Origin.SCOPE || !webMayServe(p) || p.evidenceScope() != null
+                    || retrieved.limitations().containsKey(p.id()) || retrieved.partial().contains(p.id())) continue;
+            List<ChatToolResult> reads = retrieved.results().getOrDefault(p.id(), List.of());
+            boolean recordsOnly = p.types().stream().anyMatch(RECORD_TYPES::contains);
+            boolean incomplete = retrieved.noneFound().contains(p.id())
+                    || ChatWebDemand.coverage(p.label(), run.askedAt(), p.targets(), reads,
+                            id -> demandCitation(run, id)).incomplete();
+            if (ChatWebDemand.asksExternalSource(p.label()) || incomplete && !recordsOnly) {
+                gaps.add(ChatModels.AgentRequirement.searchOnly(p.id(), p.label()));
+            }
+        }
+        return gaps;
+    }
+
+    /**
+     * Q07 may read five member companies internally, but one run may search only two of them. If more than two still need
+     * public facts, ask the member which pair to search before any search or final generation; never pick a pair by order.
+     */
+    private ChatPlan.Stop webScopeStop(ChatRun run, ChatPlan.Run plan, ChatRetrieval.Outcome retrieved) {
+        if (agent == null || !agent.tools().contains(ChatCapability.WEB_SEARCH)) return null;
+        for (Planned p : plan.requirements()) {
+            if (p.mode() != Mode.TOOLS || !p.types().contains(ChatQueryType.Q07) || !p.onScope()
+                    || p.evidenceScope() != null || retrieved.limitations().containsKey(p.id())
+                    || retrieved.partial().contains(p.id())) continue;
+            ChatRetrieval.Found scope = ChatRetrieval.found(
+                    retrieved.results().getOrDefault(p.dependsOn().requirementId(), List.of()));
+            if (scope.companies().size() <= 2) continue;
+            List<ChatToolResult> reads = retrieved.results().getOrDefault(p.id(), List.of());
+            Map<String, String> missing = new LinkedHashMap<>();
+            boolean external = ChatWebDemand.asksExternalSource(p.label());
+            scope.companies().forEach((id, label) -> {
+                if (external || ChatWebDemand.coverage(p.label(), run.askedAt(), List.of(id), reads,
+                        evidenceId -> demandCitation(run, evidenceId)).incomplete()) {
+                    missing.put(id, label);
+                }
+            });
+            if (missing.size() > 2) {
+                var pair = new ChatRouteDecision.Dependency("web", "exactly", 2);
+                return ChatPlanner.clarify(run, "web_company_selection",
+                        ChatRetrieval.choices(new ChatRetrieval.Found(missing, false), pair));
+            }
+        }
+        return null;
+    }
+
+    /** A refused or temporarily unreadable internal citation never becomes permission to replace it with the web. */
+    private Optional<Citation> demandCitation(ChatRun run, String evidenceId) {
+        try {
+            return citations.cite(evidenceId, run.graphVersionId(), run.context().asOf(), run.jobId());
+        } catch (ChatToolUnavailable unavailable) {
+            return Optional.empty();
+        }
     }
 
     /** Whether the agent was offered nothing but the web: a concept question with no read of its own. */
@@ -656,7 +792,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      * The public citation of a web hit (web search design 6): its server id, snippet, title, domain as publisher, provider
      * as {@code docId}, publication time and URL. It is no ZOOP evidence and never becomes one.
      */
-    static Citation webCitation(ChatWebResult hit) {
+    public static Citation webCitation(ChatWebResult hit) {
         return new Citation("web_result", hit.id(), hit.snippet(), null, null, hit.provider(), null, 0,
                 hit.snippet().codePointCount(0, hit.snippet().length()), hit.title(), hit.domain(), hit.publishedAt(),
                 hit.url());
@@ -675,6 +811,11 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     private static final Set<ChatQueryType> WEB_TYPES = Set.of(ChatQueryType.Q03, ChatQueryType.Q04, ChatQueryType.Q05,
             ChatQueryType.Q06, ChatQueryType.Q07, ChatQueryType.Q08);
 
+    /** The question types whose answer is ZOOP's own record, which no web result stands in for (web search design 2). */
+    private static final Set<ChatQueryType> RECORD_TYPES = Set.of(ChatQueryType.Q05, ChatQueryType.Q06, ChatQueryType.Q08);
+    private static final String WEB_UNAVAILABLE = "web_unavailable";
+    private static final String WEB_BUDGET_EXHAUSTED = "web_budget_exhausted";
+
     /** Whether a search may serve this requirement at all: a concept or a fact part, and no service rule. */
     private static boolean webMayServe(Planned p) {
         return !p.types().contains(ChatQueryType.Q01) && (p.mode() == Mode.GENERAL
@@ -685,7 +826,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     private static List<ChatModels.AgentRequirement> agentRequirements(ChatPlan.Run plan) {
         return plan.requirements().stream().filter(p -> p.mode() == Mode.TOOLS || p.mode() == Mode.GENERAL)
                 .map(p -> new ChatModels.AgentRequirement(p.id(), p.label(), p.mode() == Mode.GENERAL,
-                        p.mode() == Mode.TOOLS ? p.targets() : List.of(), webMayServe(p)))
+                        p.mode() == Mode.TOOLS ? p.targets() : List.of(), webMayServe(p),
+                        ChatWebDemand.asksExternalSource(p.label())))
                 .toList();
     }
 

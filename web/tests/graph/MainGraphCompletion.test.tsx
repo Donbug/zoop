@@ -1210,6 +1210,11 @@ describe('D-GRP-06 · 기업 영향 경로', () => {
       name: '기업 패널 너비 조절',
     });
     expect(separator.getAttribute('aria-valuenow')).toBe('320');
+    // 패널은 열릴 때 제목으로 포커스를 옮긴다. 그 뒤에 조절 손잡이로 옮겨야 키 입력이 빗나가지 않는다.
+    const heading = await within(panel).findByRole('heading', {
+      name: '삼성전자',
+    });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
     separator.focus();
     await userEvent.keyboard('{ArrowLeft}');
     expect(separator.getAttribute('aria-valuenow')).toBe('336');
