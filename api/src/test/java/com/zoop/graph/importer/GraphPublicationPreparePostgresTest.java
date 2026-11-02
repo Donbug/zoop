@@ -134,6 +134,9 @@ class GraphPublicationPreparePostgresTest {
         assertEquals(request.decisionsSha256(), result.get("decisionsSha256").asString());
         // The preparation's operator name cannot carry these inputs into an operator compose: a change is left to people.
         assertFalse(GraphPublicationPreparer.proposes(reader(), publications, request, decisionBytes(result)));
+        // Under the reserved name the guard refuses it; without the guard the composer would answer correction_required.
+        assertEquals("request_invalid", GraphPublicationPreparer.operatorCompose(reader(), publications, composer(), request,
+                decisionBytes(result)).get("code").asString());
         assertEquals(published, versions.active().orElseThrow().id());
         assertEquals(0, (int) jdbc.queryForObject("SELECT count(*) FROM graph_publications WHERE base_version_id = ?", Integer.class, published));
     }
@@ -159,8 +162,6 @@ class GraphPublicationPreparePostgresTest {
         assertEquals(GraphPublicationPreparer.OPERATOR, request.operator());
         assertTrue(GraphPublicationPreparer.proposes(reader(), publications, request, decisionBytes(result)));
         assertFalse(GraphPublicationPreparer.proposes(reader(), publications, request, "{}".getBytes(StandardCharsets.UTF_8)));
-        assertEquals("request_invalid", GraphPublicationPreparer.operatorCompose(reader(), publications, composer(), request,
-                "{}".getBytes(StandardCharsets.UTF_8)).get("code").asString());
         var recovered = GraphPublicationPreparer.operatorCompose(reader(), publications, composer(), request, decisionBytes(result));
         assertEquals("unchanged", recovered.get("outcome").asString(), recovered.toString());
         assertEquals(candidate, recovered.get("graphVersionId").asString());

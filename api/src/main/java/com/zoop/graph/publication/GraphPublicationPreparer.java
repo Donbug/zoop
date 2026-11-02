@@ -115,11 +115,31 @@ public final class GraphPublicationPreparer {
      */
     public static ObjectNode operatorCompose(GraphPublicationReader reader, JdbcGraphPublicationRepository publications,
             GraphPublicationComposer composer, PublicationComposeRequest request, byte[] decisions) {
-        boolean refused = OPERATOR.equals(request.operator())
-                ? !proposes(reader, publications, request, decisions)
-                : GraphPublicationConfiguration.claimsAutomaticReviewer(decisions);
-        if (refused) return GraphPublicationComposer.failed("request_invalid");
+        // A decisions file that does not match its request is the composer's own request_invalid; only a matching one is read further.
+        if (!Canonical.sha256(decisions).equals(request.decisionsSha256())) return composer.run(request, decisions);
+        try {
+            boolean refused = OPERATOR.equals(request.operator())
+                    ? !proposes(reader, publications, request, decisions)
+                    : claimsAutomaticReviewer(decisions);
+            if (refused) return GraphPublicationComposer.failed("request_invalid");
+        } catch (PublicationException failure) {
+            return GraphPublicationComposer.failed(failure.code());
+        } catch (DataAccessException failure) {
+            return GraphPublicationComposer.failed("database_unavailable");
+        } catch (RuntimeException unexpected) {
+            log.error("publication operator compose check failed unexpectedly: {}", unexpected.getClass().getName());
+            return GraphPublicationComposer.failed("internal_error");
+        }
         return composer.run(request, decisions);
+    }
+
+    /** True when an operator decisions file claims the automatic reviewer; a malformed one is left to the composer's request_invalid. */
+    static boolean claimsAutomaticReviewer(byte[] decisions) {
+        try {
+            return PublicationMerger.claimsAutomaticReviewer(StrictJson.parseObject(decisions));
+        } catch (StrictJson.Malformed | IllegalArgumentException malformed) {
+            return false;
+        }
     }
 
     /**

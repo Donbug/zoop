@@ -145,7 +145,10 @@ final class HandoffFixtures {
                     utf16Offsets, verdicts, manualApproval, live, origin, shape, true, issueId);
         }
 
-        /** The one issue's id (and so its relations' ids): sources with different ids publish different issues. */
+        /**
+         * The one issue's id, and with it the ids of its INVOLVES and structural edges, so sources with different ids publish
+         * different issues and relations. The article, evidence, companies and {@code canonicalId} stay the same (identical records).
+         */
         Spec withIssueId(String value) {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
                     utf16Offsets, verdicts, manualApproval, live, origin, shape, impact, value);

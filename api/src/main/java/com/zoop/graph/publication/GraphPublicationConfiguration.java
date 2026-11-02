@@ -118,12 +118,14 @@ public class GraphPublicationConfiguration {
     /** A nonweb artifact-mode process running exactly one operator command. */
     static void requireExclusiveOperator(ApplicationContext context, String publicationSibling) {
         Environment env = context.getEnvironment();
-        if (context instanceof WebApplicationContext || "fixture".equals(env.getProperty("zoop.graph.snapshot.source")))
+        if (context instanceof WebApplicationContext || "fixture".equalsIgnoreCase(env.getProperty("zoop.graph.snapshot.source")))
             throw new IllegalArgumentException("publication composition requires a nonweb artifact-mode process");
         for (String other : new String[] {"document-import", "document-analysis", "graph-handoff-import", "legacy-real-import", "disclosure-exclusion",
                 "document-bindings", publicationSibling})
             if (env.getProperty("zoop." + other + ".enabled", Boolean.class, false))
                 throw new IllegalArgumentException("publication composition requires exclusive operator execution");
+        if (env.getProperty("zoop.briefing.replay.import-enabled", Boolean.class, false))
+            throw new IllegalArgumentException("publication composition requires exclusive operator execution");
         if (env.getProperty("zoop.graph-delivery.seal.enabled", Boolean.class, false)
                 || env.getProperty("zoop.graph-delivery.install.enabled", Boolean.class, false))
             throw new IllegalArgumentException("publication composition requires exclusive delivery execution");
@@ -142,13 +144,6 @@ public class GraphPublicationConfiguration {
             if (!attrs.isDirectory() || attrs.permissions().contains(PosixFilePermission.GROUP_WRITE)
                     || attrs.permissions().contains(PosixFilePermission.OTHERS_WRITE)) throw new IOException();
         } catch (IOException error) { throw new IllegalArgumentException("publication result parent unavailable"); }
-    }
-    static boolean claimsAutomaticReviewer(byte[] decisions) {
-        try {
-            return PublicationMerger.claimsAutomaticReviewer(StrictJson.parseObject(decisions));
-        } catch (StrictJson.Malformed | IllegalArgumentException malformed) {
-            return false; // the composer refuses a malformed document as request_invalid
-        }
     }
     static byte[] readOperatorFile(Path path, int max) {
         try {

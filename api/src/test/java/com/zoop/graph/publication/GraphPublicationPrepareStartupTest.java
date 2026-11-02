@@ -10,17 +10,21 @@ import static org.junit.jupiter.api.Assertions.*;
 /** The process rules the preparation runner checks before it builds anything (#55): one nonweb artifact-mode operator command. */
 class GraphPublicationPrepareStartupTest {
     @Test void runsOnlyAsTheOneOperatorCommandOfANonwebArtifactProcess() {
-        assertDoesNotThrow(() -> GraphPublicationConfiguration.requireExclusiveOperator(context(false), "graph-publication-compose"));
-        assertThrows(IllegalArgumentException.class,
-                () -> GraphPublicationConfiguration.requireExclusiveOperator(context(true), "graph-publication-compose"));
-        for (String conflict : List.of("zoop.graph.snapshot.source=fixture", "zoop.graph-publication-compose.enabled=true",
-                "zoop.graph-handoff-import.enabled=true", "zoop.document-import.enabled=true", "zoop.disclosure-exclusion.enabled=true",
-                "zoop.graph-delivery.seal.enabled=true", "zoop.graph-delivery.install.enabled=true")) {
-            String[] pair = conflict.split("=");
-            var context = context(false);
-            ((MockEnvironment) context.getEnvironment()).setProperty(pair[0], pair[1]);
-            assertThrows(IllegalArgumentException.class,
-                    () -> GraphPublicationConfiguration.requireExclusiveOperator(context, "graph-publication-compose"), conflict);
+        // The prepare runner names compose as its sibling and the compose runner names prepare.
+        for (String sibling : List.of("graph-publication-compose", "graph-publication-prepare")) {
+            assertDoesNotThrow(() -> GraphPublicationConfiguration.requireExclusiveOperator(context(false), sibling));
+            assertThrows(IllegalArgumentException.class, () -> GraphPublicationConfiguration.requireExclusiveOperator(context(true), sibling));
+            for (String conflict : List.of("zoop.graph.snapshot.source=fixture", "zoop.graph.snapshot.source=FIXTURE",
+                    "zoop." + sibling + ".enabled=true", "zoop.graph-handoff-import.enabled=true", "zoop.document-import.enabled=true",
+                    "zoop.document-analysis.enabled=true", "zoop.legacy-real-import.enabled=true", "zoop.document-bindings.enabled=true",
+                    "zoop.disclosure-exclusion.enabled=true", "zoop.briefing.replay.import-enabled=true",
+                    "zoop.graph-delivery.seal.enabled=true", "zoop.graph-delivery.install.enabled=true")) {
+                String[] pair = conflict.split("=");
+                var context = context(false);
+                ((MockEnvironment) context.getEnvironment()).setProperty(pair[0], pair[1]);
+                assertThrows(IllegalArgumentException.class,
+                        () -> GraphPublicationConfiguration.requireExclusiveOperator(context, sibling), sibling + " " + conflict);
+            }
         }
     }
 
