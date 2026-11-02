@@ -39,10 +39,12 @@ chat-live-spike-report:
 	$(PYTHON) scripts/chat_live_spike_report.py "$(CHAT_LIVE_SPIKE_EVIDENCE)" $(if $(CHAT_LIVE_SPIKE_REPORT),--output "$(CHAT_LIVE_SPIKE_REPORT)")
 CHAT_OPERATIONS_MANIFEST ?=
 CHAT_OPERATIONS_REPORT ?=
+CHAT_WEB_PREFLIGHT_EVIDENCE ?=
 chat-operations-readiness:
 	@test -n "$(CHAT_OPERATIONS_MANIFEST)" || { printf '%s\n' 'Set CHAT_OPERATIONS_MANIFEST to the content-free readiness manifest.'; exit 2; }
 	@test -n "$(CHAT_LIVE_SPIKE_EVIDENCE)" || { printf '%s\n' 'Set CHAT_LIVE_SPIKE_EVIDENCE to the approved content-free evidence JSON.'; exit 2; }
-	$(PYTHON) scripts/chat_operations_readiness.py "$(CHAT_OPERATIONS_MANIFEST)" "$(CHAT_LIVE_SPIKE_EVIDENCE)" $(if $(CHAT_OPERATIONS_REPORT),--output "$(CHAT_OPERATIONS_REPORT)")
+	@test -n "$(CHAT_WEB_PREFLIGHT_EVIDENCE)" || { printf '%s\n' 'Set CHAT_WEB_PREFLIGHT_EVIDENCE to the content-free provider preflight evidence.'; exit 2; }
+	$(PYTHON) scripts/chat_operations_readiness.py "$(CHAT_OPERATIONS_MANIFEST)" "$(CHAT_LIVE_SPIKE_EVIDENCE)" "$(CHAT_WEB_PREFLIGHT_EVIDENCE)" $(if $(CHAT_OPERATIONS_REPORT),--output "$(CHAT_OPERATIONS_REPORT)")
 public-check:
 	$(if $(PUBLIC_PYTHON),$(PUBLIC_PYTHON),$(UV) run --no-project --with pyyaml --with openpyxl --with openapi-spec-validator $(PYTHON)) scripts/repo_checks.py public
 	PYTHONDONTWRITEBYTECODE=1 $(if $(PUBLIC_PYTHON),$(PUBLIC_PYTHON),$(UV) run --no-project --with pyyaml --with openpyxl --with openapi-spec-validator $(PYTHON)) -m unittest discover -s scripts/tests -p test_doc_system.py -v

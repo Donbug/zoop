@@ -1,6 +1,6 @@
 # ZOOP AI 챗봇 보조 웹 검색 설계
 
-문서 상태: 2026-10-28 팀 결정 · 서버 도구·예산, agent 경로 승인 gate, Q02 기본 검색과 요구별 gate 구현(2026-10-31), 대상·기간·필수 필드·인용 coverage와 Q07 2개 초과 선택 확인 및 인스턴스 로컬 공급자 요청 캐시·single-flight 구현(2026-11-02, [api/docs/chat-web-search.md](../../api/docs/chat-web-search.md)), 답변 인용 계약(`web_reported`·`web_result`, 2026-10-30) · 공급자/출시 확인 별도
+문서 상태: 2026-10-28 팀 결정 · 서버 도구·예산, agent 경로 승인 gate, Q02 기본 검색과 요구별 gate 구현(2026-10-31), 대상·기간·필수 필드·인용 coverage와 Q07 2개 초과 선택 확인 및 인스턴스 로컬 공급자 요청 캐시·single-flight 구현(2026-11-02, [api/docs/chat-web-search.md](../../api/docs/chat-web-search.md)), NAVER API HUB 운영 후보 adapter 구현(2026-11-02), 답변 인용 계약(`web_reported`·`web_result`, 2026-10-30) · 실제 공급자 preflight/출시 확인 별도
 
 기준 정책: [ZOOP-AIG-001 v0.11](../ZOOP_AI_거버넌스_정책.md) / [설계 요약](ai-chatbot-design-summary.md) / [Luna MCP 실행 계약](ai-chatbot-mcp-actions.md)
 
@@ -59,7 +59,7 @@ Q05/Q08의 배경 보도를 ‘이 기사 때문에 변경/선정됐다’고 �
 - 검색어당 최대 5건, 전체 최대 10건, snippet 건당 최대 500자, 내부 문서와 합계 20개 상한.
 - 초기 구현은 제목·URL·snippet·공급자 게시 시각만 사용한다. 임의 URL 본문 fetch/크롤링은 열지 않는다.
 - 초기 회원별 웹 공급자 호출은 하루 20회, 프로젝트 전체 하루 500회(KST 날짜 전환)로 제한한다. retry·확인 사슬·새 job에도 누적되며 동시 요청은 원자 예약한다. 실패/timeout도 시도량으로 센다.
-- 금액 상한은 공급자 가격 확정 전 미결정이다. 한도 소진은 web_budget_exhausted로 안내하고 내부 답변을 계속한다.
+- 저장소의 요청 상한은 구현됐지만 실제 공급자 과금 경보와 금액 기준은 운영 readiness 결정으로 고정한다. 한도 소진은 web_budget_exhausted로 안내하고 내부 답변을 계속한다.
 
 ## 4. 웹 실패는 전체 실패로 승격하지 않는다
 
@@ -99,11 +99,11 @@ web_reported basis와 Citation.sourceKind=web_result를 추가한다. 서버가 
 
 | 항목 | 현재 결정 / 남은 조건 |
 | --- | --- |
-| 공급자·계약 | 미선정. 가격·품질·처리 국가·권리 검토 후 선정. NAVER API HUB 웹 문서 어댑터는 후보 검토용으로만 구현(기본 꺼짐) |
+| 공급자·계약 | 운영 후보는 `naver-api-hub-webkr`로 고정(기본 꺼짐). 권리·처리 국가·보관·비용 결정을 readiness manifest에 기록하고 실제 공급자 preflight를 통과해야 활성화 가능 |
 | 호출 상한 | 턴 2회·회원 일 20회·프로젝트 일 500회, 실제 지표로 보정 |
-| 비용 상한/경보액 | 미정. 공급자 단가로 예약 금액과 일/월 금액 상한 확정 전 활성화 금지 |
-| 저장·로그 기간 | 공급자 저장/재배포 권리와 팀 정책 확정 필요 |
-| 개인정보 방침·동의 | 실제 공급자 처리 조건을 반영해 검토·개정 여부 확정 |
+| 비용 상한/경보액 | `request-caps-and-billing-alerts-approved` 결정과 운영 경보 증거 필요. 코드의 요청 상한만으로 완료 처리하지 않음 |
+| 저장·로그 기간 | `request-cache-and-chat-citation-retention-approved` 결정과 실제 보관 설정 대조 필요 |
+| 개인정보 방침·동의 | `public-query-no-member-data-approved`, `provider-processing-region-approved` 결정과 실제 처리 조건 대조 필요 |
 | source grant | OpenAI·Jev 수신자/목적별 model-send 등록 필요 |
 | schema·화면 | web_reported/web_result·answerStatus/notices·limitation·guard 동시 구현 필요 |
 | 실제 품질·시간 | 기존 서버 계획 / Luna MCP를 같은 세트로 비교 |
