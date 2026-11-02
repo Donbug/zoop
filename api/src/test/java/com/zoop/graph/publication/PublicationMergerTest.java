@@ -209,6 +209,21 @@ class PublicationMergerTest {
     }
 
     @Test
+    void aStructuralRelationFollowsTheSourceOfAMovedEventTime() {
+        Contribution published = structural(source(0, "same", "A"));
+        Contribution incoming = withEventTime(copy(published, 1), "2026-10-02");
+        var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
+        var prepared = prepare(List.of(published, incoming), PublicationMerger.emptyDecisions(), base, incoming);
+        assertEquals("2026-10-02", prepared.merged().issues().getFirst().eventTime());
+        var relation = prepared.proposal().decisions().objects("relationSelections");
+        assertEquals(1, relation.size());
+        assertEquals(GraphPublicationReader.json(new GraphPublicationReader.RelationRef(incoming.sourceVersionId(), "relation-0")),
+                relation.getFirst().raw("takeFrom"));
+        // The relation records agree, so the report names only the issue field.
+        assertEquals(List.of("eventTime"), prepared.proposal().resolutions().stream().map(PublicationMerger.AutoResolution::field).toList());
+    }
+
+    @Test
     void proposalTakesTheNewestRelationRecord() {
         Contribution published = relation(source(0, "issue-0", "A"), "shared"); Contribution incoming = relation(source(1, "issue-0", "A"), "shared");
         var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
@@ -303,6 +318,21 @@ class PublicationMergerTest {
                 x.relations(), x.articles(), x.evidence());
         return new Contribution(other.sourceVersionId(), other.sourceId(), other.sourceKind(), other.receipt(), other.projectionArtifact(),
                 projection, other.bundle());
+    }
+    private static Contribution structural(Contribution original) {
+        var p = original.projection(); var r = p.relations().getFirst();
+        var relation = new PublicGraphSnapshot.Relation(r.relationId(), "STRUCTURALLY_RELATED_TO", r.source(), r.target(), r.role(), r.assertionStatus(), r.evidenceIds(), r.basis());
+        var projection = new PublicGraphSnapshot(p.snapshotFormat(), p.versionId(), p.sourceBundleId(), p.companies(), p.issues(), List.of(relation), p.articles(), p.evidence());
+        return new Contribution(original.sourceVersionId(), original.sourceId(), original.sourceKind(), original.receipt(), original.projectionArtifact(),
+                projection, original.bundle());
+    }
+    private static Contribution withEventTime(Contribution original, String eventTime) {
+        var p = original.projection(); Issue i = p.issues().getFirst();
+        Issue issue = new Issue(i.issueId(), i.label(), eventTime, "day", i.period(), i.assertionStatus(), i.action(), i.target(), i.geography(),
+                i.geographyPolicyVersion(), i.geographyEvidenceIds(), i.articleIds(), i.evidenceIds(), i.mentions(), i.representativeMentionId(), i.latestPublishedAt());
+        var projection = new PublicGraphSnapshot(p.snapshotFormat(), p.versionId(), p.sourceBundleId(), p.companies(), List.of(issue), p.relations(), p.articles(), p.evidence());
+        return new Contribution(original.sourceVersionId(), original.sourceId(), original.sourceKind(), original.receipt(), original.projectionArtifact(),
+                projection, original.bundle());
     }
     private static Contribution copy(Contribution original, int index) {
         String source = "handoff-" + index; String version = "gv-" + Canonical.sha256(source); var p = original.projection();

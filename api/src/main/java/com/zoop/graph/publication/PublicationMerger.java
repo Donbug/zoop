@@ -303,6 +303,7 @@ public final class PublicationMerger {
         var relationOut = (tools.jackson.databind.node.ArrayNode) root.get("relationSelections");
         List<AutoResolution> resolutions = new ArrayList<>();
         Set<String> leftToPeople = new HashSet<>();
+        Set<String> retimed = new HashSet<>();
         for (var group : groups.entrySet()) {
             String publicId = group.getKey(); List<IssueRef> members = group.getValue();
             if (members.stream().noneMatch(r -> order.containsKey(r.sourceVersionId()))) continue;
@@ -348,6 +349,8 @@ public final class PublicationMerger {
                 proposed.add(selection(publicId, "label", Canonical.digest(valuesOf.apply(owner).get("label")), owner, ownerEvidence));
             }
             proposed.forEach(fieldOut::add);
+            if (resolutions.stream().anyMatch(r -> "issue".equals(r.kind()) && r.id().equals(publicId)
+                    && ("eventTime".equals(r.field()) || "geography".equals(r.field())))) retimed.add(publicId);
         }
         Map<String, List<RelationRef>> relationGroups = new TreeMap<>();
         index.relations().keySet().forEach(r -> relationGroups.computeIfAbsent(r.relationId(), ignored -> new ArrayList<>()).add(r));
@@ -367,7 +370,10 @@ public final class PublicationMerger {
             JsonNode before = GraphPublicationReader.json(projected.apply(previous)), after = GraphPublicationReader.json(chosenProjection);
             Relation chosen = index.relations().get(newest);
             boolean differs = members.stream().anyMatch(r -> !index.relations().get(r).equals(chosen));
-            if (before.equals(after) && (choice != null || !differs)) continue;
+            // A native structural relation is valid only from a source whose issue has the published event time and geography
+            // (merge); when the proposal moved either, the relation must come from the same newest source even if every record agrees.
+            boolean followsIssue = "STRUCTURALLY_RELATED_TO".equals(chosen.relationType()) && retimed.contains(chosenProjection.source());
+            if (before.equals(after) && (choice != null || !differs) && !followsIssue) continue;
             IssueRef owner = new IssueRef(newest.sourceVersionId(), chosen.source());
             Issue issue = index.originals().get(owner);
             Set<String> known = index.evidence().get(owner.sourceVersionId());
