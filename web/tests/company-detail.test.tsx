@@ -165,6 +165,7 @@ const graph: GraphResponse = {
 };
 let server: ReturnType<typeof createFakeServer>;
 beforeEach(() => {
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   useAuthStore.getState().clearSession();
   server = createFakeServer();
   server.on('GET', '/api/v1/portfolio', () =>
@@ -1265,6 +1266,7 @@ test('D-COM-05: session response drives chart and timeline; 1d price request has
   expect(
     server
       .calls('GET', '/api/v1/companies/:id/prices')
+      .filter((request) => request.query.get('period') === '1d')
       .every((request) => !request.query.has('from')),
   ).toBe(true);
   expect(
@@ -1920,6 +1922,7 @@ test('D-COM-05/06: periods preserve graph context; legacy 1d omits price from on
       expect(
         server
           .calls('GET', '/api/v1/companies/:id/prices')
+          .filter((r) => r.query.get('period') === period)
           .at(-1)
           ?.query.get('period'),
       ).toBe(period),
@@ -1927,6 +1930,7 @@ test('D-COM-05/06: periods preserve graph context; legacy 1d omits price from on
     await screen.findByRole('group', { name: '공급된 종가 차트' });
     const pricesRequest = server
       .calls('GET', '/api/v1/companies/:id/prices')
+      .filter((r) => r.query.get('period') === period)
       .at(-1)!;
     const eventsRequest = server.calls('GET', '/api/v1/events').at(-1)!;
     if (period === '1d') {
@@ -2560,9 +2564,11 @@ test.each(['success', 'failure'] as const)(
       </MemoryRouter>,
     );
     await waitFor(() =>
-      expect(server.calls('GET', '/api/v1/companies/:id/prices')).toHaveLength(
-        1,
-      ),
+      expect(
+        server
+          .calls('GET', '/api/v1/companies/:id/prices')
+          .filter((r) => r.query.get('period') === '1m'),
+      ).toHaveLength(1),
     );
     expect(screen.getByText(/차트 불러오는 중/)).toBeTruthy();
     await userEvent.click(
@@ -2570,9 +2576,11 @@ test.each(['success', 'failure'] as const)(
     );
     const notice = await screen.findByText(/그래프 버전\(v-past\)만 있어/);
     const assertUnsupported = () => {
-      expect(server.calls('GET', '/api/v1/companies/:id/prices')).toHaveLength(
-        1,
-      );
+      expect(
+        server
+          .calls('GET', '/api/v1/companies/:id/prices')
+          .filter((r) => r.query.get('period') === '1m'),
+      ).toHaveLength(1);
       expect(screen.getByTestId('address').textContent).toContain(
         'graphVersion=v-past',
       );
@@ -2610,7 +2618,9 @@ test.each(['success', 'failure'] as const)(
     );
     expect(await screen.findByText(/별 종가/)).toBeTruthy();
     expect(
-      server.calls('GET', '/api/v1/companies/:id/prices').length,
+      server
+        .calls('GET', '/api/v1/companies/:id/prices')
+        .filter((r) => r.query.get('period') === '1m').length,
     ).toBeGreaterThan(1);
     expect(screen.queryByText(/그래프 버전\(v-past\)만 있어/)).toBeNull();
   },
@@ -3249,4 +3259,47 @@ test('D-COM-01 D7 returns to the original map URL after changing a company tab',
   expect(
     screen.getByRole('link', { name: '지도에서 보기' }).getAttribute('href'),
   ).toContain('mode=all');
+});
+
+test('D-COM-01 D12 disables only unavailable short periods with a reason and reuses short prices on selection', async () => {
+  server.on('GET', '/api/v1/companies/:id/prices', (r) =>
+    r.query.get('period') === '1d'
+      ? json({ status: 'unavailable', reason: '합성 1일 자료 미제공' })
+      : r.query.get('period') === '1w'
+        ? apiError(503, 'SOURCE_UNAVAILABLE')
+        : json({
+            status: 'available',
+            companyId: id,
+            period: r.query.get('period'),
+            interval: '1d',
+            currency: 'KRW',
+            source,
+            points: [],
+          }),
+  );
+  open(pinned);
+  const day = await screen.findByRole('button', {
+    name: /^1일/,
+  });
+  await waitFor(() => expect((day as HTMLButtonElement).disabled).toBe(true));
+  expect(day.getAttribute('title')).toBe('합성 1일 자료 미제공');
+  const week = screen.getByRole('button', { name: '1주', exact: true });
+  await waitFor(() =>
+    expect(
+      server
+        .calls('GET', '/api/v1/companies/:id/prices')
+        .filter((r) => r.query.get('period') === '1w'),
+    ).toHaveLength(1),
+  );
+  expect((week as HTMLButtonElement).disabled).toBe(false);
+  await userEvent.click(week);
+  await screen.findByText(/차트 조회 실패/);
+  await userEvent.click(
+    screen.getByRole('button', { name: '1년', exact: true }),
+  );
+  expect(
+    server
+      .calls('GET', '/api/v1/companies/:id/prices')
+      .filter((r) => ['1d', '1w'].includes(r.query.get('period')!)),
+  ).toHaveLength(2);
 });

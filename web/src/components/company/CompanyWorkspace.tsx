@@ -67,6 +67,7 @@ import {
 import { useColorTheme } from '@/util/theme-color';
 import { useCompanyMapEntry } from '@/hooks/useCompanyMapEntry';
 import { useCompanyScroll } from '@/hooks/useCompanyScroll';
+import { useCompanyShortPrices } from '@/hooks/useCompanyShortPrices';
 
 // D-COM-01 B1: 백엔드 financials 컨트롤러가 생기면 계약을 확인하고 다시 켠다.
 const COMPANY_FINANCIALS_ENABLED = false;
@@ -398,11 +399,28 @@ export default function CompanyWorkspace() {
     return () => document.removeEventListener('click', outside, true);
   }, [graphTimeOpen, paramsKey, location.key]);
   // 버전 단독 주소는 그 버전의 차트를 열 수 없다고 안내하므로 가격 조회도 시작하지 않는다.
-  const prices = useCompanyResource<Prices>(
-    invalid || versionOnly || !canLoadSections
+  const ordinaryPrices = useCompanyResource<Prices>(
+    invalid ||
+      versionOnly ||
+      !canLoadSections ||
+      (ready && (period === '1d' || period === '1w'))
       ? null
       : companyUrl(id, '/prices', { period, ...range }),
   );
+  const shortPrices = useCompanyShortPrices(
+    id,
+    asOf,
+    ready && !versionOnly && canLoadSections,
+  );
+  const prices =
+    ready && (period === '1d' || period === '1w')
+      ? shortPrices[period]
+      : ordinaryPrices;
+  function unavailablePeriod(value: ChartPeriod) {
+    const result =
+      value === '1d' || value === '1w' ? shortPrices[value].data : null;
+    return result?.status === 'unavailable' ? result.reason : null;
+  }
   useEffect(() => {
     // FS040: 처음 열 때의 기준 시점은 기업 응답의 공개 기준 시점과 그 버전이다. 가격 봉 시각은
     // 거래가 없는 날(주말·휴장)에 오래된 시점을 가리켜 이후 공개 자료를 빼거나 409를 만든다.
@@ -1105,6 +1123,8 @@ export default function CompanyWorkspace() {
                 <button
                   key={p.value}
                   aria-pressed={period === p.value}
+                  disabled={unavailablePeriod(p.value) !== null}
+                  title={unavailablePeriod(p.value) ?? undefined}
                   className="min-w-14 rounded-none! border-0! border-r! border-zoop-line! last:border-r-0!"
                   onClick={() => {
                     // 선택한 사건은 유지하고, 새 기간의 버킷으로 다시 맞춘다(FS044).
@@ -1118,6 +1138,12 @@ export default function CompanyWorkspace() {
                   }}
                 >
                   {p.label}
+                  {unavailablePeriod(p.value) !== null && (
+                    <span className="sr-only">
+                      {' '}
+                      · {unavailablePeriod(p.value)}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
