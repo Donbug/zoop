@@ -42,18 +42,18 @@ def url(name: str, supplier: str) -> str:
     return f"https://example.invalid/{name}/{supplier}"
 
 
-def ingest_round(kit: Kit, name: str, batches: list[list[dict]], bodies: dict) -> tuple[str, dict]:
+def ingest_round(kit: Kit, name: str, batches: list[list[dict]], bodies: dict, *, slot: str | None = None) -> tuple[str, dict]:
     """A real (multi-page) ingestion round through the actual ingestion CLI. Every completed page advances the scope checkpoint by one."""
-    manifest = kit.manifest(name, batches, bodies=bodies)
+    manifest = kit.manifest(name, batches, bodies=bodies, coverage=slot)
     rid = f"round-{name}"
-    result = kit.cli("run", kit.request(manifest, rid, kit.rounds), state="ingestion", manifest=manifest)
+    result = kit.cli("run", kit.request(manifest, rid, kit.rounds, {"from": slot, "through": slot} if slot else None), state="ingestion", manifest=manifest)
     kit.rounds += len(batches)
     assert result["state"] == "complete", result
     return rid, result
 
 
-def simple_round(kit: Kit, name: str, suppliers: list[str], body: bytes = OK_BODY) -> tuple[str, dict]:
-    return ingest_round(kit, name, [[kit.item(f"c{i}", s, url(name, s)) for i, s in enumerate(suppliers)]], {"html": body})
+def simple_round(kit: Kit, name: str, suppliers: list[str], body: bytes = OK_BODY, *, slot: str | None = None) -> tuple[str, dict]:
+    return ingest_round(kit, name, [[kit.item(f"c{i}", s, url(name, s)) for i, s in enumerate(suppliers)]], {"html": body}, slot=slot)
 
 
 def make_round(kit: Kit, name: str) -> str:

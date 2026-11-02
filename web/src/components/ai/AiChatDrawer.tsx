@@ -12,7 +12,7 @@ import ChatHistoryList from '@/components/ai/ChatHistoryList';
 import ChatJobCard, { type AnswerMapTarget } from '@/components/ai/ChatJobCard';
 import { PHASE_LABEL } from '@/components/ai/chat-phases';
 import {
-  contextFromTarget,
+  contextFromTargets,
   isSendable,
   MAX_QUESTION,
   questionLength,
@@ -34,6 +34,11 @@ const TARGET_KIND: Record<GraphTarget['kind'], string> = {
   edge: '관계',
   path: '영향 경로',
 };
+
+type LinkedTarget = { target: GraphTarget; checked: boolean };
+const targetLabel = (target: GraphTarget) => target.label ?? target.id;
+const sameTarget = (a: GraphTarget, b: GraphTarget) =>
+  a.kind === b.kind && a.id === b.id;
 
 // D-AI-01 · prototype chat-drawer.tsx:41: 빈 대화의 추천 질문. 세 번째는 예측을 묻는 질문이라 서버가 답을 지어내지 않고 보류하는지 보여 준다.
 const SUGGESTIONS = [
@@ -186,14 +191,27 @@ function ChatPanel({
   const draft = useAiChatStore((state) => state.draft);
   const setDraft = useAiChatStore((state) => state.setDraft);
   const chat = useChatConversation(memberId);
-  const [linked, setLinked] = useState(true);
+  // D-AI-01 C2 · prototype chat-drawer.tsx:53-66: 아직 질문하지 않은 대화는 새 대상으로 바꾸고, 질문한 대화는 체크하지 않은 후보로 더한다.
+  const [targets, setTargets] = useState<LinkedTarget[]>(() =>
+    target ? [{ target, checked: true }] : [],
+  );
+  const [offered, setOffered] = useState(target);
   const [replyTo, setReplyTo] = useState<ChatJob | null>(null);
   const [view, setView] = useState<'chat' | 'history'>('chat');
   const input = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
 
-  const useTarget = linked && target !== null;
-  const targetLabel = target ? (target.label ?? target.id) : null;
+  if (offered !== target) {
+    setOffered(target);
+    const asked = chat.jobs.length > 0 || chat.pending !== null;
+    if (!asked) setTargets(target ? [{ target, checked: true }] : []);
+    else if (target && !targets.some((item) => sameTarget(item.target, target)))
+      setTargets([...targets, { target, checked: false }]);
+  }
+  const checked = targets
+    .filter((item) => item.checked)
+    .map((item) => item.target);
+  const useTarget = checked.length > 0;
   const locked =
     chat.load.kind !== 'ready' ||
     chat.sending ||
@@ -211,7 +229,7 @@ function ChatPanel({
 
   async function suggest(question: string) {
     if (locked || !useTarget) return;
-    await chat.ask(question, contextFromTarget(target));
+    await chat.ask(question, contextFromTargets(checked));
   }
 
   function rewrite(question: string) {
@@ -224,7 +242,7 @@ function ChatPanel({
     if (!sendable) return;
     const sent = replyTo
       ? await chat.reply(replyTo, null, draft)
-      : await chat.ask(draft, useTarget ? contextFromTarget(target) : null);
+      : await chat.ask(draft, contextFromTargets(checked));
     if (sent) {
       setDraft('');
       setReplyTo(null);
@@ -271,7 +289,7 @@ function ChatPanel({
     <>
       <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-2">
         <p className={ui.muted}>
-          질문 대상: {useTarget ? targetLabel : '없음'}
+          질문 대상: {useTarget ? checked.map(targetLabel).join(', ') : '없음'}
         </p>
         <div className="flex shrink-0 gap-2">
           <button
@@ -308,27 +326,43 @@ function ChatPanel({
           <div className={ui.scroll}>
             <section className={ui.section} aria-labelledby="ai-chat-target">
               <h3 id="ai-chat-target">질문에 연결할 대상</h3>
-              {target ? (
-                <label className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={linked}
-                    onChange={(event) => setLinked(event.target.checked)}
-                    className="mt-0.5"
-                  />
-                  <span>
-                    <span className={ui.itemTitle}>{targetLabel}</span>
-                    <span className={`${ui.muted} block`}>
-                      {TARGET_KIND[target.kind]}
-                      {target.evidenceIds?.length
-                        ? ` · 근거 ${target.evidenceIds.length}건`
-                        : ''}
-                      {target.mapContext?.graphVersion
-                        ? ` · 그래프 ${target.mapContext.graphVersion}`
-                        : ''}
-                    </span>
-                  </span>
-                </label>
+              {targets.length ? (
+                <ul className="flex flex-col gap-2">
+                  {targets.map((item, index) => (
+                    <li key={`${item.target.kind}:${item.target.id}`}>
+                      <label className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          checked={item.checked}
+                          onChange={(event) =>
+                            setTargets(
+                              targets.map((other, at) =>
+                                at === index
+                                  ? { ...other, checked: event.target.checked }
+                                  : other,
+                              ),
+                            )
+                          }
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className={ui.itemTitle}>
+                            {targetLabel(item.target)}
+                          </span>
+                          <span className={`${ui.muted} block`}>
+                            {TARGET_KIND[item.target.kind]}
+                            {item.target.evidenceIds?.length
+                              ? ` · 근거 ${item.target.evidenceIds.length}건`
+                              : ''}
+                            {item.target.mapContext?.graphVersion
+                              ? ` · 그래프 ${item.target.mapContext.graphVersion}`
+                              : ''}
+                          </span>
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
               ) : (
                 <p className={ui.muted}>
                   지도에서 기업이나 사건을 고르면 질문에 연결할 수 있어요.

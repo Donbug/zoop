@@ -41,6 +41,8 @@ from .relation_wire import RelationErrorEnvelope, RelationJobStatus, RelationOpe
 from .wire import KINDS, ErrorBody, ErrorEnvelope, JobStatus, ResultEnvelope
 from .plan_wire import (MAX_BODY as PLAN_MAX_BODY, MAX_COUNTER, PLAN_ID_PATTERN, POLICY_ETAG_PATTERN, PlanAdmissionEnvelope,
                         PlanErrorEnvelope, PlanPolicyState, PlanPolicyUpdate, parse_plan_policy, parse_plan_reference)
+from .round_service import RoundService
+from .round_wire import ROUND_ID_PATTERN, HandoffRequest, HandoffStatus, RunRequest, RunStatus
 
 if TYPE_CHECKING:
     from .plan_admission import PlanAdmissionService
@@ -283,6 +285,11 @@ class Gateway:
 def _error_response(error: ApiError, request: Request) -> JSONResponse:
     context = _context(request)
     context["error"] = error.code
+    if request.url.path.startswith(("/internal/v1/round-runs", "/internal/v1/round-handoffs")):
+        body = ErrorBody(code=error.code, retryable=error.code in {
+            "round_busy", "service_busy", "runtime_busy", "runtime_unavailable", "plan_verifier_unavailable", "analysis_incomplete"},
+            request_id=context["requestId"], runtime_code=error.runtime_code, field=error.field)
+        return JSONResponse(ErrorEnvelope(error=body, status=None).wire(), status_code=error.status, headers=error.headers)
     if request.url.path.startswith((PLAN_PREFIX, POLICY_PATH)):
         body = ErrorBody(code=error.code, retryable=error.code in {
             "service_busy", "plan_verifier_unavailable", "service_configuration_invalid", "authority_unavailable"},
@@ -418,7 +425,8 @@ OBSERVATION_ERRORS = {
 def create_app(service: JobService | None = None, relation: RelationJobs | None = None, extraction: ExtractionJobs | None = None,
                graph: GraphReads | None = None, handoff: HandoffReads | None = None,
                handoff_exposure: HandoffExposureReads | None = None, chat: ChatStages | None = None, *,
-               plans: PlanAdmissionService | None = None, observation: ObservationReads | None = None) -> FastAPI:
+               plans: PlanAdmissionService | None = None, observation: ObservationReads | None = None,
+               rounds: RoundService | None = None) -> FastAPI:
     """With no service this builds the route skeleton only (OpenAPI export); a service makes it serve requests. `relation` is the
     S3 relation-job family, `extraction` the S2 extraction-job family, `graph` the read-only graph-version family and `handoff` the read-only handoff family; without one, every
     route of that family answers 409 `execution_unavailable` after authentication."""
@@ -429,6 +437,7 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
     app.state.chat = chat
     app.state.plans = plans
     app.state.observation = observation
+    app.state.rounds = rounds
     app.add_middleware(Gateway)
 
     @app.exception_handler(ApiError)
@@ -913,5 +922,70 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
         document = parse_plan_policy(await read_body(request, PLAN_MAX_BODY))
         seen = _context(request)["seen"] = Observation()
         return respond(await run_in_threadpool(facade.set_policy, principal.name, key, document, expected, seen))
+
+    def round_service(request: Request) -> RoundService:
+        if request.app.state.rounds is None:
+            raise ApiError(503, "execution_unavailable")
+        return request.app.state.rounds
+
+    async def round_submit(request: Request, principal: Principal, family: str):
+        facade = round_service(request)
+        graph_query(request, ())
+        plan_headers(request, "idempotency-key")
+        key = request.headers.get("idempotency-key", "")
+        if not re.fullmatch(ROUND_ID_PATTERN, key):
+            raise invalid("Idempotency-Key")
+        check_content_type(request)
+        raw = await read_body(request, 4_001_024 if family == "handoff" else 1024)
+        try:
+            value = json.loads(raw.decode("utf-8"), object_pairs_hook=_duplicate_free, parse_constant=_no_constant)
+            model = HandoffRequest if family == "handoff" else RunRequest
+            body = model.model_validate(value).wire()
+        except (UnicodeDecodeError, ValueError, RecursionError):
+            raise invalid("body") from None
+        if body["roundId"] != key:
+            raise invalid("Idempotency-Key")
+        if family == "handoff" and len(json.dumps(body["bindings"], ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()) > 4_000_000:
+            raise ApiError(413, "request_too_large")
+        seen = _context(request)["seen"] = Observation()
+        return respond(await run_in_threadpool(facade.submit, principal.name, family, body, raw, seen))
+
+    async def round_status(request: Request, principal: Principal, family: str, round_id: str):
+        facade = round_service(request)
+        graph_query(request, ())
+        plan_headers(request)
+        if not re.fullmatch(ROUND_ID_PATTERN, round_id):
+            raise invalid("roundId")
+        seen = _context(request)["seen"] = Observation()
+        return respond(await run_in_threadpool(facade.status, principal.name, family, round_id, seen))
+
+    round_errors = {**ERRORS, 404: {"model": ErrorEnvelope, "description": "round_not_found: no exact admission for this principal."},
+                    409: {"model": ErrorEnvelope, "description": "request_conflict, round_busy, round_binding_mismatch or analysis_incomplete."},
+                    413: {"model": ErrorEnvelope, "description": "request_too_large."},
+                    415: {"model": ErrorEnvelope, "description": "unsupported_media_type."}}
+
+    @app.post("/internal/v1/round-runs", operation_id="requestRoundRun", tags=["round-runs"], status_code=202,
+              response_model=RunStatus, responses={**round_errors, 200: {"model": RunStatus}})
+    async def request_round_run(request: Request, principal: Annotated[Principal, Depends(require("round.run"))],
+                                idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None):
+        return await round_submit(request, principal, "run")
+
+    @app.get("/internal/v1/round-runs/{roundId}", operation_id="getRoundRun", tags=["round-runs"],
+             response_model=RunStatus, responses=round_errors)
+    async def get_round_run(request: Request, principal: Annotated[Principal, Depends(require("round.read"))],
+                            round_id: Annotated[str, Path(alias="roundId", pattern=ROUND_ID_PATTERN)]):
+        return await round_status(request, principal, "run", round_id)
+
+    @app.post("/internal/v1/round-handoffs", operation_id="requestRoundHandoff", tags=["round-handoffs"], status_code=202,
+              response_model=HandoffStatus, responses={**round_errors, 200: {"model": HandoffStatus}})
+    async def request_round_handoff(request: Request, principal: Annotated[Principal, Depends(require("round.run"))],
+                                    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None):
+        return await round_submit(request, principal, "handoff")
+
+    @app.get("/internal/v1/round-handoffs/{roundId}", operation_id="getRoundHandoff", tags=["round-handoffs"],
+             response_model=HandoffStatus, responses=round_errors)
+    async def get_round_handoff(request: Request, principal: Annotated[Principal, Depends(require("round.read"))],
+                                round_id: Annotated[str, Path(alias="roundId", pattern=ROUND_ID_PATTERN)]):
+        return await round_status(request, principal, "handoff", round_id)
 
     return app

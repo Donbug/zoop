@@ -16,6 +16,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from . import extraction_access, graph_access, grants, handoff_access, handoff_contexts, relation_access
+from .round_config import RoundConfig, load_round
 
 ANALYSIS_SCOPES = ("analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover")
 RELATION_SCOPES = ("relation.submit", "relation.read", "relation.cancel", "relation.recover", "relation.review")
@@ -25,7 +26,8 @@ HANDOFF_SCOPES = ("handoff.read", "handoff.exposure")
 CHAT_SCOPES = ("chat.invoke",)
 PLAN_SCOPES = ("plan.admit", "plan.read", "plan.policy")
 OBSERVATION_SCOPES = ("observation.read",)
-SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES, *GRAPH_SCOPES, *HANDOFF_SCOPES, *CHAT_SCOPES, *PLAN_SCOPES, *OBSERVATION_SCOPES)
+ROUND_SCOPES = ("round.run", "round.read")
+SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES, *GRAPH_SCOPES, *HANDOFF_SCOPES, *CHAT_SCOPES, *PLAN_SCOPES, *OBSERVATION_SCOPES, *ROUND_SCOPES)
 PRINCIPAL = re.compile(r"[a-z][a-z0-9-]{0,62}")
 DIGEST = re.compile(r"[0-9a-f]{64}")
 HOST = "127.0.0.1"
@@ -243,6 +245,7 @@ class ServiceConfig:
     plan_root: Path | None = None
     observation: ObservationConfig | None = None
     host: str = HOST
+    rounds: RoundConfig | None = None
 
     @property
     def transport_dir(self) -> Path:
@@ -796,5 +799,6 @@ def load(environ: Mapping[str, str]) -> ServiceConfig:
     pipeline_live = _pipeline_live(environ, state_dir, relation, extraction)
     exposure = _handoff_exposure(environ, principals, state_dir, worker_state, relation, extraction, graph, handoff)
     chat = _chat(environ, state_dir, worker_state, relation=relation, extraction=extraction, graph=graph, handoff=handoff, exposure=exposure)
+    rounds = load_round(environ, extraction=extraction, relation=relation, handoff=handoff, observation=observation, plan_root=plan_root)
     return ServiceConfig(principals, state_dir, worker_state, command, grants_path, replay, port, live, child, relation, extraction, graph, handoff,
-                         pipeline_live, handoff_exposure=exposure, chat=chat, plan_root=plan_root, observation=observation, host=host)
+                         pipeline_live, handoff_exposure=exposure, chat=chat, plan_root=plan_root, observation=observation, host=host, rounds=rounds)

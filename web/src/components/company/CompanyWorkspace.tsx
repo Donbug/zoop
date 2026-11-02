@@ -609,6 +609,8 @@ export default function CompanyWorkspace() {
   });
   const bucketLimit =
     bucketPage.scope === bucketScope ? bucketPage.limit : BUCKET_PAGE;
+  // D13: 사건이 여러 건인 버킷은 접어 두고 첫 제목만 보인다. 고른 버킷·사건이 있으면 펼친다.
+  const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>({});
   const shownGroups = sortedGroups.slice(
     0,
     Math.max(
@@ -1125,15 +1127,17 @@ export default function CompanyWorkspace() {
                   groups={groups}
                   selectedBucket={selectedBucket}
                   selectedEvent={event.data}
-                  onBucket={(bucket) =>
+                  onBucket={(bucket) => {
+                    // D13: 직접 접어 둔 버킷도 차트에서 고르면 펼친다.
+                    setGroupOpen((open) => ({ ...open, [bucket]: true }));
                     updateQuery({
                       tab: 'events',
                       bucket,
                       event: null,
                       document: null,
                       evidence: null,
-                    })
-                  }
+                    });
+                  }}
                 />
                 <p>
                   {prices.data.source.name} ·{' '}
@@ -1259,92 +1263,149 @@ export default function CompanyWorkspace() {
                 )}
                 {/* FS041: 시간 버킷마다 사건 수를 보이고 사건 카드를 나열한다. 차트 ⚡ 표식이나 버킷을 고르면 그 버킷을 강조한다. */}
                 <ol className="flex flex-col">
-                  {shownGroups.map(([key, items]) => (
-                    <li
-                      key={key}
-                      id={bucketElementId(key)}
-                      className={`grid grid-cols-[7rem_1fr] gap-4 border-b-[0.667px] border-zoop-line px-2 py-4 ${selectedBucket === key ? 'bg-zoop-wash' : ''}`}
-                    >
-                      <p className="text-caption text-zoop-muted tabular-nums">
-                        {key}
-                      </p>
-                      <div className="flex flex-col gap-3">
-                        <button
-                          aria-pressed={selectedBucket === key}
-                          aria-label={`${key} · 사건 ${items.length}건`}
-                          onClick={() =>
-                            updateQuery({
-                              bucket: key,
-                              event: null,
-                              document: null,
-                              evidence: null,
-                            })
-                          }
-                          className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! inline-flex items-center gap-1 self-start font-semibold text-zoop-ink aria-pressed:underline"
-                        >
-                          <BoltIcon />
-                          사건 {items.length}건
-                        </button>
-                        {items.map((item) => {
-                          const itemGraphTime = eventGraphTime(item);
-                          return (
-                            <article
-                              key={item.id}
-                              className="flex flex-col gap-1 border-0! py-0! xl:grid xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start xl:gap-x-3 xl:[&>*]:col-start-1"
+                  {shownGroups.map(([key, items]) => {
+                    const multi = items.length > 1;
+                    const expanded =
+                      !multi ||
+                      (groupOpen[key] ??
+                        (selectedBucket === key ||
+                          items.some((item) => item.id === eventId)));
+                    const listId = `${bucketElementId(key)}-events`;
+                    return (
+                      <li
+                        key={key}
+                        id={bucketElementId(key)}
+                        className={`grid grid-cols-[7rem_1fr] gap-4 border-b-[0.667px] border-zoop-line px-2 py-4 ${selectedBucket === key ? 'bg-zoop-wash' : ''}`}
+                      >
+                        <p className="text-caption text-zoop-muted tabular-nums">
+                          {key}
+                        </p>
+                        <div className="flex min-w-0 flex-col gap-3">
+                          <div className="flex items-center gap-2">
+                            <button
+                              aria-pressed={selectedBucket === key}
+                              aria-label={`${key} · 사건 ${items.length}건`}
+                              onClick={() => {
+                                if (multi)
+                                  setGroupOpen((open) => ({
+                                    ...open,
+                                    [key]: true,
+                                  }));
+                                updateQuery({
+                                  bucket: key,
+                                  event: null,
+                                  document: null,
+                                  evidence: null,
+                                });
+                              }}
+                              className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! inline-flex items-center gap-1 self-start font-semibold text-zoop-ink aria-pressed:underline"
                             >
-                              <p className="text-caption text-zoop-muted">
-                                문서 {item.articleCount}건 ·{' '}
-                                {relationLabel(item.relationTypes) ||
-                                  '직접 관계 미확인'}
-                              </p>
+                              <BoltIcon />
+                              사건 {items.length}건
+                            </button>
+                            {multi && (
                               <button
-                                aria-pressed={eventId === item.id}
-                                onClick={() => selectEvent(item)}
-                                className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-left text-body! font-semibold text-zoop-ink underline-offset-4 hover:underline aria-pressed:underline"
+                                type="button"
+                                aria-expanded={expanded}
+                                aria-controls={listId}
+                                aria-label={`${key} 사건 ${items.length}건 ${expanded ? '접기' : '펼치기'}`}
+                                onClick={() =>
+                                  setGroupOpen((open) => ({
+                                    ...open,
+                                    [key]: !expanded,
+                                  }))
+                                }
+                                className="border-0! bg-transparent! min-h-0! p-1! inline-flex items-center text-zoop-muted hover:text-zoop-ink"
                               >
-                                {item.title}
-                              </button>
-                              <p className="text-caption text-zoop-muted tabular-nums">
-                                {item.eventTime ? (
-                                  <time dateTime={item.eventTime}>
-                                    {formatTimelineTime(
-                                      item.eventTime,
-                                      item.timePrecision,
-                                    )}
-                                  </time>
-                                ) : (
-                                  '시점 미상'
-                                )}
-                              </p>
-                              <button
-                                onClick={() => selectEvent(item, 'documents')}
-                                className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-caption! text-zoop-muted underline underline-offset-4"
-                              >
-                                근거 문서 {item.articleCount}건 보기
-                              </button>
-                              {itemGraphTime && (
-                                <button
-                                  type="button"
-                                  aria-pressed={
-                                    sameInstant(graphAsOf, itemGraphTime) &&
-                                    eventId === item.id
-                                  }
-                                  data-graph-time-trigger
-                                  aria-label={`${item.title} · 이 당시 관계그래프 보기`}
-                                  onClick={() =>
-                                    showEventGraph(item, itemGraphTime)
-                                  }
-                                  className="mt-1 inline-flex items-center gap-1.5 self-start whitespace-nowrap xl:col-start-2! xl:row-span-4 xl:row-start-1 xl:mt-0 xl:self-center"
+                                <svg
+                                  aria-hidden="true"
+                                  viewBox="0 0 16 16"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.4"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className={`size-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
                                 >
-                                  <ClockIcon />이 당시 관계그래프 보기
-                                </button>
-                              )}
-                            </article>
-                          );
-                        })}
-                      </div>
-                    </li>
-                  ))}
+                                  <path d="m4 6 4 4 4-4" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                          {!expanded && (
+                            <p className="truncate text-caption text-zoop-muted">
+                              {items[0].title}
+                            </p>
+                          )}
+                          {expanded && (
+                            <div id={listId} className="flex flex-col gap-3">
+                              {items.map((item) => {
+                                const itemGraphTime = eventGraphTime(item);
+                                return (
+                                  <article
+                                    key={item.id}
+                                    className="flex flex-col gap-1 border-0! py-0! xl:grid xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start xl:gap-x-3 xl:[&>*]:col-start-1"
+                                  >
+                                    <p className="text-caption text-zoop-muted">
+                                      문서 {item.articleCount}건 ·{' '}
+                                      {relationLabel(item.relationTypes) ||
+                                        '직접 관계 미확인'}
+                                    </p>
+                                    <button
+                                      aria-pressed={eventId === item.id}
+                                      onClick={() => selectEvent(item)}
+                                      className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-left text-body! font-semibold text-zoop-ink underline-offset-4 hover:underline aria-pressed:underline"
+                                    >
+                                      {item.title}
+                                    </button>
+                                    <p className="text-caption text-zoop-muted tabular-nums">
+                                      {item.eventTime ? (
+                                        <time dateTime={item.eventTime}>
+                                          {formatTimelineTime(
+                                            item.eventTime,
+                                            item.timePrecision,
+                                          )}
+                                        </time>
+                                      ) : (
+                                        '시점 미상'
+                                      )}
+                                    </p>
+                                    <button
+                                      onClick={() =>
+                                        selectEvent(item, 'documents')
+                                      }
+                                      className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-caption! text-zoop-muted underline underline-offset-4"
+                                    >
+                                      근거 문서 {item.articleCount}건 보기
+                                    </button>
+                                    {itemGraphTime && (
+                                      <button
+                                        type="button"
+                                        aria-pressed={
+                                          sameInstant(
+                                            graphAsOf,
+                                            itemGraphTime,
+                                          ) && eventId === item.id
+                                        }
+                                        data-graph-time-trigger
+                                        aria-label={`${item.title} · 이 당시 관계그래프 보기`}
+                                        onClick={() =>
+                                          showEventGraph(item, itemGraphTime)
+                                        }
+                                        className="mt-1 inline-flex items-center gap-1.5 self-start whitespace-nowrap xl:col-start-2! xl:row-span-4 xl:row-start-1 xl:mt-0 xl:self-center"
+                                      >
+                                        <ClockIcon />이 당시 관계그래프 보기
+                                      </button>
+                                    )}
+                                  </article>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ol>
                 {shownGroups.length < sortedGroups.length && (
                   <button

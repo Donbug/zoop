@@ -1,12 +1,12 @@
-# ai/service — 내부 HTTP transport (S1 분석, S2 추출, S3 관계 job, 챗봇 모델 단계, 읽기 전용 그래프·handoff)
+# ai/service — 내부 HTTP transport (분석 job, 회차 실행, 챗봇 모델 단계, 그래프·handoff 읽기)
 
 앱 백엔드가 S1 분석(`document-summary`, `document-sentiment`, `semantic-verification`, `briefing-outlook`, 계약 `zoop-ai-s1-1`)을 제출·조회·취소·복구하는 **내부 전용 HTTP 서비스**입니다. 같은 프로세스가 별도 리소스 가족으로 S2 이벤트·토픽 후보 job(`/internal/v1/extraction-jobs`, 기본 꺼짐)과 S3 관계·영향 후보 job(`/internal/v1/relation-jobs`, 기본 꺼짐)도 노출합니다. FastAPI/uvicorn이며 **설치된 `zoop-ai`(S2는 `zoop-ai-extract`, S3는 `zoop-ai-relation`) CLI만** 호출합니다. `zoop_ai`·`zoop_ai_pipeline`·BFF를 import하지 않고 worker의 `worker.sqlite3`와 pipeline의 `extraction.sqlite3`·`relation.sqlite3`·`ingestion.sqlite3`를 열지 않습니다. 런타임 원장이 작업 상태의 유일한 출처이고 이 서비스는 소유자·멱등·고정된 승인 신원·dispatch 상태만 별도 `service.sqlite3`(S1), `extraction-jobs.sqlite3`(S2), `relation-jobs.sqlite3`(S3)에 둡니다.
 
 > **로컬 준비 상태입니다.** 배포·보안 그룹·TLS 프록시는 확인되지 않았고 승인되지 않았습니다. 원격 CI는 `5cf208e`의 [실행 38226220631](https://github.com/Donbug/zoop/actions/runs/38226220631)에서 8개 작업이 모두 통과했고 실제 Java 클라이언트 → 이 서비스 → 설치된 `zoop-ai` replay 종단 시험을 포함합니다. Spring 전송 클라이언트(`api/src/main/java/com/zoop/ai`)가 이 HTTP를 소비하고, S1 문서 요약·기업 판정은 operator 전용 비웹 실행([문서 분석](../../api/docs/DOCUMENT_ANALYSIS.md))이 결과를 앱 PostgreSQL에 저장합니다(로컬 구현·검증). 공개 인증, 분석을 읽는 공개 경로, S2·S3·`briefing-outlook` 결과의 앱 import, 배포는 아직 없습니다. 실제 모델 호출, 외부 뉴스, 실제 토큰은 쓰지 않았습니다. **S2 extraction job 라우트와 S3 relation job 라우트(아래 별도 절)는 이후 추가했고 원격 CI에서 실행된 결과는 아직 관측하지 않았습니다. 이 두 가족도 Spring 전송 클라이언트(`ExtractionClient`·`RelationClient`)가 로컬에서 소비하며 실제 서비스·설치된 pipeline replay 종단 gate(`api/scripts/ai_pipeline_gate.py`)로 검증했지만, S2·S3 결과의 앱 DB 저장·import와 사용자 격리·공개 endpoint는 없습니다.** S2-1 수집(`zoop-ai-ingest`)은 운영자 파일 입력이므로 HTTP로 열지 않습니다. S2-2 추출(`zoop-ai-extract`)은 호출자가 스냅샷·카탈로그·fixture를 보낼 수 없는 **서버 사전 승인 요청** 참조 모델로만 엽니다.
 
-> **경계.** 이 서비스는 pipeline의 비공개 Neo4j 버전 projection(`zoop-ai-graph`, FS080 일부)을 **읽기 전용 두 라우트**(`/internal/v1/graph-versions`, 아래 별도 절)로만 감싸고, 별개로 AI handoff bundle의 **읽기 전용 두 라우트**(`/internal/v1/graph-handoffs`, 아래 절)를 제공합니다. 버전 생성(`init`·`freeze`·`project`·`recover`)·게시·활성화·FS081 철회·목록·호출자 Cypher는 없고, Neo4j write 자격과 쓰기 명령은 pipeline 운영자 프로세스만 갖습니다. 공개 API·Spring 클라이언트·활성 포인터는 없습니다([pipeline README](../pipeline/README.md), [AI 실행 계약](../../docs/design/ai-system.md), [백엔드 인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)).
+> **읽기와 실행의 분리.** `/internal/v1/graph-versions`와 `/internal/v1/graph-handoffs`는 기존 읽기 전용 가족입니다. 새 회차 실행은 별도 `/round-runs`·`/round-handoffs`와 쓰기 가능 profile에서만 수행합니다. Neo4j projection·게시·앱 활성화 권한은 회차 접수에 포함되지 않습니다([pipeline README](../pipeline/README.md), [백엔드 소비 계약](../../api/docs/GRAPH_READ_HANDOFF.md)).
 
-> **관측 export(#387의 세 번째 작업만).** `POST /internal/v1/observations/export`는 설치된 `zoop-ai-ingest export --require-store`를 동기 호출합니다. 현재 권한이 허용하는 문서 본문을 200 응답에 포함하며, 수집 실행·회차 job·freeze·스케줄러는 추가하지 않습니다. 설정과 운영 경계는 아래 「관측 export」 절을 따릅니다.
+> **관측 export.** `POST /internal/v1/observations/export`는 설치된 `zoop-ai-ingest export --require-store`를 동기 호출합니다. 현재 권한이 허용하는 문서 본문을 200 응답에 포함합니다. 별도의 쓰기 가능 회차 profile은 아래 「회차 HTTP 실행」 절을 따르며, 기존 읽기 profile의 설정과 권한을 그대로 유지합니다.
 
 ```bash
 make service-install           # uv sync --project ai/service --frozen --group dev (공개 의존성만, 토큰 없음)
@@ -133,6 +133,34 @@ Admission은 `<plan-root>/<planId>`의 네 plan 파일만 읽고 receipt를 내�
 Verifier가 종료 코드 2와 닫힌 `zoop-extraction-s2-2` 오류 envelope를 함께 반환할 때만 409 `plan_verification_failed`로 분류합니다. 비정상 종료·signal·비JSON/빈/불일치 응답·출력 초과·deadline은 503 `plan_verifier_unavailable`이며, raw child 출력 없이 재시도 가능한 전송 불능으로 구분합니다. 출력 크기·deadline·kill/reap 한도는 그대로 유지하고 자동 재시도는 하지 않습니다.
 
 
+### 회차 HTTP 실행(선택, 기본 꺼짐)
+
+`ZOOP_AI_SERVICE_ROUND_PROFILE`은 운영자가 작성한 `zoop-ai-round-profile-1` JSON의 절대 경로입니다. 온라인 plan admission, S2·S3, handoff 읽기, 관측 export 설정 그룹이 모두 필요합니다. 한 profile은 한 쓰기 가능 source에 묶이며, archive의 source-context inventory를 쓰기 profile로 채택하지 않습니다. 처음 켤 때는 새 서비스 상태 디렉터리와 계획 root를 준비합니다. profile 파일의 바이트 SHA와 경로가 기존 authority binding 및 `rounds/binding.json`에 고정되므로, 나중에 기능을 끄거나 다른 profile로 바꾸어 기존 원장을 재사용할 수 없습니다. 처음부터 꺼진 profile의 authority binding에는 새 필드를 추가하지 않습니다.
+
+profile의 필수 키는 `schemaVersion`, `sourceId`, `scopeId`, `initialFrom`, `fixtureManifest`, `descriptor`, `selection`입니다. `descriptor`는 기존 extraction의 `schemaVersion`·`provenance`·`promptVersion`·`catalogue`·`snapshot`·`topic`을 담습니다. `selection`은 `cadenceMinutes:30`, 1~8의 `limit`, 양의 정수 `maxAgeSeconds`를 모두 명시해야 합니다. **운영용 maxAgeSeconds 기본값은 없습니다.** 합성 smoke의 긴 나이 한도는 시험 설정입니다. canonical 매핑·공개 decisions·모델 실행 정책과 예산은 각각 사람 운영자가 준비합니다.
+
+| 경로 | scope | 접수·조회 규칙 |
+|---|---|---|
+| `POST /internal/v1/round-runs` | `round.run` | 닫힌 `zoop-ai-round-run-1` 요청, `roundId`와 같은 `Idempotency-Key`, 본문 최대 1,024바이트 |
+| `POST /internal/v1/round-handoffs` | `round.run` | `zoop-ai-round-handoff-1`, `roundId`, 선택적 `ingestionRoundId`·`planId`, 전체 `bindings` 객체. 전체 본문 최대 4,001,024바이트, 정규 bindings 최대 4,000,000바이트 |
+| `GET /internal/v1/round-runs/{roundId}` / `round-handoffs/{roundId}` | `round.read` | 해당 principal의 접수만 조회합니다. 없는 접수는 404 `round_not_found`입니다 |
+
+앱 KST `round-yyyyMMddTHHmm`과 native ingestion `slot-…`은 다른 식별자입니다. 최초 접수는 원래 요청 바이트를 저장한 뒤 202를 반환합니다. 같은 principal·가족·roundId의 정확한 바이트 재전송은 실행 중이거나 종결됐어도 200으로 현재 상태를 반환하며 재등록하지 않습니다. 바이트가 다르면 409 `request_conflict`입니다. 다른 principal·가족을 포함해 profile 안에서 명령 하나라도 예약·실행 중이면 새 접수는 재시도 가능한 409 `round_busy`로 끝나고 행·파일을 만들지 않습니다.
+
+handoff 최초 접수 전에는 소유한 계획의 단위와 자기 수집 회차에 접수된 native S3 작업이 모두 ready 또는 cancelled인지 읽기 전용 `check-round`로 확인합니다. 미완료면 409 `analysis_incomplete`이며 접수 행·private bindings·native 쓰기가 없습니다. 접수 이후 준비 상태가 바뀌어 native가 쓰기 전 미완료를 확인한 경우에는 GET 200 `analysis_incomplete`로 대기합니다. 이 대기는 실행 슬롯을 점유하지 않으며 background dispatcher만 슬롯을 원자적으로 다시 잡습니다. 시작한 native 명령의 결과가 불명이면 `failed/round_outcome_unknown`으로 종결하고 재시작·정확한 재전송으로 다시 실행하지 않습니다.
+
+GET은 실행·재등록·디렉터리 생성을 하지 않습니다. ready 계획과 handoff는 기존 현재 권한 검증을 거쳐 읽습니다. 정상 선택 결과가 0건이면 전부 withheld인 경우도 `no_public_material/window_empty`와 **정확한 native selection 보고서**를 반환하고 handoff·grant를 만들지 않습니다. 권한·설정·읽기 오류 자체를 0건으로 바꾸지는 않습니다. 이미 ready인 handoff의 나중 권한 거절도 새 freeze로 대체하지 않습니다.
+
+run의 유효한 과거·현재 시각이 운영 시간 밖이면 `no_new_material/outside_operating_window`, 시간 안의 비정규 분이면 `no_new_material/not_due`입니다. 슬롯을 반올림하거나 native 상태를 바꾸지 않습니다. 불가능한 날짜·미래 ID는 422 `invalid_request`이며 18:05는 freeze 전용입니다. 선택은 오래된 적격 이월분을 먼저 채우고, 정확한 관측의 중복·진행 중·완료 상태를 profile 전체에서 제외합니다. 관측 예약은 불명 결과 뒤에도 유지됩니다.
+
+첫 baseline은 HTTP 응답 관측 여부가 아니라 native `round-inventory`의 읽기 전용 checkpoint `through`로 판단합니다. native tick이 commit된 뒤 응답을 잃어도 원래 요청은 unknown으로 보존하고, 다음 별도 슬롯은 저장된 checkpoint부터 진행합니다. 최초 상태가 실제로 비어 있을 때만 `initialFrom`을 보내며, 손상·잠금·미정리 WAL은 bootstrap으로 바꾸지 않습니다.
+
+작업 목록의 원본은 native의 완료된 관측 inventory입니다. 고정한 `asOf`·운영자 `maxAgeSeconds` 안에서 오래된 슬롯부터 64건씩 읽고, 각 페이지의 정확한 관측만 영구 claim 인덱스로 조회하여 최대 8건을 계획합니다. 선택되지 않은 적격 관측은 inventory에 남아 다음 슬롯에서 다시 보며, 선택된 관측의 claim과 unknown 요청의 claim은 계속 보존합니다. 만료된 관측은 작업 조회 범위에서 빠질 뿐 감사 기록을 삭제하지 않습니다. 내부 selection-v2는 선택한 관측만 고정하므로 과거 전체 carryover·inFlight·settled 이력을 새 요청에 복제하지 않습니다.
+
+ready handoff와 principal별 읽기 grant는 한 transaction으로 기록됩니다. 서비스 중지 후 `python -m zoop_ai_service.round_revoke --state-dir … --principal … --handoff-id … --manifest-digest … --bundle-digest …`로 정확한 grant를 철회할 수 있습니다. 회차 소유 ID는 grant가 철회되어도 static allowlist로 우회하지 않습니다. 앱의 저장 바이트 복구·비활성 수입은 [그래프 정기 회차](../../api/docs/GRAPH_ROUND.md)를 따릅니다.
+
+합성 native HTTP 시나리오는 새 root에서 `ai/service/.venv/bin/python ai/service/scripts/round_service_smoke.py --root NEW_PRIVATE_ROOT`로 실행합니다. 실제 CLI의 계획→접수→S2/S3 replay→freeze→읽기, 초기 미완료 거절, 원천·grant 철회, 불명 결과의 재시작 보존을 검사하며 공급자 호출은 금지합니다.
+
 ### 운영자 토큰 절차(수동, 에이전트가 실행하지 않음)
 
 서비스와 이 저장소는 비밀을 생성하지 않습니다. 운영자가 서비스 밖에서 토큰을 만들어 비밀 저장소에 보관하고 **digest만** 설정에 넣습니다.
@@ -232,7 +260,7 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 
 **서버 사전 승인(`ZOOP_AI_SERVICE_EXTRACTION_APPROVALS`).** 호출자는 pipeline의 S2 `Submit`을 보내지 못합니다. 운영자 파일(`{"schemaVersion":"zoop-ai-extraction-approvals-1","approvals":[{"principal","jobId","approvedRequestDigest","request","producerReplayDigest","topicReplayDigest"}]}`, live 항목은 `producerReplayDigest`·`topicReplayDigest` 대신 `liveRuntimeIdentity`, 알 수 없는 키·중복 `(principal, jobId)`·모르는 principal 거부)이 principal+jobId+digest를 **정확한 S2 `Submit` 본문**(스냅샷·카탈로그·incoming 관측·토픽 요청)과, replay 항목이면 그것이 실행될 fixture 바이트의 SHA-256에, live 항목이면 그 요청이 비용을 쓸 수 있는 런타임 binding 신원에 대응시킵니다. 서비스는 읽을 때마다 `request`의 정규 JSON digest가 `approvedRequestDigest`와 같은지, `request.jobId`가 항목의 `jobId`와 같은지, provenance 쌍이 `(replay, authored-test)`(fixture digest 필수) 또는 `(live, provider)`(fixture 없음, `liveRuntimeIdentity` 필수)인지, `topic` 요청과 `topicReplayDigest`가 정확히 짝인지(replay에서 `topic`이 있으면 선택 fixture가 설정돼 있어야 함)를 검증하고, 하나라도 어긋나면 시작을 거부하거나 닫힙니다. 목록에 없으면 존재 여부와 관계없이 같은 403 `request_not_approved`를 ledger·child 이전에 돌려줍니다. live 항목은 live 그룹이 없으면 409 `live_unavailable`입니다. **승인은 pipeline이 허용하는 것을 좁힐 뿐입니다.** pipeline은 내용을 다루는 모든 명령에서 운영자 source registry를 다시 읽으므로 승인이 있어도 registry가 막으면 읽히지 않습니다. 파일은 사용할 때마다 다시 읽고 읽을 수 없으면 닫힙니다(503 `service_configuration_invalid`).
 
-**회차 계획 파일(`zoop-ai-extract plan-round`).** pipeline의 [오프라인 계획 명령](../pipeline/README.md#이벤트same주제-후보-s2-2-authored-replay-또는-live-provider)은 완료 회차에서 `approvals.json`, `relation-upstreams.json`, `manifest.json`, `receipt.json`을 만듭니다. 계획 생성은 설치·유료 호출·예산 설정과 별개입니다. 앱용 manifest에는 계획 ID·digest·단위별 S2 제출 필드만 있으며, 승인 항목의 분석 입력·스냅샷·카탈로그·비밀·원문은 없습니다. 계획 작업은 `s2p-` ID를 사용하며 기존 CLI 작업을 HTTP 작업으로 재사용하지 않습니다. 검토한 계획은 아래 운영자 전용 명령으로 설치합니다. 앱의 계획 등록과 `JobCreate.planId` 처리는 BE에 제안한 후속 작업이며 아직 구현되지 않았습니다.
+**회차 계획 파일(`zoop-ai-extract plan-round`).** pipeline의 [계획 명령](../pipeline/README.md#이벤트same주제-후보-s2-2-authored-replay-또는-live-provider)은 완료 회차와 명시적 `--selection` 정책으로 `approvals.json`, `relation-upstreams.json`, `manifest.json`, `receipt.json`을 만듭니다. native manifest에는 계획 ID·digest·단위별 S2 제출 필드와 선택 정책·제외 사유·이월 관측이 들어갑니다. 계획 생성과 모델 실행 승인은 별개입니다. 수동 모드는 아래 설치 절차를, 회차 HTTP 모드는 온라인 admission과 앱 `analyze_plan` 큐를 사용합니다.
 
 **검토한 계획을 오프라인으로 설치합니다.** 먼저 서비스를 중지하고 서비스와 같은 운영자 환경을 사용합니다. 서비스 상태 디렉터리는 미리 존재하는 현재 사용자 소유의 `0700` 디렉터리여야 합니다. S2·S3 설정 그룹, 알려진 principal, 기존 두 registry가 필요합니다. 처음에는 기존 형식의 빈 `approvals`·`upstreams` 배열을 운영자가 준비합니다. registry와 fixture·명령 파일은 서비스·앱·worker·ingestion·extraction·relation 상태 루트 밖에 두고, symlink와 겹치는 경로는 사용하지 않습니다. 한 destination 쌍을 다른 서비스 상태 디렉터리나 관리되지 않는 reader/writer와 공유하면 안 됩니다.
 
@@ -410,7 +438,7 @@ ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli recover \
 
 ## 네트워크와 한계
 
-- 서비스는 기본 `127.0.0.1`에 바인드합니다. 운영자가 `ZOOP_AI_SERVICE_HOST`로 다른 literal IP를 지정할 때는 승인된 HTTPS ingress, 본문 2,000,000B 상한, `Authorization` 비로깅과 앱 접근 제한을 함께 준비해야 합니다. 설정 지원과 실제 배포·접속 증거는 구분합니다.
+- 서비스는 기본 `127.0.0.1`에 바인드합니다. 운영자가 `ZOOP_AI_SERVICE_HOST`로 다른 literal IP를 지정할 때는 승인된 HTTPS ingress, 라우트별 본문 상한(일반 2,000,000바이트, round-handoff 4,001,024바이트), `Authorization` 비로깅과 앱 접근 제한을 함께 준비해야 합니다. 설정 지원과 실제 배포·접속 증거는 구분합니다.
 - 동시 CLI 호출은 4개(초과 시 503 `service_busy`), pending dispatch는 1,000개(초과 시 503 `queue_full`)입니다. dispatcher는 직렬입니다(replay ordinal이 ledger 전체 순서이므로). 처리량 향상은 지연 측정 뒤 결정합니다.
 - live 모드의 빈 회차 outlook job은 모델 호출이 없어 호출 기록이 없으므로 recipient를 증명할 수 없다. 그래서 `result`는 `recipient_unproven`으로 내용을 내보내지 않는다(실패 시 닫힘, 허용된 현재 동작이며 receipt/상태 조회는 영향이 없다).
 - 재시작한 서비스는 이전 child의 pid를 모르므로 종료하지 않습니다. 매달린 child는 job lock을 잡은 채 `busy`로 폴링되며 운영자가 끝내야 합니다.

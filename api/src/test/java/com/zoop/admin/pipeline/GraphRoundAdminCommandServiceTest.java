@@ -120,7 +120,7 @@ class GraphRoundAdminCommandServiceTest {
         assertEquals("handoff_ready", service.retry("round-20261030T0935", "key-3", ADMIN, "req").stage());
         rounds.create("round-20261030T1105", Instant.parse("2026-10-30T02:05:00Z"), "system:scheduler", NOW);
         GraphRound waited = rounds.claim("round-20261030T1105", "worker", Duration.ofMinutes(2), NOW).orElseThrow();
-        rounds.advance(waited, GraphRoundPatch.fail("analysis_timeout"), Outcome.FAILED, "analysis_timeout", null, null, NOW);
+        rounds.advance(waited, GraphRoundPatch.fail("analysis_timeout").analysisJob("job-running"), Outcome.FAILED, "analysis_timeout", null, null, NOW);
         assertEquals("analysis_queued", service.retry("round-20261030T1105", "key-3b", ADMIN, "req").stage(),
                 "a timed-out wait keeps reading the running job; a finished job (analysis_failed) resumes at plan_ready");
         rounds.create("round-20261030T1135", Instant.parse("2026-10-30T02:35:00Z"), "system:scheduler", NOW);
@@ -143,6 +143,13 @@ class GraphRoundAdminCommandServiceTest {
                 assertThrows(CustomException.class, () -> service.retry("nope", "key-5", ADMIN, "req")).getErrorCode());
         assertEquals(ErrorCode.INVALID_REQUEST,
                 assertThrows(CustomException.class, () -> service.retry("round-20261030T0935", " ", ADMIN, "req")).getErrorCode());
+    }
+
+    @Test
+    void terminalAnalysisOverridesAnOlderFailedAtEvent() {
+        failed("round-20261030T0905", Instant.parse("2026-10-30T00:05:00Z"), GraphRoundStage.ANALYSIS_QUEUED,
+                "analysis_failed:worker_deadline");
+        assertEquals("plan_ready", service.retry("round-20261030T0905", "terminal-retry", ADMIN, "req-terminal").stage());
     }
 
     @Test

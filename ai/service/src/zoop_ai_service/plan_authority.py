@@ -69,7 +69,8 @@ def binding(config):
             "live": None if config.pipeline_live is None else {
                 "public": {k: v for k, v in config.pipeline_live.public.items() if k != "ZOOP_AI_PIPELINE_LIVE_TIMEOUT_SECONDS"},
                 "budgetDirectory": os.path.realpath(config.pipeline_live.budget["ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"])},
-            "principals": [{"name": p.name, "scopes": sorted(p.scopes)} for p in config.principals]}
+            "principals": [{"name": p.name, "scopes": sorted(p.scopes)} for p in config.principals],
+            **({"roundProfile": config.rounds.binding()} if config.rounds is not None else {})}
 
 
 def lock_creation_allowed(config):

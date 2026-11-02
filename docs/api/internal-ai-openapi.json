@@ -12480,6 +12480,1214 @@
         },
         "description": "Scope plan.policy. Raw closed policy document; exact If-Match and stable operation Idempotency-Key are required. Exact operator/key/body/If-Match retries return their historical receipt, even after another update. Changed body or If-Match with the same key conflicts (409); a new stale CAS conflicts (412). Identical current bytes do not renew revision/expiry or reset usage. A changed policy terminally retires all prior admissions. A replay receipt is not current state: GET current policy rather than treating it as the latest revision. Policy changes never refund usage and never authorize source/model spending. Application clients have no policy-write method."
       }
+    },
+    "/internal/v1/round-runs": {
+      "post": {
+        "tags": [
+          "round-runs"
+        ],
+        "summary": "Request Round Run",
+        "operationId": "requestRoundRun",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^round-[0-9]{8}T[0-9]{4}$"
+            },
+            "description": "Must equal body.roundId; retransmit the saved original bytes exactly."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Exact admitted operation with freshly observed state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunStatus"
+                },
+                "examples": {
+                  "admitted": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-round-run-1",
+                      "roundId": "round-20261031T0905",
+                      "state": "running",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied: the principal lacks this route's scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "round_not_found: no exact admission for this principal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "round_not_found",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: header, path, JSON envelope or runtime input validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_binding_mismatch or internal_error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "internal_error",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "execution_unavailable for a disabled round profile; service_busy or runtime_unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "execution_unavailable",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying with the same key and body.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "request_conflict, round_busy, round_binding_mismatch or analysis_incomplete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "request_conflict",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "request_too_large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "request_too_large",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "unsupported_media_type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "unsupported_media_type",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunStatus"
+                }
+              }
+            },
+            "description": "Exact admitted operation with freshly observed state."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "round.run"
+            ]
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunRequest"
+              }
+            }
+          }
+        },
+        "description": "Requires round.run. New admissions return 202 after original UTF-8 bytes are durably saved. Idempotency-Key equals app roundId. Same principal/family/id and identical original bytes return 200, including running and terminal states, without requeue. Changed bytes return 409 request_conflict. A distinct identity while any profile command is reserved/running returns retryable 409 round_busy without admission or files. Dormant analysis_incomplete records release the execution slot; only the background dispatcher may reacquire it atomically. Body limit 1,024 bytes. Valid nonfuture outside-window/off-cadence slots return no_new_material with outside_operating_window/not_due, without native mutation. Invalid or future dates return 422 invalid_request. Selection fixes asOf and an operator-required maxAgeSeconds; baseline maximum eight units per 30-minute round. 18:05 is freeze-only."
+      }
+    },
+    "/internal/v1/round-runs/{roundId}": {
+      "get": {
+        "tags": [
+          "round-runs"
+        ],
+        "summary": "Get Round Run",
+        "operationId": "getRoundRun",
+        "parameters": [
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^round-[0-9]{8}T[0-9]{4}$",
+              "title": "Roundid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact admitted operation with freshly observed state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunStatus"
+                },
+                "examples": {
+                  "running": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-round-run-1",
+                      "roundId": "round-20261031T0905",
+                      "state": "running",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied: the principal lacks this route's scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "round_not_found: no exact admission for this principal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "round_not_found",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: header, path, JSON envelope or runtime input validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_binding_mismatch or internal_error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "internal_error",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "execution_unavailable for a disabled round profile; service_busy or runtime_unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "execution_unavailable",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying with the same key and body.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "request_conflict, round_busy, round_binding_mismatch or analysis_incomplete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "request_conflict",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "request_too_large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "request_too_large",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "unsupported_media_type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "unsupported_media_type",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "round.read"
+            ]
+          }
+        ],
+        "description": "Requires round.read. Unknown/other-principal admission is 404 round_not_found. GET never dispatches, requeues or creates directories. Ready plans and handoffs recheck current read authority; a later denial does not trigger replacement freeze. A started uncertain command remains failed/round_outcome_unknown across restart and exact replay. Java recovery uses the saved endpoint/principal/credential binding and GET first; only decoded scoped 404 round_not_found permits exact-byte POST. Ready means an AI artifact, not app import, composition or activation."
+      }
+    },
+    "/internal/v1/round-handoffs": {
+      "post": {
+        "tags": [
+          "round-handoffs"
+        ],
+        "summary": "Request Round Handoff",
+        "operationId": "requestRoundHandoff",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^round-[0-9]{8}T[0-9]{4}$"
+            },
+            "description": "Must equal body.roundId; retransmit the saved original bytes exactly."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Exact admitted operation with freshly observed state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffStatus"
+                },
+                "examples": {
+                  "admitted": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-round-handoff-1",
+                      "roundId": "round-20261031T0905",
+                      "state": "running",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied: the principal lacks this route's scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "round_not_found: no exact admission for this principal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "round_not_found",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: header, path, JSON envelope or runtime input validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_binding_mismatch or internal_error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "internal_error",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "execution_unavailable for a disabled round profile; service_busy or runtime_unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "execution_unavailable",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying with the same key and body.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "request_conflict, round_busy, round_binding_mismatch or analysis_incomplete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "request_conflict",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "request_too_large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "request_too_large",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "unsupported_media_type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "unsupported_media_type",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffStatus"
+                }
+              }
+            },
+            "description": "Exact admitted operation with freshly observed state."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "round.run"
+            ]
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffRequest"
+              }
+            }
+          }
+        },
+        "description": "Requires round.run. New admissions return 202 after original UTF-8 bytes are durably saved. Idempotency-Key equals app roundId. Same principal/family/id and identical original bytes return 200, including running and terminal states, without requeue. Changed bytes return 409 request_conflict. A distinct identity while any profile command is reserved/running returns retryable 409 round_busy without admission or files. Dormant analysis_incomplete records release the execution slot; only the background dispatcher may reacquire it atomically. Full bindings object required; body limit 4,001,024 bytes and canonical bindings limit 4,000,000 bytes. Before admission the owned plan and own-round native jobs must be ready or cancelled; otherwise retryable 409 analysis_incomplete creates no row, private bindings or native write. A later known nonmutating readiness race may become accepted analysis_incomplete. window_empty, including all-withheld selection, returns no_public_material with the exact selection report and no handoff/grant. Ready pins and the principal read grant commit atomically."
+      }
+    },
+    "/internal/v1/round-handoffs/{roundId}": {
+      "get": {
+        "tags": [
+          "round-handoffs"
+        ],
+        "summary": "Get Round Handoff",
+        "operationId": "getRoundHandoff",
+        "parameters": [
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^round-[0-9]{8}T[0-9]{4}$",
+              "title": "Roundid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact admitted operation with freshly observed state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffStatus"
+                },
+                "examples": {
+                  "running": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-round-handoff-1",
+                      "roundId": "round-20261031T0905",
+                      "state": "running",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied: the principal lacks this route's scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "round_not_found: no exact admission for this principal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "round_not_found",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: header, path, JSON envelope or runtime input validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_binding_mismatch or internal_error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "internal_error",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "execution_unavailable for a disabled round profile; service_busy or runtime_unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "execution_unavailable",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying with the same key and body.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "request_conflict, round_busy, round_binding_mismatch or analysis_incomplete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "request_conflict",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "request_too_large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "request_too_large",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "unsupported_media_type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "error": {
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "unsupported_media_type",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "round.read"
+            ]
+          }
+        ],
+        "description": "Requires round.read. Unknown/other-principal admission is 404 round_not_found. GET never dispatches, requeues or creates directories. Ready plans and handoffs recheck current read authority; a later denial does not trigger replacement freeze. A started uncertain command remains failed/round_outcome_unknown across restart and exact replay. Java recovery uses the saved endpoint/principal/credential binding and GET first; only decoded scoped 404 round_not_found permits exact-byte POST. Ready means an AI artifact, not app import, composition or activation."
+      }
     }
   },
   "components": {
@@ -19135,6 +20343,109 @@
         "title": "HandoffManifest",
         "description": "The operator's frozen manifest exactly as the producer's ledger stores it (closed at every level): pins and file hashes only, no path or secret.\nIts canonical JSON bytes hash to `verification.manifestDigest` and to the bundle's `manifestDigest`."
       },
+      "HandoffStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "schemaVersion": {
+            "const": "zoop-ai-round-handoff-1",
+            "default": "zoop-ai-round-handoff-1",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "roundId": {
+            "pattern": "^round-[0-9]{8}T[0-9]{4}$",
+            "title": "Roundid",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "running",
+              "ready",
+              "analysis_incomplete",
+              "no_public_material",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "handoffId": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Handoffid"
+          },
+          "manifestDigest": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Manifestdigest"
+          },
+          "bundleDigest": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Bundledigest"
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Selection"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Code"
+          },
+          "observedAt": {
+            "title": "Observedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "roundId",
+          "state",
+          "observedAt"
+        ],
+        "title": "HandoffStatus",
+        "type": "object"
+      },
       "HdBundle": {
         "properties": {
           "schemaVersion": {
@@ -22480,6 +23791,95 @@
         ],
         "title": "RouterDependency"
       },
+      "RunStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "schemaVersion": {
+            "const": "zoop-ai-round-run-1",
+            "default": "zoop-ai-round-run-1",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "roundId": {
+            "pattern": "^round-[0-9]{8}T[0-9]{4}$",
+            "title": "Roundid",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "running",
+              "ready",
+              "no_new_material",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "ingestionRoundId": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ingestionroundid"
+          },
+          "planId": {
+            "anyOf": [
+              {
+                "pattern": "^s2plan-[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Planid"
+          },
+          "planDigest": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Plandigest"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Code"
+          },
+          "observedAt": {
+            "title": "Observedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "roundId",
+          "state",
+          "observedAt"
+        ],
+        "title": "RunStatus",
+        "type": "object"
+      },
       "SectionVerdict": {
         "properties": {
           "claims": {
@@ -22793,6 +24193,148 @@
         "title": "PlanReference",
         "type": "object"
       },
+      "RunRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "schemaVersion": {
+            "const": "zoop-ai-round-run-1",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "roundId": {
+            "pattern": "^round-[0-9]{8}T[0-9]{4}$",
+            "title": "Roundid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "roundId"
+        ],
+        "title": "RunRequest",
+        "type": "object"
+      },
+      "DocumentBinding": {
+        "additionalProperties": false,
+        "properties": {
+          "documentId": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Documentid",
+            "type": "string"
+          },
+          "documentVersion": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Documentversion",
+            "type": "string"
+          },
+          "articleId": {
+            "pattern": "^doc-[a-f0-9]{64}$",
+            "title": "Articleid",
+            "type": "string"
+          },
+          "articleVersion": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Articleversion",
+            "type": "string"
+          },
+          "textSha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Textsha256",
+            "type": "string"
+          },
+          "offsetUnit": {
+            "const": "unicode_code_point",
+            "title": "Offsetunit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "documentId",
+          "documentVersion",
+          "articleId",
+          "articleVersion",
+          "textSha256",
+          "offsetUnit"
+        ],
+        "title": "DocumentBinding",
+        "type": "object"
+      },
+      "DocumentBindings": {
+        "additionalProperties": false,
+        "properties": {
+          "schemaVersion": {
+            "const": "zoop-app-document-bindings-1",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "bindings": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentBinding"
+            },
+            "maxItems": 20000,
+            "title": "Bindings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "bindings"
+        ],
+        "title": "DocumentBindings",
+        "type": "object"
+      },
+      "HandoffRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "schemaVersion": {
+            "const": "zoop-ai-round-handoff-1",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "roundId": {
+            "pattern": "^round-[0-9]{8}T[0-9]{4}$",
+            "title": "Roundid",
+            "type": "string"
+          },
+          "ingestionRoundId": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ingestionroundid"
+          },
+          "planId": {
+            "anyOf": [
+              {
+                "pattern": "^s2plan-[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Planid"
+          },
+          "bindings": {
+            "$ref": "#/components/schemas/DocumentBindings"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "roundId",
+          "bindings"
+        ],
+        "title": "HandoffRequest",
+        "type": "object"
+      },
       "ObservationExportRequest": {
         "additionalProperties": false,
         "properties": {
@@ -22903,6 +24445,14 @@
     {
       "name": "plan-admission-policy",
       "description": "Separate operator-only policy CAS control; never application authority."
+    },
+    {
+      "name": "round-runs",
+      "description": "Durable app-round to native-ingestion/plan orchestration."
+    },
+    {
+      "name": "round-handoffs",
+      "description": "Bounded native freeze and atomic principal read grants."
     }
   ]
 }

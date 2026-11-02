@@ -80,6 +80,8 @@ class ChatResponseGuardTest {
         assertSame(job, guard(Set.of()).job(job, "r"), "no evidence record is read for a web hit");
         assertEquals(ChatResponseGuard.WITHHELD_ANSWER, guard(Set.of()).job(job(List.of(), web("other")), "r").result()
                 .answer());
+        assertEquals(ChatResponseGuard.WITHHELD_ANSWER, guard(Set.of()).job(job(List.of(),
+                web(com.zoop.chat.tool.NaverApiHubWebSearchProvider.ID)), "r").result().answer());
     }
 
     private static ChatResult web(String provider) {

@@ -1015,6 +1015,13 @@ test('D-COM-01 다크에서만 지도 개선 테마 표면을 쓴다', async () 
   }
 });
 
+/** D13: 사건이 여러 건인 날짜 묶음은 접혀 있으니 먼저 펼친다. */
+async function expandTimeline(user = userEvent.setup()) {
+  await screen.findAllByRole('button', { name: /사건 \d+건$/ });
+  for (const button of screen.queryAllByRole('button', { name: /펼치기$/ }))
+    await user.click(button);
+}
+
 function openHistory() {
   return renderRoutes(
     [
@@ -1034,6 +1041,7 @@ function openHistory() {
 
 test('D-COM-06: Back and Forward restore event-time history after an outside selection', async () => {
   const { router, user } = openHistory();
+  await expandTimeline(user);
   await user.click(
     await screen.findByRole('button', {
       name: '합성 사건 A · 이 당시 관계그래프 보기',
@@ -1069,6 +1077,7 @@ test('D-COM-06: Back and Forward restore event-time history after an outside sel
 
 test('D-COM-06: closing outside without navigation still allows reopening the same event time', async () => {
   const { user } = openHistory();
+  await expandTimeline(user);
   for (let i = 0; i < 2; i++) {
     await user.click(
       await screen.findByRole('button', {
@@ -1096,6 +1105,7 @@ test.each(['blank', 'selected'])(
   'D-COM-06: Back before delayed cleanup restores an earlier entry at the same timestamp (%s)',
   async (target) => {
     const { router, user } = openHistory();
+    await expandTimeline(user);
     await user.click(
       await screen.findByRole('button', {
         name: '합성 사건 A · 이 당시 관계그래프 보기',
@@ -2183,6 +2193,7 @@ test('A02: timeline shows relation types in Korean and empty relations as unconf
   );
   open(`${pinned}&period=1m&tab=events`);
   const timeline = await screen.findByRole('region', { name: '사건 타임라인' });
+  await expandTimeline();
   await within(timeline).findByRole('button', { name: '합성 사건 C' });
   expect(within(timeline).getByText(/문서 1건 · 직접 관련$/)).toBeTruthy();
   expect(within(timeline).getByText(/문서 2건 · 구조적 관련$/)).toBeTruthy();
@@ -2190,6 +2201,50 @@ test('A02: timeline shows relation types in Korean and empty relations as unconf
   expect(
     within(timeline).queryByText(/INVOLVES|STRUCTURALLY_RELATED_TO/),
   ).toBeNull();
+});
+
+test('D-COM-05 D13: a bucket with several events folds to its first title until opened or picked', async () => {
+  open(`${pinned}&period=1m&tab=events`);
+  const user = userEvent.setup();
+  const timeline = await screen.findByRole('region', { name: '사건 타임라인' });
+  const toggle = await within(timeline).findByRole('button', {
+    name: /사건 2건 펼치기$/,
+  });
+  expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  expect(within(timeline).getByText('합성 사건 A')).toBeTruthy();
+  expect(
+    within(timeline).queryByRole('button', { name: '합성 사건 B' }),
+  ).toBeNull();
+
+  await user.click(toggle);
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  expect(
+    within(timeline).getByRole('button', { name: '합성 사건 B' }),
+  ).toBeTruthy();
+
+  await user.click(toggle);
+  expect(
+    within(timeline).queryByRole('button', { name: '합성 사건 B' }),
+  ).toBeNull();
+  // 버킷(사건 2건)을 고르면 펼친다.
+  await user.click(
+    within(timeline).getByRole('button', { name: /· 사건 2건$/ }),
+  );
+  expect(
+    await within(timeline).findByRole('button', { name: '합성 사건 B' }),
+  ).toBeTruthy();
+
+  // 직접 접어 둔 버킷도 차트 ⚡ 표식으로 고르면 다시 펼친다.
+  await user.click(toggle);
+  expect(
+    within(timeline).queryByRole('button', { name: '합성 사건 B' }),
+  ).toBeNull();
+  await user.click(
+    screen.getByRole('button', { name: /^차트 사건 .* · 사건 2건$/ }),
+  );
+  expect(
+    await within(timeline).findByRole('button', { name: '합성 사건 B' }),
+  ).toBeTruthy();
 });
 
 test('F05: quote outages offer retry only when the server says it may help', async () => {
@@ -2564,6 +2619,7 @@ test.each(['success', 'failure'] as const)(
 test('D-COM-06: [이 당시 관계그래프 보기] moves only the graph to the event time and [현재] returns', async () => {
   open(pinned);
   const user = userEvent.setup();
+  await expandTimeline(user);
   await user.click(
     await screen.findByRole('button', {
       name: '합성 사건 A · 이 당시 관계그래프 보기',
@@ -2741,6 +2797,7 @@ test('D-COM-06: the event-time graph stays while the graph is used and returns t
   open(pinned);
   const user = userEvent.setup();
   const address = () => screen.getByTestId('address').textContent ?? '';
+  await expandTimeline(user);
   await user.click(
     await screen.findByRole('button', {
       name: '합성 사건 A · 이 당시 관계그래프 보기',

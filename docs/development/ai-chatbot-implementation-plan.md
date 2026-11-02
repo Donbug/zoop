@@ -50,7 +50,7 @@
 | 루트 웹 | `web/src/apis/chat`, `use-chat-conversation`, `AiChatDrawer`·`ChatJobCard`가 대화 생성·복원, 질문 접수·polling·취소·재시도와 답변·인용·확인 질문·실패 렌더링을 구현함(Vitest) | 구현됨. 타입은 손으로 쓴 `web/src/types/ai`이고 실제 백엔드·모델 종단 시험은 없음 |
 | AI worker | `zoop-ai-chat`이 `chat-router`(Jev), `chat-answer`(Luna), `chat-agent`(Luna Responses MCP), `chat-verification`(Jev)을 별도 계약·원장·grant·live gate로 실행함 | 구현됨, 기본 비활성. 임계값 보정과 실제 승인 호출은 별도 |
 | AI 내부 서비스 | `/internal/v1/chat-stages/{stage}`가 인증된 synchronous stage door로 구현되고 생성 OpenAPI에 포함됨 | 구현됨. 앱은 `HttpChatStageClient`로만 호출 |
-| 데이터 기반 | 기업·문서·evidence·공개 그래프 버전과 현재 권리 재검사 경로가 있고 `company.read`·`issue.read`·`evidence.resolve`·`graph.path.read`·`graph.version.diff`·`portfolio.scope.read`·`briefing.read`·`briefing.evidence`·`selectionRule.read`·`zoopPolicy.read`·`document.search`와 합성 공급자 `web.search`가 연결됨. Q01 승인 문서 저장소와 `help.search`·`screenSpec.read` 어댑터도 기본 비활성 gate로 구현됨 | Q01 실제 승인본 등록·활성화, 실제 웹 공급자와 종단 공개 시험은 추가 필요 |
+| 데이터 기반 | 기업·문서·evidence·공개 그래프 버전과 현재 권리 재검사 경로가 있고 `company.read`·`issue.read`·`evidence.resolve`·`graph.path.read`·`graph.version.diff`·`portfolio.scope.read`·`briefing.read`·`briefing.evidence`·`selectionRule.read`·`zoopPolicy.read`·`document.search`와 합성/NAVER 후보 `web.search`가 연결됨. Q01 승인 문서 저장소와 승인본 `2026-11-02.1`, `help.search`·`screenSpec.read` 어댑터도 기본 비활성 gate로 구현됨 | 대상 환경 Q01 활성화, 실제 데이터·모델·NAVER preflight와 종단 공개 시험은 추가 필요 |
 | 와이어프레임 | 네 정적 화면은 질문·되묻기·회수·조회 오류의 시각 기준을 제공하지만 동작 상태를 증명하지 않음 | 별도 상태 계약으로 로딩·오류·근거 수준·복구를 고정함 |
 
 결론적으로 백엔드의 저장·공개 API·작업 실행기·라우터·오케스트레이터·도구 레지스트리·Luna 생성·claim 단위 Jev 검증과 웹 D-AI-01~02b 연결은 구현돼 있다. Luna Responses MCP agent 경로도 기본 꺼진 상태로 구현돼 있다. 다만 미연결 도구, live spike, 평가 보정과 출시 증명은 남아 있다. 기능 플래그와 live gate는 기본적으로 꺼져 있으므로 “코드가 있음”은 “출시됨”이나 “실제 모델 호출 승인됨”을 뜻하지 않는다.
@@ -61,7 +61,7 @@ Q06 `briefing.read`(2026-10-30, `chat-tools/v7`): 요구 문구의 날짜(오늘
 
 Q08 `selectionRule.read`(2026-10-30, `chat-tools/v8`, 사용자 결정): 질문이 지목한 이슈마다, 실행의 고정 그래프 버전에서 보이는 이슈만 (1) 지도 공개 기록(버전의 `review_revision` 이하 마지막 검수 결정의 종류·시점·경로와 `graph_version_rules`의 공개 규칙 제목·요약)과 (2) 요구 문구가 가리키는 발행 회차(없으면 최신)가 그 이슈를 골랐다면 순위·기록된 선정 이유·지금 인용 가능한 근거를 읽는다. 결정한 관리자와 관리자가 적은 사유 문장은 내보내지 않는다. AI 판정 사유 코드는 선정 이유가 아니라 보류·거절·오류 사유뿐이라 쓰지 않는다. 기록은 기사 근거가 아니므로 인용 없이 답할 수 있고(`recordsOnly`), Jev는 같은 기록을 `publication_record`·`briefing_selection` 서버 사실로 받아 검증한다. 검수 결정이 없으면 '기록 없음'이지 자동 승인으로 말하지 않는다. MCP에는 노출하지 않는다.
 
-Q01 `help.search`·`screenSpec.read`(2026-11-01, `chat-tools/v11`): `chat_document_versions`에 승인 근거·승인/시행 시각과 함께 등록한 불변 도움말(`help.service-guide`)·화면 설명(`screen.guide`)만 읽는다. 각 `##` 절은 결정적 `zoop_doc` 인용이며 과거 시점 조회도 현재 같은 버전이 시행 중일 때만 허용한다. 현재 migration은 저장소만 만들고 미승인 초안을 넣지 않는다. 두 어댑터는 `ZOOP_CHAT_APPROVED_DOCS_ENABLED=false`로 기본 비활성이며, 켤 때 두 현재 문서가 모두 존재하고 20절·절당 2,000자 계약을 지키지 않으면 기동을 거절한다. 따라서 구현 완료는 승인·출시 완료를 뜻하지 않는다.
+Q01 `help.search`·`screenSpec.read`(2026-11-01, `chat-tools/v11`): `chat_document_versions`에 승인 근거·승인/시행 시각과 함께 등록한 불변 도움말(`help.service-guide`)·화면 설명(`screen.guide`)만 읽는다. 각 `##` 절은 결정적 `zoop_doc` 인용이며 과거 시점 조회도 현재 같은 버전이 시행 중일 때만 허용한다. 승인본 `2026-11-02.1` 두 행은 문안 PR #508과 승인 시각을 고정한 별도 migration으로 등록됐다. 두 어댑터는 `ZOOP_CHAT_APPROVED_DOCS_ENABLED=false`로 기본 비활성이며, 켤 때 두 현재 문서가 모두 존재하고 20절·절당 2,000자 계약을 지키지 않으면 기동을 거절한다. 따라서 등록 완료는 환경 활성화·출시 완료를 뜻하지 않는다.
 
 Q03 `document.search` 본문 검색(2026-11-02, `chat-tools/v12`): 서버가 요구 문장에서 일반적인 요청어·기간 숫자를 뺀 검색어를 결정하고, 공개 그래프의 고정 버전·asOf·현재 source grant를 통과한 기업 문서만 정확한 `article_id + document_version`의 검증된 `extracted_text` 본문과 제목에서 검색한다. 원문을 DB에 복제하거나 모델에 새로 보내지 않고 매치 여부만 사용하며, 인스턴스 로컬 색인은 검증된 artifact SHA별 총 32 MiB LRU다. 기업별 최신 100문서까지만 확인하고 뒤 페이지가 있으면 `truncated`로 남긴다. 의미 있는 검색어가 없는 "최근 소식"은 기존 최신순 읽기다. 요구 문장을 입력으로 갖지 않는 원격 MCP에서는 같은 요청을 재현할 수 없으므로 이 도구는 server-only direct 경로다.
 
@@ -105,9 +105,9 @@ flowchart LR
 | 1 저장·job 수명주기 | 구현 | 복구본을 DB에 두므로 DB 장애 자체는 복구 대상이 아님 |
 | 2 오케스트레이터 | 구현(합성 회귀) | direct·agent 공통 45초와 서버 requirement coverage 구현. 단계 최소 예약·상한은 live p95로 보정 |
 | 3 router·Luna agent | 부분 구현 | Jev router·Luna Responses MCP·Java 승인 루프는 구현(합성 replay로만 확인). 라우터 wire `dependsOn`도 구현(2026-10-30, `zoop-ai-chat-3`, 확신이 낮거나 요구가 대상을 지목하면 의존 없음). 승인 요청의 요구 매핑도 구현(2026-10-30, `zoop-ai-chat-4`). live 확인 |
-| 4 읽기 도구 | 부분 구현 | Q03 기업별 문서·검증 본문 검색(`document.search`, 2026-11-02), Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`·`briefing.evidence`, 2026-10-31), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 공급자), Q01 승인 저장소·기본 비활성 어댑터·승인본(`2026-11-02.1`) 구현. 환경별 Q01 활성화와 실제 웹 공급자 미정 |
+| 4 읽기 도구 | 부분 구현 | Q03 기업별 문서·검증 본문 검색(`document.search`, 2026-11-02), Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`·`briefing.evidence`, 2026-10-31), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 및 NAVER 운영 후보), Q01 승인 저장소·기본 비활성 어댑터·승인본(`2026-11-02.1`) 구현. 환경별 Q01 활성화와 실제 데이터·공급자 preflight 미실행 |
 | 5 생성·출력 검증 | 구현(합성 회귀) | 서버 claim 분할과 claim별 support·`unsupportedCausality`, 입력 24k·답변 2k 구현. 실제 모델 보정은 단계 7 |
-| 6 웹 | 부분 구현(합성 회귀) | 합성 공급자·예산·요구별 gate·웹 인용, 대상·기간·필수 필드·인용 coverage, Q07 웹 대상 2개 초과 선택 확인, 인스턴스 로컬 공급자 요청 캐시·single-flight 구현. 실제 공급자·인스턴스 공유 캐시·금액 상한·snapshot 저장은 미정 |
+| 6 웹 | 부분 구현(합성·loopback 회귀) | 합성 공급자·예산·요구별 gate·웹 인용, 대상·기간·필수 필드·인용 coverage, Q07 웹 대상 2개 초과 선택 확인, 인스턴스 로컬 공급자 요청 캐시·single-flight와 NAVER adapter 구현. 실제 NAVER preflight·인스턴스 공유 캐시·금액 상한·snapshot 저장은 미완료 |
 | 7 평가·출시 | 부분 구현 | 고정 평가 세트 v1(대본 실행)만 있음. 실제 모델·데이터 평가와 임계값 보정, 보안·종단·배포 증명 |
 
 ### 단계 0 — 계약 고정과 fixture
@@ -221,13 +221,13 @@ Q07의 `portfolio.scope.read`는 Java server-only precondition으로 실행하�
 
 ## 5. 다음 구현 순서 (2026-11-02)
 
-Q01 승인 문서 저장소와 기본 비활성 `help.search`·`screenSpec.read` 어댑터까지 구현됐다(`chat-tools/v12`). 승인본 `2026-11-02.1`은 등록됐고 기능 플래그는 기본 꺼짐이다. Q02~Q08 수직 도구, 합성 `web.search`·일일 한도·인스턴스 로컬 요청 캐시, direct·agent 공통 45초 deadline, 내부 계약 schema는 구현돼 있고(합성 회귀), 실제 웹 공급자와 출시 증명은 후속이다.
+Q01 승인 문서 저장소와 기본 비활성 `help.search`·`screenSpec.read` 어댑터까지 구현됐다(`chat-tools/v12`). 승인본 `2026-11-02.1`은 등록됐고 기능 플래그는 기본 꺼짐이다. Q02~Q08 수직 도구, 합성 `web.search`·일일 한도·인스턴스 로컬 요청 캐시, direct·agent 공통 45초 deadline, 내부 계약 schema와 NAVER API HUB 운영 후보 adapter는 구현돼 있다(합성·loopback 회귀). 남은 것은 실제 데이터·모델·공급자 실측과 운영 readiness 증거다.
 
 ### 5.1 바로 다음 PR — Q01 승인본 확정·등록
 
 현재 상태(2026-11-02): 승인본 `2026-11-02.1`을 `docs/help/approved/`와 `V20261102141000`으로 등록했다. 남은 것은 대상 환경의 `zoop-docs` grant 확인과 플래그 켜기다. 아래는 절차 기록이다.
 
-1. [도움말·화면 설명 초안](../help/README.md)의 `검수 필요` 5개 항목을 제품·운영 담당자가 결정하고, 현재 `web/` 동작과 문장별로 대조한다. 결정 전에는 초안을 `chat_document_versions`에 넣거나 플래그를 켜지 않는다. 2026-11-02 잠정 결정을 초안에 반영했고, 승인 담당자의 확정과 `approval_ref` 발급이 남았다.
+1. [도움말·화면 설명 초안](../help/README.md)의 `검수 필요` 5개 항목을 제품·운영 담당자가 결정하고, 현재 `web/` 동작과 문장별로 대조한다. 이 절차는 완료됐고 승인 담당자·시각·문안 PR #508을 승인본과 migration에 기록했다.
 2. 확정 본문을 `docs/help/approved/service-guide-<version>.md`와 `screen-guide-<version>.md`로 고정하고 문서별 승인 근거(`approval_ref`), 승인 시각, 시행 시각을 기록한다. 승인 뒤 본문 수정은 금지하고 개정은 새 버전으로 낸다.
 3. 새 Flyway migration이 `help.service-guide`와 `screen.guide` 두 행만 등록하게 한다. 기존 `V20261101100000`은 수정하지 않으며, 시행 기간 중첩·본문 변경·삭제·철회 취소 제약을 유지한다.
 4. 실제 PostgreSQL에서 두 현재 문서의 버전·`##` 절 수·2,000자 상한·code point 구간·결정적 evidence ID·과거 버전 거부를 검증한다. 기능 플래그를 켠 Spring context, direct 도구와 MCP 고정 인자/결과 동등성, `zoop_doc` citation 재열람도 합성 질문으로 시험한다. 합성 문서 시험은 준비됐다(`ChatApprovedDocumentsPostgresTest`, `ChatMcpDirectParityTest`, 2026-11-02). 승인 migration PR은 실제 두 행으로 같은 조건을 확인하고, 전체 Spring context에서 플래그를 켠 기동을 함께 증명한다.
@@ -235,18 +235,18 @@ Q01 승인 문서 저장소와 기본 비활성 `help.search`·`screenSpec.read`
 
 완료 조건: 승인 파일과 승인 근거가 존재하고, 두 문서만 현재 시행 중이며, 플래그를 켠 기동·direct/MCP 조회·citation 재열람·철회 후 재열람 거부가 CI에서 통과해야 한다. 승인 의사결정이 끝나지 않으면 이 범위를 억지로 완료 처리하지 않고 아래 5.2를 먼저 진행한다.
 
-### 5.2 후속 PR — 실제 웹 검색 공급자와 권리 경계
+### 5.2 후속 PR — 실제 웹 검색 공급자의 운영 증거와 권리 경계
 
-1. 공급자를 선정하고 이용약관·재배포/인용 권리·보관 기간·개인정보 전송 금지·지역·장애 대응·비용 상한을 문서로 승인한다. 합성 공급자는 운영 공급자로 승격하지 않는다.
-2. 공급자 adapter는 기존 `ChatWebSearchProvider` 경계 뒤에 추가하고 timeout·0건·unavailable, 일일 한도, 요청 cache/single-flight, source/model-send grant, URL/본문 최소화를 유지한다. 여러 인스턴스로 운영하면 캐시·single-flight 공유 방식과 금액 상한도 이 단계에서 정한다.
+1. 운영 후보 `naver-api-hub-webkr`의 이용약관·재배포/인용 권리·보관 기간·개인정보 전송 금지·처리 지역·장애 대응·비용 통제를 [운영 readiness gate](chat-operations-readiness.md)의 결정 참조로 고정한다. 합성 공급자는 운영 공급자로 승격하지 않는다.
+2. 구현된 adapter의 timeout·0건·unavailable, 일일 한도, 요청 cache/single-flight, source/model-send grant, URL/본문 최소화를 유지한다. 여러 인스턴스로 운영하면 캐시·single-flight 공유 방식과 금액 상한도 이 단계에서 정한다.
 3. 웹 결과 snapshot과 철회/만료 정책, Q01 웹 금지, Q02 기본 보조, Q03~Q08 내부 근거 뒤 마지막 검색([웹 검색 gate](../../api/docs/chat-web-search.md))을 direct·MCP 양쪽에서 검증한다.
 
-완료 조건: 실제 공급자 계약과 운영 설정이 승인되고, 외부 호출 없는 replay/fixture CI와 별도 승인된 소량 smoke가 모두 통과해야 한다. 공급자 미정 상태에서는 `ZOOP_CHAT_WEB_PROVIDER=synthetic`만 로컬·시험에서 사용한다.
+완료 조건: 실제 공급자 계약과 운영 설정이 승인되고, 외부 호출 없는 replay/fixture CI와 별도 승인된 소량 preflight가 모두 통과해야 한다. readiness evidence가 없는 환경에서는 `ZOOP_CHAT_WEB_PROVIDER=synthetic`만 로컬·시험에서 사용한다.
 
 ### 5.3 출시 전 검증·활성화
 
 1. [live spike 절차](chat-live-spike.md)로 MCP 도구 1·4·8회와 승인 1·3라운드의 p50/p95·토큰·비용을 측정하고, direct 경로를 포함한 terminal DB commit 45초 조건을 실측해 단계 최소 예약과 상한을 보정한다. 판정은 `scripts/chat_live_spike_report.py`로 하며, 총 8회 시나리오는 합성 공급자로 실행해 통과하기 전까지 미충족으로 남긴다.
-2. [운영 readiness gate](chat-operations-readiness.md)에 운영 HTTPS·grant·Responses 보유 조건·키 회전·사고 대응과 같은 후보 commit의 spike 결과를 결속한다. 승인 없는 실제 모델 호출은 하지 않는다.
+2. [운영 readiness gate](chat-operations-readiness.md)에 운영 HTTPS·grant·Responses 보유 조건·키 회전·사고 대응, NAVER 공급자 권리·보관·개인정보·처리 지역·비용 결정, 같은 후보 commit의 spike와 실제 공급자 preflight 결과를 결속한다. 승인 없는 실제 모델·공급자 호출은 하지 않는다.
 3. 고정 fixture, 실제 모델 한국어 평가, 부하·장애·철회 시험을 통과한 registry/model/prompt/policy 조합만 Q01 → Q02 → Q03~Q08 순으로 활성화한다. 실제 백엔드·웹 종단 시험과 D-AI-01/01b/02/02b 상태 계약도 이 단계에서 증명한다.
 
 각 PR은 현재 저장·멱등·권한·호출 원장과 기본 비활성 원칙을 유지한다. 구현 코드가 존재한다는 이유만으로 승인 문서, 외부 공급자, 유료 모델 호출 또는 운영 배포가 승인됐다고 표시하지 않는다.

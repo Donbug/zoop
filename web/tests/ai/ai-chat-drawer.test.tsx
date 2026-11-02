@@ -11,7 +11,10 @@ import { useRef } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AiChatDrawer from '@/components/ai/AiChatDrawer';
-import { contextFromTarget } from '@/hooks/use-chat-conversation';
+import {
+  contextFromTarget,
+  contextFromTargets,
+} from '@/hooks/use-chat-conversation';
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
@@ -1493,6 +1496,94 @@ describe('membership', () => {
     late.resolve(json(conversation([job({ question: '이전 회원의 질문' })])));
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(screen.queryByText('이전 회원의 질문')).toBeNull();
+  });
+});
+
+describe('D-AI-01 C2 · several question targets', () => {
+  const HYNIX: GraphTarget = {
+    kind: 'company',
+    id: 'KRX:000660',
+    label: 'SK하이닉스',
+    mapContext: { url: '/?mode=all', graphVersion: 'gv-1' },
+  };
+
+  it('replaces the target while nothing was asked yet', async () => {
+    server.on('GET', CURRENT, () => json(conversation([])));
+    await open();
+    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    act(() => useAiChatStore.getState().open(HYNIX));
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(screen.getByText('질문 대상: SK하이닉스')).toBeTruthy();
+  });
+
+  it('adds a new target unchecked after a question and sends every checked target', async () => {
+    server.on('GET', CURRENT, () => json(conversation([job()])));
+    server.on('POST', JOBS, (request) =>
+      json(job({ id: (request.body as { jobId: string }).jobId, seq: 2 })),
+    );
+    const { user } = await open();
+    await screen.findByRole('article', { name: 'HBM이 뭐야?' });
+    act(() => useAiChatStore.getState().open(HYNIX));
+    const added = screen.getByRole('checkbox', { name: /SK하이닉스/ });
+    expect((added as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByText('질문 대상: 삼성전자')).toBeTruthy();
+    // 같은 대상을 다시 전달해도 후보가 늘지 않는다.
+    act(() => useAiChatStore.getState().open({ ...HYNIX }));
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+
+    await user.click(added);
+    expect(screen.getByText('질문 대상: 삼성전자, SK하이닉스')).toBeTruthy();
+    await user.type(screen.getByLabelText('질문'), '두 회사 관계는?');
+    await user.click(screen.getByRole('button', { name: '보내기' }));
+    await waitFor(() => expect(server.calls('POST', JOBS)).toHaveLength(1));
+    expect(
+      (server.calls('POST', JOBS)[0].body as { context?: unknown }).context,
+    ).toEqual({
+      contextIds: ['KRX:005930', 'KRX:000660'],
+      graphVersion: 'gv-1',
+    });
+  });
+});
+
+describe('contextFromTargets', () => {
+  it('merges ids and evidence, keeping a version or cutoff only when every target agrees', () => {
+    const at =
+      '/?mode=all&companyId=KRX%3A005930&asOf=2026-10-01T00%3A00%3A00Z';
+    expect(contextFromTargets([])).toBeNull();
+    expect(
+      contextFromTargets([
+        {
+          kind: 'company',
+          id: 'KRX:005930',
+          evidenceIds: ['ev-1'],
+          mapContext: { url: at, graphVersion: 'gv-1' },
+        },
+        {
+          kind: 'path',
+          id: 'KRX:005930,iss-1',
+          evidenceIds: ['ev-1', 'ev-2'],
+          mapContext: { url: '/', graphVersion: 'gv-1' },
+        },
+      ]),
+    ).toEqual({
+      contextIds: ['KRX:005930', 'iss-1'],
+      evidenceIds: ['ev-1', 'ev-2'],
+      graphVersion: 'gv-1',
+    });
+    expect(
+      contextFromTargets([
+        {
+          kind: 'company',
+          id: 'a',
+          mapContext: { url: '/', graphVersion: 'gv-1' },
+        },
+        {
+          kind: 'company',
+          id: 'b',
+          mapContext: { url: '/', graphVersion: 'gv-2' },
+        },
+      ]),
+    ).toEqual({ contextIds: ['a', 'b'] });
   });
 });
 

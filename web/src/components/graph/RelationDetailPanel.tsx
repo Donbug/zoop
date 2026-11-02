@@ -21,6 +21,8 @@ interface Props {
   context: EventContext;
   /** 지도에 있는 기업 노드의 로고 */
   logoOf?: (companyId: string) => string | null | undefined;
+  /** 지도에 있는 사건 노드의 짧은 행동 문구(제목 줄이기용) */
+  actionOf?: (issueId: string) => string | null | undefined;
   onClose: () => void;
   onSelectNode: (id: string) => void;
   onAction: (
@@ -31,11 +33,24 @@ interface Props {
   ) => void;
 }
 
+// M20: prototype node-panel selectionTitle처럼 사건 쪽은 짧은 행동 문구나 16자로 줄인다.
+// 전체 이름은 '연결된 두 대상'에 그대로 남는다.
+function shortLabel(
+  end: RelationDetail['source'],
+  actionOf?: Props['actionOf'],
+) {
+  if (end.kind !== 'issue') return end.label;
+  const action = actionOf?.(end.id);
+  if (action) return action;
+  return end.label.length > 16 ? `${end.label.slice(0, 15)}…` : end.label;
+}
+
 // D-GRP-04 · Figma 619:7557 · WBS 6.6.24 · FS023/024/055.
 export default function RelationDetailPanel({
   id,
   context,
   logoOf,
+  actionOf,
   onClose,
   onSelectNode,
   onAction,
@@ -82,7 +97,7 @@ export default function RelationDetailPanel({
             className={ui.title}
           >
             {data
-              ? `${data.source.label} – ${data.target.label}`
+              ? `${shortLabel(data.source, actionOf)} – ${shortLabel(data.target, actionOf)}`
               : '연결선 상세'}
           </h2>
           <button className={ui.close} onClick={onClose} aria-label="상세 닫기">

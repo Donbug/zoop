@@ -22,6 +22,7 @@ from .relation_wire import (SCHEMA as RELATION_SCHEMA, RelationErrorEnvelope, Re
 from .wire import SCHEMA, ErrorBody, ErrorEnvelope, JobStatus, ResultEnvelope, next_action
 from .plan_wire import (PLAN_ID_PATTERN, PlanAdmissionEnvelope, PlanErrorEnvelope, PlanPolicyDisabled,
                         PlanPolicyEnabled, PlanPolicyState, PlanPolicyUpdate, PlanReference)
+from .round_wire import ROUND_ID_PATTERN, HandoffRequest, HandoffStatus, RunRequest, RunStatus
 
 CONTRACT = "ai-contract.schema.json"
 STAMP = "2026-10-12T03:00:00Z"
@@ -498,6 +499,59 @@ def _document_plans(spec: dict[str, Any]) -> None:
                     response["content"]["application/json"]["examples"] = {"error": {"summary": error_code, "value": value}}
 
 
+def _document_rounds(spec: dict[str, Any]) -> None:
+    schemas = spec["components"]["schemas"]
+    for model in (RunRequest, HandoffRequest, RunStatus, HandoffStatus):
+        definition = model.model_json_schema(by_alias=True, ref_template="#/components/schemas/{model}")
+        for name, nested in definition.pop("$defs", {}).items():
+            schemas.setdefault(name, nested)
+        schemas[model.__name__] = definition
+    for family, request, status_model in (("runs", RunRequest, RunStatus), ("handoffs", HandoffRequest, HandoffStatus)):
+        path = "/internal/v1/round-" + family
+        post, get = spec["paths"][path]["post"], spec["paths"][path + "/{roundId}"]["get"]
+        post["requestBody"] = {"required": True, "content": {"application/json": {
+            "schema": {"$ref": "#/components/schemas/" + request.__name__}}}}
+        post["description"] = (
+            "Requires round.run. New admissions return 202 after original UTF-8 bytes are durably saved. "
+            "Idempotency-Key equals app roundId. Same principal/family/id and identical original bytes return 200, "
+            "including running and terminal states, without requeue. Changed bytes return 409 request_conflict. "
+            "A distinct identity while any profile command is reserved/running returns retryable 409 round_busy without admission or files. "
+            "Dormant analysis_incomplete records release the execution slot; only the background dispatcher may reacquire it atomically. "
+            + ("Body limit 1,024 bytes. Valid nonfuture outside-window/off-cadence slots return no_new_material with "
+               "outside_operating_window/not_due, without native mutation. Invalid or future dates return 422 invalid_request. "
+               "Selection fixes asOf and an operator-required maxAgeSeconds; baseline maximum eight units per 30-minute round. 18:05 is freeze-only."
+               if family == "runs" else
+               "Full bindings object required; body limit 4,001,024 bytes and canonical bindings limit 4,000,000 bytes. "
+               "Before admission the owned plan and own-round native jobs must be ready or cancelled; otherwise retryable 409 analysis_incomplete "
+               "creates no row, private bindings or native write. A later known nonmutating readiness race may become accepted analysis_incomplete. "
+               "window_empty, including all-withheld selection, returns no_public_material with the exact selection report and no handoff/grant. "
+               "Ready pins and the principal read grant commit atomically."))
+        get["description"] = (
+            "Requires round.read. Unknown/other-principal admission is 404 round_not_found. GET never dispatches, requeues or creates directories. "
+            "Ready plans and handoffs recheck current read authority; a later denial does not trigger replacement freeze. "
+            "A started uncertain command remains failed/round_outcome_unknown across restart and exact replay. "
+            "Java recovery uses the saved endpoint/principal/credential binding and GET first; only decoded scoped 404 round_not_found permits exact-byte POST. "
+            "Ready means an AI artifact, not app import, composition or activation.")
+        for operation in (post, get):
+            for parameter in operation.get("parameters", []):
+                if parameter["name"] == "Idempotency-Key":
+                    parameter.update(required=True, schema={"type": "string", "pattern": ROUND_ID_PATTERN},
+                                     description="Must equal body.roundId; retransmit the saved original bytes exactly.")
+            for code, response in operation["responses"].items():
+                if int(code) < 400:
+                    response["description"] = "Exact admitted operation with freshly observed state."
+                    response["content"]["application/json"]["schema"] = {"$ref": "#/components/schemas/" + status_model.__name__}
+                else:
+                    error_code = {401: "authentication_required", 403: "scope_denied", 404: "round_not_found",
+                                  409: "request_conflict", 413: "request_too_large", 415: "unsupported_media_type",
+                                  422: "invalid_request", 500: "internal_error", 503: "execution_unavailable"}[int(code)]
+                    response["content"]["application/json"]["examples"] = {"error": {"value": error(error_code)}}
+            operation["responses"]["503"]["description"] = "execution_unavailable for a disabled round profile; service_busy or runtime_unavailable."
+        waiting = status_model.model_validate({"roundId": "round-20261031T0905", "state": "running", "observedAt": STAMP}).wire()
+        _attach(post, "202", {"admitted": {"value": waiting}})
+        _attach(get, "200", {"running": {"value": waiting}})
+
+
 def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     """The full document. `submit_example` is a worker-fixture Submit body (repository-authored synthetic text)."""
     spec = app.openapi()
@@ -514,7 +568,9 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
                     {"name": "chat-stages", "description": "One chatbot model stage (router, answer or verification) per request, synchronously, through the installed zoop-ai-chat runtime (replay, or live behind the chat gate)."},
                     {"name": "plan-admissions", "description": "Bounded exact plan admission and immutable reference reads; no dispatch."},
                     {"name": "observations", "description": "Synchronous native ingestion export with current read/store/quote-display rights; no ingestion writes or model permission."},
-                    {"name": "plan-admission-policy", "description": "Separate operator-only policy CAS control; never application authority."}]
+                    {"name": "plan-admission-policy", "description": "Separate operator-only policy CAS control; never application authority."},
+                    {"name": "round-runs", "description": "Durable app-round to native-ingestion/plan orchestration."},
+                    {"name": "round-handoffs", "description": "Bounded native freeze and atomic principal read grants."}]
     components = spec["components"]
     components["securitySchemes"] = {"bearerAuth": {"type": "http", "scheme": "bearer",
                                                     "description": "Operator-issued token; the service holds only its SHA-256 digest. Roles are the route scopes."}}
@@ -531,7 +587,8 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
               "getGraphVersionStatus": "graph.read", "getGraphVersionFocus": "graph.read",
               "getGraphHandoffStatus": "handoff.read", "getGraphHandoffBundle": "handoff.read", "queryGraphHandoffExposure": "handoff.exposure",
               "invokeChatStage": "chat.invoke", "probeChatMcp": "chat.invoke", "admitPlan": "plan.admit", "getPlanAdmission": "plan.read",
-              "getPlanAdmissionPolicy": "plan.policy", "setPlanAdmissionPolicy": "plan.policy", "exportObservation": "observation.read"}
+              "getPlanAdmissionPolicy": "plan.policy", "setPlanAdmissionPolicy": "plan.policy", "exportObservation": "observation.read",
+              "requestRoundRun": "round.run", "getRoundRun": "round.read", "requestRoundHandoff": "round.run", "getRoundHandoff": "round.read"}
     for path in spec["paths"].values():
         for operation in path.values():
             operation["security"] = [{"bearerAuth": [scopes[operation["operationId"]]]}]
@@ -603,6 +660,7 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     exposure["responses"]["200"]["description"] = "Complete unchanged identity-only report in the handoff envelope; not current delivery authority or import readiness."
     chat_doc.document(spec)
     _document_plans(spec)
+    _document_rounds(spec)
     components["schemas"]["ObservationExportRequest"] = ObservationExportRequest.model_json_schema(
         by_alias=True, ref_template="#/components/schemas/{model}")
     export = spec["paths"]["/internal/v1/observations/export"]["post"]
