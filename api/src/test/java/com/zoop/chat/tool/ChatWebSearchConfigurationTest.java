@@ -7,7 +7,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** The web search tool is off by default, and on it runs only with the synthetic provider until a real one is chosen. */
+/** The web search tool is off by default, and on it refuses to start without a supported provider and its credentials. */
 class ChatWebSearchConfigurationTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(ChatWebSearchConfiguration.class)
@@ -22,7 +22,20 @@ class ChatWebSearchConfigurationTest {
     }
 
     @Test
-    void enabledWithoutTheSyntheticProviderRefusesToStart() {
+    void naverApiHubNeedsBothCredentials() {
+        String[] selected = {"zoop.chat.web.enabled=true", "zoop.chat.web.provider=" + NaverApiHubWebSearchProvider.ID};
+        runner.withPropertyValues(selected).run(context -> assertNotNull(context.getStartupFailure()));
+        runner.withPropertyValues(selected).withPropertyValues("zoop.chat.web.naver-api-hub.client-id=test-client-id")
+                .run(context -> assertNotNull(context.getStartupFailure()));
+        runner.withPropertyValues(selected).withPropertyValues("zoop.chat.web.naver-api-hub.client-id=test-client-id",
+                "zoop.chat.web.naver-api-hub.client-secret=test-client-secret").run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertEquals(NaverApiHubWebSearchProvider.ID, context.getBean(ChatWebSearchProvider.class).id());
+                });
+    }
+
+    @Test
+    void enabledWithoutASupportedProviderRefusesToStart() {
         for (String provider : new String[] {"none", "openai", ""}) {
             runner.withPropertyValues("zoop.chat.web.enabled=true", "zoop.chat.web.provider=" + provider)
                     .run(context -> assertNotNull(context.getStartupFailure(), provider));

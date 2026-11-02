@@ -140,11 +140,15 @@ zoop:
       # runtime (ZOOP_AI_CHAT_MCP_SERVER_URL), the only server a run's grant is ever sent to.
       agent-enabled: ${ZOOP_CHAT_AGENT_ENABLED:false}
     web:
-      # The supplementary web search tool (api/docs/chat-web-search.md). Off by default. No real provider is selected yet:
-      # enabled, it needs provider=synthetic (fixture hits under example domains, local and tests only). It is never
+      # The supplementary web search tool (api/docs/chat-web-search.md). Off by default. provider=synthetic uses fixture hits
+      # under example domains. provider=naver-api-hub-webkr calls NAVER API HUB and stays unused until the open decisions of
+      # the web search design are made; its answers are withheld on read until redisplay rights are decided. It is never
       # planned by the router; it is an MCP tool of the agent path, whose answers cite its hits as web_result.
       enabled: ${ZOOP_CHAT_WEB_ENABLED:false}
       provider: ${ZOOP_CHAT_WEB_PROVIDER:none}
+      naver-api-hub:
+        client-id: ${ZOOP_CHAT_WEB_NAVER_API_HUB_CLIENT_ID:}
+        client-secret: ${ZOOP_CHAT_WEB_NAVER_API_HUB_CLIENT_SECRET:}
   analysis:
     analyze-plan:
       # Executes fixed admitted S2/S3 units only; completion does not collect or publish data.

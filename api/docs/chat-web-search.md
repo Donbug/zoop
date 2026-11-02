@@ -6,14 +6,14 @@
 
 | 있음 (2026-11-02) | 아직 없음 |
 | --- | --- |
-| `web.search` 도구(`ChatWebSearchTool`), 공급자 포트(`ChatWebSearchProvider`), 합성 공급자 | 실제 공급자(미선정), 공급자 키·약관·처리 국가 결정 |
+| `web.search` 도구(`ChatWebSearchTool`), 공급자 포트(`ChatWebSearchProvider`), 합성 공급자, NAVER API HUB 웹 문서 어댑터(`NaverApiHubWebSearchProvider`, 실제 호출 미검증) | 실제 공급자 선정(미선정), 공급자 키·약관·처리 국가 결정 |
 | 검색어 검사(`ChatWebQueryPolicy`), 요구별 웹 gate(개념 요구의 기본 1회 검색, 사실 요구의 내부 미충족 뒤 검색, Q01 요구 제외), 대상·기간·필수 필드·인용 coverage | 실제 공급자의 언어·기간·필터 계약(현재 검색 계약에는 정규화 검색어와 limit만 있음) |
-| agent 경로의 MCP 도구 노출과 Java 승인 gate(5장), direct Q07 웹 대상 3개 이상일 때 두 기업 선택 clarification, `web-search:<공급자>` 전송 grant 검사 | 실제 공급자의 재열람 권리(저장·보유 기간): 정해지기 전에는 합성 공급자 인용만 다시 보여 줌 |
+| agent 경로의 MCP 도구 노출과 Java 승인 gate(5장), direct Q07 웹 대상 3개 이상일 때 두 기업 선택 clarification, `web-search:<공급자>` 전송 grant 검사 | 실제 공급자의 재열람 권리(저장·보유 기간): 정해지기 전에는 합성 공급자 인용만 다시 보여 주며, NAVER 인용 답변은 조회 때 가려짐 |
 | 호출당 7초, job당 웹 2회(내부 6회와 별도), 회원 하루 20회·프로젝트 하루 500회 원자 예약 | 공급자 단가 기반 금액 상한·경보 |
 | 같은 정규화 공급자 요청의 인스턴스 로컬 TTL/LRU 캐시·single-flight | 여러 API 인스턴스가 공유하는 캐시와 실제 공급자 호출·비용 집계 |
 | `web_*` notice 문구(`ChatResults`), 답변 인용 계약(6장: `web_reported` basis, `Citation.sourceKind=web_result`, AI 단계 계약, 화면) | snapshot 저장 |
 
-라우터·서버 계획은 이 도구를 고르지 않는다(`ChatToolRegistry.bound()`에서 빠짐). 등록되면 MCP 도구로 노출되고, agent 경로에서만 Luna가 요청하고 서버가 승인한다(5장). 웹 결과는 `web_reported` 구간에서 `web_result`로 인용되고 Jev가 snippet과 대조하므로(6장), 웹 도구와 agent 경로를 함께 켤 수 있다(2026-10-30). 실제 공급자가 없어 합성 공급자로만 동작한다.
+라우터·서버 계획은 이 도구를 고르지 않는다(`ChatToolRegistry.bound()`에서 빠짐). 등록되면 MCP 도구로 노출되고, agent 경로에서만 Luna가 요청하고 서버가 승인한다(5장). 웹 결과는 `web_reported` 구간에서 `web_result`로 인용되고 Jev가 snippet과 대조하므로(6장), 웹 도구와 agent 경로를 함께 켤 수 있다(2026-10-30). 실제 공급자가 선정되지 않아 지금은 로컬·시험에서 합성 공급자로만 쓴다.
 
 ## 2. 켜는 방법 (로컬·시험 전용)
 
@@ -21,7 +21,8 @@
 ZOOP_CHAT_WEB_ENABLED=true ZOOP_CHAT_WEB_PROVIDER=synthetic
 ```
 
-- 기본은 꺼짐이다. 켜고 공급자가 `synthetic`이 아니면 기동을 거절한다(실제 공급자가 없다).
+- 기본은 꺼짐이다. 켜고 공급자가 `synthetic`이나 `naver-api-hub-webkr`이 아니면 기동을 거절한다.
+- `naver-api-hub-webkr`은 어댑터만 있는 상태다. 실제 외부 호출을 하므로 설계 7장의 공급자·약관·비용·개인정보 결정 전에는 켜지 않는다. `ZOOP_CHAT_WEB_NAVER_API_HUB_CLIENT_ID`·`_CLIENT_SECRET`이 없으면 기동을 거절한다. 고정 엔드포인트 `https://naverapihub.apigw.ntruss.com/search/v1/webkr`에 검사된 검색어만 보내고 redirect·프록시를 쓰지 않으며 결과 페이지를 열지 않는다. 이 API 응답에는 게시 시각이 없어 hit의 `publishedAt`이 비므로 기간 요구의 coverage를 채우지 못한다. 켜려면 `web-search:naver-api-hub-webkr` grant 등록과 `ChatResponseGuard`의 재열람 허용 결정도 필요하다.
 - 합성 공급자는 `api/src/main/resources/chat-web-fixtures/synthetic-v1.json`의 고정 결과만 돌려준다. 모든 주소는 예약 도메인(`example.com`·`example.org`·`example.net`) 아래여야 하고, 아니면 기동을 거절한다. 외부로 나가는 호출은 없다.
 - fixture에서 `unavailable`에 적힌 검색어는 공급자 장애(`tool_unavailable`)처럼 동작하고, 없는 검색어는 0건이다.
 - 공급자 요청 캐시는 기본 5분·인스턴스당 256개다. `ZOOP_CHAT_WEB_CACHE_TTL`(ISO-8601 duration, 최대 1시간)과 `ZOOP_CHAT_WEB_CACHE_MAX_ENTRIES`(1~10000)로 줄이거나 조정할 수 있다.
