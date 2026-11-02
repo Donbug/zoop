@@ -233,7 +233,7 @@ public final class PublicationMerger {
 
     /** The reviewer recorded on decisions the automatic preparation proposes; people's decisions use any other reviewer. */
     public static final String AUTO_REVIEWER = "graph-publication-prepare";
-    private static final String AUTO_DECISION_REF = "graph-publication-prepare:newest-native";
+    private static final String AUTO_DECISION_REF = "graph-publication-prepare:same-headline";
     private static final String AUTO_DECISION_VERSION = "1";
 
     /** The incoming sources of a prepared composition, oldest first. */
@@ -244,15 +244,20 @@ public final class PublicationMerger {
         }
     }
 
-    /** One published value the proposal replaces: {@code field} is null for a relation; digests are of the value before and after. */
-    public record AutoResolution(String kind, String id, String field, String sourceVersionId, List<String> replacedSourceVersionIds,
-            String previousValueDigest, String valueDigest) {
-        public AutoResolution { replacedSourceVersionIds = List.copyOf(replacedSourceVersionIds); }
+    /** A proposed {@code label} selection: the source it keeps and the representative mention before and after (null when new). */
+    public record SameHeadline(String issueId, String sourceVersionId, String previousRepresentativeMentionId, String representativeMentionId) {}
+
+    /** One source's value in a {@link Change}: {@code side} is {@code base} (already published) or {@code incoming}. */
+    public record SourceValue(String sourceVersionId, String side, String valueDigest) {}
+
+    /** A value the sources disagree on and no decision covers: {@code field} is null for a relation. Nothing is chosen for it. */
+    public record Change(String kind, String id, String field, List<SourceValue> values) {
+        public Change { values = List.copyOf(values); }
     }
 
-    /** Decisions to compose with (a closed decisions document) and the published values they change. */
-    public record Proposal(Obj decisions, List<AutoResolution> resolutions) {
-        public Proposal { resolutions = List.copyOf(resolutions); }
+    /** Decisions to compose with (a closed decisions document), what they keep, and the differences left to people. */
+    public record Proposal(Obj decisions, List<SameHeadline> sameHeadlines, List<Change> changes) {
+        public Proposal { sameHeadlines = List.copyOf(sameHeadlines); changes = List.copyOf(changes); }
     }
 
     /** True when an operator-supplied decisions document claims the automatic reviewer, which only the preparation may write. */
@@ -264,14 +269,15 @@ public final class PublicationMerger {
     }
 
     /**
-     * The decisions a prepared composition adds, so that {@link #merge} (and every later read of the publication) applies them like any
-     * other decision. A public issue whose members are all native, that has an incoming member, whose incoming records agree with each
-     * other, that has no issue mapping and none of whose headline fields a person decided takes the newest incoming value. A relation
-     * takes the newest incoming record under the same conditions when no person selected it and neither endpoint issue was left to
-     * people. Everything else gets no proposal and keeps the operator rules ({@code correction_required} where it disagrees): sources
-     * admitted together have no order, and a legacy package, a mapping or a person's decision (reviewer other than
-     * {@link #AUTO_REVIEWER}) is never overridden. An earlier automatic decision is replaced when newer incoming records disagree with
-     * it. {@code expectedValueDigest} is the value published before, as the composer requires of every new decision.
+     * What a prepared composition may decide by itself, so that {@link #merge} (and every later read of the publication) applies it
+     * like any other decision. Only one case is decided: a native public issue whose sources agree on every headline field but differ in
+     * evidence or mentions gets a {@code label} selection that keeps the published owner (the newest incoming source for a new issue),
+     * which merges their evidence and changes no published value. Anything that changes a published value is left to people: a headline
+     * field or relation record the sources disagree on (base against incoming, or incoming against each other) and no decision covers
+     * is returned as a {@link Change} and gets no decision, so the composer stops with {@code correction_required}. A new source may be
+     * a correction, an analysis change or a different scope, and nothing in the handoff says which, so the newest value is never chosen.
+     * A legacy package, an issue mapping or a person's decision (reviewer other than {@link #AUTO_REVIEWER}) also gets no proposal.
+     * {@code expectedValueDigest} is the published value, as the composer requires of every new decision.
      */
     public static Proposal propose(List<Contribution> contributions, Obj inherited, Map<String, IssueOwners> previousOwners, Automatic automatic) {
         validateRoot(inherited);
@@ -292,107 +298,51 @@ public final class PublicationMerger {
         groups.values().forEach(list -> list.sort(ISSUE_ORDER));
         Map<String, Obj> fields = indexed(inherited.objects("fieldSelections"), o -> o.string("issueId") + "\n" + o.string("field"));
         Map<String, Obj> selections = indexed(inherited.objects("relationSelections"), o -> o.string("relationId"));
-        Map<IssueRef, Map<String, JsonNode>> values = new HashMap<>();
-        Function<IssueRef, Map<String, JsonNode>> valuesOf = ref -> values.computeIfAbsent(ref, r -> {
-            Map<String, JsonNode> fieldValues = new HashMap<>();
-            for (String field : FIELDS) fieldValues.put(field, field(index.originals().get(r), field));
-            return fieldValues;
-        });
+        Function<String, String> side = source -> order.containsKey(source) ? "incoming" : "base";
         ObjectNode root = (ObjectNode) emptyDecisions().node().deepCopy();
         var fieldOut = (tools.jackson.databind.node.ArrayNode) root.get("fieldSelections");
-        var relationOut = (tools.jackson.databind.node.ArrayNode) root.get("relationSelections");
-        List<AutoResolution> resolutions = new ArrayList<>();
-        Set<String> leftToPeople = new HashSet<>();
-        Set<String> retimed = new HashSet<>();
+        List<SameHeadline> sameHeadlines = new ArrayList<>();
+        List<Change> changes = new ArrayList<>();
         for (var group : groups.entrySet()) {
             String publicId = group.getKey(); List<IssueRef> members = group.getValue();
             if (members.stream().noneMatch(r -> order.containsKey(r.sourceVersionId()))) continue;
-            IssueRef newest = newestAgreeing(members, order, index.sources(), IssueRef::sourceVersionId, index.originals()::get);
-            boolean peopleDecided = FIELDS.stream().map(f -> fields.get(publicId + "\n" + f))
-                    .anyMatch(choice -> choice != null && !AUTO_REVIEWER.equals(choice.string("reviewer")));
-            if (newest == null || peopleDecided || members.stream().anyMatch(r -> mappings.containsKey(r) || mappings.containsValue(r))) {
-                leftToPeople.add(publicId); continue;
+            boolean changed = false;
+            for (String field : FIELDS) {
+                if (fields.containsKey(publicId + "\n" + field)) continue;
+                List<SourceValue> values = members.stream().map(r -> new SourceValue(r.sourceVersionId(), side.apply(r.sourceVersionId()),
+                        Canonical.digest(field(index.originals().get(r), field)))).toList();
+                if (values.stream().map(SourceValue::valueDigest).distinct().count() > 1) {
+                    changes.add(new Change("issue", publicId, field, values)); changed = true;
+                }
             }
-            if (members.stream().allMatch(r -> order.containsKey(r.sourceVersionId()))) continue;
+            if (changed || members.stream().anyMatch(r -> mappings.containsKey(r) || mappings.containsValue(r))
+                    || members.stream().anyMatch(r -> !"native".equals(index.sources().get(r.sourceVersionId()).sourceKind()))
+                    || FIELDS.stream().anyMatch(f -> fields.containsKey(publicId + "\n" + f))) continue;
+            Issue first = index.originals().get(members.getFirst());
+            if (members.stream().allMatch(r -> index.originals().get(r).equals(first))) continue;
             IssueOwners previous = previousOwners.get(publicId);
-            Map<String, IssueRef> owners = new HashMap<>();
-            for (String field : FIELDS) {
-                Obj choice = fields.get(publicId + "\n" + field);
-                IssueRef owner = choice != null ? issueRef(choice.object("takeFrom"))
-                        : previous != null ? previous.headlineSources().get(field) : defaultOwner(publicId, members, mappings);
-                if (owner == null || !index.originals().containsKey(owner)) owner = null;
-                owners.put(field, owner);
-            }
-            if (owners.containsValue(null)) { leftToPeople.add(publicId); continue; }
-            ObjectNode newestEvidence = issueEvidence(newest, index);
-            List<ObjectNode> proposed = new ArrayList<>();
-            for (String field : FIELDS) {
-                boolean inheritedChoice = fields.containsKey(publicId + "\n" + field);
-                IssueRef owner = owners.get(field);
-                JsonNode before = valuesOf.apply(owner).get(field), after = valuesOf.apply(newest).get(field);
-                boolean fieldDiffers = members.stream().anyMatch(r -> !valuesOf.apply(r).get(field).equals(after));
-                if (before.equals(after) && (inheritedChoice || !fieldDiffers)) continue;
-                if (newestEvidence == null) { proposed = null; break; }
-                proposed.add(selection(publicId, field, Canonical.digest(before), newest, newestEvidence));
-                if (!before.equals(after)) resolutions.add(new AutoResolution("issue", publicId, field, newest.sourceVersionId(),
-                        replaced(members, r -> valuesOf.apply(r).get(field), after, IssueRef::sourceVersionId), Canonical.digest(before), Canonical.digest(after)));
-            }
-            if (proposed == null) { leftToPeople.add(publicId); resolutions.removeIf(r -> "issue".equals(r.kind()) && r.id().equals(publicId)); continue; }
-            Issue newestIssue = index.originals().get(newest);
-            boolean recordsDiffer = members.stream().anyMatch(r -> !index.originals().get(r).equals(newestIssue));
-            if (recordsDiffer && proposed.isEmpty() && FIELDS.stream().noneMatch(f -> fields.containsKey(publicId + "\n" + f))) {
-                // Records that differ only outside the headline fields (evidence, mentions) still need one decision to be merged; it
-                // keeps the published owner, so nothing published changes except the union of the parts' evidence.
-                IssueRef owner = owners.get("label");
-                ObjectNode ownerEvidence = issueEvidence(owner, index);
-                if (ownerEvidence == null) { leftToPeople.add(publicId); continue; }
-                proposed.add(selection(publicId, "label", Canonical.digest(valuesOf.apply(owner).get("label")), owner, ownerEvidence));
-            }
-            proposed.forEach(fieldOut::add);
-            if (resolutions.stream().anyMatch(r -> "issue".equals(r.kind()) && r.id().equals(publicId)
-                    && ("eventTime".equals(r.field()) || "geography".equals(r.field())))) retimed.add(publicId);
+            IssueRef owner = previous != null ? previous.headlineSources().get("label")
+                    : members.stream().filter(r -> order.containsKey(r.sourceVersionId()))
+                            .max(Comparator.comparing(r -> order.get(r.sourceVersionId()))).orElseThrow();
+            if (owner == null || !members.contains(owner)) continue;
+            ObjectNode evidence = issueEvidence(owner, index);
+            if (evidence == null) continue;
+            fieldOut.add(selection(publicId, "label", Canonical.digest(field(index.originals().get(owner), "label")), owner, evidence));
+            sameHeadlines.add(new SameHeadline(publicId, owner.sourceVersionId(),
+                    previous == null ? null : index.originals().get(previous.headlineSources().get("label")).representativeMentionId(),
+                    index.originals().get(owner).representativeMentionId()));
         }
         Map<String, List<RelationRef>> relationGroups = new TreeMap<>();
         index.relations().keySet().forEach(r -> relationGroups.computeIfAbsent(r.relationId(), ignored -> new ArrayList<>()).add(r));
         for (var group : relationGroups.entrySet()) {
             List<RelationRef> members = group.getValue(); members.sort(RELATION_ORDER);
-            Obj choice = selections.get(group.getKey());
-            if (choice != null && !AUTO_REVIEWER.equals(choice.string("reviewer"))) continue;
-            RelationRef newest = newestAgreeing(members, order, index.sources(), RelationRef::sourceVersionId, index.relations()::get);
-            if (newest == null) continue;
-            Function<RelationRef, Relation> projected = r -> project(index.relations().get(r), r, publicIds);
-            Relation chosenProjection = projected.apply(newest);
-            if (chosenProjection.source() == null || leftToPeople.contains(chosenProjection.source())
-                    || ("FOLLOWS".equals(chosenProjection.relationType()) && leftToPeople.contains(chosenProjection.target()))) continue;
-            RelationRef previous = choice != null ? relationRef(choice.object("takeFrom"))
-                    : members.stream().filter(r -> !order.containsKey(r.sourceVersionId())).findFirst().orElse(null);
-            if (previous == null || !index.relations().containsKey(previous)) continue;
-            JsonNode before = GraphPublicationReader.json(projected.apply(previous)), after = GraphPublicationReader.json(chosenProjection);
-            Relation chosen = index.relations().get(newest);
-            boolean differs = members.stream().anyMatch(r -> !index.relations().get(r).equals(chosen));
-            // A native structural relation is valid only from a source whose issue has the published event time and geography
-            // (merge); when the proposal moved either, the relation must come from the same newest source even if every record agrees.
-            boolean followsIssue = "STRUCTURALLY_RELATED_TO".equals(chosen.relationType()) && retimed.contains(chosenProjection.source());
-            if (before.equals(after) && (choice != null || !differs) && !followsIssue) continue;
-            IssueRef owner = new IssueRef(newest.sourceVersionId(), chosen.source());
-            Issue issue = index.originals().get(owner);
-            Set<String> known = index.evidence().get(owner.sourceVersionId());
-            String evidenceId = issue == null ? null
-                    : chosen.evidenceIds().stream().filter(e -> issue.evidenceIds().contains(e) && known.contains(e)).findFirst().orElse(null);
-            if (evidenceId == null) continue;
-            ObjectNode out = relationOut.addObject();
-            out.put("relationId", group.getKey()); out.put("expectedValueDigest", Canonical.digest(before));
-            out.set("takeFrom", GraphPublicationReader.json(newest));
-            ObjectNode ref = out.putArray("evidenceRefs").addObject();
-            ref.put("sourceVersionId", owner.sourceVersionId()); ref.put("issueId", owner.issueId()); ref.put("evidenceId", evidenceId);
-            autoAudit(out);
-            if (!before.equals(after)) resolutions.add(new AutoResolution("relation", group.getKey(), null, newest.sourceVersionId(),
-                    replaced(members, r -> GraphPublicationReader.json(projected.apply(r)), after, RelationRef::sourceVersionId),
-                    Canonical.digest(before), Canonical.digest(after)));
+            if (members.stream().noneMatch(r -> order.containsKey(r.sourceVersionId())) || selections.containsKey(group.getKey())) continue;
+            List<SourceValue> values = members.stream().map(r -> new SourceValue(r.sourceVersionId(), side.apply(r.sourceVersionId()),
+                    Canonical.digest(GraphPublicationReader.json(project(index.relations().get(r), r, publicIds))))).toList();
+            if (values.stream().map(SourceValue::valueDigest).distinct().count() > 1) changes.add(new Change("relation", group.getKey(), null, values));
         }
-        resolutions.sort(Comparator.comparing(AutoResolution::kind).thenComparing(AutoResolution::id)
-                .thenComparing(r -> r.field() == null ? "" : r.field()));
-        return new Proposal(Obj.of(root), resolutions);
+        changes.sort(Comparator.comparing(Change::kind).thenComparing(Change::id).thenComparing(c -> c.field() == null ? "" : c.field()));
+        return new Proposal(Obj.of(root), sameHeadlines, changes);
     }
 
     private record Index(Map<String, Contribution> sources, Map<IssueRef, Issue> originals, Map<RelationRef, Relation> relations,
@@ -427,17 +377,6 @@ public final class PublicationMerger {
                 relation.evidenceIds(), relation.basis());
     }
 
-    private static <R, V> R newestAgreeing(List<R> members, Map<String, Integer> order, Map<String, Contribution> sources,
-            Function<R, String> sourceOf, Function<R, V> value) {
-        List<R> incoming = members.stream().filter(r -> order.containsKey(sourceOf.apply(r)))
-                .sorted(Comparator.comparing(r -> order.get(sourceOf.apply(r)))).toList();
-        if (incoming.isEmpty() || members.stream().anyMatch(r -> !"native".equals(sources.get(sourceOf.apply(r)).sourceKind()))) return null;
-        V agreed = value.apply(incoming.getFirst());
-        return incoming.stream().allMatch(r -> agreed.equals(value.apply(r))) ? incoming.getLast() : null;
-    }
-    private static <R> List<String> replaced(List<R> members, Function<R, JsonNode> value, JsonNode after, Function<R, String> sourceOf) {
-        return members.stream().filter(r -> !value.apply(r).equals(after)).map(sourceOf).distinct().sorted().toList();
-    }
     private static ObjectNode issueEvidence(IssueRef ref, Index index) {
         Set<String> known = index.evidence().get(ref.sourceVersionId());
         String id = index.originals().get(ref).evidenceIds().stream().filter(known::contains).findFirst().orElse(null);
