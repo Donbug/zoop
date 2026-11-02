@@ -39,7 +39,7 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 
 ## 3. 도구 (`ChatMcpTools`)
 
-노출: 레지스트리에 바인딩된 기능 중 `portfolio.scope.read`, `briefing.read`, `selectionRule.read`를 뺀 전부(서버가 회원 범위·요구 문구로 입력을 정하는 도구). MCP 이름은 기능 ID의 `.`을 `_`로 바꾼 것(`company.read` → `company_read`)이며 `tools/list`는 grant가 허용한 도구만 보여 준다. 모든 도구는 `readOnlyHint=true`다. Q01 `help.search`·`screenSpec.read`는 `ZOOP_CHAT_APPROVED_DOCS_ENABLED=true`일 때만 레지스트리에 들어오며, 두 승인 문서가 모두 현재 시행 중이지 않으면 애플리케이션 기동 자체를 거절한다.
+노출: 레지스트리에 바인딩된 기능 중 `portfolio.scope.read`, `document.search`, `briefing.read`, `briefing.evidence`, `selectionRule.read`를 뺀 전부다. 이들은 회원 범위나 요구 문구로 입력을 정하는 server-only 도구다. MCP 이름은 기능 ID의 `.`을 `_`로 바꾼 것(`company.read` → `company_read`)이며 `tools/list`는 grant가 허용한 도구만 보여 준다. 모든 도구는 `readOnlyHint=true`다. Q01 `help.search`·`screenSpec.read`는 `ZOOP_CHAT_APPROVED_DOCS_ENABLED=true`일 때만 레지스트리에 들어오며, 두 승인 문서가 모두 현재 시행 중이지 않으면 애플리케이션 기동 자체를 거절한다.
 
 모델이 정하는 인자는 조회 인자 둘과 요구 지목(`requirementIds`)뿐이고 나머지는 서버가 job의 고정 문맥에서 넣는다.
 
@@ -114,7 +114,7 @@ MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 상태(예약 → 실
 
 `zoop.chat.mcp.agent-enabled=true`(`ZOOP_CHAT_AGENT_ENABLED`)이고 `/mcp`, 챗봇 모델 단계(`zoop.ai.chat-client.enabled`)가 모두 있을 때만 `ChatMcpAgent`가 등록된다. 하나라도 없으면 기동을 거절한다(`/mcp`가 꺼진 채 agent만 켜도 `ChatAgentFlagCheck`가 거절해 direct 경로로 조용히 떨어지지 않는다). 공급자가 이 엔드포인트에 닿는 HTTPS 주소는 Java가 보내지 않고 AI runtime 운영자 설정 `ZOOP_AI_CHAT_MCP_SERVER_URL`로만 정한다(요청으로 지정 불가: grant가 다른 호스트로 가지 않게).
 
-**어느 run이 타는가.** 라우터·계획은 그대로다. 계획의 읽기가 모두 **독립 1단계 읽기**이고 그 기능이 모두 MCP로 노출될 때만 agent 경로다. Q07 본인 범위(server-only `portfolio.scope.read` 선행), Q06 브리핑·Q08 선정 기록(`briefing.read`·`selectionRule.read`는 회차를 요구 문구에서 서버가 정하므로 MCP에 노출하지 않음), 의존 단계·체크포인트가 있는 계획, 읽기가 없는 계획(일반 개념·제한만)은 기존 direct 경로(서버가 읽고 Luna는 쓰기만)다.
+**어느 run이 타는가.** 라우터·계획은 그대로다. 계획의 읽기가 모두 **독립 1단계 읽기**이고 그 기능이 모두 MCP로 노출될 때만 agent 경로다. Q07 본인 범위(server-only `portfolio.scope.read` 선행), Q03 본문 검색(`document.search`는 요구 문장에서 검색어 결정), Q06 브리핑·Q08 선정 기록(`briefing.read`·`briefing.evidence`·`selectionRule.read`는 회차를 요구 문구에서 결정), 의존 단계·체크포인트가 있는 계획, 읽기가 없는 계획(일반 개념·제한만)은 기존 direct 경로(서버가 읽고 Luna는 쓰기만)다.
 
 **preflight·circuit.** agent에 맞는 계획은 첫 `chat-agent` 단계 전에 Java가 AI service의 `GET /internal/v1/chat-mcp-health`를 한 번 호출한다. `reachable`일 때만 agent를 시작하고, `unreachable` 또는 probe/service 오류면 그 run은 처음부터 기존 direct 조회·생성 경로를 쓴다. `reachable` probe는 circuit이 닫혀 있고 그 뒤 연결 실패가 없는 동안 10초 재사용한다(연속 run마다 worker 프로세스와 공개 URL 왕복을 반복하지 않음). replay 모드 run은 MCP endpoint에 닿지 않으므로 preflight를 하지 않는다. 최근 연결 관측 5회 중 timeout·connect 실패·앞단 gateway의 502/503/504(`mcp_unavailable`)/실행 중 `mcp_unreachable`가 3회면 endpoint별 인스턴스 circuit을 30초 열며, 그동안 probe 없이 direct로 시작한다. 30초 뒤에는 동시 요청 중 하나만 half-open probe를 보내고 나머지는 direct로 시작한다. 성공하면 창을 비우고 닫고, 실패·probe 오류면 다시 30초 연다. 그 밖의 예상 밖 HTTP 상태(401/403 포함), 정책·grant·schema 거부, DB 오류, AI service probe 오류는 연결 실패 창에 넣지 않는다. route 요약은 읽기가 있는 run마다 `path`(`agent`·`direct`)를 남기고, agent 후보였지만 preflight가 막은 run에는 `agentPreflight=unavailable`을 더한다.
 
@@ -135,7 +135,7 @@ agent 단계가 하나라도 시작된 뒤의 `mcp_unreachable`는 **같은 run�
 같은 질문은 어느 경로로 읽어도 같은 자료를 읽어야 한다. `ChatMcpDirectParityTest`가 실제 읽기 도구와 합성 그래프로 도구별 결과(항목, 근거, 버전, 경로, 잘림)를 비교한다. MCP 인자는 대상과 개수뿐이라, 요구의 문구나 대상의 출처에 달린 읽기는 agent로 보내지 않고 direct로 둔다(`OrchestratedChatEngine.agentReadsLikeDirect`).
 
 - 질문에 적힌 기간이 있는 `graph.version.diff`
-- 기간이 있는 `document.search`
+- `document.search`(기간뿐 아니라 요구 문장에서 서버가 만든 본문 검색어도 요청에 결속되므로 항상 direct)
 - 회원이 근거를 좁혀 선택했는데 요구가 자기 대상을 지목한 읽기
 
 ## 5. 켜기 전에 남은 조건

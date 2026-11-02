@@ -172,14 +172,17 @@ final class ChatRetrieval {
                     List<String> scope = fixed ? null : p.evidenceScope();
                     Instant since = capability == ChatCapability.GRAPH_VERSION_DIFF
                             || capability == ChatCapability.DOCUMENT_SEARCH ? since(run, p).orElse(null) : null;
+                    String searchText = capability == ChatCapability.DOCUMENT_SEARCH ? p.label() : null;
                     for (List<String> chunk : batches(capability, read)) {
                         String key = capability.id() + "\u0000" + String.join("\u0000", chunk) + "\u0001"
-                                + (scope == null ? "*" : String.join("\u0000", scope)) + "\u0001" + since;
+                                + (scope == null ? "*" : String.join("\u0000", scope)) + "\u0001" + since + "\u0001"
+                                + searchText;
                         Integer index = callIndex.get(key);
                         if (index == null) {
                             index = calls.size();
                             callIndex.put(key, index);
-                            calls.add(new ChatToolRequest(capability.id(), chunk, ChatToolRequest.MAX_LIMIT, scope, since));
+                            calls.add(new ChatToolRequest(capability.id(), chunk, ChatToolRequest.MAX_LIMIT, scope, since,
+                                    searchText));
                         }
                         owned.computeIfAbsent(p.id(), k -> new ArrayList<>()).add(index);
                     }
