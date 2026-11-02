@@ -557,6 +557,23 @@ it('D-GRP-01 keeps event focus and map information controls without the extra he
   expect(screen.queryByRole('button', { name: '조작 도움말' })).toBeNull();
 });
 
+it('D-GRP-01 지도 안내는 개발용 MOCK 문구 없이 보유·관심 표기와 크기·거리의 뜻을 알린다', async () => {
+  anonymous();
+  vi.mocked(getGraph).mockResolvedValue(
+    createMockGraph({ mode: 'all', personalFilter: 'all' }),
+  );
+  setup();
+  await userEvent.click(
+    await screen.findByRole('button', { name: '지도 데이터 안내' }),
+  );
+  const info = await screen.findByText(/개별 사건은 ϟ 숫자로/);
+  expect(info.textContent).toContain('이름 아래에 보유·관심이라고');
+  expect(info.textContent).toContain(
+    '노드 크기와 거리는 인과 관계나 중요도를 뜻하지',
+  );
+  expect(info.textContent).not.toMatch(/MOCK|개발용/);
+});
+
 it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도로 복귀한다', async () => {
   anonymous();
   vi.mocked(getGraph).mockImplementation(async (request) =>
