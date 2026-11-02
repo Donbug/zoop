@@ -138,6 +138,36 @@ function setup(url = '/?mode=all&scope=watchlist') {
 }
 
 describe('D-GRP-02 · map selection and downstream context', () => {
+  it.each([
+    '/?mode=all&select=node%3Amock-issue-1&focus=mock-issue-1&hops=1',
+    '/?mode=all&select=node%3Amock-issue-1',
+  ])(
+    'D-GRP-02 M9 hides focus for an already focused or disconnected issue: %s',
+    async (url) => {
+      const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      vi.mocked(getGraph).mockResolvedValue(
+        url.includes('focus=') ? graph : { ...graph, edges: [] },
+      );
+      setup(url);
+      await screen.findByRole('button', { name: 'AI에게 묻기' });
+      expect(
+        screen.queryByRole('button', { name: '이슈 중심 그래프' }),
+      ).toBeNull();
+    },
+  );
+  it('D-GRP-02 M10 selects a related company through the existing map address', async () => {
+    const router = setup('/?mode=all&select=node%3Amock-issue-1');
+    const company = await screen.findByRole('button', {
+      name: /^삼성전자$/,
+    });
+    await userEvent.click(company);
+    await waitFor(() =>
+      expect(
+        new URLSearchParams(router.state.location.search).get('select'),
+      ).toBe('node:KRX:005930'),
+    );
+    expect(router.state.location.pathname).toBe('/');
+  });
   it('opens by node selection; closing and Back preserve graph, mode and filter', async () => {
     const router = setup();
     const button = await screen.findByRole('button', {

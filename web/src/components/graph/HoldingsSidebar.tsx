@@ -38,6 +38,7 @@ type Props = {
   member: boolean;
   logoOf: (companyId: string) => string | null | undefined;
   graph?: GraphResponse | null;
+  selectedId?: string | null;
   onPick: (companyId: string) => void;
   onClose: () => void;
   /** 지도 화면에서 마지막으로 저장한 관심 목록(기업 상세에서 저장한 것 포함). */
@@ -50,6 +51,7 @@ export default function HoldingsSidebar({
   member,
   logoOf,
   graph,
+  selectedId,
   onPick,
   onClose,
   watchSync,
@@ -81,6 +83,7 @@ export default function HoldingsSidebar({
         <HoldingsList
           logoOf={logoOf}
           graph={graph}
+          selectedId={selectedId}
           onPick={onPick}
           watchSync={watchSync}
           onWatchChanged={onWatchChanged}
@@ -104,6 +107,7 @@ export default function HoldingsSidebar({
 function HoldingsList({
   logoOf,
   graph,
+  selectedId,
   onPick,
   watchSync,
   onWatchChanged,
@@ -227,7 +231,8 @@ function HoldingsList({
           type="button"
           onClick={() => onPick(id)}
           aria-label={`${name}, 지도에서 보기`}
-          className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left hover:bg-zoop-soft focus-visible:outline-2"
+          aria-current={selectedId === id ? 'true' : undefined}
+          className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left hover:bg-zoop-soft aria-current:bg-zoop-soft aria-current:font-semibold focus-visible:outline-2"
         >
           <CompanyLogo
             name={name}
@@ -295,7 +300,7 @@ function HoldingsList({
                     h.companyId,
                     h.name,
                     logoOf(h.companyId),
-                    `${h.quantity.toLocaleString('ko-KR')}주`,
+                    `${h.quantity.toLocaleString('ko-KR')}주${h.weight !== null ? ` · 비중 ${(h.weight * 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}%` : ''}`,
                     false,
                   ),
                 )}
