@@ -1449,8 +1449,9 @@ def test_funded_fetch_lazy_actor_contract_uses_collector_proofs_without_credenti
 def test_metadata_repair_discovery_limit_omission_preserves_policy_wire(tmp_path, contact):
     policy = config_data(tmp_path, "http://127.0.0.1:18765")["policy"]
     policy["contactUrl"] = contact
-    assert intake.PrivatePolicy.model_validate(policy).wire() == intake.Policy.model_validate(policy).wire()
-    assert intake.PrivatePolicy.model_validate({**policy, "maxDiscoveryResponseBytes": None}).wire() == intake.Policy.model_validate(policy).wire()
+    omitted = intake.PrivatePolicy.model_validate(policy).wire()
+    assert "maxDiscoveryResponseBytes" not in omitted
+    assert intake.PrivatePolicy.model_validate({**policy, "maxDiscoveryResponseBytes": None}).wire() == omitted
     explicit = intake.PrivatePolicy.model_validate({**policy, "maxDiscoveryResponseBytes": 500_000})
     assert explicit.wire()["maxDiscoveryResponseBytes"] == 500_000
     for invalid in (0, 1_000_001, 10_000_001):
