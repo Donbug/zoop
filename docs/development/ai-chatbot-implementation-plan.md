@@ -228,7 +228,7 @@ Q01 승인 문서 저장소와 기본 비활성 `help.search`·`screenSpec.read`
 1. [도움말·화면 설명 초안](../help/README.md)의 `검수 필요` 5개 항목을 제품·운영 담당자가 결정하고, 현재 `web/` 동작과 문장별로 대조한다. 결정 전에는 초안을 `chat_document_versions`에 넣거나 플래그를 켜지 않는다.
 2. 확정 본문을 `docs/help/approved/service-guide-<version>.md`와 `screen-guide-<version>.md`로 고정하고 문서별 승인 근거(`approval_ref`), 승인 시각, 시행 시각을 기록한다. 승인 뒤 본문 수정은 금지하고 개정은 새 버전으로 낸다.
 3. 새 Flyway migration이 `help.service-guide`와 `screen.guide` 두 행만 등록하게 한다. 기존 `V20261101100000`은 수정하지 않으며, 시행 기간 중첩·본문 변경·삭제·철회 취소 제약을 유지한다.
-4. 실제 PostgreSQL에서 두 현재 문서의 버전·`##` 절 수·2,000자 상한·code point 구간·결정적 evidence ID·과거 버전 거부를 검증한다. 기능 플래그를 켠 Spring context, direct 도구와 MCP 고정 인자/결과 동등성, `zoop_doc` citation 재열람도 합성 질문으로 시험한다.
+4. 실제 PostgreSQL에서 두 현재 문서의 버전·`##` 절 수·2,000자 상한·code point 구간·결정적 evidence ID·과거 버전 거부를 검증한다. 기능 플래그를 켠 Spring context, direct 도구와 MCP 고정 인자/결과 동등성, `zoop_doc` citation 재열람도 합성 질문으로 시험한다. 합성 문서 시험은 준비됐다(`ChatApprovedDocumentsPostgresTest`, `ChatMcpDirectParityTest`, 2026-11-02). 승인 migration PR은 실제 두 행으로 같은 조건을 확인하고, 전체 Spring context에서 플래그를 켠 기동을 함께 증명한다.
 5. 저장소 기본값 `ZOOP_CHAT_APPROVED_DOCS_ENABLED=false`는 유지한다. 승인 migration 적용과 `zoop-docs` model-send grant 확인 뒤 승인된 환경에서만 플래그를 켜며, 실제 모델 호출·운영 배포는 별도 승인으로 실행한다.
 
 완료 조건: 승인 파일과 승인 근거가 존재하고, 두 문서만 현재 시행 중이며, 플래그를 켠 기동·direct/MCP 조회·citation 재열람·철회 후 재열람 거부가 CI에서 통과해야 한다. 승인 의사결정이 끝나지 않으면 이 범위를 억지로 완료 처리하지 않고 아래 5.2를 먼저 진행한다.
