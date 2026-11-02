@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from .extraction import Extractor, Fixtures, LiveAccess, Sources, Store, current, mutation_job, open_job_inspection, open_legacy_history
 from .extraction_contracts import MAX_COMMAND, MAX_REPLAY, SCHEMA, EnqueueRound, ExtractionFailure, Selector, Submit, canonical
 from .extraction_enqueue import enqueue_round
-from .extraction_plan import plan_round, strict_json, verify_plan
+from .extraction_plan import parse_selection, plan_round, strict_json, verify_plan
 from .ingestion_contracts import IngestionFailure, read_file
 from .private_processing import runtime_factory, select_authority
 from .native_read_contracts import s2_historical
@@ -44,13 +44,16 @@ def plan_service(args, incoming) -> int:
         raise ExtractionFailure("plan_option_not_allowed")
     if args.principal is None or args.output is None:
         raise ExtractionFailure("plan_principal_and_output_required")
+    if args.selection is None:
+        raise ExtractionFailure("plan_selection_policy_required")
+    selection = parse_selection(strict_json(read_file(args.selection, MAX_COMMAND)))
     live = request.provenance.execution_mode == "live"
     if live and (args.replay or args.topic_replay):
         raise ExtractionFailure("fixture_not_allowed")
     if args.replay is None and not live:
         raise ExtractionFailure("replay_fixture_required")
     fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None, read_file(args.topic_replay, MAX_REPLAY) if args.topic_replay else None)
-    print(canonical(plan_round(request, fixtures, args.principal, args.ingestion_state_dir, args.sources, args.output)))
+    print(canonical(plan_round(request, fixtures, args.principal, args.ingestion_state_dir, args.sources, args.output, selection=selection)))
     return 0
 
 
@@ -77,6 +80,7 @@ def main() -> int:
     parser.add_argument("--topic-replay", type=Path)
     parser.add_argument("--principal", help="plan-round only: the service principal the plan is written for")
     parser.add_argument("--output", type=Path, help="plan-round only: the new plan directory (must not exist unless it already holds this exact plan)")
+    parser.add_argument("--selection", type=Path, help="plan-round: pinned selection policy and exact carryover/in-flight/settled observations")
     parser.add_argument("--plan-dir", type=Path, help="verify-plan only: exact existing operator plan directory")
     parser.add_argument("--expected-receipt-sha256", help="verify-plan only: operator-pinned receipt bytes SHA-256")
     parser.add_argument("--initial-only", action="store_true", help="automatic dispatch: refuse (initial_dispatch_taken) unless nothing has dispatched this job")
@@ -90,9 +94,11 @@ def main() -> int:
         raw = sys.stdin.buffer.read(MAX_COMMAND + 1)
         if len(raw) > MAX_COMMAND:
             raise ExtractionFailure("command_input_limit")
+        if args.command != "plan-round" and args.selection is not None:
+            raise ExtractionFailure("plan_option_not_allowed")
         if args.command != "verify-plan" and (args.plan_dir is not None or args.expected_receipt_sha256 is not None):
             raise ExtractionFailure("plan_option_not_allowed")
-        incoming = strict_json(raw) if args.command == "verify-plan" else json.loads(raw)
+        incoming = strict_json(raw) if args.command in {"verify-plan", "plan-round"} else json.loads(raw)
         if args.command == "verify-plan":
             return verify_service(args, incoming)
         if args.command == "plan-round":
@@ -163,7 +169,8 @@ def main() -> int:
         print(canonical(result))
         return 2 if result.get("delivery", {}).get("status") == "withheld" else 0
     except (ExtractionFailure, IngestionFailure) as exc:
-        print(canonical({"schemaVersion": SCHEMA, "error": {"code": exc.code}}))
+        detail = getattr(exc, "detail", None) if args.command == "plan-round" else None
+        print(canonical({"schemaVersion": SCHEMA, "error": {"code": exc.code, **({"detail": detail} if detail else {})}}))
         return 2
     except (ValidationError, ValueError, TypeError, KeyError, OSError, AttributeError):
         print(canonical({"schemaVersion": SCHEMA, "error": {"code": "input_or_configuration_invalid"}}))

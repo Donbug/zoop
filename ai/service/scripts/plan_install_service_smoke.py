@@ -148,9 +148,12 @@ runpy.run_module("zoop_ai_service.plan_install_cli", run_name="__main__")
 
     def prepare(self, *, relation: bool = False) -> dict:
         workspace = self.workspace
+        selection = self.plan_dir.with_suffix(".selection.json")
+        selection.write_text(canonical({"schemaVersion": "zoop-extraction-round-selection-1", "asOf": "2026-10-31T09:00:00+09:00",
+                                        "maxAgeSeconds": 3600}), encoding="utf-8")
         argv = [str(workspace.s2_command), "plan-round", "--ingestion-state-dir", str(workspace.world.ingestion),
                 "--sources", str(workspace.sources), "--replay", str(workspace.s2_replay), "--topic-replay", str(workspace.s2_topic),
-                "--principal", "alpha", "--output", str(self.plan_dir)]
+                "--principal", "alpha", "--output", str(self.plan_dir), "--selection", str(selection)]
         done = subprocess.run(argv, input=canonical(descriptor(workspace.world)).encode(), env=pipeline_env(workspace), capture_output=True, timeout=300)
         self.record("plan-round", done)
         check(done.returncode == 0 and done.stderr == b"", f"plan-round failed: {done.stdout!r} {done.stderr!r}")

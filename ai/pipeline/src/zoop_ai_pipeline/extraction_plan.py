@@ -27,13 +27,17 @@ import stat
 import sys
 import tempfile
 from contextlib import ExitStack
+from dataclasses import replace
 from pathlib import Path
+from typing import Literal
+
+from pydantic import Field, field_validator
 
 from . import extraction_replay as analysis
 from .extraction import Fixtures, LiveAccess, Sources, doc_key
-from .extraction_contracts import EnqueueRound, ExtractionFailure, Submit, canonical, digest
+from .extraction_contracts import EnqueueRound, ExtractionFailure, ObservationRef, Submit, canonical, digest
 from .extraction_enqueue import _read_round, plan
-from .ingestion_contracts import Authority, IngestionFailure, byte_hash
+from .ingestion_contracts import Authority, IngestionFailure, Wire, byte_hash, timestamp
 
 PLAN_SCHEMA = "zoop-extraction-service-plan-1"
 RECEIPT_SCHEMA = "zoop-extraction-service-plan-receipt-1"
@@ -46,6 +50,112 @@ MAX_APPROVALS = 16_000_000
 MAX_UPSTREAMS = 1_000_000
 MAX_MANIFEST = 8_000_000
 PRINCIPAL = re.compile(r"[A-Za-z0-9._:@-]{1,120}")
+
+
+class RoundSelection(Wire):
+    """Explicit immutable policy and queue snapshot for one 30-minute planning round."""
+    schema_version: Literal["zoop-extraction-round-selection-1"]
+    as_of: str
+    max_age_seconds: int = Field(gt=0)
+    limit: int = Field(default=8, gt=0, le=8)
+    cadence_minutes: Literal[30] = 30
+    carryover: list[ObservationRef] = Field(default_factory=list)
+    in_flight: list[ObservationRef] = Field(default_factory=list)
+    settled: list[ObservationRef] = Field(default_factory=list)
+
+    @field_validator("as_of")
+    @classmethod
+    def valid_time(cls, value):
+        timestamp(value)
+        return value
+
+
+class ExplicitRoundSelection(Wire):
+    """A bounded working page; every omitted candidate remains in the native inventory."""
+    schema_version: Literal["zoop-extraction-round-selection-2"]
+    as_of: str
+    max_age_seconds: int = Field(gt=0)
+    limit: int = Field(default=8, gt=0, le=8)
+    cadence_minutes: Literal[30] = 30
+    observations: list[ObservationRef] = Field(max_length=8)
+
+    @field_validator("as_of")
+    @classmethod
+    def valid_time(cls, value):
+        timestamp(value)
+        return value
+
+
+def parse_selection(value):
+    model = ExplicitRoundSelection if value.get("schemaVersion") == "zoop-extraction-round-selection-2" else RoundSelection
+    return model.model_validate(value)
+
+
+def _select(request, head, entries, selection, ingestion_dir, authority):
+    """Oldest eligible carry first; original observations and slots remain owner-derived."""
+    checks, reports, carried = [], [], []
+    explicit = isinstance(selection, ExplicitRoundSelection)
+    groups = {}
+    for ref in selection.observations if explicit else selection.carryover:
+        groups.setdefault((ref.round_id, ref.source_id), []).append(ref)
+    for (round_id, source_id), refs in groups.items():
+        descriptor = request.model_copy(update={"round_id": round_id, "source_id": source_id})
+        try:
+            old_head, old_refs, scope, saved, operations = _read_round(descriptor, ingestion_dir, authority)
+        except IngestionFailure as exc:
+            if exc.code != "source_unauthorized":
+                raise
+            reports.extend({"observation": ref.wire(), "slot": None, "code": "current_rights_withheld", "detail": exc.code} for ref in refs)
+            continue
+        checks.append((source_id, scope, operations, saved))
+        indexed = {canonical(e.ref.wire()): e for e in plan(descriptor, old_head, old_refs) if e.ref is not None}
+        window = old_head["checkedWindow"]
+        for ref in refs:
+            entry = indexed.get(canonical(ref.wire()))
+            if entry is None:
+                raise ExtractionFailure("carryover_observation_mismatch")
+            carried.append((entry, window["through"] if window else None))
+    window = head["checkedWindow"]
+    current = [] if explicit else [(e, window["through"] if window else None) for e in entries]
+    carried.sort(key=lambda pair: (timestamp(pair[1]) if pair[1] is not None else timestamp(selection.as_of),
+                                   pair[0].ref.source_id, pair[0].ref.round_id, pair[0].page, pair[0].ordinal))
+    excluded = {}
+    if not explicit:
+        excluded = {canonical(ref.wire()): "in_flight" for ref in selection.in_flight}
+        excluded.update({canonical(ref.wire()): "already_settled" for ref in selection.settled})
+    seen, selected, carryover, output = set(), 0, [], []
+    now = timestamp(selection.as_of)
+    reader = Sources(ingestion_dir, authority)
+    for original, slot in [*carried, *current]:
+        entry = replace(original)
+        if entry.ref is None:
+            output.append(entry)
+            continue
+        key = canonical(entry.ref.wire())
+        code, detail = entry.skip if entry.skip is not None and entry.skip[0] != "duplicate_in_round" else (None, None)
+        if key in excluded:
+            code = excluded[key]
+        elif key in seen:
+            code = "duplicate_observation"
+        elif code is None:
+            if slot is None:
+                code = "round_slot_unavailable"
+            elif timestamp(slot) > now:
+                code = "round_slot_future"
+            elif (now - timestamp(slot)).total_seconds() > selection.max_age_seconds:
+                code = "too_old"
+            else:
+                reader.export(entry.ref)
+                if selected == selection.limit:
+                    code = "round_limit"
+                    carryover.append(entry.ref.wire())
+                else:
+                    selected += 1
+        seen.add(key)
+        entry.skip = (code, detail) if code is not None else None
+        reports.append({"observation": entry.ref.wire(), "slot": slot, "code": code, "detail": detail})
+        output.append(entry)
+    return output, checks, {"selection": selection.wire(), "selectionReport": reports, "carryover": carryover}
 
 
 def _line(value: dict) -> bytes:
@@ -67,11 +177,12 @@ def _output(path: Path) -> Path:
     return absolute
 
 
-def build(request: EnqueueRound, entries: list, head: dict, fixtures: Fixtures, principal: str, live_identity: str | None) -> dict[str, bytes]:
+def build(request: EnqueueRound, entries: list, head: dict, fixtures: Fixtures, principal: str, live_identity: str | None,
+          selection: dict | None = None) -> dict[str, bytes]:
     """Pure: the bytes of every file of the plan directory. Raises before returning anything when a bound or a rule is violated."""
     planned = [entry for entry in entries if entry.skip is None]
     if not planned:
-        raise ExtractionFailure("plan_has_no_units")
+        raise ExtractionFailure("plan_has_no_units", selection)
     live = live_identity is not None
     topic_digest = byte_hash(fixtures.topic_raw) if fixtures.topic_raw is not None else None
     pins = {"producerReplayDigest": fixtures.replay_hash, "topicReplayDigest": topic_digest, "liveRuntimeIdentity": live_identity}
@@ -80,7 +191,7 @@ def build(request: EnqueueRound, entries: list, head: dict, fixtures: Fixtures, 
         "format": PLAN_FORMAT, "principal": principal, "enqueueId": request.enqueue_id, "round": round_identity, "provenance": request.provenance.wire(),
         "promptVersion": request.prompt_version, "catalogue": request.catalogue.wire(), "snapshot": request.snapshot.wire(),
         "topic": request.topic.wire() if request.topic else None, "pins": pins,
-        "observations": [entry.ref.wire() for entry in planned]})
+        "observations": [entry.ref.wire() for entry in planned], **({"selection": selection["selection"]} if selection is not None else {})})
     approvals, upstreams, units = [], [], []
     approvals_size, translated = 0, {}  # translated: the enqueue-namespace id the planner derived -> this plan's unit id
     for entry in planned:
@@ -115,6 +226,8 @@ def build(request: EnqueueRound, entries: list, head: dict, fixtures: Fixtures, 
                 "pins": {key: value for key, value in pins.items() if value is not None},
                 "registryFiles": {name: {"sha256": byte_hash(raw), "bytes": len(raw)} for name, raw in files.items()},
                 "units": units, "skipped": skipped, "counts": {"units": len(units), "skipped": len(skipped)}}
+    if selection is not None:
+        manifest.update(selection)
     manifest = {**manifest, "planDigest": digest(manifest)}
     files["manifest.json"] = _line(manifest)
     if len(files["manifest.json"]) > MAX_MANIFEST:
@@ -193,7 +306,7 @@ def _sync(directory: Path) -> None:
 
 
 def _prepare(request: EnqueueRound, fixtures: Fixtures, principal: str, ingestion_dir: Path, sources: Authority | Path,
-             live: LiveAccess | None = None) -> tuple[dict[str, bytes], list, Authority, tuple]:
+             live: LiveAccess | None = None, selection: RoundSelection | ExplicitRoundSelection | None = None) -> tuple[dict[str, bytes], list, Authority, list]:
     """Shared read-only planning path; publication and source export authority remain separate operations."""
     if not PRINCIPAL.fullmatch(principal):
         raise ExtractionFailure("plan_principal_invalid")
@@ -210,19 +323,27 @@ def _prepare(request: EnqueueRound, fixtures: Fixtures, principal: str, ingestio
     authority = sources if isinstance(sources, Authority) else Authority(sources)
     head, refs, scope_id, saved, operations = _read_round(request, ingestion_dir, authority)
     entries = plan(request, head, refs)
-    files = build(request, entries, head, fixtures, principal, identity)
-    return files, entries, authority, (request.source_id, scope_id, operations, saved)
+    checks = [(request.source_id, scope_id, operations, saved)]
+    report = None
+    if selection is not None:
+        entries, carried_checks, report = _select(request, head, entries, selection, ingestion_dir, authority)
+        checks.extend(carried_checks)
+    files = build(request, entries, head, fixtures, principal, identity, report)
+    return files, entries, authority, checks
 
 
 def plan_round(request: EnqueueRound, fixtures: Fixtures, principal: str, ingestion_dir: Path, sources: Path, output: Path,
-               live: LiveAccess | None = None) -> dict:
+               live: LiveAccess | None = None, *, selection: RoundSelection | ExplicitRoundSelection | None = None) -> dict:
     """Publish one immutable plan without opening an extraction ledger or freezing a job."""
+    if selection is None:
+        raise ExtractionFailure("plan_selection_policy_required")
     if not PRINCIPAL.fullmatch(principal):
         raise ExtractionFailure("plan_principal_invalid")
     target = _output(output)
-    files, _, authority, check = _prepare(request, fixtures, principal, ingestion_dir, sources, live)
+    files, _, authority, checks = _prepare(request, fixtures, principal, ingestion_dir, sources, live, selection)
     try:
-        authority.check(*check)
+        for check in checks:
+            authority.check(*check)
     except OSError as exc:
         raise IngestionFailure("registry_changed") from exc
     outcome = commit(target, files)
@@ -392,7 +513,8 @@ def verify_plan(plan_dir: Path, expected_receipt_sha256: str, fixtures: Fixtures
         except (ValueError, TypeError, KeyError, IndexError) as exc:
             raise ExtractionFailure("plan_input_invalid") from exc
         authority = Authority(sources)
-        files, entries, _, check = _prepare(request, fixtures, principal, ingestion_dir, authority, live)
+        selection = parse_selection(manifest["selection"]) if "selection" in manifest else None
+        files, entries, _, checks = _prepare(request, fixtures, principal, ingestion_dir, authority, live, selection)
         if files != pinned.files:
             raise ExtractionFailure("plan_content_mismatch")
         refs = {doc_key(e.ref): e.ref for e in entries if e.skip is None}
@@ -412,7 +534,8 @@ def verify_plan(plan_dir: Path, expected_receipt_sha256: str, fixtures: Fixtures
         source_digest = bindings()
         if bindings() != source_digest:
             raise ExtractionFailure("plan_sources_changed")
-        authority.check(*check)
+        for check in checks:
+            authority.check(*check)
         pinned.check()
         receipt = docs["receipt.json"]
         return {"schemaVersion": VERIFICATION_SCHEMA, "planId": receipt["planId"], "planDigest": receipt["planDigest"],

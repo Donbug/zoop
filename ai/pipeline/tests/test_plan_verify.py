@@ -12,8 +12,8 @@ import sys
 import pytest
 
 from scripts.extraction_smoke import LIVE_ENV_NAMES, SECRET_NAMES, simulator_env
-from tests.test_round_plan import make, read, sha, world  # noqa: F401 - shared real-ingestion fixture
-from tests.test_round_enqueue import descriptor, simple_round
+from tests.test_round_plan import make, policy, read, sha, simple_round, world  # noqa: F401 - shared real-ingestion fixture
+from tests.test_round_enqueue import descriptor
 from zoop_ai_pipeline import extraction_cli, extraction_plan, extraction_replay as analysis
 from zoop_ai_pipeline.extraction import Extractor, Fixtures, Sources
 from zoop_ai_pipeline.extraction_contracts import EnqueueRound, ExtractionFailure, canonical, digest
@@ -215,7 +215,7 @@ def test_fixture_bytes_provenance_and_topic_pins_must_match(world, tmp_path):
     topic_out = tmp_path / "topic-plan"
     request = EnqueueRound.model_validate(descriptor(rid, events=[world.event], topic=True))
     extraction_plan.plan_round(request, Fixtures(original, b"{}"), "alpha", world.kit.root / "ingestion",
-                               world.kit.registry_path, topic_out)
+                               world.kit.registry_path, topic_out, selection=policy())
     with pytest.raises(ExtractionFailure, match="topic_replay_required"):
         verify(world, topic_out)
     assert verify(world, topic_out, fixtures=Fixtures(original, b"{}"))["pins"]["topicReplayDigest"] == sha(b"{}")
@@ -248,7 +248,7 @@ def test_snapshot_reference_is_exported_and_exact_source_identity_is_required(wo
     # Planning deliberately does not do submit-time freeze viability; verification must still read every reference.
     request = EnqueueRound.model_validate(descriptor(rid, events=[event]))
     extraction_plan.plan_round(request, Fixtures(world.replay.read_bytes(), None), "alpha", world.kit.root / "ingestion",
-                               world.kit.registry_path, out)
+                               world.kit.registry_path, out, selection=policy())
     with pytest.raises(ExtractionFailure, match="observation_not_found"):
         verify(world, out)
 

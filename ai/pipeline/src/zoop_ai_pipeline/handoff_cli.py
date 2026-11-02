@@ -26,10 +26,10 @@ from pydantic import ValidationError
 from .handoff import Handoff, HandoffPaths, Store, open_legacy_history, require_current_sources
 from .handoff_contracts import ID, MAX_COMMAND, SCHEMA, ExtractionFailure, Manifest, Selector, canonical
 from .handoff_contexts import configured, source_flags
-from .handoff_round import RoundPaths, check_files_dir, freeze_round, preflight_round
+from .handoff_round import RoundPaths, SourcePaths, check_files_dir, completion_round, freeze_round, preflight_round
 from .ingestion_contracts import IngestionFailure
 
-COMMANDS = ("freeze", "freeze-round", "recover", "inspect", "export")
+COMMANDS = ("freeze", "freeze-round", "check-round", "recover", "inspect", "export")
 SOURCED = frozenset({"freeze", "export"})                  # commands that consult the source ledgers, grants and the operator files
 WRITERS = {"freeze": "create", "recover": "write"}          # everything else opens the ledger read-only
 PLAN_ID = re.compile(r"s2plan-[0-9a-f]{64}")
@@ -63,6 +63,16 @@ def main() -> int:
     args = parser.parse_args()
     store = None
     try:
+        if args.command == "check-round":
+            required = (args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources, args.canonical)
+            if any(value is None for value in required) or not args.round_id or not re.fullmatch(ID, args.round_id) \
+                    or (args.plan_id is None) != (args.plan_root is None) \
+                    or (args.plan_id is not None and not PLAN_ID.fullmatch(args.plan_id)) \
+                    or any(value is not None for value in (args.decisions, args.bindings, args.files_dir, args.recovery_attempt_id,
+                                                          args.issue_summary_state_dir, args.source_contexts, args.source_contexts_sha256)):
+                raise ExtractionFailure("input_or_configuration_invalid")
+            print(canonical(completion_round(SourcePaths(*required), args.round_id, args.plan_root, args.plan_id)))
+            return 0
         rounded = args.command == "freeze-round"
         sourced = args.command in SOURCED or rounded
         flags = (args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources, args.canonical, args.decisions, args.bindings)

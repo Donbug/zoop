@@ -24,8 +24,8 @@ from scripts import graph_handoff_smoke as hs
 from scripts.extraction_smoke import page
 from scripts.ingestion_smoke import json_bytes
 from scripts.relation_smoke import RelKit, converge, co, ev, proposal, world_cite
-from tests.test_round_enqueue import simple_round, world  # noqa: F401 - `world` is a fixture
-from tests.test_round_plan import make
+from tests.test_round_enqueue import world  # noqa: F401 - `world` is a fixture
+from tests.test_round_plan import make, simple_round
 from tests.test_native_historical_reads import inspect as inspect_native, inventory, restore
 from zoop_ai_pipeline import handoff_cli as cli
 from zoop_ai_pipeline import handoff_round
@@ -509,7 +509,7 @@ def test_a_representative_pushed_out_of_the_window_excludes_only_its_issue(tmp_p
     monkeypatch.setattr(handoff_round, "WINDOW", 1)
     out = rig.freeze_round("round-docs-b")
     assert jobs_of(out) == ["rel-b"]
-    assert {i["jobId"]: (i["status"], i.get("neverFrozen")) for i in out["selection"]["jobs"]} == {"rel-b": ("selected", None), "rel-a": ("out_of_window", True)}
+    assert {i["jobId"]: (i["status"], i.get("neverFrozen")) for i in out["selection"]["jobs"]} == {"rel-b": ("selected", True), "rel-a": ("out_of_window", True)}
     assert out["narrowing"]["summaryPinsDropped"] == [{"issueId": hs.SUPPLY, "code": "issue_not_public"}]
     bundle = rig.bundle(out)
     assert {i["id"] for i in bundle["issues"]} == {hs.FACTORY}
@@ -652,6 +652,25 @@ def test_a_real_plan_round_directory_names_the_units_of_its_round(world, tmp_pat
     with pytest.raises(ExtractionFailure) as refused:
         handoff_round.plan_units(plans, receipt["planId"], "another-round")
     assert refused.value.code == "plan_round_mismatch"
+
+
+def test_completion_preflight_reads_native_own_round_without_handoff_writes(units, tmp_path):
+    units.round("completion", 1, ["a"])
+    units.relate("a", queue=True)
+    rig = light_rig(tmp_path, units, ["a"])
+    root = units.kit.root
+    argv = ["zoop-ai-handoff", "check-round", "--state-dir", str(rig.state),
+            "--relation-state-dir", str(root / "relation"), "--extraction-state-dir", str(root / "extraction"),
+            "--ingestion-state-dir", str(root / "ingestion"), "--sources", str(units.kit.registry_path),
+            "--canonical", str(rig.root / "master-canonical.json"), "--round-id", "round-completion"]
+    before = hs.ledger_snapshot(root)
+    refused = rig.invoke(argv, expected=2)
+    assert refused["error"]["code"] == "analysis_incomplete"
+    assert hs.ledger_snapshot(root) == before and not rig.state.exists() and not rig.files.exists()
+    units.kit.rel("cancel", {"schemaVersion": "zoop-relation-s3", "jobId": "rel-a"}, expected=2)
+    before = hs.ledger_snapshot(root)
+    assert rig.invoke(argv)["state"] == "complete"
+    assert hs.ledger_snapshot(root) == before and not rig.state.exists() and not rig.files.exists()
 
 
 @pytest.mark.parametrize("schema,policy,bundle_schema", [
