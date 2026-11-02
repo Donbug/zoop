@@ -53,7 +53,7 @@ class GraphDeliveryOperatorBoundaryTest {
             for (String conflict : List.of("zoop.document-import.enabled=true", "zoop.document-analysis.enabled=true",
                     "zoop.disclosure-exclusion.enabled=true", "zoop.legacy-real-import.enabled=true", "zoop.document-bindings.enabled=true",
                     "zoop.briefing.replay.import-enabled=true", "zoop.graph.auto-activation.enabled=true",
-                    "zoop.graph-publication-compose.enabled=true", "zoop.graph.snapshot.source=fixture",
+                    "zoop.graph-publication-compose.enabled=true", "zoop.graph-publication-prepare.enabled=true", "zoop.graph.snapshot.source=fixture",
                     "zoop.graph-delivery." + (command.equals("seal") ? "install" : "seal") + ".enabled=true")) {
                 refused(command, "configuration_invalid", conflict);
             }

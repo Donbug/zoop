@@ -70,69 +70,69 @@ final class HandoffFixtures {
      */
     record Spec(String handoffId, String canonicalPin, String publishedAt, String precision, String eventTime,
             String eventPrecision, String validFrom, String validUntil, boolean utf16Offsets, boolean verdicts,
-            boolean manualApproval, boolean live, boolean origin, Shape shape, boolean impact) {
+            boolean manualApproval, boolean live, boolean origin, Shape shape, boolean impact, String issueId) {
         static Spec standard() {
             return new Spec(HANDOFF_ID, "4".repeat(64), PUBLISHED_AT, "datetime", "2026-09-30", "day", "2026-01-01",
-                    "2026-12-31", false, false, false, false, false, Shape.ONE_HOP, false);
+                    "2026-12-31", false, false, false, false, false, Shape.ONE_HOP, false, ISSUE);
         }
 
         Spec withHandoffId(String value) {
             return new Spec(value, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact, issueId);
         }
 
         Spec withCanonicalPin(String value) {
             return new Spec(handoffId, value, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact, issueId);
         }
 
         Spec withPublication(String value, String valuePrecision) {
             return new Spec(handoffId, canonicalPin, value, valuePrecision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact, issueId);
         }
 
         Spec withEvent(String value, String valuePrecision) {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, value, valuePrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact, issueId);
         }
 
         Spec withValidity(String from, String until) {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, from, until,
-                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact, issueId);
         }
 
         Spec withUtf16Offsets() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    true, verdicts, manualApproval, live, origin, shape, impact);
+                    true, verdicts, manualApproval, live, origin, shape, impact, issueId);
         }
 
         Spec withVerdicts() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, true, manualApproval, live, origin, shape, impact);
+                    utf16Offsets, true, manualApproval, live, origin, shape, impact, issueId);
         }
 
         /** The one S3 relation the edges rest on became eligible by an operator's final approval of a HOLD, not by the verifier. */
         Spec withManualApproval() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, true, live, origin, shape, impact);
+                    utf16Offsets, verdicts, true, live, origin, shape, impact, issueId);
         }
 
         /** Provider-recorded live provenance ({@code executionMode: live}, {@code recordingKind: provider}). */
         Spec withLive() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, true, origin, shape, impact);
+                    utf16Offsets, verdicts, manualApproval, true, origin, shape, impact, issueId);
         }
 
         /** The article's document version carries an operator-declared origin. */
         Spec withOrigin() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, true, shape, impact);
+                    utf16Offsets, verdicts, manualApproval, live, true, shape, impact, issueId);
         }
 
         /** The shape of the one structural edge's company chain. */
         Spec withShape(Shape value) {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin, value, impact);
+                    utf16Offsets, verdicts, manualApproval, live, origin, value, impact, issueId);
         }
 
         /**
@@ -142,7 +142,16 @@ final class HandoffFixtures {
          */
         Spec withImpact() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin, shape, true);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape, true, issueId);
+        }
+
+        /**
+         * The one issue's id, and with it the ids of its INVOLVES and structural edges, so sources with different ids publish
+         * different issues and relations. The article, evidence, companies and {@code canonicalId} stay the same (identical records).
+         */
+        Spec withIssueId(String value) {
+            return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact, value);
         }
     }
 
@@ -302,7 +311,7 @@ final class HandoffFixtures {
         observation.put("documentVersion", ARTICLE_VERSION);
 
         ObjectNode issue = bundle.putArray("issues").addObject();
-        issue.put("id", ISSUE);
+        issue.put("id", spec.issueId());
         issue.put("canonicalId", "issue:supply");
         issue.put("title", "합성 공급 계약");
         issue.put("action", "공급 계약");
@@ -388,9 +397,9 @@ final class HandoffFixtures {
         // INVOLVES edge to be linked, as every public company does).
         for (String participant : spec.shape() == Shape.TWO_HOP_PUBLIC ? List.of(COMPANY_A, COMPANY_M) : List.of(COMPANY_A)) {
             ObjectNode involves = StrictJson.newObject();
-            involves.put("id", edge(Map.of("type", "INVOLVES", "source", ISSUE, "target", participant)));
+            involves.put("id", edge(Map.of("type", "INVOLVES", "source", spec.issueId(), "target", participant)));
             involves.put("type", "INVOLVES");
-            involves.put("source", ISSUE);
+            involves.put("source", spec.issueId());
             involves.put("target", participant);
             involves.putNull("role");
             involves.put("assertionStatus", "announced");
@@ -410,14 +419,14 @@ final class HandoffFixtures {
         List<String> relationKeys = spec.shape().twoHop() ? List.of(relationKey, "9".repeat(64)) : List.of(relationKey);
         ObjectNode structuralPreimage = StrictJson.newObject();
         structuralPreimage.put("type", "STRUCTURALLY_RELATED_TO");
-        structuralPreimage.put("source", ISSUE);
+        structuralPreimage.put("source", spec.issueId());
         structuralPreimage.put("target", COMPANY_B);
         ArrayNode preimageKeys = structuralPreimage.putArray("basis");
         relationKeys.forEach(preimageKeys::add);
         ObjectNode structural = StrictJson.newObject();
         structural.put("id", "edge-" + Canonical.digest(structuralPreimage));
         structural.put("type", "STRUCTURALLY_RELATED_TO");
-        structural.put("source", ISSUE);
+        structural.put("source", spec.issueId());
         structural.put("target", COMPANY_B);
         structural.putNull("role");
         structural.put("assertionStatus", "announced");
@@ -687,7 +696,7 @@ final class HandoffFixtures {
             String quoteEvidenceId) {
         ObjectNode row = StrictJson.newObject();
         row.put("edgeId", edgeId);
-        row.put("issueId", ISSUE);
+        row.put("issueId", spec.issueId());
         row.put("companyId", company);
         row.putObject("sourceRelation").put("jobId", jobId).put("relationCandidateId", relationCandidateId);
         boolean verified = spec.impact() && !spec.manualApproval();

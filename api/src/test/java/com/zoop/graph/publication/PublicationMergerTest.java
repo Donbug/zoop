@@ -266,9 +266,9 @@ class PublicationMergerTest {
         var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
         var proposal = propose(List.of(published, incoming), PublicationMerger.emptyDecisions(), base, incoming);
         assertTrue(PublicationMerger.claimsAutomaticReviewer(proposal.decisions()));
-        assertTrue(GraphPublicationConfiguration.claimsAutomaticReviewer(Canonical.bytes(proposal.decisions().node())));
-        assertFalse(GraphPublicationConfiguration.claimsAutomaticReviewer(Canonical.bytes(peopleLabel(published))));
-        assertFalse(GraphPublicationConfiguration.claimsAutomaticReviewer("not json".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        assertTrue(GraphPublicationPreparer.claimsAutomaticReviewer(Canonical.bytes(proposal.decisions().node())));
+        assertFalse(GraphPublicationPreparer.claimsAutomaticReviewer(Canonical.bytes(peopleLabel(published))));
+        assertFalse(GraphPublicationPreparer.claimsAutomaticReviewer("not json".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     }
 
     @Test

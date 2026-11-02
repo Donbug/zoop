@@ -39,6 +39,49 @@ public class JdbcGraphPublicationRepository {
                 """, new MapSqlParameterSource("receipts", sourceVersionIds.stream().map(id -> "artifact-receipt-" + id).toList()), String.class);
     }
 
+    /**
+     * Imported native single-source versions an automatic preparation may add on top of a base whose sources are {@code members},
+     * oldest first, at most {@code limit}: a staged snapshot that is not a composed publication or a legacy package, has exactly one
+     * source, is not one of {@code members} and comes after the cutoff in import order ({@code sequence}). The cutoff is the newest of
+     * all the base's sources, those its composition took in and those it carried from its own base, whoever composed it: a source
+     * imported before it that the base does not hold was there to choose and stays out, and an operator adding an older source back
+     * never lowers it. Sources past a preparation's cap, imported while a candidate waited for approval, or imported while an operator
+     * wrote a request are still prepared. A source that stops preparation stays the oldest candidate until an operator compose takes
+     * it, or a newer source without it.
+     */
+    public List<String> preparationCandidates(Set<String> members, int limit) {
+        var args = new MapSqlParameterSource("members", members.toArray(String[]::new)).addValue("limit", limit);
+        return jdbc.queryForList("""
+                WITH cutoff AS (SELECT max(m.sequence) AS sequence FROM graph_versions m WHERE m.id = ANY (CAST(:members AS text[])))
+                SELECT v.id FROM graph_versions v, cutoff
+                WHERE v.kind = 'snapshot'
+                  AND v.sequence > cutoff.sequence
+                  AND COALESCE(v.source_label, '') NOT LIKE 'legacy-real:%'
+                  AND NOT EXISTS (SELECT 1 FROM graph_publications p WHERE p.version_id = v.id)
+                  AND (SELECT count(*) FROM graph_version_sources s WHERE s.graph_version_id = v.id) = 1
+                  AND NOT (v.id = ANY (CAST(:members AS text[])))
+                ORDER BY v.sequence
+                LIMIT :limit
+                """, args, String.class);
+    }
+
+    /** {@code versionIds} that exist, in import order ({@code sequence}). */
+    public List<String> importOrder(List<String> versionIds) {
+        if (versionIds.isEmpty()) return List.of();
+        return jdbc.queryForList("SELECT id FROM graph_versions WHERE id IN (:ids) ORDER BY sequence",
+                new MapSqlParameterSource("ids", versionIds), String.class);
+    }
+
+    /** Staged publications on {@code baseVersionId} that were never made public, oldest first (earlier or orphaned candidates). */
+    public List<String> unpublishedCandidates(String baseVersionId) {
+        return jdbc.queryForList("""
+                SELECT p.version_id FROM graph_publications p JOIN graph_versions v ON v.id = p.version_id
+                WHERE p.base_version_id = :base
+                  AND NOT EXISTS (SELECT 1 FROM graph_activations a WHERE a.version_id = p.version_id AND a.pointer_changed)
+                ORDER BY v.sequence
+                """, new MapSqlParameterSource("base", baseVersionId), String.class);
+    }
+
     public void insert(Metadata metadata) {
         var args = new MapSqlParameterSource("id", metadata.versionId()).addValue("publication", metadata.publicationId())
                 .addValue("digest", metadata.compositionDigest()).addValue("base", metadata.baseVersionId()).addValue("expected", metadata.expectedActiveVersionId());

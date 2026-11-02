@@ -40,7 +40,7 @@ public class GraphDeliverySealConfiguration {
             for (String property : new String[] {"zoop.graph-delivery.install.enabled", "zoop.document-import.enabled",
                     "zoop.document-analysis.enabled", "zoop.disclosure-exclusion.enabled", "zoop.graph.auto-activation.enabled",
                     "zoop.legacy-real-import.enabled", "zoop.document-bindings.enabled", "zoop.briefing.replay.import-enabled",
-                    "zoop.graph-publication-compose.enabled"}) {
+                    "zoop.graph-publication-compose.enabled", "zoop.graph-publication-prepare.enabled"}) {
                 if (environment.getProperty(property, Boolean.class, false)) throw new GraphDeliveryException("configuration_invalid");
             }
             if ("fixture".equalsIgnoreCase(environment.getProperty("zoop.graph.snapshot.source"))) {

@@ -54,42 +54,85 @@ public class GraphPublicationConfiguration {
             DocumentRegistryRepository registry, GraphVersionRepository versions, JdbcGraphPublicationRepository publications,
             GraphPublicationAuthority authority, DocumentReadProperties documentRead, TransactionOperations transaction, Clock clock) {
         Environment env = context.getEnvironment();
-        if (context instanceof WebApplicationContext || "fixture".equals(env.getProperty("zoop.graph.snapshot.source")))
-            throw new IllegalArgumentException("publication composition requires a nonweb artifact-mode process");
-        for (String other : new String[] {"document-import", "document-analysis", "graph-handoff-import", "legacy-real-import", "disclosure-exclusion", "document-bindings"})
-            if (env.getProperty("zoop." + other + ".enabled", Boolean.class, false))
-                throw new IllegalArgumentException("publication composition requires exclusive operator execution");
-        if (env.getProperty("zoop.graph-delivery.seal.enabled", Boolean.class, false)
-                || env.getProperty("zoop.graph-delivery.install.enabled", Boolean.class, false))
-            throw new IllegalArgumentException("publication composition requires exclusive delivery execution");
-        Path root = path(env, "artifact-root"), request = path(env, "request"), decisions = path(env, "decisions"), result = path(env, "result");
+        requireExclusiveOperator(context, "graph-publication-prepare");
+        Path root = path(env, COMPOSE, "artifact-root"), request = path(env, COMPOSE, "request"), decisions = path(env, COMPOSE, "decisions"),
+                result = path(env, COMPOSE, "result");
         if (request.startsWith(root) || decisions.startsWith(root) || result.startsWith(root) || request.equals(result) || decisions.equals(result))
             throw new IllegalArgumentException("publication operator paths overlap");
         requireOwnedParent(result);
         ArtifactFileStore files = ArtifactFileStore.at(root);
         var reader = new GraphPublicationReader(graph, registry, files, publications);
-        var composer = new GraphPublicationComposer(files, graph, registry, versions, publications, reader, authority,
-                new DocumentReadSources(documentRead.ingestionSourcesPath()), transaction, clock);
-        return args -> {
-            try (FileChannel output = FileChannel.open(result, Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS),
-                    PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))) {
-                ObjectNode answer;
-                try {
-                    var parsed = PublicationComposeRequest.parse(readOperatorFile(request, PublicationComposeRequest.MAX_BYTES));
-                    byte[] decisionBytes = readOperatorFile(decisions, 4_000_000);
-                    // Only the preparation writes automatic decisions; an operator file claiming them could later be replaced as automatic.
-                    answer = claimsAutomaticReviewer(decisionBytes) ? GraphPublicationComposer.failed("request_invalid") : composer.run(parsed, decisionBytes);
-                } catch (PublicationException invalid) { answer = GraphPublicationComposer.failed(invalid.code()); }
-                ByteBuffer bytes = ByteBuffer.wrap(Canonical.bytes(answer));
-                while (bytes.hasRemaining()) output.write(bytes);
-                output.force(true);
-                if (!"succeeded".equals(answer.get("status").stringValue())) throw new IllegalStateException("publication composition refused; see operator result");
-            } catch (IOException error) { throw new IllegalStateException("publication result unavailable"); }
-        };
+        var composer = composer(files, graph, registry, versions, publications, reader, authority, documentRead, transaction, clock);
+        return args -> writeOperatorResult(result, () -> {
+            try {
+                var parsed = PublicationComposeRequest.parse(readOperatorFile(request, PublicationComposeRequest.MAX_BYTES));
+                byte[] decisionBytes = readOperatorFile(decisions, 4_000_000);
+                return GraphPublicationPreparer.operatorCompose(reader, publications, composer, parsed, decisionBytes);
+            } catch (PublicationException invalid) { return GraphPublicationComposer.failed(invalid.code()); }
+        }, "publication composition refused; see operator result");
     }
 
-    private static Path path(Environment env, String name) {
-        Path path = Path.of(env.getRequiredProperty("zoop.graph-publication-compose." + name));
+    /**
+     * The automatic preparation (#55): an operator run that builds the compose request and decisions itself and stages an inactive
+     * candidate on top of the active publication. Same process rules as the operator composition; the two exclude each other.
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "zoop.graph-publication-prepare", name = "enabled", havingValue = "true")
+    ApplicationRunner graphPublicationPrepareRunner(ApplicationContext context, GraphHandoffRepository graph,
+            DocumentRegistryRepository registry, GraphVersionRepository versions, JdbcGraphPublicationRepository publications,
+            GraphPublicationAuthority authority, DocumentReadProperties documentRead, TransactionOperations transaction, Clock clock) {
+        Environment env = context.getEnvironment();
+        requireExclusiveOperator(context, "graph-publication-compose");
+        Path root = path(env, PREPARE, "artifact-root"), result = path(env, PREPARE, "result");
+        if (result.startsWith(root)) throw new IllegalArgumentException("publication operator paths overlap");
+        requireOwnedParent(result);
+        ArtifactFileStore files = ArtifactFileStore.at(root);
+        var reader = new GraphPublicationReader(graph, registry, files, publications);
+        var preparer = new GraphPublicationPreparer(versions, graph, publications, reader,
+                composer(files, graph, registry, versions, publications, reader, authority, documentRead, transaction, clock));
+        return args -> writeOperatorResult(result, preparer::run, "publication preparation stopped; see operator result");
+    }
+
+    private static GraphPublicationComposer composer(ArtifactFileStore files, GraphHandoffRepository graph, DocumentRegistryRepository registry,
+            GraphVersionRepository versions, JdbcGraphPublicationRepository publications, GraphPublicationReader reader,
+            GraphPublicationAuthority authority, DocumentReadProperties documentRead, TransactionOperations transaction, Clock clock) {
+        return new GraphPublicationComposer(files, graph, registry, versions, publications, reader, authority,
+                new DocumentReadSources(documentRead.ingestionSourcesPath()), transaction, clock);
+    }
+
+    /** Writes the operator result to a new owner-only file (never over an existing one) and fails the run when it did not succeed. */
+    private static void writeOperatorResult(Path result, java.util.function.Supplier<ObjectNode> run, String refusal) {
+        try (FileChannel output = FileChannel.open(result, Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS),
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))) {
+            ObjectNode answer = run.get();
+            ByteBuffer bytes = ByteBuffer.wrap(Canonical.bytes(answer));
+            while (bytes.hasRemaining()) output.write(bytes);
+            output.force(true);
+            if (!"succeeded".equals(answer.get("status").stringValue())) throw new IllegalStateException(refusal);
+        } catch (IOException error) { throw new IllegalStateException("publication result unavailable"); }
+    }
+
+    private static final String COMPOSE = "zoop.graph-publication-compose";
+    private static final String PREPARE = "zoop.graph-publication-prepare";
+
+    /** A nonweb artifact-mode process running exactly one operator command. */
+    static void requireExclusiveOperator(ApplicationContext context, String publicationSibling) {
+        Environment env = context.getEnvironment();
+        if (context instanceof WebApplicationContext || "fixture".equalsIgnoreCase(env.getProperty("zoop.graph.snapshot.source")))
+            throw new IllegalArgumentException("publication composition requires a nonweb artifact-mode process");
+        for (String other : new String[] {"document-import", "document-analysis", "graph-handoff-import", "legacy-real-import", "disclosure-exclusion",
+                "document-bindings", publicationSibling})
+            if (env.getProperty("zoop." + other + ".enabled", Boolean.class, false))
+                throw new IllegalArgumentException("publication composition requires exclusive operator execution");
+        if (env.getProperty("zoop.briefing.replay.import-enabled", Boolean.class, false))
+            throw new IllegalArgumentException("publication composition requires exclusive operator execution");
+        if (env.getProperty("zoop.graph-delivery.seal.enabled", Boolean.class, false)
+                || env.getProperty("zoop.graph-delivery.install.enabled", Boolean.class, false))
+            throw new IllegalArgumentException("publication composition requires exclusive delivery execution");
+    }
+
+    private static Path path(Environment env, String prefix, String name) {
+        Path path = Path.of(env.getRequiredProperty(prefix + "." + name));
         if (!path.isAbsolute() || !path.equals(path.normalize())) throw new IllegalArgumentException("publication requires normalized absolute " + name);
         return path;
     }
@@ -101,13 +144,6 @@ public class GraphPublicationConfiguration {
             if (!attrs.isDirectory() || attrs.permissions().contains(PosixFilePermission.GROUP_WRITE)
                     || attrs.permissions().contains(PosixFilePermission.OTHERS_WRITE)) throw new IOException();
         } catch (IOException error) { throw new IllegalArgumentException("publication result parent unavailable"); }
-    }
-    static boolean claimsAutomaticReviewer(byte[] decisions) {
-        try {
-            return PublicationMerger.claimsAutomaticReviewer(StrictJson.parseObject(decisions));
-        } catch (StrictJson.Malformed | IllegalArgumentException malformed) {
-            return false; // the composer refuses a malformed document as request_invalid
-        }
     }
     static byte[] readOperatorFile(Path path, int max) {
         try {
