@@ -22,5 +22,9 @@ ALTER TABLE disclosure_exclusion_changes ADD CONSTRAINT ck_disclosure_exclusion_
         AND base_version_id ~ '^[A-Za-z0-9._:-]{1,120}$')
     OR (action = 'lift' AND cause = 'operator' AND report_sha256 IS NULL AND base_version_id IS NULL));
 
+-- A lift with `laterVersions` follows carries from a version under the publication lock.
+CREATE INDEX ix_disclosure_exclusion_changes_carried_base ON disclosure_exclusion_changes (base_version_id)
+    WHERE cause = 'carried';
+
 COMMENT ON COLUMN disclosure_exclusion_changes.base_version_id IS
     'Carried change only: the original version whose current exclusion was copied. Null for operator changes.';

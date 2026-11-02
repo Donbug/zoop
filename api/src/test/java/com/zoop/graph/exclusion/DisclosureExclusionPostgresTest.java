@@ -635,12 +635,20 @@ class DisclosureExclusionPostgresTest {
         assertEquals(Set.of(), reader.current(v1).issueIds());
         assertEquals(Set.of(), reader.current(v2).issueIds());
 
+        // A carry that copied another target does not bring the operator's own exclusion on v1 into the lift.
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_1, List.of("issue-f"), List.of(), false))));
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_2, List.of("issue-f", "issue-g"), List.of(), false))));
+        assertEquals(1, carry(v2, v1), "issue-g only: v1 already excludes issue-f");
+        ExclusionResult own = run(ExposureReports.lift(v2, revision(), true, "issue-f"));
+        assertEquals(List.of(v2), own.versions().stream().map(VersionChange::graphVersionId).toList());
+        assertEquals(Set.of("issue-f", "issue-g"), reader.current(v1).issueIds(), "v1 keeps the operator's decision");
+
         // Without laterVersions the copy stays.
         run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_2, List.of("issue-e"), List.of(), false))));
         assertEquals(1, carry(v2, v1));
         ExclusionResult named = run(ExposureReports.lift(v2, revision(), false, "issue-e"));
         assertEquals(List.of(v2), named.versions().stream().map(VersionChange::graphVersionId).toList());
-        assertEquals(Set.of("issue-e"), reader.current(v1).issueIds());
+        assertTrue(reader.current(v1).issueIds().contains("issue-e"));
     }
 
     @Test

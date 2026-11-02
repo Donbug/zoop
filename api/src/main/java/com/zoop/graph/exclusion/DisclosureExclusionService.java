@@ -45,8 +45,8 @@ import tools.jackson.databind.JsonNode;
  * <li>{@code lift}: the only way an exclusion ends. A report never lifts anything, however small or empty (rule 4). Refused when
  *     a target changed after the lift's {@code expectedRevision}: a lift never undoes a change its operator did not see. With
  *     {@code laterVersions} the same targets are lifted in every imported version after the named one (a report applied them
- *     there while they waited) and in every version an activation carried the named one's exclusions to, imported before or
- *     after it, under the same stale check.</li>
+ *     there while they waited) and, for the targets an activation carried from the named one, in every version it carried them
+ *     to (followed through carries of those copies), imported before or after it, under the same stale check.</li>
  * </ul>
  * An activation appends changes of its own ({@link DisclosureExclusionCarry}, cause {@code carried}): the public version's
  * unlifted exclusions, carried to the version being activated.
@@ -326,21 +326,29 @@ public final class DisclosureExclusionService {
         return commit(request, () -> {
             if (request.expectedRevision() > repository.revision()) throw new ExclusionException(ExclusionFailure.REVISION_STALE);
             // The versions this lift covers are resolved under the lock: the named one and, with laterVersions, every imported
-            // version after it and every version carried to from it (a carried or reported copy of the same targets may sit there). The stale check covers them all,
-            // except that a carry between versions of this set copied a decision the set already holds: it is no new change.
-            List<String> versionIds = new ArrayList<>();
-            versionIds.add(request.graphVersionId());
-            if (request.laterVersions()) versionIds.addAll(repository.laterVersions(request.graphVersionId()));
+            // version after it (a reported copy of the same targets may sit there) with all the targets, and every other version
+            // a carry copied some of the targets to from the named one, with only those targets: an exclusion the operator took
+            // there is not the named version's decision. The stale check covers them all, except that a carry between versions
+            // of this set copied a decision the set already holds: it is no new change.
+            Map<String, List<Target>> covered = new LinkedHashMap<>();
+            covered.put(request.graphVersionId(), request.targets());
+            if (request.laterVersions()) {
+                repository.laterVersions(request.graphVersionId()).forEach(versionId -> covered.put(versionId, request.targets()));
+                repository.carriedCopies(request.graphVersionId(), request.targets()).forEach((versionId, copied) ->
+                        covered.putIfAbsent(versionId, request.targets().stream().filter(copied::contains).toList()));
+            }
+            List<String> versionIds = List.copyOf(covered.keySet());
             Map<String, List<Target>> lifted = new LinkedHashMap<>();
             List<VersionChange> versions = new ArrayList<>();
             for (String versionId : versionIds) {
+                List<Target> targets = covered.get(versionId);
                 Map<Target, Long> lastChanged = repository.lastChanged(versionId, versionIds);
-                if (request.targets().stream().anyMatch(t -> lastChanged.getOrDefault(t, 0L) > request.expectedRevision())) {
+                if (targets.stream().anyMatch(t -> lastChanged.getOrDefault(t, 0L) > request.expectedRevision())) {
                     throw new ExclusionException(ExclusionFailure.REVISION_STALE);
                 }
                 Set<Target> current = repository.excluded(versionId);
-                List<Target> moved = request.targets().stream().filter(current::contains).toList();
-                List<Target> notExcluded = request.targets().stream().filter(t -> !current.contains(t)).toList();
+                List<Target> moved = targets.stream().filter(current::contains).toList();
+                List<Target> notExcluded = targets.stream().filter(t -> !current.contains(t)).toList();
                 lifted.put(versionId, moved);
                 versions.add(new VersionChange(versionId, null, true, byKind(moved), byKind(notExcluded)));
             }

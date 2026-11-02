@@ -67,6 +67,8 @@ class GraphPublicationAuthorityTest {
         // #55 A-14: an activation carries an exclusion to a new source whether or not it holds the id.
         setup.exclusions().put(second.sourceVersionId(), new DisclosureExclusions(5, Set.of("issue-0", "issue-absent"), Set.of(), Set.of()));
         assertEquals(Set.of("issue-0"), setup.authority().current(publication("carried", setup.contributions()), "test").issueIds());
+        assertEquals(Set.of("issue-0"), setup.authority().current(publication(second.sourceVersionId(), List.of(second)), "test").issueIds(),
+                "a version that is its own source too");
         setup.exclusions().put(second.sourceVersionId(), new DisclosureExclusions(6, Set.of("issue-absent"), Set.of(), Set.of()));
         assertEquals(Set.of(), setup.authority().current(publication("only-absent", setup.contributions()), "test").issueIds());
     }

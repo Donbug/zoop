@@ -32,7 +32,9 @@ public final class GraphPublicationAuthority {
     public DisclosureExclusions current(Publication publication, String requestId) {
         try {
             DisclosureExclusions own = exclusions.current(publication.versionId());
-            Set<String> issues = new HashSet<>(own.issueIds()), relations = new HashSet<>(own.relationIds()), evidence = new HashSet<>(own.evidenceIds());
+            // A version that is its own source maps its issue exclusions in the loop below, like every source.
+            boolean ownIsSource = publication.contributions().stream().anyMatch(c -> c.sourceVersionId().equals(publication.versionId()));
+            Set<String> issues = new HashSet<>(ownIsSource ? Set.of() : own.issueIds()), relations = new HashSet<>(own.relationIds()), evidence = new HashSet<>(own.evidenceIds());
             Set<ArticleTarget> articles = new HashSet<>(own.articleTargets()); long revision = own.revision();
             SourceRegistry current = sources.registry(requestId);
             Instant at = clock.instant();
@@ -41,9 +43,10 @@ public final class GraphPublicationAuthority {
                 revision = Math.max(revision, excluded.revision());
                 // An id the source does not hold filters nothing: an activation carries an exclusion to a new source whether or
                 // not it holds the id (#55 A-14), and the record stays for a later source that does.
+                Set<String> held = new HashSet<>();
+                for (var issue : source.projection().issues()) held.add(issue.issueId());
                 for (String issue : excluded.issueIds()) {
-                    if (source.projection().issues().stream().anyMatch(i -> i.issueId().equals(issue)))
-                        issues.add(publication.publicIssue(new IssueRef(source.sourceVersionId(), issue)));
+                    if (held.contains(issue)) issues.add(publication.publicIssue(new IssueRef(source.sourceVersionId(), issue)));
                 }
                 relations.addAll(excluded.relationIds()); evidence.addAll(excluded.evidenceIds()); articles.addAll(excluded.articleTargets());
                 for (var article : source.projection().articles()) {

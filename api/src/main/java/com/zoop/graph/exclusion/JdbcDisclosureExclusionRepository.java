@@ -1,8 +1,11 @@
 package com.zoop.graph.exclusion;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.Collection;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -119,27 +122,55 @@ public class JdbcDisclosureExclusionRepository {
     }
 
     /**
-     * What a lift with {@code laterVersions} also covers, in import order: the original imported ({@code snapshot}) versions
-     * after this one, and every version a carry copied this one's exclusions to, followed through carries of those copies. A
-     * carry follows activation order, not import order, so a version imported before this one can hold a copy. Cumulative
-     * publications are left out: their exclusions belong to their original versions, and neither an operator change nor a carry
-     * writes to their own id. Empty when the version is unknown.
+     * The original imported ({@code snapshot}) versions after this one in import order, oldest first: what a lift with
+     * {@code laterVersions} also covers for all its targets. Cumulative publications are left out: their exclusions belong to
+     * their original versions, and neither an operator change nor a carry writes to their own id. Empty when the version is
+     * unknown.
      */
     public List<String> laterVersions(String versionId) {
         return jdbc.queryForList("""
-                WITH RECURSIVE carried(id) AS (
-                    SELECT CAST(:id AS text)
-                    UNION
-                    SELECT t.graph_version_id FROM carried k
-                      JOIN disclosure_exclusion_changes c ON c.cause = 'carried' AND c.base_version_id = k.id
-                      JOIN disclosure_exclusion_targets t ON t.revision = c.revision
-                )
                 SELECT v.id FROM graph_versions v
-                 WHERE v.kind = 'snapshot' AND v.id <> :id
-                   AND (v.sequence > (SELECT sequence FROM graph_versions WHERE id = :id) OR v.id IN (SELECT id FROM carried))
+                 WHERE v.kind = 'snapshot' AND v.sequence > (SELECT sequence FROM graph_versions WHERE id = :id)
                    AND NOT EXISTS (SELECT 1 FROM graph_publications p WHERE p.version_id = v.id)
                  ORDER BY v.sequence
                 """, new MapSqlParameterSource("id", versionId), String.class);
+    }
+
+    /**
+     * Per version other than this one, which of {@code targets} a carry copied there from this version, followed through
+     * carries of those copies, in the order found: what a lift with {@code laterVersions} also covers for those targets. A carry
+     * follows activation order, not import order, so the version can be imported before this one. A carry that copied other
+     * targets does not bring a version in: an exclusion the operator took there is not this version's decision.
+     */
+    public Map<String, Set<Target>> carriedCopies(String versionId, Collection<Target> targets) {
+        Map<String, Set<Target>> reached = new LinkedHashMap<>();
+        Deque<Map.Entry<String, Set<Target>>> pending = new ArrayDeque<>();
+        pending.add(Map.entry(versionId, Set.copyOf(targets)));
+        while (!pending.isEmpty()) {
+            Map.Entry<String, Set<Target>> from = pending.poll();
+            Map<String, Set<Target>> copied = new LinkedHashMap<>();
+            jdbc.query("""
+                    SELECT t.graph_version_id, t.target_kind, t.target_id, t.article_version
+                    FROM disclosure_exclusion_changes c JOIN disclosure_exclusion_targets t ON t.revision = c.revision
+                    WHERE c.cause = 'carried' AND c.base_version_id = :base
+                    ORDER BY c.revision, t.graph_version_id
+                    """, new MapSqlParameterSource("base", from.getKey()), result -> {
+                Target target = new Target(result.getString("target_kind"), result.getString("target_id"),
+                        result.getString("article_version"));
+                if (from.getValue().contains(target)) {
+                    copied.computeIfAbsent(result.getString("graph_version_id"), id -> new LinkedHashSet<>()).add(target);
+                }
+            });
+            copied.forEach((to, found) -> {
+                if (to.equals(versionId)) return;
+                Set<Target> known = reached.computeIfAbsent(to, id -> new LinkedHashSet<>());
+                Set<Target> fresh = new LinkedHashSet<>(found);
+                fresh.removeAll(known);
+                known.addAll(fresh);
+                if (!fresh.isEmpty()) pending.add(Map.entry(to, Set.copyOf(fresh)));
+            });
+        }
+        return reached;
     }
 
     /**
