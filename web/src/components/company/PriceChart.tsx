@@ -1,4 +1,6 @@
 import type { ChartPeriod } from '@/types/company';
+import { useState, type PointerEvent } from 'react';
+import { formatKst, formatMoney } from '@/util/format';
 import type { EventDetail, Events, PriceRange } from '@/types/company/detail';
 import { bucketKey, exactTime, legacyTimeRange } from './detail-model';
 
@@ -64,6 +66,7 @@ export default function PriceChart({
   selectedBucket,
   selectedEvent,
   onBucket,
+  currency,
 }: {
   points: { time: string; close: number }[];
   range?: PriceRange | null;
@@ -73,7 +76,13 @@ export default function PriceChart({
   selectedBucket: string | null;
   selectedEvent: EventDetail | null;
   onBucket: (bucket: string) => void;
+  currency?: string;
 }) {
+  // D-COM-06 D11: display-only pointer; never changes the reference time.
+  const [hover, setHover] = useState<{
+    points: typeof points;
+    time: string;
+  } | null>(null);
   if (!points.length)
     return (
       <p className="text-caption text-zoop-muted">제공된 가격 봉이 없어요.</p>
@@ -93,6 +102,26 @@ export default function PriceChart({
       ? 300
       : 10 + ((Date.parse(time) - start) * 520) / (end - start);
   const y = (close: number) => 160 - ((close - min) * 140) / (max - min || 1);
+  const pointed =
+    hover?.points === points
+      ? points.find((point) => point.time === hover.time)
+      : null;
+  const pick = (event: PointerEvent<SVGSVGElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const position = Math.min(
+      530,
+      Math.max(10, ((event.clientX - rect.left) / rect.width) * 600),
+    );
+    const at = start + ((position - 10) / 520) * (end - start);
+    const nearest = points.reduce((best, point) =>
+      Math.abs(Date.parse(point.time) - at) <
+      Math.abs(Date.parse(best.time) - at)
+        ? point
+        : best,
+    );
+    setHover({ points, time: nearest.time });
+  };
   const markers = [...groups].flatMap(([key, items]) => {
     const at = markerTime(key, items, points, period);
     if (!at || Date.parse(at) < start || Date.parse(at) > end) return [];
@@ -104,6 +133,14 @@ export default function PriceChart({
 
   return (
     <figure className="flex flex-col gap-1">
+      {pointed && (
+        <p className="text-caption tabular-nums" aria-live="off">
+          <time dateTime={pointed.time}>{formatKst(pointed.time)}</time> · 종가{' '}
+          {currency
+            ? formatMoney(pointed.close, currency)
+            : won.format(pointed.close)}
+        </p>
+      )}
       {period === '1d' && suppliedRange?.sessionDate && (
         <p className="text-caption text-zoop-muted">
           {suppliedRange.sessionDate} 장 · 거래소 현지 거래일 · 시간 표시는 KST
@@ -114,7 +151,20 @@ export default function PriceChart({
         viewBox="0 0 600 205"
         role="group"
         aria-label="공급된 종가 차트"
+        onPointerMove={pick}
+        onPointerDown={pick}
+        onPointerLeave={() => setHover(null)}
+        onPointerCancel={() => setHover(null)}
       >
+        {pointed && (
+          <line
+            x1={x(pointed.time)}
+            x2={x(pointed.time)}
+            y1="10"
+            y2="178"
+            className="stroke-zoop-faint"
+          />
+        )}
         {markers.map(({ key, position, selected }) => (
           <line
             key={`line-${key}`}

@@ -1,5 +1,7 @@
 import CompanyInfoTab from './CompanyInfoTab';
 import PriceChart from './PriceChart';
+import QuoteSourceHint from './QuoteSourceHint';
+import HoldingProfit from './HoldingProfit';
 import { formatKst, formatMoney } from '@/util/format';
 import { formatTimelineTime } from '@/util/event-time';
 import { ChangeRate } from '@/components/stocks/StockQuote';
@@ -844,15 +846,19 @@ export default function CompanyWorkspace() {
                   className=""
                 />
               </span>
-              <p>
+              <div className="flex flex-wrap items-baseline gap-x-1 text-caption text-zoop-muted [&>details]:my-0!">
                 공급자 관측{' '}
                 <ReferenceTime
                   value={quote.data.quote.asOf}
                   missing="시각 미제공"
                 />{' '}
-                · {quote.data.source.name} ·{' '}
-                {quote.data.source.delayNote ?? '지연 정보 미제공'}
-              </p>
+                ·{' '}
+                <QuoteSourceHint
+                  source={quote.data.source}
+                  derived={quote.data.quote.derived}
+                />{' '}
+                · {quote.data.source.delayNote ?? '지연 정보 미제공'}
+              </div>
               <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-caption [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
                 <dt>시가총액</dt>
                 <dd>
@@ -911,20 +917,29 @@ export default function CompanyWorkspace() {
                 <ReferenceTime value={metrics.data.asOf} />
               </p>
               <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-caption md:grid-cols-4">
-                {metrics.data.items.map((item) => (
-                  <div key={item.code} className="min-w-0">
-                    <dt className="text-zoop-muted">{item.label}</dt>
-                    <dd className="font-semibold tabular-nums">
-                      {item.value}
-                      {item.basis && (
-                        <span className="font-normal text-zoop-muted">
-                          {' '}
-                          ({item.basis} 기준)
-                        </span>
-                      )}
-                    </dd>
-                  </div>
-                ))}
+                {metrics.data.items
+                  .filter(
+                    (item) =>
+                      !(
+                        item.code === 'marketValue' &&
+                        quote.data?.status === 'available' &&
+                        quote.data.quote.marketCap != null
+                      ),
+                  )
+                  .map((item) => (
+                    <div key={item.code} className="min-w-0">
+                      <dt className="text-zoop-muted">{item.label}</dt>
+                      <dd className="font-semibold tabular-nums">
+                        {item.value}
+                        {item.basis && (
+                          <span className="font-normal text-zoop-muted">
+                            {' '}
+                            ({item.basis} 기준)
+                          </span>
+                        )}
+                      </dd>
+                    </div>
+                  ))}
               </dl>
             </>
           )}
@@ -961,6 +976,7 @@ export default function CompanyWorkspace() {
                       ? '-'
                       : `${number(holding.weight * 100)}%`}
                   </dd>
+                  <HoldingProfit holding={holding} />
                 </dl>
                 <p>
                   모의 수량 기준{' '}
@@ -1101,6 +1117,7 @@ export default function CompanyWorkspace() {
             ) : (
               <>
                 <PriceChart
+                  currency={prices.data.currency}
                   points={prices.data.points}
                   range={prices.data.range}
                   asOf={asOf}
@@ -1134,6 +1151,7 @@ export default function CompanyWorkspace() {
                       <tr className="text-zoop-muted">
                         <th className="py-1 font-medium">시각</th>
                         <th className="py-1 text-right font-medium">종가</th>
+                        <th className="py-1 text-right font-medium">거래량</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1147,6 +1165,9 @@ export default function CompanyWorkspace() {
                           </td>
                           <td className="py-1 text-right">
                             {number(point.close)}
+                          </td>
+                          <td className="py-1 text-right">
+                            {point.volume == null ? '—' : number(point.volume)}
                           </td>
                         </tr>
                       ))}
@@ -1377,7 +1398,7 @@ export default function CompanyWorkspace() {
                       }
                       건
                     </p>
-                    {event.data.evidenceIds.map((evidenceId) => (
+                    {event.data.evidenceIds.map((evidenceId, index) => (
                       <button
                         key={evidenceId}
                         onClick={() =>
@@ -1389,7 +1410,7 @@ export default function CompanyWorkspace() {
                           })
                         }
                       >
-                        근거 {evidenceId} 보기
+                        근거 {index + 1} 보기
                       </button>
                     ))}
                     <Link to={`/?${eventMapQuery}`}>

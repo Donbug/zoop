@@ -21,6 +21,24 @@ import {
   deferred,
 } from './support/fakeServer';
 const asOf = '2026-10-05T00:00:00Z';
+
+test.each([['다른 합성 이름'], [], undefined])(
+  'D-COM-03 gap6 D14/D18 aliases %j and KST keep original time',
+  async (aliases) => {
+    server.on('GET', '/api/v1/companies/:id', () =>
+      json({ ...company, aliases }),
+    );
+    const view = open();
+    await screen.findByText('다른 이름');
+    const label = screen.getByText('다른 이름');
+    expect(label.nextElementSibling?.textContent).toBe(
+      aliases?.length ? '다른 합성 이름' : '미제공',
+    );
+    const time = view.container.querySelector('time');
+    expect(time?.textContent).toBe('2026-10-05 09:00 KST');
+    expect(time?.dateTime).toBe(asOf);
+  },
+);
 const company: Company = {
   id: 'fixture-a',
   name: '표시용 가상 기업',
@@ -123,7 +141,7 @@ test('null/blank fields remain missing, never copied from the display name', asy
   );
   open();
   await screen.findByText('확인된 기업 기준정보가 없습니다.');
-  expect(screen.getAllByText('미제공')).toHaveLength(6);
+  expect(screen.getAllByText('미제공')).toHaveLength(7);
   expect(screen.queryByText(company.name)).toBeNull();
 });
 test.each([

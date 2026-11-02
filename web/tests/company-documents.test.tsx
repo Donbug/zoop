@@ -140,7 +140,7 @@ async function selectEvidence() {
       await screen.findByRole('article', { name: '문서 합성 뉴스 A' }),
     ).getByRole('button', { name: '문서 근거 선택 · 2건' }),
   );
-  await user.click(screen.getByRole('button', { name: '근거 ev-a 상세' }));
+  await user.click(screen.getByRole('button', { name: '근거 1 상세' }));
   await screen.findByText('상세 합성 근거 인용');
   return user;
 }
