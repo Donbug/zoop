@@ -25,7 +25,7 @@ FS066-01/02, D-BRF-01, A-ADM-02b. 도움 됨·안 됨과 선택 사유를 실제
 
 ## 보존과 실행
 
-새 Flyway `V20261029160000__create_briefing_member_feedback.sql`이 `briefing_feedback`을 추가한다. `UNIQUE(member_id,feature,target_id)`와 회차 FK, 값/사유/대상 CHECK를 적용한다. 기존 migration이나 발행 payload를 수정하지 않는다.
+새 Flyway `V20261102130100__create_briefing_member_feedback.sql`이 `briefing_feedback`을 추가한다. `UNIQUE(member_id,feature,target_id)`와 회차 FK, 값/사유/대상 CHECK를 적용한다. 기존 migration이나 발행 payload를 수정하지 않는다.
 
 개발 미리보기의 SQLite 평가는 브라우저 단위 익명 기록이다. 회원 ID가 없어 자동 이관하거나 관리자 회원 집계에 합치지 않는다. 기존 파일과 기록은 그대로 보존하고 기존 미리보기 실행에서 조회할 수 있다. 이 구분은 운영 회원 평가 유실을 뜻하지 않는다.
 
