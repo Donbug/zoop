@@ -25,7 +25,7 @@ it('D-GRP-06 M12 selects a connected company and opens only that relation eviden
     id: 'other-edge',
     source: issue.id,
     target: other.id,
-    role: '참여 기업',
+    role: 'participant',
     evidenceIds: ['specific-evidence', 'specific-evidence'],
   };
   const select = vi.fn();

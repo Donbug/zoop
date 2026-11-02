@@ -133,7 +133,11 @@ export default function CompanyPathPanel({
               ))}
             </ul>
             {!matches.length && (
-              <p role="status">‘{query.trim()}’와 맞는 기업이 없어요.</p>
+              <p role="status">
+                {query.trim()
+                  ? `‘${query.trim()}’와 맞는 기업이 없어요.`
+                  : '고를 수 있는 기업이 없어요.'}
+              </p>
             )}
           </section>
         ) : !target ? (

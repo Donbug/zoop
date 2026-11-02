@@ -278,7 +278,12 @@ export default function ImpactPathPanel({
                           {edge.relationType === 'INVOLVES'
                             ? '직접 관련'
                             : '구조적 관련'}{' '}
-                          · {(edge.role ?? edge.summary) || '공개 그래프 연결'}
+                          ·{' '}
+                          {(edge.role === 'participant'
+                            ? '참여 기업'
+                            : edge.role) ||
+                            edge.summary ||
+                            '공개 그래프 연결'}
                         </p>
                         <button
                           type="button"

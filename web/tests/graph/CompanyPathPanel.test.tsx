@@ -26,6 +26,19 @@ it('D-GRP-07 M13 shows candidate logos and an explicit empty search', async () =
   expect(screen.queryByRole('button', { name: 'NVIDIA' })).toBeNull();
 });
 
+it('D-GRP-07 M13 does not quote an empty search when no other company exists', () => {
+  const only = {
+    ...graph,
+    nodes: graph.nodes.filter(
+      (node) => node.kind !== 'company' || node.id === props.from,
+    ),
+  };
+  render(<CompanyPathPanel {...props} graph={only} to={null} />);
+  expect(screen.getByRole('status').textContent).toBe(
+    '고를 수 있는 기업이 없어요.',
+  );
+});
+
 it('D-GRP-07 M14 selects the actual issue node from the path', async () => {
   const select = vi.fn();
   render(<CompanyPathPanel {...props} onSelectNode={select} />);
