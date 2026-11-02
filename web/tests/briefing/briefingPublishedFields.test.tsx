@@ -301,10 +301,15 @@ describe('D-BRF-01 회차 판단', () => {
     expect(within(section).queryByText(/event-missing/)).toBeNull();
   });
 
-  it('간단히 보기에는 회차 판단을 그리지 않는다', async () => {
+  it('간단히 보기에도 회차 판단을 그리고, 근거 이슈 링크는 화면의 이슈 카드로 이어진다', async () => {
     setup(withFourth(), true);
-    await openIssues();
-    expect(screen.queryByRole('region', { name: '회차 판단' })).toBeNull();
+    const section = await screen.findByRole('region', { name: '회차 판단' });
+    expect(within(section).getByText('합성 회차 판단 근거')).toBeTruthy();
+    const links = within(section).getAllByRole('link');
+    expect(links.map((link) => link.textContent)).toEqual(['합성 이슈 둘']);
+    const anchor = links[0].getAttribute('href')!.slice(1);
+    expect(document.getElementById(anchor)).toBeTruthy();
+    expect(within(section).getByText('합성 이슈 넷').tagName).toBe('SPAN');
   });
 });
 

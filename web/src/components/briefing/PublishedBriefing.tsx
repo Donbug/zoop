@@ -377,7 +377,8 @@ export default function PublishedBriefing({
                 {result.notice.at && ` · ${briefingTime(result.notice.at)}`}
               </p>
             )}
-            {!compact && result.status === 'published' && (
+            {/* 회차 판단은 보기와 관계없이 카드 머리에 둔다(프로토타입 briefing-page). */}
+            {result.status === 'published' && (
               <BriefingOutlook
                 outlook={result.outlook}
                 issues={result.items.map((item) => ({
