@@ -269,6 +269,21 @@ class PublicationMergerTest {
         assertTrue(GraphPublicationConfiguration.claimsAutomaticReviewer(Canonical.bytes(proposal.decisions().node())));
         assertFalse(GraphPublicationConfiguration.claimsAutomaticReviewer(Canonical.bytes(peopleLabel(published))));
         assertFalse(GraphPublicationConfiguration.claimsAutomaticReviewer("not json".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        // The preparation's operator name goes only with its own decisions (the recovery of an unknown outcome), and back.
+        byte[] automatic = Canonical.bytes(proposal.decisions().node());
+        byte[] empty = Canonical.bytes(PublicationMerger.emptyDecisions().node());
+        byte[] people = Canonical.bytes(peopleLabel(published));
+        String version = "gv-" + "a".repeat(64);
+        java.util.function.BiPredicate<String, byte[]> refused = (operator, bytes) -> GraphPublicationConfiguration.refusedForOperator(
+                new PublicationComposeRequest(null, List.of(version), null, null, Map.of(version, "b".repeat(64)), 0, 0, Canonical.sha256(bytes), operator), bytes);
+        assertFalse(refused.test(GraphPublicationPreparer.OPERATOR, automatic));
+        assertFalse(refused.test(GraphPublicationPreparer.OPERATOR, empty));
+        assertTrue(refused.test(GraphPublicationPreparer.OPERATOR, people));
+        assertTrue(refused.test(GraphPublicationPreparer.OPERATOR, "not json".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        assertTrue(refused.test("synthetic", automatic));
+        assertFalse(refused.test("synthetic", people));
+        assertFalse(refused.test("synthetic", empty));
     }
 
     @Test

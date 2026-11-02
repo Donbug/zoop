@@ -1,6 +1,7 @@
 package com.zoop.graph.publication;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
@@ -23,11 +24,13 @@ import tools.jackson.databind.node.ObjectNode;
  * built. It never activates; publishing stays a person's approval and manual CAS. The first real publication (nothing or a fixture
  * active) is an operator compose.
  *
- * <p>The result keeps the request and decisions so a person can see what was composed and, on a stop, start an operator decisions file
- * from them (an operator compose refuses the automatic reviewer and operator, so a person takes the decisions over first). After an
- * unknown outcome, run again with a new result path: the same inputs make the same composition, which the composer answers
- * {@code unchanged} when it was committed; if an import or a rule changed meanwhile it stages a new candidate, and
- * {@code pendingCandidates} lists every candidate on the same base that was never made public.
+ * <p>Only sources whose values agree with what is published are composed: {@link PublicationMerger.Proposal#changes()} (a headline value
+ * or relation record the sources disagree on) stops the run with {@code correction_required} before composing, and people decide those
+ * with an operator compose started from the result's request. Every result past source selection keeps the fixed inputs: the request
+ * document, the decision bytes ({@code decisionsBase64}) and their sha256. After {@code outcome_unknown}, recover by running an operator
+ * compose with exactly those inputs (the composer answers {@code unchanged} when it was committed); running the preparation again is a
+ * new preparation, which picks base, sources and revisions afresh. {@code pendingCandidates} lists every candidate on the same base
+ * that was never made public.
  */
 public final class GraphPublicationPreparer {
     public static final String RESULT_SCHEMA = "zoop-graph-publication-prepare-result-1";
@@ -79,7 +82,12 @@ public final class GraphPublicationPreparer {
                     state.ruleRevision(), state.reviewRevision(), Canonical.sha256(decisions), OPERATOR);
             result.set("request", request.wire());
             result.set("decisions", proposal.decisions().node());
-            result.set("autoResolutions", GraphPublicationReader.json(proposal.resolutions()));
+            result.put("decisionsBase64", Base64.getEncoder().encodeToString(decisions));
+            result.put("decisionsSha256", request.decisionsSha256());
+            result.set("sameHeadlines", GraphPublicationReader.json(proposal.sameHeadlines()));
+            result.set("changes", GraphPublicationReader.json(proposal.changes()));
+            // A changed value is never chosen by the preparation: people decide it with an operator compose (11-02 AI reply).
+            if (!proposal.changes().isEmpty()) return failed(result, "correction_required");
             ObjectNode composed = composer.run(request, decisions);
             result.set("compose", composed);
             if (!"succeeded".equals(composed.get("status").asString())) return failed(result, composed.get("code").asString());

@@ -7,8 +7,11 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Base64;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.common.json.Canonical;
 import com.zoop.document.analysis.repository.JdbcDocumentAnalysisRepository;
@@ -112,30 +115,60 @@ class GraphPublicationPreparePostgresTest {
         assertEquals("first_publication_manual", result.get("code").asString());
     }
 
-    @Test void stagesTheNewestNativeValueAsAnInactiveCandidateAndRerunIsUnchanged() {
-        String published = publish(importNative(HandoffFixtures.Spec.standard()));
+    @Test void aChangedValueStopsWithItsChangesAndNoCandidate() {
+        String base = importNative(HandoffFixtures.Spec.standard());
+        String published = publish(base);
         String incoming = importNative(HandoffFixtures.Spec.standard().withEvent("2026-10-01", "day"));
+
+        var result = preparer().run();
+        assertEquals("failed", result.get("status").asString(), result.toString());
+        assertEquals("correction_required", result.get("code").asString());
+        assertEquals(List.of(incoming), strings(result, "incomingVersionIds"));
+        var eventTime = change(result, "eventTime");
+        assertEquals("issue", eventTime.get("kind").asString());
+        assertEquals(Set.of(base + ":base", incoming + ":incoming"), eventTime.get("values").values().stream()
+                .map(v -> v.get("sourceVersionId").asString() + ":" + v.get("side").asString()).collect(Collectors.toSet()));
+        // The fixed inputs are kept for the operator decision that follows.
+        var request = PublicationComposeRequest.parse(Canonical.bytes(result.get("request")));
+        assertEquals(Canonical.sha256(decisionBytes(result)), request.decisionsSha256());
+        assertEquals(request.decisionsSha256(), result.get("decisionsSha256").asString());
+        assertEquals(published, versions.active().orElseThrow().id());
+        assertEquals(0, (int) jdbc.queryForObject("SELECT count(*) FROM graph_publications WHERE base_version_id = ?", Integer.class, published));
+    }
+
+    @Test void anAgreeingSourceIsStagedAndItsKeptInputsRecoverAsAnOperatorCompose() {
+        String published = publish(importNative(HandoffFixtures.Spec.standard()));
+        String incoming = importNative(HandoffFixtures.Spec.standard());
 
         var result = preparer().run();
         assertEquals("succeeded", result.get("status").asString(), result.toString());
         assertEquals("staged", result.get("outcome").asString());
         assertEquals(List.of(incoming), strings(result, "incomingVersionIds"));
+        assertEquals(0, result.get("changes").size());
         String candidate = result.get("graphVersionId").asString();
-        var reader = reader();
-        var publication = reader.read(candidate);
+        var publication = reader().read(candidate);
         assertEquals(published, publication.baseVersionId());
         assertEquals(published, versions.active().orElseThrow().id());
         assertFalse(versions.everActivated(candidate));
-        assertTrue(publication.snapshot().issues().stream().allMatch(i -> "2026-10-01".equals(i.eventTime())), publication.snapshot().issues().toString());
-        assertTrue(result.get("autoResolutions").values().stream().anyMatch(r -> "eventTime".equals(r.get("field").asString())));
-        assertTrue(PublicationMerger.claimsAutomaticReviewer(publication.effectiveDecisions()));
-        // The kept request is a valid operator compose request for the same decisions.
-        var request = PublicationComposeRequest.parse(Canonical.bytes(result.get("request")));
-        assertEquals(Canonical.sha256(Canonical.bytes(result.get("decisions"))), request.decisionsSha256());
+        assertEquals(2, publication.contributions().size());
 
+        // Recovery of an unknown outcome: the kept request and decision bytes, run as an operator compose, find the committed candidate.
+        var request = PublicationComposeRequest.parse(Canonical.bytes(result.get("request")));
+        assertEquals(GraphPublicationPreparer.OPERATOR, request.operator());
+        var recovered = composer().run(request, decisionBytes(result));
+        assertEquals("unchanged", recovered.get("outcome").asString(), recovered.toString());
+        assertEquals(candidate, recovered.get("graphVersionId").asString());
         var again = preparer().run();
         assertEquals("unchanged", again.get("outcome").asString(), again.toString());
         assertEquals(candidate, again.get("graphVersionId").asString());
+
+        // A preparation after a new import is a new composition, not a recovery of the first one.
+        String later = importNative(HandoffFixtures.Spec.standard());
+        var next = preparer().run();
+        assertEquals("staged", next.get("outcome").asString(), next.toString());
+        assertEquals(Set.of(incoming, later), Set.copyOf(strings(next, "incomingVersionIds")));
+        assertNotEquals(candidate, next.get("graphVersionId").asString());
+        assertEquals(List.of(candidate), strings(next, "pendingCandidates"));
     }
 
     @Test void nothingToPrepareWithoutNewImportsAndASourceLeftOutOfAnOperatorComposeStaysOut() {
@@ -149,20 +182,17 @@ class GraphPublicationPreparePostgresTest {
 
     @Test void aSourceImportedWhileACandidateWaitsForApprovalIsPreparedAfterIt() {
         publish(importNative(HandoffFixtures.Spec.standard()));
-        importNative(HandoffFixtures.Spec.standard().withEvent("2026-10-01", "day"));
-        String first = preparer().run().get("graphVersionId").asString();
+        String first = importNative(HandoffFixtures.Spec.standard());
+        String candidate = preparer().run().get("graphVersionId").asString();
         assertEquals(JdbcGraphPublicationRepository.PREPARED_BY,
-                jdbc.queryForObject("SELECT created_by FROM graph_versions WHERE id = ?", String.class, first));
-        String waiting = importNative(HandoffFixtures.Spec.standard().withEvent("2026-10-02", "day"));
-        // The second run proposes on the same published base: the waiting source is admitted together with the first one and
-        // disagrees with it, so it stops for a person until the first candidate is published.
-        assertEquals("correction_required", preparer().run().get("code").asString());
-        activate(first);
+                jdbc.queryForObject("SELECT created_by FROM graph_versions WHERE id = ?", String.class, candidate));
+        String waiting = importNative(HandoffFixtures.Spec.standard());
+        // Until the first candidate is published, a run prepares on the same base and admits both sources together.
+        assertEquals(Set.of(first, waiting), Set.copyOf(strings(preparer().run(), "incomingVersionIds")));
+        activate(candidate);
         var result = preparer().run();
         assertEquals("staged", result.get("outcome").asString(), result.toString());
         assertEquals(List.of(waiting), strings(result, "incomingVersionIds"));
-        assertTrue(reader().read(result.get("graphVersionId").asString()).snapshot().issues().stream()
-                .allMatch(i -> "2026-10-02".equals(i.eventTime())));
     }
 
     @Test void sourcesPastTheCapArePreparedAfterTheCappedCandidateIsPublished() {
@@ -188,7 +218,7 @@ class GraphPublicationPreparePostgresTest {
         assertEquals(broken, result.get("versionId").asString());
     }
 
-    @Test void sourcesAdmittedTogetherThatDisagreeStopForAPersonAndKeepTheRequest() {
+    @Test void sourcesAdmittedTogetherThatDisagreeStopWithEverySide() {
         String published = publish(importNative(HandoffFixtures.Spec.standard()));
         importNative(HandoffFixtures.Spec.standard().withEvent("2026-10-01", "day"));
         importNative(HandoffFixtures.Spec.standard().withEvent("2026-10-02", "day"));
@@ -196,7 +226,8 @@ class GraphPublicationPreparePostgresTest {
         assertEquals("failed", result.get("status").asString());
         assertEquals("correction_required", result.get("code").asString(), result.toString());
         assertEquals(2, strings(result, "incomingVersionIds").size());
-        assertNotNull(PublicationComposeRequest.parse(Canonical.bytes(result.get("request"))));
+        assertEquals(List.of("base", "incoming", "incoming"),
+                change(result, "eventTime").get("values").values().stream().map(v -> v.get("side").asString()).sorted().toList());
         assertEquals(published, versions.active().orElseThrow().id());
         assertEquals(0, (int) jdbc.queryForObject("SELECT count(*) FROM graph_publications WHERE base_version_id = ?", Integer.class, published));
     }
@@ -205,13 +236,23 @@ class GraphPublicationPreparePostgresTest {
         return new GraphPublicationReader(graph, registry, files, publications);
     }
 
-    private GraphPublicationPreparer preparer() {
+    private GraphPublicationComposer composer() {
         var sources = new DocumentReadSources(authority);
-        var reader = reader();
         var rights = new GraphPublicationAuthority(registry, sources,
-                version -> new DisclosureExclusions(0, java.util.Set.of(), java.util.Set.of(), java.util.Set.of(), java.util.Set.of()), CLOCK);
-        var composer = new GraphPublicationComposer(files, graph, registry, versions, publications, reader, rights, sources, transaction, CLOCK);
-        return new GraphPublicationPreparer(versions, graph, publications, reader, composer);
+                version -> new DisclosureExclusions(0, Set.of(), Set.of(), Set.of(), Set.of()), CLOCK);
+        return new GraphPublicationComposer(files, graph, registry, versions, publications, reader(), rights, sources, transaction, CLOCK);
+    }
+
+    private GraphPublicationPreparer preparer() {
+        return new GraphPublicationPreparer(versions, graph, publications, reader(), composer());
+    }
+
+    private static byte[] decisionBytes(ObjectNode result) {
+        return Base64.getDecoder().decode(result.get("decisionsBase64").asString());
+    }
+
+    private static tools.jackson.databind.JsonNode change(ObjectNode result, String field) {
+        return result.get("changes").values().stream().filter(c -> field.equals(c.get("field").asString())).findFirst().orElseThrow();
     }
 
     private String importNative(HandoffFixtures.Spec spec) {
@@ -224,18 +265,13 @@ class GraphPublicationPreparePostgresTest {
 
     /** Composes the first publication from {@code source} like the operator B4 and makes it the active version a person approved. */
     private String publish(String source) {
-        var sources = new DocumentReadSources(authority);
-        var reader = reader();
-        var rights = new GraphPublicationAuthority(registry, sources,
-                version -> new DisclosureExclusions(0, java.util.Set.of(), java.util.Set.of(), java.util.Set.of(), java.util.Set.of()), CLOCK);
         byte[] decisions = Canonical.bytes(PublicationMerger.emptyDecisions().node());
         var state = graph.publicationState();
         var pins = new java.util.TreeMap<String, String>();
         pins.put(source, registry.findArtifact("artifact-receipt-" + source).orElseThrow().sha256());
         var request = new PublicationComposeRequest(null, List.of(source), null, null, pins, state.ruleRevision(), state.reviewRevision(),
                 Canonical.sha256(decisions), "synthetic");
-        var composed = new GraphPublicationComposer(files, graph, registry, versions, publications, reader, rights, sources, transaction, CLOCK)
-                .run(request, decisions);
+        var composed = composer().run(request, decisions);
         assertEquals("succeeded", composed.get("status").asString(), composed.toString());
         String id = composed.get("graphVersionId").asString();
         jdbc.update("UPDATE graph_versions SET active = true WHERE id = ?", id);

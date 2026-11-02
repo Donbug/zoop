@@ -68,8 +68,8 @@ public class GraphPublicationConfiguration {
             try {
                 var parsed = PublicationComposeRequest.parse(readOperatorFile(request, PublicationComposeRequest.MAX_BYTES));
                 byte[] decisionBytes = readOperatorFile(decisions, 4_000_000);
-                // Only the preparation writes automatic decisions or uses its operator name; an operator compose claiming either could
-                // later be taken for an automatic one (its decisions replaced, its sources cut off).
+                // Automatic decisions go only with the preparation's operator name, and that name only with automatic decisions, so a
+                // person's composition is never taken for a prepared one (whose sources set the next preparation's cutoff).
                 if (refusedForOperator(parsed, decisionBytes)) return GraphPublicationComposer.failed("request_invalid");
                 return composer.run(parsed, decisionBytes);
             } catch (PublicationException invalid) { return GraphPublicationComposer.failed(invalid.code()); }
@@ -141,8 +141,18 @@ public class GraphPublicationConfiguration {
                     || attrs.permissions().contains(PosixFilePermission.OTHERS_WRITE)) throw new IOException();
         } catch (IOException error) { throw new IllegalArgumentException("publication result parent unavailable"); }
     }
+    /**
+     * The preparation's operator name goes only with the preparation's own decisions, so the recovery of an unknown outcome (the
+     * prepared request and decision bytes from its result file) can be run as an operator compose; any other operator may not write the
+     * automatic reviewer.
+     */
     static boolean refusedForOperator(PublicationComposeRequest request, byte[] decisions) {
-        return claimsAutomaticReviewer(decisions) || GraphPublicationPreparer.OPERATOR.equals(request.operator());
+        if (!GraphPublicationPreparer.OPERATOR.equals(request.operator())) return claimsAutomaticReviewer(decisions);
+        try {
+            return !PublicationMerger.onlyAutomaticDecisions(StrictJson.parseObject(decisions));
+        } catch (StrictJson.Malformed | IllegalArgumentException malformed) {
+            return true;
+        }
     }
     static boolean claimsAutomaticReviewer(byte[] decisions) {
         try {

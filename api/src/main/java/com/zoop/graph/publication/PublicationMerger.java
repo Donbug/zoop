@@ -274,6 +274,14 @@ public final class PublicationMerger {
         return false;
     }
 
+    /** True when a decisions document holds only what {@link #propose} writes: automatic {@code label} selections, or nothing. */
+    public static boolean onlyAutomaticDecisions(Obj decisions) {
+        if (!decisions.objects("issueMappings").isEmpty() || !decisions.objects("relationSelections").isEmpty()) return false;
+        for (Obj item : decisions.objects("fieldSelections"))
+            if (!item.has("reviewer") || !AUTO_REVIEWER.equals(item.string("reviewer")) || !"label".equals(item.string("field"))) return false;
+        return true;
+    }
+
     /**
      * What a prepared composition may decide by itself, so that {@link #merge} (and every later read of the publication) applies it
      * like any other decision. Only one case is decided: a native public issue whose sources agree on every headline field but differ in
