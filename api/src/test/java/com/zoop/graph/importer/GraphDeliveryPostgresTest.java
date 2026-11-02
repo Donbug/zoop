@@ -330,7 +330,8 @@ class GraphDeliveryPostgresTest {
             candidate.validate();
             assertEquals(history, upgradeJdbc.queryForList(
                     "SELECT * FROM flyway_schema_history ORDER BY installed_rank LIMIT ?", history.size()));
-            assertEquals("20261102150000", candidate.info().current().getVersion().getVersion());
+            // Other domains can legitimately add forward migrations after the request journal.
+            assertEquals(0, candidate.info().pending().length);
             assertEquals(1, upgradeJdbc.queryForObject("""
                     SELECT count(*) FROM flyway_schema_history WHERE version = '20261102150000' AND success
                     """, Integer.class));
