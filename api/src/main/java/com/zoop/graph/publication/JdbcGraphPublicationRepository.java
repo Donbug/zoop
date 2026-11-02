@@ -39,26 +39,21 @@ public class JdbcGraphPublicationRepository {
                 """, new MapSqlParameterSource("receipts", sourceVersionIds.stream().map(id -> "artifact-receipt-" + id).toList()), String.class);
     }
 
-    /** {@code created_by} of a version the automatic preparation staged; operator composes cannot use this operator name. */
-    public static final String PREPARED_BY = "operator:" + GraphPublicationPreparer.OPERATOR;
-
     /**
      * Imported native single-source versions an automatic preparation may add on top of {@code baseVersionId}, oldest first, at most
      * {@code limit}: a staged snapshot that is not a composed publication or a legacy package, has exactly one source, is not one of
-     * {@code members} (the base's sources) and comes after the cutoff in import order ({@code sequence}). The cutoff keeps a source a
-     * person deliberately left out of a composition from coming back without dropping anything else: after an operator compose it is
-     * the base's own sequence (everything imported before it was the operator's to choose); after an automatic preparation it is the
-     * last source that preparation took, so sources past its cap or imported while it waited for approval are still prepared.
+     * {@code members} (the base's sources) and comes after the cutoff in import order ({@code sequence}). The cutoff is the newest
+     * source the base's composition took in (the base itself when it is not a composition), whoever composed it: a source imported
+     * before it that the composition left out was there to choose and stays out, while sources past a preparation's cap, imported while a
+     * candidate waited for approval, or imported while an operator wrote a request are still prepared. A source that stops preparation
+     * stays the oldest candidate until an operator compose takes it, or a newer source without it.
      */
     public List<String> preparationCandidates(String baseVersionId, Set<String> members, int limit) {
-        var args = new MapSqlParameterSource("base", baseVersionId).addValue("members", members.toArray(String[]::new))
-                .addValue("prepared", PREPARED_BY).addValue("limit", limit);
+        var args = new MapSqlParameterSource("base", baseVersionId).addValue("members", members.toArray(String[]::new)).addValue("limit", limit);
         return jdbc.queryForList("""
                 WITH cutoff AS (
-                  SELECT CASE WHEN b.created_by = :prepared
-                         THEN (SELECT max(i.sequence) FROM graph_publication_inputs p JOIN graph_versions i ON i.id = p.source_version_id
-                               WHERE p.version_id = b.id)
-                         ELSE b.sequence END AS sequence
+                  SELECT COALESCE((SELECT max(i.sequence) FROM graph_publication_inputs p JOIN graph_versions i ON i.id = p.source_version_id
+                                   WHERE p.version_id = b.id), b.sequence) AS sequence
                   FROM graph_versions b WHERE b.id = :base)
                 SELECT v.id FROM graph_versions v, cutoff
                 WHERE v.kind = 'snapshot'
@@ -70,6 +65,13 @@ public class JdbcGraphPublicationRepository {
                 ORDER BY v.sequence
                 LIMIT :limit
                 """, args, String.class);
+    }
+
+    /** {@code versionIds} that exist, in import order ({@code sequence}). */
+    public List<String> importOrder(List<String> versionIds) {
+        if (versionIds.isEmpty()) return List.of();
+        return jdbc.queryForList("SELECT id FROM graph_versions WHERE id IN (:ids) ORDER BY sequence",
+                new MapSqlParameterSource("ids", versionIds), String.class);
     }
 
     /** Staged publications on {@code baseVersionId} that were never made public, oldest first (earlier or orphaned candidates). */

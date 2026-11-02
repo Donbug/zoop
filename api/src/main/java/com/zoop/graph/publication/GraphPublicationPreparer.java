@@ -1,6 +1,7 @@
 package com.zoop.graph.publication;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
@@ -13,6 +14,8 @@ import com.zoop.graph.importer.GraphHandoffRepository;
 import com.zoop.graph.publication.GraphPublicationReader.Contribution;
 import com.zoop.graph.publication.GraphPublicationReader.Publication;
 import com.zoop.graph.version.GraphVersionRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -28,13 +31,14 @@ import tools.jackson.databind.node.ObjectNode;
  * or relation record the sources disagree on) stops the run with {@code correction_required} before composing, and people decide those
  * with an operator compose started from the result's request. Every result past source selection keeps the fixed inputs: the request
  * document, the decision bytes ({@code decisionsBase64}) and their sha256. After {@code outcome_unknown}, recover by running an operator
- * compose with exactly those inputs (the composer answers {@code unchanged} when it was committed); running the preparation again is a
- * new preparation, which picks base, sources and revisions afresh. {@code pendingCandidates} lists every candidate on the same base
- * that was never made public.
+ * compose with exactly those inputs (the composer answers {@code unchanged} when it was committed; {@link #proposes} admits them);
+ * running the preparation again is a new preparation, which picks base, sources and revisions afresh. {@code pendingCandidates} lists
+ * every candidate on the same base that was never made public.
  */
 public final class GraphPublicationPreparer {
+    private static final Logger log = LoggerFactory.getLogger(GraphPublicationPreparer.class);
     public static final String RESULT_SCHEMA = "zoop-graph-publication-prepare-result-1";
-    /** The compose request operator of a preparation; reserved, so its staged versions are recognisable. */
+    /** The compose request operator of a preparation; an operator compose may use it only to recover one ({@link #proposes}). */
     public static final String OPERATOR = "graph-publication-prepare";
     static final int MAX_INCOMING = 20;
 
@@ -60,6 +64,7 @@ public final class GraphPublicationPreparer {
             if (active == null || "fixture".equals(active.kind())) return failed(result, "first_publication_manual");
             reading = active.id();
             Publication base = reader.read(active.id());
+            reading = null;
             Set<String> members = base.contributions().stream().map(Contribution::sourceVersionId).collect(Collectors.toSet());
             List<Contribution> incoming = new ArrayList<>();
             for (String id : publications.preparationCandidates(active.id(), members, MAX_INCOMING)) {
@@ -71,9 +76,7 @@ public final class GraphPublicationPreparer {
             reading = null;
             result.set("pendingCandidates", GraphPublicationReader.json(publications.unpublishedCandidates(active.id())));
             if (incoming.isEmpty()) { result.put("status", "succeeded"); result.put("outcome", "nothing_to_prepare"); return result; }
-            List<Contribution> all = new ArrayList<>(base.contributions()); all.addAll(incoming);
-            var proposal = PublicationMerger.propose(all, base.effectiveDecisions(), base.issueSources(),
-                    new PublicationMerger.Automatic(incoming.stream().map(Contribution::sourceVersionId).toList()));
+            var proposal = proposal(base, incoming);
             byte[] decisions = Canonical.bytes(proposal.decisions().node());
             var pins = new TreeMap<String, String>();
             incoming.forEach(c -> pins.put(c.sourceVersionId(), c.receipt().sha256()));
@@ -100,8 +103,36 @@ public final class GraphPublicationPreparer {
         } catch (DataAccessException failure) {
             return failed(result, "database_unavailable", reading);
         } catch (RuntimeException unexpected) {
+            log.error("publication preparation failed unexpectedly: {}", unexpected.getClass().getName());
             return failed(result, "internal_error", reading);
         }
+    }
+
+    /**
+     * True when {@code decisions} are exactly what a preparation proposes for the request's base and incoming sources, with no change
+     * left to people: the only operator compose that may use {@link #OPERATOR} (the recovery of an unknown outcome). A hand-written
+     * decision under the automatic reviewer is refused, so the published record never says the application chose what a person did.
+     */
+    public static boolean proposes(GraphPublicationReader reader, JdbcGraphPublicationRepository publications, PublicationComposeRequest request,
+            byte[] decisions) {
+        if (request.baseVersionId() == null) return false;
+        Publication base = reader.read(request.baseVersionId());
+        List<Contribution> incoming = new ArrayList<>();
+        for (String id : publications.importOrder(request.incomingVersionIds())) {
+            var contributions = reader.read(id).contributions();
+            if (contributions.size() != 1 || !"native".equals(contributions.getFirst().sourceKind())) return false;
+            incoming.add(contributions.getFirst());
+        }
+        if (incoming.size() != request.incomingVersionIds().size()) return false;
+        var proposal = proposal(base, incoming);
+        return proposal.changes().isEmpty() && Arrays.equals(Canonical.bytes(proposal.decisions().node()), decisions);
+    }
+
+    /** {@code incoming} oldest first (import order), which decides the owner of an issue no published source has. */
+    private static PublicationMerger.Proposal proposal(Publication base, List<Contribution> incoming) {
+        List<Contribution> all = new ArrayList<>(base.contributions()); all.addAll(incoming);
+        return PublicationMerger.propose(all, base.effectiveDecisions(), base.issueSources(),
+                new PublicationMerger.Automatic(incoming.stream().map(Contribution::sourceVersionId).toList()));
     }
 
     private static ObjectNode failed(ObjectNode result, String code) {

@@ -62,15 +62,17 @@ public class GraphPublicationConfiguration {
         requireOwnedParent(result);
         ArtifactFileStore files = ArtifactFileStore.at(root);
         var reader = new GraphPublicationReader(graph, registry, files, publications);
-        var composer = new GraphPublicationComposer(files, graph, registry, versions, publications, reader, authority,
-                new DocumentReadSources(documentRead.ingestionSourcesPath()), transaction, clock);
+        var composer = composer(files, graph, registry, versions, publications, reader, authority, documentRead, transaction, clock);
         return args -> writeOperatorResult(result, () -> {
             try {
                 var parsed = PublicationComposeRequest.parse(readOperatorFile(request, PublicationComposeRequest.MAX_BYTES));
                 byte[] decisionBytes = readOperatorFile(decisions, 4_000_000);
-                // Automatic decisions go only with the preparation's operator name, and that name only with automatic decisions, so a
-                // person's composition is never taken for a prepared one (whose sources set the next preparation's cutoff).
-                if (refusedForOperator(parsed, decisionBytes)) return GraphPublicationComposer.failed("request_invalid");
+                // Automatic decisions are the preparation's alone. Its operator name is accepted only to recover an unknown outcome:
+                // the decisions must be exactly what the preparation proposes for that base and those sources.
+                boolean refused = GraphPublicationPreparer.OPERATOR.equals(parsed.operator())
+                        ? !GraphPublicationPreparer.proposes(reader, publications, parsed, decisionBytes)
+                        : claimsAutomaticReviewer(decisionBytes);
+                if (refused) return GraphPublicationComposer.failed("request_invalid");
                 return composer.run(parsed, decisionBytes);
             } catch (PublicationException invalid) { return GraphPublicationComposer.failed(invalid.code()); }
         }, "publication composition refused; see operator result");
@@ -92,10 +94,16 @@ public class GraphPublicationConfiguration {
         requireOwnedParent(result);
         ArtifactFileStore files = ArtifactFileStore.at(root);
         var reader = new GraphPublicationReader(graph, registry, files, publications);
-        var composer = new GraphPublicationComposer(files, graph, registry, versions, publications, reader, authority,
-                new DocumentReadSources(documentRead.ingestionSourcesPath()), transaction, clock);
-        var preparer = new GraphPublicationPreparer(versions, graph, publications, reader, composer);
+        var preparer = new GraphPublicationPreparer(versions, graph, publications, reader,
+                composer(files, graph, registry, versions, publications, reader, authority, documentRead, transaction, clock));
         return args -> writeOperatorResult(result, preparer::run, "publication preparation stopped; see operator result");
+    }
+
+    private static GraphPublicationComposer composer(ArtifactFileStore files, GraphHandoffRepository graph, DocumentRegistryRepository registry,
+            GraphVersionRepository versions, JdbcGraphPublicationRepository publications, GraphPublicationReader reader,
+            GraphPublicationAuthority authority, DocumentReadProperties documentRead, TransactionOperations transaction, Clock clock) {
+        return new GraphPublicationComposer(files, graph, registry, versions, publications, reader, authority,
+                new DocumentReadSources(documentRead.ingestionSourcesPath()), transaction, clock);
     }
 
     /** Writes the operator result to a new owner-only file (never over an existing one) and fails the run when it did not succeed. */
@@ -140,19 +148,6 @@ public class GraphPublicationConfiguration {
             if (!attrs.isDirectory() || attrs.permissions().contains(PosixFilePermission.GROUP_WRITE)
                     || attrs.permissions().contains(PosixFilePermission.OTHERS_WRITE)) throw new IOException();
         } catch (IOException error) { throw new IllegalArgumentException("publication result parent unavailable"); }
-    }
-    /**
-     * The preparation's operator name goes only with the preparation's own decisions, so the recovery of an unknown outcome (the
-     * prepared request and decision bytes from its result file) can be run as an operator compose; any other operator may not write the
-     * automatic reviewer.
-     */
-    static boolean refusedForOperator(PublicationComposeRequest request, byte[] decisions) {
-        if (!GraphPublicationPreparer.OPERATOR.equals(request.operator())) return claimsAutomaticReviewer(decisions);
-        try {
-            return !PublicationMerger.onlyAutomaticDecisions(StrictJson.parseObject(decisions));
-        } catch (StrictJson.Malformed | IllegalArgumentException malformed) {
-            return true;
-        }
     }
     static boolean claimsAutomaticReviewer(byte[] decisions) {
         try {

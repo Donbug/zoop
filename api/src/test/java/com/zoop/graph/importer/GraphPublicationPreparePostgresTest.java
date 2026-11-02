@@ -132,6 +132,8 @@ class GraphPublicationPreparePostgresTest {
         var request = PublicationComposeRequest.parse(Canonical.bytes(result.get("request")));
         assertEquals(Canonical.sha256(decisionBytes(result)), request.decisionsSha256());
         assertEquals(request.decisionsSha256(), result.get("decisionsSha256").asString());
+        // The preparation's operator name cannot carry these inputs into an operator compose: a change is left to people.
+        assertFalse(GraphPublicationPreparer.proposes(reader(), publications, request, decisionBytes(result)));
         assertEquals(published, versions.active().orElseThrow().id());
         assertEquals(0, (int) jdbc.queryForObject("SELECT count(*) FROM graph_publications WHERE base_version_id = ?", Integer.class, published));
     }
@@ -155,6 +157,8 @@ class GraphPublicationPreparePostgresTest {
         // Recovery of an unknown outcome: the kept request and decision bytes, run as an operator compose, find the committed candidate.
         var request = PublicationComposeRequest.parse(Canonical.bytes(result.get("request")));
         assertEquals(GraphPublicationPreparer.OPERATOR, request.operator());
+        assertTrue(GraphPublicationPreparer.proposes(reader(), publications, request, decisionBytes(result)));
+        assertFalse(GraphPublicationPreparer.proposes(reader(), publications, request, "{}".getBytes(StandardCharsets.UTF_8)));
         var recovered = composer().run(request, decisionBytes(result));
         assertEquals("unchanged", recovered.get("outcome").asString(), recovered.toString());
         assertEquals(candidate, recovered.get("graphVersionId").asString());
@@ -184,8 +188,6 @@ class GraphPublicationPreparePostgresTest {
         publish(importNative(HandoffFixtures.Spec.standard()));
         String first = importNative(HandoffFixtures.Spec.standard());
         String candidate = preparer().run().get("graphVersionId").asString();
-        assertEquals(JdbcGraphPublicationRepository.PREPARED_BY,
-                jdbc.queryForObject("SELECT created_by FROM graph_versions WHERE id = ?", String.class, candidate));
         String waiting = importNative(HandoffFixtures.Spec.standard());
         // Until the first candidate is published, a run prepares on the same base and admits both sources together.
         assertEquals(Set.of(first, waiting), Set.copyOf(strings(preparer().run(), "incomingVersionIds")));
@@ -193,6 +195,18 @@ class GraphPublicationPreparePostgresTest {
         var result = preparer().run();
         assertEquals("staged", result.get("outcome").asString(), result.toString());
         assertEquals(List.of(waiting), strings(result, "incomingVersionIds"));
+    }
+
+    @Test void aSourceImportedWhileAnOperatorComposedIsStillPrepared() {
+        String published = publish(importNative(HandoffFixtures.Spec.standard()));
+        String chosen = importNative(HandoffFixtures.Spec.standard());
+        String meanwhile = importNative(HandoffFixtures.Spec.standard());
+        // The operator's request names only the first source; the composition commits after the second one was imported.
+        String composed = compose(published, chosen);
+        activate(composed);
+        var result = preparer().run();
+        assertEquals("staged", result.get("outcome").asString(), result.toString());
+        assertEquals(List.of(meanwhile), strings(result, "incomingVersionIds"));
     }
 
     @Test void sourcesPastTheCapArePreparedAfterTheCappedCandidateIsPublished() {
@@ -265,21 +279,27 @@ class GraphPublicationPreparePostgresTest {
 
     /** Composes the first publication from {@code source} like the operator B4 and makes it the active version a person approved. */
     private String publish(String source) {
-        byte[] decisions = Canonical.bytes(PublicationMerger.emptyDecisions().node());
-        var state = graph.publicationState();
-        var pins = new java.util.TreeMap<String, String>();
-        pins.put(source, registry.findArtifact("artifact-receipt-" + source).orElseThrow().sha256());
-        var request = new PublicationComposeRequest(null, List.of(source), null, null, pins, state.ruleRevision(), state.reviewRevision(),
-                Canonical.sha256(decisions), "synthetic");
-        var composed = composer().run(request, decisions);
-        assertEquals("succeeded", composed.get("status").asString(), composed.toString());
-        String id = composed.get("graphVersionId").asString();
+        String id = compose(null, source);
         jdbc.update("UPDATE graph_versions SET active = true WHERE id = ?", id);
         jdbc.update("""
                 INSERT INTO graph_activations (version_id, previous_version_id, action, actor_kind, pointer_changed, admin_id,
                     admin_email_snapshot, reason, activated_at) VALUES (?, NULL, 'activate', 'system', true, NULL, 'system', 'synthetic', ?)
                 """, id, Timestamp.from(NOW.minusSeconds(60)));
         return id;
+    }
+
+    /** An operator compose (B4) of {@code source} on {@code base} with no decisions; not activated. */
+    private String compose(String base, String source) {
+        byte[] decisions = Canonical.bytes(PublicationMerger.emptyDecisions().node());
+        var state = graph.publicationState();
+        var pins = new java.util.TreeMap<String, String>();
+        pins.put(source, registry.findArtifact("artifact-receipt-" + source).orElseThrow().sha256());
+        String basePin = base == null ? null : registry.findArtifact("artifact-receipt-" + base).orElseThrow().sha256();
+        var request = new PublicationComposeRequest(base, List.of(source), base, basePin, pins, state.ruleRevision(), state.reviewRevision(),
+                Canonical.sha256(decisions), "synthetic");
+        var composed = composer().run(request, decisions);
+        assertEquals("succeeded", composed.get("status").asString(), composed.toString());
+        return composed.get("graphVersionId").asString();
     }
 
     private void activate(String id) {
