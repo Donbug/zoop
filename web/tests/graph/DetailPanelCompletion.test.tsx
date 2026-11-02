@@ -301,6 +301,30 @@ describe('D-GRP-04 · prototype relation fields', () => {
     expect(screen.queryByText('인용 검증')).toBeNull();
     expect(screen.queryByRole('region', { name: '관계 기준 문서' })).toBeNull();
   });
+
+  it('M20: shortens issue ends in the title to the action or 16 characters', async () => {
+    const server = createFakeServer();
+    const relation = createMockRelation('mock-follows-1');
+    relation.source.label = '삼성전자 HBM4 12단 엔비디아 공급 계약 체결';
+    relation.target.label = '가나다라마바사아자차카타파하거너더러';
+    server.on('GET', '/api/v1/graph/edges/:id', () => json(relation));
+    render(
+      <RelationDetailPanel
+        id={relation.id}
+        context={context}
+        actionOf={(id) => (id === relation.source.id ? '공급 계약' : null)}
+        onClose={vi.fn()}
+        onSelectNode={vi.fn()}
+        onAction={vi.fn()}
+      />,
+    );
+    await screen.findByRole('heading', {
+      name: '공급 계약 – 가나다라마바사아자차카타파하거…',
+    });
+    // 전체 이름은 '연결된 두 대상'에 그대로 남는다.
+    expect(screen.getByText(relation.source.label)).toBeTruthy();
+    expect(screen.getByText(relation.target.label)).toBeTruthy();
+  });
 });
 
 describe('D-GRP-05 · saved document analysis', () => {
