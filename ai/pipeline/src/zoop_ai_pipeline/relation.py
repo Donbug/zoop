@@ -802,7 +802,7 @@ class Engine:
         """Decode a persisted raw receipt, expand request-local producer references, then apply the native parser."""
         runtime = self._runtime(row, send=False)
         frozen = json.loads(row["binding"])["runtime"]
-        if "fallback" in frozen.get("generation", {}):
+        if "fallback" in frozen.get("generation", {}) or ("outputContract" in frozen.get("generation", {}) and stage in {"relation", "impact"}):
             if runtime.fallback_recipient(stage) is not None and receipt.get("format") != "zoop-live-chain-receipt-1":
                 raise ExtractionFailure("receipt_binding_mismatch")
             expected = runtime.prepare(stage, payload)["requestDigest"]
@@ -812,7 +812,10 @@ class Engine:
             if receipt.get("format") == "zoop-live-chain-receipt-1" and receipt.get("logicalAttemptId") != attempt:
                 raise ExtractionFailure("receipt_binding_mismatch")
         try:
-            raw = runtime.answer(stage, receipt)
+            if "outputContract" in frozen.get("generation", {}) and stage in {"relation", "impact"}:
+                raw = runtime.answer(stage, receipt, prepared=runtime.prepare(stage, payload))
+            else:
+                raw = runtime.answer(stage, receipt)
         except LiveFailure as exc:
             if exc.uncertain:
                 raise ProviderResponseUnknown(exc.code) from exc

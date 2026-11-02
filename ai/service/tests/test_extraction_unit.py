@@ -704,7 +704,7 @@ def test_pipeline_live_is_off_unless_the_service_switch_and_the_pipeline_gate_ar
 def test_the_live_environment_is_split_by_what_each_command_needs_and_never_reaches_a_replay_command(tmp_path):
     from zoop_ai_service.extraction_runtime import ExtractionProcess
     ws = Workspace(tmp_path, replay=document_replay())
-    config = load(live_env(ws, tmp_path, ZOOP_AI_BASE_URL="http://127.0.0.1:1"))
+    config = load(live_env(ws, tmp_path, ZOOP_AI_BASE_URL="http://127.0.0.1:1", ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT="citation-enum-1"))
     assert config.extraction is not None and config.pipeline_live is not None
     process = ExtractionProcess(config)
     seen: list[tuple[list[str], dict[str, str] | None]] = []
@@ -721,9 +721,10 @@ def test_the_live_environment_is_split_by_what_each_command_needs_and_never_reac
     assert not {"ZOOP_AI_API_KEY", "TYPESAFE_API_KEY", "ZOOP_AI_PIPELINE_LIVE_MAX_USD", "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS"} & set(live_env_)  # registering needs no key or cap
     assert live_env_["ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"] == str(tmp_path / "budget")   # the binding pins the directory's realpath
     assert send_env is not None and send_env["ZOOP_AI_API_KEY"] == "k-openai-secret" and send_env["TYPESAFE_API_KEY"] == "k-jev-secret"
+    assert live_env_["ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT"] == send_env["ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT"] == "citation-enum-1"
     assert send_env["ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"] == str(tmp_path / "budget") and send_env["ZOOP_AI_PIPELINE_LIVE_MAX_CALLS"] == "20"
     assert set(send_env) - set(config.extraction.child_env) == set(LIVE_ENV) - {"ZOOP_AI_SERVICE_PIPELINE_LIVE"} | {
-        "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR", "ZOOP_AI_BASE_URL"}   # exactly the documented names: nothing else of the service environment
+        "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR", "ZOOP_AI_BASE_URL", "ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT"}   # exactly the documented names: nothing else of the service environment
     assert "ZOOP_AI_SERVICE_PIPELINE_LIVE" not in send_env and "HOME" not in send_env and "OPENAI_API_KEY" not in send_env
     assert (inspect_env, cancel_env, replay_submit_env, replay_env) == (None, None, None, None)   # the fixed replay-only environment
     assert "--replay" in replay_submit and "--replay" in replay_resume and "--topic-replay" in replay_resume and "--initial-only" in replay_resume
