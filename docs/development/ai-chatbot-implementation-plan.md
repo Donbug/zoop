@@ -105,7 +105,7 @@ flowchart LR
 | 1 저장·job 수명주기 | 구현 | 복구본을 DB에 두므로 DB 장애 자체는 복구 대상이 아님 |
 | 2 오케스트레이터 | 구현(합성 회귀) | direct·agent 공통 45초와 서버 requirement coverage 구현. 단계 최소 예약·상한은 live p95로 보정 |
 | 3 router·Luna agent | 부분 구현 | Jev router·Luna Responses MCP·Java 승인 루프는 구현(합성 replay로만 확인). 라우터 wire `dependsOn`도 구현(2026-10-30, `zoop-ai-chat-3`, 확신이 낮거나 요구가 대상을 지목하면 의존 없음). 승인 요청의 요구 매핑도 구현(2026-10-30, `zoop-ai-chat-4`). live 확인 |
-| 4 읽기 도구 | 부분 구현 | Q03 기업별 문서·검증 본문 검색(`document.search`, 2026-11-02), Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`·`briefing.evidence`, 2026-10-31), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 공급자), Q01 승인 저장소·기본 비활성 어댑터 구현. Q01 승인본·활성화와 실제 웹 공급자 미정 |
+| 4 읽기 도구 | 부분 구현 | Q03 기업별 문서·검증 본문 검색(`document.search`, 2026-11-02), Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`·`briefing.evidence`, 2026-10-31), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 공급자), Q01 승인 저장소·기본 비활성 어댑터·승인본(`2026-11-02.1`) 구현. 환경별 Q01 활성화와 실제 웹 공급자 미정 |
 | 5 생성·출력 검증 | 구현(합성 회귀) | 서버 claim 분할과 claim별 support·`unsupportedCausality`, 입력 24k·답변 2k 구현. 실제 모델 보정은 단계 7 |
 | 6 웹 | 부분 구현(합성 회귀) | 합성 공급자·예산·요구별 gate·웹 인용, 대상·기간·필수 필드·인용 coverage, Q07 웹 대상 2개 초과 선택 확인, 인스턴스 로컬 공급자 요청 캐시·single-flight 구현. 실제 공급자·인스턴스 공유 캐시·금액 상한·snapshot 저장은 미정 |
 | 7 평가·출시 | 부분 구현 | 고정 평가 세트 v1(대본 실행)만 있음. 실제 모델·데이터 평가와 임계값 보정, 보안·종단·배포 증명 |
@@ -221,9 +221,11 @@ Q07의 `portfolio.scope.read`는 Java server-only precondition으로 실행하�
 
 ## 5. 다음 구현 순서 (2026-11-02)
 
-Q01 승인 문서 저장소와 기본 비활성 `help.search`·`screenSpec.read` 어댑터까지 구현됐다(`chat-tools/v12`). 현재 migration에는 승인본이 없고 기능 플래그도 꺼져 있으므로, 다음 작업은 초안을 코드에 복사하는 일이 아니라 **승인 근거가 있는 본문을 확정하고 안전하게 등록하는 일**이다. Q02~Q08 수직 도구, 합성 `web.search`·일일 한도·인스턴스 로컬 요청 캐시, direct·agent 공통 45초 deadline, 내부 계약 schema는 구현돼 있고(합성 회귀), 실제 웹 공급자와 출시 증명은 후속이다.
+Q01 승인 문서 저장소와 기본 비활성 `help.search`·`screenSpec.read` 어댑터까지 구현됐다(`chat-tools/v12`). 승인본 `2026-11-02.1`은 등록됐고 기능 플래그는 기본 꺼짐이다. Q02~Q08 수직 도구, 합성 `web.search`·일일 한도·인스턴스 로컬 요청 캐시, direct·agent 공통 45초 deadline, 내부 계약 schema는 구현돼 있고(합성 회귀), 실제 웹 공급자와 출시 증명은 후속이다.
 
 ### 5.1 바로 다음 PR — Q01 승인본 확정·등록
+
+현재 상태(2026-11-02): 승인본 `2026-11-02.1`을 `docs/help/approved/`와 `V20261102141000`으로 등록했다. 남은 것은 대상 환경의 `zoop-docs` grant 확인과 플래그 켜기다. 아래는 절차 기록이다.
 
 1. [도움말·화면 설명 초안](../help/README.md)의 `검수 필요` 5개 항목을 제품·운영 담당자가 결정하고, 현재 `web/` 동작과 문장별로 대조한다. 결정 전에는 초안을 `chat_document_versions`에 넣거나 플래그를 켜지 않는다. 2026-11-02 잠정 결정을 초안에 반영했고, 승인 담당자의 확정과 `approval_ref` 발급이 남았다.
 2. 확정 본문을 `docs/help/approved/service-guide-<version>.md`와 `screen-guide-<version>.md`로 고정하고 문서별 승인 근거(`approval_ref`), 승인 시각, 시행 시각을 기록한다. 승인 뒤 본문 수정은 금지하고 개정은 새 버전으로 낸다.

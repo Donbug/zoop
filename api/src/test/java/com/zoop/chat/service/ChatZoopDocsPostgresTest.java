@@ -2,8 +2,14 @@ package com.zoop.chat.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Map;
 
+import com.zoop.chat.tool.HelpSearchTool;
+import com.zoop.chat.tool.ScreenSpecReadTool;
 import com.zoop.document.evidence.service.EvidenceService.Readability;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -49,6 +55,29 @@ class ChatZoopDocsPostgresTest {
     }
 
     @Test
+    void theApprovedGuidesAreShippedExactlyAsTheirFilesAndReadSectionBySection() throws IOException {
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM chat_document_versions", Integer.class));
+        new HelpSearchTool(docs).afterPropertiesSet();
+        new ScreenSpecReadTool(docs).afterPropertiesSet();
+
+        for (var guide : Map.of(ChatZoopDocs.HELP_GUIDE, "service-guide", ChatZoopDocs.SCREEN_GUIDE, "screen-guide")
+                .entrySet()) {
+            var document = docs.inEffect(guide.getKey(), null)
+                    .orElseThrow(() -> new AssertionError(guide.getKey() + " is not in effect"));
+            String body = jdbc.queryForObject("SELECT body FROM chat_document_versions WHERE doc_id = ? AND version = ?",
+                    String.class, guide.getKey(), document.version()).replace("\r\n", "\n");
+            String file = Files.readString(Path.of("..", "docs", "help", "approved",
+                    guide.getValue() + "-" + document.version() + ".md")).replace("\r\n", "\n");
+            assertEquals(file, body, guide.getKey());
+            assertEquals(20, document.quotes().size(), guide.getKey());
+            for (var quote : document.quotes()) {
+                assertTrue(quote.text().length() <= 2_000, quote.title());
+                assertEquals(Readability.READABLE, docs.check(quote.evidenceId(), null).orElseThrow(), quote.title());
+            }
+        }
+    }
+
+    @Test
     void beforeAVersionTakesEffectItIsNeitherReadNorCitable() {
         Instant before = Instant.parse("2026-10-01T00:00:00Z");
         var quote = docs.inEffect("policy.privacy", null).orElseThrow().quotes().getFirst();
@@ -58,8 +87,7 @@ class ChatZoopDocsPostgresTest {
 
     @Test
     @Transactional
-    void anApprovedHelpVersionCanBeRegisteredButTheMigrationShipsNoDraftRows() {
-        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM chat_document_versions", Integer.class));
+    void anApprovedHelpVersionCanBeRegistered() {
         insertHelp("synthetic-test-v1");
 
         var document = docs.inEffect(ChatZoopDocs.HELP_GUIDE, null).orElseThrow();
@@ -91,6 +119,9 @@ class ChatZoopDocsPostgresTest {
     }
 
     private void insertHelp(String version) {
+        jdbc.execute("ALTER TABLE chat_document_versions DISABLE TRIGGER USER");
+        jdbc.update("DELETE FROM chat_document_versions");
+        jdbc.execute("ALTER TABLE chat_document_versions ENABLE TRIGGER USER");
         jdbc.update("""
                 INSERT INTO chat_document_versions
                     (doc_id, kind, version, title, body, approval_ref, approved_at, effective_at)
