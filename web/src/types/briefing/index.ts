@@ -216,6 +216,8 @@ export type BriefingResponse = {
   continuity?: BriefingContinuity;
   editionReview?: import('./editionReview').EditionReview;
   companyPriceContext?: import('./priceContext').BriefingPriceContext;
+  /** Fixed original review used only to authenticate reused price observations in an explicit selection. */
+  companyPriceBasis?: import('./editionReview').EditionReview;
   aiPriceOutlooks?: import('./aiPriceOutlook').AiPriceOutlooks;
   preservedPublication?: {
     sha256: string;

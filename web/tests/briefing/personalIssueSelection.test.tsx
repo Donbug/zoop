@@ -206,3 +206,67 @@ it.each(['roundId', 'dataAsOf'])('rejects mismatched %s', async (field) => {
   expect(await screen.findByRole('alert')).toBeTruthy();
   expect(screen.queryByText('[합성] 공통 3개 밖의 독립 사건')).toBeNull();
 });
+
+it('shows newly generated AI impact, personal context, observations and follow-up without replacing sources', async () => {
+  member();
+  const server = mount();
+  const s = { text: '[합성] 검증한 조건부 사업 영향', evidenceIds: ['e'] };
+  const company = {
+    direction: 'positive',
+    keyPoint: s,
+    confirmedFact: { ...s, text: '[합성] 확인 사실' },
+    businessImpact: { ...s, text: '[합성] 생산 확대 가능성' },
+    forMyStocks: { ...s, text: '[합성] 관심 기업의 납품을 관찰' },
+    priceObservation: {
+      ...s,
+      text: '[합성] 실제 구간 관측이며 인과 단정 없음',
+    },
+    previousChange: { ...s, status: 'unavailable' },
+    nextCheck: { ...s, text: '[합성] 실제 가동 확인' },
+  };
+  const analysis = {
+    status: 'available',
+    roundId: 'r',
+    cutoff,
+    model: 'gpt-6-luna',
+    promptVersion: 'personal-briefing-v1',
+    resultVersion: 'synthetic-result',
+    generatedAt: cutoff,
+    verificationMode: 'separate_request_same_model',
+    draft: {
+      overview: {
+        text: '[합성] 공급 계획을 점검합니다. 비교 가능한 아침 판단이 제공되지 않아 아침 대비 변화는 평가할 수 없다.',
+        evidenceIds: ['e'],
+      },
+      issues: { 'not-in-common-three': { companies: { b: company } } },
+    },
+  };
+  server.on('GET', '/api/v1/briefings/:id/personalized/issues', () =>
+    json({ ...result(), edition: 'morning', aiAnalysis: analysis }),
+  );
+  expect(await screen.findByText('[합성] 생산 확대 가능성')).toBeTruthy();
+  expect(screen.getByText('사업상 긍정')).toBeTruthy();
+  expect(screen.getByText('[합성] 관심 기업의 납품을 관찰')).toBeTruthy();
+  expect(screen.getByText(/직전 퇴근 회차의 같은 이슈·기업 판단/)).toBeTruthy();
+  expect(screen.queryByText(/비교 가능한 아침 판단이 제공되지/)).toBeNull();
+  expect(
+    screen.getByText('[합성] 실제 구간 관측이며 인과 단정 없음'),
+  ).toBeTruthy();
+});
+it('does not display AI analysis from a different round', async () => {
+  member();
+  const server = mount();
+  server.on('GET', '/api/v1/briefings/:id/personalized/issues', () =>
+    json({
+      ...result(),
+      aiAnalysis: {
+        status: 'available',
+        roundId: 'other',
+        cutoff,
+        draft: { overview: { text: '다른 회원의 해석' }, issues: {} },
+      },
+    }),
+  );
+  await screen.findByText('[합성] 공통 3개 밖의 독립 사건');
+  expect(screen.queryByText('다른 회원의 해석')).toBeNull();
+});

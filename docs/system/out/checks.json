@@ -2690,6 +2690,13 @@
     },
     {
       "code": "TARGET_ONLY_API",
+      "target": "getPersonalizedBriefingIssues",
+      "severity": "difference",
+      "message": "GET /api/v1/briefings/{id}/personalized/issues: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
       "target": "getPersonalizedBriefing",
       "severity": "difference",
       "message": "GET /api/v1/briefings/{id}/personalized: 직접 대응 BFF 없음",
@@ -2707,6 +2714,76 @@
       "target": "getCompanyGraphAsOf",
       "severity": "difference",
       "message": "목표만 124 · BFF만 41 · 형식/필수/권한 변경 7",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "getBriefingPersonalizationOptions",
+      "severity": "difference",
+      "message": "GET /api/v1/briefings/personalization/options: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "selectPersonalBriefingIssues",
+      "severity": "difference",
+      "message": "POST /api/v1/briefings/{id}/personalized/selection: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "createPersonalBriefingGeneration",
+      "severity": "difference",
+      "message": "POST /api/v1/briefings/{id}/personalized/generations: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "getPersonalBriefingGeneration",
+      "severity": "difference",
+      "message": "GET /api/v1/briefings/{id}/personalized/generations/{jobId}: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "retryPersonalBriefingGeneration",
+      "severity": "difference",
+      "message": "POST /api/v1/briefings/{id}/personalized/generations/{jobId}/retry: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "getPersonalBriefingSettings",
+      "severity": "difference",
+      "message": "GET /api/v1/briefings/personalization/settings: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "savePersonalBriefingSettings",
+      "severity": "difference",
+      "message": "PUT /api/v1/briefings/personalization/settings: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "initializePersonalBriefingSettings",
+      "severity": "difference",
+      "message": "POST /api/v1/briefings/personalization/settings/initialize: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "getPersonalBriefingDelivery",
+      "severity": "difference",
+      "message": "GET /api/v1/briefings/{id}/personalized/delivery: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "createPersonalBriefingDemo",
+      "severity": "difference",
+      "message": "POST /api/v1/briefings/{id}/personalized/demo: 직접 대응 BFF 없음",
       "source": ""
     },
     {
@@ -2752,28 +2829,28 @@
     "BFF_CACHED_OBSERVATION": 1,
     "BFF_PATH_DIFFERENCE": 81,
     "BFF_FIELD_DIFFERENCE": 81,
-    "TARGET_ONLY_API": 15,
+    "TARGET_ONLY_API": 26,
     "PROTOTYPE_ONLY_API": 3
   },
   "severityCounts": {
     "warning": 210,
-    "difference": 180
+    "difference": 191
   },
   "xlsxReadback": {
     "status": "passed",
     "sheetDataRows": {
-      "추적표": 728,
-      "화면→기능→API": 1529,
+      "추적표": 794,
+      "화면→기능→API": 1727,
       "기능→WBS→구현 상태": 500,
-      "API 목록": 96,
+      "API 목록": 107,
       "오류 코드": 28,
-      "경고": 390,
+      "경고": 401,
       "원문 WBS": 173,
       "원문 제안·유효 기준": 8,
       "범위 예외·상세 권한": 34,
       "수용 기준": 121
     },
-    "cells": 50923
+    "cells": 54707
   },
   "acceptanceCoverage": {
     "status": "passed",
@@ -2818,15 +2895,15 @@
       "BE": 82,
       "FE": 33
     },
-    "targetOperations": 96
+    "targetOperations": 107
   },
   "sheetDataRows": {
-    "추적표": 728,
-    "화면→기능→API": 1529,
+    "추적표": 794,
+    "화면→기능→API": 1727,
     "기능→WBS→구현 상태": 500,
-    "API 목록": 96,
+    "API 목록": 107,
     "오류 코드": 28,
-    "경고": 390,
+    "경고": 401,
     "원문 WBS": 173,
     "원문 제안·유효 기준": 8,
     "범위 예외·상세 권한": 34,
