@@ -140,6 +140,8 @@ public final class PublicationMerger {
                 JsonNode initial = field(originals.get(owner), field);
                 boolean conflict = members.stream().anyMatch(r -> !field(originals.get(r), field).equals(initial));
                 if (choice == null && conflict) throw failure("correction_required");
+                // An automatic selection only merged sources that agreed (same-headline); once they disagree it decides nothing.
+                if (choice != null && conflict && automatic(choice)) throw failure("correction_required");
                 if (choice != null) {
                     usedFields.add(publicId + "\n" + field);
                     choice.exactly(Set.of("issueId", "field", "expectedValueDigest", "takeFrom", "evidenceRefs", "reviewer", "decisionRef", "decisionVersion"));
@@ -261,6 +263,10 @@ public final class PublicationMerger {
     }
 
     /** True when an operator-supplied decisions document claims the automatic reviewer, which only the preparation may write. */
+    private static boolean automatic(Obj choice) {
+        return choice.has("reviewer") && AUTO_REVIEWER.equals(choice.string("reviewer"));
+    }
+
     public static boolean claimsAutomaticReviewer(Obj decisions) {
         for (String collection : List.of("issueMappings", "fieldSelections", "relationSelections"))
             for (Obj item : decisions.objects(collection))
@@ -277,6 +283,7 @@ public final class PublicationMerger {
      * is returned as a {@link Change} and gets no decision, so the composer stops with {@code correction_required}. A new source may be
      * a correction, an analysis change or a different scope, and nothing in the handoff says which, so the newest value is never chosen.
      * A legacy package, an issue mapping or a person's decision (reviewer other than {@link #AUTO_REVIEWER}) also gets no proposal.
+     * An earlier automatic selection does not cover its field: a later disagreement is reported, and {@link #merge} stops on it.
      * {@code expectedValueDigest} is the published value, as the composer requires of every new decision.
      */
     public static Proposal propose(List<Contribution> contributions, Obj inherited, Map<String, IssueOwners> previousOwners, Automatic automatic) {
@@ -308,7 +315,8 @@ public final class PublicationMerger {
             if (members.stream().noneMatch(r -> order.containsKey(r.sourceVersionId()))) continue;
             boolean changed = false;
             for (String field : FIELDS) {
-                if (fields.containsKey(publicId + "\n" + field)) continue;
+                Obj decided = fields.get(publicId + "\n" + field);
+                if (decided != null && !automatic(decided)) continue;
                 List<SourceValue> values = members.stream().map(r -> new SourceValue(r.sourceVersionId(), side.apply(r.sourceVersionId()),
                         Canonical.digest(field(index.originals().get(r), field)))).toList();
                 if (values.stream().map(SourceValue::valueDigest).distinct().count() > 1) {

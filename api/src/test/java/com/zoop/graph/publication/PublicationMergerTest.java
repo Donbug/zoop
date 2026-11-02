@@ -181,6 +181,32 @@ class PublicationMergerTest {
     }
 
     @Test
+    void aLaterHeadlineChangeIsNotHiddenByAnEarlierAutomaticSelection() {
+        Contribution published = source(0, "same", "A");
+        Contribution incoming = sameHeadline(published, source(1, "same", "A"));
+        var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
+        var prepared = prepare(List.of(published, incoming), PublicationMerger.emptyDecisions(), base, incoming);
+        assertEquals(1, prepared.proposal().decisions().objects("fieldSelections").size());
+
+        // The next source changes only the headline label: it is reported and stops, the stored automatic selection decides nothing.
+        Contribution retitled = relabel(sameHeadline(published, source(2, "same", "A")), "다른 제목");
+        var all = List.of(published, incoming, retitled);
+        var next = propose(all, prepared.effective(), prepared.merged(), retitled);
+        assertEquals(0, next.decisions().objects("fieldSelections").size());
+        var label = next.changes().stream().filter(c -> "label".equals(c.field())).findFirst().orElseThrow();
+        assertEquals(List.of(retitled.sourceVersionId()), label.values().stream().filter(v -> "incoming".equals(v.side()))
+                .map(PublicationMerger.SourceValue::sourceVersionId).toList());
+        assertEquals("correction_required", assertThrows(PublicationException.class, () -> PublicationMerger.merge(all,
+                PublicationMerger.combine(prepared.effective(), next.decisions()), prepared.merged().issueSources().keySet(),
+                prepared.merged().issueSources())).code());
+
+        // A person's selection replaces the automatic one under the same key and settles the label.
+        var decided = PublicationMerger.merge(all, PublicationMerger.combine(prepared.effective(), Obj.of(peopleLabel(published))),
+                prepared.merged().issueSources().keySet(), prepared.merged().issueSources());
+        assertEquals(published.projection().issues().getFirst().label(), decided.issues().getFirst().label());
+    }
+
+    @Test
     void identicalIncomingRecordsMergeWithoutADecision() {
         Contribution published = source(0, "same", "A"); Contribution first = copy(published, 1); Contribution second = copy(published, 2);
         var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
@@ -314,6 +340,18 @@ class PublicationMergerTest {
                 x.relations(), x.articles(), x.evidence());
         return new Contribution(other.sourceVersionId(), other.sourceId(), other.sourceKind(), other.receipt(), other.projectionArtifact(),
                 projection, other.bundle());
+    }
+    /** {@code original} with only its issue's headline label replaced. */
+    private static Contribution relabel(Contribution original, String label) {
+        Issue o = original.projection().issues().getFirst();
+        Issue issue = new Issue(o.issueId(), label, o.eventTime(), o.timePrecision(), o.period(), o.assertionStatus(), o.action(), o.target(),
+                o.geography(), o.geographyPolicyVersion(), o.geographyEvidenceIds(), o.articleIds(), o.evidenceIds(), o.mentions(),
+                o.representativeMentionId(), o.latestPublishedAt());
+        var x = original.projection();
+        var projection = new PublicGraphSnapshot(x.snapshotFormat(), x.versionId(), x.sourceBundleId(), x.companies(), List.of(issue),
+                x.relations(), x.articles(), x.evidence());
+        return new Contribution(original.sourceVersionId(), original.sourceId(), original.sourceKind(), original.receipt(),
+                original.projectionArtifact(), projection, original.bundle());
     }
     private static Contribution copy(Contribution original, int index) {
         String source = "handoff-" + index; String version = "gv-" + Canonical.sha256(source); var p = original.projection();
