@@ -709,3 +709,610 @@ def test_a_valid_declared_publisher_is_stored_and_exported_exactly_without_norma
 def test_a_lone_surrogate_publisher_is_refused(kit):
     with pytest.raises(ValidationError):
         Item.model_validate({**kit.item(), "publisher": "a\ud800b"})
+
+
+def caption_fixture(kit):
+    """Synthetic collected bytes and an explicit synthetic-only boundary decision."""
+    raw = ("<html><body><article><p>허용 한😀e\u0301 &amp; <b>인라인</b> 꼬리</p>"
+           "<figure>도표 본문도 유지<img src='a.jpg'><figcaption><b>제외캡션하나</b></figcaption>캡션꼬리</figure>"
+           "<p>뉴스1 무단 전재라는 단어도 본문이면 유지</p>"
+           "<figure><img src='b.jpg'><figcaption>제외캡션둘</figcaption></figure>"
+           "<p>마지막 허용본문</p></article></body></html>").encode()
+    source = kit.registry["sources"][0]
+    source["adapter"] = "collected-http"
+    kit.save_registry()
+    item = kit.item()
+    item["publishedAt"] = None
+    collection = {"provenance": "collected_http", "collectionId": "synthetic-caption", "fetchedAt": "2026-10-08T01:00:00+00:00",
+        "finalUrl": item["url"], "httpStatus": 200, "contentType": "text/html", "bodySha256": sha(raw),
+        "documentKind": "news", "network": "synthetic_loopback",
+        "published": {"raw": "2026-10-08", "precision": "day", "date": "2026-10-08", "basis": "synthetic declaration"}}
+    receipt = {"schemaVersion": "zoop-collection-receipt-1", "collectionId": collection["collectionId"],
+        "sourceId": source["sourceId"], "scopeId": "body", "candidateId": item["candidateId"],
+        "grantId": source["grant"]["grantId"], "grantRevision": source["grant"]["revision"],
+        "requestedUrl": item["url"], "finalUrl": item["url"], "redirects": [], "httpStatus": 200,
+        "contentType": "text/html", "mediaType": "text/html", "contentLength": None, "etag": None,
+        "lastModified": None, "serverDate": None, "bodySha256": sha(raw), "bodyBytes": len(raw),
+        "fetchedAt": collection["fetchedAt"], "userAgent": "synthetic", "network": "synthetic_loopback",
+        "robots": [], "requestCount": 1}
+    collection["receipt"] = kit.file("receipt.json", json_bytes(receipt))
+    item["collection"] = collection
+    manifest = kit.manifest("captions", [[item]], bodies={"html": raw})
+    parent = execute(kit, manifest)
+    ref = parent["documentRefs"][0]
+    exported = inspect(kit, ref)
+    paths = [f"/html/body/article/figure[{i}]/figcaption" for i in (1, 2)]
+    rights = kit.file("rights.json", json_bytes({"bodySha256": sha(raw), "canonicalUrl": item["url"],
+        "license": "KOGL-type-1-text-only", "notice": "synthetic item-local text-only notice"}))
+    metadata = exported["locatorMetadata"]
+    projection = {"profile": "korea-kogl1-caption-boundary-1",
+        "parent": {**{k: ref[k] for k in ("documentId", "rawVersion", "documentVersion")},
+            **{k: metadata[k] for k in ("rawHash", "representationHash", "mappingHash", "parserProfile")},
+            "sourceHash": exported["document"]["sourceHash"]},
+        "excludedCaptionPaths": paths, "rightsReceipt": {"path": str(kit.inputs / rights["file"]), "sha256": rights["sha256"]},
+        "boundaryDecision": {"revision": "synthetic-boundary-1", "status": "approved",
+            "retainedScope": "article-prose-only", "reviewedCaptionPaths": paths,
+            "evidence": ["synthetic fixture owner reviewed all retained prose and both caption boundaries"]}}
+    return manifest, projection, exported
+
+
+def test_caption_projection_preserves_exact_slots_and_barriers_with_new_identity(kit):
+    manifest, projection, parent = caption_fixture(kit)
+    kit.registry["sources"][0]["scopes"][0]["textProjection"] = projection
+    kit.save_registry()
+    result = execute(kit, manifest, state="projected")
+    assert result["counts"]["textReady"] == 1
+    ref = result["documentRefs"][0]
+    store = Store(kit.root / "projected", existing=True)
+    try:
+        runner = Ingestor(store, Authority(kit.registry_path))
+        selected = kit.selector(**{k: ref[k] for k in ("page", "ordinal", "documentId", "rawVersion", "documentVersion")})
+        derived = runner.export(Export.model_validate(selected))
+        doc = derived["document"]
+        assert doc["text"] == "허용 한😀e\u0301 & 인라인 꼬리\n도표 본문도 유지\n캡션꼬리\n뉴스1 무단 전재라는 단어도 본문이면 유지\n마지막 허용본문"
+        assert ref["documentId"] == parent["document"]["documentId"]
+        assert ref["rawVersion"] == parent["locatorMetadata"]["rawVersion"]
+        assert ref["documentVersion"] != parent["document"]["documentVersion"]
+        assert derived["locatorMetadata"]["representationHash"] == parent["locatorMetadata"]["representationHash"]
+        assert derived["observation"]["publishedAt"] is None
+        assert derived["observation"]["collection"]["published"]["precision"] == "day"
+        for quote in ("한😀e\u0301 & 인라인 꼬리", "캡션꼬리", "마지막 허용본문"):
+            start = doc["text"].index(quote)
+            end = start + len(quote)
+            locator = next(loc for loc in doc["rawLocators"] if loc["start"] <= start < end <= loc["end"])
+            resolved = runner.inspect(Inspect.model_validate(kit.selector(documentId=ref["documentId"],
+                documentVersion=ref["documentVersion"], locatorId=locator["locatorId"], start=start, end=end)))["resolvedLocator"]
+            assert "".join(s["text"] for s in resolved["segments"]) == quote
+            if quote == "캡션꼬리":
+                assert resolved["segments"][0]["domPath"] == "/html/body/article/figure[1]/figcaption"
+                assert resolved["segments"][0]["slot"] == "tail"
+        exact_check(doc, 0, len(doc["text"]), False)
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("fault,code", [
+    ("rawHash", "projection_parent_mismatch"),
+    ("sourceHash", "projection_parent_mismatch"),
+    ("representationHash", "projection_parent_mismatch"),
+    ("mappingHash", "projection_parent_mismatch"),
+    ("documentId", "projection_parent_mismatch"),
+    ("rawVersion", "projection_parent_mismatch"),
+    ("documentVersion", "projection_parent_mismatch"),
+    ("parserProfile", "projection_parent_mismatch"),
+    ("path", "projection_caption_boundary_incomplete"),
+    ("one-caption", "projection_caption_boundary_incomplete"),
+    ("rights-hash", "projection_rights_receipt_hash_mismatch"),
+    ("rights-body", "projection_rights_receipt_invalid"),
+    ("rights-license", "projection_rights_receipt_invalid"),
+    ("proposal", "projection_boundary_review_required"),
+    ("hold", "projection_boundary_review_required"),
+])
+def test_caption_projection_failures_hold_instead_of_exporting_parent_text(kit, fault, code):
+    manifest, projection, _ = caption_fixture(kit)
+    if fault in projection["parent"]:
+        projection["parent"][fault] = {} if fault == "parserProfile" else "0" * 64
+    elif fault in {"path", "one-caption"}:
+        paths = ["/html/body/article/p[1]"] if fault == "path" else projection["excludedCaptionPaths"][:1]
+        projection["excludedCaptionPaths"] = projection["boundaryDecision"]["reviewedCaptionPaths"] = paths
+    elif fault == "rights-hash":
+        projection["rightsReceipt"]["sha256"] = "0" * 64
+    elif fault in {"rights-body", "rights-license"}:
+        rights = json.loads(Path(projection["rightsReceipt"]["path"]).read_bytes())
+        rights["bodySha256" if fault == "rights-body" else "license"] = "wrong"
+        changed = kit.file("changed-rights.json", json_bytes(rights))
+        projection["rightsReceipt"] = {"path": str(kit.inputs / changed["file"]), "sha256": changed["sha256"]}
+    else:
+        projection["boundaryDecision"]["status"] = fault
+    kit.registry["sources"][0]["scopes"][0]["textProjection"] = projection
+    kit.save_registry()
+    result = execute(kit, manifest, state="refused")
+    assert result["counts"]["held"] == 1 and result["counts"]["textReady"] == 0
+    assert result["documentRefs"][0]["hold"] == code
+    assert result["documentRefs"][0]["documentVersion"] is None
+
+
+def test_caption_projection_descriptor_is_optional_closed_and_adapter_bound(kit):
+    from zoop_ai_pipeline.ingestion_contracts import Registry
+
+    original = copy.deepcopy(kit.registry)
+    assert Registry.model_validate(original).wire() == original
+    _, projection, _ = caption_fixture(kit)
+    for fault in ("profile", "decision", "reviewed", "adapter"):
+        registry = copy.deepcopy(kit.registry)
+        value = copy.deepcopy(projection)
+        registry["sources"][0]["scopes"][0]["textProjection"] = value
+        if fault == "profile":
+            value["profile"] = "arbitrary-xpath-delete"
+        elif fault == "decision":
+            del value["boundaryDecision"]
+        elif fault == "reviewed":
+            value["boundaryDecision"]["reviewedCaptionPaths"] = value["excludedCaptionPaths"][:1]
+        else:
+            registry["sources"][0]["adapter"] = "authored-files"
+        with pytest.raises(ValidationError):
+            Registry.model_validate(registry)
+
+
+def test_caption_projection_cache_and_current_send_authority_bind_the_frozen_descriptor(kit):
+    from zoop_ai_pipeline.ingestion_contracts import Registry
+
+    manifest, projection, _ = caption_fixture(kit)
+    original = copy.deepcopy(kit.registry)
+    source = kit.registry["sources"][0]
+    source["scopes"][0]["textProjection"] = projection
+    kit.save_registry()
+    first = execute(kit, manifest, state="projected")
+    ref = first["documentRefs"][0]
+    reused = execute(kit, manifest, "again", 1, state="projected")
+    assert reused["counts"]["reusedVersions"] == 1
+    projection["boundaryDecision"]["revision"] = "synthetic-boundary-2"
+    kit.save_registry()
+    second = execute(kit, manifest, state="changed-descriptor")
+    assert second["documentRefs"][0]["documentVersion"] != ref["documentVersion"]
+    current = copy.deepcopy(kit.registry)
+    current["sources"][0]["scopes"][0]["textProjection"]["boundaryDecision"]["revision"] = "synthetic-boundary-1"
+    current["sources"][0]["grant"].update(revision="send-2", allowedOperations=["read", "quote-display", "model-send"],
+        purposes=["pipeline:extract"], recipients=["synthetic-recipient"])
+    parsed = Registry.model_validate(current).sources[0]
+    config = parsed.configuration(parsed.scopes[0])
+    kit.registry = current
+    kit.save_registry()
+    authority = Authority(kit.registry_path)
+    authority.check("synthetic-source", "body", ("read", "quote-display"), config, purpose="pipeline:extract", recipient="synthetic-recipient")
+    for purpose, recipient in (("wrong", "synthetic-recipient"), ("pipeline:extract", "wrong")):
+        with pytest.raises(IngestionFailure, match="source_purpose_or_recipient_denied"):
+            authority.check("synthetic-source", "body", ("read",), config, purpose=purpose, recipient=recipient)
+    old = Registry.model_validate(original).sources[0]
+    with pytest.raises(IngestionFailure, match="scope_configuration_conflict"):
+        authority.check("synthetic-source", "body", ("read",), old.configuration(old.scopes[0]),
+            purpose="pipeline:extract", recipient="synthetic-recipient")
+    kit.registry["sources"][0]["grant"]["enabled"] = False
+    kit.save_registry()
+    with pytest.raises(IngestionFailure, match="source_unauthorized"):
+        Authority(kit.registry_path).check("synthetic-source", "body", ("read",), config,
+            purpose="pipeline:extract", recipient="synthetic-recipient")
+
+
+def test_projected_native_export_is_caption_free_in_every_real_offline_request(kit, monkeypatch, tmp_path):
+    from tests.live_support import PAYLOADS, article, environment
+    from zoop_ai_pipeline import live_runtime
+    from zoop_ai_pipeline.live_runtime import LiveRuntime
+
+    manifest, projection, _ = caption_fixture(kit)
+    kit.registry["sources"][0]["scopes"][0]["textProjection"] = projection
+    kit.save_registry()
+    result = execute(kit, manifest, state="projected")
+    ref = result["documentRefs"][0]
+    store = Store(kit.root / "projected", existing=True)
+    try:
+        exported = Ingestor(store, Authority(kit.registry_path)).export(Export.model_validate(
+            kit.selector(**{k: ref[k] for k in ("page", "ordinal", "documentId", "rawVersion", "documentVersion")})))
+    finally:
+        store.close()
+    doc = exported["document"]
+    native_article = article(doc["text"]).model_copy(update={"article_id": doc["documentId"]})
+    source = {"documentId": doc["documentId"], "documentVersion": doc["documentVersion"],
+        "article_id": native_article.article_id, "article_version": native_article.version, "text": doc["text"],
+        "mapped": [[r["start"], r["end"]] for r in doc["rawLocators"]]}
+    quote = {"quoteId": "ev-a", "documentId": doc["documentId"], "documentVersion": doc["documentVersion"],
+        "start": 0, "end": doc["rawLocators"][0]["end"], "text": doc["text"][:doc["rawLocators"][0]["end"]]}
+    environment(monkeypatch, tmp_path, **{live_runtime.OPENAI_KEY_VAR: None, live_runtime.JEV_KEY_VAR: None})
+    runtime = LiveRuntime.from_binding(LiveRuntime.from_env().binding())
+    for stage, factory in PAYLOADS.items():
+        payload = factory()
+        if "article" in payload:
+            payload["article"] = native_article.model_dump(mode="json")
+        if "article_version" in payload:
+            payload["article_version"] = native_article.version
+        if "issue" in payload:
+            payload["issue"]["articles"] = [native_article.model_dump(mode="json")]
+        if stage in {"topic", "relation", "impact"}:
+            payload["documents"] = [{k: doc[k] for k in ("documentId", "documentVersion", "text")} | {"title": "synthetic"}]
+        if stage in {"extract", "compare", "topic", "relation", "impact"}:
+            payload["citationSources"] = [source]
+        if "quotes" in payload:
+            payload["quotes"] = [quote, {**quote, "quoteId": "ev-b"}]
+        if "relationQuotes" in payload:
+            payload["relationQuotes"] = [quote]
+        body = canonical(runtime.prepare(stage, payload)["body"])
+        assert "허용 한😀e\u0301 & 인라인 꼬리" in body, stage
+        assert "제외캡션하나" not in body and "제외캡션둘" not in body, stage
+
+
+@pytest.mark.parametrize("media", ["application/pdf", "text/markdown"])
+def test_caption_projection_refuses_non_html_representations(kit, media):
+    from zoop_ai_pipeline.ingestion_contracts import TextProjection
+
+    _, projection, _ = caption_fixture(kit)
+    with pytest.raises(IngestionFailure, match="projection_media_unsupported"):
+        parsers.prepare(b"body", media, None, projection=TextProjection.model_validate(projection))
+
+
+def test_caption_projection_requires_image_associated_caption_boundaries(kit):
+    from zoop_ai_pipeline.ingestion_contracts import TextProjection, digest
+
+    manifest, projection, _ = caption_fixture(kit)
+    payload = json.loads(manifest.read_bytes())
+    raw = (kit.inputs / payload["documents"]["html"]["file"]).read_bytes().replace(b"<img src='a.jpg'>", b"")
+    baseline = parsers.prepare(raw, "text/html", None)
+    representation = digest(baseline["sources"])
+    projection["parent"].update(sourceHash=digest(baseline["text"]), representationHash=representation,
+        mappingHash=digest({"representationHash": representation, "segments": baseline["segments"], "runs": baseline["runs"]}))
+    with pytest.raises(IngestionFailure, match="projection_caption_boundary_unsupported"):
+        parsers.prepare(raw, "text/html", None, projection=TextProjection.model_validate(projection))
+
+
+def pdf_projection_fixture(kit):
+    from pypdf import PdfReader, PdfWriter
+    from pypdf.generic import NameObject
+    from zoop_ai_pipeline.ingestion_contracts import digest
+
+    caption_fixture(kit)
+    raw = authored_pdf("DATE. Narrative first. CONTACT_SENTINEL. Continued paragraph",
+                       "continues here. Retained final. DIGEST_SENTINEL.")
+    writer = PdfWriter(clone_from=PdfReader(io.BytesIO(raw)))
+    page = writer.pages[1]
+    page["/Resources"]["/Font"]["/F1"][NameObject("/Encoding")] = NameObject("/WinAnsiEncoding")
+    stream = page["/Contents"]
+    stream.set_data(stream.get_data().replace(b"final", b"fin\\341l"))
+    output = io.BytesIO()
+    writer.write(output)
+    raw = output.getvalue()
+    collected = kit.item()
+    collected["publishedAt"] = None
+    receipt = json.loads((kit.inputs / "receipt.json").read_bytes())
+    receipt.update(contentType="application/pdf", mediaType="application/pdf", bodySha256=sha(raw), bodyBytes=len(raw))
+    receipt_ref = kit.file("pdf-receipt.json", json_bytes(receipt))
+    collected.update(mediaType="application/pdf", collection={
+        "provenance": "collected_http", "collectionId": receipt["collectionId"], "fetchedAt": receipt["fetchedAt"],
+        "finalUrl": collected["url"], "httpStatus": 200, "contentType": "application/pdf", "bodySha256": sha(raw),
+        "documentKind": "news", "network": "synthetic_loopback", "receipt": receipt_ref,
+        "published": {"raw": "2026-10-08", "precision": "day", "date": "2026-10-08", "basis": "synthetic"}})
+    manifest = kit.manifest("pdf-body", [[collected]], bodies={"html": raw})
+    parent_result = execute(kit, manifest, state="pdf-parent")
+    ref = parent_result["documentRefs"][0]
+    store = Store(kit.root / "pdf-parent", existing=True)
+    try:
+        parent = Ingestor(store, Authority(kit.registry_path)).export(Export.model_validate(
+            kit.selector(**{k: ref[k] for k in ("page", "ordinal", "documentId", "rawVersion", "documentVersion")})))
+    finally:
+        store.close()
+    baseline = parsers.prepare(raw, "application/pdf", None)
+    units, allowed = [], []
+    cuts = [
+        [(0, 5, "date", "original-dateline"), (5, 23, "narrative", "commission-narrative"),
+         (23, 41, "contact", "press-contact"), (41, len(baseline["sources"][0]["text"]), "cross", "commission-narrative")],
+        [(0, 15, "cross", "commission-narrative"), (15, 31, "final", "commission-narrative"),
+         (31, len(baseline["sources"][1]["text"]), "digest", "unrelated-digest")]]
+    by_id = {}
+    for source, spans in zip(baseline["sources"], cuts):
+        for start, end, uid, classification in spans:
+            span = {"pageNumber": source["pageNumber"], "pageTextHash": source["pageTextHash"],
+                "sourceStart": start, "sourceEnd": end, "textUtf8Sha256": sha(source["text"][start:end].encode())}
+            if uid not in by_id:
+                by_id[uid] = {"unitId": uid, "classification": classification, "spans": [],
+                    "reviewBasis": "Synthetic fixture owner specifies whole source units"}
+                units.append(by_id[uid])
+            by_id[uid]["spans"].append(span)
+            if classification not in {"press-contact", "unrelated-digest"}:
+                allowed.append({**span, "reviewUnitId": uid})
+    metadata = parent["locatorMetadata"]
+    rights = {"schemaVersion": "zoop-eu-pdf-body-rights-1", "bodySha256": sha(raw),
+        "parentDocumentVersion": ref["documentVersion"], "selectionHash": digest(allowed),
+        "license": "CC-BY-4.0-qualified-commission-content", "applicabilityAssessment": "Synthetic owner",
+        "notice": "Synthetic CC BY notice", "evidence": [], "attribution": "Synthetic Commission",
+        "changesNotice": "Selected paragraphs; contacts and unrelated digest omitted", "reviewUnits": units}
+    evidence = kit.file("pdf-policy.txt", b"Synthetic policy evidence")
+    rights["evidence"] = [{"path": str(kit.inputs / evidence["file"]), "sha256": evidence["sha256"]}]
+    rights_file = kit.file("pdf-rights.json", json_bytes(rights))
+    member = {"parent": {**{k: ref[k] for k in ("documentId", "rawVersion", "documentVersion")},
+        **{k: metadata[k] for k in ("rawHash", "representationHash", "mappingHash", "parserProfile")},
+        "sourceHash": parent["document"]["sourceHash"]}, "collectionReceiptSha256": receipt_ref["sha256"],
+        "allowedRanges": allowed, "rightsReceipt": {"path": str(kit.inputs / rights_file["file"]), "sha256": rights_file["sha256"]},
+        "boundaryDecision": {"revision": "synthetic-pdf-1", "status": "approved",
+            "retainedScope": "commission-narrative-and-original-dateline", "selectionHash": digest(allowed),
+            "evidence": ["Synthetic whole-paragraph review"]}}
+    return manifest, {"profile": "eu-commission-pdf-body-ranges-1", "members": [member]}, parent, rights
+
+
+def test_pdf_body_projection_native_identity_and_whole_source_units(kit):
+    manifest, projection, parent, _ = pdf_projection_fixture(kit)
+    kit.registry["sources"][0]["scopes"][0]["textProjection"] = projection
+    kit.save_registry()
+    result = execute(kit, manifest, state="pdf-projected")
+    assert result["counts"]["textReady"] == 1
+    ref = result["documentRefs"][0]
+    store = Store(kit.root / "pdf-projected", existing=True)
+    try:
+        derived = Ingestor(store, Authority(kit.registry_path)).export(Export.model_validate(
+            kit.selector(**{k: ref[k] for k in ("page", "ordinal", "documentId", "rawVersion", "documentVersion")})))
+        assert derived["document"]["text"] == "DATE. Narrative first. \nContinued paragraph\ncontinues here. Retained finál."
+        assert derived["locatorMetadata"]["representationHash"] == parent["locatorMetadata"]["representationHash"]
+        assert derived["document"]["documentId"] == parent["document"]["documentId"]
+        assert derived["locatorMetadata"]["rawVersion"] == parent["locatorMetadata"]["rawVersion"]
+        assert derived["document"]["documentVersion"] != parent["document"]["documentVersion"]
+        assert derived["observation"]["collection"] == parent["observation"]["collection"]
+        exact_check(derived["document"], 0, len(derived["document"]["text"]), False)
+    finally:
+        store.close()
+
+
+def test_pdf_projection_warm_cache_checks_each_observation_receipt(kit):
+    manifest, projection, _, _ = pdf_projection_fixture(kit)
+    kit.registry["sources"][0]["scopes"][0]["textProjection"] = projection
+    kit.save_registry()
+    state = "pdf-receipt-reuse"
+    first = kit.cli("run", kit.request(manifest), state=state, manifest=manifest)
+    ref = first["documentRefs"][0]
+    selector = kit.selector(**{k: ref[k] for k in
+        ("page", "ordinal", "documentId", "rawVersion", "documentVersion")})
+    original = kit.cli("export", selector, state=state)
+
+    payload = json.loads(manifest.read_bytes())
+    page = json.loads((kit.inputs / payload["pages"][0]["response"]["file"]).read_bytes())
+    second_item = page["items"][0]
+    receipt = json.loads((kit.inputs / second_item["collection"]["receipt"]["file"]).read_bytes())
+    receipt.update(collectionId="synthetic-reacquisition", fetchedAt="2026-10-09T01:02:03+00:00")
+    second_item["collection"].update(collectionId=receipt["collectionId"], fetchedAt=receipt["fetchedAt"],
+        receipt=kit.file("reacquisition-receipt.json", json_bytes(receipt)))
+    raw = (kit.inputs / payload["documents"]["html"]["file"]).read_bytes()
+    second_manifest = kit.manifest("reacquisition", [[second_item]], bodies={"html": raw})
+    second_request = kit.request(second_manifest, "reacquisition", 1)
+    second = kit.cli("run", second_request, state=state, manifest=second_manifest)
+    second_ref = second["documentRefs"][0]
+    assert second["state"] == "complete"
+    assert second_ref["rawVersion"] == ref["rawVersion"]
+    assert second["counts"]["held"] == 1 and second["counts"]["textReady"] == 0
+    assert second_ref["hold"] == "projection_collection_receipt_mismatch"
+    assert second_ref["documentVersion"] is None and second_ref["failure"] is None
+    assert kit.cli("run", second_request, state=state, manifest=second_manifest) == second
+    refused = kit.cli("export", {**selector, "roundId": "reacquisition"}, state=state, expected=2)
+    assert refused["error"]["code"] == "observation_not_found"
+
+    assert kit.cli("export", selector, state=state) == original
+    inspected = kit.cli("inspect", kit.selector(documentId=ref["documentId"],
+        documentVersion=ref["documentVersion"]), state=state)
+    assert inspected["document"] == original["document"]
+    store = Store(kit.root / state, existing=True)
+    try:
+        assert store.one("SELECT data FROM blobs WHERE hash=?",
+            (projection["members"][0]["collectionReceiptSha256"],))["data"] == (kit.inputs / "pdf-receipt.json").read_bytes()
+        assert store.one("SELECT COUNT(*) n FROM preparations")["n"] == 1
+        assert store.one("SELECT COUNT(*) n FROM versions")["n"] == 1
+    finally:
+        store.close()
+    replay = kit.cli("run", kit.request(manifest, "unchanged-receipt", 2), state=state, manifest=manifest)
+    assert replay["counts"]["reusedVersions"] == 1
+    assert replay["counts"]["newRawVersions"] == replay["counts"]["newTextVersions"] == 0
+    assert replay["documentRefs"][0]["documentVersion"] == ref["documentVersion"]
+
+
+@pytest.mark.parametrize("fault,code", [
+    ("parent", "projection_parent_mismatch"), ("receipt", "projection_collection_receipt_mismatch"),
+    ("member", "projection_member_missing"), ("rights-pin", "projection_rights_receipt_hash_mismatch"),
+    ("rights-binding", "projection_rights_receipt_invalid"), ("evidence", "projection_rights_evidence_mismatch"),
+    ("rights-missing", "projection_rights_receipt_invalid"), ("rights-unresolved", "projection_rights_receipt_invalid"),
+    ("coverage", "projection_review_coverage_invalid"), ("unit-overlap", "projection_review_coverage_invalid"),
+    ("page-hash", "projection_review_units_invalid"), ("page-bounds", "projection_review_units_invalid"),
+    ("slice-hash", "projection_review_units_invalid"), ("partial", "projection_whole_positive_unit_required"),
+    ("cross-page-partial", "projection_whole_positive_unit_required"),
+    ("contact", "projection_whole_positive_unit_required"), ("whole-page", "projection_whole_positive_unit_required"),
+    ("proposal", "projection_boundary_review_required"), ("hold", "projection_boundary_review_required"),
+])
+def test_pdf_body_projection_refuses_unreviewed_or_unbound_content(kit, fault, code):
+    from zoop_ai_pipeline.ingestion_contracts import digest
+
+    manifest, projection, _, rights = pdf_projection_fixture(kit)
+    member = projection["members"][0]
+    if fault == "parent":
+        member["parent"]["mappingHash"] = "0" * 64
+    elif fault == "receipt":
+        member["collectionReceiptSha256"] = "0" * 64
+    elif fault == "member":
+        member["parent"]["documentId"] = "different-document"
+    elif fault in {"rights-pin", "rights-missing"}:
+        member["rightsReceipt"]["sha256"] = "0" * 64
+    elif fault == "rights-binding":
+        rights["bodySha256"] = "0" * 64
+    elif fault == "rights-unresolved":
+        rights["applicabilityAssessment"] = " "
+    elif fault == "evidence":
+        rights["evidence"][0]["sha256"] = "0" * 64
+    elif fault == "coverage":
+        rights["reviewUnits"].pop()
+    elif fault == "unit-overlap":
+        rights["reviewUnits"].append({**rights["reviewUnits"][0], "unitId": "overlap"})
+    elif fault in {"page-hash", "page-bounds", "slice-hash"}:
+        span = rights["reviewUnits"][0]["spans"][0]
+        span[{"page-hash": "pageTextHash", "page-bounds": "sourceEnd", "slice-hash": "textUtf8Sha256"}[fault]] = (
+            10000 if fault == "page-bounds" else "0" * 64)
+    elif fault == "partial":
+        member["allowedRanges"][1]["sourceEnd"] -= 1
+    elif fault == "cross-page-partial":
+        member["allowedRanges"] = [s for s in member["allowedRanges"] if not
+            (s["reviewUnitId"] == "cross" and s["pageNumber"] == 2)]
+    elif fault == "contact":
+        span = rights["reviewUnits"][2]["spans"][0]
+        member["allowedRanges"].insert(2, {**span, "reviewUnitId": "contact"})
+    elif fault == "whole-page":
+        member["allowedRanges"] = [{**member["allowedRanges"][0], "sourceEnd": 57}]
+    else:
+        member["boundaryDecision"]["status"] = fault
+    selection = digest(member["allowedRanges"])
+    member["boundaryDecision"]["selectionHash"] = rights["selectionHash"] = selection
+    changed = kit.file("pdf-changed-rights.json", json_bytes(rights))
+    if fault != "rights-pin":
+        member["rightsReceipt"] = {"path": str(kit.inputs / changed["file"]), "sha256": changed["sha256"]}
+    if fault == "rights-missing":
+        member["rightsReceipt"]["path"] = str(kit.inputs / "missing-rights.json")
+    kit.registry["sources"][0]["scopes"][0]["textProjection"] = projection
+    kit.save_registry()
+    result = execute(kit, manifest, state="pdf-refused")
+    assert result["counts"]["held"] == 1 and result["counts"]["textReady"] == 0
+    assert result["documentRefs"][0]["hold"] == code
+    assert result["documentRefs"][0]["documentVersion"] is None
+
+
+@pytest.mark.parametrize("fault", ["duplicate", "overlap", "reverse", "selection", "empty"])
+def test_pdf_body_projection_rejects_malformed_descriptor_without_repair(kit, fault):
+    from zoop_ai_pipeline.ingestion_contracts import Registry, digest
+
+    _, projection, _, _ = pdf_projection_fixture(kit)
+    member = projection["members"][0]
+    if fault == "duplicate":
+        projection["members"].append(copy.deepcopy(member))
+    elif fault == "overlap":
+        member["allowedRanges"][1]["sourceStart"] = 0
+    elif fault == "reverse":
+        member["allowedRanges"].reverse()
+    elif fault == "selection":
+        member["boundaryDecision"]["selectionHash"] = "0" * 64
+    else:
+        member["allowedRanges"] = []
+    if fault != "selection":
+        member["boundaryDecision"]["selectionHash"] = digest(member["allowedRanges"])
+    kit.registry["sources"][0]["scopes"][0]["textProjection"] = projection
+    with pytest.raises(ValidationError):
+        Registry.model_validate(kit.registry)
+
+
+def test_pdf_projected_export_serializes_only_retained_body_in_all_seven_routes(kit, monkeypatch, tmp_path):
+    from tests.live_support import PAYLOADS, article, environment
+    from zoop_ai_pipeline import live_runtime
+    from zoop_ai_pipeline.live_runtime import LiveRuntime
+
+    manifest, projection, _, _ = pdf_projection_fixture(kit)
+    kit.registry["sources"][0]["scopes"][0]["textProjection"] = projection
+    kit.save_registry()
+    result = execute(kit, manifest, state="pdf-payload")
+    ref = result["documentRefs"][0]
+    store = Store(kit.root / "pdf-payload", existing=True)
+    try:
+        exported = Ingestor(store, Authority(kit.registry_path)).export(Export.model_validate(
+            kit.selector(**{k: ref[k] for k in ("page", "ordinal", "documentId", "rawVersion", "documentVersion")})))
+    finally:
+        store.close()
+    doc = exported["document"]
+    native = article(doc["text"]).model_copy(update={"article_id": doc["documentId"]})
+    citation = {"documentId": doc["documentId"], "documentVersion": doc["documentVersion"],
+        "article_id": native.article_id, "article_version": native.version, "text": doc["text"],
+        "mapped": [[r["start"], r["end"]] for r in doc["rawLocators"]]}
+    quote = {"quoteId": "ev-a", "documentId": doc["documentId"], "documentVersion": doc["documentVersion"],
+        "start": 0, "end": doc["rawLocators"][0]["end"], "text": doc["text"][:doc["rawLocators"][0]["end"]]}
+    environment(monkeypatch, tmp_path, **{live_runtime.OPENAI_KEY_VAR: None, live_runtime.JEV_KEY_VAR: None})
+    runtime = LiveRuntime.from_binding(LiveRuntime.from_env().binding())
+    for stage, factory in PAYLOADS.items():
+        payload = factory()
+        if "article" in payload:
+            payload["article"] = native.model_dump(mode="json")
+        if "article_version" in payload:
+            payload["article_version"] = native.version
+        if "issue" in payload:
+            payload["issue"]["articles"] = [native.model_dump(mode="json")]
+        if stage in {"topic", "relation", "impact"}:
+            payload["documents"] = [{k: doc[k] for k in ("documentId", "documentVersion", "text")} | {"title": "synthetic"}]
+        if stage in {"extract", "compare", "topic", "relation", "impact"}:
+            payload["citationSources"] = [citation]
+        for name in ("quotes", "relationQuotes"):
+            if name in payload:
+                payload[name] = [quote, {**quote, "quoteId": "ev-b"}] if name == "quotes" else [quote]
+        body = canonical(runtime.prepare(stage, payload)["body"])
+        assert "Narrative first." in body, stage
+        assert all(value not in body for value in ("CONTACT_SENTINEL", "DIGEST_SENTINEL",
+            projection["members"][0]["rightsReceipt"]["path"], "Synthetic CC BY notice")), stage
+
+
+def test_pdf_shared_scope_cohort_identity_and_current_send_configuration(kit):
+    from zoop_ai_pipeline.ingestion_contracts import Registry
+
+    manifest, projection, _, rights = pdf_projection_fixture(kit)
+    original_registry = copy.deepcopy(kit.registry)
+    payload = json.loads(manifest.read_bytes())
+    response = json.loads((kit.inputs / payload["pages"][0]["response"]["file"]).read_bytes())
+    second = copy.deepcopy(response["items"][0])
+    second.update(candidateId="c2", supplierDocumentId="supplier-2", url="https://example.invalid/second")
+    receipt = json.loads((kit.inputs / "pdf-receipt.json").read_bytes())
+    receipt.update(candidateId="c2", requestedUrl=second["url"], finalUrl=second["url"])
+    second["collection"].update(finalUrl=second["url"], receipt=kit.file("second-receipt.json", json_bytes(receipt)))
+    raw = (kit.inputs / payload["documents"]["html"]["file"]).read_bytes()
+    cohort_manifest = kit.manifest("pdf-cohort", [[response["items"][0], second]], bodies={"html": raw})
+    parents = execute(kit, cohort_manifest, state="cohort-parents")
+    parent_ref = parents["documentRefs"][1]
+    store = Store(kit.root / "cohort-parents", existing=True)
+    try:
+        parent = Ingestor(store, Authority(kit.registry_path)).export(Export.model_validate(
+            kit.selector(**{k: parent_ref[k] for k in ("page", "ordinal", "documentId", "rawVersion", "documentVersion")})))
+    finally:
+        store.close()
+    member = copy.deepcopy(projection["members"][0])
+    member["parent"] = {**{k: parent_ref[k] for k in ("documentId", "rawVersion", "documentVersion")},
+        **{k: parent["locatorMetadata"][k] for k in ("rawHash", "representationHash", "mappingHash", "parserProfile")},
+        "sourceHash": parent["document"]["sourceHash"]}
+    member["collectionReceiptSha256"] = second["collection"]["receipt"]["sha256"]
+    rights["parentDocumentVersion"] = parent_ref["documentVersion"]
+    pinned = kit.file("second-rights.json", json_bytes(rights))
+    member["rightsReceipt"] = {"path": str(kit.inputs / pinned["file"]), "sha256": pinned["sha256"]}
+    projection["members"].append(member)
+    source = kit.registry["sources"][0]
+    source["scopes"][0]["textProjection"] = projection
+    kit.save_registry()
+    first = execute(kit, cohort_manifest, state="cohort-projected")
+    assert first["counts"]["textReady"] == 2
+    assert len({ref["documentId"] for ref in first["documentRefs"]}) == 2
+    assert projection["members"][0]["parent"]["rawHash"] == member["parent"]["rawHash"]
+    reused = execute(kit, cohort_manifest, "again", 1, state="cohort-projected")
+    assert reused["counts"]["reusedVersions"] == 2
+    frozen = Registry.model_validate(kit.registry).sources[0]
+    config = frozen.configuration(frozen.scopes[0])
+    member["boundaryDecision"]["revision"] = "second-member-revised"
+    kit.save_registry()
+    changed = execute(kit, cohort_manifest, state="cohort-changed")
+    assert all(a["documentVersion"] != b["documentVersion"] for a, b in zip(first["documentRefs"], changed["documentRefs"]))
+    member["boundaryDecision"]["revision"] = "synthetic-pdf-1"
+    source["grant"].update(revision="synthetic-send-2", allowedOperations=["read", "quote-display", "model-send"],
+        purposes=["pipeline:extract"], recipients=["synthetic-recipient"])
+    kit.save_registry()
+    authority = Authority(kit.registry_path)
+    authority.check("synthetic-source", "body", ("read",), config, purpose="pipeline:extract", recipient="synthetic-recipient")
+    old = Registry.model_validate(original_registry).sources[0]
+    with pytest.raises(IngestionFailure, match="scope_configuration_conflict"):
+        authority.check("synthetic-source", "body", ("read",), old.configuration(old.scopes[0]),
+            purpose="pipeline:extract", recipient="synthetic-recipient")
+    for purpose, recipient in (("wrong", "synthetic-recipient"), ("pipeline:extract", "wrong")):
+        with pytest.raises(IngestionFailure, match="source_purpose_or_recipient_denied"):
+            authority.check("synthetic-source", "body", ("read",), config, purpose=purpose, recipient=recipient)
+    source["grant"]["enabled"] = False
+    kit.save_registry()
+    with pytest.raises(IngestionFailure, match="source_unauthorized"):
+        Authority(kit.registry_path).check("synthetic-source", "body", ("read",), config,
+            purpose="pipeline:extract", recipient="synthetic-recipient")
+
+
+@pytest.mark.parametrize("media,xpath", [("text/html", None), ("text/markdown", None), ("application/pdf", "/html/body")])
+def test_pdf_projection_is_bound_to_native_pdf_page_sources(kit, media, xpath):
+    from zoop_ai_pipeline.ingestion_contracts import PdfBodyProjection
+
+    _, projection, _, _ = pdf_projection_fixture(kit)
+    with pytest.raises(IngestionFailure, match="projection_media_unsupported"):
+        parsers.prepare(b"not admitted", media, xpath, projection=PdfBodyProjection.model_validate(projection))

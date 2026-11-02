@@ -753,6 +753,39 @@ PYTHONDONTWRITEBYTECODE=1 ai/pipeline/.venv/bin/python ai/pipeline/scripts/inges
 
 wire schema는 `zoop-ingestion-s2-1`이며 공용 OpenAPI나 S1 schema를 바꾸지 않았다. 정확한 문서/version을 고른 `inspect`만 현재 read 권한으로 내부 S1 `Document` projection을 반환한다. 원문 span 해석에는 quote-display도 요구한다. S2-2가 쓰도록 정확한 관측(round/source/page/ordinal/document/rawVersion/documentVersion)의 서버 소유 URL·title·publishedAt과 grant를 반환하는 읽기 전용 `ingestion_cli export`를 추가했다. HTML 위치는 decoded DOM text/tail 좌표이고 PDF 위치는 frozen page-extracted text 좌표이지 raw byte·glyph geometry가 아니다. 이 문서는 앱 Dataset에 등록되거나 게시되지 않는다. 실제 공급원/정기 수집·기업/이슈 연결·공개 등록/게시·유료 의미 검증은 구현 완료로 주장하지 않는다. 명령·registry·manifest·한계와 실행 증거는 [AI 실행 계약의 S2-1 절](../../docs/design/ai-system.md#s2-1-독립-오프라인-원문-준비와-검사)을 따른다.
 
+### Explicit caption-boundary preparation
+
+For an individually reviewed `collected-http` HTML item, `Scope.textProjection` accepts the closed `TextProjection` contract in `ingestion_contracts.py`. Its `profile` is `korea-kogl1-caption-boundary-1`. Omit the whole field for ordinary preparation; the default scope wire, parser profile and historical version identities remain unchanged.
+
+| Descriptor member | Required binding |
+| --- | --- |
+| `parent` | Original `documentId`, `rawVersion`, `documentVersion`, `rawHash`, `sourceHash`, `representationHash`, `mappingHash`, and `parserProfile`. `sourceHash` hashes the canonical JSON string, as in the ordinary export. Preparation reproduces these pins from the original bytes before projecting. |
+| `excludedCaptionPaths` | Exact absolute original DOM paths of all reviewed `figcaption` elements in the selected body. Each must be a nonempty caption directly inside an image-bearing `figure`; unsupported media or incomplete boundaries produce a hold. |
+| `rightsReceipt` | `{path, sha256}` for the existing item-local rights JSON. The absolute path is read with the ordinary bounded, symlink-refusing reader; its hash, original `bodySha256`, text-only license declaration and notice must match. |
+| `boundaryDecision` | `revision`, `status` (`approved`, `proposal`, or `hold`), `retainedScope: article-prose-only`, `reviewedCaptionPaths`, and nonblank `evidence`. The reviewed paths must equal the excluded paths. Only an explicit approved item decision permits native preparation; ambiguous retained prose stays in hold. |
+
+Create a new derivation registry and ingestion namespace with the original source/scope/inputRoot and acquisition grant ID/revision. Keep the original manifest, collection receipt, body and metadata. Run the existing `zoop-ai-ingest run`, then select the new version with `inspect` or `export`. The descriptor digest enters the opt-in parser profile, preparation key and new `documentVersion`; `documentId`, `rawVersion`, acquisition provenance and publication precision remain original. A projection is another preparation of the same article, not another source article.
+
+Only caption content is excluded: the caption element's own tail, ordinary figure text and all retained prose remain exact. Original source slots stay private; mapped barriers prevent a quote from crossing excluded content. `locatorMetadata.textProjection` exposes the descriptor hash, parent version, decision revision, rights-receipt hash and excluded slot coordinates. Provider requests use the derived `document.text`; hiding locators alone does not remove transmitted text.
+
+This is preparation authority. A future current grant must reproduce the frozen projected configuration and separately authorize each model-send purpose/recipient; it cannot authorize an unprojected observation. Fresh projected S2 jobs require separate approval and new request pins. Candidates 14 and 41 were structurally preflighted against retained HTML: one and two caption boundaries were excluded, respectively, while actual native CLI runs retained `projection_boundary_review_required` under proposal decisions. Their future current registries remain disabled. The synthetic derived CLI export was consumed by the unchanged Java `IngestionExportParser`, preserving its closed document shape, original acquisition hash and day precision.
+
+AI supplies technical boundary proposals and local preparation proof. BE owns the current data's mapping/evidence/public-decision review and HOLD classification; team publication requires that review and separate approval. Automatic activation remains disabled.
+
+### Reviewed Commission PDF body ranges
+
+`Scope.textProjection` is a profile-discriminated union. The HTML `TextProjection` contract above stays exact; `PdfBodyProjection` uses `eu-commission-pdf-body-ranges-1` for `collected-http` PDFs with `articleXPath: null`. Its bounded `members` list selects by exact `(documentId, rawVersion)`. Each member binds the complete original parent pins, original collection-receipt SHA-256, `allowedRanges`, a hash-pinned item `rightsReceipt`, and one `boundaryDecision`. Every observation must match its member's collection-receipt pin before preparation-cache reuse; a mismatch durably holds that observation with `projection_collection_receipt_mismatch` while preserving the prepared version for correctly bound observations.
+
+Each range identifies a `reviewUnitId`, positive `pageNumber`, original `pageTextHash`, Unicode `sourceStart`/`sourceEnd`, and exact substring UTF-8 SHA-256. Ranges must be disjoint and source-ordered. `boundaryDecision.selectionHash` is `digest(allowedRanges)` in supplied order. Its retained scope is `commission-narrative-and-original-dateline`; only `status: approved` permits native preparation.
+
+The item receipt uses `zoop-eu-pdf-body-rights-1`. It binds the original `bodySha256`, parent document version and selection hash, qualified Commission CC BY applicability, notice, hash-pinned evidence, attribution/change notice, and classified `reviewUnits`. Account for every original non-whitespace character, including excluded headers, contacts and unrelated digest material. A selected narrative, dateline or public-official-statement unit must retain every reviewed span, including paragraphs spanning pages. Classification and permission remain explicit operator decisions; a public office-holder attribution is not automatically a press-contact record.
+
+Preparation reproduces the original bounded PDF page extraction and parent hashes, then maps only the selected complete units. Original page sources stay private and unchanged. Omission/page barriers prevent quote stitching. The public export keeps its existing shape; `locatorMetadata.textProjection` contains only hashes, identities, decision revision and retained coordinates. Every generation/verifier route uses the derived body or exact quotes from it.
+
+Keep the original source/scope/inputRoot, acquisition grant revision, manifest, receipt and metadata in a new derivation registry and ingestion namespace. The **whole descriptor** enters the parser profile: changing any member changes every re-prepared cohort version and requires fresh analysis pins. Day-precision publication stays day precision; API publication timestamps are separate evidence.
+
+Projected registries require a feature-aware pipeline/CLI reader. Pre-feature readers reject `textProjection`; the unchanged Java export shape does not establish compatibility with an older AI service image. Integrate and release the feature-aware runtime before operating projected inputs. Preparation approval, provider transmission and public publication remain separate gates.
+
 ## 정기 회차 컨트롤러 (S2-1 `tick`, FS058·요구 70의 오프라인 일부)
 
 `zoop-ai-ingest tick`은 시계 한 번의 읽기를 **가장 최근에 도래한 slot 하나**로 바꾸고, 그 slot의 회차를 기존 engine으로 **최대 한 번** 진행한다. 새 DB·table·column·migration·console script가 없고 기존 engine 동작도 바꾸지 않으며 새 서비스·모델·provider·네트워크·cron·AWS도 없다. **이 명령은 trigger를 배포하지 않는다.** 누가 언제 `tick`을 부를지(cron·AWS 등)는 이 저장소에 없고 FS058은 완료되지 않았다(아래 "하지 않는 일").
