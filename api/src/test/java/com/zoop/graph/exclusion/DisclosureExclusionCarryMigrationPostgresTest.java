@@ -21,7 +21,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 @Tag("graph-postgres")
 class DisclosureExclusionCarryMigrationPostgresTest {
     /** The carry migration; renumbering it (merge order) changes only this constant. */
-    private static final MigrationVersion CARRY = MigrationVersion.fromVersion("20261101120000");
+    private static final MigrationVersion CARRY = MigrationVersion.fromVersion("20261102160000");
     private static final String SHA_A = "a".repeat(64);
     private static final String SHA_B = "b".repeat(64);
     private static final String SHA_C = "c".repeat(64);
