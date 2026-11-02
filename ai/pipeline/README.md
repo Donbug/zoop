@@ -886,7 +886,7 @@ Selected unit roots must be independent: duplicate roots and ancestor/descendant
 
 The hash-pinned item receipt uses `zoop-eu-html-body-rights-1`: original `bodySha256`, `parentBindingHash`, `selectionHash`, qualified Commission CC BY applicability, notice, bounded hash-pinned evidence, attribution and changes notice. Current source authority, exact observation inventory routing, model purpose/recipient permission and public publication remain separate gates.
 
-The collector accepts JSON only when policy explicitly includes `application/json` in `allowedMediaTypes` and `jsonBodyProfile: eu-commission-json-html-body-ranges-1`. Other policies retain their original wire and Accept header. Acquisition still requests identity encoding and rejects compressed responses. Previously retained client-decompressed captures remain offline review evidence until genuine native acquisition and item rights bind them.
+The native document collector accepts JSON only when its `Policy` explicitly includes `application/json` in `allowedMediaTypes` and `jsonBodyProfile: eu-commission-json-html-body-ranges-1`. Shared `HttpPolicy` supplies transport bounds and contact validation to private and official-source adapters; their JSON API containers are governed by those adapters rather than an EC body approval. The shared fetcher derives JSON Accept support from each transport's allowed media. Native policies without JSON retain their original wire and Accept header. Acquisition still requests identity encoding and rejects compressed responses. Previously retained client-decompressed captures remain offline review evidence until genuine native acquisition and item rights bind them.
 
 Use the offline review command on retained bytes before authoring a native descriptor:
 

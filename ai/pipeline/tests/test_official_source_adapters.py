@@ -49,6 +49,20 @@ def task(site, source, **options):
     return official.plan(source, FIRST, LAST, synthetic_origin=site.url(""), **options).tasks[0]
 
 
+def test_official_json_transport_keeps_native_approval_separate_and_bounds_strict():
+    from pydantic import ValidationError
+    from zoop_ai_pipeline.collection_contracts import Policy
+
+    transport = policy(allowedMediaTypes=["application/json"])
+    assert transport.allowed_media_types == ["application/json"]
+    with pytest.raises(ValidationError, match="explicit EC body profile"):
+        Policy.model_validate(transport.wire())
+    with pytest.raises(ValidationError):
+        policy(allowedMediaTypes=["application/json"], jsonBodyProfile="eu-commission-json-html-body-ranges-1")
+    with pytest.raises(ValidationError, match="per-item limits"):
+        policy(maxTotalBytes=1)
+
+
 def test_keyless_plan_prerequisites_windows_and_actual_scope():
     matrix = {row["sourceId"]: row for row in official.source_matrix(FIRST, LAST)}
     assert matrix["opendart"]["state"] == "credential-blocked"

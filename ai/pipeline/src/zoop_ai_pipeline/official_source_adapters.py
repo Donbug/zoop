@@ -31,7 +31,7 @@ from lxml import etree, html
 from pydantic import Field
 
 from .collection import Fetcher, Fetched
-from .collection_contracts import Policy
+from .collection_contracts import HttpPolicy
 from .ingestion_contracts import IngestionFailure, MAX_RAW, byte_hash, digest
 from .ingestion_parsers import _mapped, prepare
 from .ingestion_url import canonical_url
@@ -51,7 +51,7 @@ _SEC_LOCK = threading.Lock()
 _SEC_LAST = 0.0
 
 
-class OfficialPolicy(Policy):
+class OfficialPolicy(HttpPolicy):
     # Per-set resource bounds, not business/document/day quotas.
     max_requests: int = Field(ge=1)
     max_total_seconds: int = Field(ge=1)
