@@ -104,6 +104,9 @@ beforeEach(() => {
   });
   currentSession = session();
   server = createFakeServer();
+  server.on('GET', '/api/v1/auth/social/providers', () =>
+    json({ items: [], nextCursor: null }),
+  );
   server.on('GET', '/api/v1/me/settings', () => json({ watchlistIds: [] }));
   server.on('GET', '/api/v1/portfolio', () =>
     json({ holdings: [{ companyId: 'synthetic-company' }] }),
@@ -392,7 +395,7 @@ describe('D-AUT-01 시작 방법 선택 (FS001·FS005)', () => {
     );
   });
 
-  test('소셜 제공자 목록을 불러오지 못하면 소셜 버튼을 두지 않는다', async () => {
+  test('D-AUT-01 A2 failed social providers keep an error and retry, without fabricated provider buttons', async () => {
     server.on('GET', '/api/v1/auth/social/providers', () =>
       apiError(503, 'SOURCE_UNAVAILABLE'),
     );
@@ -406,6 +409,19 @@ describe('D-AUT-01 시작 방법 선택 (FS001·FS005)', () => {
     expect(screen.queryByRole('link', { name: '구글 로그인' })).toBeNull();
     expect(screen.queryByRole('link', { name: '카카오톡 로그인' })).toBeNull();
     expect(screen.queryByText('또는', { exact: true })).toBeNull();
+    expect(
+      await screen.findByText('소셜 로그인 목록을 불러오지 못했어요'),
+    ).toBeTruthy();
+    server.on('GET', '/api/v1/auth/social/providers', () =>
+      json({ items: [{ id: 'google', name: 'Google' }], nextCursor: null }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(
+      await screen.findByRole('link', { name: '구글 로그인' }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText('소셜 로그인 목록을 불러오지 못했어요'),
+    ).toBeNull();
   });
 
   test.each([

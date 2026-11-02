@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   completeSocialSignup,
   listSignupTerms,
@@ -34,6 +34,7 @@ const usable = (term: SignupTerm) =>
  * 이때 이메일·비밀번호는 받지 않고 표시 이름과 약관 동의만 보낸다.
  */
 export default function SignupForm({ social = false }: { social?: boolean }) {
+  const location = useLocation();
   const auth = useAuth();
   const flow = useAuthCompletion();
   const [attempt, setAttempt] = useState(0);
@@ -104,6 +105,7 @@ export default function SignupForm({ social = false }: { social?: boolean }) {
       ) : (
         <Link
           to="/login"
+          state={location.state}
           className="self-start text-body font-semibold text-zoop-ink hover:text-zoop-ink"
         >
           ← 시작 화면으로
@@ -317,10 +319,16 @@ export default function SignupForm({ social = false }: { social?: boolean }) {
             {message}
           </p>
         )}
+        {/* D-AUT-02 A3/A4: preserve the destination, never prefill an email. */}
+        {!validation && flow.error === 'EMAIL_TAKEN' && (
+          <Link to="/login" state={location.state} className={authLink}>
+            이 이메일로 로그인하기
+          </Link>
+        )}
         {social &&
           (flow.error === 'ACCESS_DENIED' ||
             flow.error === 'SOCIAL_LINK_REQUIRED') && (
-            <Link to="/login" className={authLink}>
+            <Link to="/login" state={location.state} className={authLink}>
               로그인 화면으로
             </Link>
           )}
@@ -334,7 +342,7 @@ export default function SignupForm({ social = false }: { social?: boolean }) {
             >
               가입 상태 다시 확인
             </button>
-            <Link to="/login" className={authLink}>
+            <Link to="/login" state={location.state} className={authLink}>
               로그인으로 계정 확인
             </Link>
           </>

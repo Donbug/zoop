@@ -191,10 +191,6 @@
     display: none;
   }
 
-  .relationship-user-tools > button {
-    display: none;
-  }
-
   .relationship-user {
     font-size: 0;
   }
