@@ -15,6 +15,7 @@ import com.zoop.chat.tool.ChatToolUnavailable;
 import com.zoop.chat.tool.HelpSearchTool;
 import com.zoop.chat.tool.ScreenSpecReadTool;
 import com.zoop.document.evidence.service.EvidenceService.Readability;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -26,10 +27,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * What the Q01 approval migration must hold on a real database (implementation plan 5.1), tried on synthetic rows that every
+ * What the Q01 document registry must hold on a real database (implementation plan 5.1), tried on synthetic rows that every
  * test rolls back: the two fixed documents, their sections and spans, the read tools with the approved-document gate on, and
- * citations reopened before and after a document is replaced or retired. No approved text exists yet, so nothing here says
- * anything about the content of a real guide.
+ * citations reopened before and after a document is replaced or retired. The shipped guides are tried in
+ * {@link ChatZoopDocsPostgresTest}.
  */
 @SpringBootTest(properties = {
         "ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=test",
@@ -58,6 +59,14 @@ class ChatApprovedDocumentsPostgresTest {
     @Autowired EvidenceReadAccess access;
     @Autowired EvidenceCitationSource citations;
     @Autowired JdbcTemplate jdbc;
+
+    /** These tests own the registry: the shipped guides leave for the test's transaction, whose rollback restores them. */
+    @BeforeEach
+    void emptyTheRegistry() {
+        jdbc.execute("ALTER TABLE chat_document_versions DISABLE TRIGGER USER");
+        jdbc.update("DELETE FROM chat_document_versions");
+        jdbc.execute("ALTER TABLE chat_document_versions ENABLE TRIGGER USER");
+    }
 
     @Test
     void sectionsKeepCodePointSpansAndTheirIdsDependOnlyOnTheVersionedSection() {
