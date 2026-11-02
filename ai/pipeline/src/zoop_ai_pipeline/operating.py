@@ -231,10 +231,10 @@ class Owner:
                     native = adapter.prepare(batch, collection, path, authority)
                     refs = adapter.observations(batch, collection, items, native, authority)
                     generated = adapter.operating_manifest(batch, refs)
-                    adapter.authorize(batch, authority, refs)
                     for index, unit in enumerate(generated["sets"]):
                         registration["interruptedSetId"] = unit["setId"]
                         registration["notAttempted"] = [later.set_id for later in batch.sets[index + 1:]]
+                        adapter.authorize(batch, authority, [refs[index]])
                         self._register(unit, token)
                         registration["registered"].append(unit["setId"])
                         registration["interruptedSetId"] = None

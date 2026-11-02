@@ -219,18 +219,40 @@ def test_existing_jobs_recheck_current_rights_and_withhold_metadata(setup, opera
     assert owner.budget.sets() == before
 
 
-def test_registry_change_after_registration_suppresses_durable_prefix(setup, monkeypatch):
+@pytest.mark.parametrize("revocation", ["disabled", "incoming-store", "snapshot-store"])
+def test_registry_change_after_registration_suppresses_durable_prefix(setup, monkeypatch, revocation):
     kit, owner, _ = setup
-    batch = authored_collection(kit)
+    if revocation == "snapshot-store":
+        batch, source = batch_with_snapshot(kit, owner)
+    else:
+        batch = authored_collection(kit)
+        source = kit.registry["sources"][0]
+    existing = owner.budget.sets()
+    prefix_pins = {}
     register = owner._register
     def revoke_after_first(unit, token):
         register(unit, token)
-        kit.registry["sources"][0]["grant"]["enabled"] = False
-        kit.save_registry()
+        if unit["setId"] == "batch-set-0":
+            prefix_pins.update(owner.budget.bound("native:batch-set-0:s2"))
+            if revocation == "disabled":
+                source["grant"]["enabled"] = False
+            else:
+                source["grant"]["allowedOperations"].remove("store")
+            kit.save_registry()
     monkeypatch.setattr(owner, "_register", revoke_after_first)
     result = owner.register_collection(batch)
     assert result == {"schemaVersion": operating_collection.RESULT, "error": {"code": "registry_changed"}, "localProgressMayExist": True}
-    assert [entry["id"] for entry in owner.budget.sets()] == ["batch-set-0"]
+    assert owner.budget.sets()[:-1] == existing
+    assert [entry["id"] for entry in owner.budget.sets()[len(existing):]] == ["batch-set-0"]
+    assert owner.budget.bound("native:batch-set-0:s2") == prefix_pins
+    for unit in batch["sets"][1:]:
+        assert owner.budget.bound("job:" + unit["extractionJobId"]) is None
+        assert owner.budget.bound("job:" + unit["relationJobId"]) is None
+    with owner.native(owner.budget.sets()[len(existing)]["pins"]["unit"], "s2") as store:
+        assert [row["job_id"] for row in store.all("SELECT job_id FROM jobs ORDER BY job_id")] == sorted(
+            [entry["pins"]["unit"]["extraction"]["jobId"] for entry in existing] + ["batch-s2-0"])
+        assert store.one("SELECT COUNT(*) n FROM calls")["n"] == 0
+    assert owner.budget.snapshot()["calls"] == 0
 
 
 def batch_with_snapshot(kit, owner):
