@@ -150,11 +150,25 @@ it('D-GRP-01 opens the sidebar on wide screens and remembers an explicit close',
     initialEntries: ['/'],
   });
   const rendered = render(<RouterProvider router={router} />);
+  const sidebarToggle = screen.getByRole('button', { name: '보유·관심 목록' });
+  expect(sidebarToggle.textContent).toBe('보유·관심');
+  expect(sidebarToggle.getAttribute('title')).toBe('보유·관심 종목 목록 보기');
   expect(
-    await screen.findByRole('complementary', { name: '내 종목' }),
+    within(screen.getByLabelText('그래프 모드')).getByRole('button', {
+      name: '내 종목',
+    }),
+  ).toBeTruthy();
+  expect(
+    await screen.findByRole('complementary', { name: '보유·관심' }),
+  ).toBeTruthy();
+  expect(
+    within(screen.getByRole('complementary', { name: '보유·관심' })).getByRole(
+      'heading',
+      { name: '보유·관심' },
+    ),
   ).toBeTruthy();
   await userEvent.click(
-    screen.getByRole('button', { name: '내 종목 사이드바 닫기' }),
+    screen.getByRole('button', { name: '보유·관심 사이드바 닫기' }),
   );
   expect(localStorage.getItem('zoop:sidebar-open')).toBe('0');
   rendered.unmount();
@@ -163,7 +177,7 @@ it('D-GRP-01 opens the sidebar on wide screens and remembers an explicit close',
   });
   render(<RouterProvider router={second} />);
   await screen.findByTestId('graph-canvas');
-  expect(screen.queryByRole('complementary', { name: '내 종목' })).toBeNull();
+  expect(screen.queryByRole('complementary', { name: '보유·관심' })).toBeNull();
   localStorage.removeItem('zoop:sidebar-open');
   vi.unstubAllGlobals();
 });

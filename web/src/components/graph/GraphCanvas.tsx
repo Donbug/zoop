@@ -133,7 +133,7 @@ export default function GraphCanvas({
   connectionPath?: boolean;
   memoryOwner?: string;
   onOpenIsolated?: () => void;
-  /** 내 종목 사이드바에서 고른 기업. seq가 바뀔 때마다 그 노드를 화면 가운데로 옮긴다. */
+  /** 보유·관심 사이드바에서 고른 기업. seq가 바뀔 때마다 그 노드를 화면 가운데로 옮긴다. */
   centerRequest?: { id: string; seq: number } | null;
 }) {
   const suppliedAppearance =
