@@ -1017,6 +1017,7 @@ export default function CompanyWorkspace() {
                 <button
                   key={value}
                   aria-pressed={relation === value}
+                  className="min-w-14 rounded-none! border-0! border-r! border-zoop-line! last:border-r-0!"
                   onClick={() =>
                     updateQuery({
                       relation: value === 'all' ? null : value,
