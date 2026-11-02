@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -411,5 +411,226 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     expect(screen.getByText(/^2026 · 근거/)).toBeTruthy();
     expect(screen.queryByText(/00:00 KST/)).toBeNull();
     expect(screen.getByText(/^시각 미상 · 근거/)).toBeTruthy();
+  });
+});
+
+describe('D-GRP-03 prototype company panel gaps (M1-M7, M9)', () => {
+  type PanelProps = Parameters<typeof CompanyDetailPanel>[0];
+  const issueNode = (id: string, label: string) => ({
+    ...fallback,
+    id,
+    kind: 'issue' as const,
+    label,
+    brandColor: null,
+    eventTime: '2026-10-09',
+    timePrecision: 'day' as const,
+    evidenceCount: 1,
+  });
+  const edge = (
+    id: string,
+    source: string,
+    target: string,
+    relationType: 'INVOLVES' | 'FOLLOWS' | 'SHARES_ISSUE',
+    evidenceIds: string[] = [],
+  ) => ({
+    id,
+    source,
+    target,
+    relationType,
+    role: null,
+    summary: '',
+    assertionStatus: null,
+    derived: relationType === 'SHARES_ISSUE',
+    via: [],
+    evidenceIds,
+  });
+  function renderWith(props: Partial<PanelProps> = {}) {
+    return render(
+      <MemoryRouter>
+        <CompanyDetailPanel
+          companyId={company.id}
+          fallback={fallback}
+          relatedCompanies={[]}
+          token={null}
+          onClose={vi.fn()}
+          onSelectIssue={vi.fn()}
+          onFocus={vi.fn()}
+          onAskAi={vi.fn()}
+          {...props}
+        />
+      </MemoryRouter>,
+    );
+  }
+  function withCompany(
+    patch: Partial<typeof company>,
+    documents = state.data.documents,
+  ) {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      data: { ...state.data, company: { ...company, ...patch }, documents },
+    });
+  }
+  const sectionOf = (title: string) =>
+    within(screen.getByRole('heading', { name: title }).closest('section')!);
+
+  beforeEach(() => {
+    vi.mocked(useCompanyData).mockReturnValue(state);
+  });
+
+  it('M2 shows three issues and folds the rest, opening the fold for a tutorial target inside it', () => {
+    const [first] = company.directIssues;
+    const five = Array.from({ length: 5 }, (_, i) => ({
+      ...first,
+      issueId: `issue-${i}`,
+      title: `합성 사건 ${i + 1}`,
+    }));
+    withCompany({ directIssues: five });
+    const view = renderWith();
+    const direct = sectionOf('직접 관련 사건');
+    const more = direct.getByText('직접 관련 사건 2건 더 보기');
+    expect(more.closest('details')!.open).toBe(false);
+    expect(
+      more
+        .closest('details')!
+        .contains(
+          direct.getByRole('button', { name: /합성 사건 4/, hidden: true }),
+        ),
+    ).toBe(true);
+    view.unmount();
+    renderWith({ tutorialIssueId: 'issue-4' });
+    expect(
+      screen.getByText('직접 관련 사건 2건 더 보기').closest('details')!.open,
+    ).toBe(true);
+  });
+
+  it('M1·M4 adds the earlier and later events of a direct issue from FOLLOWS edges, with their time', () => {
+    const [first] = company.directIssues;
+    renderWith({
+      graph: {
+        nodes: [issueNode('later-issue', '합성 후속 사건')],
+        edges: [edge('f1', 'later-issue', first.issueId, 'FOLLOWS')],
+      },
+    });
+    const indirect = sectionOf('간접 관련 사건');
+    expect(
+      indirect.getByText(
+        `2026-10-09 · 이어진 사건 · ${first.title} · 근거 1건`,
+      ),
+    ).toBeTruthy();
+    expect(indirect.getAllByText(/구조적 관련 · 근거/).length).toBe(
+      company.structuralIssues.length,
+    );
+  });
+
+  it('M3 shows the role and opens the evidence the map has for the issue', async () => {
+    const [first, second, ...rest] = company.directIssues;
+    withCompany({
+      directIssues: [
+        { ...first, role: '공급사' },
+        { ...second, role: 'participant' },
+        ...rest,
+      ],
+    });
+    const onIssueEvidence = vi.fn();
+    renderWith({
+      onIssueEvidence,
+      graph: {
+        nodes: [],
+        edges: [
+          edge('e1', first.issueId, company.id, 'INVOLVES', ['ev-1', 'ev-2']),
+          edge('e2', first.issueId, 'KRX:000660', 'INVOLVES', ['ev-9']),
+        ],
+      },
+    });
+    const direct = sectionOf('직접 관련 사건');
+    expect(direct.getByText('역할 · 공급사')).toBeTruthy();
+    expect(direct.getByText('역할 · 참여 기업')).toBeTruthy();
+    await userEvent.click(
+      direct.getByRole('button', { name: '근거 2건 보기' }),
+    );
+    expect(onIssueEvidence).toHaveBeenCalledWith({
+      id: first.issueId,
+      title: first.title,
+      evidenceIds: ['ev-1', 'ev-2'],
+    });
+    // 지도에 근거가 없는 사건에는 버튼을 두지 않는다.
+    expect(
+      direct.getAllByRole('button', { name: /근거 \d+건 보기/ }),
+    ).toHaveLength(1);
+  });
+
+  it('M5 explains each relation type beside the section titles with the legend wording', () => {
+    renderWith({
+      relatedCompanies: [
+        { id: 'NASDAQ:NVDA', name: 'NVIDIA', sharedIssueCount: 1 },
+      ],
+    });
+    expect(
+      screen.getByLabelText('직접 관련 설명').closest('details')!.textContent,
+    ).toContain('기업이 사건의 당사자입니다');
+    expect(
+      screen.getByLabelText('간접 관련 설명').closest('details')!.textContent,
+    ).toContain('후속 사건');
+    expect(
+      screen.getByLabelText('사건 공유 설명').closest('details')!.textContent,
+    ).toContain('같은 사건에');
+  });
+
+  it('M6 shows a logo and the shared-issue line swatch on related companies', () => {
+    renderWith({
+      relatedCompanies: [
+        { id: 'NASDAQ:NVDA', name: 'NVIDIA', sharedIssueCount: 1 },
+      ],
+    });
+    const row = screen.getByRole('button', { name: /NVIDIA/ });
+    expect(row.querySelector('.legend-line.dashed')).toBeTruthy();
+    expect(row.querySelector('[aria-hidden="true"].rounded-full')).toBeTruthy();
+  });
+
+  it('M7 lists three documents with their judgement and links the rest to the company documents tab', () => {
+    const [document] = state.data.documents.items;
+    const items = Array.from({ length: 5 }, (_, i) => ({
+      ...document,
+      id: `doc-${i}`,
+      title: `합성 문서 ${i + 1}`,
+      sentiment:
+        i === 0
+          ? {
+              companyId: company.id,
+              label: 'positive' as const,
+              rationale: '합성 사유',
+              quotes: [],
+              judgedAt: '2026-10-09T00:00:00Z',
+              model: 'test-model',
+              promptVersion: 'test-prompt',
+            }
+          : null,
+    }));
+    withCompany({}, { items, nextCursor: null });
+    renderWith({ companyDetailHref: (id) => `/companies/${id}?asOf=x` });
+    const news = sectionOf('뉴스·공시');
+    expect(news.getByText('합성 문서 3')).toBeTruthy();
+    expect(news.queryByText('합성 문서 4')).toBeNull();
+    expect(news.getByLabelText(/합성 문서 1 · 긍정 판정/)).toBeTruthy();
+    expect(
+      news.getByRole('link', { name: '기업 상세 문서' }).getAttribute('href'),
+    ).toBe(`/companies/${company.id}?asOf=x&tab=documents`);
+  });
+
+  it('M9 hides the company focus button when the company is already the focus or has no edges', () => {
+    const focusButton = () =>
+      screen.queryByRole('button', { name: '기업 중심 그래프' });
+    const connected = {
+      nodes: [],
+      edges: [edge('e1', 'issue-1', company.id, 'INVOLVES')],
+    };
+    const view = renderWith({ graph: connected });
+    expect(focusButton()).toBeTruthy();
+    view.unmount();
+    const focused = renderWith({ graph: connected, focusId: company.id });
+    expect(focusButton()).toBeNull();
+    focused.unmount();
+    renderWith({ graph: { nodes: [], edges: [] } });
+    expect(focusButton()).toBeNull();
   });
 });
