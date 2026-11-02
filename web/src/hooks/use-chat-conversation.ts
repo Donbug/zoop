@@ -71,6 +71,32 @@ export function contextFromTarget(target: GraphTarget): ChatContextRequest {
   return context;
 }
 
+/**
+ * D-AI-01 C2: 체크한 여러 대상을 한 질문 문맥으로 합친다. ID·근거는 겹치지 않게 합치고, 그래프 버전·기준 시각은
+ * 모든 대상이 같을 때만 보낸다(서로 다르면 어느 하나로 고정하지 않는다).
+ */
+export function contextFromTargets(
+  targets: GraphTarget[],
+): ChatContextRequest | null {
+  if (!targets.length) return null;
+  const parts = targets.map(contextFromTarget);
+  const context: ChatContextRequest = {
+    contextIds: [
+      ...new Set(parts.flatMap((part) => part.contextIds ?? [])),
+    ].slice(0, MAX_IDS),
+  };
+  const evidenceIds = [
+    ...new Set(parts.flatMap((part) => part.evidenceIds ?? [])),
+  ].slice(0, MAX_IDS);
+  if (evidenceIds.length) context.evidenceIds = evidenceIds;
+  for (const key of ['graphVersion', 'asOf'] as const) {
+    const value = parts[0][key];
+    if (value && parts.every((part) => part[key] === value))
+      context[key] = value;
+  }
+  return context;
+}
+
 /** 지도가 실제로 적용한 기준 시각만: 지도와 같이 기업 지도(companyId)의 정확한 시각(시간대 포함)일 때다. */
 function requestedAsOf(url: string | undefined) {
   if (!url) return null;

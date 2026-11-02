@@ -58,7 +58,7 @@ public class DocumentImportConfiguration {
      * The installed S2-1 CLI, or the observation export client that {@code zoop.ai.observation-export-client} registers
      * (ai/service {@code POST /internal/v1/observations/export}, the same route the graph handoff import uses with its
      * {@code observation-source=http}). {@code http} needs the client; {@code cli} ignores one that is enabled, since the web
-     * application sharing this environment may hold one (its round bridge binds it in a follow-up). See {@link IngestionExporters}.
+     * application's round bridge may use that client independently. See {@link IngestionExporters}.
      */
     static IngestionExporter ingestionExporter(DocumentImportSettings settings,
             ObjectProvider<ObservationExportClient> observationExports) {

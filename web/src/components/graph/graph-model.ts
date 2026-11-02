@@ -216,8 +216,7 @@ export function toG6Data(
             : 'Wanted Sans Variable',
           labelFontSize: (company ? (chosen ? 24 : 19) : 15) * scale,
           labelFontWeight: chosen ? 800 : company ? 500 : 700,
-          labelFill:
-            company && !chosen ? themeColor('muted') : themeColor('ink'),
+          labelFill: themeColor('ink'),
           labelOffsetY: company ? (n.holding || n.watch ? 28 : 10) : -5,
           labelBackground: !company,
           labelBackgroundFill: themeColor('paper'),

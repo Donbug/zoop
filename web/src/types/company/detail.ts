@@ -19,6 +19,7 @@ export type Company = {
   id: string;
   name: string;
   ticker: string | null;
+  aliases?: string[];
   logoUrl?: string | null;
   legalName: string | null;
   market: string | null;
@@ -59,6 +60,7 @@ export type Quote =
         fiftyTwoWeekLow: number | null;
         fiftyTwoWeekHigh: number | null;
         marketCap?: number | null;
+        derived?: string[];
       };
     };
 export type PricePoint = {
@@ -136,7 +138,7 @@ export type Portfolio = {
     avgPriceCurrency: string | null;
     marketValue: number | null;
     weight: number | null;
-    quote: { status: string; currency?: string };
+    quote: { status: string; currency?: string; price?: number | null };
   }[];
   mockAsOf: string | null;
   valuation: {

@@ -35,6 +35,9 @@ import {
 import type { Event, Impact } from '@/types/company/detail';
 import type { GraphResponse } from '@/types/map/graph';
 import { renderRoutes } from './support/renderRoutes';
+import * as companyApi from '@/apis/graph/companies';
+import { call } from '@/apis/auth/ApiService';
+import type { CompanyMetrics } from '@/types/map/company';
 import {
   eventRangeDate,
   widerCompanyPeriod,
@@ -335,6 +338,214 @@ function open(query = '') {
   );
 }
 const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
+
+test.each([120, 80, 100, 0])(
+  'D-COM-01 gap6 D6 holding profit uses the holding price %s',
+  async (price) => {
+    useAuthStore.getState().setSession({
+      authenticated: true,
+      kind: 'member',
+      user: {
+        id: 'gap6-member',
+        email: 'gap6@example.invalid',
+        displayName: '합성 회원',
+      },
+      setup: { completed: true, tutorialCompleted: false },
+      csrfToken: 'fixture',
+      expiresAt: null,
+    });
+    server.on('GET', '/api/v1/portfolio', () =>
+      json({
+        connected: true,
+        holdings: [
+          {
+            companyId: id,
+            quantity: 2,
+            avgPrice: 100,
+            avgPriceCurrency: 'KRW',
+            marketValue: price * 2,
+            weight: 1,
+            quote: { status: 'available', price, currency: 'KRW' },
+          },
+        ],
+        mockAsOf: time,
+        valuation: null,
+        metadata,
+      }),
+    );
+    open(pinned);
+    const panel = within(
+      await screen.findByRole('region', { name: '가상 계좌 보유' }),
+    );
+    await panel.findByText('평가 손익');
+    const value = panel.getByText('평가 손익').nextElementSibling!;
+    expect(value.textContent).toContain(`${Math.abs((price - 100) * 2)}원`);
+    expect(value.textContent).toContain(`${Math.abs(price - 100).toFixed(2)}%`);
+    expect(value.querySelector('span')?.className).toContain(
+      price > 100
+        ? 'text-zoop-up'
+        : price < 100
+          ? 'text-zoop-down'
+          : 'text-zoop-muted',
+    );
+  },
+);
+
+test.each([
+  ['USD', 120, 100, '통화가'],
+  [null, 120, 100, '통화가'],
+  ['KRW', null, 100, '시세가'],
+  ['KRW', 120, 0, '계산 불가'],
+] as const)(
+  'D-COM-01 gap6 D6 does not invent a return for %s/%s/%s',
+  async (currency, price, avgPrice, reason) => {
+    useAuthStore.getState().setSession({
+      authenticated: true,
+      kind: 'member',
+      user: {
+        id: 'gap6-member',
+        email: 'gap6@example.invalid',
+        displayName: '합성 회원',
+      },
+      setup: { completed: true, tutorialCompleted: false },
+      csrfToken: 'fixture',
+      expiresAt: null,
+    });
+    server.on('GET', '/api/v1/portfolio', () =>
+      json({
+        connected: true,
+        holdings: [
+          {
+            companyId: id,
+            quantity: 2,
+            avgPrice,
+            avgPriceCurrency: currency,
+            marketValue: null,
+            weight: null,
+            quote: { status: 'available', price, currency: 'KRW' },
+          },
+        ],
+        mockAsOf: null,
+        valuation: null,
+        metadata,
+      }),
+    );
+    open(pinned);
+    const panel = within(
+      await screen.findByRole('region', { name: '가상 계좌 보유' }),
+    );
+    await panel.findByText(new RegExp(reason));
+    if (currency !== 'KRW' || price === null)
+      expect(panel.queryByText('평가 손익')).toBeNull();
+  },
+);
+
+test.each([0, 120, null, 'unavailable'] as const)(
+  'D-COM-01 gap6 D15 metrics marketValue visibility when cap=%s',
+  async (cap) => {
+    vi.spyOn(companyApi, 'getCompanyMetrics').mockImplementation(() =>
+      call<CompanyMetrics>(
+        `/api/v1/companies/${encodeURIComponent(id)}/metrics`,
+        'GET',
+        undefined,
+        { skipAuth: true },
+      ),
+    );
+    server.on('GET', '/api/v1/companies/:id/quote', () =>
+      json(
+        cap === 'unavailable'
+          ? { status: 'unavailable', reason: '합성 미제공' }
+          : {
+              status: 'available',
+              companyId: id,
+              source,
+              quote: {
+                price: 120,
+                currency: 'KRW',
+                asOf: time,
+                change: 0,
+                changeRate: 0,
+                marketCap: cap,
+              },
+            },
+      ),
+    );
+    server.on('GET', '/api/v1/companies/:id/metrics', () =>
+      json({
+        status: 'available',
+        companyId: id,
+        source: { ...source, provider: 'yahoo' },
+        asOf: time,
+        items: [
+          {
+            code: 'marketValue',
+            label: '시가총액',
+            value: '합성 시총',
+            basis: null,
+          },
+        ],
+      }),
+    );
+    open(pinned);
+    await screen.findByText(/주요 지표 · 합성 공급자/);
+    const metrics = within(screen.getByRole('region', { name: '주요 지표' }));
+    expect(metrics.queryByText('합성 시총') !== null).toBe(
+      cap === null || cap === 'unavailable',
+    );
+  },
+);
+
+test('D-COM-02/05 gap6 D17 evidence labels hide raw IDs and keep request identity', async () => {
+  open(`${pinned}&event=issue-a`);
+  const button = await screen.findByRole('button', { name: '근거 1 보기' });
+  expect(button.textContent).not.toContain('ev-a');
+  await userEvent.click(button);
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).toContain(
+      'evidence=ev-a',
+    ),
+  );
+});
+
+test('D-COM-06 gap6 D19 chart table preserves zero and missing volume', async () => {
+  server.on('GET', '/api/v1/companies/:id/prices', () =>
+    json({
+      status: 'available',
+      companyId: id,
+      period: '1m',
+      interval: '1d',
+      source,
+      currency: 'KRW',
+      points: [
+        { time: old, open: 1, high: 1, low: 1, close: 1, volume: 0 },
+        { time, open: 2, high: 2, low: 2, close: 2, volume: null },
+      ],
+    }),
+  );
+  open(pinned);
+  await userEvent.click(await screen.findByText('표로 보기'));
+  const table = within(screen.getByRole('table'));
+  expect(table.getByRole('columnheader', { name: '거래량' })).toBeTruthy();
+  expect(table.getByRole('cell', { name: '0' }).className).toContain(
+    'text-right',
+  );
+  expect(table.getByRole('cell', { name: '—' })).toBeTruthy();
+});
+
+test('D-COM-06 gap6 D11 pointer and click leave asOf and graphAsOf unchanged', async () => {
+  vi.stubGlobal('PointerEvent', MouseEvent);
+  open(pinned);
+  const chart = await screen.findByRole('group', { name: '공급된 종가 차트' });
+  vi.spyOn(chart, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    width: 600,
+  } as DOMRect);
+  const before = screen.getByTestId('address').textContent;
+  fireEvent.pointerDown(chart, { clientX: 200 });
+  fireEvent.pointerMove(chart, { clientX: 600 });
+  fireEvent.click(chart);
+  expect(screen.getByTestId('address').textContent).toBe(before);
+});
 
 test('D-COM-05 C38 filters timeline, unknown events and chart markers with one URL parameter', async () => {
   server.on('GET', '/api/v1/events', () =>
@@ -804,6 +1015,13 @@ test('D-COM-01 다크에서만 지도 개선 테마 표면을 쓴다', async () 
   }
 });
 
+/** D13: 사건이 여러 건인 날짜 묶음은 접혀 있으니 먼저 펼친다. */
+async function expandTimeline(user = userEvent.setup()) {
+  await screen.findAllByRole('button', { name: /사건 \d+건$/ });
+  for (const button of screen.queryAllByRole('button', { name: /펼치기$/ }))
+    await user.click(button);
+}
+
 function openHistory() {
   return renderRoutes(
     [
@@ -823,6 +1041,7 @@ function openHistory() {
 
 test('D-COM-06: Back and Forward restore event-time history after an outside selection', async () => {
   const { router, user } = openHistory();
+  await expandTimeline(user);
   await user.click(
     await screen.findByRole('button', {
       name: '합성 사건 A · 이 당시 관계그래프 보기',
@@ -858,6 +1077,7 @@ test('D-COM-06: Back and Forward restore event-time history after an outside sel
 
 test('D-COM-06: closing outside without navigation still allows reopening the same event time', async () => {
   const { user } = openHistory();
+  await expandTimeline(user);
   for (let i = 0; i < 2; i++) {
     await user.click(
       await screen.findByRole('button', {
@@ -885,6 +1105,7 @@ test.each(['blank', 'selected'])(
   'D-COM-06: Back before delayed cleanup restores an earlier entry at the same timestamp (%s)',
   async (target) => {
     const { router, user } = openHistory();
+    await expandTimeline(user);
     await user.click(
       await screen.findByRole('button', {
         name: '합성 사건 A · 이 당시 관계그래프 보기',
@@ -1972,6 +2193,7 @@ test('A02: timeline shows relation types in Korean and empty relations as unconf
   );
   open(`${pinned}&period=1m&tab=events`);
   const timeline = await screen.findByRole('region', { name: '사건 타임라인' });
+  await expandTimeline();
   await within(timeline).findByRole('button', { name: '합성 사건 C' });
   expect(within(timeline).getByText(/문서 1건 · 직접 관련$/)).toBeTruthy();
   expect(within(timeline).getByText(/문서 2건 · 구조적 관련$/)).toBeTruthy();
@@ -1979,6 +2201,50 @@ test('A02: timeline shows relation types in Korean and empty relations as unconf
   expect(
     within(timeline).queryByText(/INVOLVES|STRUCTURALLY_RELATED_TO/),
   ).toBeNull();
+});
+
+test('D-COM-05 D13: a bucket with several events folds to its first title until opened or picked', async () => {
+  open(`${pinned}&period=1m&tab=events`);
+  const user = userEvent.setup();
+  const timeline = await screen.findByRole('region', { name: '사건 타임라인' });
+  const toggle = await within(timeline).findByRole('button', {
+    name: /사건 2건 펼치기$/,
+  });
+  expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  expect(within(timeline).getByText('합성 사건 A')).toBeTruthy();
+  expect(
+    within(timeline).queryByRole('button', { name: '합성 사건 B' }),
+  ).toBeNull();
+
+  await user.click(toggle);
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  expect(
+    within(timeline).getByRole('button', { name: '합성 사건 B' }),
+  ).toBeTruthy();
+
+  await user.click(toggle);
+  expect(
+    within(timeline).queryByRole('button', { name: '합성 사건 B' }),
+  ).toBeNull();
+  // 버킷(사건 2건)을 고르면 펼친다.
+  await user.click(
+    within(timeline).getByRole('button', { name: /· 사건 2건$/ }),
+  );
+  expect(
+    await within(timeline).findByRole('button', { name: '합성 사건 B' }),
+  ).toBeTruthy();
+
+  // 직접 접어 둔 버킷도 차트 ⚡ 표식으로 고르면 다시 펼친다.
+  await user.click(toggle);
+  expect(
+    within(timeline).queryByRole('button', { name: '합성 사건 B' }),
+  ).toBeNull();
+  await user.click(
+    screen.getByRole('button', { name: /^차트 사건 .* · 사건 2건$/ }),
+  );
+  expect(
+    await within(timeline).findByRole('button', { name: '합성 사건 B' }),
+  ).toBeTruthy();
 });
 
 test('F05: quote outages offer retry only when the server says it may help', async () => {
@@ -2353,6 +2619,7 @@ test.each(['success', 'failure'] as const)(
 test('D-COM-06: [이 당시 관계그래프 보기] moves only the graph to the event time and [현재] returns', async () => {
   open(pinned);
   const user = userEvent.setup();
+  await expandTimeline(user);
   await user.click(
     await screen.findByRole('button', {
       name: '합성 사건 A · 이 당시 관계그래프 보기',
@@ -2530,6 +2797,7 @@ test('D-COM-06: the event-time graph stays while the graph is used and returns t
   open(pinned);
   const user = userEvent.setup();
   const address = () => screen.getByTestId('address').textContent ?? '';
+  await expandTimeline(user);
   await user.click(
     await screen.findByRole('button', {
       name: '합성 사건 A · 이 당시 관계그래프 보기',

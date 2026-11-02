@@ -368,7 +368,7 @@ export default function CompanyDocumentPanel() {
             <section aria-label="선택 문서 인용">
               <h3>{activeDoc.title ?? '제목 미제공'} · 근거 인용</h3>
               {!activeDoc.quotes?.length && <p>제공된 근거 인용이 없어요.</p>}
-              {activeDoc.quotes?.map((quote) => (
+              {activeDoc.quotes?.map((quote, index) => (
                 <div key={quote.evidenceId}>
                   <blockquote>{quote.quote}</blockquote>
                   <p>
@@ -383,7 +383,7 @@ export default function CompanyDocumentPanel() {
                     aria-pressed={evidenceId === quote.evidenceId}
                     onClick={() => updateQuery({ evidence: quote.evidenceId })}
                   >
-                    근거 {quote.evidenceId} 상세
+                    근거 {index + 1} 상세
                   </button>
                 </div>
               ))}

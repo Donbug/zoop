@@ -27,9 +27,9 @@ trigger로 `graph_rounds`는 DELETE와 식별 열(`round_id`·`slot_at`·`starte
 
 **fencing.** `advance`와 `link`는 호출자가 claim한 행(그 `lease_token`)과 그때의 stage를 WHERE 조건으로 씁니다(`round_id = ? AND stage = <예상 stage> AND lease_token = ?`). lease가 만료되어 다른 인스턴스가 행을 가져갔거나 행이 이미 다른 단계로 갔으면 아무것도 쓰지 않고(이벤트도 없음) `advance`는 빈 Optional, `link`는 false를 돌려주며 호출자는 행을 다시 읽습니다. 종결 단계로 가면 lease 세 열을 모두 비웁니다.
 
-기존 migration은 그대로 두고, 아직 적용하지 않은 요청 journal을 `V20261102150000__graph_round_requests.sql`로 추가합니다. SQL 내용은 유지하며 요청 journal과 불변 guard만 만듭니다. 기준 main `66420ee44df8b3104eed26d04ed7bfb66bd06a4e`의 최신 migration은 `V20261102141000__register_approved_chat_guides.sql`입니다. 배포 DB의 실제 Flyway 이력과 checksum을 확인하고, 이 기준 main의 migration을 `141000`까지 적용한 뒤 journal `150000`을 `out-of-order=false`로 적용하고 validate합니다. 이 브랜치의 `V20261101100000` 기준 업그레이드 시험은 별도 회귀 검사이며, 현재 main의 `141000 → 150000` 업그레이드 검증을 대신하지 않습니다.
+기존 migration은 그대로 두고, 아직 적용하지 않은 요청 journal을 `V20261102150000__graph_round_requests.sql`로 추가합니다. SQL 내용은 유지하며 요청 journal과 불변 guard만 만듭니다. 통합 기준 main `8ccba600ac1121287210cb4b4ab673311155ad0a`의 최신 migration은 `V20261102141000__register_approved_chat_guides.sql`이며, 확인된 배포 DB의 최신 버전도 `141000`입니다. 배포 DB의 실제 Flyway 이력과 checksum을 확인하고, journal `150000`을 `out-of-order=false`로 적용한 뒤 validate합니다. 이 브랜치의 `V20261101100000` 기준 업그레이드 시험은 별도 회귀 검사이며, 현재 main의 `141000 → 150000` 업그레이드 검증을 대신하지 않습니다.
 
-**#467과의 DB 배포 순서.** 실제 적용 순서는 현재 main의 `V20261102141000`까지 → 이 회차 journal의 `V20261102150000` → #467 담당자가 정할 `20261102150000`보다 큰 버전입니다. #467의 기존 `V20261101120000`은 재번호가 필요하며, 이전의 `110000 → 120000` 순서만으로는 현재 main 이후 배포를 보장할 수 없습니다. 배포 이미지에는 확정된 순서의 migration을 함께 포함하고, 스케줄러를 중지한 상태에서 순차 적용·validate를 마친 뒤 아래 전환 절차를 진행합니다. journal의 이전 이름이나 순서가 다른 migration이 이미 적용된 DB는 실제 이력을 기준으로 별도 forward 이행을 검토하며, 기존 이력 수정이나 repair로 순서를 덮지 않습니다.
+**#467과의 DB 배포 순서.** 실제 적용 순서는 현재 main의 `V20261102141000`까지 → 이 회차 journal의 `V20261102150000` → #467 백엔드 담당자가 계획한 `V20261102160000`입니다. 배포 이미지에는 확정된 순서의 migration을 함께 포함하고, 스케줄러를 중지한 상태에서 순차 적용·validate를 마친 뒤 아래 전환 절차를 진행합니다. journal의 이전 이름이나 순서가 다른 migration이 이미 적용된 DB는 실제 이력을 기준으로 별도 forward 이행을 검토하며, 기존 이력 수정이나 repair로 순서를 덮지 않습니다.
 
 **journal 도입 전 배포 조건.** 기존 바이너리와 기존 credential로 열린 회차를 모두 끝낸 뒤 모든 인스턴스의 스케줄러를 중지하고 배포합니다. 아래 drain 절차처럼 새 슬롯·수동 시작이 들어오지 않는 시간대를 확보해야 합니다. journal 없이 R1·R5를 지난 회차를 새 바이너리로 넘기면 `run_request_missing` 또는 `freeze_request_missing`으로 실패합니다. 최초 요청 바이트와 binding을 사후에 추정해 채우지 않습니다. 기존 `failed` 회차도 AI 측 결과를 대조하여 미확정 실행을 정리한 뒤 전환하며, journal이 없는 회차의 관리자 retry를 복구 수단으로 사용하지 않습니다.
 
@@ -98,6 +98,7 @@ R5의 최초 409 `analysis_incomplete`는 접수 전 대기이므로 `analysis_d
 | `ZOOP_GRAPH_ROUND_WAIT_RETRY_AFTER` / `BUSY_RETRY_AFTER` | 대기 단계 재시도 간격(기본 `PT1M` / `PT5M`) |
 | `ZOOP_GRAPH_ROUND_MAX_ATTEMPTS_PER_STAGE` | 단계당 시도 상한(기본 20) |
 | `ZOOP_GRAPH_ROUND_IMPORT_SOURCE` | `cli`(기본)는 설치된 `zoop-ai-ingest export --require-store`, `http`는 `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED=true`인 기존 관측 exporter를 사용합니다. 두 경로 모두 같은 파서·현재 권한·commit 직전 재검증을 거칩니다 |
+| `ZOOP_GRAPH_ROUND_ARTIFACT_STORE_ID` | `import-source=http`일 때 필수. 모든 API Task가 공유하는 artifact root의 1~64자 opaque ID입니다. root의 `.zoop-artifact-store-id`(API 실행 소유자, mode `0600`) 내용과 같아야 기동합니다 |
 | `ZOOP_GRAPH_ROUND_INGESTION_CLI` / `INGESTION_STATE_DIR` / `INGESTION_SOURCES` | `import-source=cli`일 때 필수(실행 파일·디렉터리·파일, 정규화된 절대 경로). `http`일 때는 세 값을 모두 비웁니다. 비어 있지 않은 값이 하나라도 있으면 해당 설정 이름으로 기동을 거절하며 입력 경로는 오류에 싣지 않습니다 |
 | `ZOOP_AI_ROUND_CLIENT_EXPECTED_PRINCIPAL` | round client의 서버 principal. endpoint·credential fingerprint와 함께 복구 binding에 고정하며 필수입니다 |
 | `ZOOP_AI_PLAINTEXT_HTTP_HOSTS` | 모든 AI 클라이언트가 공유하는 정확한 plaintext HTTP host 목록입니다. dev의 `http://ai:8000`은 `ai`를 명시해야 하며, round 클라이언트와 스케줄러의 복구 binding 생성에도 같은 설정을 적용합니다([허용 규칙](AI_INTEGRATION.md#설정)) |
@@ -106,7 +107,7 @@ R5의 최초 409 `analysis_incomplete`는 접수 전 대기이므로 `analysis_d
 
 dev에서 round URL을 `http://ai:8000`으로 바꾸어도 기존 요청 journal은 최초 바이트와 서비스 binding을 보존합니다. 기존 endpoint와 새 endpoint가 다르면 해당 회차는 네트워크 호출 전에 `run_binding_mismatch` 또는 `freeze_binding_mismatch`로 거절됩니다. 복구는 [원래 바이트와 같은 서비스로 복구](#원래-바이트와-같은-서비스로-복구)의 규칙을 따릅니다.
 
-**배포 제약.** durable artifact root와 POSIX lock·소유권·인스턴스 간 공유 방식은 Infra가 정합니다. HTTP 연결 구현만으로 EFS 잠금·TLS·무중단 배포가 검증된 것은 아닙니다. 서비스 쓰기 profile·원장과 기존 read-only archive는 따로 유지하고, first47의 Web RO·operator RW 계약을 그대로 지킵니다.
+**배포 제약.** artifact store는 POSIX 파일 시스템(0600/0700, 단일 소유자)을 요구합니다. ECS 인스턴스가 둘 이상이면 같은 EFS access point와 UID/GID를 사용해야 합니다. HTTP 회차 수입은 `ZOOP_GRAPH_ROUND_ARTIFACT_STORE_ID`와 root 마커를 비교해 잘못된 mount를 차단하며, 실제 공유 여부는 배포 전 두 Task의 교차 읽기로 확인합니다. durable artifact root와 POSIX lock·소유권·인스턴스 간 공유 방식은 Infra가 정합니다. EFS 잠금·TLS·무중단 배포는 별도 검증이 필요합니다. 서비스 쓰기 profile·원장과 기존 read-only archive는 따로 유지하고, first47의 Web RO·operator RW 계약을 그대로 지킵니다.
 
 R7은 관측 전체를 최초 확인과 commit 직전 재확인에서 **두 번 순차 export**합니다. 수입 시간에는 `2 × 관측 수 × 관측 HTTP 소요시간` 외에도 handoff 읽기·현재성 확인과 DB lock 대기·검증·파일 기록·commit 시간이 포함됩니다. DB lock 대기의 유한 상한이 보장되지 않으므로 관측 수와 request timeout만으로 안전한 고정 lease를 입증할 수 없습니다. 기본 `PT2M`은 운영 안전값으로 검증된 수치가 아닙니다.
 
