@@ -29,7 +29,7 @@ const stances = {
   priority_watch: '우선 관찰',
   watch: '관찰 유지',
   cautious_watch: '주의해서 관찰',
-  deferred: '판단 유보',
+  deferred: '판단 보류',
 };
 const conditionLabels = {
   confirmed: '조건 관측',
