@@ -2233,6 +2233,18 @@ test('D-COM-05 D13: a bucket with several events folds to its first title until 
   expect(
     await within(timeline).findByRole('button', { name: '합성 사건 B' }),
   ).toBeTruthy();
+
+  // 직접 접어 둔 버킷도 차트 ⚡ 표식으로 고르면 다시 펼친다.
+  await user.click(toggle);
+  expect(
+    within(timeline).queryByRole('button', { name: '합성 사건 B' }),
+  ).toBeNull();
+  await user.click(
+    screen.getByRole('button', { name: /^차트 사건 .* · 사건 2건$/ }),
+  );
+  expect(
+    await within(timeline).findByRole('button', { name: '합성 사건 B' }),
+  ).toBeTruthy();
 });
 
 test('F05: quote outages offer retry only when the server says it may help', async () => {

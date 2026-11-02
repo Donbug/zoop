@@ -1127,15 +1127,17 @@ export default function CompanyWorkspace() {
                   groups={groups}
                   selectedBucket={selectedBucket}
                   selectedEvent={event.data}
-                  onBucket={(bucket) =>
+                  onBucket={(bucket) => {
+                    // D13: 직접 접어 둔 버킷도 차트에서 고르면 펼친다.
+                    setGroupOpen((open) => ({ ...open, [bucket]: true }));
                     updateQuery({
                       tab: 'events',
                       bucket,
                       event: null,
                       document: null,
                       evidence: null,
-                    })
-                  }
+                    });
+                  }}
                 />
                 <p>
                   {prices.data.source.name} ·{' '}
@@ -1278,7 +1280,7 @@ export default function CompanyWorkspace() {
                         <p className="text-caption text-zoop-muted tabular-nums">
                           {key}
                         </p>
-                        <div className="flex flex-col gap-3">
+                        <div className="flex min-w-0 flex-col gap-3">
                           <div className="flex items-center gap-2">
                             <button
                               aria-pressed={selectedBucket === key}
