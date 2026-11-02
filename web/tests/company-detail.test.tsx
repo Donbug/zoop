@@ -3136,3 +3136,86 @@ test('D-COM-01 N-x keeps fractional won and formats other currencies like the pr
   expect(money(12.5, 'USD')).toBe('$12.50');
   expect(money(null, 'KRW')).toBe('미제공');
 });
+
+test('D-COM-05 D4 expands details directly below the selected card and closes the same card', async () => {
+  server.on('GET', '/api/v1/events/:id', (r) =>
+    json({
+      ...events[0],
+      id: r.params.id,
+      period: '2026년 10월',
+      companies: [
+        {
+          id: 'OTHER',
+          name: '합성 연결 기업',
+          role: 'participant',
+          roleUnconfirmed: false,
+          relationType: 'INVOLVES',
+        },
+      ],
+      articles: [
+        {
+          id: 'doc-a',
+          title: '합성 원문 문서',
+          publisher: '합성 출처',
+          publishedAt: old,
+          url: 'https://example.test/original',
+        },
+      ],
+      evidenceIds: ['ev-a'],
+      relations: [],
+      metadata,
+    }),
+  );
+  server.on('GET', '/api/v1/evidence/:id', (r) =>
+    json({
+      id: r.params.id,
+      articleId: 'doc-a',
+      articleVersion: 'doc-v1',
+      eventIds: ['issue-a'],
+      quote: '합성 원문에서 확인된 문장',
+      quoteVerified: true,
+      start: 0,
+      end: 12,
+      article: {
+        title: '합성 원문 문서',
+        publisher: '합성 출처',
+        publishedAt: old,
+        url: 'https://example.test/original',
+      },
+      metadata,
+      sentiment: {
+        companyId: 'OTHER',
+        label: 'mixed',
+        rationale: '합성 문맥',
+        quotes: ['합성 인용'],
+        judgedAt: time,
+        model: 'fixture',
+        promptVersion: 'fixture-v1',
+      },
+    }),
+  );
+  open(`${pinned}&event=issue-a`);
+  await screen.findByText('합성 원문에서 확인된 문장');
+  const detail = screen.getByRole('region', { name: '선택 사건 상세' });
+  expect(within(detail).getByText('합성 원문에서 확인된 문장')).toBeTruthy();
+  expect(
+    detail.previousElementSibling?.querySelector('button')?.textContent,
+  ).toBe('합성 사건 A');
+  expect(within(detail).getByText(/대상 기간 2026년 10월/)).toBeTruthy();
+  expect(within(detail).getByText('직접 관련 · 참여 기업')).toBeTruthy();
+  expect(
+    within(detail)
+      .getByRole('link', { name: '합성 연결 기업' })
+      .getAttribute('href'),
+  ).toBe('/companies/OTHER');
+  expect(
+    within(detail)
+      .getByRole('link', { name: '원문 보기' })
+      .getAttribute('href'),
+  ).toBe('https://example.test/original');
+  expect(within(detail).getByText(/원문 판정/)).toBeTruthy();
+  await userEvent.click(
+    screen.getByRole('button', { name: '합성 사건 A', exact: true }),
+  );
+  expect(screen.queryByRole('region', { name: '선택 사건 상세' })).toBeNull();
+});

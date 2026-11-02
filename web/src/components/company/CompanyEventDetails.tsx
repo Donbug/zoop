@@ -10,6 +10,8 @@ import type { EvidenceResponse } from '@/types/evidence';
 import { formatTimelineTime } from '@/util/event-time';
 import { formatKst } from '@/util/format';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import { safeArticleUrl } from '@/components/graph/event-format';
+import LoadingIndicator from '@/components/common/LoadingIndicator';
 
 /** D-COM-05: port of company-timeline EventExpanded; document judgments stay document/company scoped. */
 export default function CompanyEventDetails({
@@ -99,7 +101,8 @@ export default function CompanyEventDetails({
                   {company.relationType === 'INVOLVES'
                     ? '직접 관련'
                     : '구조적 관련'}
-                  {company.role && ` · ${company.role}`}
+                  {company.role &&
+                    ` · ${company.role === 'participant' ? '참여 기업' : company.role}`}
                   {company.roleUnconfirmed && ' · 역할 미확인'}
                 </span>
               </li>
@@ -112,7 +115,10 @@ export default function CompanyEventDetails({
       <section aria-label="사건 근거 문서">
         <h4>근거 문서 {event.articles.length}건</h4>
         {evidence.status === 'loading' && event.evidenceIds.length > 0 && (
-          <p role="status">근거 문서를 불러오고 있어요</p>
+          <LoadingIndicator
+            label="근거 문서를 불러오고 있어요"
+            className="flex min-h-10 w-full"
+          />
         )}
         {failed && (
           <p role="alert">
@@ -123,6 +129,8 @@ export default function CompanyEventDetails({
         {!event.articles.length && <p>연결된 근거 문서가 없어요.</p>}
         <ul>
           {event.articles.map((article) => {
+            const quotes = documents.filter((d) => d.articleId === article.id);
+            const href = safeArticleUrl(article.url);
             const sentiments = [
               ...new Map(
                 documents
@@ -137,6 +145,33 @@ export default function CompanyEventDetails({
                   {article.publisher ?? '발행처 미제공'} ·{' '}
                   {formatKst(article.publishedAt)}
                 </p>
+                {quotes.map((quote) => (
+                  <div key={quote.id}>
+                    <blockquote className="my-2 border-l-2 border-zoop-line pl-3 text-body">
+                      {quote.quote}
+                    </blockquote>
+                    <p>
+                      원문 구간{' '}
+                      {quote.quoteVerified === true
+                        ? '확인됨'
+                        : quote.quoteVerified === false
+                          ? '불일치'
+                          : '미확인'}
+                    </p>
+                  </div>
+                ))}
+                {href ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={ui.button}
+                  >
+                    원문 보기
+                  </a>
+                ) : (
+                  <p>원문을 제공하지 않는 자료입니다</p>
+                )}
                 {sentiments.map((sentiment) => (
                   <div
                     key={sentiment.companyId}

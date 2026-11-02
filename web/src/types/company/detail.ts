@@ -1,5 +1,8 @@
 import type { ChartPeriod } from './index';
-import type { EventCompany } from '@/types/map/event';
+import type {
+  EventCompany,
+  EventDetail as GraphEventDetail,
+} from '@/types/map/event';
 export type Meta = {
   source: string;
   asOf: string;
@@ -110,6 +113,8 @@ export type Events = {
   };
 };
 export type EventDetail = Event & {
+  /** getEvent 승인 출처. #392에 따라 사용자 화면의 배지는 유지하지 않는다. */
+  approval?: GraphEventDetail['approval'];
   period?: string | null;
   companies?: EventCompany[];
   articles: {
@@ -118,6 +123,7 @@ export type EventDetail = Event & {
     publisher: string | null;
     publishedAt: string | null;
     url: string | null;
+    relationType?: string | null;
   }[];
   relations: {
     edgeId: string | null;
