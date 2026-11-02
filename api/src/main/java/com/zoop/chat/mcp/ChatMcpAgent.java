@@ -5,7 +5,9 @@ import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.executor.ChatRunSuperseded;
 import com.zoop.chat.orchestrator.ChatAgentPath;
+import com.zoop.chat.orchestrator.ChatCitationSource;
 import com.zoop.chat.orchestrator.ChatModels;
+import com.zoop.chat.orchestrator.ChatWebDemand;
 import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.chat.repository.ChatKeptToolResult;
 import com.zoop.chat.tool.ChatCapability;
@@ -13,6 +15,7 @@ import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolPath;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.chat.tool.ChatToolRunner;
+import com.zoop.chat.tool.ChatToolUnavailable;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -71,11 +74,19 @@ public final class ChatMcpAgent implements ChatAgentPath {
     private final String recipient;
     private final ChatExecutionRepository runs;
     private final ChatToolRunner runner;
+    /** Pinned internal evidence used only to decide whether a requested date or field is still missing. */
+    private final ChatCitationSource citations;
     /** The MCP preflight and circuit of live runs; null for replay runs, which reach no MCP endpoint. */
     private final ChatMcpCircuitBreaker circuit;
 
     public ChatMcpAgent(ChatModels.Agent agent, ChatMcpTools tools, ChatMcpGrants grants, String recipient,
             ChatExecutionRepository runs, ChatToolRunner runner, ChatMcpCircuitBreaker circuit) {
+        this(agent, tools, grants, recipient, runs, runner, circuit, null);
+    }
+
+    public ChatMcpAgent(ChatModels.Agent agent, ChatMcpTools tools, ChatMcpGrants grants, String recipient,
+            ChatExecutionRepository runs, ChatToolRunner runner, ChatMcpCircuitBreaker circuit,
+            ChatCitationSource citations) {
         this.agent = agent;
         this.tools = tools;
         this.grants = grants;
@@ -83,6 +94,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
         this.runs = runs;
         this.runner = runner;
         this.circuit = circuit;
+        this.citations = citations;
     }
 
     @Override
@@ -161,7 +173,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
             List<ChatToolResult> done = closing ? List.of() : kept(run);
             done.forEach(result -> served.getOrDefault(result.toolCallId(), List.of())
                     .forEach(id -> reachable.get(id).addAll(reached(result))));
-            Set<String> gaps = unmet(done, served, withheldReads(run), external);
+            Set<String> gaps = unmet(done, served, withheldReads(run), external, requirements, run, citations);
             gaps.addAll(openFromStart);
             Set<String> webOpen = webOpen(gaps, concepts, searched, searchable);
             List<ChatModels.Decision> next = new ArrayList<>();
@@ -233,6 +245,43 @@ public final class ChatMcpAgent implements ChatAgentPath {
         looked.removeAll(refused);
         unmet.addAll(looked);
         return unmet;
+    }
+
+    /** The same gate with target, requested period, requested field and citation coverage for live agent runs. */
+    static Set<String> unmet(List<ChatToolResult> done, Map<String, List<String>> served, Set<String> withheld,
+            Set<String> external, List<ChatModels.AgentRequirement> requirements, ChatRun run,
+            ChatCitationSource citations) {
+        if (citations == null) return unmet(done, served, withheld, external);
+        Map<String, List<ChatToolResult>> reads = new LinkedHashMap<>();
+        Set<String> refused = new LinkedHashSet<>();
+        for (ChatToolResult read : done) {
+            if (ChatCapability.WEB_SEARCH.id().equals(read.capabilityId())) continue;
+            List<String> owners = served.getOrDefault(read.toolCallId(), List.of());
+            if (withheld.contains(read.toolCallId())) {
+                refused.addAll(owners);
+                continue;
+            }
+            owners.forEach(id -> reads.computeIfAbsent(id, ignored -> new ArrayList<>()).add(read));
+        }
+        Set<String> gaps = new LinkedHashSet<>();
+        for (ChatModels.AgentRequirement requirement : requirements) {
+            List<ChatToolResult> own = reads.getOrDefault(requirement.id(), List.of());
+            if (own.isEmpty() || refused.contains(requirement.id())) continue;
+            if (external.contains(requirement.id()) || ChatWebDemand.coverage(requirement.label(), run.askedAt(),
+                    requirement.targets(), own, id -> citation(citations, run, id)).incomplete()) {
+                gaps.add(requirement.id());
+            }
+        }
+        return gaps;
+    }
+
+    private static java.util.Optional<com.zoop.chat.dto.Citation> citation(ChatCitationSource citations, ChatRun run,
+            String evidenceId) {
+        try {
+            return citations.cite(evidenceId, run.graphVersionId(), run.context().asOf(), run.jobId());
+        } catch (ChatToolUnavailable unavailable) {
+            return java.util.Optional.empty();
+        }
     }
 
     /** The requirements a search may name now: facts with a gap, concepts yet to search, of those the web may serve. */

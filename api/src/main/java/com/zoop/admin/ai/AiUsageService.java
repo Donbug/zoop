@@ -83,9 +83,64 @@ public class AiUsageService {
             features.add(unavailable("briefing-outlook", "브리핑 전망", "브리핑 전망 사용량 기록을 조회하지 못했어요."));
             unavailable.add("briefing-outlook");
         }
-        // Date-series, member counts and price catalog remain outside this slice.
+        List<Object> daily = null;
+        try { daily = daily(from,asOf); unavailable.remove("daily"); }
+        catch (DataAccessException failure) { /* Source absence never becomes an empty usage series. */ }
+        Object members = memberCoverage(asOf);
         return new AiUsageResponse("partial", List.copyOf(unavailable), asOf, window, List.copyOf(features), List.of(),
-                new Cost("unavailable", null, null, null, UNAVAILABLE_COST), null, null);
+                new Cost("unavailable", null, null, null, UNAVAILABLE_COST), daily, members);
+    }
+
+    private List<Object> daily(Instant from,Instant asOf) {
+        var params=new MapSqlParameterSource("from",from==null?null:Timestamp.from(from)).addValue("asOf",Timestamp.from(asOf));
+        var rows=jdbc.queryForList("""
+            SELECT (COALESCE(started_at,finished_at) AT TIME ZONE 'Asia/Seoul')::date AS day,feature,
+              count(*) FILTER(WHERE sent) calls,count(*) FILTER(WHERE uncertain) uncertain,
+              count(*) FILTER(WHERE sent AND input_tokens IS NULL) missing_input,
+              count(*) FILTER(WHERE sent AND output_tokens IS NULL) missing_output,
+              sum(input_tokens) FILTER(WHERE sent) input_tokens,sum(output_tokens) FILTER(WHERE sent) output_tokens,
+              count(*) FILTER(WHERE sent AND actual_cost IS NULL) missing_actual,
+              count(*) FILTER(WHERE sent AND estimated_cost IS NULL) missing_estimate,
+              sum(actual_cost) FILTER(WHERE sent) actual_cost,sum(estimated_cost) FILTER(WHERE sent) estimated_cost,
+              count(DISTINCT currency) FILTER(WHERE actual_cost IS NOT NULL OR estimated_cost IS NOT NULL) currencies
+            FROM (SELECT e.*,
+              execution_mode='live' AND CASE WHEN feature IN ('briefing','briefing-outlook') THEN transmission_confirmed=true ELSE (provider_send_state='sent' OR receipt_artifact_id IS NOT NULL) END sent,
+              execution_mode='live' AND CASE WHEN feature IN ('briefing','briefing-outlook') THEN transmission_confirmed IS NULL ELSE provider_send_state IS DISTINCT FROM 'sent' AND receipt_artifact_id IS NULL END uncertain
+              FROM ai_executions e) e
+            WHERE feature IN ('chatbot','news-analysis','briefing','document-sentiment','briefing-outlook')
+              AND COALESCE(started_at,finished_at)<=:asOf
+              AND (CAST(:from AS timestamptz) IS NULL OR COALESCE(started_at,finished_at)>=:from)
+            GROUP BY day,feature ORDER BY day,feature
+            """,params);
+        Map<String,List<Object>> days=new java.util.LinkedHashMap<>();
+        for(var row:rows){
+            boolean known=number(row,"uncertain")==0;
+            Map<String,Object> feature=new java.util.LinkedHashMap<>();
+            feature.put("feature",row.get("feature"));feature.put("availability","partial");
+            feature.put("unavailableMetrics",List.of("cost.actual","cost.estimated","historicalCoverage"));
+            feature.put("modelCalls",known?number(row,"calls"):null);
+            feature.put("inputTokens",known&&number(row,"missing_input")==0?number(row,"input_tokens"):null);
+            feature.put("outputTokens",known&&number(row,"missing_output")==0?number(row,"output_tokens"):null);
+            feature.put("actualCost",known&&number(row,"missing_actual")==0&&number(row,"currencies")<=1?row.get("actual_cost"):null);
+            feature.put("estimatedCost",known&&number(row,"missing_estimate")==0&&number(row,"currencies")<=1?row.get("estimated_cost"):null);
+            days.computeIfAbsent(row.get("day").toString(),k->new ArrayList<>()).add(feature);
+        }
+        List<Object> result=new ArrayList<>();days.forEach((date,features)->{
+            for(String name:List.of("chatbot","news-analysis","briefing","document-sentiment","briefing-outlook")){
+                boolean exists=features.stream().anyMatch(f->name.equals(((Map<?,?>)f).get("feature")));
+                if(!exists){Map<String,Object> zero=new java.util.LinkedHashMap<>();zero.put("feature",name);zero.put("availability","partial");zero.put("unavailableMetrics",List.of("cost.actual","cost.estimated","historicalCoverage"));zero.put("modelCalls",0L);zero.put("inputTokens",0L);zero.put("outputTokens",0L);zero.put("actualCost",null);zero.put("estimatedCost",null);features.add(zero);}
+            }
+            result.add(Map.of("date",date,"features",features));});return result;
+    }
+
+    private Object memberCoverage(Instant asOf) {
+        try {
+            Long total=jdbc.queryForObject("SELECT count(*) FROM members WHERE created_at<=:asOf AND status<>'withdrawn'",new MapSqlParameterSource("asOf",Timestamp.from(asOf)),Long.class);
+            Map<String,Object> result=new java.util.LinkedHashMap<>();result.put("availability","partial");
+            result.put("unavailableMetrics",List.of("aiMembers","chatbotMembers","briefingMembers"));
+            result.put("totalMembers",total);result.put("aiMembers",null);result.put("chatbotMembers",null);result.put("briefingMembers",null);
+            result.put("note","가입 회원 수만 확인했습니다. 회원별 AI 이용 원장 연결이 확인되지 않은 비율은 제공하지 않습니다.");return result;
+        }catch(DataAccessException failure){return null;}
     }
 
     private Feature safeDocumentFeature(String feature, String label, String engine, Instant from, Instant asOf, String stage) {
@@ -122,7 +177,7 @@ public class AiUsageService {
                        max(extract(epoch FROM (finished_at-started_at))*1000)
                            FILTER (WHERE finished_at IS NOT NULL AND finished_at>=started_at) AS latency_max
                   FROM briefing_attempts
-                 WHERE purpose='generation' AND started_at<=:asOf AND (CAST(:from AS timestamptz) IS NULL OR started_at>=:from)
+                 WHERE purpose='generation' AND COALESCE(started_at,finished_at)<=:asOf AND (CAST(:from AS timestamptz) IS NULL OR COALESCE(started_at,finished_at)>=:from)
                 """ : """
                 SELECT count(*) AS requests,
                        count(*) FILTER (WHERE stages->'outlook'->>'outcome'='available') AS succeeded,
@@ -164,7 +219,7 @@ public class AiUsageService {
                        min(currency) FILTER (WHERE actual_cost IS NOT NULL OR estimated_cost IS NOT NULL) AS currency
                   FROM ai_executions
                  WHERE feature=:feature AND briefing_attempt_id IS NOT NULL
-                   AND started_at<=:asOf AND (CAST(:from AS timestamptz) IS NULL OR started_at>=:from)
+                   AND COALESCE(started_at,finished_at)<=:asOf AND (CAST(:from AS timestamptz) IS NULL OR COALESCE(started_at,finished_at)>=:from)
                 """, params);
         long uncertain = number(executions, "uncertain_calls"), sent = number(executions, "sent_calls");
         boolean usageComplete = uncertain == 0 && number(executions, "missing_input") == 0 && number(executions, "missing_output") == 0;
@@ -179,7 +234,8 @@ public class AiUsageService {
         if (number(executions, "currencies") > 1) missing.addAll(List.of("cost.actual", "cost.estimated"));
         boolean hasLatency = requests.get("latency_avg") != null;
         boolean sourceIncomplete = number(requests, "unrecorded_publications") > 0;
-        if (sourceIncomplete) missing.addAll(List.of("requests", "succeeded", "failed", "latencyMs"));
+        if (sourceIncomplete) missing.addAll(List.of("requests", "succeeded", "failed", "latencyMs",
+                "usage.modelCalls", "usage.inputTokens", "usage.outputTokens", "usage.retries", "usage.replayCalls"));
         if (!hasLatency && number(requests, "requests") > 0) missing.add("latencyMs");
         Latency latency = hasLatency && !sourceIncomplete ? new Latency(decimal(requests, "latency_avg"), decimal(requests, "latency_p95"), decimal(requests, "latency_max")) : null;
         String currency = number(executions, "currencies") == 1 ? (String) executions.get("currency") : null;
@@ -195,11 +251,11 @@ public class AiUsageService {
                     SELECT finished_at AS occurred_at, failure_reason AS code FROM briefing_attempts
                      WHERE (purpose=:purpose OR (:purpose='outlook' AND purpose='generation' AND jsonb_exists(stages, 'outlook')))
                        AND status='failed' AND finished_at<=:asOf
-                       AND (CAST(:from AS timestamptz) IS NULL OR started_at>=:from)
+                       AND (CAST(:from AS timestamptz) IS NULL OR COALESCE(started_at,finished_at)>=:from)
                     UNION ALL
                     SELECT finished_at AS occurred_at, error_code AS code FROM ai_executions
                      WHERE feature=:feature AND briefing_attempt_id IS NOT NULL AND status IN ('failed','unknown')
-                       AND started_at<=:asOf AND (CAST(:from AS timestamptz) IS NULL OR started_at>=:from)
+                       AND COALESCE(started_at,finished_at)<=:asOf AND (CAST(:from AS timestamptz) IS NULL OR COALESCE(started_at,finished_at)>=:from)
                 ) errors WHERE occurred_at IS NOT NULL ORDER BY occurred_at DESC LIMIT 10
                 """, params.addValue("purpose", ledgerFeature.equals("briefing") ? "generation" : "outlook"),
                 (rs, row) -> new RecentError(rs.getTimestamp("occurred_at").toInstant(), rs.getString("code"), null));
@@ -209,10 +265,11 @@ public class AiUsageService {
                 feature.equals("briefing") ? "브리핑 생성·검증" : "브리핑 전망 생성·검증", true,
                 sourceIncomplete ? null : number(requests, "requests"), sourceIncomplete ? null : number(requests, "succeeded"),
                 sourceIncomplete ? null : number(requests, "failed"), latency,
-                new Usage(uncertain == 0 ? sent : null, usageComplete ? number(executions, "input_tokens") : null,
-                        usageComplete ? number(executions, "output_tokens") : null, number(executions, "replay_calls"), number(executions, "retries")),
+                new Usage(!sourceIncomplete && uncertain == 0 ? sent : null, !sourceIncomplete && usageComplete ? number(executions, "input_tokens") : null,
+                        !sourceIncomplete && usageComplete ? number(executions, "output_tokens") : null, sourceIncomplete ? null : number(executions, "replay_calls"), sourceIncomplete ? null : number(executions, "retries")),
                 cost, "ledger-db", List.copyOf(errors), missing.isEmpty() ? "" :
-                        "일부 지표는 원천 기록이 없어 미제공입니다: " + String.join(", ", missingMetrics));
+                        "일부 지표는 원천 기록이 없어 미제공입니다: " + String.join(", ", missingMetrics)
+                        + (sourceIncomplete ? ". 확인된 영수증 범위: 실제 호출 " + sent + "건, 입력 " + number(executions,"input_tokens") + "토큰, 출력 " + number(executions,"output_tokens") + "토큰. 전체 사용량과 구분합니다." : ""));
     }
 
     private Feature chatFeature(Instant from, Instant asOf) {

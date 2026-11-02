@@ -447,6 +447,25 @@
     }
   },
   "changed": {
+    "request:application/json.feature": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "chatbot_answer",
+          "news_summary",
+          "briefing_round",
+          "briefing_issue"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "chatbot_answer",
+          "briefing_round",
+          "briefing_issue"
+        ]
+      }
+    },
     "request:application/json.reason<anyOf:0>": {
       "target": {
         "type": "string"
@@ -474,6 +493,25 @@
       "bff": {
         "type": "string",
         "maxLength": 160
+      }
+    },
+    "response:200:application/json.feature": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "chatbot_answer",
+          "news_summary",
+          "briefing_round",
+          "briefing_issue"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "chatbot_answer",
+          "briefing_round",
+          "briefing_issue"
+        ]
       }
     },
     "response:401:application/json.error.code": {

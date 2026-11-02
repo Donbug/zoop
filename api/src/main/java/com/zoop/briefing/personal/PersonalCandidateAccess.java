@@ -2,6 +2,7 @@ package com.zoop.briefing.personal;
 
 import com.zoop.briefing.query.BriefingGraphContentAuthority;
 import com.zoop.document.analysis.GrantRegistry;
+import com.zoop.briefing.storage.BriefingRound;
 import com.zoop.document.evidence.config.DocumentReadProperties;
 import com.zoop.document.evidence.service.DocumentReadGrants;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,8 +17,12 @@ public class PersonalCandidateAccess {
     private final JdbcTemplate jdbc;
     private final DocumentReadGrants grants;
     private final Clock clock;
-    public PersonalCandidateAccess(JdbcTemplate jdbc, DocumentReadProperties properties, Clock clock) {
-        this.jdbc=jdbc; this.grants=new DocumentReadGrants(properties.grantsPath()); this.clock=clock;
+    private final BriefingGraphContentAuthority authority;
+    public PersonalCandidateAccess(JdbcTemplate jdbc, DocumentReadProperties properties, Clock clock, BriefingGraphContentAuthority authority) {
+        this.jdbc=jdbc; this.grants=new DocumentReadGrants(properties.grantsPath()); this.clock=clock; this.authority=authority;
+    }
+    public boolean readableForRound(JsonNode candidate, BriefingRound round, String requestId) {
+        return readable(candidate,authority.context(round.graphVersion(),requestId),requestId);
     }
     public boolean readable(JsonNode candidate, BriefingGraphContentAuthority.Context graph, String requestId) {
         if (!graph.allowsCandidate(candidate)) return false;

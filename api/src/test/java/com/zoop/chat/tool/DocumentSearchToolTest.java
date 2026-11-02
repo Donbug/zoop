@@ -75,6 +75,40 @@ class DocumentSearchToolTest {
     }
 
     @Test
+    void meaningfulRequirementTermsFilterExactDocumentVersionsWithinABoundedScan() {
+        List<String> matched = new ArrayList<>();
+        DocumentSearchTool filtered = new DocumentSearchTool((company, from, version, asOf, limit, trace) -> {
+            asked.add(company + "|" + limit);
+            return page(null, document("art-1", "일반 공급 소식", "ev-1"),
+                    document("art-2", "반도체 업계", "ev-2"));
+        }, (article, version, title, query) -> {
+            matched.add(article + "|" + version + "|" + query);
+            return article.equals("art-2");
+        });
+
+        var output = filtered.read(SCOPE, new ChatToolRequest("document.search", List.of("KRX:000660"), 20, null,
+                null, "HBM 공급 계약 소식 알려줘"));
+
+        assertEquals(List.of("KRX:000660|100"), asked);
+        assertEquals(List.of("art-1|v1|HBM 공급 계약 소식 알려줘", "art-2|v1|HBM 공급 계약 소식 알려줘"), matched);
+        assertEquals(List.of("ev-2"), output.evidenceIds());
+    }
+
+    @Test
+    void genericRecentNewsRequirementDoesNotReadFullTextOrExpandTheScan() {
+        DocumentSearchTool recent = new DocumentSearchTool((company, from, version, asOf, limit, trace) -> {
+            asked.add(company + "|" + limit);
+            return page(null, document("art-1", "최근 문서", "ev-1"));
+        }, (article, version, title, query) -> fail("generic recent-news wording has no search terms"));
+
+        var output = recent.read(SCOPE, new ChatToolRequest("document.search", List.of("KRX:000660"), 20, null,
+                null, "최근 소식 알려줘"));
+
+        assertEquals(List.of("KRX:000660|20"), asked);
+        assertEquals(List.of("ev-1"), output.evidenceIds());
+    }
+
+    @Test
     void whatTheLimitLeftOutIsACutNeverNone() {
         var quotes = tool(Map.of("KRX:000660", page(null, document("art-1", "t", "ev-1", "ev-2"))))
                 .read(SCOPE, new ChatToolRequest("document.search", List.of("KRX:000660"), 1));

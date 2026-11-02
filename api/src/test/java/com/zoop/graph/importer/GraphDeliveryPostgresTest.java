@@ -285,7 +285,9 @@ class GraphDeliveryPostgresTest {
             var history = upgradeJdbc.queryForList(
                     "SELECT * FROM flyway_schema_history ORDER BY installed_rank");
             var candidate = Flyway.configure().dataSource(upgradeSource).schemas(schema).defaultSchema(schema).load();
-            assertEquals(5, candidate.migrate().migrationsExecuted);
+            // Other domains can legitimately add forward migrations after the delivery watermark.
+            int pending = candidate.info().pending().length;
+            assertEquals(pending, candidate.migrate().migrationsExecuted);
             candidate.validate();
             assertEquals(history, upgradeJdbc.queryForList(
                     "SELECT * FROM flyway_schema_history ORDER BY installed_rank LIMIT ?", history.size()));
@@ -293,7 +295,8 @@ class GraphDeliveryPostgresTest {
                             "20261101100000"),
                     upgradeJdbc.queryForList("""
                             SELECT version FROM flyway_schema_history
-                            WHERE version > '20261031130000' AND success ORDER BY installed_rank
+                            WHERE version > '20261031130000' AND version <= '20261101100000'
+                                AND success ORDER BY installed_rank
                             """, String.class));
             assertEquals(1, upgradeJdbc.queryForObject("""
                     SELECT count(*) FROM information_schema.columns

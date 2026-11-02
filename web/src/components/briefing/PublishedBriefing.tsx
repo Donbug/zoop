@@ -400,7 +400,7 @@ export default function PublishedBriefing({
                   {result.notice.at && ` · ${briefingTime(result.notice.at)}`}
                 </p>
               )}
-              {!compact && result.status === 'published' && (
+              {result.status === 'published' && (
                 <BriefingOutlook
                   outlook={result.outlook}
                   issues={result.items.map((item) => ({
@@ -549,6 +549,15 @@ export default function PublishedBriefing({
                 </BriefingReadingSection>
               )}
               {compact && result.status === 'published' && roundFeedback}
+              {compact && (
+                <BriefingReadingSection
+                  compact
+                  title="발행 정보와 자료 확인 범위"
+                >
+                  {publicationInfo}
+                  {knownLimits && partialInfo}
+                </BriefingReadingSection>
+              )}
             </>
           )
         )}

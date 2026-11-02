@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
 import SavedResultFeedback from '@/components/common/SavedResultFeedback';
+import { Link, useLocation } from 'react-router-dom';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import { LoadingSpinner } from '@/components/common/LoadingIndicator';
 import { PHASES } from '@/components/ai/chat-phases';
