@@ -67,7 +67,7 @@ public final class GraphPublicationPreparer {
             reading = null;
             Set<String> members = base.contributions().stream().map(Contribution::sourceVersionId).collect(Collectors.toSet());
             List<Contribution> incoming = new ArrayList<>();
-            for (String id : publications.preparationCandidates(active.id(), members, MAX_INCOMING)) {
+            for (String id : publications.preparationCandidates(members, MAX_INCOMING)) {
                 reading = id;
                 Contribution source = reader.read(id).contributions().getFirst();
                 if (!"native".equals(source.sourceKind())) return failed(result, "basis_mismatch", id);

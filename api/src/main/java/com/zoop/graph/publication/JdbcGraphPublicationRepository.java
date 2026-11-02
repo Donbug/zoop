@@ -40,21 +40,19 @@ public class JdbcGraphPublicationRepository {
     }
 
     /**
-     * Imported native single-source versions an automatic preparation may add on top of {@code baseVersionId}, oldest first, at most
-     * {@code limit}: a staged snapshot that is not a composed publication or a legacy package, has exactly one source, is not one of
-     * {@code members} (the base's sources) and comes after the cutoff in import order ({@code sequence}). The cutoff is the newest
-     * source the base's composition took in (the base itself when it is not a composition), whoever composed it: a source imported
-     * before it that the composition left out was there to choose and stays out, while sources past a preparation's cap, imported while a
-     * candidate waited for approval, or imported while an operator wrote a request are still prepared. A source that stops preparation
-     * stays the oldest candidate until an operator compose takes it, or a newer source without it.
+     * Imported native single-source versions an automatic preparation may add on top of a base whose sources are {@code members},
+     * oldest first, at most {@code limit}: a staged snapshot that is not a composed publication or a legacy package, has exactly one
+     * source, is not one of {@code members} and comes after the cutoff in import order ({@code sequence}). The cutoff is the newest of
+     * all the base's sources, those its composition took in and those it carried from its own base, whoever composed it: a source
+     * imported before it that the base does not hold was there to choose and stays out, and an operator adding an older source back
+     * never lowers it. Sources past a preparation's cap, imported while a candidate waited for approval, or imported while an operator
+     * wrote a request are still prepared. A source that stops preparation stays the oldest candidate until an operator compose takes
+     * it, or a newer source without it.
      */
-    public List<String> preparationCandidates(String baseVersionId, Set<String> members, int limit) {
-        var args = new MapSqlParameterSource("base", baseVersionId).addValue("members", members.toArray(String[]::new)).addValue("limit", limit);
+    public List<String> preparationCandidates(Set<String> members, int limit) {
+        var args = new MapSqlParameterSource("members", members.toArray(String[]::new)).addValue("limit", limit);
         return jdbc.queryForList("""
-                WITH cutoff AS (
-                  SELECT COALESCE((SELECT max(i.sequence) FROM graph_publication_inputs p JOIN graph_versions i ON i.id = p.source_version_id
-                                   WHERE p.version_id = b.id), b.sequence) AS sequence
-                  FROM graph_versions b WHERE b.id = :base)
+                WITH cutoff AS (SELECT max(m.sequence) AS sequence FROM graph_versions m WHERE m.id = ANY (CAST(:members AS text[])))
                 SELECT v.id FROM graph_versions v, cutoff
                 WHERE v.kind = 'snapshot'
                   AND v.sequence > cutoff.sequence

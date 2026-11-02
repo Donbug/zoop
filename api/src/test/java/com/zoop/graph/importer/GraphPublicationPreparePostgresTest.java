@@ -295,6 +295,20 @@ class GraphPublicationPreparePostgresTest {
         assertEquals("staged", result.get("outcome").asString(), result.toString());
     }
 
+    @Test void anOlderSourceAddedByAnOperatorDoesNotBringBackASourceLeftOut() {
+        // A, B, C imported in that order; C is published alone, then an operator adds A. B stays out.
+        String older = importNative(HandoffFixtures.Spec.standard());
+        importNative(HandoffFixtures.Spec.standard().withEvent("2026-10-01", "day"));
+        String published = publish(importNative(HandoffFixtures.Spec.standard()));
+        activate(compose(published, older));
+        var result = preparer().run();
+        assertEquals("nothing_to_prepare", result.get("outcome").asString(), result.toString());
+        String later = importNative(HandoffFixtures.Spec.standard());
+        var next = preparer().run();
+        assertEquals("staged", next.get("outcome").asString(), next.toString());
+        assertEquals(List.of(later), strings(next, "incomingVersionIds"));
+    }
+
     @Test void sourcesPastTheCapArePreparedAfterTheCappedCandidateIsPublished() {
         publish(importNative(HandoffFixtures.Spec.standard()));
         var imported = new java.util.ArrayList<String>();
