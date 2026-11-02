@@ -39,22 +39,47 @@ public class JdbcGraphPublicationRepository {
                 """, new MapSqlParameterSource("receipts", sourceVersionIds.stream().map(id -> "artifact-receipt-" + id).toList()), String.class);
     }
 
+    /** {@code created_by} of a version the automatic preparation staged; operator composes cannot use this operator name. */
+    public static final String PREPARED_BY = "operator:" + GraphPublicationPreparer.OPERATOR;
+
     /**
-     * Imported single-source versions an automatic preparation may add, oldest first: a staged snapshot that is not a composed
-     * publication, has exactly one source, is not one of {@code members} (the active version's sources) and was imported after the
-     * last pointer change, so a source an operator left out of the published composition is not added back. Activation is manual,
-     * so every pointer change is a person's decision.
+     * Imported native single-source versions an automatic preparation may add on top of {@code baseVersionId}, oldest first, at most
+     * {@code limit}: a staged snapshot that is not a composed publication or a legacy package, has exactly one source, is not one of
+     * {@code members} (the base's sources) and comes after the cutoff in import order ({@code sequence}). The cutoff keeps a source a
+     * person deliberately left out of a composition from coming back without dropping anything else: after an operator compose it is
+     * the base's own sequence (everything imported before it was the operator's to choose); after an automatic preparation it is the
+     * last source that preparation took, so sources past its cap or imported while it waited for approval are still prepared.
      */
-    public List<String> preparationCandidates(Set<String> members) {
+    public List<String> preparationCandidates(String baseVersionId, Set<String> members, int limit) {
+        var args = new MapSqlParameterSource("base", baseVersionId).addValue("members", members.toArray(String[]::new))
+                .addValue("prepared", PREPARED_BY).addValue("limit", limit);
         return jdbc.queryForList("""
-                SELECT v.id FROM graph_versions v
+                WITH cutoff AS (
+                  SELECT CASE WHEN b.created_by = :prepared
+                         THEN (SELECT max(i.sequence) FROM graph_publication_inputs p JOIN graph_versions i ON i.id = p.source_version_id
+                               WHERE p.version_id = b.id)
+                         ELSE b.sequence END AS sequence
+                  FROM graph_versions b WHERE b.id = :base)
+                SELECT v.id FROM graph_versions v, cutoff
                 WHERE v.kind = 'snapshot'
+                  AND v.sequence > cutoff.sequence
+                  AND COALESCE(v.source_label, '') NOT LIKE 'legacy-real:%'
                   AND NOT EXISTS (SELECT 1 FROM graph_publications p WHERE p.version_id = v.id)
                   AND (SELECT count(*) FROM graph_version_sources s WHERE s.graph_version_id = v.id) = 1
                   AND NOT (v.id = ANY (CAST(:members AS text[])))
-                  AND v.created_at > COALESCE((SELECT max(a.activated_at) FROM graph_activations a WHERE a.pointer_changed), '-infinity'::timestamptz)
                 ORDER BY v.sequence
-                """, new MapSqlParameterSource("members", members.toArray(String[]::new)), String.class);
+                LIMIT :limit
+                """, args, String.class);
+    }
+
+    /** Staged publications on {@code baseVersionId} that were never made public, oldest first (earlier or orphaned candidates). */
+    public List<String> unpublishedCandidates(String baseVersionId) {
+        return jdbc.queryForList("""
+                SELECT p.version_id FROM graph_publications p JOIN graph_versions v ON v.id = p.version_id
+                WHERE p.base_version_id = :base
+                  AND NOT EXISTS (SELECT 1 FROM graph_activations a WHERE a.version_id = p.version_id AND a.pointer_changed)
+                ORDER BY v.sequence
+                """, new MapSqlParameterSource("base", baseVersionId), String.class);
     }
 
     public void insert(Metadata metadata) {

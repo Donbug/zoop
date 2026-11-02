@@ -64,22 +64,16 @@ public class GraphPublicationConfiguration {
         var reader = new GraphPublicationReader(graph, registry, files, publications);
         var composer = new GraphPublicationComposer(files, graph, registry, versions, publications, reader, authority,
                 new DocumentReadSources(documentRead.ingestionSourcesPath()), transaction, clock);
-        return args -> {
-            try (FileChannel output = FileChannel.open(result, Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS),
-                    PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))) {
-                ObjectNode answer;
-                try {
-                    var parsed = PublicationComposeRequest.parse(readOperatorFile(request, PublicationComposeRequest.MAX_BYTES));
-                    byte[] decisionBytes = readOperatorFile(decisions, 4_000_000);
-                    // Only the preparation writes automatic decisions; an operator file claiming them could later be replaced as automatic.
-                    answer = claimsAutomaticReviewer(decisionBytes) ? GraphPublicationComposer.failed("request_invalid") : composer.run(parsed, decisionBytes);
-                } catch (PublicationException invalid) { answer = GraphPublicationComposer.failed(invalid.code()); }
-                ByteBuffer bytes = ByteBuffer.wrap(Canonical.bytes(answer));
-                while (bytes.hasRemaining()) output.write(bytes);
-                output.force(true);
-                if (!"succeeded".equals(answer.get("status").stringValue())) throw new IllegalStateException("publication composition refused; see operator result");
-            } catch (IOException error) { throw new IllegalStateException("publication result unavailable"); }
-        };
+        return args -> writeOperatorResult(result, () -> {
+            try {
+                var parsed = PublicationComposeRequest.parse(readOperatorFile(request, PublicationComposeRequest.MAX_BYTES));
+                byte[] decisionBytes = readOperatorFile(decisions, 4_000_000);
+                // Only the preparation writes automatic decisions or uses its operator name; an operator compose claiming either could
+                // later be taken for an automatic one (its decisions replaced, its sources cut off).
+                if (refusedForOperator(parsed, decisionBytes)) return GraphPublicationComposer.failed("request_invalid");
+                return composer.run(parsed, decisionBytes);
+            } catch (PublicationException invalid) { return GraphPublicationComposer.failed(invalid.code()); }
+        }, "publication composition refused; see operator result");
     }
 
     /**
@@ -95,24 +89,25 @@ public class GraphPublicationConfiguration {
         requireExclusiveOperator(context, "graph-publication-compose");
         Path root = path(env, PREPARE, "artifact-root"), result = path(env, PREPARE, "result");
         if (result.startsWith(root)) throw new IllegalArgumentException("publication operator paths overlap");
-        String operator = env.getProperty(PREPARE + ".operator", "prepare");
-        if (!operator.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,63}")) throw new IllegalArgumentException("publication preparation operator is invalid");
         requireOwnedParent(result);
         ArtifactFileStore files = ArtifactFileStore.at(root);
         var reader = new GraphPublicationReader(graph, registry, files, publications);
         var composer = new GraphPublicationComposer(files, graph, registry, versions, publications, reader, authority,
                 new DocumentReadSources(documentRead.ingestionSourcesPath()), transaction, clock);
-        var preparer = new GraphPublicationPreparer(versions, graph, publications, reader, composer, operator);
-        return args -> {
-            try (FileChannel output = FileChannel.open(result, Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS),
-                    PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))) {
-                ObjectNode answer = preparer.run();
-                ByteBuffer bytes = ByteBuffer.wrap(Canonical.bytes(answer));
-                while (bytes.hasRemaining()) output.write(bytes);
-                output.force(true);
-                if (!"succeeded".equals(answer.get("status").stringValue())) throw new IllegalStateException("publication preparation stopped; see operator result");
-            } catch (IOException error) { throw new IllegalStateException("publication result unavailable"); }
-        };
+        var preparer = new GraphPublicationPreparer(versions, graph, publications, reader, composer);
+        return args -> writeOperatorResult(result, preparer::run, "publication preparation stopped; see operator result");
+    }
+
+    /** Writes the operator result to a new owner-only file (never over an existing one) and fails the run when it did not succeed. */
+    private static void writeOperatorResult(Path result, java.util.function.Supplier<ObjectNode> run, String refusal) {
+        try (FileChannel output = FileChannel.open(result, Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS),
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))) {
+            ObjectNode answer = run.get();
+            ByteBuffer bytes = ByteBuffer.wrap(Canonical.bytes(answer));
+            while (bytes.hasRemaining()) output.write(bytes);
+            output.force(true);
+            if (!"succeeded".equals(answer.get("status").stringValue())) throw new IllegalStateException(refusal);
+        } catch (IOException error) { throw new IllegalStateException("publication result unavailable"); }
     }
 
     private static final String COMPOSE = "zoop.graph-publication-compose";
@@ -145,6 +140,9 @@ public class GraphPublicationConfiguration {
             if (!attrs.isDirectory() || attrs.permissions().contains(PosixFilePermission.GROUP_WRITE)
                     || attrs.permissions().contains(PosixFilePermission.OTHERS_WRITE)) throw new IOException();
         } catch (IOException error) { throw new IllegalArgumentException("publication result parent unavailable"); }
+    }
+    static boolean refusedForOperator(PublicationComposeRequest request, byte[] decisions) {
+        return claimsAutomaticReviewer(decisions) || GraphPublicationPreparer.OPERATOR.equals(request.operator());
     }
     static boolean claimsAutomaticReviewer(byte[] decisions) {
         try {

@@ -138,15 +138,54 @@ class GraphPublicationPreparePostgresTest {
         assertEquals(candidate, again.get("graphVersionId").asString());
     }
 
-    @Test void nothingToPrepareWithoutNewImportsOrForSourcesImportedBeforeTheLastActivation() {
-        publish(importNative(HandoffFixtures.Spec.standard()));
-        assertEquals("nothing_to_prepare", preparer().run().get("outcome").asString());
-
-        // A source imported before a person's last activation was left out on purpose and is not added back.
+    @Test void nothingToPrepareWithoutNewImportsAndASourceLeftOutOfAnOperatorComposeStaysOut() {
+        // Imported before the operator composed the published version: the operator chose not to include it.
         importNative(HandoffFixtures.Spec.standard().withEvent("2026-10-01", "day"));
-        jdbc.update("UPDATE graph_activations SET activated_at = ?", Timestamp.from(NOW.plusSeconds(60)));
+        publish(importNative(HandoffFixtures.Spec.standard()));
         var result = preparer().run();
         assertEquals("nothing_to_prepare", result.get("outcome").asString(), result.toString());
+        assertEquals(List.of(), strings(result, "incomingVersionIds"));
+    }
+
+    @Test void aSourceImportedWhileACandidateWaitsForApprovalIsPreparedAfterIt() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        importNative(HandoffFixtures.Spec.standard().withEvent("2026-10-01", "day"));
+        String first = preparer().run().get("graphVersionId").asString();
+        assertEquals(JdbcGraphPublicationRepository.PREPARED_BY,
+                jdbc.queryForObject("SELECT created_by FROM graph_versions WHERE id = ?", String.class, first));
+        String waiting = importNative(HandoffFixtures.Spec.standard().withEvent("2026-10-02", "day"));
+        // The second run proposes on the same published base: the waiting source is admitted together with the first one and
+        // disagrees with it, so it stops for a person until the first candidate is published.
+        assertEquals("correction_required", preparer().run().get("code").asString());
+        activate(first);
+        var result = preparer().run();
+        assertEquals("staged", result.get("outcome").asString(), result.toString());
+        assertEquals(List.of(waiting), strings(result, "incomingVersionIds"));
+        assertTrue(reader().read(result.get("graphVersionId").asString()).snapshot().issues().stream()
+                .allMatch(i -> "2026-10-02".equals(i.eventTime())));
+    }
+
+    @Test void sourcesPastTheCapArePreparedAfterTheCappedCandidateIsPublished() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        var imported = new java.util.ArrayList<String>();
+        for (int index = 0; index < 21; index++) imported.add(importNative(HandoffFixtures.Spec.standard()));
+        var first = preparer().run();
+        assertEquals("staged", first.get("outcome").asString(), first.toString());
+        assertEquals(imported.subList(0, 20), strings(first, "incomingVersionIds"));
+        activate(first.get("graphVersionId").asString());
+        var next = preparer().run();
+        assertEquals("staged", next.get("outcome").asString(), next.toString());
+        assertEquals(List.of(imported.getLast()), strings(next, "incomingVersionIds"));
+    }
+
+    @Test void anUnreadableSourceStopsPreparationAndIsNamed() throws Exception {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        String broken = importNative(HandoffFixtures.Spec.standard());
+        String uri = jdbc.queryForObject("SELECT storage_uri FROM artifacts WHERE id = ?", String.class, "artifact-receipt-" + broken);
+        Files.delete(temp.toRealPath().resolve("producer").resolve(uri.substring(uri.indexOf(':') + 1)));
+        var result = preparer().run();
+        assertEquals("failed", result.get("status").asString(), result.toString());
+        assertEquals(broken, result.get("versionId").asString());
     }
 
     @Test void sourcesAdmittedTogetherThatDisagreeStopForAPersonAndKeepTheRequest() {
@@ -172,7 +211,7 @@ class GraphPublicationPreparePostgresTest {
         var rights = new GraphPublicationAuthority(registry, sources,
                 version -> new DisclosureExclusions(0, java.util.Set.of(), java.util.Set.of(), java.util.Set.of(), java.util.Set.of()), CLOCK);
         var composer = new GraphPublicationComposer(files, graph, registry, versions, publications, reader, rights, sources, transaction, CLOCK);
-        return new GraphPublicationPreparer(versions, graph, publications, reader, composer, "prepare");
+        return new GraphPublicationPreparer(versions, graph, publications, reader, composer);
     }
 
     private String importNative(HandoffFixtures.Spec spec) {
@@ -205,6 +244,16 @@ class GraphPublicationPreparePostgresTest {
                     admin_email_snapshot, reason, activated_at) VALUES (?, NULL, 'activate', 'system', true, NULL, 'system', 'synthetic', ?)
                 """, id, Timestamp.from(NOW.minusSeconds(60)));
         return id;
+    }
+
+    private void activate(String id) {
+        String previous = versions.active().orElseThrow().id();
+        jdbc.update("UPDATE graph_versions SET active = false WHERE active");
+        jdbc.update("UPDATE graph_versions SET active = true WHERE id = ?", id);
+        jdbc.update("""
+                INSERT INTO graph_activations (version_id, previous_version_id, action, actor_kind, pointer_changed, admin_id,
+                    admin_email_snapshot, reason, activated_at) VALUES (?, ?, 'activate', 'system', true, NULL, 'system', 'synthetic', ?)
+                """, id, previous, Timestamp.from(NOW));
     }
 
     private static List<String> strings(ObjectNode node, String field) {
