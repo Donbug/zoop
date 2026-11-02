@@ -77,6 +77,6 @@ public class GraphRoundPrepareConfiguration {
                 transaction, clock);
         return new GraphRoundPreparer(rounds, new JdbcGraphPublicationPreparationRepository(jdbc), new JdbcGraphRoundImportLock(dataSource),
                 new GraphPublicationPreparer(versions, graph, publications, reader, composer), reader, publications, composer,
-                properties.busyRetryAfter(), properties.maxAttemptsPerStage());
+                properties.busyRetryAfter(), properties.maxAttemptsPerStage(), clock);
     }
 }

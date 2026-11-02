@@ -60,7 +60,7 @@ class GraphRoundPreparerTest {
     }
 
     private static Preparation row(long id, Long recoveryOf, byte[] request, String status, String code) {
-        return new Preparation(id, Optional.of("round-20261103T0905"), AT, Optional.ofNullable(recoveryOf), AT, Optional.empty(),
+        return new Preparation(id, Optional.of("round-20261103T0905"), 7L, Optional.ofNullable(recoveryOf), AT, Optional.empty(),
                 Optional.ofNullable(request), Optional.ofNullable(request), Optional.ofNullable(status), Optional.ofNullable(code),
                 status == null ? Optional.empty() : Optional.of(AT));
     }

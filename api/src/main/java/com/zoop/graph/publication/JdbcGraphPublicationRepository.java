@@ -65,6 +65,15 @@ public class JdbcGraphPublicationRepository {
                 """, args, String.class);
     }
 
+    /** The import order ({@code sequence}) of the newest staged snapshot that is not a composition (an import), if any. */
+    public java.util.Optional<Long> newestImport() {
+        Long sequence = jdbc.queryForObject(
+                "SELECT max(v.sequence) FROM graph_versions v WHERE v.kind = 'snapshot'"
+                        + " AND NOT EXISTS (SELECT 1 FROM graph_publications p WHERE p.version_id = v.id)",
+                new MapSqlParameterSource(), Long.class);
+        return java.util.Optional.ofNullable(sequence);
+    }
+
     /** {@code versionIds} that exist, in import order ({@code sequence}). */
     public List<String> importOrder(List<String> versionIds) {
         if (versionIds.isEmpty()) return List.of();

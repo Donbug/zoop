@@ -1,12 +1,14 @@
 -- Automatic preparations of the round path (#55 PR-P3): one row per attempt the writer's round scheduler makes after a new import.
 -- The request and decision bytes commit before the composition runs, so an attempt whose outcome is unknown (the process stopped,
 -- or the composer answered outcome_unknown) is recovered with exactly those bytes: a recovery is a new row naming the attempt it
--- recovers (recovery_of). trigger_committed_at is the newest round import commit the attempt answered, so the scheduler prepares
--- once per new import. The result columns are written at most once, from NULL; nothing else changes and no row is deleted.
+-- recovers (recovery_of). trigger_sequence is the newest import (graph_versions.sequence of a single-source snapshot) the attempt
+-- answered, so the scheduler prepares once per new import. round_id names the newest imported round for reading only (no FK: the
+-- round tables are cleaned on their own in tests and nothing here depends on the row). The result columns are written at most
+-- once, from NULL; nothing else changes and no row is deleted.
 CREATE TABLE graph_publication_preparations (
     id bigserial PRIMARY KEY,
-    round_id text REFERENCES graph_rounds (round_id) ON DELETE RESTRICT,
-    trigger_committed_at timestamptz NOT NULL,
+    round_id text,
+    trigger_sequence bigint NOT NULL,
     recovery_of bigint REFERENCES graph_publication_preparations (id) ON DELETE RESTRICT,
     created_at timestamptz NOT NULL,
     active_version_id text,
@@ -28,6 +30,7 @@ CREATE TABLE graph_publication_preparations (
         AND (status IS NULL OR code IS NOT NULL))
 );
 CREATE INDEX ix_graph_publication_preparations_recovery ON graph_publication_preparations (recovery_of);
+CREATE INDEX ix_graph_publication_preparations_trigger ON graph_publication_preparations (trigger_sequence);
 
 CREATE FUNCTION graph_publication_preparations_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -36,7 +39,7 @@ BEGIN
     END IF;
     IF OLD.status IS NOT NULL
         OR NEW.id <> OLD.id OR NEW.round_id IS DISTINCT FROM OLD.round_id
-        OR NEW.trigger_committed_at <> OLD.trigger_committed_at OR NEW.recovery_of IS DISTINCT FROM OLD.recovery_of
+        OR NEW.trigger_sequence <> OLD.trigger_sequence OR NEW.recovery_of IS DISTINCT FROM OLD.recovery_of
         OR NEW.created_at <> OLD.created_at OR NEW.active_version_id IS DISTINCT FROM OLD.active_version_id
         OR NEW.request IS DISTINCT FROM OLD.request OR NEW.request_sha256 IS DISTINCT FROM OLD.request_sha256
         OR NEW.decisions IS DISTINCT FROM OLD.decisions OR NEW.decisions_sha256 IS DISTINCT FROM OLD.decisions_sha256 THEN

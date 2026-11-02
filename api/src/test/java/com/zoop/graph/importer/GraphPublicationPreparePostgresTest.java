@@ -399,7 +399,7 @@ class GraphPublicationPreparePostgresTest {
         publish(importNative(HandoffFixtures.Spec.standard()));
         String round = roundImported(importNative(HandoffFixtures.Spec.standard()), NOW.minusSeconds(10));
         // The process stopped after the composition committed, before its result was written.
-        var result = preparer().run((active, request, decisions) -> journal().begin(round, NOW.minusSeconds(10), null, active, request, decisions, NOW));
+        var result = preparer().run((active, request, decisions) -> journal().begin(round, publications.newestImport().orElseThrow(), null, active, request, decisions, NOW));
         assertEquals("staged", result.get("outcome").asString(), result.toString());
         roundPreparer().afterPass(NOW.plusSeconds(15));
         var rows = preparations();
@@ -415,7 +415,7 @@ class GraphPublicationPreparePostgresTest {
         publish(importNative(HandoffFixtures.Spec.standard()));
         String round = roundImported(importNative(HandoffFixtures.Spec.standard()), NOW.minusSeconds(10));
         var result = preparer().run((active, request, decisions) -> {
-            journal().begin(round, NOW.minusSeconds(10), null, active, request, decisions, NOW);
+            journal().begin(round, publications.newestImport().orElseThrow(), null, active, request, decisions, NOW);
             throw new IllegalStateException("stopped");
         });
         assertEquals("internal_error", result.get("code").asString());
@@ -429,7 +429,7 @@ class GraphPublicationPreparePostgresTest {
     @Test void aRecoveryAfterTheActiveVersionMovedIsAConflictThenANewPreparation() {
         publish(importNative(HandoffFixtures.Spec.standard()));
         String round = roundImported(importNative(HandoffFixtures.Spec.standard()), NOW.minusSeconds(10));
-        var result = preparer().run((active, request, decisions) -> journal().begin(round, NOW.minusSeconds(10), null, active, request, decisions, NOW));
+        var result = preparer().run((active, request, decisions) -> journal().begin(round, publications.newestImport().orElseThrow(), null, active, request, decisions, NOW));
         activate(result.get("graphVersionId").asString());
         roundPreparer().afterPass(NOW.plusSeconds(15));
         var rows = preparations();
@@ -468,7 +468,7 @@ class GraphPublicationPreparePostgresTest {
         return new GraphRoundPreparer(new JdbcGraphRoundRepository(named, tools.jackson.databind.json.JsonMapper.builder().build(),
                 new DataSourceTransactionManager(dataSource)), journal(), new JdbcGraphRoundImportLock(dataSource),
                 new GraphPublicationPreparer(versions, graph, publications, reader, composer), reader, publications, composer,
-                Duration.ofMinutes(5), 3);
+                Duration.ofMinutes(5), 3, CLOCK);
     }
 
     /** A round whose import of {@code versionId} committed at {@code committedAt}; returns its id. */

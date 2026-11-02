@@ -85,17 +85,17 @@ R5의 최초 409 `analysis_incomplete`는 접수 전 대기이므로 `analysis_d
 
 ## 자동 준비 (회차 경로, `GraphRoundPreparer`, 기본 꺼짐)
 
-`ZOOP_GRAPH_ROUND_PREPARE_ENABLED=true`이면 scheduler 한 바퀴의 끝에서, 마지막 준비 뒤에 새 수입 commit(`newestImported().versionCommittedAt`)이 있을 때 운영자 명령 `graph-publication-prepare`와 같은 준비(`GraphPublicationPreparer`)를 한 번 실행해 비활성 candidate를 만듭니다. 대상·상한·멈춤 규칙과 예약 operator는 운영자 명령과 같습니다([누적 발행 계약](GRAPH_READ_HANDOFF.md#누적-발행과-원본별-현재-권한)). 활성화는 하지 않고, 회차 행은 바꾸지 않습니다(이미 `imported`). 준비가 실패하거나 예외가 나도 회차와 바퀴는 그대로 진행합니다.
+`ZOOP_GRAPH_ROUND_PREPARE_ENABLED=true`이면 scheduler 한 바퀴의 끝에서, 마지막 준비 뒤에 새 수입(composition이 아닌 snapshot 중 가장 큰 `sequence`, 회차 재시도의 새 버전과 운영자 수입 포함)이 있을 때 운영자 명령 `graph-publication-prepare`와 같은 준비(`GraphPublicationPreparer`)를 한 번 실행해 비활성 candidate를 만듭니다. 대상·상한·멈춤 규칙과 예약 operator는 운영자 명령과 같습니다([누적 발행 계약](GRAPH_READ_HANDOFF.md#누적-발행과-원본별-현재-권한)). 활성화는 하지 않고, 회차 행은 바꾸지 않습니다(이미 `imported`). 준비가 실패하거나 예외가 나도 회차와 바퀴는 그대로 진행합니다.
 
-- **기록:** 시도마다 `graph_publication_preparations` 1행입니다. 요청·결정 바이트를 compose 전에 commit하고 결과(`status`·`code`·`graph_version_id`·결과 문서)는 한 번만 씁니다. 행은 영구 보존이며 trigger가 다른 변경과 삭제를 거절합니다. `trigger_committed_at`은 그 시도가 답한 수입 commit 시각입니다.
-- **한 수입에 한 번:** 같은 수입에 대한 답이 확정되면 다시 하지 않습니다. 일시 실패(`import_busy`·`database_unavailable`·`basis_unavailable`·`source_authority_unavailable`·`artifact_store_unavailable`)는 `busy-retry-after` 뒤에, 충돌(`active_conflict`·`revision_conflict`)은 바로 다음 바퀴에 새 준비로 다시 판단합니다. 값이 바뀐 원본의 `correction_required`는 확정 답이라 다음 수입까지 다시 하지 않습니다. 사람은 저장된 요청을 바탕으로 결정 파일을 만들어 운영자 compose합니다.
-- **결과를 모르는 시도의 복구(고정 입력):** 바이트는 있는데 결과가 없거나(compose 도중 중단) 결과가 `outcome_unknown`인 시도는, 새 준비 전에 저장된 바이트 그대로 운영자 compose 규칙(`GraphPublicationPreparer.operatorCompose`)으로 다시 실행합니다. 새 행(`recovery_of`)으로 남기며 commit됐으면 `unchanged`, 활성·규칙이 바뀌었으면 충돌입니다. 복구가 일시 실패를 `max-attempts-per-stage`번 넘기면 새 준비를 멈추고 로그에 `recovery_required`를 남깁니다. 그 뒤는 BE가 저장된 바이트로 운영자 compose를 합니다.
-- **한 번에 하나:** 준비 전체를 회차 수입 lock(`JdbcGraphRoundImportLock`)을 쥔 채 실행하므로 회차 수입이나 다른 인스턴스의 준비와 겹치지 않습니다. lock을 얻지 못하면 다음 바퀴에 합니다. composer의 artifact store lock·publication lock도 그대로이며, 운영자 RunTask와 겹치면 `import_busy`로 기다립니다.
+- **기록:** 시도마다 `graph_publication_preparations` 1행입니다. 요청·결정 바이트를 compose 전에 commit하고 결과(`status`·`code`·`graph_version_id`·결과 문서)는 한 번만 씁니다. 행은 영구 보존이며 trigger가 다른 변경과 삭제를 거절합니다. `trigger_sequence`는 그 시도가 답한 수입의 `sequence`이고, `round_id`는 가장 최근 수입 회차(참고용, FK 없음)입니다.
+- **한 수입에 한 번:** 같은 수입에 대한 답이 확정되면 다시 하지 않습니다. 일시 실패(`import_busy`·`database_unavailable`·`basis_unavailable`·`source_authority_unavailable`)는 `busy-retry-after` 뒤에 같은 수입에 대해 최대 `max-attempts-per-stage`번까지(넘으면 다음 수입까지 기다림), 충돌(`active_conflict`·`revision_conflict`)은 바로 다음 바퀴에 새 준비로 다시 판단합니다. 값이 바뀐 원본의 `correction_required`는 확정 답이라 다음 수입까지 다시 하지 않습니다. 사람은 저장된 요청을 바탕으로 결정 파일을 만들어 운영자 compose합니다.
+- **결과를 모르는 시도의 복구(고정 입력):** 바이트는 있는데 결과가 없거나(compose 도중 중단) 결과가 `outcome_unknown`인 시도는, 새 준비 전에 저장된 바이트 그대로 운영자 compose 규칙(`GraphPublicationPreparer.operatorCompose`)으로 다시 실행합니다. 새 행(`recovery_of`)으로 남기며 commit됐으면 `unchanged`, 활성·규칙이 바뀌었으면 충돌입니다. 복구가 확정되지 않으면 새 준비를 하지 않고 `busy-retry-after` 뒤에 다시 복구합니다. `max-attempts-per-stage`번을 넘기면 로그에 `recovery_required`를 남기고 `busy-retry-after × max-attempts-per-stage` 간격으로만 다시 복구합니다. 이때 BE가 저장된 바이트로 운영자 compose를 하면(또는 활성이 바뀌면) 다음 복구가 `unchanged`(또는 충돌)로 확정되어 새 준비가 이어집니다.
+- **한 번에 하나:** 준비 전체를 회차 수입 lock(`JdbcGraphRoundImportLock`)을 쥔 채 실행하므로 회차 수입이나 다른 인스턴스의 준비와 겹치지 않습니다. lock을 얻지 못하면 다음 바퀴에 합니다. composer의 artifact store lock·publication lock도 그대로이며, 운영자 RunTask와 겹치면 `import_busy`로 기다립니다. 준비는 scheduler 스레드에서 돌므로 compose가 길면 그 인스턴스의 다음 바퀴가 그만큼 늦어집니다(슬롯 간격 30분). 준비 기록(DB)에 실패하면 그 프로세스는 `busy-retry-after` 동안 준비를 쉽니다.
 - **켤 때 요구:** `ZOOP_GRAPH_ROUND_ENABLED=true`, `ZOOP_GRAPH_SNAPSHOT_SOURCE=artifact`와 존재하는 `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT`(bridge가 쓰는 같은 root에서 compose), `ZOOP_DOCUMENT_READ_INGESTION_SOURCES`(현재 권한), `ZOOP_GRAPH_AUTO_ACTIVATION_ENABLED=false`(자동 활성화는 단일 원본을 직접 활성화해 준비의 base를 움직이므로 함께 켤 수 없음). 아니면 설정 이름으로 기동을 거절합니다.
 - **확인:** 관리자 화면에는 아직 내지 않습니다(OpenAPI 변경 없음). 준비된 candidate는 관리자 그래프 버전 목록에서, 멈춤·복구 상태는 writer 로그와 다음 조회로 봅니다.
 
 ```sql
-SELECT id, round_id, recovery_of, created_at, status, code, graph_version_id, trigger_committed_at
+SELECT id, round_id, recovery_of, created_at, status, code, graph_version_id, trigger_sequence
 FROM graph_publication_preparations ORDER BY id DESC LIMIT 20;
 ```
 
