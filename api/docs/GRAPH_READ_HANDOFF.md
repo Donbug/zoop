@@ -947,6 +947,8 @@ nonweb 실행은 `--zoop.graph-publication-compose.enabled=true`와 정규화된
 
 `round` 없는 근거 조회에서 현재 권한으로 숨겨진 근거는 `404 EVIDENCE_UNAVAILABLE`이다. `round`를 지정하면 먼저 저장된 브리핑 전체의 원천 binding과 그 발행본이 참조하는 이슈·근거의 현재 공개 가능 여부를 검사한다. 필수 ingestion grant 또는 별도 briefing-purpose grant가 철회되어 저장된 발행본을 제공할 수 없으면 `503 SOURCE_UNAVAILABLE`이다. 이 검사를 통과한 회차 안에서 요청 근거가 범위 밖이거나 구조·영향 소속 증명을 충족하지 못하면 404다. 회차에 고정된 버전·마감 시각은 현재 권한 검사를 대신하지 않는다.
 
+자동 준비(`GraphPublicationPreparer`)는 같은 composer를 쓰고 요청과 결정만 스스로 만든다. 결정은 `PublicationMerger.propose`가 만드는 명시적인 필드·관계 선택이며 `reviewer`가 `graph-publication-prepare`다. 저장된 publication은 읽을 때마다 저장된 결정·소유자로 다시 합쳐 검증되므로, 자동 규칙은 merge를 바꾸지 않고 결정으로만 남긴다. 같은 공개 ID의 원본이 모두 native이고 incoming이 있으며 incoming 레코드끼리 같으면 가장 최근 incoming 값을 고르고, `expectedValueDigest`는 바꾸기 전 공개 값이다. incoming끼리 다르거나 legacy 원본, `issueMappings`, 사람의 결정이 하나라도 있는 이슈와 그 이슈를 끝점으로 하는 관계에는 결정을 만들지 않는다. 사건 시각·지리를 새 원본으로 옮긴 이슈의 native 구조 관계는 같은 원본에서 고른다. headline은 같고 근거만 다른 레코드는 현재 공개 소유자를 고르는 `label` 선택 하나로 합친다. 이전 자동 결정은 더 새 incoming이 다르면 같은 키로 교체된다. 운영자 compose는 자동 reviewer를 쓴 결정 파일을 거절한다.
+
 복합 버전을 대상으로 제외하려면 기존 `zoop-disclosure-exclusion-1` 요청에 `action:exclude-publication`을 사용한다. 키는 `requestId/action/operator/reason/graphVersionId/receiptSha256/targets`이며 실제 복합 receipt SHA를 고정한다. 한 요청의 모든 대상을 모든 해당 원본 소유자로 해석하고 같은 publication lock·revision 아래 원본 범위에 원자적으로 기록한다. 소유자가 없는 대상과 표시용 파생 edge ID는 거절한다. 빈 입력이나 작은 결과는 기존 제외를 해제하지 않는다. 해제는 원본 버전과 대상·`expectedRevision`을 명시한 기존 `lift`로 수행한다.
 
 `exclude-query`는 선택한 복합 버전을 원본 native handoff로 먼저 펼친다. 20개를 넘으면 `exposure_batch_required`로 전체 요청을 거절하고 운영자가 원본 버전을 명시적으로 나눠 선택해야 한다. legacy를 포함한 혼합 선택은 native 조회로 전부 확인했다고 처리할 수 없으므로 거절한다. 원본별 제외는 이후 구성본과 과거 구성본에도 그대로 적용된다.

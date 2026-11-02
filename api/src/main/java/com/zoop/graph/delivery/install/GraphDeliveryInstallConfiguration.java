@@ -35,7 +35,7 @@ public class GraphDeliveryInstallConfiguration {
                     "zoop.graph-handoff-import.enabled", "zoop.graph-delivery.seal.enabled", "zoop.disclosure-exclusion.enabled",
                     "zoop.graph.auto-activation.enabled", "zoop.legacy-real-import.enabled", "zoop.document-bindings.enabled",
                     "zoop.briefing.replay.import-enabled", "zoop.ai.handoff-read-client.enabled",
-                    "zoop.graph-publication-compose.enabled"}) {
+                    "zoop.graph-publication-compose.enabled", "zoop.graph-publication-prepare.enabled"}) {
                 if (environment.getProperty(other, Boolean.class, false)) throw new GraphDeliveryException("configuration_invalid");
             }
             if ("fixture".equalsIgnoreCase(environment.getProperty("zoop.graph.snapshot.source"))) {

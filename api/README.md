@@ -603,6 +603,8 @@ JVM은 보존 응답의 SHA·기업·통화·해상도·요청 마감·완료 �
 
 `staged` 또는 `unchanged` 결과의 `graphVersionId`와 `receiptSha256`을 다음 전송·수동 활성화 단계에 사용합니다. 실패 코드가 `outcome_unknown`이면 같은 요청과 새 결과 경로로 상태를 대조합니다. 자세한 결정 파일·원본별 제외·권한 계약은 [누적 발행](docs/GRAPH_READ_HANDOFF.md#누적-발행과-원본별-현재-권한)을 따릅니다.
 
+**자동 준비(`zoop.graph-publication-prepare.enabled=true`).** 첫 실데이터 공개 뒤에는 요청·결정 파일 없이 같은 compose를 실행할 수 있습니다. 현재 활성 publication을 base로, 공개 버전에 없고 마지막 활성화 뒤에 수입된 native 단일 원본(수입 순서로 최대 20개)을 골라 요청을 만들고, `PublicationMerger.propose`의 결정(`reviewer: graph-publication-prepare`)으로 compose합니다. 활성화는 하지 않습니다. 설정은 `artifact-root`, `result`(artifact root 밖의 새 파일), 선택 `operator`(기본 `prepare`)이고 현재 권한은 compose와 같은 `zoop.document-read.ingestion-sources`에서 읽습니다. compose·다른 운영자 명령과 한 프로세스에서 함께 켤 수 없습니다. 결과(`zoop-graph-publication-prepare-result-1`)에는 `outcome`(`staged`·`unchanged`·`nothing_to_prepare`) 또는 실패 `code`, 대상 원본, 만든 요청(`request`)과 결정(`decisions`), 공개 값을 바꾼 결정의 보고서(`autoResolutions`), compose 결과가 남습니다. 활성 버전이 없거나 fixture면 `first_publication_manual`로 거절하며 첫 공개는 운영자 compose로 합니다. 같은 준비에 함께 들어온 원본끼리 값이 다르거나 legacy·매핑·사람의 결정이 걸린 이슈는 결정을 만들지 않아 compose가 `correction_required`로 멈추고, 결과 파일의 요청을 바탕으로 사람이 결정 파일을 만들어 운영자 compose로 처리합니다. 결과를 알 수 없으면 같은 명령을 다시 실행합니다(이미 commit됐으면 `unchanged`). 운영자 compose는 자동 reviewer를 쓴 결정 파일을 `request_invalid`로 거절합니다.
+
 ### 개인화 브리핑
 
 최초 이용 시 회원의 보유·관심 종목으로 기본 설정을 저장하며, 둘 다 없으면 개인화 생성은 시작하지 않습니다. 이후 종목 설정 변경은 다음 09:20/17:30 회차부터 적용하고, 이미 확정한 발행본은 유지합니다. 회차 전체 적격 후보에서 핵심 최대3개를 선정하고, 누락 분석은 공통 AI 생성·별도 검증 경로에 연결합니다. 설정 저장·조회에는 AI 호출이 없습니다.

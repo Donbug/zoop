@@ -39,6 +39,24 @@ public class JdbcGraphPublicationRepository {
                 """, new MapSqlParameterSource("receipts", sourceVersionIds.stream().map(id -> "artifact-receipt-" + id).toList()), String.class);
     }
 
+    /**
+     * Imported single-source versions an automatic preparation may add, oldest first: a staged snapshot that is not a composed
+     * publication, has exactly one source, is not one of {@code members} (the active version's sources) and was imported after the
+     * last pointer change, so a source an operator left out of the published composition is not added back. Activation is manual,
+     * so every pointer change is a person's decision.
+     */
+    public List<String> preparationCandidates(Set<String> members) {
+        return jdbc.queryForList("""
+                SELECT v.id FROM graph_versions v
+                WHERE v.kind = 'snapshot'
+                  AND NOT EXISTS (SELECT 1 FROM graph_publications p WHERE p.version_id = v.id)
+                  AND (SELECT count(*) FROM graph_version_sources s WHERE s.graph_version_id = v.id) = 1
+                  AND NOT (v.id = ANY (CAST(:members AS text[])))
+                  AND v.created_at > COALESCE((SELECT max(a.activated_at) FROM graph_activations a WHERE a.pointer_changed), '-infinity'::timestamptz)
+                ORDER BY v.sequence
+                """, new MapSqlParameterSource("members", members.toArray(String[]::new)), String.class);
+    }
+
     public void insert(Metadata metadata) {
         var args = new MapSqlParameterSource("id", metadata.versionId()).addValue("publication", metadata.publicationId())
                 .addValue("digest", metadata.compositionDigest()).addValue("base", metadata.baseVersionId()).addValue("expected", metadata.expectedActiveVersionId());
