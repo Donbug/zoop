@@ -1,5 +1,6 @@
 package com.zoop.chat.tool;
 
+import com.zoop.document.evidence.config.DocumentReadProperties;
 import com.zoop.document.evidence.service.EvidenceArtifactReader;
 import com.zoop.document.repository.ArticleRow;
 import com.zoop.document.repository.ArtifactRow;
@@ -8,11 +9,28 @@ import com.zoop.document.repository.VersionRow;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class DocumentTextSearchTest {
     private static final Instant NOW = Instant.parse("2026-10-31T00:00:00Z");
+
+    @Test
+    void springUsesTheProductionConstructorWhenTestPortsAlsoExist() {
+        ArtifactRow artifact = new ArtifactRow("text-v1", "extracted_text", "artifact-root:extracted_text/a.txt",
+                "a".repeat(64), 1, "text/plain", NOW);
+        VersionRow version = new VersionRow("art-1", "v1", "제목", null, null, NOW, null, "datetime", null,
+                artifact.id(), NOW);
+        try (var context = new AnnotationConfigApplicationContext()) {
+            context.registerBean(DocumentRegistryRepository.class, () -> registry(version, artifact));
+            context.registerBean(DocumentReadProperties.class, () -> new DocumentReadProperties(null, null, null));
+            context.register(DocumentTextSearch.class);
+            context.refresh();
+
+            assertNotNull(context.getBean(DocumentTextSearch.class));
+        }
+    }
 
     @Test
     void searchesTheVerifiedUtf8BodyOfTheExactVersion() {

@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
@@ -56,6 +57,7 @@ public final class DocumentTextSearch {
     private final Map<Key, Indexed> cache = new LinkedHashMap<>(16, 0.75f, true);
     private long cachedBytes;
 
+    @Autowired
     public DocumentTextSearch(DocumentRegistryRepository registry, DocumentReadProperties properties) {
         this(registry, new EvidenceArtifactReader(properties.artifactRootPath() == null ? null
                 : ArtifactFileStore.at(properties.artifactRootPath()))::read);
