@@ -109,6 +109,20 @@ public final class GraphPublicationPreparer {
     }
 
     /**
+     * The operator compose (B4) of a request and decisions file. Automatic decisions are the preparation's alone: an operator's
+     * decisions may not claim the automatic reviewer, and the preparation's operator name is accepted only to recover an unknown
+     * outcome, with exactly the decisions {@link #proposes} for that base and those sources.
+     */
+    public static ObjectNode operatorCompose(GraphPublicationReader reader, JdbcGraphPublicationRepository publications,
+            GraphPublicationComposer composer, PublicationComposeRequest request, byte[] decisions) {
+        boolean refused = OPERATOR.equals(request.operator())
+                ? !proposes(reader, publications, request, decisions)
+                : GraphPublicationConfiguration.claimsAutomaticReviewer(decisions);
+        if (refused) return GraphPublicationComposer.failed("request_invalid");
+        return composer.run(request, decisions);
+    }
+
+    /**
      * True when {@code decisions} are exactly what a preparation proposes for the request's base and incoming sources, with no change
      * left to people: the only operator compose that may use {@link #OPERATOR} (the recovery of an unknown outcome). A hand-written
      * decision under the automatic reviewer is refused, so the published record never says the application chose what a person did.

@@ -159,7 +159,9 @@ class GraphPublicationPreparePostgresTest {
         assertEquals(GraphPublicationPreparer.OPERATOR, request.operator());
         assertTrue(GraphPublicationPreparer.proposes(reader(), publications, request, decisionBytes(result)));
         assertFalse(GraphPublicationPreparer.proposes(reader(), publications, request, "{}".getBytes(StandardCharsets.UTF_8)));
-        var recovered = composer().run(request, decisionBytes(result));
+        assertEquals("request_invalid", GraphPublicationPreparer.operatorCompose(reader(), publications, composer(), request,
+                "{}".getBytes(StandardCharsets.UTF_8)).get("code").asString());
+        var recovered = GraphPublicationPreparer.operatorCompose(reader(), publications, composer(), request, decisionBytes(result));
         assertEquals("unchanged", recovered.get("outcome").asString(), recovered.toString());
         assertEquals(candidate, recovered.get("graphVersionId").asString());
         var again = preparer().run();
@@ -207,6 +209,89 @@ class GraphPublicationPreparePostgresTest {
         var result = preparer().run();
         assertEquals("staged", result.get("outcome").asString(), result.toString());
         assertEquals(List.of(meanwhile), strings(result, "incomingVersionIds"));
+    }
+
+    @Test void aFixtureActiveVersionStaysAnOperatorCompose() {
+        importNative(HandoffFixtures.Spec.standard());
+        var at = Timestamp.from(NOW);
+        jdbc.update("""
+                INSERT INTO artifacts (id, kind, storage_uri, sha256, bytes, media_type, created_at)
+                VALUES ('artifact-fixture-prepare', 'graph_snapshot', 'fixture:prepare.json', ?, 1, 'application/json', ?)
+                """, "f".repeat(64), at);
+        jdbc.update("""
+                INSERT INTO graph_versions (id, sequence, kind, created_at, published_at, created_by, reason, source_label,
+                    issue_count, relation_count, article_count, snapshot_artifact_id, review_revision, active)
+                VALUES ('fixture-prepare', (SELECT COALESCE(MAX(sequence), 0) + 1 FROM graph_versions), 'fixture', ?, ?, 'system',
+                    'synthetic', 'fixture', 0, 0, 0, 'artifact-fixture-prepare', 0, true)
+                """, at, at);
+        var result = preparer().run();
+        assertEquals("first_publication_manual", result.get("code").asString(), result.toString());
+        assertEquals("fixture-prepare", result.get("activeVersionId").asString());
+    }
+
+    @Test void aKeptRequestReturnsAConflictOnceTheActiveVersionMoved() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        importNative(HandoffFixtures.Spec.standard());
+        var result = preparer().run();
+        assertEquals("staged", result.get("outcome").asString(), result.toString());
+        activate(result.get("graphVersionId").asString());
+        var request = PublicationComposeRequest.parse(Canonical.bytes(result.get("request")));
+        var recovered = GraphPublicationPreparer.operatorCompose(reader(), publications, composer(), request, decisionBytes(result));
+        assertEquals("active_conflict", recovered.get("code").asString(), recovered.toString());
+    }
+
+    @Test void aSourceWithOnlyANewIssueIsStaged() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        String incoming = importNative(HandoffFixtures.Spec.standard().withIssueId("issue:supply-2026q4"));
+        var result = preparer().run();
+        assertEquals("staged", result.get("outcome").asString(), result.toString());
+        assertEquals(List.of(incoming), strings(result, "incomingVersionIds"));
+        assertEquals(0, result.get("changes").size());
+        assertEquals(Set.of(HandoffFixtures.ISSUE, "issue:supply-2026q4"), reader().read(result.get("graphVersionId").asString())
+                .snapshot().issues().stream().map(i -> i.issueId()).collect(Collectors.toSet()));
+    }
+
+    @Test void sourcesThatDoNotOverlapBecomeOneCandidate() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        var imported = List.of(importNative(HandoffFixtures.Spec.standard().withIssueId("issue:supply-2026q4")),
+                importNative(HandoffFixtures.Spec.standard().withIssueId("issue:supply-2026q5")),
+                importNative(HandoffFixtures.Spec.standard().withIssueId("issue:supply-2026q6")));
+        var result = preparer().run();
+        assertEquals("staged", result.get("outcome").asString(), result.toString());
+        assertEquals(Set.copyOf(imported), Set.copyOf(strings(result, "incomingVersionIds")));
+        assertEquals(4, reader().read(result.get("graphVersionId").asString()).snapshot().issues().size());
+    }
+
+    @Test void aBatchSplitByIssueAcrossHandoffsIsOneCandidate() {
+        // The normal split (11-02 AI reply): every handoff holds whole issues, and one repeats the published issue unchanged.
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        var imported = List.of(importNative(HandoffFixtures.Spec.standard().withIssueId("issue:supply-2026q4")),
+                importNative(HandoffFixtures.Spec.standard().withIssueId("issue:supply-2026q5")),
+                importNative(HandoffFixtures.Spec.standard()));
+        var result = preparer().run();
+        assertEquals("staged", result.get("outcome").asString(), result.toString());
+        assertEquals(Set.copyOf(imported), Set.copyOf(strings(result, "incomingVersionIds")));
+        assertEquals(0, result.get("changes").size());
+        assertEquals(3, reader().read(result.get("graphVersionId").asString()).snapshot().issues().size());
+    }
+
+    @Test void preparesUnderAnAuthorityWithATextProjection() throws Exception {
+        // #511: a collected source whose scope carries a text projection descriptor keeps the same grant decision.
+        Files.writeString(authority, """
+                {"schemaVersion":"zoop-ingestion-s2-1","revision":"registry-a","sources":[{
+                  "sourceId":"synthetic-source","adapter":"collected-http","inputRoot":"/synthetic",
+                  "allowedHosts":["example.invalid"],"scopes":[{"scopeId":"scope-a","selection":"all",
+                    "initialCursor":null,"articleXPath":null,"timestampLimitations":["synthetic"],
+                    "textProjection":{"profile":"korea-kogl1-caption-boundary-1","parent":{},
+                      "excludedCaptionPaths":["/html/body/figure"],"rightsReceipt":{},"boundaryDecision":{}}}],
+                  "grant":{"grantId":"operator-grant","revision":"rights-1","sourceId":"synthetic-source","enabled":true,
+                    "rights":"known","allowedOperations":["read","store","quote-display"],"recipients":[],
+                    "purposes":[],"evidence":["synthetic operator grant"],"expiresAt":null}}]}
+                """);
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        importNative(HandoffFixtures.Spec.standard().withIssueId("issue:supply-2026q4"));
+        var result = preparer().run();
+        assertEquals("staged", result.get("outcome").asString(), result.toString());
     }
 
     @Test void sourcesPastTheCapArePreparedAfterTheCappedCandidateIsPublished() {

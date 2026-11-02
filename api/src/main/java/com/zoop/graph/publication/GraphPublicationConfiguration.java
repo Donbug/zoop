@@ -67,13 +67,7 @@ public class GraphPublicationConfiguration {
             try {
                 var parsed = PublicationComposeRequest.parse(readOperatorFile(request, PublicationComposeRequest.MAX_BYTES));
                 byte[] decisionBytes = readOperatorFile(decisions, 4_000_000);
-                // Automatic decisions are the preparation's alone. Its operator name is accepted only to recover an unknown outcome:
-                // the decisions must be exactly what the preparation proposes for that base and those sources.
-                boolean refused = GraphPublicationPreparer.OPERATOR.equals(parsed.operator())
-                        ? !GraphPublicationPreparer.proposes(reader, publications, parsed, decisionBytes)
-                        : claimsAutomaticReviewer(decisionBytes);
-                if (refused) return GraphPublicationComposer.failed("request_invalid");
-                return composer.run(parsed, decisionBytes);
+                return GraphPublicationPreparer.operatorCompose(reader, publications, composer, parsed, decisionBytes);
             } catch (PublicationException invalid) { return GraphPublicationComposer.failed(invalid.code()); }
         }, "publication composition refused; see operator result");
     }
@@ -122,7 +116,7 @@ public class GraphPublicationConfiguration {
     private static final String PREPARE = "zoop.graph-publication-prepare";
 
     /** A nonweb artifact-mode process running exactly one operator command. */
-    private static void requireExclusiveOperator(ApplicationContext context, String publicationSibling) {
+    static void requireExclusiveOperator(ApplicationContext context, String publicationSibling) {
         Environment env = context.getEnvironment();
         if (context instanceof WebApplicationContext || "fixture".equals(env.getProperty("zoop.graph.snapshot.source")))
             throw new IllegalArgumentException("publication composition requires a nonweb artifact-mode process");
