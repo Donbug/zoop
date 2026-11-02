@@ -77,7 +77,34 @@ manifest의 정확한 최상위 모양은 `{"schemaVersion":"zoop-operating-inpu
 
 공개 read·store·quote-display 권한은 incoming과 모든 snapshot 관측에 필요하며 각 set의 수용·동결을 시작하기 직전과 최종 응답 직전에 확인합니다. 기존 job 재등록에도 같은 검사를 적용합니다. 배치에서 처음 읽은 registry가 바뀌면 다음 set의 등록을 중단하고, 이미 등록된 prefix와 핀은 보존하되 응답 metadata는 숨깁니다. 최초 import는 receipt의 acquisition grant ID/revision을 현재 grant와 대조하므로 바뀐 경우 `collection_receipt_invalid`를 그대로 처리해야 합니다. 현재 읽기 권한이 유효해도 이미 동결된 job의 이전 grant binding이 향후 전송을 허용한다는 뜻은 아닙니다. 등록에는 model-send·키·live-send gate가 필요하지 않으며 실제 전송 승인은 기존 정확한 purpose/recipient 검사와 별도로 받아야 합니다. 등록은 기존 metered funding을 사용하므로 누적 USD 상한이 필요한 작업에는 이 모드를 그대로 적용할 수 없습니다.
 
-등록 결과의 원래 set ID를 `run --set-id`로 선택해 따로 실행한 뒤, 운영자가 그 set의 S3/S2 핀과 canonical·decisions·bindings 파일을 담은 manifest로 기존 `zoop-ai-handoff freeze`와 `export`를 호출합니다. 완료 여부는 원래 unit과 영속 `complete` 상태, 선택한 모든 S3 job의 `ready`·현재 delivery를 함께 확인해야 합니다. 완료된 set은 다음 `run` 응답에서 빠지므로 빈 `sets`만으로 판단하면 안 됩니다. handoff는 명시한 source 집합을 검증하며 수집 배치 전체와의 일치는 운영자가 책임집니다. 한 manifest에는 S3 source를 최대 20개까지 넣을 수 있으므로 21–50개를 모두 전달할 때는 원래 집합을 중복과 누락 없이 나눈 여러 manifest가 필요합니다. export 결과는 앱 import와 공개 활성화 전의 `publication: not-published`입니다.
+등록 결과의 원래 set ID를 `run --set-id`로 선택해 따로 실행한 뒤, 운영자가 그 set의 S3/S2 핀과 canonical·decisions·bindings 파일을 담은 manifest로 기존 `zoop-ai-handoff freeze`와 `export`를 호출합니다. 완료 여부는 원래 unit과 영속 `complete` 상태, 선택한 모든 S3 job의 `ready`·현재 delivery를 함께 확인해야 합니다. 완료된 set은 다음 `run` 응답에서 빠지므로 빈 `sets`만으로 판단하면 안 됩니다. handoff는 명시한 source 집합을 검증하며 수집 배치 전체와의 일치는 운영자가 책임집니다. 한 manifest에는 S3 source를 최대 20개까지 넣을 수 있습니다. 21–50개를 전달할 때는 아래의 분할 사전 검사로 원래 집합의 누락·중복과 같은 이슈의 연결 관계를 확인합니다. export 결과는 앱 import와 공개 활성화 전의 `publication: not-published`입니다.
+
+### handoff 분할 사전 검사 (#493 수집 배치 전달)
+
+`zoop-ai-handoff partition-check`는 독립적으로 고정한 원래 수집·승인 선택 집합을 기준으로 제안된 manifest들을 검사합니다. canonical 이슈를 공유하는 S3 job들을 하나의 연결 성분으로 묶으며, 매핑이 없는 job도 단독 성분으로 셉니다. 같은 이슈가 여러 manifest에 걸치거나 한 연결 성분이 **고유 S3 job 20개**를 넘으면 `invalid`입니다. 반복되는 snapshot member가 있어도 job 수는 줄어들지 않습니다.
+
+```sh
+zoop-ai-handoff partition-check < "$ZOOP_HANDOFF_PARTITION_CONFIG"
+```
+
+입력은 기존 handoff CLI와 같이 stdin의 65,536바이트 이하 닫힌 JSON입니다. 이 명령의 경로는 설정 안에서 지정합니다. 파일 참조는 모두 `{"path": "/absolute/input.json", "sha256": "<파일 바이트의 SHA-256>"}` 형식이며 일반 파일·크기·symlink 검사는 기존 owner 규칙을 따릅니다.
+
+| 필드 | 계약 |
+| --- | --- |
+| `schemaVersion`, `scope`, `sourceKind` | `zoop-partition-check-1`, 원래 모집단을 설명하는 문자열, `actual` 또는 `synthetic` |
+| `universe` | 원래 수집 또는 승인된 선택에서 독립적으로 보존한 `{"sources": [SourcePin, ...]}` 파일 참조. S3 identity/input digest, S2 identity/input/result digest, review digest를 모두 고정합니다 |
+| `canonical` | 실제 member의 권위 있는 canonical registry 파일 참조. S2 job·input digest·kind·ref가 정확히 일치해야 합니다 |
+| `contexts` | 원래 source와 관측을 기존 owner에 연결하는 `zoop-handoff-source-contexts-1` 파일 참조 |
+| `partitions` | 하나 이상의 `{manifest, canonical, decisions, bindings}` 객체. 각 값은 파일 참조이며 manifest 안의 operator 파일 해시와 일치해야 합니다 |
+| `operatingManifests` | 선택 사항인 원래 `zoop-operating-input-manifest-1` 파일 참조 목록. 지정하면 전체 S2/S3 집합과 실제 extraction 요청도 `universe`·원장과 대조합니다 |
+
+`universe`는 제안된 분할 manifest들을 합쳐 만들지 않습니다. 승인된 일부만 대상으로 삼았다면 `scope`에 그 범위를 명시합니다. 임의의 파일이 전체 수집을 대표한다는 운영자의 주장을 이 검사만으로 인증할 수는 없습니다.
+
+출력은 canonical JSON인 `zoop-partition-check-result-1`입니다. 종료 코드는 `valid: 0`, `invalid: 1`, `blocked: 2`입니다. `inputs`의 역할별 해시, `counts`, `components`, `issues`, `findings`를 보존합니다. 원래 job의 누락·중복·예상 밖 job·핀 불일치, canonical 매핑 차이, representative와 field verdict·geography·structural·FOLLOWS 참조의 분할 내 결합을 확인합니다. `findings[].effect`는 `partition-invalid`, `whole-freeze-error`, `issue-exclusion`, `item-exclusion`, `source-blocked`를 구분합니다.
+
+member는 기존 `Contexts.open`·`handoff.load_source`·`members_of`를 통해 현재 권한과 원장 무결성을 확인한 뒤 읽습니다. recorded `candidate`인 S2 event와 고정 snapshot event의 모든 member를 사용하며 HOLD/REJECT를 membership 필터로 바꾸지 않습니다. S3 공유 lock은 분할 분석이 끝날 때까지 유지하고, 응답 직전에 모든 원천을 owner loader로 다시 읽어 현재 권한·upstream 결합·정확한 review digest를 재검증합니다. 이 최종 검사를 통과해야 `memberInventoryComplete: true`와 정확한 source pin·event inventory를 반환하고 매핑이 없는 member도 별도로 보고합니다. 최종 검사가 막히면 `blocked`로 남으며 준비한 member inventory·counts·issue·component와 그로부터 나온 findings를 응답에서 걷어냅니다. 보존 archive를 검사할 때는 전체 원장·sidecar·권한 파일을 사본으로 준비하고 context의 운영 경로만 사본에 맞춰 다시 고정합니다. source registry의 역사적 `inputRoot`는 유지합니다.
+
+`valid`는 분할의 정합성만 뜻합니다. 연결 관계는 선언된 canonical ID에 한정되며, 서로 다른 ID의 의미상 동일성, 분할 간 public ID 충돌, manifest 전체의 execution mode 일치는 이 결과와 별도로 확인해야 합니다. 실제 freeze의 근거·관계·요약 검증과 앱 import·활성화 승인은 각각 기존 절차를 따릅니다. 20개를 넘는 연결 성분은 별도 판단이 필요합니다. 기존 수동 관계 선택은 여러 basis 중 하나를 고를 수 있으므로 모든 근거를 보존하는 무손실 분할 대안으로 취급하면 안 됩니다.
 
 
 ### 명령과 환경
@@ -133,7 +160,7 @@ raw receipt와 비용 정산은 같은 운영 원장 transaction에 저장합니
 | `zoop-ai-dependents` (하위 명령 없음, stdin 변경 1건) | `zoop_ai_pipeline.dependency_cli` | `zoop-dependency-s4` | 위 세 원장을 읽기 전용으로만 연다(쓰는 상태 파일 없음) |
 | `zoop-ai-graph {init,freeze,project,recover,inspect,read,focus}` | `zoop_ai_pipeline.graph_projection_cli` | `zoop-graph-projection-1` (plan `zoop-graph-plan-2`) | `graph.sqlite3` + 이 원장 하나에 묶인 별도 Neo4j 5 database의 **비공개** version(공개 아님) |
 | `zoop-ai-issue-summary {submit,run,resume,inspect,export,cancel,live-binding}` | `zoop_ai_pipeline.issue_summary_cli` | `zoop-issue-summary-1` (policy `zoop-issue-summary-policy-1`) | `issue-summary.sqlite3`; 위 세 원장과 운영자 파일을 읽기 전용으로만 열고 handoff·Neo4j·app은 쓰지 않음 |
-| `zoop-ai-handoff {freeze,freeze-round,check-round,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `-8`/decisions `-4`/policy `-2` 또는 bundle `-9`/decisions `-5`/policy `-3`) | `handoff.sqlite3` + `bundles/<sha256>.json`; `check-round`는 원천 완료 상태만 읽고, `freeze-round`는 window로 좁힌 운영자 파일을 `--files-dir`에 설치 |
+| `zoop-ai-handoff {freeze,freeze-round,check-round,partition-check,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `-8`/decisions `-4`/policy `-2` 또는 bundle `-9`/decisions `-5`/policy `-3`); 분할 검사는 `zoop-partition-check-1` | `handoff.sqlite3` + `bundles/<sha256>.json`; `partition-check`는 source만 읽고, `check-round`는 원천 완료 상태만 읽고, `freeze-round`는 window로 좁힌 운영자 파일을 `--files-dir`에 설치 |
 | `zoop-ai-handoff-exposure` | `zoop_ai_pipeline.handoff_exposure_cli` | `zoop-handoff-exposure-1` | handoff 원장·고정 artifact를 읽기만 함. 원천 변경 조회는 ingestion·extraction 원장도 읽으며 relation·Neo4j·앱 원장은 열지 않음 |
 | `zoop-ai-operate {init,register,register-collection,run,status,pause,resume,stop,force-stop}` | `zoop_ai_pipeline.operating` | `zoop-operating-runtime-config-1` / `zoop-operating-input-manifest-1` / `zoop-operating-collection-registration-1` | 운영 전용 `live-budget.sqlite3`와 공유 `stateDirectory/s2`, `stateDirectory/s3` 원장; `register-collection`은 승인된 공통 ingestion도 준비 |
 
