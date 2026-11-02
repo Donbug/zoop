@@ -646,6 +646,24 @@ function MapWorkspace({
     graphVersion: data?.metadata.graphVersion ?? undefined,
     asOf: data?.metadata.asOf ?? undefined,
   };
+  // D-GRP-02/06/07 M10–M14: panel rows reuse map selection and centering.
+  const panelNodeIds = new Set(data?.nodes.map((node) => node.id) ?? []);
+  function selectPanelNode(id: string) {
+    if (tutorialOpen) {
+      selectNode(id);
+      return;
+    }
+    updateQuery({
+      select: `node:${id}`,
+      id: null,
+      path: null,
+      impact: null,
+      focus: null,
+      hops: null,
+    });
+    track({ type: 'graph_node_select', targetId: id, viewId });
+    setCenterRequest((request) => ({ id, seq: (request?.seq ?? 0) + 1 }));
+  }
   const impact = useImpactPath(
     data && !loading && !error ? impactCompanyId : null,
     data && !loading && !error ? impactIssueId : null,
@@ -1127,6 +1145,7 @@ function MapWorkspace({
                 <HoldingsSidebar
                   key={memoryOwner}
                   member={Boolean(token)}
+                  selectedId={selectedId}
                   graph={!loading && !error ? data : null}
                   watchSync={watchSync}
                   onWatchChanged={watchSaved}
@@ -1429,7 +1448,10 @@ function MapWorkspace({
             >
               {isolatedOpen && data && (
                 <IsolatedIssuesPanel
+                  key={`${memoryOwner}:${JSON.stringify(eventContext)}`}
                   issues={isolatedIssues(data)}
+                  context={eventContext}
+                  onEvidence={(event) => eventAction('evidence', event)}
                   onClose={() => selectNode(null)}
                   onSelect={(id) => {
                     selectNode(id);
@@ -1511,14 +1533,8 @@ function MapWorkspace({
                       select: null,
                     })
                   }
-                  onSelectCompany={(id) =>
-                    updateQuery({
-                      path: null,
-                      focus: null,
-                      hops: null,
-                      select: `node:${id}`,
-                    })
-                  }
+                  onSelectCompany={selectPanelNode}
+                  onSelectNode={selectPanelNode}
                   onEvidence={(id) => {
                     const node = data?.nodes.find((n) => n.id === id);
                     const evidenceIds = [
@@ -1545,6 +1561,7 @@ function MapWorkspace({
                   context={eventContext}
                   graph={data}
                   impact={impact.data}
+                  onSelectNode={selectPanelNode}
                   loading={impact.loading}
                   error={impact.error}
                   errorCode={impact.errorCode}
@@ -1596,6 +1613,17 @@ function MapWorkspace({
                     context={eventContext}
                     geography={selectedNode?.geography ?? null}
                     logoOf={logoOf}
+                    nodeIds={panelNodeIds}
+                    onSelectNode={selectPanelNode}
+                    canFocus={
+                      focusId !== eventId &&
+                      Boolean(
+                        data?.edges.some(
+                          (edge) =>
+                            edge.source === eventId || edge.target === eventId,
+                        ),
+                      )
+                    }
                     onClose={() => selectNode(null)}
                     onAction={eventAction}
                   />

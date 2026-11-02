@@ -171,12 +171,13 @@ it('does not claim no linked events when the graph is partial', async () => {
   expect(company.textContent).not.toContain('연결된 사건 없음');
 });
 
-function renderSidebar(member = true) {
+function renderSidebar(member = true, selectedId?: string) {
   const onPick = vi.fn();
   render(
     <MemoryRouter>
       <HoldingsSidebar
         member={member}
+        selectedId={selectedId}
         logoOf={(id) =>
           id === 'KRX:005930' ? '/graph-assets/samsung.svg' : null
         }
@@ -188,19 +189,19 @@ function renderSidebar(member = true) {
   return onPick;
 }
 
-it('lists holdings with their quote and picks one for the map', async () => {
+it('D-GRP-01 M16 lists holdings with quote, actual weight and current selection', async () => {
   server.on('GET', '/api/v1/portfolio', () =>
     json({
       connected: true,
       connection: null,
       holdings: [
-        holding('KRX:005930', '삼성전자', 12),
+        { ...holding('KRX:005930', '삼성전자', 12), weight: 0 },
         holding('NASDAQ:META', '메타', 3),
       ],
       mockAsOf: null,
     }),
   );
-  const onPick = renderSidebar();
+  const onPick = renderSidebar(true, 'KRX:005930');
   expect(screen.getByRole('heading', { name: '내 종목' })).toBeTruthy();
   const samsung = await screen.findByRole('button', {
     name: '삼성전자, 지도에서 보기',
@@ -209,6 +210,11 @@ it('lists holdings with their quote and picks one for the map', async () => {
     '/graph-assets/samsung.svg',
   );
   expect(samsung.textContent).toContain('12주');
+  expect(samsung.textContent).toContain('비중 0%');
+  expect(samsung.getAttribute('aria-current')).toBe('true');
+  const meta = screen.getByRole('button', { name: '메타, 지도에서 보기' });
+  expect(meta.textContent).not.toContain('비중');
+  expect(meta.hasAttribute('aria-current')).toBe(false);
   await userEvent.click(samsung);
   expect(onPick).toHaveBeenCalledWith('KRX:005930');
 });
