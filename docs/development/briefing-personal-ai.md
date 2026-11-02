@@ -12,7 +12,7 @@
 
 `scripts/briefing_personal_ai_import.py`는 생성·검증 요청/응답의 원본 bytes SHA, 입력·문안·검증 결과의 정확한 일치를 확인한 뒤 SQL을 작성한다. `--member-id`, `--calls <완료 기록 폴더>`(반복 가능), `--record <PASS 기록>`(반복 가능), `--output <새 비공개 폴더>`를 사용한다. 출력 SQL은 원문/평가를 갱신하지 않고 해당 회원·회차·선정 기준과 일치하는 AI 버전만 추가한다. 실제 모델 결과·회원 식별자·키 파일·SQL 출력은 공개 저장소에 포함하지 않는다.
 
-후속 migration `V20261030121200`은 현재 보유/관심 집합·pool version·선정 이슈와 기업 조합을 고정한 입력, 검증 결과, 두 provider receipts를 저장한다. UPDATE를 막고 새 버전을 추가하며, 회원 삭제의 개인정보 파기를 위해 회원 FK의 DELETE CASCADE는 허용한다.
+후속 migration `V20261102131000`은 현재 보유/관심 집합·pool version·선정 이슈와 기업 조합을 고정한 입력, 검증 결과, 두 provider receipts를 저장한다. UPDATE를 막고 새 버전을 추가하며, 회원 삭제의 개인정보 파기를 위해 회원 FK의 DELETE CASCADE는 허용한다.
 
 `GET /api/v1/briefings/{id}/personalized/issues` 응답의 `aiAnalysis`는 다음을 구분한다.
 

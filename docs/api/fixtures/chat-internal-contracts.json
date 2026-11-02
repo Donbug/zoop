@@ -1,0 +1,124 @@
+{
+  "requests": [
+    {
+      "capabilityId": "document.search",
+      "targets": ["KRX:000660"],
+      "limit": 5,
+      "evidenceScope": ["ev-hbm-1"],
+      "since": "2026-10-01T00:00:00Z",
+      "searchText": "HBM 공급 계약"
+    },
+    {
+      "capabilityId": "graph.path.read",
+      "targets": ["KRX:000660", "NASDAQ:NVDA"],
+      "limit": 20
+    }
+  ],
+  "results": [
+    {
+      "schemaVersion": "chat-tool/v1",
+      "toolCallId": "call-document-1",
+      "capabilityId": "document.search",
+      "dataVersion": "graph-fixture-2026-10-08",
+      "items": [
+        {
+          "id": "ev-hbm-1",
+          "kind": "article",
+          "label": "합성 HBM 공급 계약",
+          "companyIds": ["KRX:000660"],
+          "evidenceIds": ["ev-hbm-1"]
+        }
+      ],
+      "evidenceIds": ["ev-hbm-1"],
+      "truncated": false,
+      "nextAllowed": false,
+      "error": null
+    },
+    {
+      "schemaVersion": "chat-tool/v1",
+      "toolCallId": "call-web-2",
+      "capabilityId": "web.search",
+      "dataVersion": "web:synthetic-web-v1",
+      "items": [
+        {
+          "id": "web-0123456789abcdef0123456789abcdef",
+          "kind": "web_result",
+          "label": "합성 공개 웹 결과",
+          "companyIds": [],
+          "evidenceIds": []
+        }
+      ],
+      "evidenceIds": [],
+      "truncated": true,
+      "nextAllowed": false,
+      "error": null,
+      "webResults": [
+        {
+          "id": "web-0123456789abcdef0123456789abcdef",
+          "url": "https://example.invalid/hbm",
+          "domain": "example.invalid",
+          "title": "합성 공개 웹 결과",
+          "snippet": "외부 호출 없이 계약 검증에만 쓰는 합성 결과입니다.",
+          "publishedAt": null,
+          "provider": "synthetic-web-v1",
+          "searchedAt": "2026-10-30T00:00:00Z"
+        }
+      ],
+      "cachedFrom": "call-web-1",
+      "withheld": {
+        "reason": "source_grant_denied",
+        "items": 1,
+        "evidenceIds": 0,
+        "paths": 0
+      }
+    },
+    {
+      "schemaVersion": "chat-tool/v1",
+      "toolCallId": "call-graph-3",
+      "capabilityId": "graph.version.diff",
+      "dataVersion": null,
+      "items": [],
+      "evidenceIds": [],
+      "truncated": null,
+      "nextAllowed": null,
+      "error": "tool_timeout"
+    }
+  ],
+  "routeSummaries": [
+    {
+      "requirements": [
+        {
+          "id": "r1",
+          "mode": "tools",
+          "stage": 1,
+          "types": ["Q03"],
+          "capabilities": ["document.search"]
+        }
+      ],
+      "path": "direct",
+      "deterministicCheck": "passed",
+      "outcome": "answered",
+      "coverage": [
+        {
+          "requirementId": "r1",
+          "explicit": true,
+          "status": "answered",
+          "toolCallIds": ["call-document-1"]
+        }
+      ]
+    },
+    {
+      "outcome": "guidance",
+      "reason": "out_of_scope",
+      "coverage": [
+        {
+          "requirementId": "r1",
+          "explicit": true,
+          "status": "limited",
+          "toolCallIds": [],
+          "reason": "out_of_scope"
+        }
+      ]
+    }
+  ]
+}
