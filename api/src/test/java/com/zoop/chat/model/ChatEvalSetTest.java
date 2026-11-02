@@ -569,9 +569,9 @@ public class ChatEvalSetTest {
         }
 
         /** The same tools with one more, such as the web search the direct path never plans. */
-        public ChatToolRegistry registryWith(com.zoop.chat.tool.ChatTool extra) {
+        public ChatToolRegistry registryWith(com.zoop.chat.tool.ChatTool... extra) {
             List<com.zoop.chat.tool.ChatTool> all = new ArrayList<>(tools);
-            all.add(faultable(extra));
+            Stream.of(extra).map(this::faultable).forEach(all::add);
             return new ChatToolRegistry(all);
         }
 
