@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import SlimHeader from '@/components/common/SlimHeader';
+import SkipLink from '@/components/common/SkipLink';
 import './login-surface.css';
 
 /** D-AUT-01만 사용하는 장식 배경. 로그인 정보와 조작은 모두 실제 HTML이다. */
@@ -9,8 +10,13 @@ export default function LoginFrame({ children }: { children: ReactNode }) {
       className="service-surface auth-surface login-surface"
       data-screen-id="D-AUT-01"
     >
+      <SkipLink />
       <SlimHeader themeSwitch />
-      <main className="relative isolate flex min-h-[calc(100dvh-48px)] flex-col items-center justify-center overflow-hidden bg-zoop-paper px-6 py-12 sm:py-16">
+      <main
+        id="service-main"
+        tabIndex={-1}
+        className="relative isolate flex min-h-[calc(100dvh-48px)] flex-col items-center justify-center overflow-hidden bg-zoop-paper px-6 py-12 sm:py-16"
+      >
         <img
           src="/auth/login-news-background.webp"
           alt=""

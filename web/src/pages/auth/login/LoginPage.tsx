@@ -6,9 +6,9 @@ import {
   logIn,
   socialLoginUrl,
   startGuestSession,
-  type SocialProvider,
 } from '@/apis/auth/session';
 import { useAuth } from '@/hooks/useAuth';
+import { useAsyncData } from '@/hooks/useAsyncData';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useAuthCompletion } from '@/hooks/useAuthCompletion';
 import { acceptMemberSession, loadSession } from '@/apis/auth/member-session';
@@ -141,25 +141,15 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [guestError, setGuestError] = useState(false);
   const [guestConfirm, setGuestConfirm] = useState(false);
-  // 서버에 설정된 소셜 제공자. 불러오기 전·실패 시에는 소셜 버튼을 두지 않는다.
-  const [providers, setProviders] = useState<SocialProvider[]>([]);
+  // D-AUT-01 A2: a failed provider read stays distinct from an empty list.
+  const providerRequest = useAsyncData(listSocialProviders);
+  const providers =
+    providerRequest.status === 'success' ? providerRequest.data : [];
   const params = new URLSearchParams(location.search);
   const socialResult =
     params.get('notice') === 'blocked'
       ? '이용이 제한된 계정이라 로그아웃했어요. 고객센터로 문의해 주세요.'
       : socialResultMessage(params.get('social'));
-  useEffect(() => {
-    let alive = true;
-    listSocialProviders().then(
-      (items) => {
-        if (alive) setProviders(items);
-      },
-      () => undefined,
-    );
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   // FS006: existing members use the same confirmed holdings/interests branch.
   useEffect(() => {
@@ -321,6 +311,7 @@ export default function LoginPage() {
             <div className="mt-1 flex items-center justify-between gap-2 px-2 text-caption">
               <Link
                 to="/signup"
+                state={location.state}
                 aria-disabled={busy}
                 className={textLink}
                 onClick={(event) => busy && event.preventDefault()}
@@ -344,7 +335,23 @@ export default function LoginPage() {
           </form>
         )}
 
-        <div className="flex flex-col gap-2.5">
+        <div
+          className="flex flex-col gap-2.5"
+          aria-busy={providerRequest.status === 'loading'}
+        >
+          {providerRequest.status === 'error' && (
+            <div role="alert" className={authAlert}>
+              <p>소셜 로그인 목록을 불러오지 못했어요</p>
+              <button
+                type="button"
+                className={textLink}
+                disabled={busy}
+                onClick={() => providerRequest.reload()}
+              >
+                다시 시도
+              </button>
+            </div>
+          )}
           {providers.length > 0 && (
             <>
               <div className="flex items-center gap-3 text-caption text-zoop-faint before:h-px before:flex-1 before:bg-zoop-line after:h-px after:flex-1 after:bg-zoop-line">
