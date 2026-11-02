@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
  * that holds the id). A target the operator lifted on the new source itself (its
  * latest change there is a lift) is not carried over that decision, and one already excluded there is not carried again, so a
  * re-activation or a retried activation appends nothing twice. A lift on the original version is not carried either; a lift with
- * {@code laterVersions} on that original version also ends the copies, on whichever versions they were carried to.
+ * {@code laterVersions} on that original version also ends the copies that are still the latest change of their versions, on whichever versions they were carried to.
  */
 public class DisclosureExclusionCarry {
     public static final String CAUSE = "carried";

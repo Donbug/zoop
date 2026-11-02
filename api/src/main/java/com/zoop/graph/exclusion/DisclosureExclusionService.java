@@ -45,8 +45,9 @@ import tools.jackson.databind.JsonNode;
  * <li>{@code lift}: the only way an exclusion ends. A report never lifts anything, however small or empty (rule 4). Refused when
  *     a target changed after the lift's {@code expectedRevision}: a lift never undoes a change its operator did not see. With
  *     {@code laterVersions} the same targets are lifted in every imported version after the named one (a report applied them
- *     there while they waited) and, for the targets an activation carried from the named one, in every version it carried them
- *     to (followed through carries of those copies), imported before or after it, under the same stale check.</li>
+ *     there while they waited) and, for the targets an activation carried from the named one, in every version that still holds
+ *     the copy of that decision (followed through carries of those copies), imported before or after it, under the same stale
+ *     check. A copy the operator changed on its version after the carry is that version's own decision and stays.</li>
  * </ul>
  * An activation appends changes of its own ({@link DisclosureExclusionCarry}, cause {@code carried}): the public version's
  * unlifted exclusions, carried to the version being activated.
@@ -327,25 +328,35 @@ public final class DisclosureExclusionService {
             if (request.expectedRevision() > repository.revision()) throw new ExclusionException(ExclusionFailure.REVISION_STALE);
             // The versions this lift covers are resolved under the lock: the named one and, with laterVersions, every imported
             // version after it (a reported copy of the same targets may sit there) with all the targets, and every other version
-            // a carry copied some of the targets to from the named one, with only those targets: an exclusion the operator took
-            // there is not the named version's decision. The stale check covers them all, except that a carry between versions
-            // of this set copied a decision the set already holds: it is no new change.
+            // that still holds a carried copy of the named version's decision, with only those targets: an exclusion the operator
+            // took there, also after such a copy, is not the named version's decision. The stale check covers every version the
+            // decision was carried through, kept copies included, except that a carry between versions of this set copied a
+            // decision the set already holds: it is no new change.
             Map<String, List<Target>> covered = new LinkedHashMap<>();
+            Map<String, List<Target>> checked = new LinkedHashMap<>();
             covered.put(request.graphVersionId(), request.targets());
             if (request.laterVersions()) {
                 repository.laterVersions(request.graphVersionId()).forEach(versionId -> covered.put(versionId, request.targets()));
-                repository.carriedCopies(request.graphVersionId(), request.targets()).forEach((versionId, copied) ->
+                var copies = repository.carriedCopies(request.graphVersionId(), request.targets());
+                copies.current().forEach((versionId, copied) ->
                         covered.putIfAbsent(versionId, request.targets().stream().filter(copied::contains).toList()));
+                checked.putAll(covered);
+                copies.traced().forEach((versionId, copied) ->
+                        checked.putIfAbsent(versionId, request.targets().stream().filter(copied::contains).toList()));
+            } else {
+                checked.putAll(covered);
             }
-            List<String> versionIds = List.copyOf(covered.keySet());
-            Map<String, List<Target>> lifted = new LinkedHashMap<>();
-            List<VersionChange> versions = new ArrayList<>();
+            List<String> versionIds = List.copyOf(checked.keySet());
             for (String versionId : versionIds) {
-                List<Target> targets = covered.get(versionId);
                 Map<Target, Long> lastChanged = repository.lastChanged(versionId, versionIds);
-                if (targets.stream().anyMatch(t -> lastChanged.getOrDefault(t, 0L) > request.expectedRevision())) {
+                if (checked.get(versionId).stream().anyMatch(t -> lastChanged.getOrDefault(t, 0L) > request.expectedRevision())) {
                     throw new ExclusionException(ExclusionFailure.REVISION_STALE);
                 }
+            }
+            Map<String, List<Target>> lifted = new LinkedHashMap<>();
+            List<VersionChange> versions = new ArrayList<>();
+            for (String versionId : covered.keySet()) {
+                List<Target> targets = covered.get(versionId);
                 Set<Target> current = repository.excluded(versionId);
                 List<Target> moved = targets.stream().filter(current::contains).toList();
                 List<Target> notExcluded = targets.stream().filter(t -> !current.contains(t)).toList();
