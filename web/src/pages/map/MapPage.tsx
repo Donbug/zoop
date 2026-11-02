@@ -1051,9 +1051,10 @@ function MapWorkspace({
               aria-controls="holdings-sidebar"
               onClick={() => changeSidebar(!sidebarOpen)}
               title="보유·관심 종목 목록 보기"
-              aria-label="내 종목 목록"
+              aria-label="보유·관심 목록"
             >
-              <GraphIcon name="sidebar" inheritColor />내 종목
+              <GraphIcon name="sidebar" inheritColor />
+              보유·관심
             </button>
             <div className="relationship-mode" aria-label="그래프 모드">
               <button

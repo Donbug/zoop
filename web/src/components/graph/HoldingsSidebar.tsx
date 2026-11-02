@@ -68,12 +68,12 @@ export default function HoldingsSidebar({
           id="holdings-sidebar-title"
           className="m-0 text-lead font-bold text-zoop-ink"
         >
-          내 종목
+          보유·관심
         </h2>
         <button
           type="button"
           onClick={onClose}
-          aria-label="내 종목 사이드바 닫기"
+          aria-label="보유·관심 사이드바 닫기"
           className="grid size-7 place-items-center rounded text-zoop-muted hover:bg-zoop-soft focus-visible:outline-2"
         >
           ×

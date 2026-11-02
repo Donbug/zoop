@@ -202,7 +202,7 @@ it('D-GRP-01 M16 lists holdings with quote, actual weight and current selection'
     }),
   );
   const onPick = renderSidebar(true, 'KRX:005930');
-  expect(screen.getByRole('heading', { name: '내 종목' })).toBeTruthy();
+  expect(screen.getByRole('heading', { name: '보유·관심' })).toBeTruthy();
   const samsung = await screen.findByRole('button', {
     name: '삼성전자, 지도에서 보기',
   });
