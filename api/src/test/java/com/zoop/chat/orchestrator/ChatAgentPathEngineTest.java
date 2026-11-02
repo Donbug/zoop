@@ -228,8 +228,8 @@ class ChatAgentPathEngineTest {
     }
 
     @Test
-    void aPeriodInTheQuestionStaysOnTheDirectPathWhereItIsRead() {
-        // MCP arguments carry no period, and the server cannot read it from the run: the two paths would read different data.
+    void requirementOwnedDocumentTermsAndQuestionPeriodsStayOnTheDirectPath() {
+        // MCP arguments carry neither server-derived document terms nor a question period: the paths would read differently.
         var agent = new Agent(Set.of(ChatCapability.COMPANY_READ, ChatCapability.DOCUMENT_SEARCH,
                 ChatCapability.GRAPH_VERSION_DIFF));
         var engine = engine(agent);
@@ -239,8 +239,7 @@ class ChatAgentPathEngineTest {
         assertEquals(null, engine.agentTools(run, planned(run, asking("10월 5일 이후 소식", "document.search", List.of(HYNIX)))));
         assertTrue(engine.agentTools(run, planned(run, asking("달라진 관계", "graph.version.diff", List.of())))
                 .contains(ChatCapability.GRAPH_VERSION_DIFF));
-        assertTrue(engine.agentTools(run, planned(run, asking("최근 소식", "document.search", List.of(HYNIX))))
-                .contains(ChatCapability.DOCUMENT_SEARCH));
+        assertEquals(null, engine.agentTools(run, planned(run, asking("최근 HBM 소식", "document.search", List.of(HYNIX)))));
     }
 
     @Test

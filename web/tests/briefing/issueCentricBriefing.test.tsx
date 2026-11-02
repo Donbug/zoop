@@ -535,7 +535,7 @@ describe('D-BRF-01/02 new issue/company AI revision', () => {
   // D-BRF-01/02: grouped reading must retain each issue's original judgment.
   it.each([
     ['positive', 'negative', '긍정 요인', '부정 요인'],
-    ['mixed', 'watch', '긍정·부정 혼재', '판단 유보'],
+    ['mixed', 'watch', '긍정·부정 혼재', '판단 보류'],
   ] as const)(
     'preserves %s/%s judgments in the compact group member details',
     async (first, second, firstLabel, secondLabel) => {

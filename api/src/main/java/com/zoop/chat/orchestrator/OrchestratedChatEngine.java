@@ -651,15 +651,14 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
 
     /**
      * Whether an MCP call would read what the plan reads. Its arguments are targets and a limit, and the server fills in the
-     * rest from the run, which knows neither the requirement's own words nor where its targets came from. So a period read from
-     * the question (or any period of a document read) and a requirement that names its own targets while the member
-     * narrowed the selection to chosen evidence stay on the direct path.
+     * rest from the run, which knows neither the requirement's own words nor where its targets came from. A document search
+     * always needs those words for its server-owned full-text terms. A graph comparison period read from the question and a
+     * requirement that names its own targets while the member narrowed the selection to chosen evidence also stay direct.
      */
     private static boolean agentReadsLikeDirect(ChatRun run, Planned p) {
-        boolean dated = p.capabilities().contains(ChatCapability.DOCUMENT_SEARCH)
-                ? ChatRetrieval.period(run, p).isPresent()
-                : p.capabilities().contains(ChatCapability.GRAPH_VERSION_DIFF)
-                        && ChatPeriods.parse(p.label(), run.askedAt()).isPresent();
+        if (p.capabilities().contains(ChatCapability.DOCUMENT_SEARCH)) return false;
+        boolean dated = p.capabilities().contains(ChatCapability.GRAPH_VERSION_DIFF)
+                && ChatPeriods.parse(p.label(), run.askedAt()).isPresent();
         boolean scopeDiffers = !run.selection().evidenceIds().isEmpty() && p.evidenceScope() == null
                 && p.capabilities().stream().anyMatch(c -> c.documents().isEmpty());
         return !dated && !scopeDiffers;

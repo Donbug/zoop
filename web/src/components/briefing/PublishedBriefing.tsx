@@ -369,7 +369,7 @@ export default function PublishedBriefing({
             <>
               <header className="border-b-[0.667px] border-zoop-line pb-[18px]">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-lg font-bold tracking-[-0.025em]">
+                  <h2 className="text-title-sm font-bold tracking-[-0.025em]">
                     {result.edition === 'morning' ? '출근' : '퇴근'} 브리핑
                   </h2>
                   <span className={STATUS_PILL}>
@@ -400,7 +400,7 @@ export default function PublishedBriefing({
                   {result.notice.at && ` · ${briefingTime(result.notice.at)}`}
                 </p>
               )}
-              {!compact && result.status === 'published' && (
+              {result.status === 'published' && (
                 <BriefingOutlook
                   outlook={result.outlook}
                   issues={result.items.map((item) => ({
