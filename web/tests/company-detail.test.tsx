@@ -384,6 +384,11 @@ test.each(['events', 'documents', 'info'])(
     expect(screen.getAllByRole('main')).toHaveLength(1);
     const main = screen.getByRole('main');
     expect(main.id).toBe('service-main');
+    // D-COM-01: 라이트는 #491 이전 표면(흰 카드, rounded-2xl)을 유지하고 본문 랜드마크도 그대로다.
+    expect(main.parentElement?.classList.contains('bg-zoop-page!')).toBe(false);
+    const catalog = screen.getByRole('complementary', { name: '기업 선택' });
+    expect(catalog.classList.contains('bg-white')).toBe(true);
+    expect(catalog.classList.contains('rounded-2xl')).toBe(true);
     await view.user.click(
       screen.getByRole('link', { name: '본문으로 건너뛰기' }),
     );
@@ -392,6 +397,53 @@ test.each(['events', 'documents', 'info'])(
     expect(view.router.state.location.search).toContain(`tab=${tab}`);
   },
 );
+
+test.each([
+  ['/stocks', false],
+  ['/briefing', true],
+] as const)(
+  'D-COM-01 · D-BRF-01 theme page surface is correctly scoped for %s',
+  (path, themed) => {
+    renderRoutes(
+      [
+        {
+          element: <AppLayout />,
+          children: [{ path, element: <h1>합성 화면</h1> }],
+        },
+      ],
+      path,
+    );
+    expect(
+      screen
+        .getByRole('main')
+        .parentElement?.classList.contains('bg-zoop-page!'),
+    ).toBe(themed);
+  },
+);
+test('D-COM-01 다크에서만 지도 개선 테마 표면을 쓴다', async () => {
+  document.documentElement.dataset.theme = 'dark';
+  try {
+    renderRoutes(
+      [
+        {
+          element: <AppLayout />,
+          children: [
+            { path: '/companies/:id', element: <CompanyDetailPage /> },
+          ],
+        },
+      ],
+      `/companies/${encodeURIComponent(id)}${pinned}&tab=events`,
+    );
+    await screen.findByRole('heading', { name: '합성 기업', level: 1 });
+    const main = screen.getByRole('main');
+    expect(main.parentElement?.classList.contains('bg-zoop-page!')).toBe(true);
+    const catalog = screen.getByRole('complementary', { name: '기업 선택' });
+    expect(catalog.classList.contains('bg-zoop-surface')).toBe(true);
+    expect(catalog.classList.contains('rounded-xl')).toBe(true);
+  } finally {
+    document.documentElement.dataset.theme = 'light';
+  }
+});
 
 function openHistory() {
   return renderRoutes(

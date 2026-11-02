@@ -7,6 +7,7 @@ import { exactTime, safeHref, versionOnlyAddress } from './detail-model';
 import { formatKst } from '@/util/format';
 import type { CompanyDocuments, Evidence } from '@/types/company/documents';
 import type { DocumentAnalysis } from '@/types/evidence';
+import { useColorTheme } from '@/util/theme-color';
 
 const stageLabels = {
   not_requested: '미요청',
@@ -66,6 +67,8 @@ function Analysis({
   companyId: string;
   documentId: string;
 }) {
+  // 기업 상세 라이트는 #491 이전 모양을 유지하고, 다크만 지도 개선 테마 표면을 쓴다.
+  const dark = useColorTheme() === 'dark';
   const sentiment =
     value.sentiment?.companyId === companyId ? value.sentiment : null;
   const summary =
@@ -122,7 +125,13 @@ function Analysis({
         )
       )}
       {value.analysisProvenance?.sourceKind === 'synthetic' && (
-        <p className="border-l-2 border-zoop-faint bg-zoop-soft p-2">
+        <p
+          className={
+            dark
+              ? 'rounded-md border-l-2 border-zoop-faint bg-zoop-control p-2'
+              : 'border-l-2 border-zoop-faint bg-zoop-soft p-2'
+          }
+        >
           합성 테스트 분석입니다. 실제 뉴스 분석 결과가 아닙니다.
         </p>
       )}
@@ -130,6 +139,8 @@ function Analysis({
   );
 }
 export default function CompanyDocumentPanel() {
+  // 기업 상세 라이트는 #491 이전 모양을 유지하고, 다크만 지도 개선 테마 표면을 쓴다.
+  const dark = useColorTheme() === 'dark';
   const { id = '' } = useParams();
   const { params, updateQuery } = useRouteQuery();
   const asOf = params.get('asOf'),
@@ -207,7 +218,7 @@ export default function CompanyDocumentPanel() {
     <section
       aria-label="뉴스·공시"
       data-screen-id="D-COM-02"
-      className="[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-zoop-line [&_blockquote]:bg-zoop-wash [&_blockquote]:p-3 [&_blockquote]:text-caption [&_blockquote]:leading-[1.7] [&_blockquote]:wrap-anywhere [&_summary]:cursor-pointer [&_h4]:font-semibold"
+      className={`[&_blockquote]:my-3 [&_blockquote]:border-l-2 ${dark ? '[&_blockquote]:rounded-md [&_blockquote]:border-zoop-border [&_blockquote]:bg-zoop-control' : '[&_blockquote]:border-zoop-line [&_blockquote]:bg-zoop-wash'} [&_blockquote]:p-3 [&_blockquote]:text-caption [&_blockquote]:leading-[1.7] [&_blockquote]:wrap-anywhere [&_summary]:cursor-pointer [&_h4]:font-semibold`}
     >
       <h2>뉴스·공시 · 근거 문서</h2>
       <nav aria-label="문서 종류">

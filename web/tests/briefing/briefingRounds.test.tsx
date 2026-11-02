@@ -720,3 +720,34 @@ describe('D-BRF-04 회차 기준 지도 (FS032·FS035, getBriefingGraphBasis)', 
     );
   });
 });
+
+it('D-BRF-01/02 theme keeps surface roles and reading query/keyboard behavior', async () => {
+  const server = createFakeServer();
+  server.on('GET', '/api/v1/briefings', () => json(briefing()));
+  server.on('GET', '/api/v1/briefings/rounds', () =>
+    json({ items: [ref('2026-09-17', 'morning')], nextCursor: null }),
+  );
+  const view = renderAt('/briefing?reading=full&theme=dark', <BriefingPage />);
+  const heading = await screen.findByRole('heading', {
+    name: '출근 브리핑',
+    level: 2,
+  });
+  expect(
+    heading.closest('article')?.classList.contains('bg-zoop-surface'),
+  ).toBe(true);
+  expect(heading.closest('article')?.classList.contains('rounded-xl')).toBe(
+    true,
+  );
+  const indicators = screen.getByRole('region', { name: '주요 시장 지표' });
+  expect(indicators.classList.contains('bg-zoop-card')).toBe(true);
+  expect(indicators.classList.contains('rounded-lg')).toBe(true);
+  expect(screen.getByLabelText('발행일').classList.contains('rounded-md')).toBe(
+    true,
+  );
+  const compact = screen.getByRole('button', { name: /^간단히$/ });
+  compact.focus();
+  await view.user.keyboard('{Enter}');
+  expect(currentQuery().get('reading')).toBe('compact');
+  expect(currentQuery().get('theme')).toBe('dark');
+  expect(document.activeElement).toBe(compact);
+});

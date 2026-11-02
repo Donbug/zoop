@@ -20,7 +20,7 @@ export default function PersonalAiJudgment({
   return (
     <section
       aria-label={`${name} 개인화 AI 분석`}
-      className="mt-3 space-y-3 border-t border-panel-line pt-3 text-sm leading-relaxed"
+      className="mt-3 space-y-3 border-t border-zoop-border pt-3 text-sm leading-relaxed"
     >
       <div className="flex flex-wrap items-center gap-2">
         <strong>{name}</strong>

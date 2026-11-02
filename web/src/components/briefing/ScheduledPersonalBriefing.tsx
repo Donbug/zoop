@@ -254,7 +254,7 @@ export default function ScheduledPersonalBriefing({
         return (
           <span
             key={id}
-            className="inline-flex items-center gap-2 rounded-full border border-zoop-line px-3 py-1 text-sm"
+            className="inline-flex items-center gap-2 rounded-full border border-zoop-border px-3 py-1 text-sm"
           >
             <CompanyLogo
               name={c?.name ?? id}
@@ -338,7 +338,7 @@ export default function ScheduledPersonalBriefing({
                 aria-expanded={picker}
                 aria-controls="personal-stock-picker"
                 placeholder="클릭해서 기업명 또는 종목 코드 검색"
-                className={`mt-2 w-full rounded-lg border border-zoop-line p-3 ${FOCUS_RING}`}
+                className={`mt-2 w-full rounded-lg border border-zoop-border p-3 ${FOCUS_RING}`}
               />
             </label>
             {picker && (
@@ -347,7 +347,7 @@ export default function ScheduledPersonalBriefing({
                 role="dialog"
                 aria-label="기준 종목 선택"
                 disabled={busy}
-                className="max-h-64 overflow-y-auto rounded-lg border border-zoop-line p-3"
+                className="max-h-64 overflow-y-auto rounded-lg border border-zoop-border p-3"
               >
                 <legend className="text-xs">기준 종목 선택</legend>
                 <div className="flex justify-end">
