@@ -257,6 +257,16 @@ def scenario(args, db, scratch, evidence, layouts):
         check(quote["metadata"]["graphVersion"] == vid and quote["quote"] == hs.EVT_A and quote["quoteVerified"] is True
               and quote["start"] == span["start"] and quote["end"] == span["end"]
               and quote["articleId"] == span["documentId"] and quote["articleVersion"] == span["documentVersion"], "evidence span/version mismatch")
+        company = handoff.PUBLIC_IDS["KRX:005930"]
+        documents_path = "/api/v1/companies/" + urllib.parse.quote(company, safe="") + "/documents?" + urllib.parse.urlencode(
+            {"graphVersion": vid, "limit": 20})
+        documents = expect(web, "chat-document-search-source", documents_path, 200)
+        check(documents["metadata"]["graphVersion"] == vid and documents["items"],
+              "company documents did not read the activated non-fixture version")
+        check(any(q["evidenceId"] == eid for item in documents["items"] for q in item["quotes"]),
+              "company documents did not expose the same currently-readable evidence")
+        evidence["steps"].append({"step": "chat-public-data-path", "status": "passed", "graphVersion": vid,
+                                  "company": company, "documents": len(documents["items"]), "evidence": "same-version"})
         for label, change in (
             ("disabled", lambda g: g.update({"enabled": False})),
             ("quote-display-revoked", lambda g: g.update({"allowedOperations": [op for op in g["allowedOperations"] if op != "quote-display"]})),
@@ -272,7 +282,8 @@ def scenario(args, db, scratch, evidence, layouts):
         evidence.update({"adminHttpActivations": 2, "httpPointerChanges": 1,
                          "currentRights": {"activation": "passed", "evidence": "passed", "event": "unverified"},
                          "publicReads": {"graph": "same-version", "event": "unverified",
-                                         "evidence": "same-version-exact-span-current-rights"},
+                                         "evidence": "same-version-exact-span-current-rights",
+                                         "chatDocumentSource": "same-version-current-rights"},
                          "idempotency": "replay-no-write; changed-body-conflict; new-key-active-audited-noop",
                          "stalePointer": "409 REVISION_CONFLICT; unchanged publication state"})
         check({name: handoff.fingerprint(path) for name, path in layout.ledgers.items()} == ledgers_before, "source ledgers changed")

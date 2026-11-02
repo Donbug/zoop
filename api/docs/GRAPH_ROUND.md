@@ -1,8 +1,8 @@
 # 그래프 정기 회차 (#55, WBS 6.5.4) — 앱 쪽 상태·수입 bridge·스케줄러·관리자 보기
 
-그래프 수입을 30분 회차마다 실행하는 작업의 **앱(api) 쪽**입니다. PR-R1(2026-10-29)은 회차 상태 테이블, 웹 애플리케이션 안의 수입 bridge, 관리자 회차 읽기를, PR-R2(2026-10-30)는 회차 스케줄러 본체(AI `round-runs`·`round-handoffs` 호출, `analyze_plan` 접수, 단계 전진), 슬롯 달력(18개 정규 슬롯 + 18:05 freeze 전용 슬롯), retry·수동 시작을 넣었습니다. 전체는 **기본 꺼짐**이며, AI 쪽 #387 ①②의 HTTP 구현과 앱 수입 전용 principal이 있어야 실제로 돕니다. 그 전에는 가짜 클라이언트 시험으로만 검증했습니다.
+그래프 수입을 30분 회차마다 실행하는 작업의 **앱(api) 쪽**입니다. PR-R1(2026-10-29)은 회차 상태 테이블, 웹 애플리케이션 안의 수입 bridge, 관리자 회차 읽기를, PR-R2(2026-10-30)는 회차 스케줄러 본체(AI `round-runs`·`round-handoffs` 호출, `analyze_plan` 접수, 단계 전진), 슬롯 달력(18개 정규 슬롯 + 18:05 freeze 전용 슬롯), retry·수동 시작을 넣었습니다. 전체는 **기본 꺼짐**이며, HTTP observation export bridge는 앱에 연결되어 있습니다. 실제 운영에서는 AI HTTP route, 전용 principal·scope, 공유 artifact mount가 모두 준비되어야 합니다.
 
-배포 목표는 API와 AI를 별도 Task로 두고 공유 디스크 없이 HTTP로 연결하는 것입니다. 현재 회차 bridge의 관측 재확인은 로컬 CLI를 사용하므로 로컬·단일 인스턴스 실행에 한정됩니다. 회차 스케줄러는 앱 쪽 하나이며, 묶음 1개를 비활성 원본 버전 1개로 수입합니다. 자동 활성화(FS059)는 활성 포인터가 없거나 fixture인 첫 native 공개에만 적용됩니다. 실데이터가 활성화된 뒤에는 그 버전을 base로 삼아 누적 publication을 구성하고 관리자가 CAS로 활성화합니다([누적 발행 계약](GRAPH_READ_HANDOFF.md#누적-발행과-원본별-현재-권한)). 원본 수입은 publication lock을 잡지 않습니다.
+배포 목표는 API와 AI를 별도 Task로 두고 공유 원장 없이 HTTP로 연결하는 것입니다. 회차 bridge의 관측 재확인은 `IMPORT_SOURCE=http`일 때 AI service의 observation export를 사용하고, `cli`는 로컬·단일 인스턴스 운영에만 사용합니다. 회차 스케줄러는 앱 쪽 하나이며, 묶음 1개를 비활성 원본 버전 1개로 수입합니다. 자동 활성화(FS059)는 활성 포인터가 없거나 fixture인 첫 native 공개에만 적용됩니다. 실데이터가 활성화된 뒤에는 그 버전을 base로 삼아 누적 publication을 구성하고 관리자가 CAS로 활성화합니다([누적 발행 계약](GRAPH_READ_HANDOFF.md#누적-발행과-원본별-현재-권한)). 원본 수입은 publication lock을 잡지 않습니다.
 
 ## 회차 한 바퀴
 
@@ -69,12 +69,13 @@ trigger로 `graph_rounds`는 DELETE와 식별 열(`round_id`·`slot_at`·`starte
 | `ZOOP_GRAPH_ROUND_OPERATOR` | 수입 요청의 `operator`(기본 `scheduler`, 운영자 요청 알파벳 `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`). 회차의 `started_by`와는 별개 |
 | `ZOOP_GRAPH_ROUND_WAIT_RETRY_AFTER` / `BUSY_RETRY_AFTER` | 대기 단계 재시도 간격(기본 `PT1M` / `PT5M`) |
 | `ZOOP_GRAPH_ROUND_MAX_ATTEMPTS_PER_STAGE` | 단계당 시도 상한(기본 20) |
-| `ZOOP_GRAPH_ROUND_IMPORT_SOURCE` | 관측 재확인 방식. `cli`(기본): 설치된 `zoop-ai-ingest export --require-store`를 실행(로컬·단일 인스턴스 운영만 가능. API 컨테이너 이미지에는 CLI가 없음). `http`는 관측 export client를 회차 bridge에 연결하기 전까지 **기동 거절** |
+| `ZOOP_GRAPH_ROUND_IMPORT_SOURCE` | 관측 재확인 방식. `cli`(기본): 설치된 `zoop-ai-ingest export --require-store`를 실행(로컬·단일 인스턴스 운영만 가능. API 컨테이너 이미지에는 CLI가 없음). `http`: `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_*`로 AI service의 `POST /internal/v1/observations/export`를 호출. ECS에서는 `http`를 사용 |
+| `ZOOP_GRAPH_ROUND_ARTIFACT_STORE_ID` | `import-source=http`일 때 필수. 모든 API Task가 같은 artifact root를 보는지 확인하는 1~64자 opaque ID. root의 `.zoop-artifact-store-id`(API 실행 소유자, mode `0600`) 내용과 정확히 같아야 기동함 |
 | `ZOOP_GRAPH_ROUND_INGESTION_CLI` / `INGESTION_STATE_DIR` / `INGESTION_SOURCES` | `import-source=cli`일 때 필수(실행 파일·디렉터리·파일, 정규화된 절대 경로) |
 
 켜면 다음도 요구합니다(아니면 설정 이름을 담은 메시지로 기동 거절): `ZOOP_GRAPH_SNAPSHOT_SOURCE=artifact`와 존재하는 `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT`(bridge가 올린 버전을 같은 프로세스의 자동 활성화가 읽어야 하므로 **같은 root**에 씁니다. `fixture`는 seeder가 활성화하므로 거절), `ZOOP_AI_HANDOFF_READ_CLIENT_ENABLED=true`, `ZOOP_AI_ROUND_CLIENT_ENABLED=true`(+`_BASE_URL`·`_TOKEN`, scope `round.run`·`round.read`; R1·R2·R5·R6), `ZOOP_ANALYSIS_ANALYZE_PLAN_ENABLED=true`(R3·R4). 앱 수입 전용 principal 하나가 `handoff.read`·`observation.read`·`round.run`·`round.read`를 가집니다(#431 답, 10-30). 운영자 명령의 `ZOOP_GRAPH_HANDOFF_IMPORT_*`·`ZOOP_ARTIFACT_ROOT`와는 별개 설정이며, 둘이 같은 root를 가리키면 lock으로 서로 `import_busy`가 됩니다.
 
-**배포 제약.** artifact store는 로컬 POSIX 디스크 전용(0600/0700, 단일 소유자)이라 웹 인스턴스가 둘 이상이면 한쪽이 쓴 스냅샷을 다른 쪽이 읽지 못합니다. 단일 인스턴스, 공유 POSIX 디스크(uid 매핑), 객체 저장소 전환 중 하나를 Infra가 정해야 합니다(결정 D-I1). ECS에서 bridge를 켜려면 관측 export HTTP client를 회차 수입에 연결하는 작업(A-5)이 먼저 필요합니다.
+**배포 제약.** artifact store는 POSIX 파일 시스템(0600/0700, 단일 소유자)을 요구합니다. ECS 인스턴스가 둘 이상이면 같은 EFS access point와 UID/GID를 사용해야 하며, 공유하지 않은 로컬 디스크는 다중 인스턴스 구성으로 사용하지 않습니다. HTTP 회차 수입은 `ZOOP_GRAPH_ROUND_ARTIFACT_STORE_ID`와 root 마커가 없거나 다르면 fail-fast합니다. 이 마커는 잘못된 mount를 차단하지만 EFS의 실제 내구성 검증을 대신하지 않으므로, 배포 전 두 Task의 교차 읽기를 한 번 확인합니다.
 
 ## 관리자 읽기 (A-ADM-03)
 
