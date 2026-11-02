@@ -54,7 +54,22 @@ public final class GraphPublicationPreparer {
         this.reader = reader; this.composer = composer;
     }
 
+    /**
+     * Told the fixed inputs just before the composition runs, so a caller can keep them where a stop cannot lose them (the round
+     * path's journal). A failure here (a database one included) stops the run before composing.
+     */
+    @FunctionalInterface
+    public interface BeforeCompose {
+        BeforeCompose NONE = (active, request, decisions) -> { };
+
+        void accept(String activeVersionId, byte[] request, byte[] decisions);
+    }
+
     public ObjectNode run() {
+        return run(BeforeCompose.NONE);
+    }
+
+    public ObjectNode run(BeforeCompose before) {
         ObjectNode result = StrictJson.newObject(); result.put("schemaVersion", RESULT_SCHEMA);
         ArrayNode incomingIds = result.putArray("incomingVersionIds");
         String reading = null;
@@ -91,6 +106,7 @@ public final class GraphPublicationPreparer {
             result.set("changes", GraphPublicationReader.json(proposal.changes()));
             // A changed value is never chosen by the preparation: people decide it with an operator compose (11-02 AI reply).
             if (!proposal.changes().isEmpty()) return failed(result, "correction_required");
+            before.accept(active.id(), Canonical.bytes(request.wire()), decisions);
             ObjectNode composed = composer.run(request, decisions);
             result.set("compose", composed);
             if (!"succeeded".equals(composed.get("status").asString())) return failed(result, composed.get("code").asString());
