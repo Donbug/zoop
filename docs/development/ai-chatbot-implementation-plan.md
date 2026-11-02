@@ -99,9 +99,9 @@ flowchart LR
 
 ## 3. 권장 구현 순서와 현재 상태
 
-| 단계 | 2026-10-30 main 상태 | 남은 핵심 |
+| 단계 | 2026-11-02 main 상태 | 남은 핵심 |
 | --- | --- | --- |
-| 0 계약·fixture | 부분 구현 | 목표 내부 schema 전체와 고정 평가 fixture 정리 |
+| 0 계약·fixture | 구현(합성 계약 회귀) | 새 capability·내부 wire 추가 시 schema·portable fixture drift 검사 유지 |
 | 1 저장·job 수명주기 | 구현 | 복구본을 DB에 두므로 DB 장애 자체는 복구 대상이 아님 |
 | 2 오케스트레이터 | 구현(합성 회귀) | direct·agent 공통 45초와 서버 requirement coverage 구현. 단계 최소 예약·상한은 live p95로 보정 |
 | 3 router·Luna agent | 부분 구현 | Jev router·Luna Responses MCP·Java 승인 루프는 구현(합성 replay로만 확인). 라우터 wire `dependsOn`도 구현(2026-10-30, `zoop-ai-chat-3`, 확신이 낮거나 요구가 대상을 지목하면 의존 없음). 승인 요청의 요구 매핑도 구현(2026-10-30, `zoop-ai-chat-4`). live 확인 |
@@ -118,6 +118,8 @@ flowchart LR
 4. 실제 모델 없이도 전체 상태 머신을 시험할 deterministic fake router·MCP tool·generator·server coverage를 만든다.
 
 완료 조건: 공개 OpenAPI 검사 통과, schema fixture round-trip, 예전 BFF와 목표 API의 의도된 차이 목록 갱신.
+
+현재 상태(2026-11-02): `ChatToolRequest v1`, `ChatToolResult v1`, `ChatRouteSummary v1`을 JSON Schema 2020-12 정본으로 `docs/api/`에 고정했다. 성공·실패·웹 cache/withheld와 answered·stopped route를 포함한 합성 portable fixture 7건을 표준 format 검사로 검증하고, Java의 capability 목록·요청 상한·`chat-tool/v1` 버전 및 request record round-trip과의 drift도 기본 API 테스트에서 막는다. 공개 OpenAPI, Q01~Q08/capability registry와 deterministic router·tool·generator 회귀는 기존 구현을 유지한다. 실제 모델·운영 데이터 평가는 단계 7의 별도 gate다.
 
 ### 단계 1 — 저장과 공개 job 수명주기
 

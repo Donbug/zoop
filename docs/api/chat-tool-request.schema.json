@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zoop.example/internal/chat-tool-request.schema.json",
+  "title": "ChatToolRequest v1",
+  "description": "A server-approved logical chatbot read. Job ownership, member identity, graph version and as-of pins are supplied by the run and are not model-controlled request fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["capabilityId", "targets", "limit"],
+  "properties": {
+    "capabilityId": {"$ref": "#/$defs/capabilityId"},
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+    "evidenceScope": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "since": {"type": "string", "format": "date-time"},
+    "searchText": {"type": "string", "minLength": 1, "maxLength": 500}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["searchText"]},
+      "then": {"properties": {"capabilityId": {"const": "document.search"}}}
+    }
+  ],
+  "$defs": {
+    "capabilityId": {
+      "enum": [
+        "help.search",
+        "screenSpec.read",
+        "zoopPolicy.read",
+        "company.read",
+        "document.search",
+        "issue.read",
+        "evidence.resolve",
+        "period.compare",
+        "selectionRule.read",
+        "graph.path.read",
+        "graph.version.diff",
+        "briefing.read",
+        "briefing.evidence",
+        "portfolio.scope.read",
+        "web.search"
+      ]
+    }
+  }
+}
