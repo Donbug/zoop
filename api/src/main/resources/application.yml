@@ -75,7 +75,7 @@ zoop:
       # command, read over the handoff-read client, written into zoop.graph.snapshot.artifact-root, which must be an artifact
       # source here). Needs zoop.ai.round-client, zoop.ai.handoff-read-client and zoop.analysis.analyze-plan enabled.
       # import-source cli runs the installed zoop-ai-ingest export --require-store for the observation re-check (local,
-      # single-instance operation); the round bridge rejects http until it is wired to the observation-export client.
+      # single-instance operation); http uses zoop.ai.observation-export-client and is the ECS/shared-nothing path.
       enabled: ${ZOOP_GRAPH_ROUND_ENABLED:false}
       interval: ${ZOOP_GRAPH_ROUND_INTERVAL:PT15S}
       lease: ${ZOOP_GRAPH_ROUND_LEASE:PT2M}
@@ -95,6 +95,9 @@ zoop:
       busy-retry-after: ${ZOOP_GRAPH_ROUND_BUSY_RETRY_AFTER:PT5M}
       max-attempts-per-stage: ${ZOOP_GRAPH_ROUND_MAX_ATTEMPTS_PER_STAGE:20}
       import-source: ${ZOOP_GRAPH_ROUND_IMPORT_SOURCE:cli}
+      # Required for the ECS/http import path. Every API task must mount the same POSIX artifact root and see an owner-only
+      # <artifact-root>/.zoop-artifact-store-id file whose content exactly equals this opaque id.
+      artifact-store-id: ${ZOOP_GRAPH_ROUND_ARTIFACT_STORE_ID:}
       ingestion-cli: ${ZOOP_GRAPH_ROUND_INGESTION_CLI:}
       ingestion-state-dir: ${ZOOP_GRAPH_ROUND_INGESTION_STATE_DIR:}
       ingestion-sources: ${ZOOP_GRAPH_ROUND_INGESTION_SOURCES:}
