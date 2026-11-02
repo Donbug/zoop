@@ -40,7 +40,8 @@ import org.springframework.transaction.support.TransactionOperations;
  *     {@code fixture} is refused because its seeder activates versions;</li>
  * <li>{@code zoop.ai.handoff-read-client} is not enabled: there is no other way to read a handoff here;</li>
  * <li>{@code import-source=cli} and the S2-1 CLI, ledger directory or source registry is missing, or {@code import-source=http}
- *     and the observation export client is disabled. Both use the same current-rights export and importer verification.</li>
+ *     and the observation export client is disabled or any CLI setting is nonblank. Both use the same current-rights export
+ *     and importer verification.</li>
  * </ul>
  */
 @Configuration(proxyBeanMethods = false)
@@ -61,6 +62,11 @@ public class GraphRoundImportConfiguration {
         }
         ObservationSource source = ObservationSource.parse(properties.importSource())
                 .orElseThrow(() -> new GraphRoundConfigurationException("import-source", "must be cli or http"));
+        if (source == ObservationSource.HTTP) {
+            unset("ingestion-cli", properties.ingestionCli());
+            unset("ingestion-state-dir", properties.ingestionStateDir());
+            unset("ingestion-sources", properties.ingestionSources());
+        }
         IngestionExporter ingestion = IngestionExporters.forSource(source, () -> ingestionExporter(properties), observationExports,
                 () -> new GraphRoundConfigurationException("import-source",
                         "http requires zoop.ai.observation-export-client.enabled=true"));
@@ -103,6 +109,10 @@ public class GraphRoundImportConfiguration {
         require(Files.isDirectory(state), "ingestion-state-dir", "must be an existing directory");
         require(Files.isRegularFile(sources), "ingestion-sources", "must be an existing file");
         return ProcessIngestionExporter.forPaths(cli, state, sources);
+    }
+
+    private static void unset(String setting, String value) {
+        require(value == null || value.isBlank(), setting, "must not be set with import-source=http");
     }
 
     private static Path absolute(String setting, String value) {

@@ -290,7 +290,7 @@ class GraphDeliveryPostgresTest {
             assertEquals(history, upgradeJdbc.queryForList(
                     "SELECT * FROM flyway_schema_history ORDER BY installed_rank LIMIT ?", history.size()));
             assertEquals(List.of("20261031150000", "20261031160000", "20261031170000", "20261031180000",
-                            "20261101100000", "20261101110000"),
+                            "20261101100000", "20261102150000"),
                     upgradeJdbc.queryForList("""
                             SELECT version FROM flyway_schema_history
                             WHERE version > '20261031130000' AND success ORDER BY installed_rank
@@ -324,7 +324,7 @@ class GraphDeliveryPostgresTest {
             candidate.validate();
             assertEquals(history, upgradeJdbc.queryForList(
                     "SELECT * FROM flyway_schema_history ORDER BY installed_rank LIMIT ?", history.size()));
-            assertEquals("20261101110000", candidate.info().current().getVersion().getVersion());
+            assertEquals("20261102150000", candidate.info().current().getVersion().getVersion());
             assertEquals(0, upgradeJdbc.queryForObject("SELECT count(*) FROM graph_round_requests", Integer.class));
             assertEquals(1, upgradeJdbc.queryForObject("""
                     SELECT count(*) FROM information_schema.columns

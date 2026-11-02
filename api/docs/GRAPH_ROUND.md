@@ -27,7 +27,9 @@ trigger로 `graph_rounds`는 DELETE와 식별 열(`round_id`·`slot_at`·`starte
 
 **fencing.** `advance`와 `link`는 호출자가 claim한 행(그 `lease_token`)과 그때의 stage를 WHERE 조건으로 씁니다(`round_id = ? AND stage = <예상 stage> AND lease_token = ?`). lease가 만료되어 다른 인스턴스가 행을 가져갔거나 행이 이미 다른 단계로 갔으면 아무것도 쓰지 않고(이벤트도 없음) `advance`는 빈 Optional, `link`는 false를 돌려주며 호출자는 행을 다시 읽습니다. 종결 단계로 가면 lease 세 열을 모두 비웁니다.
 
-기존 migration은 그대로 두고, 이미 배포된 `V20261101100000__create_approved_chat_documents.sql` 뒤에 `V20261101110000__graph_round_requests.sql`을 추가합니다. 새 migration은 요청 journal과 불변 guard만 만듭니다. `out-of-order=false`인 DB가 `V20261101100000`까지 적용된 상태에서도 순서대로 업그레이드합니다.
+기존 migration은 그대로 두고, 아직 적용하지 않은 요청 journal을 `V20261102150000__graph_round_requests.sql`로 추가합니다. SQL 내용은 유지하며 요청 journal과 불변 guard만 만듭니다. 기준 main `66420ee44df8b3104eed26d04ed7bfb66bd06a4e`의 최신 migration은 `V20261102141000__register_approved_chat_guides.sql`입니다. 배포 DB의 실제 Flyway 이력과 checksum을 확인하고, 이 기준 main의 migration을 `141000`까지 적용한 뒤 journal `150000`을 `out-of-order=false`로 적용하고 validate합니다. 이 브랜치의 `V20261101100000` 기준 업그레이드 시험은 별도 회귀 검사이며, 현재 main의 `141000 → 150000` 업그레이드 검증을 대신하지 않습니다.
+
+**#467과의 DB 배포 순서.** 실제 적용 순서는 현재 main의 `V20261102141000`까지 → 이 회차 journal의 `V20261102150000` → #467 담당자가 정할 `20261102150000`보다 큰 버전입니다. #467의 기존 `V20261101120000`은 재번호가 필요하며, 이전의 `110000 → 120000` 순서만으로는 현재 main 이후 배포를 보장할 수 없습니다. 배포 이미지에는 확정된 순서의 migration을 함께 포함하고, 스케줄러를 중지한 상태에서 순차 적용·validate를 마친 뒤 아래 전환 절차를 진행합니다. journal의 이전 이름이나 순서가 다른 migration이 이미 적용된 DB는 실제 이력을 기준으로 별도 forward 이행을 검토하며, 기존 이력 수정이나 repair로 순서를 덮지 않습니다.
 
 **journal 도입 전 배포 조건.** 기존 바이너리와 기존 credential로 열린 회차를 모두 끝낸 뒤 모든 인스턴스의 스케줄러를 중지하고 배포합니다. 아래 drain 절차처럼 새 슬롯·수동 시작이 들어오지 않는 시간대를 확보해야 합니다. journal 없이 R1·R5를 지난 회차를 새 바이너리로 넘기면 `run_request_missing` 또는 `freeze_request_missing`으로 실패합니다. 최초 요청 바이트와 binding을 사후에 추정해 채우지 않습니다. 기존 `failed` 회차도 AI 측 결과를 대조하여 미확정 실행을 정리한 뒤 전환하며, journal이 없는 회차의 관리자 retry를 복구 수단으로 사용하지 않습니다.
 
@@ -75,7 +77,7 @@ R5의 최초 409 `analysis_incomplete`는 접수 전 대기이므로 `analysis_d
 - 입력: 호출자가 `claim`한 회차 행(`importRound(GraphRound claimed)`, `handoff_ready`·lease 필수)의 `handoff_id`·`manifest_digest`·`bundle_digest`가 요청의 핀이 되고, `operator`는 `zoop.graph.round.operator`(기본 `scheduler`, 운영자 요청과 같은 알파벳 → `created_by=operator:scheduler`)입니다. 회차 행의 `started_by`는 이와 별개로 `system:scheduler`입니다. handoff는 ai/service의 읽기 전용 HTTP(`zoop.ai.handoff-read-client`, `handoff-source=http`와 같은 `HttpHandoffSource`)로 받습니다.
 - 출력: 결과 파일 대신 회차 행과 이벤트에 기록합니다. 버전과 회차의 연결(`graph_version_id`)은 importer의 `VersionRecorder`로 **수입 트랜잭션 안에서** 기록되어(`GraphRoundRepository.link`) 버전 등록과 함께 commit되거나 함께 취소되고, 단계 변경 `imported`(이벤트 code `staged`|`unchanged`)는 그 뒤 별도 트랜잭션입니다. 두 트랜잭션 사이에서 프로세스가 멈추면 행은 `handoff_ready`인 채 `graph_version_id`만 가진 상태로 남고, 다음 시도가 같은 핀을 다시 수입해(`unchanged`) 단계 변경을 마칩니다. `imported`는 비활성 원본의 수입 완료이며, 실제 공개는 위 활성화 정책에 따릅니다.
 - **수입 순서 보호** (`skipped_superseded`): 수입이 commit된 가장 최근 회차(`newestImported`: `imported`이거나 `version_committed_at`이 있는 행. 단계가 아니라 commit된 기록을 기준으로 한다)보다 **오래된** 슬롯은 읽지도 않고 `skipped`로 끝냅니다. 자동 활성화가 commit 순(`sequence`)으로 고르므로 뒤늦게 수입된 옛 회차가 공개되는 일을 막습니다. 건너뛴 회차의 내용은 다음 세 조건이 모두 성립할 때만 최종 공개 상태에서 잃지 않습니다(#407 AI 회신 2026-10-29): (1) AI의 선택이 freeze 시점의 원장만으로 정해지고 이전 묶음을 이어 쓰지 않는다, (2) 앱이 새 계획이 없는 슬롯에도 freeze를 요청한다(PR-R2), (3) 어떤 ready handoff에도 아직 들어가지 않은 job이 있는 가장 오래된 회차부터 현재 회차까지 매핑된 S3 job이 20개 이하다(넘으면 오래된 job은 `out_of_window`로 기록되고 공개되지 않는다). 잃는 것은 잠깐 공개됐을 중간 버전뿐입니다. 자동 실행을 연결하기 전에(PR-R2 전) 지연 완료·범위 경계를 포함한 합성 연속 회차 검증이 필요합니다. 자기 수입이 이미 commit된 회차(`graph_version_id`가 있는 행)는 이 검사의 대상이 아니며 그 사이에 더 새로운 회차가 수입되었어도 `unchanged`로 완료합니다. 연결된 버전이 이 회차의 handoff가 만드는 버전 id(`gv-` + handoffId의 SHA-256)와 다르면 읽기 전에 `failed(import:version_conflict)`입니다(행 guard가 버전 연결을 다른 값으로 바꾸지 못하게 하므로). retry(`GraphRoundPatch.retryAt`)는 핀을 그대로 두는 `handoff_ready` 재개면 연결을 유지하고, freeze를 다시 하는 그 전 단계 재개면 연결(`graph_version_id`)을 비웁니다. 어느 쪽이든 `version_committed_at`은 남으므로, 최신 회차의 버전 commit → 단계 변경 유실 → 복구 실패 → retry 뒤에도 이전 슬롯은 계속 `skipped_superseded`이고 retry된 회차는 같은 핀이면 `unchanged`로 완료합니다. 연결이 비워진 회차가 더 새로운 회차 뒤에 다시 수입을 시도하면 다른 옛 슬롯과 같이 건너뛰며(먼저 만든 버전은 그대로 등록돼 있음), 그 skip 이벤트 detail에 `versionCommittedAt`이 실립니다.
-- **lease fencing**: bridge의 모든 기록(연결·`imported`·`failed`·대기)은 호출자가 claim한 행의 `lease_token`과 `handoff_ready` 단계를 조건으로 씁니다. 수입 중에 lease가 만료되어 다른 인스턴스가 행을 가져갔으면 연결이 거절되어 수입 트랜잭션이 취소되고(버전·파일 없음, `GraphHandoffImporter.RecordRefused`) 아무것도 기록하지 않으며, 늦게 도착한 대기·실패 기록도 같은 조건으로 거절됩니다. 그 경우 bridge는 새 holder가 남긴 행을 돌려줍니다. lease는 수입(수 분)을 덮을 만큼 길거나 holder가 갱신해야 하며 같은 holder의 갱신은 token을 유지합니다.
+- **lease fencing**: bridge의 모든 기록(연결·`imported`·`failed`·대기)은 호출자가 claim한 행의 `lease_token`과 `handoff_ready` 단계를 조건으로 씁니다. 수입 중에 lease가 만료되어 다른 인스턴스가 행을 가져갔으면 연결이 거절되어 수입 트랜잭션이 취소되고(버전·파일 없음, `GraphHandoffImporter.RecordRefused`) 아무것도 기록하지 않으며, 늦게 도착한 대기·실패 기록도 같은 조건으로 거절됩니다. 그 경우 bridge는 새 holder가 남긴 행을 돌려줍니다. worker는 R7 직전에 lease를 한 번 연장하고 동기 수입 중에는 갱신하지 않습니다. 운영 배치는 아래 배포 제약을 따릅니다.
 - 일시 실패는 기다립니다: `import_busy`(다른 수입·운영자 명령이 artifact store lock 보유) → `busy-retry-after`(기본 5분), `handoff_export_unavailable`·`ingestion_export_unavailable`·`database_unavailable`·`artifact_store_unavailable` → `wait-retry-after`(기본 1분). `max-attempts-per-stage`(기본 20)에 이르면 `failed(import_timeout)`.
 - 그 밖의 실패(`handoff_withheld`·`handoff_refused`·`pin_mismatch`·`bundle_invalid`·`rights_changed`·`version_conflict` 등)는 `failed(import:<code>)`이고 이벤트 `detail`에 생산자 코드·관측 번호만 남깁니다.
 - 순서 보호 검사와 수입은 DB 전역 advisory lock(`JdbcGraphRoundImportLock`, 세션 수준, 전용 커넥션)을 잡은 채 이어서 하므로 다른 인스턴스가 그 사이에 수입할 수 없습니다. lock을 다른 인스턴스가 쥐고 있으면 `import:round_import_busy`로 `busy-retry-after`만큼 기다립니다. 운영자 수입 명령은 회차가 아니므로 이 순서 규칙 밖입니다.
@@ -96,7 +98,7 @@ R5의 최초 409 `analysis_incomplete`는 접수 전 대기이므로 `analysis_d
 | `ZOOP_GRAPH_ROUND_WAIT_RETRY_AFTER` / `BUSY_RETRY_AFTER` | 대기 단계 재시도 간격(기본 `PT1M` / `PT5M`) |
 | `ZOOP_GRAPH_ROUND_MAX_ATTEMPTS_PER_STAGE` | 단계당 시도 상한(기본 20) |
 | `ZOOP_GRAPH_ROUND_IMPORT_SOURCE` | `cli`(기본)는 설치된 `zoop-ai-ingest export --require-store`, `http`는 `ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED=true`인 기존 관측 exporter를 사용합니다. 두 경로 모두 같은 파서·현재 권한·commit 직전 재검증을 거칩니다 |
-| `ZOOP_GRAPH_ROUND_INGESTION_CLI` / `INGESTION_STATE_DIR` / `INGESTION_SOURCES` | `import-source=cli`일 때 필수(실행 파일·디렉터리·파일, 정규화된 절대 경로) |
+| `ZOOP_GRAPH_ROUND_INGESTION_CLI` / `INGESTION_STATE_DIR` / `INGESTION_SOURCES` | `import-source=cli`일 때 필수(실행 파일·디렉터리·파일, 정규화된 절대 경로). `http`일 때는 세 값을 모두 비웁니다. 비어 있지 않은 값이 하나라도 있으면 해당 설정 이름으로 기동을 거절하며 입력 경로는 오류에 싣지 않습니다 |
 | `ZOOP_AI_ROUND_CLIENT_EXPECTED_PRINCIPAL` | round client의 서버 principal. endpoint·credential fingerprint와 함께 복구 binding에 고정하며 필수입니다 |
 | `ZOOP_AI_PLAINTEXT_HTTP_HOSTS` | 모든 AI 클라이언트가 공유하는 정확한 plaintext HTTP host 목록입니다. dev의 `http://ai:8000`은 `ai`를 명시해야 하며, round 클라이언트와 스케줄러의 복구 binding 생성에도 같은 설정을 적용합니다([허용 규칙](AI_INTEGRATION.md#설정)) |
 
@@ -104,7 +106,11 @@ R5의 최초 409 `analysis_incomplete`는 접수 전 대기이므로 `analysis_d
 
 dev에서 round URL을 `http://ai:8000`으로 바꾸어도 기존 요청 journal은 최초 바이트와 서비스 binding을 보존합니다. 기존 endpoint와 새 endpoint가 다르면 해당 회차는 네트워크 호출 전에 `run_binding_mismatch` 또는 `freeze_binding_mismatch`로 거절됩니다. 복구는 [원래 바이트와 같은 서비스로 복구](#원래-바이트와-같은-서비스로-복구)의 규칙을 따릅니다.
 
-**배포 제약.** durable artifact root와 POSIX lock·소유권·인스턴스 간 공유 방식은 Infra가 정합니다. HTTP 연결 구현만으로 EFS 잠금·TLS·무중단 배포가 검증된 것은 아닙니다. 서비스 쓰기 profile·원장과 기존 read-only archive는 따로 유지합니다.
+**배포 제약.** durable artifact root와 POSIX lock·소유권·인스턴스 간 공유 방식은 Infra가 정합니다. HTTP 연결 구현만으로 EFS 잠금·TLS·무중단 배포가 검증된 것은 아닙니다. 서비스 쓰기 profile·원장과 기존 read-only archive는 따로 유지하고, first47의 Web RO·operator RW 계약을 그대로 지킵니다.
+
+R7은 관측 전체를 최초 확인과 commit 직전 재확인에서 **두 번 순차 export**합니다. 수입 시간에는 `2 × 관측 수 × 관측 HTTP 소요시간` 외에도 handoff 읽기·현재성 확인과 DB lock 대기·검증·파일 기록·commit 시간이 포함됩니다. DB lock 대기의 유한 상한이 보장되지 않으므로 관측 수와 request timeout만으로 안전한 고정 lease를 입증할 수 없습니다. 기본 `PT2M`은 운영 안전값으로 검증된 수치가 아닙니다.
+
+활성화 전에 **실제로 동시에 실행되는 scheduler holder 하나**를 보장하거나, 다중 holder의 수입 시간 제한·수입 중 갱신 방식을 별도로 설계·검증해야 합니다. desired count가 1이어도 rolling 배포에서 구·신 task가 겹치면 holder가 둘일 수 있으므로 전환 중 중첩도 차단해야 합니다. 운영 배치와 입력 age 정책이 정해질 때까지 회차는 기본 꺼짐으로 유지하며 age 값은 운영자가 별도로 정합니다.
 
 ## 관리자 읽기 (A-ADM-03)
 
@@ -124,7 +130,7 @@ dev에서 round URL을 `http://ai:8000`으로 바꾸어도 기존 요청 journal
 - `GraphRoundRepositoryPostgresTest`(`graph-postgres`): migration·제약·guard trigger(식별·끝난 회차 재개·버전 연결 변경), lease와 token(갱신 유지·인계 시 새 token·조건부 연장 `extend`), fenced advance(옛 holder·stale stage → 기록 없음), `link`(트랜잭션 밖 거절·rollback에 따라 취소·fencing·`newestImported`가 연결만 된 미완료 행을 봄), retry 뒤에도 `version_committed_at`과 순서 기준이 남음(열은 한 번만 씀), due·page.
 - `GraphRoundImportBridgeTest`: staged→imported, unchanged, `skipped_superseded`, 버전 commit 뒤 단계 변경 전 중단 → 옛 슬롯 skipped·다음 시도 unchanged로 완료, 수입 중 lease 인계 → 수입 취소·기록 없음·새 holder가 수입, withheld→failed, busy→waiting→`import_timeout`, 준비 안 된·claim 안 된 회차 거절.
 - `GraphHandoffImportPostgresIntegrationTest`(`graph-postgres`): 실제 테이블에서 같은 복구 시나리오(연결 fencing으로 수입 rollback, 최신 회차 버전 commit 뒤 중단 → 복구 실패·새 freeze로 retry(연결 비움, commit 기록 유지) → 옛 슬롯 skipped → 같은 핀으로 최신 회차 unchanged 완료, 버전 1개).
-- `GraphRoundImportConfigurationTest`: 꺼짐·웹 전용·설정 닫힘(snapshot source, read client, CLI 경로, import-source, operator).
+- `GraphRoundImportConfigurationTest`: 꺼짐·웹 전용·설정 닫힘(snapshot source, read client, CLI 경로, import-source, operator), 실제 observation client 설정의 HTTP 기동·loopback export, 비활성 client와 잔존 CLI 세 설정의 거절·경로 미노출, CLI 선택 시 활성 HTTP client와 무관한 CLI 필수 조건.
 - `GraphRoundSchedulerConfigurationTest`: 꺼짐이면 스케줄러·상태 없음, 켜면 스케줄러가 overview의 `GraphRoundStatus`, round 클라이언트·analyze-plan 미설정·달력 오류는 설정 이름으로 기동 거절.
 - `GraphRoundClockTest`: 하루 18+1 슬롯(KST), 반열린 구간·자정 넘김, 다음 슬롯, 회차 id 형식, 달력 검증.
 - `GraphRoundWorkerTest`(가짜 AI 라우트·큐·bridge): 정규 슬롯 R1→R7 전진과 이벤트·선택 결과 개수, 새 자료 없음·freeze 전용 슬롯의 계획 없는 freeze와 `no_public_material`→`skipped`, `round_busy`(`Retry-After`)·전송 실패 대기와 4xx 거절(`failedAt`), 단계 상한 `run_timeout`과 분석 상한 `analysis_timeout`, 분석 실패·계획 거절·큐 미설정, lookback 열기와 다른 인스턴스 lease 존중. lease 만료 뒤 다른 인스턴스가 인계해 실패·해제까지 마친 행에 늦은 결과를 쓰지 않음(새 claim은 다시 놓음), 만료만 된 lease는 token을 유지한 채 연장되어 결과 보존, 끝난 분석 job의 실패는 `failedAt=plan_ready`, R3 상한은 `analysis_queue_timeout`(`failedAt=plan_ready`).

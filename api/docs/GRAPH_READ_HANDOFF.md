@@ -19,6 +19,8 @@ API 이미지의 비웹 operator 프로세스는 문서 등록과 graph 수입 �
 
 웹 회차의 `GraphRoundImportBridge`도 같은 importer를 사용합니다. handoff는 HTTP로 읽고, `ZOOP_GRAPH_ROUND_IMPORT_SOURCE=http`이면 기존 `ObservationSource`·`IngestionExporters.forSource`를 통해 관측 export client로 현재 권리를 재확인합니다. 기본 `cli`는 설치된 ingestion 경로를 사용합니다. 회차 연결은 수입 트랜잭션 안에서 원래 lease token으로 기록하며 caller-owned root lock과 transactional `VersionRecorder`를 유지합니다. 결과는 비활성 incoming 버전이고 누적 composition·활성화와 구분합니다([회차 계약](GRAPH_ROUND.md)).
 
+회차의 HTTP 설정에서는 `ZOOP_GRAPH_ROUND_INGESTION_CLI`·`INGESTION_STATE_DIR`·`INGESTION_SOURCES`를 모두 비웁니다. 잔존 값은 해당 설정 이름으로 기동을 거절합니다. `cli`를 선택하면 활성 HTTP client와 무관하게 CLI 필수 조건을 적용합니다. R7의 두 관측 확인 순회와 DB 대기를 포함한 lease·단일 holder 배치 조건은 [회차 배포 제약](GRAPH_ROUND.md#설정-zoopgraphround-웹-애플리케이션-전용-기본-꺼짐)을 따릅니다.
+
 ### TaskDefinition 설정 이름과 profile 조건
 
 | 실행 profile | 설정 |

@@ -1,26 +1,37 @@
 package com.zoop.graph.round;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.sql.DataSource;
 
 import com.zoop.ai.config.AiHandoffReadClientConfiguration;
+import com.zoop.ai.config.AiObservationExportClientConfiguration;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.ai.observation.ObservationExportClient;
 import com.zoop.graph.importer.GraphHandoffRepository;
+import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mockito;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
@@ -31,7 +42,7 @@ import org.springframework.transaction.support.TransactionOperations;
 
 /**
  * The bridge's configuration in a minimal web context: it exists only with {@code zoop.graph.round.enabled=true} and fails
- * closed, naming the setting, when the snapshot source, the read client or the S2-1 CLI settings are missing.
+ * closed, naming the setting, when a required source setting is missing or HTTP retains a nonblank CLI setting.
  */
 class GraphRoundImportConfigurationTest {
     @TempDir
@@ -109,15 +120,109 @@ class GraphRoundImportConfigurationTest {
         });
     }
 
+    private static final String[] EXPORT_CLIENT = {
+            "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED", "true",
+            "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL", "https://ai.internal.example",
+            "ZOOP_AI_OBSERVATION_EXPORT_CLIENT_TOKEN", "export-token-0123456789abcdefghijklmnopqrstuvwxyz"};
+
+    private String[] observationHttp(String... extra) {
+        List<String> changes = new ArrayList<>(Arrays.asList("ZOOP_GRAPH_ROUND_IMPORT_SOURCE", "http",
+                "ZOOP_GRAPH_ROUND_INGESTION_CLI", null, "ZOOP_GRAPH_ROUND_INGESTION_STATE_DIR", null,
+                "ZOOP_GRAPH_ROUND_INGESTION_SOURCES", null));
+        changes.addAll(Arrays.asList(EXPORT_CLIENT));
+        changes.addAll(Arrays.asList(extra));
+        return with(changes.toArray(String[]::new));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "ZOOP_GRAPH_ROUND_INGESTION_CLI,ingestion-cli",
+            "ZOOP_GRAPH_ROUND_INGESTION_STATE_DIR,ingestion-state-dir",
+            "ZOOP_GRAPH_ROUND_INGESTION_SOURCES,ingestion-sources"
+    })
+    void httpRejectsEachResidualCliSettingWithoutLeakingItsValue(String environmentKey, String setting) {
+        runner().withUserConfiguration(AiObservationExportClientConfiguration.class)
+                .withPropertyValues(observationHttp(environmentKey, valid.get(environmentKey))).run(context -> {
+                    Throwable failure = configurationFailure(context.getStartupFailure());
+                    assertNotNull(failure, environmentKey);
+                    assertTrue(failure.getMessage().startsWith("zoop.graph.round." + setting + " "), failure.getMessage());
+                    assertTrue(failure.getMessage().contains("import-source=http"), failure.getMessage());
+                    assertTrue(!failure.getMessage().contains(temp.toString()), failure.getMessage());
+                });
+    }
+
     @Test
-    void httpUsesTheExistingObservationExporterFactoryWithoutCliPaths() {
-        runner().withBean(ObservationExportClient.class, () -> Mockito.mock(ObservationExportClient.class))
-                .withPropertyValues(with("ZOOP_GRAPH_ROUND_IMPORT_SOURCE", "http",
-                        "ZOOP_GRAPH_ROUND_INGESTION_CLI", "", "ZOOP_GRAPH_ROUND_INGESTION_STATE_DIR", "",
-                        "ZOOP_GRAPH_ROUND_INGESTION_SOURCES", "")).run(context -> {
+    void httpRequiresTheEnabledRealObservationClient() {
+        runner().withUserConfiguration(AiObservationExportClientConfiguration.class)
+                .withPropertyValues(observationHttp("ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED", "false")).run(context -> {
+                    Throwable failure = configurationFailure(context.getStartupFailure());
+                    assertNotNull(failure);
+                    assertTrue(failure.getMessage().startsWith("zoop.graph.round.import-source "), failure.getMessage());
+                    assertTrue(failure.getMessage().contains("zoop.ai.observation-export-client.enabled"), failure.getMessage());
+                });
+    }
+
+    @Test
+    void cliStillRequiresItsExecutableWhenTheHttpClientIsEnabled() {
+        runner().withUserConfiguration(AiObservationExportClientConfiguration.class).withPropertyValues(with(EXPORT_CLIENT))
+                .run(context -> {
                     assertNull(context.getStartupFailure());
                     assertNotNull(context.getBean(GraphRoundImportBridge.class));
                 });
+        runner().withUserConfiguration(AiObservationExportClientConfiguration.class)
+                .withPropertyValues(with(EXPORT_CLIENT))
+                .withPropertyValues("ZOOP_GRAPH_ROUND_INGESTION_CLI=").run(context -> {
+                    Throwable failure = configurationFailure(context.getStartupFailure());
+                    assertNotNull(failure);
+                    assertTrue(failure.getMessage().startsWith("zoop.graph.round.ingestion-cli "), failure.getMessage());
+                });
+    }
+
+    @Test
+    void httpContextExportsAnObservationThroughTheConfiguredClient() throws IOException {
+        var selector = new ObservationExportClient.Selector("round-1", "source-a", 0, 1, "doc-" + "a".repeat(64),
+                "b".repeat(64), "c".repeat(64));
+        byte[] exported = ("""
+                {"schemaVersion":"zoop-ingestion-s2-1","observation":{"roundId":"round-1","sourceId":"source-a",
+                "page":0,"ordinal":1,"documentId":"%s","rawVersion":"%s","documentVersion":"%s"}}
+                """.formatted(selector.documentId(), selector.rawVersion(), selector.documentVersion()))
+                .getBytes(StandardCharsets.UTF_8);
+        List<String> requests = new ArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/internal/v1/observations/export", exchange -> {
+            requests.add(exchange.getRequestMethod() + " " + exchange.getRequestURI().getPath());
+            requests.add(exchange.getRequestHeaders().getFirst("Authorization"));
+            requests.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.getResponseHeaders().set("X-Request-ID", exchange.getRequestHeaders().getFirst("X-Request-ID"));
+            exchange.sendResponseHeaders(200, exported.length);
+            try (var body = exchange.getResponseBody()) {
+                body.write(exported);
+            } finally {
+                exchange.close();
+            }
+        });
+        server.start();
+        try {
+            runner().withUserConfiguration(AiObservationExportClientConfiguration.class)
+                    .withPropertyValues(observationHttp("ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL",
+                            "http://127.0.0.1:" + server.getAddress().getPort(),
+                            "ZOOP_GRAPH_ROUND_INGESTION_CLI", " ",
+                            "ZOOP_GRAPH_ROUND_INGESTION_STATE_DIR", " ",
+                            "ZOOP_GRAPH_ROUND_INGESTION_SOURCES", " ")).run(context -> {
+                        assertNull(context.getStartupFailure());
+                        assertNotNull(context.getBean(GraphRoundImportBridge.class));
+                        assertArrayEquals(exported, context.getBean(ObservationExportClient.class).export(selector));
+                    });
+            assertEquals("POST /internal/v1/observations/export", requests.get(0));
+            assertEquals("Bearer " + EXPORT_CLIENT[5], requests.get(1));
+            var request = tools.jackson.databind.json.JsonMapper.builder().build().readTree(requests.get(2));
+            assertEquals(selector.documentId(), request.get("documentId").stringValue());
+            assertEquals(selector.documentVersion(), request.get("documentVersion").stringValue());
+            assertEquals(3, requests.size());
+        } finally {
+            server.stop(0);
+        }
     }
 
     @Test
@@ -130,7 +235,6 @@ class GraphRoundImportConfigurationTest {
                 {"ZOOP_GRAPH_ROUND_INGESTION_CLI", temp.resolve("missing").toString(), "zoop.graph.round.ingestion-cli "},
                 {"ZOOP_GRAPH_ROUND_INGESTION_STATE_DIR", "", "zoop.graph.round.ingestion-state-dir "},
                 {"ZOOP_GRAPH_ROUND_INGESTION_SOURCES", "relative.json", "zoop.graph.round.ingestion-sources "},
-                {"ZOOP_GRAPH_ROUND_IMPORT_SOURCE", "http", "zoop.graph.round.import-source "},
                 {"ZOOP_GRAPH_ROUND_IMPORT_SOURCE", "grpc", "zoop.graph.round.import-source "},
                 {"ZOOP_GRAPH_ROUND_OPERATOR", "operator:x", "zoop.graph.round.operator "},
         };
