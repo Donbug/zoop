@@ -6,19 +6,26 @@ export function useCompanyScroll(scope: string, ready: boolean) {
   const location = useLocation();
   const restore = useRef<(() => void) | null>(null);
   const settled = useRef(ready);
+  const previousPage = useRef<{ pathname: string; scope: string } | null>(null);
+  const pathname = location.pathname;
   const url = location.pathname + location.search;
   useLayoutEffect(() => {
+    const changedPage =
+      previousPage.current?.pathname !== pathname ||
+      previousPage.current?.scope !== scope;
+    previousPage.current = { pathname, scope };
     const key = `zoop.company.scroll:${scope}:${location.key}`;
-    let target = 0;
+    let savedY: number | null = null;
     try {
       const saved = JSON.parse(sessionStorage.getItem(key) ?? 'null');
       if (saved?.url === url && Number.isFinite(saved.y) && saved.y >= 0)
-        target = saved.y;
+        savedY = saved.y;
     } catch {
       /* optional history persistence */
     }
-    let pending = target > 0;
-    let y = target;
+    const target = savedY ?? 0;
+    let pending = savedY !== null;
+    let y = pending ? target : window.scrollY;
     let frame = 0;
     const observer =
       typeof ResizeObserver === 'undefined'
@@ -49,8 +56,12 @@ export function useCompanyScroll(scope: string, ready: boolean) {
       cancelAnimationFrame(frame);
       observer?.disconnect();
     };
-    if (!pending) window.scrollTo(0, 0);
-    else observer?.observe(document.body);
+    // D8: query pushes/replacements keep the current viewport. Only entering
+    // another company/member page starts at the top without saved history.
+    if (!pending && changedPage) {
+      window.scrollTo(0, 0);
+      y = 0;
+    } else if (pending) observer?.observe(document.body);
     restore.current = attempt;
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('wheel', cancelRestore, { passive: true });
@@ -69,7 +80,7 @@ export function useCompanyScroll(scope: string, ready: boolean) {
         /* storage can be blocked */
       }
     };
-  }, [location.key, scope, url]);
+  }, [location.key, pathname, scope, url]);
   useLayoutEffect(() => {
     settled.current = ready;
     restore.current?.();

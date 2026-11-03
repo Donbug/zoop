@@ -856,7 +856,11 @@ export default function CompanyWorkspace() {
           </p>
         )}
         <section aria-label="기업 개요">
-          {mapEntry && <Link to={mapEntry}>그래프로 돌아가기</Link>}
+          {mapEntry && (
+            <Link className={ui.button} to={mapEntry}>
+              그래프로 돌아가기
+            </Link>
+          )}
           <Status resource={company} label="기업 정보" />
           {company.data && (
             <>

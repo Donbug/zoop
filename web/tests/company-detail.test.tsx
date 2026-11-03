@@ -3246,6 +3246,9 @@ test('D-COM-01 D7 returns to the original map URL after changing a company tab',
   );
   const link = await screen.findByRole('link', { name: '그래프로 돌아가기' });
   expect(link.getAttribute('href')).toBe(entry);
+  expect(link.className).toBe(
+    screen.getByRole('link', { name: '지도에서 보기' }).className,
+  );
   await userEvent.click(screen.getByRole('button', { name: '문서' }));
   expect(
     screen
