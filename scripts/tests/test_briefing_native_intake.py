@@ -2,6 +2,7 @@ import json,os,sys,tempfile,unittest
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
 from unittest.mock import Mock,patch
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'ai/pipeline/src'))
 import httpx
 import briefing_native_intake as native
 import briefing_server_runtime as server
