@@ -1,6 +1,9 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, expect, test } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
+import { useAuthStore } from '@/stores/useAuthStore';
+import type { DocumentAnalysisSummary } from '@/types/evidence';
+vi.hoisted(() => vi.stubEnv('VITE_EVIDENCE_DATA_SOURCE', 'api'));
 import {
   MemoryRouter,
   Route,
@@ -585,3 +588,137 @@ test('D-COM-01 N-k shows document and judgment times in KST with the shared unde
   expect(screen.getAllByText(/2026-10-05 12:00 KST/).length).toBeGreaterThan(0);
   expect(screen.queryByText(/2026-10-05T03:00:00Z/)).toBeNull();
 });
+
+const claimSummary: DocumentAnalysisSummary = {
+  schemaVersion: 'zoop-ai-s1-1',
+  artifactId: 'summary-artifact',
+  documentId: 'doc-a',
+  documentVersion: 'doc-v1',
+  resultVersion: 'result-v1',
+  text: '합성 주장별 요약',
+  claims: [
+    {
+      claimId: 'claim-1',
+      text: '확인 가능한 합성 주장',
+      assertionKind: 'fact',
+      evidenceIds: ['ev-a', 'ev-a'],
+    },
+    {
+      claimId: 'claim-2',
+      text: '근거 없는 합성 해석',
+      assertionKind: 'interpretation',
+      evidenceIds: [],
+    },
+    {
+      claimId: 'claim-3',
+      text: '합성 자료의 한계',
+      assertionKind: 'limitation',
+      evidenceIds: [],
+    },
+  ],
+  citations: [
+    {
+      evidenceId: 'ev-a',
+      documentId: 'doc-a',
+      documentVersion: 'doc-v1',
+      textArtifactId: 'text-a',
+      offsetUnit: 'unicode_code_point',
+      start: 4,
+      end: 14,
+      quote: evidence.quote,
+      inputKind: 'body',
+      rawLocatorIds: [],
+    },
+  ],
+  limitations: [],
+  producedAt: asOf,
+  provenance: {
+    sourceKind: 'synthetic',
+    executionMode: 'replay',
+    recordingKind: 'authored-test',
+  },
+};
+function serveClaims(summary = claimSummary) {
+  server.on('GET', '/api/v1/companies/:id/documents', () =>
+    json({
+      items: [
+        {
+          ...doc,
+          documentVersion: 'doc-v1',
+          resultVersion: 'result-v1',
+          documentSummary: summary,
+        },
+      ],
+      nextCursor: null,
+      metadata,
+    }),
+  );
+}
+test('D-COM-02 D16 opens only actual claim evidence in the shared drawer and returns keyboard focus', async () => {
+  serveClaims();
+  open();
+  await userEvent.click(await screen.findByText('제공된 문서 요약'));
+  expect(screen.getByText('확인 가능한 합성 주장')).toBeTruthy();
+  expect(screen.getByText('해석 · 근거 없는 합성 해석')).toBeTruthy();
+  expect(screen.getByText('한계 · 합성 자료의 한계')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '요약 2 근거 보기' })).toBeNull();
+  const button = screen.getByRole('button', { name: '요약 1 근거 보기' });
+  expect(button.textContent).toBe('근거 1건 보기');
+  await userEvent.click(button);
+  const drawer = await screen.findByRole('dialog', { name: '근거 문서' });
+  expect(await within(drawer).findByText('상세 합성 근거 인용')).toBeTruthy();
+  expect(server.calls('GET', '/api/v1/evidence/:id')).toHaveLength(1);
+  expect(server.calls('GET', '/api/v1/evidence/:id')[0].query.get('asOf')).toBe(
+    asOf,
+  );
+  expect(
+    server.calls('GET', '/api/v1/evidence/:id')[0].query.get('graphVersion'),
+  ).toBe('v1');
+  expect(drawer.closest('[aria-label="뉴스·공시"]')).toBeNull();
+  await userEvent.keyboard('{Escape}');
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(document.activeElement).toBe(button);
+});
+test.each(['documentId', 'documentVersion', 'resultVersion'] as const)(
+  'D-COM-02 D16 hides summary claims with a mismatched %s',
+  async (field) => {
+    serveClaims({ ...claimSummary, [field]: 'other' });
+    open();
+    await screen.findByRole('heading', { name: doc.title! });
+    expect(screen.queryByText('제공된 문서 요약')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: '요약 1 근거 보기' }),
+    ).toBeNull();
+  },
+);
+test.each(['company', 'time', 'member'] as const)(
+  'D-COM-02 D16 closes claim evidence and ignores a late response after changing %s',
+  async (change) => {
+    const pending = deferred<Response>();
+    serveClaims();
+    server.on('GET', '/api/v1/evidence/:id', () => pending.promise);
+    open();
+    await userEvent.click(await screen.findByText('제공된 문서 요약'));
+    await userEvent.click(
+      screen.getByRole('button', { name: '요약 1 근거 보기' }),
+    );
+    await screen.findByRole('dialog', { name: '근거 문서' });
+    if (change === 'member')
+      act(() =>
+        useAuthStore.setState((s) => ({
+          sessionRevision: s.sessionRevision + 1,
+        })),
+      );
+    else
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: change === 'company' ? '기업 바꾸기' : '시점 바꾸기',
+        }),
+      );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await act(async () =>
+      pending.resolve(json({ ...evidence, quote: '이전 맥락의 늦은 인용' })),
+    );
+    expect(screen.queryByText('이전 맥락의 늦은 인용')).toBeNull();
+  },
+);
