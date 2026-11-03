@@ -140,6 +140,7 @@ R7은 관측 전체를 최초 확인과 commit 직전 재확인에서 **두 번 
 - `GraphRoundAdminCommandServiceTest`: retry 재개 단계(이벤트 `failedAt`·코드 계열), lease 해제·멱등 재생·열린 회차 409, 수동 시작(현재 분·지정 슬롯·중복 409·형식 422), 스케줄러 없음 404. `analysis_timeout`은 `analysis_queued`, `analysis_failed`·`analysis_queue_timeout`은 `plan_ready`로 재개, 이벤트 `failedAt`이 코드 계열보다 우선.
 - `AnalyzePlanPersistencePostgresTest`(`auth-postgres`): `createForSystem`이 system actor로 계획·job·감사 행을 만들고 같은 계획은 재사용, 실패한 job은 retry job 1개.
 - `PipelineOverviewPostgresTest`(`auth-postgres`): 기존 검사 + `rounds` 섹션(`enabled=false`, null 시각, 배열)이 직렬화됨.
+- `api/scripts/graph_round_smoke.py`(로컬 실행, CI 미연결): 실제 AI 회차 서비스(profile-2 영업일 달력, 온라인 계획 접수, S2·S3 replay, freeze, 관측 export)와 빌드한 jar(scheduler R1~R7, `analyze_plan` worker, HTTP 문서 등록, 관리자 `startGraphRound`), 전용 PostgreSQL로 두 회차를 돌립니다. 금요일 슬롯은 앱 자신의 bindings로 freeze해 비활성 버전을 수입하고 활성 포인터를 바꾸지 않습니다. 토요일 슬롯은 `no_new_material`/`non_business_day`로 tick 없이 계획 없는 freeze를 하고, 같은 내용 파생 handoff라 `unchanged`로 끝납니다. 시험 경계는 AI 시계 주입과, replay fixture·접수 정책을 준비하는 동안 계획 접수를 잡아 두는 투명 프록시뿐입니다. 실행 방법은 스크립트 머리말에 있습니다.
 
 ## 다음
 
