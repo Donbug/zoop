@@ -616,7 +616,7 @@ describe('D-BRF-01/02 new issue/company AI revision', () => {
     );
     const title = screen.getByText('같은 결정과 조건부 후속 절차');
     expect(title.closest('summary')!.textContent).not.toContain('발생');
-    expect(screen.getByText('근거 문서 3건')).toBeTruthy();
+    expect(screen.getByText('근거 3건')).toBeTruthy();
     expect(title.closest('summary')!.textContent).toContain('선정 이유');
     expect(title.closest('summary')!.textContent).toContain('자본정책');
     expect(
