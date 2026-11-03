@@ -33,6 +33,8 @@ public class GraphRoundCommandsConfiguration {
     GraphRoundStatus graphRoundCommandsStatus(GraphRoundTicks ticks, GraphRoundClock graphRoundCommandsClock, Clock clock,
             PlatformTransactionManager transactions) {
         TransactionTemplate own = new TransactionTemplate(transactions);
+        // A transaction of its own, so a failed read never aborts the caller's (the overview's, a command's). It borrows a second
+        // pooled connection while the caller holds one; admin traffic is a few people, far below the pool size.
         own.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         own.setReadOnly(true);
         return new TickedGraphRoundStatus(ticks, graphRoundCommandsClock, clock, own);

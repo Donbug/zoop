@@ -22,29 +22,43 @@ class GraphRoundHeartbeatTest {
     private static final GraphRoundClock CALENDAR = new GraphRoundClock(ZoneId.of("Asia/Seoul"), LocalTime.of(9, 5), Duration.ofMinutes(30),
             18, List.of(LocalTime.of(18, 5)));
 
+    private final java.util.concurrent.atomic.AtomicReference<Instant> now = new java.util.concurrent.atomic.AtomicReference<>(NOW);
+    private final Clock moving = new Clock() {
+        @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(ZoneId zone) { return this; }
+        @Override public Instant instant() { return now.get(); }
+    };
+
     @Test void theWebCountsTheFreshestLiveWriterWithItsCalendarAndNothingElse() {
         var rows = new ArrayList<Tick>();
         var status = status(() -> rows);
         assertFalse(status.enabled(), "no writer");
+        assertTrue(status.available());
         assertEquals(Optional.empty(), status.nextSlotAt());
 
+        later();
         rows.add(tick("writer-a-0000000a", NOW.minusSeconds(12), CALENDAR.digest(), true));
         rows.add(tick("writer-b-0000000b", NOW.minusSeconds(41), CALENDAR.digest(), true));
         assertTrue(status.enabled());
         assertEquals(Optional.of(NOW.minusSeconds(12)), status.lastTickAt(), "the freshest live writer's last pass");
-        assertEquals(CALENDAR.nextSlotAt(NOW), status.nextSlotAt(), "the next slot from this process's own calendar");
+        assertEquals(CALENDAR.nextSlotAt(now.get()), status.nextSlotAt(), "the next slot from this process's own calendar");
 
         rows.clear();
+        assertTrue(status.enabled(), "one read serves the calls within a second, so one overview sees one state");
+        later();
         rows.add(tick("writer-a-0000000a", NOW.minusSeconds(50), CALENDAR.digest(), false));
         assertFalse(status.enabled(), "a beat three intervals old (by the database's clock) is a stopped writer");
 
+        later();
         rows.clear();
         rows.add(tick("writer-c-0000000c", NOW.minusSeconds(5), "0".repeat(64), true));
         assertFalse(status.enabled(), "a writer with another slot calendar is not counted");
     }
 
-    @Test void unreadableHeartbeatsLookLikeNoWriter() {
-        assertFalse(status(() -> { throw new IllegalStateException("database away"); }).enabled());
+    @Test void unreadableHeartbeatsLookLikeNoWriterButSayTheyWereNotRead() {
+        var status = status(() -> { throw new IllegalStateException("database away"); });
+        assertFalse(status.enabled());
+        assertFalse(status.available());
     }
 
     @Test void theSchedulerBeatsItsRowWithItsCalendarAndRemovesItOnStop() {
@@ -58,6 +72,7 @@ class GraphRoundHeartbeatTest {
                 eq(CALENDAR.digest()));
         scheduler.stop();
         verify(ticks).remove("writer-a-0000000a");
+        verify(ticks).prune();
 
         doThrow(new IllegalStateException("database away")).when(ticks).beat(any(), any(), any(), any(), any());
         assertDoesNotThrow(scheduler::beat, "a failed beat waits for the next one");
@@ -65,6 +80,10 @@ class GraphRoundHeartbeatTest {
 
     @Test void theCalendarDigestNamesTheCalendar() {
         var other = new GraphRoundClock(ZoneId.of("Asia/Seoul"), LocalTime.of(9, 0), Duration.ofMinutes(30), 18, List.of(LocalTime.of(18, 5)));
+        var reordered = new GraphRoundClock(ZoneId.of("Asia/Seoul"), LocalTime.of(9, 5), Duration.ofMinutes(30), 18,
+                List.of(LocalTime.of(23, 0), LocalTime.of(18, 5)));
+        assertEquals(reordered.digest(), new GraphRoundClock(ZoneId.of("Asia/Seoul"), LocalTime.of(9, 5), Duration.ofMinutes(30), 18,
+                List.of(LocalTime.of(18, 5), LocalTime.of(23, 0))).digest(), "the freeze-only slots in any order are one calendar");
         assertEquals(CALENDAR.digest(), new GraphRoundClock(ZoneId.of("Asia/Seoul"), LocalTime.of(9, 5), Duration.ofMinutes(30), 18,
                 List.of(LocalTime.of(18, 5))).digest());
         assertNotEquals(CALENDAR.digest(), other.digest());
@@ -74,11 +93,15 @@ class GraphRoundHeartbeatTest {
         List<Tick> read();
     }
 
-    private static TickedGraphRoundStatus status(Rows rows) {
+    private void later() {
+        now.set(now.get().plusSeconds(2));
+    }
+
+    private TickedGraphRoundStatus status(Rows rows) {
         var ticks = new GraphRoundTicks(null) {
             @Override public List<Tick> all() { return rows.read(); }
         };
-        return new TickedGraphRoundStatus(ticks, CALENDAR, Clock.fixed(NOW, ZoneOffset.UTC), TransactionOperations.withoutTransaction());
+        return new TickedGraphRoundStatus(ticks, CALENDAR, moving, TransactionOperations.withoutTransaction());
     }
 
     private static Tick tick(String owner, Instant lastPassAt, String digest, boolean alive) {

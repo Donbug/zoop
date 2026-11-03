@@ -38,6 +38,10 @@ public class GraphRoundTicks {
                 """, new MapSqlParameterSource("owner", owner).addValue("started", stamp(startedAt))
                 .addValue("interval", interval.toMillis()).addValue("pass", lastPassAt.map(GraphRoundTicks::stamp).orElse(null))
                 .addValue("calendar", calendarDigest));
+    }
+
+    /** Drops the rows silent for a day (writers that stopped without removing theirs); a scheduler runs it when it starts. */
+    public void prune() {
         jdbc.update("DELETE FROM graph_round_scheduler_ticks WHERE beat_at < clock_timestamp() - interval '1 day'",
                 new MapSqlParameterSource());
     }

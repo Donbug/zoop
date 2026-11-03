@@ -31,6 +31,7 @@ public final class GraphRoundClock {
     private final Duration interval;
     private final int count;
     private final List<LocalTime> freezeOnly;
+    private final String digest;
 
     public GraphRoundClock(GraphRoundProperties properties) {
         this(properties.slotZone(), properties.firstSlot(), properties.slotInterval(), properties.slotCount(),
@@ -46,15 +47,17 @@ public final class GraphRoundClock {
         this.interval = interval;
         this.count = count;
         this.freezeOnly = List.copyOf(freezeOnly);
+        this.digest = com.zoop.common.json.Canonical.sha256((zone + "|" + first + "|" + interval + "|" + count + "|"
+                + this.freezeOnly.stream().sorted().toList()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     /**
-     * A digest of this calendar (zone, first slot, interval, count, freeze-only slots): a writer records it with its heartbeat, so
+     * A digest of this calendar (zone, first slot, interval, count, freeze-only slots in time order): a writer records it with its
+     * heartbeat, so
      * the public web, which names round ids and the current minute with its own calendar, counts only a writer with the same one.
      */
     public String digest() {
-        return com.zoop.common.json.Canonical.sha256((zone + "|" + first + "|" + interval + "|" + count + "|" + freezeOnly)
-                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return digest;
     }
 
     /** The slots with {@code from < slotAt <= to}, oldest first. */

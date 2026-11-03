@@ -53,6 +53,11 @@ public final class GraphRoundScheduler implements SmartLifecycle, GraphRoundStat
         });
         executor.scheduleWithFixedDelay(this::tick, interval.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
         startedAt = clock.instant();
+        try {
+            ticks.prune();
+        } catch (RuntimeException unavailable) {
+            log.warn("graph round heartbeat rows not pruned ({})", unavailable.getClass().getSimpleName());
+        }
         heartbeat = Executors.newSingleThreadScheduledExecutor(task -> {
             Thread thread = new Thread(task, "graph-round-heartbeat");
             thread.setDaemon(true);

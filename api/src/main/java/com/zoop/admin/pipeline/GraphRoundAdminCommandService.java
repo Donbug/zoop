@@ -160,7 +160,11 @@ public class GraphRoundAdminCommandService {
      * already took effect returns its stored answer even while the writer is restarting (#275).
      */
     private void requireLiveScheduler() {
-        if (!status.getIfAvailable(() -> GraphRoundStatus.DISABLED).enabled()) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+        GraphRoundStatus scheduler = status.getIfAvailable(() -> GraphRoundStatus.DISABLED);
+        if (scheduler.enabled()) return;
+        // Unread is not "no writer": a database failure answers as every other one here does.
+        if (!scheduler.available()) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, true);
+        throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
     }
 
     private static Instant parse(String slotAt) {

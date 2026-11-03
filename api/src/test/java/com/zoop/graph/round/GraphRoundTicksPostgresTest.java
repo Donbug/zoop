@@ -67,7 +67,7 @@ class GraphRoundTicksPostgresTest {
                 """, DIGEST, DIGEST);
         var rows = ticks.all();
         assertEquals(List.of(true, false, false), rows.stream().map(Tick::alive).toList());
-        ticks.beat("writer-a-0000000a", STARTED, Duration.ofSeconds(15), Optional.empty(), DIGEST);
+        ticks.prune();
         assertEquals(List.of("writer-a-0000000a", "writer-b-0000000b"), ticks.all().stream().map(Tick::owner).toList());
         assertThrows(Exception.class, () -> ticks.beat("not an owner", STARTED, Duration.ofSeconds(15), Optional.empty(), DIGEST));
     }

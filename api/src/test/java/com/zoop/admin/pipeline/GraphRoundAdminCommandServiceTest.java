@@ -226,6 +226,22 @@ class GraphRoundAdminCommandServiceTest {
                 () -> commands.start(new GraphRoundStartRequest("2026-10-30T02:05:00Z"), "key-new", ADMIN, "req-r3")).getErrorCode());
     }
 
+    @Test
+    void anUnreadableHeartbeatIsSourceUnavailableNotNoWriter() {
+        var web = new StaticListableBeanFactory();
+        web.addBean("clock", new GraphRoundClock(ZoneId.of("Asia/Seoul"), LocalTime.of(9, 5), Duration.ofMinutes(30), 18,
+                List.of(LocalTime.of(18, 5))));
+        web.addBean("status", new GraphRoundStatus() {
+            @Override public boolean enabled() { return false; }
+            @Override public boolean available() { return false; }
+            @Override public java.util.Optional<Instant> nextSlotAt() { return java.util.Optional.empty(); }
+            @Override public java.util.Optional<Instant> lastTickAt() { return java.util.Optional.empty(); }
+        });
+        GraphRoundAdminCommandService unread = new GraphRoundAdminCommandService(rounds, web.getBeanProvider(GraphRoundClock.class),
+                web.getBeanProvider(GraphRoundStatus.class), idempotency, audit, JsonMapper.builder().build(), Clock.fixed(NOW, ZoneOffset.UTC));
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class, () -> unread.start(null, "k-u", ADMIN, "r")).getErrorCode());
+    }
+
     private static GraphRoundStatus alive(boolean enabled) {
         return new GraphRoundStatus() {
             @Override public boolean enabled() { return enabled; }
