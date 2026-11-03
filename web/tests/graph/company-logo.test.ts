@@ -20,6 +20,13 @@ it('D-GRP-01 resolves all fixture company logos to existing local files', () => 
     'KRX:035420',
     'KRX:035720',
     'NASDAQ:GOOGL',
+    'KRX:000270',
+    'KRX:005380',
+    'KRX:047050',
+    'KRX:066570',
+    'KRX:032640',
+    'KRX:009150',
+    'KRX:028260',
   ]) {
     const path = companyLogo(id, null);
     expect(path).toBeTruthy();
@@ -110,11 +117,15 @@ it.each([
 );
 
 it('D-GRP-01 fills the circle with logos that carry their own tile', () => {
-  // SK텔레콤·삼성SDS use the same tiled marks as SK하이닉스·삼성전자.
+  // SK텔레콤·삼성SDS use the same tiled marks as SK하이닉스·삼성전자; first47 marks carry tiles too.
   for (const url of [
     '/graph-assets/sk-telecom.svg',
     '/graph-assets/samsung-sds.svg',
+    '/graph-assets/kia.svg',
+    '/graph-assets/hyundai.svg',
+    '/graph-assets/lg.svg',
+    '/graph-assets/posco-international.svg',
   ])
     expect(logoScale(url)).toBe(1);
-  expect(logoScale('/graph-assets/lg.svg')).toBe(0.68);
+  expect(logoScale('/graph-assets/nvidia.svg')).toBe(0.68);
 });

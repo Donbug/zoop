@@ -29,6 +29,13 @@ const logos: Record<string, string> = {
   'KRX:018260': 'samsung-sds.svg',
   'KRX:000990': 'db-hitek.svg',
   'KRX:017670': 'sk-telecom.svg',
+  // first47 companies use the same file names as the API catalogue; Samsung/LG affiliates share one mark.
+  'KRX:000270': 'kia.svg',
+  'KRX:047050': 'posco-international.svg',
+  'KRX:066570': 'lg.svg',
+  'KRX:032640': 'lg.svg',
+  'KRX:009150': 'samsung.svg',
+  'KRX:028260': 'samsung.svg',
 };
 
 // These checked-in square marks already include a background and safe artwork margins.
@@ -44,6 +51,10 @@ export function logoScale(url?: string | null) {
       'naver',
       'kakao',
       'kt',
+      'kia',
+      'hyundai',
+      'lg',
+      'posco-international',
     ].some((name) => url === `/graph-assets/${name}.svg`)
     ? 1
     : 0.68;
