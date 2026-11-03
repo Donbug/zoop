@@ -35,9 +35,20 @@ def source_matches(text,companies):
             if re.search(expression,text,re.I):matches.append(company['companyId']);break
     return matches
 
+
+def relevance_text(raw):
+    """Disposable article DOM for picking inputs; never changes native text or citation offsets."""
+    from zoop_ai_pipeline.korea_portal import BODY_XPATH,tree,text as node_text
+    body=tree(raw).xpath(BODY_XPATH);require(len(body)==1,'article_scope')
+    excluded={'law_copy_wrap','area_page','view_opt','share','share_lst'}
+    for node in list(body[0].iterdescendants()):
+        if not isinstance(node.tag,str):continue
+        if node.tag in ('script','style','button') or excluded.intersection((node.get('class') or '').split()):
+            if node.getparent() is not None:node.getparent().remove(node)
+    return node_text(body[0])
+
 def collect(cfg,round,root):
     from zoop_ai_pipeline.korea_corpus import Config,run,package
-    from zoop_ai_pipeline.korea_portal import BODY_XPATH,tree,text as node_text
     base=Path(cfg['work'])/'native';root.mkdir(mode=0o700,parents=True,exist_ok=True)
     config_path=root/'collection-config.json'
     if not config_path.exists():
@@ -77,11 +88,7 @@ def collect(cfg,round,root):
         native=root/'collection/native/collections'/('item-'+row['candidate']['newsId'])
         raw=(native/'bodies'/(row['nativeBodySha256']+'.bin')).read_bytes()
         require(b.digest(raw)==row['nativeBodySha256'],'native_body_pin')
-        dom=tree(raw);body=dom.xpath(BODY_XPATH);require(len(body)==1,'article_scope')
-        # A disposable DOM copy for relevance only; the native canonical text and offsets remain unchanged.
-        for node in body[0].xpath('.//*[contains(@class,"law_copy_wrap") or self::script or self::style]'):
-            if node.getparent() is not None:node.getparent().remove(node)
-        matches=source_matches(node_text(body[0]),companies)
+        matches=source_matches(relevance_text(raw),companies)
         if matches:eligible.append((row,exported,matches))
     eligible.sort(key=lambda x:(x[0]['candidate']['publicationDay'],x[0]['candidate']['newsId']),reverse=True)
     require(bool(eligible),'no_current_company_source')

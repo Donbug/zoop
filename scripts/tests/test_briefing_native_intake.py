@@ -60,6 +60,13 @@ class IntakeTests(unittest.TestCase):
         self.assertEqual([cfg['originalSourceAuthority'],str(self.root/'authority/new-authorities.json')],json.loads(before)['delegates'])
         native.initialize_authority(cfg)
         self.assertEqual(before,(self.root/'authority/serving-delegates.json').read_bytes())
+    def test_share_controls_and_next_article_are_not_company_news(self):
+        companies=[{'companyId':'synthetic-kakao','name':'카카오','aliases':[]},
+            {'companyId':'synthetic-samsung','name':'삼성전자','aliases':[]}]
+        raw='<div class="article_body"><div class="view_cont"><p>수목원 한파 대비</p><section class="area_page">다음기사 삼성전자</section><div class="view_opt"><div class="share"><button>카카오톡</button></div></div></div></div>'.encode()
+        self.assertEqual([],native.source_matches(native.relevance_text(raw),companies))
+        self.assertIn('수목원',native.relevance_text(raw))
+
     def test_embedded_english_substring_is_not_a_company_match(self):
         companies=[{'companyId':'synthetic-kia','name':'가상기아','aliases':['Kia']}]
         self.assertEqual([],native.source_matches('Helsinkiannual unrelated word',companies))
