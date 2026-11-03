@@ -196,7 +196,7 @@ AI 담당과 BE가 2026-11-03까지 확정한 정기 운영 규칙 중 **앱이 
 
 ## 다음
 
-- 합성 연속 회차 검증은 새로운 DB·artifact root에서 실행하고 Java 요청 journal, native 단일 실행, 재시작 뒤 GET-first 복구, 비활성 수입과 기존 활성 포인터 유지를 함께 확인합니다. 운영 profile을 켜는 결정과 별개입니다.
+- 합성 연속 회차 중 새 DB·artifact root에서 두 회차의 비활성 수입, 기존 활성 포인터 유지, 비영업일 계획 없는 freeze는 `api/scripts/graph_round_smoke.py`(#537)로 확인합니다. 앱 재시작 뒤 GET-first 복구는 아직 종단 검증에 없습니다. 운영 profile을 켜는 결정과 별개입니다.
 - R8 활성화 결과를 회차 행에 사후 기록(`recordActivation`), 큐 대기 지표, 관리자 응답의 `ingestionRoundId`·`versionCommittedAt` 노출(OpenAPI 변경).
-- 버전 보존·정리 명령은 publication이 원본 버전을 FK로 묶는 전제를 반영해 다시 설계한 뒤. 실제 AI 서비스(달력 정책 profile-2, 합성 공급)와 잇는 합성 회차 종단 smoke.
+- 버전 보존·정리 명령은 만들지 않습니다(2026-11-03 보류). 명세는 버전·스냅샷 보존만 요구하고, publication과 그 원본 버전은 삭제가 막혀 있으며(`graph_publications` 불변 trigger, 원본 FK RESTRICT), 같은 내용의 freeze는 새 버전을 만들지 않습니다. 정규 회차를 켠 뒤 버전 수나 artifact 용량이 실제 문제가 되면 다시 검토합니다.
 - `quota_exhausted` 분석 실패를 retry 판정에서 막을지(지금은 운영 절차로만 막음).
