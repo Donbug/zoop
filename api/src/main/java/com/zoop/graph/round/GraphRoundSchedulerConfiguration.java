@@ -76,8 +76,8 @@ public class GraphRoundSchedulerConfiguration {
 
     @Bean
     GraphRoundScheduler graphRoundScheduler(GraphRoundWorker worker, GraphRoundClock calendar, Clock clock,
-            GraphRoundProperties properties) {
-        return new GraphRoundScheduler(worker, calendar, clock, properties.interval());
+            GraphRoundProperties properties, GraphRoundTicks ticks) {
+        return new GraphRoundScheduler(worker, calendar, clock, properties.interval(), ticks);
     }
 
     /** The lease owner of this instance: host name plus a per-start suffix, so two instances or a restart never share one. */

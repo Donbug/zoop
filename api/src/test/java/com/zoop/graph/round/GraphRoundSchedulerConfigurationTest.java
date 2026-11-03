@@ -1,6 +1,9 @@
 package com.zoop.graph.round;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -72,6 +75,7 @@ class GraphRoundSchedulerConfigurationTest {
                 .withBean(DocumentRegistryRepository.class, () -> Mockito.mock(DocumentRegistryRepository.class))
                 .withBean(GraphHandoffRepository.class, () -> Mockito.mock(GraphHandoffRepository.class))
                 .withBean(GraphRoundRepository.class, InMemoryGraphRoundRepository::new)
+                .withBean(GraphRoundTicks.class, () -> Mockito.mock(GraphRoundTicks.class))
                 .withBean(TransactionOperations.class, TransactionOperations::withoutTransaction)
                 .withBean(DataSource.class, () -> Mockito.mock(DataSource.class))
                 .withBean(NamedParameterJdbcTemplate.class, () -> Mockito.mock(NamedParameterJdbcTemplate.class))
@@ -90,6 +94,38 @@ class GraphRoundSchedulerConfigurationTest {
             else changed.put(extra[i], extra[i + 1]);
         }
         return changed.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).toArray(String[]::new);
+    }
+
+    @Test
+    void thePublicWebCommandsRegisterTheCalendarAndTheHeartbeatStatusButNoScheduler() {
+        WebApplicationContextRunner web = new WebApplicationContextRunner()
+                .withInitializer(GraphRoundSchedulerConfigurationTest::isolate)
+                .withBean(GraphRoundRepository.class, InMemoryGraphRoundRepository::new)
+                .withBean(GraphRoundTicks.class, () -> Mockito.mock(GraphRoundTicks.class))
+                .withBean(Clock.class, Clock::systemUTC)
+                .withUserConfiguration(GraphRoundCommandsConfiguration.class, GraphRoundImportConfiguration.class,
+                        GraphRoundSchedulerConfiguration.class);
+        web.withPropertyValues("zoop.graph.round.commands-enabled=true").run(context -> {
+            assertNull(context.getStartupFailure());
+            assertEquals(1, context.getBeansOfType(GraphRoundClock.class).size());
+            assertInstanceOf(TickedGraphRoundStatus.class, context.getBean(GraphRoundStatus.class));
+            assertTrue(context.getBeansOfType(GraphRoundScheduler.class).isEmpty());
+            assertTrue(context.getBeansOfType(GraphRoundImportBridge.class).isEmpty());
+        });
+        web.run(context -> assertTrue(context.getBeansOfType(GraphRoundClock.class).isEmpty(), "off by default"));
+        new org.springframework.boot.test.context.runner.ApplicationContextRunner()
+                .withBean(GraphRoundTicks.class, () -> Mockito.mock(GraphRoundTicks.class)).withBean(Clock.class, Clock::systemUTC)
+                .withUserConfiguration(GraphRoundCommandsConfiguration.class).withPropertyValues("zoop.graph.round.commands-enabled=true")
+                .run(context -> assertTrue(context.getBeansOfType(GraphRoundClock.class).isEmpty(), "web only"));
+    }
+
+    @Test
+    void theWriterKeepsItsOwnCalendarAndStatusWhenTheCommandsAreAlsoOn() {
+        runner().withPropertyValues(with("ZOOP_GRAPH_ROUND_COMMANDS_ENABLED", "true")).run(context -> {
+            assertNull(context.getStartupFailure());
+            assertEquals(1, context.getBeansOfType(GraphRoundClock.class).size());
+            assertInstanceOf(GraphRoundScheduler.class, context.getBean(GraphRoundStatus.class));
+        });
     }
 
     @Test

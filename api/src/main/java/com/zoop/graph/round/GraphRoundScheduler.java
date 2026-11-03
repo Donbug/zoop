@@ -17,6 +17,10 @@ import org.springframework.context.SmartLifecycle;
  * pass. Like the auto-activation scheduler it owns its thread, never the shared scheduling thread, and a stop waits for the
  * pass in progress (an import is one transaction that commits or rolls back on its own). It is also the admin overview's
  * {@link GraphRoundStatus}.
+ *
+ * <p>A second small thread ({@code graph-round-heartbeat}) beats this scheduler's row in {@link GraphRoundTicks} every
+ * {@code interval}, apart from the passes, so a long pass (an import, a preparation) does not look like a dead writer to the public
+ * web; a graceful stop removes the row (#55 PR-P4).
  */
 public final class GraphRoundScheduler implements SmartLifecycle, GraphRoundStatus {
     private static final Logger log = LoggerFactory.getLogger(GraphRoundScheduler.class);
@@ -26,13 +30,17 @@ public final class GraphRoundScheduler implements SmartLifecycle, GraphRoundStat
     private final GraphRoundClock calendar;
     private final Clock clock;
     private final Duration interval;
+    private final GraphRoundTicks ticks;
     private volatile ScheduledExecutorService executor;
+    private volatile ScheduledExecutorService heartbeat;
+    private volatile Instant startedAt;
 
-    public GraphRoundScheduler(GraphRoundWorker worker, GraphRoundClock calendar, Clock clock, Duration interval) {
+    public GraphRoundScheduler(GraphRoundWorker worker, GraphRoundClock calendar, Clock clock, Duration interval, GraphRoundTicks ticks) {
         this.worker = worker;
         this.calendar = calendar;
         this.clock = clock;
         this.interval = interval;
+        this.ticks = ticks;
     }
 
     @Override
@@ -44,6 +52,13 @@ public final class GraphRoundScheduler implements SmartLifecycle, GraphRoundStat
             return thread;
         });
         executor.scheduleWithFixedDelay(this::tick, interval.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
+        startedAt = clock.instant();
+        heartbeat = Executors.newSingleThreadScheduledExecutor(task -> {
+            Thread thread = new Thread(task, "graph-round-heartbeat");
+            thread.setDaemon(true);
+            return thread;
+        });
+        heartbeat.scheduleWithFixedDelay(this::beat, 0, interval.toMillis(), TimeUnit.MILLISECONDS);
         log.info("graph round scheduler started (interval {}, next slot {})", interval, nextSlotAt().map(Instant::toString).orElse("none"));
     }
 
@@ -56,9 +71,31 @@ public final class GraphRoundScheduler implements SmartLifecycle, GraphRoundStat
         }
     }
 
+    /** Writes this scheduler's row; a failure (the database away) is logged and the next beat tries again. */
+    void beat() {
+        try {
+            ticks.beat(new GraphRoundTicks.Tick(worker.owner(), startedAt, clock.instant(), interval, worker.lastTick(), nextSlotAt()));
+        } catch (Throwable unavailable) {
+            log.warn("graph round heartbeat not written ({})", unavailable.getClass().getSimpleName());
+        }
+    }
+
     @Override
     public synchronized void stop() {
         if (executor == null) return;
+        heartbeat.shutdown();
+        try {
+            // A beat in flight must not write the row back after it is removed.
+            if (!heartbeat.awaitTermination(STOP_WAIT.toMillis(), TimeUnit.MILLISECONDS)) heartbeat.shutdownNow();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+        heartbeat = null;
+        try {
+            ticks.remove(worker.owner());
+        } catch (RuntimeException unavailable) {
+            log.warn("graph round heartbeat row not removed ({}); it ages out", unavailable.getClass().getSimpleName());
+        }
         executor.shutdown();
         try {
             if (!executor.awaitTermination(STOP_WAIT.toMillis(), TimeUnit.MILLISECONDS)) {

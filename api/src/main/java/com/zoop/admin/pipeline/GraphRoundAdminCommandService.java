@@ -24,6 +24,7 @@ import com.zoop.graph.round.GraphRoundEvent.Outcome;
 import com.zoop.graph.round.GraphRoundPatch;
 import com.zoop.graph.round.GraphRoundRepository;
 import com.zoop.graph.round.GraphRoundStage;
+import com.zoop.graph.round.GraphRoundStatus;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -37,7 +38,8 @@ import tools.jackson.databind.node.ObjectNode;
  * The two admin commands on rounds (A-ADM-03, #55): {@code retryGraphRound} resumes a failed round at the stage it failed, under
  * the same round id (the AI side's idempotency keys are bound to it), and {@code startGraphRound} opens a row for a slot by
  * hand ({@code started_by = admin:<id>}). Both only mark the row; the scheduler's next pass does the work, so both are 404
- * while no scheduler runs here. Both are idempotent under the #275 contract (same key and body replay, another body
+ * while no scheduler is alive: in the writer the scheduler is here, in the public web ({@code zoop.graph.round.commands-enabled})
+ * it is a writer whose heartbeat is fresh (#55 PR-P4). Both are idempotent under the #275 contract (same key and body replay, another body
  * conflicts) through the shared {@code idempotency_records}, and both leave an audit row.
  */
 @Service
@@ -47,15 +49,18 @@ public class GraphRoundAdminCommandService {
 
     private final GraphRoundRepository rounds;
     private final ObjectProvider<GraphRoundClock> calendar;
+    private final ObjectProvider<GraphRoundStatus> status;
     private final JdbcAnalysisJobRepository idempotency;
     private final AdminAuditRepository audit;
     private final ObjectMapper mapper;
     private final Clock clock;
 
     public GraphRoundAdminCommandService(GraphRoundRepository rounds, ObjectProvider<GraphRoundClock> calendar,
-            JdbcAnalysisJobRepository idempotency, AdminAuditRepository audit, ObjectMapper mapper, Clock clock) {
+            ObjectProvider<GraphRoundStatus> status, JdbcAnalysisJobRepository idempotency, AdminAuditRepository audit, ObjectMapper mapper,
+            Clock clock) {
         this.rounds = rounds;
         this.calendar = calendar;
+        this.status = status;
         this.idempotency = idempotency;
         this.audit = audit;
         this.mapper = mapper;
@@ -143,7 +148,9 @@ public class GraphRoundAdminCommandService {
 
     private GraphRoundClock requireScheduler() {
         GraphRoundClock clockOfSlots = calendar.getIfAvailable();
-        if (clockOfSlots == null) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+        if (clockOfSlots == null || !status.getIfAvailable(() -> GraphRoundStatus.DISABLED).enabled()) {
+            throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
         return clockOfSlots;
     }
 
