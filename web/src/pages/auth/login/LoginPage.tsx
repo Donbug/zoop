@@ -17,6 +17,12 @@ import ConfirmDialog from '@/components/common/ConfirmDialog';
 import SessionStatus from '@/components/auth/SessionStatus';
 import { authAlert, authNote, focusRing } from '@/components/auth/authStyles';
 import type { LoginLocationState } from '@/types/auth';
+import {
+  clearSocialReturn,
+  consumeSocialReturn,
+  fromPath,
+  saveSocialReturn,
+} from '@/util/auth-return';
 
 // 와이어프레임 D-AUT-01 버튼 문구. 서버가 알려 준 제공자만 버튼을 둔다.
 const SOCIAL_LABEL: Record<string, string> = {
@@ -107,17 +113,6 @@ function loginErrorMessage(error: unknown) {
   return '로그인하지 못했어요. 잠시 후 다시 시도해 주세요.';
 }
 
-function fromPath(state: LoginLocationState | null) {
-  const from = state?.from;
-  if (
-    !from?.pathname?.startsWith('/') ||
-    from.pathname.startsWith('//') ||
-    ['/login', '/signup'].includes(from.pathname)
-  )
-    return null;
-  return `${from.pathname}${from.search ?? ''}${from.hash ?? ''}`;
-}
-
 // D-AUT-01 시작·이메일 로그인 (FS001·FS002·FS005·FS006)
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -127,6 +122,7 @@ export default function LoginPage() {
   const flow = useAuthCompletion();
   const active = useRef(true);
   const autoStarted = useRef(false);
+  const autoReturn = useRef<string | null>(null);
   const [started, setStarted] = useState(false);
   useEffect(() => {
     active.current = true;
@@ -146,10 +142,15 @@ export default function LoginPage() {
   const providers =
     providerRequest.status === 'success' ? providerRequest.data : [];
   const params = new URLSearchParams(location.search);
+  const socialMessage = socialResultMessage(params.get('social'));
   const socialResult =
     params.get('notice') === 'blocked'
       ? '이용이 제한된 계정이라 로그아웃했어요. 고객센터로 문의해 주세요.'
-      : socialResultMessage(params.get('social'));
+      : socialMessage;
+
+  useEffect(() => {
+    if (socialMessage) clearSocialReturn();
+  }, [socialMessage]);
 
   // FS006: existing members use the same confirmed holdings/interests branch.
   useEffect(() => {
@@ -162,7 +163,10 @@ export default function LoginPage() {
       return;
     autoStarted.current = true;
     setStarted(true);
-    void flow.run(undefined, undefined, from);
+    // Consume even when state.from wins, so a previous attempt cannot leak.
+    const savedReturn = consumeSocialReturn();
+    autoReturn.current = from ?? savedReturn;
+    void flow.run(undefined, undefined, autoReturn.current);
   }, [auth.status, auth.isAuthenticated, started, flow, from]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -298,7 +302,11 @@ export default function LoginPage() {
                 disabled={flow.busy}
                 className={pillButton}
                 onClick={() =>
-                  void flow.run(undefined, email.trim() || undefined, from)
+                  void flow.run(
+                    undefined,
+                    email.trim() || undefined,
+                    from ?? autoReturn.current,
+                  )
                 }
               >
                 로그인 상태 다시 확인
@@ -368,7 +376,13 @@ export default function LoginPage() {
                         SOCIAL_LABEL[provider.id] ?? `${provider.name} 로그인`
                       }
                       className={startCircle}
-                      onClick={(event) => busy && event.preventDefault()}
+                      onClick={(event) => {
+                        if (busy) {
+                          event.preventDefault();
+                          return;
+                        }
+                        saveSocialReturn(from);
+                      }}
                     >
                       <StartIcon id={provider.id} />
                     </a>

@@ -59,6 +59,9 @@ export function loadSession(force = false): Promise<MemberSession | null> {
   pending = { revision, promise };
   return promise;
 }
+/** D-AUT-01 / A6: completed members start on the market-wide map. */
+export const completedMemberDestination = '/?mode=all';
+
 /** FS006: an unknown/failed portfolio response is never interpreted as zero holdings. */
 export async function memberDestination(
   session: MemberSession,
@@ -95,5 +98,5 @@ export async function memberDestination(
       '종목을 확인하지 못했어요.',
     );
   // D-AUT-01 → D-GRP-01: a completed login always starts at the market-wide map.
-  return '/?mode=all';
+  return completedMemberDestination;
 }
