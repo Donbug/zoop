@@ -3224,9 +3224,7 @@ test('D-COM-05 D4 expands details directly below the selected card and closes th
       .getAttribute('href'),
   ).toBe('https://example.test/original');
   expect(within(detail).getByText(/원문 판정/)).toBeTruthy();
-  await userEvent.click(
-    screen.getByRole('button', { name: '합성 사건 A', exact: true }),
-  );
+  await userEvent.click(screen.getByRole('button', { name: '합성 사건 A' }));
   expect(screen.queryByRole('region', { name: '선택 사건 상세' })).toBeNull();
 });
 
@@ -3248,9 +3246,7 @@ test('D-COM-01 D7 returns to the original map URL after changing a company tab',
   );
   const link = await screen.findByRole('link', { name: '그래프로 돌아가기' });
   expect(link.getAttribute('href')).toBe(entry);
-  await userEvent.click(
-    screen.getByRole('button', { name: '문서', exact: true }),
-  );
+  await userEvent.click(screen.getByRole('button', { name: '문서' }));
   expect(
     screen
       .getByRole('link', { name: '그래프로 돌아가기' })
@@ -3283,7 +3279,7 @@ test('D-COM-01 D12 disables only unavailable short periods with a reason and reu
   });
   await waitFor(() => expect((day as HTMLButtonElement).disabled).toBe(true));
   expect(day.getAttribute('title')).toBe('합성 1일 자료 미제공');
-  const week = screen.getByRole('button', { name: '1주', exact: true });
+  const week = screen.getByRole('button', { name: '1주' });
   await waitFor(() =>
     expect(
       server
@@ -3294,9 +3290,7 @@ test('D-COM-01 D12 disables only unavailable short periods with a reason and reu
   expect((week as HTMLButtonElement).disabled).toBe(false);
   await userEvent.click(week);
   await screen.findByText(/차트 조회 실패/);
-  await userEvent.click(
-    screen.getByRole('button', { name: '1년', exact: true }),
-  );
+  await userEvent.click(screen.getByRole('button', { name: '1년' }));
   expect(
     server
       .calls('GET', '/api/v1/companies/:id/prices')
