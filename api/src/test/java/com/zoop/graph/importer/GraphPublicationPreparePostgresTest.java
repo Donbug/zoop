@@ -7,6 +7,9 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.time.Duration;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
@@ -23,11 +26,15 @@ import com.zoop.document.repository.VersionRow;
 import com.zoop.graph.publication.GraphPublicationAuthority;
 import com.zoop.graph.publication.GraphPublicationComposer;
 import com.zoop.graph.publication.GraphPublicationPreparer;
+import com.zoop.graph.publication.GraphRoundPreparer;
+import com.zoop.graph.publication.JdbcGraphPublicationPreparationRepository;
 import com.zoop.graph.publication.GraphPublicationReader;
 import com.zoop.graph.publication.JdbcGraphPublicationRepository;
 import com.zoop.graph.publication.PublicationComposeRequest;
 import com.zoop.graph.publication.PublicationMerger;
 import com.zoop.graph.read.DisclosureExclusions;
+import com.zoop.graph.round.JdbcGraphRoundImportLock;
+import com.zoop.graph.round.JdbcGraphRoundRepository;
 import com.zoop.graph.version.JdbcGraphVersionRepository;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
@@ -56,6 +63,9 @@ class GraphPublicationPreparePostgresTest {
     private JdbcGraphVersionRepository versions;
     private JdbcGraphPublicationRepository publications;
     private TransactionTemplate transaction;
+    private DriverManagerDataSource dataSource;
+    private NamedParameterJdbcTemplate named;
+    private int slots;
     private ArtifactFileStore files;
     private Path authority;
 
@@ -65,13 +75,13 @@ class GraphPublicationPreparePostgresTest {
         if (url == null || !url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/zoop_company_test_19")) {
             throw new IllegalStateException("Set ZOOP_COMPANY_TEST_DB_URL to the dedicated localhost zoop_company_test_19 database");
         }
-        var dataSource = new DriverManagerDataSource(url + "?currentSchema=" + schema + ",public", "company_test",
+        dataSource = new DriverManagerDataSource(url + "?currentSchema=" + schema + ",public", "company_test",
                 System.getenv().getOrDefault("ZOOP_COMPANY_TEST_DB_PASSWORD", ""));
         jdbc = new JdbcTemplate(dataSource);
         jdbc.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public");
         jdbc.execute("CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public");
         Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).load().migrate();
-        var named = new NamedParameterJdbcTemplate(jdbc);
+        named = new NamedParameterJdbcTemplate(jdbc);
         registry = new JdbcDocumentRegistryRepository(named);
         graph = new JdbcGraphHandoffRepository(named, new JdbcDocumentAnalysisRepository(named));
         versions = new JdbcGraphVersionRepository(named, CLOCK);
@@ -344,6 +354,184 @@ class GraphPublicationPreparePostgresTest {
                 change(result, "eventTime").get("values").values().stream().map(v -> v.get("side").asString()).sorted().toList());
         assertEquals(published, versions.active().orElseThrow().id());
         assertEquals(0, (int) jdbc.queryForObject("SELECT count(*) FROM graph_publications WHERE base_version_id = ?", Integer.class, published));
+    }
+
+    // ---------------------------------------------------------------- round path (#55 PR-P3)
+
+    @Test void theRoundPathPreparesOncePerNewImport() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        String first = importNative(HandoffFixtures.Spec.standard());
+        String round = roundImported(first, NOW.minusSeconds(10));
+        var rounds = roundPreparer();
+        rounds.afterPass(NOW);
+        var rows = preparations();
+        assertEquals(1, rows.size());
+        assertEquals("staged", rows.getFirst().get("code"));
+        assertEquals(round, rows.getFirst().get("round_id"));
+        assertNotNull(rows.getFirst().get("request"), "the fixed inputs are kept");
+        rounds.afterPass(NOW.plusSeconds(15));
+        assertEquals(1, preparations().size(), "no new import, no new attempt");
+
+        String second = importNative(HandoffFixtures.Spec.standard());
+        roundImported(second, NOW.plusSeconds(20));
+        rounds.afterPass(NOW.plusSeconds(30));
+        rows = preparations();
+        assertEquals(2, rows.size());
+        assertEquals("staged", rows.get(1).get("code"));
+        assertNotEquals(rows.getFirst().get("graph_version_id"), rows.get(1).get("graph_version_id"));
+    }
+
+    @Test void aChangedValueIsRecordedOnceWithItsInputs() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        roundImported(importNative(HandoffFixtures.Spec.standard().withEvent("2026-10-01", "day")), NOW.minusSeconds(10));
+        var rounds = roundPreparer();
+        rounds.afterPass(NOW);
+        rounds.afterPass(NOW.plusSeconds(15));
+        var rows = preparations();
+        assertEquals(1, rows.size());
+        assertEquals("failed", rows.getFirst().get("status"));
+        assertEquals("correction_required", rows.getFirst().get("code"));
+        assertNotNull(rows.getFirst().get("request"));
+        assertNotNull(rows.getFirst().get("decisions"));
+    }
+
+    @Test void anAttemptThatStoppedAfterCommittingIsRecoveredAsUnchanged() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        String round = roundImported(importNative(HandoffFixtures.Spec.standard()), NOW.minusSeconds(10));
+        // The process stopped after the composition committed, before its result was written.
+        var result = preparer().run((active, request, decisions) -> journal().begin(round, publications.newestImport().orElseThrow(), null, active, request, decisions, NOW));
+        assertEquals("staged", result.get("outcome").asString(), result.toString());
+        roundPreparer().afterPass(NOW.plusSeconds(15));
+        var rows = preparations();
+        assertEquals(2, rows.size(), "the recovery, and no new preparation for the same import");
+        assertNull(rows.getFirst().get("status"), "the stopped attempt keeps no result");
+        assertEquals(rows.getFirst().get("id"), rows.get(1).get("recovery_of"));
+        assertEquals("unchanged", rows.get(1).get("code"));
+        assertEquals(result.get("graphVersionId").asString(), rows.get(1).get("graph_version_id"));
+        assertArrayEquals((byte[]) rows.getFirst().get("request"), (byte[]) rows.get(1).get("request"));
+    }
+
+    @Test void anAttemptThatStoppedBeforeComposingIsComposedFromItsFixedInputs() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        String round = roundImported(importNative(HandoffFixtures.Spec.standard()), NOW.minusSeconds(10));
+        var result = preparer().run((active, request, decisions) -> {
+            journal().begin(round, publications.newestImport().orElseThrow(), null, active, request, decisions, NOW);
+            throw new IllegalStateException("stopped");
+        });
+        assertEquals("internal_error", result.get("code").asString());
+        assertEquals(1, (int) jdbc.queryForObject("SELECT count(*) FROM graph_publications", Integer.class), "only the published one; nothing composed yet");
+        roundPreparer().afterPass(NOW.plusSeconds(15));
+        var rows = preparations();
+        assertEquals(2, rows.size());
+        assertEquals("staged", rows.get(1).get("code"));
+    }
+
+    @Test void aRecoveryThatFailsUnexpectedlyIsRecoveredAgainBeforeANewImportIsPrepared() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        String round = roundImported(importNative(HandoffFixtures.Spec.standard()), NOW.minusSeconds(10));
+        // The composition committed, but the process stopped before its result was written.
+        var result = preparer().run((active, request, decisions) -> journal().begin(round, publications.newestImport().orElseThrow(), null, active, request, decisions, NOW));
+        String candidate = result.get("graphVersionId").asString();
+        // The recovery's first read fails unexpectedly; the cause is gone by the next try.
+        var reader = org.mockito.Mockito.spy(reader());
+        org.mockito.Mockito.doThrow(new IllegalStateException("transient")).doCallRealMethod().when(reader).read(org.mockito.ArgumentMatchers.anyString());
+        var clock = new MovingClock(NOW.plusSeconds(15));
+        var rounds = roundPreparer(reader, clock);
+        rounds.afterPass(clock.instant());
+        var rows = preparations();
+        assertEquals(2, rows.size());
+        assertEquals(rows.getFirst().get("id"), rows.get(1).get("recovery_of"));
+        assertEquals("internal_error", rows.get(1).get("code"));
+        // A new import arrives while the original is undecided: no new preparation before the original is settled.
+        roundImported(importNative(HandoffFixtures.Spec.standard()), NOW.plusSeconds(20));
+        clock.set(NOW.plusSeconds(60));
+        rounds.afterPass(clock.instant());
+        assertEquals(2, preparations().size(), "the recovery waits; the new import does not start a preparation");
+        // After the wait the same fixed inputs are recovered and settle as the committed candidate; then the new import is prepared.
+        clock.set(NOW.plusSeconds(15 + 301));
+        rounds.afterPass(clock.instant());
+        rows = preparations();
+        assertEquals(4, rows.size(), rows.toString());
+        assertEquals(rows.getFirst().get("id"), rows.get(2).get("recovery_of"));
+        assertEquals("unchanged", rows.get(2).get("code"));
+        assertEquals(candidate, rows.get(2).get("graph_version_id"));
+        assertNull(rows.get(3).get("recovery_of"));
+        assertTrue(Set.of("staged", "nothing_to_prepare").contains((String) rows.get(3).get("code")), rows.get(3).toString());
+    }
+
+    /** A clock the round-path tests move past the recovery wait. */
+    private static final class MovingClock extends Clock {
+        private volatile Instant now;
+        MovingClock(Instant now) { this.now = now; }
+        void set(Instant at) { now = at; }
+        @Override public ZoneOffset getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(java.time.ZoneId zone) { return this; }
+        @Override public Instant instant() { return now; }
+    }
+
+    @Test void aRecoveryAfterTheActiveVersionMovedIsAConflictThenANewPreparation() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        String round = roundImported(importNative(HandoffFixtures.Spec.standard()), NOW.minusSeconds(10));
+        var result = preparer().run((active, request, decisions) -> journal().begin(round, publications.newestImport().orElseThrow(), null, active, request, decisions, NOW));
+        activate(result.get("graphVersionId").asString());
+        roundPreparer().afterPass(NOW.plusSeconds(15));
+        var rows = preparations();
+        assertEquals(List.of("active_conflict", "nothing_to_prepare"), List.of(rows.get(1).get("code"), rows.get(2).get("code")));
+        assertNull(rows.get(2).get("recovery_of"));
+    }
+
+    @Test void aBusyImportLockWaitsForTheNextPass() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        roundImported(importNative(HandoffFixtures.Spec.standard()), NOW.minusSeconds(10));
+        try (var held = new JdbcGraphRoundImportLock(dataSource).tryAcquire().orElseThrow()) {
+            roundPreparer().afterPass(NOW);
+            assertEquals(0, preparations().size());
+        }
+        roundPreparer().afterPass(NOW.plusSeconds(15));
+        assertEquals(1, preparations().size());
+    }
+
+    @Test void thePreparationJournalKeepsItsBytesAndWritesAResultOnce() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        roundImported(importNative(HandoffFixtures.Spec.standard()), NOW.minusSeconds(10));
+        roundPreparer().afterPass(NOW);
+        long id = ((Number) preparations().getFirst().get("id")).longValue();
+        assertThrows(Exception.class, () -> jdbc.update("UPDATE graph_publication_preparations SET request = ? WHERE id = ?", new byte[] {1}, id));
+        assertThrows(Exception.class, () -> jdbc.update("UPDATE graph_publication_preparations SET code = 'other' WHERE id = ?", id));
+        assertThrows(Exception.class, () -> jdbc.update("DELETE FROM graph_publication_preparations WHERE id = ?", id));
+    }
+
+    private JdbcGraphPublicationPreparationRepository journal() {
+        return new JdbcGraphPublicationPreparationRepository(named);
+    }
+
+    private GraphRoundPreparer roundPreparer() {
+        return roundPreparer(reader(), CLOCK);
+    }
+    private GraphRoundPreparer roundPreparer(GraphPublicationReader reader, Clock clock) {
+        var composer = composer();
+        return new GraphRoundPreparer(new JdbcGraphRoundRepository(named, tools.jackson.databind.json.JsonMapper.builder().build(),
+                new DataSourceTransactionManager(dataSource)), journal(), new JdbcGraphRoundImportLock(dataSource),
+                new GraphPublicationPreparer(versions, graph, publications, reader, composer), reader, publications, composer,
+                Duration.ofMinutes(5), 3, clock);
+    }
+
+    /** A round whose import of {@code versionId} committed at {@code committedAt}; returns its id. */
+    private String roundImported(String versionId, Instant committedAt) {
+        Instant slotAt = Instant.parse("2026-11-02T00:05:00Z").plus(Duration.ofMinutes(30L * slots++));
+        String id = "round-" + DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmm").withZone(ZoneId.of("Asia/Seoul")).format(slotAt);
+        jdbc.update("""
+                INSERT INTO graph_rounds (round_id, slot_at, stage, graph_version_id, version_committed_at, started_by, created_at, updated_at)
+                VALUES (?, ?, 'imported', ?, ?, 'system:scheduler', ?, ?)
+                """, id, Timestamp.from(slotAt), versionId, Timestamp.from(committedAt), Timestamp.from(committedAt), Timestamp.from(committedAt));
+        return id;
+    }
+
+    private List<java.util.Map<String, Object>> preparations() {
+        return jdbc.queryForList("""
+                SELECT id, round_id, recovery_of, request, decisions, status, code, graph_version_id
+                FROM graph_publication_preparations ORDER BY id
+                """);
     }
 
     private GraphPublicationReader reader() {

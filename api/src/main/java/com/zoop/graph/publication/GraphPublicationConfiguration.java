@@ -93,7 +93,7 @@ public class GraphPublicationConfiguration {
         return args -> writeOperatorResult(result, preparer::run, "publication preparation stopped; see operator result");
     }
 
-    private static GraphPublicationComposer composer(ArtifactFileStore files, GraphHandoffRepository graph, DocumentRegistryRepository registry,
+    static GraphPublicationComposer composer(ArtifactFileStore files, GraphHandoffRepository graph, DocumentRegistryRepository registry,
             GraphVersionRepository versions, JdbcGraphPublicationRepository publications, GraphPublicationReader reader,
             GraphPublicationAuthority authority, DocumentReadProperties documentRead, TransactionOperations transaction, Clock clock) {
         return new GraphPublicationComposer(files, graph, registry, versions, publications, reader, authority,

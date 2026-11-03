@@ -83,6 +83,22 @@ R5의 최초 409 `analysis_incomplete`는 접수 전 대기이므로 `analysis_d
 - 순서 보호 검사와 수입은 DB 전역 advisory lock(`JdbcGraphRoundImportLock`, 세션 수준, 전용 커넥션)을 잡은 채 이어서 하므로 다른 인스턴스가 그 사이에 수입할 수 없습니다. lock을 다른 인스턴스가 쥐고 있으면 `import:round_import_busy`로 `busy-retry-after`만큼 기다립니다. 운영자 수입 명령은 회차가 아니므로 이 순서 규칙 밖입니다.
 - 호출 스레드에서 동기로 돕니다(스케줄러 전용 스레드, 요청 스레드 아님). 수입 트랜잭션은 `companies` SHARE lock과 묶음 기사 행 lock을 commit 직전 재확인(관측별 `require-store`)까지 잡으므로, 그 기사에 닿는 활성화·철회는 수입이 끝날 때까지 기다립니다.
 
+## 자동 준비 (회차 경로, `GraphRoundPreparer`, 기본 꺼짐)
+
+`ZOOP_GRAPH_ROUND_PREPARE_ENABLED=true`이면 scheduler 한 바퀴의 끝에서, 마지막 준비 뒤에 새 수입(composition이 아닌 snapshot 중 가장 큰 `sequence`, 회차 재시도의 새 버전과 운영자 수입 포함)이 있을 때 운영자 명령 `graph-publication-prepare`와 같은 준비(`GraphPublicationPreparer`)를 한 번 실행해 비활성 candidate를 만듭니다. 대상·상한·멈춤 규칙과 예약 operator는 운영자 명령과 같습니다([누적 발행 계약](GRAPH_READ_HANDOFF.md#누적-발행과-원본별-현재-권한)). 활성화는 하지 않고, 회차 행은 바꾸지 않습니다(이미 `imported`). 준비가 실패하거나 예외가 나도 회차와 바퀴는 그대로 진행합니다.
+
+- **기록:** 시도마다 `graph_publication_preparations` 1행입니다. 요청·결정 바이트를 compose 전에 commit하고 결과(`status`·`code`·`graph_version_id`·결과 문서)는 한 번만 씁니다. 행은 영구 보존이며 trigger가 다른 변경과 삭제를 거절합니다. `trigger_sequence`는 그 시도가 답한 수입의 `sequence`이고, `round_id`는 가장 최근 수입 회차(참고용, FK 없음)입니다.
+- **한 수입에 한 번:** 같은 수입에 대한 답이 확정되면 다시 하지 않습니다. 일시 실패(`import_busy`·`database_unavailable`·`basis_unavailable`·`source_authority_unavailable`)는 `busy-retry-after` 뒤에 같은 수입에 대해 최대 `max-attempts-per-stage`번까지(넘으면 다음 수입까지 기다림), 충돌(`active_conflict`·`revision_conflict`)은 바로 다음 바퀴에 새 준비로 다시 판단합니다. 값이 바뀐 원본의 `correction_required`는 확정 답이라 다음 수입까지 다시 하지 않습니다. 사람은 저장된 요청을 바탕으로 결정 파일을 만들어 운영자 compose합니다.
+- **결과를 모르는 시도의 복구(고정 입력):** 바이트는 있는데 결과가 없거나(compose 도중 중단) 결과가 `outcome_unknown`인 시도는, 새 준비 전에 저장된 바이트 그대로 운영자 compose 규칙(`GraphPublicationPreparer.operatorCompose`)으로 다시 실행합니다. 새 행(`recovery_of`)으로 남기며 commit됐으면 `unchanged`, 활성·규칙이 바뀌었으면 충돌입니다. 복구가 확정되지 않으면 새 준비를 하지 않고 `busy-retry-after` 뒤에 다시 복구합니다. `max-attempts-per-stage`번을 넘기면 로그에 `recovery_required`를 남기고 `busy-retry-after × max-attempts-per-stage` 간격으로만 다시 복구합니다. 이때 BE가 저장된 바이트로 운영자 compose를 하면(또는 활성이 바뀌면) 다음 복구가 `unchanged`(또는 충돌)로 확정되어 새 준비가 이어집니다. 복구 자체가 예상 밖 오류(`internal_error`)로 끝나면 원래 시도에 대해 확인한 것이 없으므로, 일시 실패와 같이 원래 시도를 계속 복구 대상으로 두고 같은 대기·재시도 규칙을 적용합니다(그 사이 새 수입이 와도 새 준비를 하지 않음). 같은 오류가 반복되면 `recovery_required` 로그의 stack trace로 원인을 찾아야 하며, 같은 바이트의 운영자 compose도 같은 검사에서 실패할 수 있습니다. 첫 시도의 `internal_error`는 composer가 rollback한 결과라 확정입니다.
+- **한 번에 하나:** 준비 전체를 회차 수입 lock(`JdbcGraphRoundImportLock`)을 쥔 채 실행하므로 회차 수입이나 다른 인스턴스의 준비와 겹치지 않습니다. lock을 얻지 못하면 다음 바퀴에 합니다. composer의 artifact store lock·publication lock도 그대로이며, 운영자 RunTask와 겹치면 `import_busy`로 기다립니다. 준비는 scheduler 스레드에서 돌므로 compose가 길면 그 인스턴스의 다음 바퀴가 그만큼 늦어집니다(슬롯 간격 30분). 준비 기록(DB)에 실패하면 그 프로세스는 `busy-retry-after` 동안 준비를 쉽니다.
+- **켤 때 요구:** `ZOOP_GRAPH_ROUND_ENABLED=true`, `ZOOP_GRAPH_SNAPSHOT_SOURCE=artifact`와 존재하는 `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT`(bridge가 쓰는 같은 root에서 compose), `ZOOP_DOCUMENT_READ_INGESTION_SOURCES`(현재 권한), `ZOOP_GRAPH_AUTO_ACTIVATION_ENABLED=false`(자동 활성화는 단일 원본을 직접 활성화해 준비의 base를 움직이므로 함께 켤 수 없음). 아니면 설정 이름으로 기동을 거절합니다. 이 검사는 같은 프로세스의 설정만 보므로, 자동 준비를 켜는 동안 같은 DB를 쓰는 **모든** API 프로세스(공개 Web 포함)에서 자동 활성화를 꺼 둡니다.
+- **확인:** 관리자 화면에는 아직 내지 않습니다(OpenAPI 변경 없음). 준비된 candidate는 관리자 그래프 버전 목록에서, 멈춤·복구 상태는 writer 로그와 다음 조회로 봅니다.
+
+```sql
+SELECT id, round_id, recovery_of, created_at, status, code, graph_version_id, trigger_sequence
+FROM graph_publication_preparations ORDER BY id DESC LIMIT 20;
+```
+
 ## 설정 (`zoop.graph.round.*`, 웹 애플리케이션 전용, 기본 꺼짐)
 
 | 환경 변수 | 뜻 |
@@ -94,6 +110,7 @@ R5의 최초 409 `analysis_incomplete`는 접수 전 대기이므로 `analysis_d
 | `ZOOP_GRAPH_ROUND_LOOKBACK` | 기동 시 이만큼 전까지의 지난 슬롯 행을 만듦(기본 `PT30M`) |
 | `ZOOP_GRAPH_ROUND_MAX_OPEN_ROUNDS` | 한 바퀴에 전진시키는 열린 회차 수(기본 3) |
 | `ZOOP_GRAPH_ROUND_ANALYSIS_WAIT_DEADLINE` | R4 대기 상한(기본 `PT2H`; `ZOOP_ANALYSIS_ANALYZE_PLAN_ATTEMPT_DEADLINE`보다 길게) |
+| `ZOOP_GRAPH_ROUND_PREPARE_ENABLED` | `true`면 바퀴 끝의 자동 준비를 등록합니다(위 "자동 준비" 절). 기본 `false` |
 | `ZOOP_GRAPH_ROUND_OPERATOR` | 수입 요청의 `operator`(기본 `scheduler`, 운영자 요청 알파벳 `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`). 회차의 `started_by`와는 별개 |
 | `ZOOP_GRAPH_ROUND_WAIT_RETRY_AFTER` / `BUSY_RETRY_AFTER` | 대기 단계 재시도 간격(기본 `PT1M` / `PT5M`) |
 | `ZOOP_GRAPH_ROUND_MAX_ATTEMPTS_PER_STAGE` | 단계당 시도 상한(기본 20) |
@@ -133,6 +150,7 @@ R7은 관측 전체를 최초 확인과 commit 직전 재확인에서 **두 번 
 - `GraphHandoffImportPostgresIntegrationTest`(`graph-postgres`): 실제 테이블에서 같은 복구 시나리오(연결 fencing으로 수입 rollback, 최신 회차 버전 commit 뒤 중단 → 복구 실패·새 freeze로 retry(연결 비움, commit 기록 유지) → 옛 슬롯 skipped → 같은 핀으로 최신 회차 unchanged 완료, 버전 1개).
 - `GraphRoundImportConfigurationTest`: 꺼짐·웹 전용·설정 닫힘(snapshot source, read client, CLI 경로, import-source, operator), 실제 observation client 설정의 HTTP 기동·loopback export, 비활성 client와 잔존 CLI 세 설정의 거절·경로 미노출, CLI 선택 시 활성 HTTP client와 무관한 CLI 필수 조건.
 - `GraphRoundSchedulerConfigurationTest`: 꺼짐이면 스케줄러·상태 없음, 켜면 스케줄러가 overview의 `GraphRoundStatus`, round 클라이언트·analyze-plan 미설정·달력 오류는 설정 이름으로 기동 거절.
+- `GraphRoundWorkerTest`의 준비 단계: 바퀴 끝에 한 번 부르고, 준비의 실패가 회차와 바퀴를 바꾸지 않음. `GraphRoundPreparerTest`: 결과를 모르는 시도의 판단, 기동 거절(회차 꺼짐·자동 활성화·snapshot source·root·현재 권한). `GraphPublicationPreparePostgresTest`의 회차 경로: 새 수입마다 한 번 `staged`, 값 변경은 한 번 기록, commit 뒤 중단 → 고정 입력 복구 `unchanged`, compose 전 중단 → 고정 입력으로 `staged`, 활성 이동 뒤 복구 → `active_conflict` 뒤 새 준비, 수입 lock 사용 중이면 다음 바퀴, 기록 trigger.
 - `GraphRoundClockTest`: 하루 18+1 슬롯(KST), 반열린 구간·자정 넘김, 다음 슬롯, 회차 id 형식, 달력 검증.
 - `GraphRoundWorkerTest`(가짜 AI 라우트·큐·bridge): 정규 슬롯 R1→R7 전진과 이벤트·선택 결과 개수, 새 자료 없음·freeze 전용 슬롯의 계획 없는 freeze와 `no_public_material`→`skipped`, `round_busy`(`Retry-After`)·전송 실패 대기와 4xx 거절(`failedAt`), 단계 상한 `run_timeout`과 분석 상한 `analysis_timeout`, 분석 실패·계획 거절·큐 미설정, lookback 열기와 다른 인스턴스 lease 존중. lease 만료 뒤 다른 인스턴스가 인계해 실패·해제까지 마친 행에 늦은 결과를 쓰지 않음(새 claim은 다시 놓음), 만료만 된 lease는 token을 유지한 채 연장되어 결과 보존, 끝난 분석 job의 실패는 `failedAt=plan_ready`, R3 상한은 `analysis_queue_timeout`(`failedAt=plan_ready`).
 - `HttpRoundClientTest`(loopback stub): 요청 본문·멱등 키·bindings 포함, 상태 문서 닫힘·상태별 필수 필드, 오류 envelope, 5xx 뒤 `requestMaybeProcessed`.

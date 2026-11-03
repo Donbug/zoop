@@ -82,6 +82,7 @@ public final class GraphRoundWorker {
     private final RoundServiceBinding binding;
     private final Clock clock;
     private final String owner;
+    private final RoundPreparation preparation;
     private final JsonNodeFactory nodes = JsonNodeFactory.instance;
     private volatile Instant opened;
     private volatile Instant lastTick;
@@ -89,6 +90,12 @@ public final class GraphRoundWorker {
     public GraphRoundWorker(GraphRoundRepository rounds, GraphRoundClock calendar, RoundRunClient runs,
             RoundHandoffClient handoffs, RoundAnalysisQueue analysis, RoundBindingsSource bindings, GraphRoundImportBridge bridge,
             GraphRoundProperties properties, RoundServiceBinding binding, Clock clock, String owner) {
+        this(rounds, calendar, runs, handoffs, analysis, bindings, bridge, properties, binding, clock, owner, RoundPreparation.NONE);
+    }
+
+    public GraphRoundWorker(GraphRoundRepository rounds, GraphRoundClock calendar, RoundRunClient runs,
+            RoundHandoffClient handoffs, RoundAnalysisQueue analysis, RoundBindingsSource bindings, GraphRoundImportBridge bridge,
+            GraphRoundProperties properties, RoundServiceBinding binding, Clock clock, String owner, RoundPreparation preparation) {
         this.rounds = rounds;
         this.calendar = calendar;
         this.runs = runs;
@@ -100,6 +107,7 @@ public final class GraphRoundWorker {
         this.binding = binding;
         this.clock = clock;
         this.owner = owner;
+        this.preparation = preparation;
     }
 
     public Optional<Instant> lastTick() {
@@ -131,6 +139,11 @@ public final class GraphRoundWorker {
                 continue;
             }
             claimed.ifPresent(this::progress);
+        }
+        try {
+            preparation.afterPass(clock.instant());
+        } catch (RuntimeException unexpected) {
+            log.warn("graph round: preparation after the pass interrupted by {}", unexpected.getClass().getSimpleName());
         }
     }
 

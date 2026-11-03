@@ -172,6 +172,22 @@ class GraphRoundWorkerTest {
     }
 
     @Test
+    void thePreparationRunsAtTheEndOfEveryPassAndItsFailureChangesNoRound() {
+        List<Instant> passes = new java.util.ArrayList<>();
+        worker = new GraphRoundWorker(rounds, new GraphRoundClock(properties), runs, handoffs, queue, () -> BINDINGS, bridge,
+                properties, BINDING, clock, "worker-a", at -> {
+                    passes.add(at);
+                    throw new IllegalStateException("preparation failed");
+                });
+        runs.answer(R0905, running());
+        tick(Instant.parse("2026-10-30T00:05:10Z"));
+        assertEquals(List.of(Instant.parse("2026-10-30T00:05:10Z")), passes);
+        assertEquals(GraphRoundStage.RUN_REQUESTED, round(R0905).stage(), "the round went on before the preparation and kept its stage");
+        tick(Instant.parse("2026-10-30T00:05:25Z"));
+        assertEquals(2, passes.size(), "the scheduler keeps going after a failed preparation");
+    }
+
+    @Test
     void aSlotWithoutNewMaterialAndTheFreezeOnlySlotAskForACarryOnlyFreeze() {
         properties = properties(20, Duration.ofHours(2), 100);
         worker = new GraphRoundWorker(rounds, new GraphRoundClock(properties), runs, handoffs, queue, () -> BINDINGS, bridge,
