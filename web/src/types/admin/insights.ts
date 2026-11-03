@@ -205,5 +205,9 @@ export type TranscriptDetail = {
     citationCount: number;
     feedback: { up: number; down: number; reasons: string[] };
   }[];
-  masking: { rules: string[]; counts: Record<string, number> };
+  masking: {
+    completed: boolean;
+    rules: string[];
+    counts: Record<string, number>;
+  };
 };

@@ -377,7 +377,7 @@
 | BFF_PATH_DIFFERENCE | difference | listMaskedTranscripts | 목표 /api/v1/admin/transcripts ↔ BFF /api/admin/transcripts |  |
 | BFF_FIELD_DIFFERENCE | difference | listMaskedTranscripts | 목표만 117 · BFF만 23 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getMaskedTranscript | 목표 /api/v1/admin/transcripts/{session_id} ↔ BFF /api/admin/transcripts/{session_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getMaskedTranscript | 목표만 116 · BFF만 21 · 형식/필수/권한 변경 8 |  |
+| BFF_FIELD_DIFFERENCE | difference | getMaskedTranscript | 목표만 118 · BFF만 21 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | listMembers | 목표 /api/v1/admin/members ↔ BFF /api/admin/members |  |
 | BFF_FIELD_DIFFERENCE | difference | listMembers | 목표만 148 · BFF만 26 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | getMemberActivity | 목표 /api/v1/admin/members/{member_id} ↔ BFF /api/admin/members/{member_id} |  |

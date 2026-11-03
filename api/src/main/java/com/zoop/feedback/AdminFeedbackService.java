@@ -108,7 +108,8 @@ public class AdminFeedbackService {
       items.addObject().put("id",row.get("id").toString()).put("feature",feature).put("featureLabel",label(feature))
         .put("targetId",row.get("target_id").toString()).put("targetVersion",row.get("target_version").toString())
         .put("targetLabel",title).put("reason",FeedbackReasonMasker.mask((String)row.get("reason"),(String)row.get("owner_email"),(String)row.get("owner_name")))
-        .put("at",((Timestamp)row.get("updated_at")).toInstant().toString()).put("voter",voter(row.get("member_id").toString())).putNull("sessionId");
+        .put("at",((Timestamp)row.get("updated_at")).toInstant().toString()).put("voter",voter(row.get("member_id").toString()))
+        .put("sessionId","chatbot_answer".equals(feature)?(String)row.get("session_id"):null);
     }
     if(rows.size()>limit){var last=rows.get(limit-1);result.put("nextCursor",FeedbackCursor.encode(mapper,keys,PURPOSE,admin,filters,limit,p.asOf(),((Timestamp)last.get("updated_at")).toInstant().toString(),cursorId(last)));}
     return result;

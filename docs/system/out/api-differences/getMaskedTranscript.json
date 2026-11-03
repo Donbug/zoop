@@ -12,6 +12,10 @@
       "minLength": 1
     },
     "query.purpose:required": true,
+    "response:200:application/json.masking.completed": {
+      "type": "boolean"
+    },
+    "response:200:application/json.masking.completed:required": true,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },

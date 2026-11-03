@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test } from 'vitest';
 import AdminProtectedRoute from '@/components/admin/common/AdminProtectedRoute';
 import AdminStatsPage from '@/pages/admin/stats/AdminStatsPage';
@@ -226,7 +226,11 @@ const transcript: TranscriptDetail = {
       feedback: { up: 0, down: 1, reasons: ['근거가 부족해요'] },
     },
   ],
-  masking: { rules: ['이메일', '전화번호'], counts: { email: 1 } },
+  masking: {
+    completed: true,
+    rules: ['이메일', '전화번호'],
+    counts: { email: 1 },
+  },
 };
 
 function openAdmin(path: string) {
@@ -452,6 +456,57 @@ describe('A-ADM-02 이용 통계 (FS065)', () => {
       await screen.findByRole('table', { name: '서비스 이용 지표' }),
     ).toBeTruthy();
   });
+});
+
+describe('A-ADM-02b FS066-03 실제 대화록 응답 경계', () => {
+  test.each([
+    [403, 'ACCESS_DENIED', '대화록을 볼 권한이 없어요'],
+    [422, 'INVALID_REQUEST', '열람 목적과 조회 조건을 확인해 주세요'],
+    [
+      503,
+      'MASKING_FAILED',
+      '개인정보를 가리지 못해 대화록을 보여 주지 않았어요',
+    ],
+    [
+      503,
+      'AUDIT_UNAVAILABLE',
+      '열람 기록을 남기지 못해 대화록을 보여 주지 않았어요',
+    ],
+    [404, 'RESOURCE_NOT_FOUND', '찾는 대화록이 없어요'],
+  ] as const)(
+    '목록·상세는 %s %s를 빈 성공으로 바꾸지 않는다',
+    async (status, code, title) => {
+      server.on('GET', TRANSCRIPTS, () => apiError(status, code));
+      server.on('GET', TRANSCRIPT, () => apiError(status, code));
+      openAdmin('/admin/feedback?tab=transcripts&purpose=품질점검');
+      expect(await screen.findByText(title)).toBeTruthy();
+      expect(screen.queryByRole('table', { name: 'AI 대화록' })).toBeNull();
+      cleanup();
+      openAdmin('/admin/feedback/transcripts/chat-1?purpose=품질점검');
+      expect(await screen.findByText(new RegExp(title))).toBeTruthy();
+      expect(
+        screen.queryByText('삼성전자는 반도체 사건과 연결돼 있어요.'),
+      ).toBeNull();
+    },
+  );
+
+  test.each([false, undefined])(
+    '마스킹 완료가 %s이면 본문을 제공하지 않는다',
+    async (completed) => {
+      server.on('GET', TRANSCRIPT, () =>
+        json({ ...transcript, masking: { ...transcript.masking, completed } }),
+      );
+      openAdmin('/admin/feedback/transcripts/chat-1?purpose=품질점검');
+      expect(
+        await screen.findByText(
+          '개인정보를 가리지 못해 대화록을 보여 주지 않았어요',
+        ),
+      ).toBeTruthy();
+      expect(
+        screen.queryByText('삼성전자는 반도체 사건과 연결돼 있어요.'),
+      ).toBeNull();
+    },
+  );
 });
 
 describe('A-ADM-02b 선호도·대화록 (FS066-02·FS066-03)', () => {

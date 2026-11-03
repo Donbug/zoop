@@ -59,7 +59,7 @@ public class AiResultFeedbackService {
     List<Map<String,Object>> currentRows(String member,java.time.Instant asOf){
         List<Object> args=new ArrayList<>();args.add(Timestamp.from(asOf));
         String filter=member==null?"":" AND f.member_id=?";if(member!=null)args.add(member);
-        var rows=jdbc.queryForList("SELECT f.*,m.email AS owner_email,m.display_name AS owner_name FROM ai_result_feedback f JOIN members m ON m.id=f.member_id WHERE f.updated_at<=? AND m.status='active'"+filter,args.toArray());
+        var rows=jdbc.queryForList("SELECT f.*,m.email AS owner_email,m.display_name AS owner_name,j.session_id FROM ai_result_feedback f JOIN members m ON m.id=f.member_id LEFT JOIN chat_jobs j ON j.id=f.chat_job_id AND f.feature='chatbot_answer' WHERE f.updated_at<=? AND m.status='active'"+filter,args.toArray());
         List<Map<String,Object>> current=new ArrayList<>();
         for(var row:rows){
             try{
