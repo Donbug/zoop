@@ -79,6 +79,8 @@ function list(active: 'v1' | 'v2' = 'v2'): GraphVersionList {
         relationCount: 20,
         articleCount: 8,
         active: active === 'v1',
+        // 아직 표시한 적 없는 fixture: 전환(forward) 대상
+        activatedAt: active === 'v1' ? '2026-10-22T00:00:00Z' : null,
         graphDb: { status: 'pending', pendingJobsAtCreation: 3, note: null },
       }),
     ],
@@ -267,7 +269,7 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     const form = screen.getByRole('form', { name: '그래프 버전 되돌리기' });
     expect(within(form).getByText(/이전에 표시했던 버전이에요/)).toBeTruthy();
     await user.type(
-      within(form).getByLabelText('전환 사유(감사 로그에 남아요)'),
+      within(form).getByLabelText('되돌리기 사유(감사 로그에 남아요)'),
       '새 버전 문제로 되돌림',
     );
     await user.click(
@@ -284,13 +286,19 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     });
   });
 
-  test('되돌릴 수 없는 버전이라는 거절(422)은 그 이유로 알린다', async () => {
+  test('표시했던 fixture로 돌아가는 것도 되돌리기(rollback)이고, 422는 입력 확인으로 안내한다', async () => {
     server.on('GET', VERSIONS, () =>
       json({
         activeVersionId: 'v3',
         items: [
           version({ id: 'v3', sequence: 3 }),
-          version({ id: 'v2', active: false }),
+          version({
+            id: 'v1',
+            sequence: 1,
+            kind: 'fixture',
+            active: false,
+            activatedAt: '2026-10-20T00:00:00Z',
+          }),
         ],
         activations: [],
         nextCursor: null,
@@ -300,18 +308,22 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     const { user } = open();
 
     await user.click(
-      await screen.findByRole('button', { name: 'v2로 되돌리기' }),
+      await screen.findByRole('button', { name: 'v1로 되돌리기' }),
     );
     const form = screen.getByRole('form', { name: '그래프 버전 되돌리기' });
     await user.type(
-      within(form).getByLabelText('전환 사유(감사 로그에 남아요)'),
+      within(form).getByLabelText('되돌리기 사유(감사 로그에 남아요)'),
       '되돌림',
     );
     await user.click(
-      within(form).getByRole('button', { name: 'v2로 되돌리기' }),
+      within(form).getByRole('button', { name: 'v1로 되돌리기' }),
     );
+    expect(server.calls('POST', ACTIVATE)[0].body).toMatchObject({
+      mode: 'rollback',
+    });
+    // 422는 사유 형식·설정 거절에서도 오므로 mode 탓으로 단정하지 않는다.
     expect(
-      await within(form).findByText(/표시된 적이 없어 되돌릴 수 없어요/),
+      await within(form).findByText(/입력 내용을 확인해 주세요/),
     ).toBeTruthy();
   });
 
