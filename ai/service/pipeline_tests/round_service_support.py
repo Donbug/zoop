@@ -22,12 +22,14 @@ CARRY = "round-20261017T0935"
 POLICY = "/internal/v1/plan-admission-policy"
 
 
-def run_scenario(root: Path, *, lost_first_tick=False):
+def run_scenario(root: Path, *, lost_first_tick=False, calendar_case=None):
     root = root.resolve()
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
     guard = root / "guard"
     guard.mkdir()
     (guard / "sitecustomize.py").write_text(GUARD.replace("__ROOT__", repr(str(root))).replace("__GUARD_DIR__", repr(str(guard))))
+    with (guard / "sitecustomize.py").open("a") as hook:
+        hook.write("\nimport sys\nsys.path.insert(0, " + repr(str(PIPELINE / "src")) + ")\n")
     env = {"PATH": "/usr/bin:/bin", "PYTHONPATH": str(guard), "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUTF8": "1",
            "ZOOP_STATE_DIR": str(root / "builder-app"), "ZOOP_AI_WORKER_STATE_DIR": str(root / "builder-worker")}
 
@@ -38,7 +40,12 @@ def run_scenario(root: Path, *, lost_first_tick=False):
         check(done.returncode == 0 and not done.stderr, "round fixture subprocess failed; inspect retained stderr")
         return json.loads(done.stdout)
 
-    info = build()
+    if calendar_case:
+        from calendar_round_support import calendar_inputs
+        calendar_input = calendar_inputs(calendar_case)
+        info = build("--calendar-fixture", "2026-10-16", calendar_input["nextSlot"])
+    else:
+        info = build()
     world = SimpleNamespace(root=Path(info["root"]), ingestion=Path(info["ingestion"]), extraction=Path(info["extraction"]),
         registry=Path(info["registry"]), producer=Path(info["producer"]), verifier=Path(info["verifier"]),
         s2_replay=Path(info["s2Replay"]), s2_topic=Path(info["s2Topic"]), s2_request=info["s2Request"],
@@ -50,6 +57,8 @@ def run_scenario(root: Path, *, lost_first_tick=False):
     services = []
     try:
         workspace.relation_state.mkdir()
+        if calendar_case:
+            build("--initialize-ledgers", workspace.extraction_state, workspace.relation_state)
         plans, handoffs = root / "plans", root / "handoffs"
         plans.mkdir(mode=0o700)
         handoffs.mkdir(mode=0o700)
@@ -96,6 +105,9 @@ def run_scenario(root: Path, *, lost_first_tick=False):
         profile.write_text(canonical({"schemaVersion": "zoop-ai-round-profile-1", "sourceId": "synthetic-source", "scopeId": "body",
             "initialFrom": "2026-10-17T00:00:00+09:00", "fixtureManifest": info["fixtureManifest"], "descriptor": info["descriptor"],
             "selection": {"maxAgeSeconds": 315360000, "limit": 8, "cadenceMinutes": 30}}))
+        if calendar_case:
+            from calendar_round_support import configure_calendar
+            configure_calendar(root, profile, calendar_input)
         service_env = workspace.env(ZOOP_AI_SERVICE_PLAN_ADMISSION="1", ZOOP_AI_SERVICE_PLAN_ROOT=str(plans),
             ZOOP_AI_SERVICE_EXTRACTION_APPROVALS=None, ZOOP_AI_SERVICE_RELATION_UPSTREAMS=None,
             ZOOP_AI_SERVICE_INGESTION_COMMAND=str(commands["ingestion_cli"]), ZOOP_AI_SERVICE_ROUND_PROFILE=str(profile),
@@ -104,11 +116,14 @@ def run_scenario(root: Path, *, lost_first_tick=False):
             ZOOP_AI_HANDOFF_INGESTION_STATE_DIR=str(world.ingestion), ZOOP_AI_SERVICE_HANDOFF_SOURCES=str(workspace.sources),
             ZOOP_AI_SERVICE_HANDOFF_CANONICAL=str(canonical_path), ZOOP_AI_SERVICE_HANDOFF_DECISIONS=str(decisions_path),
             ZOOP_AI_SERVICE_HANDOFF_BINDINGS=str(bindings_path), ZOOP_AI_SERVICE_HANDOFF_EXPORTS=str(exports_path))
+        service_env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1] / "src")
 
         def start():
             service = make_service(workspace, env=service_env)
             service._runs = len(services)
             services.append(service)
+            if calendar_case:
+                service._argv = [sys.executable, str(Path(__file__).with_name("calendar_round_launcher.py")), str(root / "clock")]
             return service.start()
 
         service = start()
@@ -124,6 +139,9 @@ def run_scenario(root: Path, *, lost_first_tick=False):
                 time.sleep(0.05)
             raise AssertionError("round operation did not settle: " + path)
 
+        if calendar_case:
+            from calendar_round_support import exercise_calendar
+            return exercise_calendar(root, workspace, info, plans, service, start, wait_status, calendar_input)
         if lost_first_tick:
             import sqlite3
 
@@ -263,7 +281,8 @@ def run_scenario(root: Path, *, lost_first_tick=False):
         service.close()
         revoked = subprocess.run([sys.executable, "-m", "zoop_ai_service.round_revoke", "--state-dir", str(workspace.state), "--principal", "alpha",
             "--handoff-id", handoff["handoffId"], "--manifest-digest", handoff["manifestDigest"], "--bundle-digest", handoff["bundleDigest"]],
-            env={"PATH": "/usr/bin:/bin", "PYTHONDONTWRITEBYTECODE": "1"}, capture_output=True, timeout=30)
+            env={"PATH": "/usr/bin:/bin", "PYTHONDONTWRITEBYTECODE": "1",
+                 "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")}, capture_output=True, timeout=30)
         check(revoked.returncode == 0, "exact stopped-service grant revocation failed")
         service = start()
         denied = service.request("GET", "/internal/v1/graph-handoffs/" + handoff["handoffId"] + "/bundle")

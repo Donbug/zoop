@@ -519,7 +519,9 @@ def _document_rounds(spec: dict[str, Any]) -> None:
             "Dormant analysis_incomplete records release the execution slot; only the background dispatcher may reacquire it atomically. "
             + ("Body limit 1,024 bytes. Valid nonfuture outside-window/off-cadence slots return no_new_material with "
                "outside_operating_window/not_due, without native mutation. Invalid or future dates return 422 invalid_request. "
-               "Selection fixes asOf and an operator-required maxAgeSeconds; baseline maximum eight units per 30-minute round. 18:05 is freeze-only."
+               "Selection fixes actual service asOf and an explicit elapsed-age or pinned finite-calendar policy; "
+               "calendar-mode holidays return no_new_material/non_business_day before ingestion or planning. "
+               "Maximum eight units per 30-minute round. 18:05 is freeze-only."
                if family == "runs" else
                "Full bindings object required; body limit 4,001,024 bytes and canonical bindings limit 4,000,000 bytes. "
                "Before admission the owned plan and own-round native jobs must be ready or cancelled; otherwise retryable 409 analysis_incomplete "

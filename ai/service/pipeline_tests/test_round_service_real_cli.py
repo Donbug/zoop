@@ -14,3 +14,10 @@ def test_first_committed_tick_lost_output_does_not_poison_later_slots(tmp_path):
     assert report["committedUnknownRecoveredByFutureSlot"] and report["originalUnknownPreserved"]
     assert report["unclaimedObservationCarried"]
     assert report["providerCalls"] == report["networkAttempts"] == 0
+
+
+def test_calendar_friday_carry_holiday_freeze_and_exact_restart_replay(tmp_path):
+    for case in ("weekend", "monday_holiday", "long_closure"):
+        report = run_scenario(tmp_path / case, calendar_case=case)
+        assert report["state"] == "passed"
+        assert report["providerCalls"] == report["networkAttempts"] == 0

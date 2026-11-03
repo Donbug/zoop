@@ -38,6 +38,7 @@ from .extraction import Fixtures, LiveAccess, Sources, doc_key
 from .extraction_contracts import EnqueueRound, ExtractionFailure, ObservationRef, Submit, canonical, digest
 from .extraction_enqueue import _read_round, plan
 from .ingestion_contracts import Authority, IngestionFailure, Wire, byte_hash, timestamp
+from .round_calendar import CalendarEligibility
 
 PLAN_SCHEMA = "zoop-extraction-service-plan-1"
 RECEIPT_SCHEMA = "zoop-extraction-service-plan-receipt-1"
@@ -85,16 +86,43 @@ class ExplicitRoundSelection(Wire):
         timestamp(value)
         return value
 
+class ElapsedEligibility(Wire):
+    kind: Literal["elapsed-age-1"]
+    max_age_seconds: int = Field(gt=0)
+
+
+class PolicyRoundSelection(Wire):
+    schema_version: Literal["zoop-extraction-round-selection-3"]
+    as_of: str
+    eligibility: CalendarEligibility | ElapsedEligibility = Field(discriminator="kind")
+    limit: int = Field(default=8, gt=0, le=8)
+    cadence_minutes: Literal[30] = 30
+    observations: list[ObservationRef] = Field(max_length=8)
+
+    @field_validator("as_of")
+    @classmethod
+    def valid_time(cls, value):
+        timestamp(value)
+        return value
+
+
 
 def parse_selection(value):
-    model = ExplicitRoundSelection if value.get("schemaVersion") == "zoop-extraction-round-selection-2" else RoundSelection
+    model = {"zoop-extraction-round-selection-2": ExplicitRoundSelection,
+             "zoop-extraction-round-selection-3": PolicyRoundSelection}.get(value.get("schemaVersion"), RoundSelection)
     return model.model_validate(value)
 
 
 def _select(request, head, entries, selection, ingestion_dir, authority):
     """Oldest eligible carry first; original observations and slots remain owner-derived."""
     checks, reports, carried = [], [], []
-    explicit = isinstance(selection, ExplicitRoundSelection)
+    explicit = isinstance(selection, (ExplicitRoundSelection, PolicyRoundSelection))
+    policy = selection.eligibility if isinstance(selection, PolicyRoundSelection) else None
+    calendar = policy.calendar() if isinstance(policy, CalendarEligibility) else None
+    max_age = policy.max_age_seconds if isinstance(policy, ElapsedEligibility) else (
+        selection.max_age_seconds if policy is None else None)
+    if calendar is not None and not calendar.business(timestamp(selection.as_of)):
+        raise IngestionFailure("non_business_day")
     groups = {}
     for ref in selection.observations if explicit else selection.carryover:
         groups.setdefault((ref.round_id, ref.source_id), []).append(ref)
@@ -142,7 +170,9 @@ def _select(request, head, entries, selection, ingestion_dir, authority):
                 code = "round_slot_unavailable"
             elif timestamp(slot) > now:
                 code = "round_slot_future"
-            elif (now - timestamp(slot)).total_seconds() > selection.max_age_seconds:
+            elif calendar is not None and not calendar.eligible(slot, selection.as_of):
+                code = "automatic_window_expired"
+            elif calendar is None and (now - timestamp(slot)).total_seconds() > max_age:
                 code = "too_old"
             else:
                 reader.export(entry.ref)
@@ -306,7 +336,7 @@ def _sync(directory: Path) -> None:
 
 
 def _prepare(request: EnqueueRound, fixtures: Fixtures, principal: str, ingestion_dir: Path, sources: Authority | Path,
-             live: LiveAccess | None = None, selection: RoundSelection | ExplicitRoundSelection | None = None) -> tuple[dict[str, bytes], list, Authority, list]:
+             live: LiveAccess | None = None, selection: RoundSelection | ExplicitRoundSelection | PolicyRoundSelection | None = None) -> tuple[dict[str, bytes], list, Authority, list]:
     """Shared read-only planning path; publication and source export authority remain separate operations."""
     if not PRINCIPAL.fullmatch(principal):
         raise ExtractionFailure("plan_principal_invalid")
@@ -333,7 +363,7 @@ def _prepare(request: EnqueueRound, fixtures: Fixtures, principal: str, ingestio
 
 
 def plan_round(request: EnqueueRound, fixtures: Fixtures, principal: str, ingestion_dir: Path, sources: Path, output: Path,
-               live: LiveAccess | None = None, *, selection: RoundSelection | ExplicitRoundSelection | None = None) -> dict:
+               live: LiveAccess | None = None, *, selection: RoundSelection | ExplicitRoundSelection | PolicyRoundSelection | None = None) -> dict:
     """Publish one immutable plan without opening an extraction ledger or freezing a job."""
     if selection is None:
         raise ExtractionFailure("plan_selection_policy_required")
