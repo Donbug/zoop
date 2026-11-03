@@ -190,6 +190,11 @@ jobs:
             --file api/Dockerfile \
             --tag "zoop-api:ci-${GITHUB_SHA}" \
             api
+      - name: Build and check dedicated briefing runtime without credentials or model calls
+        run: |
+          docker build --file deployment/briefing/Dockerfile --build-arg "API_IMAGE=zoop-api:ci-${GITHUB_SHA}" --tag "zoop-briefing:ci-${GITHUB_SHA}" .
+          docker run --rm "zoop-briefing:ci-${GITHUB_SHA}" --check
+
   ai-container:
     name: ai-container
     runs-on: ubuntu-24.04
