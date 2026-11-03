@@ -202,19 +202,17 @@ export default function CompanyDocumentPanel() {
       ...(asOf ? { asOf } : {}),
       ...(version ? { graphVersion: version } : {}),
     });
-    useGraphUiStore
-      .getState()
-      .openEvidence({
-        kind: 'company',
-        id,
-        label,
-        evidenceIds: [...new Set(ids)],
-        mapContext: {
-          url: `/?${map}`,
-          ...(asOf ? { asOf } : {}),
-          ...(version ? { graphVersion: version } : {}),
-        },
-      });
+    useGraphUiStore.getState().openEvidence({
+      kind: 'company',
+      id,
+      label,
+      evidenceIds: [...new Set(ids)],
+      mapContext: {
+        url: `/?${map}`,
+        ...(asOf ? { asOf } : {}),
+        ...(version ? { graphVersion: version } : {}),
+      },
+    });
   }
   const snapshot = { asOf, graphVersion: version };
   const list = useCompanyResource<CompanyDocuments>(
