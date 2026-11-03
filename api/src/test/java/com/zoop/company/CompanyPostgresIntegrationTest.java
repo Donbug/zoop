@@ -89,7 +89,7 @@ class CompanyPostgresIntegrationTest {
 
     @Test
     void freshMigrationsAndJpaValidationSucceed() {
-        assertEquals(24, startupCompanyCount);
+        assertEquals(33, startupCompanyCount);
         assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT success FROM flyway_schema_history "
                 + "WHERE version='20261013153313'", Boolean.class));
         assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT success FROM flyway_schema_history "
@@ -111,7 +111,7 @@ class CompanyPostgresIntegrationTest {
     }
 
     @Test
-    void confirmedCatalogImportsTwentyFourCompaniesAndPreservesOtherRows() throws Exception {
+    void confirmedCatalogImportsThirtyThreeCompaniesAndPreservesOtherRows() throws Exception {
         var importer = context.getBean(CompanyCatalogImportService.class);
         Path file = Path.of(getClass().getResource("/company/demo-companies.json").toURI());
         jdbc.update("INSERT INTO companies (id, name) VALUES ('NYSE:PINS', 'Old seed company')");
@@ -122,10 +122,10 @@ class CompanyPostgresIntegrationTest {
         long before = repository.catalogRevision();
 
         var imported = importer.importFile(file);
-        assertEquals(24, imported.total());
-        assertEquals(24, imported.changed());
+        assertEquals(33, imported.total());
+        assertEquals(33, imported.changed());
         assertEquals(0, imported.unchanged());
-        assertEquals(25, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id LIKE 'KRX:%' "
+        assertEquals(34, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id LIKE 'KRX:%' "
                 + "OR id LIKE 'NASDAQ:%' OR id LIKE 'NYSE:%' OR id LIKE 'TSE:%' "
                 + "OR id LIKE 'ORG:%'", Integer.class));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id='NYSE:PINS'", Integer.class));
@@ -156,8 +156,17 @@ class CompanyPostgresIntegrationTest {
                 "SELECT profile->>'legalName' FROM companies WHERE id='NASDAQ:AAPL'", String.class));
         assertEquals("1976-04-01", jdbc.queryForObject(
                 "SELECT profile->>'foundedDate' FROM companies WHERE id='NASDAQ:AAPL'", String.class));
-        assertEquals(22, jdbc.queryForObject(
+        assertEquals(31, jdbc.queryForObject(
                 "SELECT count(*) FROM companies WHERE profile->>'foundedDate' IS NOT NULL", Integer.class));
+        // A company the migration never seeded is inserted from the JSON with every field.
+        assertEquals("000270", jdbc.queryForObject("SELECT ticker FROM companies WHERE id='KRX:000270'", String.class));
+        assertEquals("KRX", jdbc.queryForObject(
+                "SELECT exchange_code FROM companies WHERE id='KRX:000270'", String.class));
+        assertEquals("KOSPI", jdbc.queryForObject("SELECT market FROM companies WHERE id='KRX:000270'", String.class));
+        assertEquals("/graph-assets/kia.svg", jdbc.queryForObject(
+                "SELECT logo_url FROM companies WHERE id='KRX:000270'", String.class));
+        assertEquals("1944-12-10", jdbc.queryForObject(
+                "SELECT profile->>'foundedDate' FROM companies WHERE id='KRX:000270'", String.class));
         assertFalse(jdbc.queryForObject("SELECT profile ? 'foundedDate' FROM companies WHERE id='NASDAQ:MSFT'",
                 Boolean.class), "an unconfirmed value is left out, not stored as an empty string");
         assertTrue(repository.catalogRevision() > before);
@@ -165,7 +174,7 @@ class CompanyPostgresIntegrationTest {
 
         var repeated = importer.importFile(file);
         assertEquals(0, repeated.changed());
-        assertEquals(24, repeated.unchanged());
+        assertEquals(33, repeated.unchanged());
         assertEquals(after, repository.catalogRevision());
     }
 
