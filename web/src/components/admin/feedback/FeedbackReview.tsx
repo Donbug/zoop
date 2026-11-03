@@ -30,6 +30,7 @@ import { useCursorPages } from '@/hooks/useCursorPages';
 import type { FeedbackPeriod, TranscriptFilter } from '@/types/admin/insights';
 import { formatKst } from '@/util/format';
 import { transcriptPath } from './transcriptPath';
+import { transcriptErrorTitle } from './transcriptErrorTitle';
 
 const INPUT = `h-10 rounded-full border border-transparent bg-zoop-soft px-4 text-caption text-zoop-ink focus:border-zoop-ink ${FOCUS_RING}`;
 const FIELD_LABEL = 'flex flex-col gap-1 text-caption text-zoop-muted';
@@ -460,7 +461,7 @@ function TranscriptList({
   if (transcripts.status === 'error' && transcripts.error)
     return (
       <ErrorBox
-        title="대화록을 불러오지 못했어요"
+        title={transcriptErrorTitle(transcripts.error)}
         error={transcripts.error}
         onRetry={transcripts.reload}
       />

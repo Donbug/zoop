@@ -1,4 +1,5 @@
 import { adminCall } from '@/apis/admin/auth';
+import { ApiError } from '@/apis/auth/ApiService';
 import type {
   DislikePage,
   FeedbackPeriod,
@@ -92,5 +93,13 @@ export function getMaskedTranscript(sessionId: string, purpose: string) {
   return adminCall<TranscriptDetail>(
     `/api/v1/admin/transcripts/${encodeURIComponent(sessionId)}${query({ purpose })}`,
     'GET',
-  );
+  ).then((data) => {
+    if (data?.masking?.completed !== true)
+      throw new ApiError(
+        503,
+        'MASKING_FAILED',
+        '마스킹 완료를 확인하지 못했어요.',
+      );
+    return data;
+  });
 }

@@ -9,6 +9,8 @@ public enum ErrorCode {
     MEMBER_REQUIRED(HttpStatus.FORBIDDEN, "회원 전용 기능입니다.", false),
     MEMBER_BLOCKED(HttpStatus.FORBIDDEN, "차단된 회원입니다.", false),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "요청이 허용되지 않습니다.", false),
+    AUDIT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "필수 열람 기록을 저장하지 못했습니다.", true),
+    MASKING_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "개인정보 마스킹을 확인하지 못했습니다.", true),
     EMAIL_TAKEN(HttpStatus.CONFLICT, "이미 등록된 이메일입니다.", false),
     SOCIAL_LINK_REQUIRED(HttpStatus.CONFLICT, "기존 계정으로 로그인한 후 소셜 계정을 연결해 주세요.", false),
     VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_CONTENT, "자동 검증 또는 필수 근거 검증을 통과하지 못했습니다.", false),

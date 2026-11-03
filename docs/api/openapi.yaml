@@ -17685,6 +17685,9 @@ components:
       description: "The three market indicators stored with a published round; never changed after publication."
     MaskingReport:
       properties:
+        completed:
+          type: "boolean"
+          description: "True only after all response masking and required audit storage succeed."
         rules:
           items:
             type: "string"
@@ -17696,6 +17699,7 @@ components:
           description: "Replacements made in this response, per kind"
       type: "object"
       required:
+        - "completed"
         - "rules"
         - "counts"
     MemberAction:

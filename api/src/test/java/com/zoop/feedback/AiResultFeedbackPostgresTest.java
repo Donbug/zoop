@@ -36,12 +36,12 @@ class AiResultFeedbackPostgresTest {
     @Autowired WebApplicationContext context;@Autowired RequestIdFilter ids;@Autowired JdbcTemplate jdbc;
     @Autowired MemberSessionService sessions;@Autowired ObjectMapper mapper;@Autowired AdminFeedbackService statistics;
     @MockitoBean ChatService chat;@MockitoBean EvidenceService evidence;
-    MockMvc mvc;String member,csrf,message,job,version;Cookie cookie;
+    MockMvc mvc;String member,csrf,message,job,version,conversation;Cookie cookie;
     @BeforeEach void setup(){
         mvc=MockMvcBuilders.webAppContextSetup(context).addFilters(ids).build();member="feedback-"+UUID.randomUUID();
         jdbc.update("INSERT INTO members(id,analytics_key,email,email_key,display_name,password_hash,signup_method,status,completed,tutorial_completed,settings_version,created_at,updated_at) VALUES(?,?,?,?,?,'test-hash','email','active',true,true,1,now(),now())",member,member,member+"@example.com",member+"@example.com","Synthetic Member");
         var session=sessions.issue(member,null,"synthetic-feedback");cookie=new Cookie(SessionCookie.NAME,session.token());csrf=session.response().csrfToken();
-        String conversation="session-"+UUID.randomUUID();job="job-"+UUID.randomUUID();message="message-"+UUID.randomUUID();
+        conversation="session-"+UUID.randomUUID();job="job-"+UUID.randomUUID();message="message-"+UUID.randomUUID();
         jdbc.update("INSERT INTO chat_sessions(id,member_id,created_at,updated_at) VALUES(?,?,now(),now())",conversation,member);
         jdbc.update("""
           INSERT INTO chat_jobs(id,session_id,seq,question,request_hash,asked_at,frozen_context,frozen_selection,status,outcome,message_id,result,result_schema_version,created_at,updated_at,finished_at)
@@ -57,6 +57,9 @@ class AiResultFeedbackPostgresTest {
     }
     @Test void chatVoteRoundTripIdempotencyVersionAndCancellation()throws Exception{
         vote("chatbot_answer",message,version,"down","판단 근거가 부족해요").andExpect(status().isOk());
+        var linked=statistics.dislikes("synthetic-admin","all",null,null,null,100).path("items").valueStream()
+                .filter(row->message.equals(row.path("targetId").asText())).findFirst().orElseThrow();
+        assertEquals(conversation,linked.path("sessionId").asText());
         var timestamp=jdbc.queryForObject("SELECT updated_at FROM ai_result_feedback WHERE member_id=?",java.sql.Timestamp.class,member);
         vote("chatbot_answer",message,version,"down","판단 근거가 부족해요").andExpect(status().isOk());
         assertEquals(timestamp,jdbc.queryForObject("SELECT updated_at FROM ai_result_feedback WHERE member_id=?",java.sql.Timestamp.class,member));

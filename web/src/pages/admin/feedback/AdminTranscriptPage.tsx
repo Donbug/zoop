@@ -11,6 +11,7 @@ import {
 } from '@/components/admin/common/AdminUi';
 import { FOCUS_RING } from '@/components/admin/common/adminStyles';
 import { PurposeForm } from '@/components/admin/feedback/FeedbackReview';
+import { transcriptErrorTitle } from '@/components/admin/feedback/transcriptErrorTitle';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { formatKst } from '@/util/format';
@@ -34,6 +35,8 @@ const maskedLabel: Record<string, string> = {
   card: '카드번호',
   account: '계좌번호',
   name: '이름',
+  userId: '회원 식별자',
+  token: 'URL 토큰',
 };
 
 function Transcript({
@@ -54,25 +57,9 @@ function Transcript({
     const error = transcript.error;
     if (error instanceof ApiError && error.status === 404)
       return <Empty>찾는 대화록이 없어요.</Empty>;
-    if (error instanceof ApiError && error.code === 'MASKING_FAILED')
-      return (
-        <ErrorBox
-          title="개인정보를 가리지 못해 대화록을 보여 주지 않았어요"
-          error={error}
-          onRetry={transcript.reload}
-        />
-      );
-    if (error instanceof ApiError && error.code === 'AUDIT_UNAVAILABLE')
-      return (
-        <ErrorBox
-          title="열람 기록을 남기지 못해 대화록을 보여 주지 않았어요"
-          error={error}
-          onRetry={transcript.reload}
-        />
-      );
     return (
       <ErrorBox
-        title="대화록을 불러오지 못했어요"
+        title={transcriptErrorTitle(error)}
         error={error}
         onRetry={transcript.reload}
       />

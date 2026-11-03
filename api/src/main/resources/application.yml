@@ -50,6 +50,9 @@ zoop:
     social:
       frontend-origin: ${ZOOP_AUTH_SOCIAL_FRONTEND_ORIGIN:}
   admin:
+    # FS066-03 transcript:read grant, separate from admin:all. Empty means nobody may read.
+    # Team approval is required before listing administrator IDs. Restart to apply changes.
+    transcript-readers: ${ZOOP_ADMIN_TRANSCRIPT_READERS:}
     session:
       idle-timeout: ${ZOOP_ADMIN_IDLE_TIMEOUT:30m}
       absolute-timeout: ${ZOOP_ADMIN_ABSOLUTE_TIMEOUT:8h}

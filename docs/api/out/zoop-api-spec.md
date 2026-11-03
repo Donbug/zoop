@@ -7051,6 +7051,7 @@ The three market indicators stored with a published round; never changed after p
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| completed | 필수 | boolean | True only after all response masking and required audit storage succeed. |
 | rules | 필수 | string[] |  |
 | counts | 필수 | object | Replacements made in this response, per kind |
 
