@@ -8,6 +8,7 @@ import type {
 } from '@/types/briefing';
 import { briefingTime } from '@/util/briefingTime';
 import { formatKst } from '@/util/format';
+import { eventTimeText } from '@/util/event-time';
 import {
   EMPTY,
   FOCUS_RING,
@@ -34,7 +35,7 @@ function reported(iso: string | null, roundDate: string) {
   return day === roundDate && time ? `보도 ${time}` : `보도 ${text}`;
 }
 
-/** 둘째 줄: 근거 수 변화. 같은 제목이 여럿이면 관련 기업을 앞에 붙여 구분한다. */
+/** D-BRF-02 B4: 같은 제목은 관련 기업·정밀도를 보존한 발생 시각으로 구분한다. */
 function detail(item: PreviousBriefingComparisonItem, sharesTitle: boolean) {
   const count = (value: number | null) =>
     value === null ? '확인되지 않음' : `${value}건`;
@@ -46,12 +47,17 @@ function detail(item: PreviousBriefingComparisonItem, sharesTitle: boolean) {
     item.previousEvidenceCount !== item.evidenceCount
   )
     evidence = `근거 ${count(item.previousEvidenceCount)} → ${count(item.evidenceCount)}`;
-  if (!sharesTitle || item.companyNames.length === 0) return evidence;
+  if (!sharesTitle) return evidence;
   const names = item.companyNames;
-  const companies = `관련 기업 ${names.slice(0, 3).join(', ')}${
-    names.length > 3 ? ` 외 ${names.length - 3}곳` : ''
-  }`;
-  return `${companies} · ${evidence}`;
+  const companies = names.length
+    ? `관련 기업 ${names.slice(0, 3).join(', ')}${
+        names.length > 3 ? ` 외 ${names.length - 3}곳` : ''
+      }`
+    : null;
+  const happened = eventTimeText(item.eventTime, item.timePrecision);
+  return [companies, happened ? `발생 ${happened}` : null, evidence]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 type Props = {
@@ -158,7 +164,7 @@ export default function BriefingComparison(props: Props) {
   const graphHref = (item: PreviousBriefingComparisonItem) => {
     const round = item.change === 'dropped' ? comparedRoundId : graphRoundId;
     return graphRoundId && round
-      ? `/?round=${encodeURIComponent(round)}&select=${encodeURIComponent(`node:${item.eventId}`)}`
+      ? `/?round=${encodeURIComponent(round)}&select=${encodeURIComponent(`node:${item.eventId}`)}&focus=${encodeURIComponent(item.eventId)}&hops=1`
       : null;
   };
   const referenceHref =

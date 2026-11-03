@@ -142,6 +142,28 @@ describe.each([
   ['간단히 보기', true],
   ['전체 보기', false],
 ])('D-BRF-01 발행 필드 · %s', (_, compact) => {
+  it('B1 counts unique evidence IDs across all issues and hides an empty total', async () => {
+    setup(
+      briefing({
+        items: [
+          item({ evidenceIds: ['a', 'a', 'shared'], evidenceCount: 99 }),
+          item({ eventId: 'event-2', rank: 2, evidenceIds: ['shared', 'b'] }),
+        ],
+      }),
+      compact,
+    );
+    expect(await screen.findByText('근거 3건')).toBeTruthy();
+  });
+
+  it('B1 omits the total when no evidence IDs exist, even with a reported count', async () => {
+    setup(
+      briefing({ items: [item({ evidenceIds: [], evidenceCount: 4 })] }),
+      compact,
+    );
+    await openIssues();
+    expect(screen.queryByText(/^근거 \d+건$/)).toBeNull();
+  });
+
   it('회차 판단이 null이면 영역을 그리지 않는다', async () => {
     setup(briefing({ outlook: null }), compact);
     await openIssues();
@@ -361,10 +383,14 @@ describe('D-BRF-01 비교 이슈 지도 링크', () => {
     );
     expect(
       screen.getByRole('link', { name: '새 합성 이슈' }).getAttribute('href'),
-    ).toBe('/?round=brf-2026-10-08-evening&select=node%3Aevent-new');
+    ).toBe(
+      '/?round=brf-2026-10-08-evening&select=node%3Aevent-new&focus=event-new&hops=1',
+    );
     expect(
       screen.getByRole('link', { name: '빠진 합성 이슈' }).getAttribute('href'),
-    ).toBe('/?round=brf-2026-10-08-morning&select=node%3Aevent-dropped');
+    ).toBe(
+      '/?round=brf-2026-10-08-morning&select=node%3Aevent-dropped&focus=event-dropped&hops=1',
+    );
   });
 
   it('지도 회차가 없으면(새 분석 회차) 제목을 링크로 만들지 않는다', () => {
@@ -376,6 +402,77 @@ describe('D-BRF-01 비교 이슈 지도 링크', () => {
     expect(screen.getByText('새 합성 이슈').tagName).toBe('SPAN');
     expect(screen.queryByRole('link', { name: '새 합성 이슈' })).toBeNull();
   });
+
+  it('B4 distinguishes duplicate titles by precise occurrence time and keeps companies when time is unknown', () => {
+    render(
+      <MemoryRouter>
+        <BriefingComparison
+          since={{
+            ...since,
+            items: [
+              {
+                ...since.items[0],
+                title: '같은 제목',
+                companyNames: ['합성기업A'],
+                eventTime: '2026-10-08T00:30:00Z',
+                timePrecision: 'datetime',
+              },
+              {
+                ...since.items[1],
+                title: '같은 제목',
+                companyNames: ['합성기업B'],
+              },
+              {
+                ...since.items[0],
+                eventId: 'no-company',
+                title: '같은 제목',
+                eventTime: '2026-09',
+                timePrecision: 'month',
+              },
+              {
+                ...since.items[0],
+                eventId: 'unique',
+                title: '다른 제목',
+                eventTime: '2026-10-07',
+                timePrecision: 'day',
+              },
+            ],
+          }}
+        />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByText(
+        '관련 기업 합성기업A · 발생 2026-10-08 09:30 KST · 근거 1건',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        '관련 기업 합성기업B · 이번 회차 핵심 이슈에는 없어요 · 근거 1건',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('발생 2026-09 · 근거 1건')).toBeTruthy();
+    expect(screen.queryByText(/발생 2026-10-07/)).toBeNull();
+    expect(screen.queryByText(/발생 시각 미상/)).toBeNull();
+  });
+});
+
+describe('D-BRF-01 B3 compact occurrence metadata', () => {
+  it.each([
+    ['2026-10-08T00:30:00Z', 'datetime' as const, '2026-10-08 09:30 KST'],
+    ['2026-10', 'month' as const, '2026-10'],
+    [null, 'unknown' as const, null],
+    ['2026-10-08', 'unknown' as const, null],
+  ])(
+    'shows %s at its supplied precision, omitting unknown time',
+    async (eventTime, timePrecision, expected) => {
+      setup(briefing({ items: [item({ eventTime, timePrecision })] }));
+      const title = await screen.findByText('합성 이슈 하나');
+      const summary = title.closest('summary')!;
+      if (expected) expect(summary.textContent).toContain(`발생 ${expected}`);
+      else expect(summary.textContent).not.toContain('발생');
+    },
+  );
 });
 
 describe('D-BRF-01 N-y 발생 시각', () => {

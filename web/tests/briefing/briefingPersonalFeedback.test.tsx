@@ -112,7 +112,7 @@ describe('FS032 핵심 이슈의 회차 기준 지도', () => {
       name: '이 회차 관계 그래프에서 보기',
     });
     expect(link.getAttribute('href')).toBe(
-      `/?round=${ROUND}&select=node%3Aev-1`,
+      `/?round=${ROUND}&select=node%3Aev-1&focus=ev-1&hops=1`,
     );
   });
 });

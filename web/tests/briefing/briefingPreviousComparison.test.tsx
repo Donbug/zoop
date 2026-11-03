@@ -154,7 +154,9 @@ describe('D-BRF-01 이전 퇴근 브리핑 대비', () => {
       within(section)
         .getByRole('link', { name: '계속 선정된 합성 이슈' })
         .getAttribute('href'),
-    ).toBe('/?round=brf-2026-10-08-morning&select=node%3Acontinuing-issue');
+    ).toBe(
+      '/?round=brf-2026-10-08-morning&select=node%3Acontinuing-issue&focus=continuing-issue&hops=1',
+    );
   });
 
   it('출근 회차의 고정 이전 회차·기준시각·근거와 순위 변화를 조회 결과대로 표시한다', async () => {
