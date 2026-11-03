@@ -426,6 +426,49 @@ class GraphPublicationPreparePostgresTest {
         assertEquals("staged", rows.get(1).get("code"));
     }
 
+    @Test void aRecoveryThatFailsUnexpectedlyIsRecoveredAgainBeforeANewImportIsPrepared() {
+        publish(importNative(HandoffFixtures.Spec.standard()));
+        String round = roundImported(importNative(HandoffFixtures.Spec.standard()), NOW.minusSeconds(10));
+        // The composition committed, but the process stopped before its result was written.
+        var result = preparer().run((active, request, decisions) -> journal().begin(round, publications.newestImport().orElseThrow(), null, active, request, decisions, NOW));
+        String candidate = result.get("graphVersionId").asString();
+        // The recovery's first read fails unexpectedly; the cause is gone by the next try.
+        var reader = org.mockito.Mockito.spy(reader());
+        org.mockito.Mockito.doThrow(new IllegalStateException("transient")).doCallRealMethod().when(reader).read(org.mockito.ArgumentMatchers.anyString());
+        var clock = new MovingClock(NOW.plusSeconds(15));
+        var rounds = roundPreparer(reader, clock);
+        rounds.afterPass(clock.instant());
+        var rows = preparations();
+        assertEquals(2, rows.size());
+        assertEquals(rows.getFirst().get("id"), rows.get(1).get("recovery_of"));
+        assertEquals("internal_error", rows.get(1).get("code"));
+        // A new import arrives while the original is undecided: no new preparation before the original is settled.
+        roundImported(importNative(HandoffFixtures.Spec.standard()), NOW.plusSeconds(20));
+        clock.set(NOW.plusSeconds(60));
+        rounds.afterPass(clock.instant());
+        assertEquals(2, preparations().size(), "the recovery waits; the new import does not start a preparation");
+        // After the wait the same fixed inputs are recovered and settle as the committed candidate; then the new import is prepared.
+        clock.set(NOW.plusSeconds(15 + 301));
+        rounds.afterPass(clock.instant());
+        rows = preparations();
+        assertEquals(4, rows.size(), rows.toString());
+        assertEquals(rows.getFirst().get("id"), rows.get(2).get("recovery_of"));
+        assertEquals("unchanged", rows.get(2).get("code"));
+        assertEquals(candidate, rows.get(2).get("graph_version_id"));
+        assertNull(rows.get(3).get("recovery_of"));
+        assertTrue(Set.of("staged", "nothing_to_prepare").contains((String) rows.get(3).get("code")), rows.get(3).toString());
+    }
+
+    /** A clock the round-path tests move past the recovery wait. */
+    private static final class MovingClock extends Clock {
+        private volatile Instant now;
+        MovingClock(Instant now) { this.now = now; }
+        void set(Instant at) { now = at; }
+        @Override public ZoneOffset getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(java.time.ZoneId zone) { return this; }
+        @Override public Instant instant() { return now; }
+    }
+
     @Test void aRecoveryAfterTheActiveVersionMovedIsAConflictThenANewPreparation() {
         publish(importNative(HandoffFixtures.Spec.standard()));
         String round = roundImported(importNative(HandoffFixtures.Spec.standard()), NOW.minusSeconds(10));
@@ -463,12 +506,14 @@ class GraphPublicationPreparePostgresTest {
     }
 
     private GraphRoundPreparer roundPreparer() {
-        var reader = reader();
+        return roundPreparer(reader(), CLOCK);
+    }
+    private GraphRoundPreparer roundPreparer(GraphPublicationReader reader, Clock clock) {
         var composer = composer();
         return new GraphRoundPreparer(new JdbcGraphRoundRepository(named, tools.jackson.databind.json.JsonMapper.builder().build(),
                 new DataSourceTransactionManager(dataSource)), journal(), new JdbcGraphRoundImportLock(dataSource),
                 new GraphPublicationPreparer(versions, graph, publications, reader, composer), reader, publications, composer,
-                Duration.ofMinutes(5), 3, CLOCK);
+                Duration.ofMinutes(5), 3, clock);
     }
 
     /** A round whose import of {@code versionId} committed at {@code committedAt}; returns its id. */

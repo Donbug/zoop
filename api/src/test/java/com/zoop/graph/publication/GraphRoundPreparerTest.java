@@ -25,11 +25,15 @@ class GraphRoundPreparerTest {
         assertEquals(Optional.of(1L), GraphRoundPreparer.unsettled(row(1, null, bytes, "failed", "outcome_unknown")));
         // A recovery that met a temporary failure, or itself stopped, names the attempt it recovers.
         assertEquals(Optional.of(1L), GraphRoundPreparer.unsettled(row(2, 1L, bytes, "failed", "import_busy")));
+        // A recovery that failed unexpectedly learned nothing about the original (PR #530 review P2).
+        assertEquals(Optional.of(1L), GraphRoundPreparer.unsettled(row(2, 1L, bytes, "failed", "internal_error")));
         assertEquals(Optional.of(1L), GraphRoundPreparer.unsettled(row(2, 1L, bytes, null, null)));
         // Settled answers, and attempts that never composed.
         for (Preparation settled : List.of(row(1, null, bytes, "succeeded", "staged"), row(1, null, bytes, "failed", "correction_required"),
                 row(1, null, bytes, "failed", "import_busy"), row(2, 1L, bytes, "failed", "active_conflict"),
-                row(1, null, null, "succeeded", "nothing_to_prepare"), row(1, null, null, "failed", "first_publication_manual"))) {
+                row(1, null, null, "succeeded", "nothing_to_prepare"), row(1, null, null, "failed", "first_publication_manual"),
+                // A first attempt's internal_error is settled: the composer rolled it back (an unknown commit is outcome_unknown).
+                row(1, null, bytes, "failed", "internal_error"))) {
             assertEquals(Optional.empty(), GraphRoundPreparer.unsettled(settled), settled.toString());
         }
     }

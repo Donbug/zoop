@@ -27,7 +27,10 @@ import tools.jackson.databind.node.ObjectNode;
  * <li>An unknown outcome is recovered first, with the fixed inputs (11-02 AI reply): an attempt that kept its bytes but has no
  *     result (the process stopped while composing) or answered {@code outcome_unknown} is run again as an operator compose of
  *     exactly those bytes ({@link GraphPublicationPreparer#operatorCompose}), as a new row naming it. Only a settled recovery lets a
- *     new preparation run. A recovery that does not settle waits {@code retryAfter}; after {@code maxAttempts} of them it is
+ *     new preparation run. A recovery that fails unexpectedly ({@code internal_error}) learned nothing about the original, so the
+ *     original stays the one to recover, like a recovery that met a temporary failure. (A first attempt's {@code internal_error} is
+ *     settled: the composer rolls an unexpected failure back and reports a commit it cannot know as {@code outcome_unknown}.)
+ *     A recovery that does not settle waits {@code retryAfter}; after {@code maxAttempts} of them it is
  *     logged as {@code recovery_required} and tried only every {@code retryAfter × maxAttempts}, so a person's operator compose of
  *     the same bytes (or a moved active pointer) settles it at the next try.</li>
  * <li>One at a time: the work holds the round import lock, so no round import and no other instance's preparation runs
@@ -43,6 +46,7 @@ public final class GraphRoundPreparer implements RoundPreparation {
     /** Codes that end the attempt because the state it read moved; a new preparation judges the moved state. */
     static final Set<String> CONFLICT = Set.of("active_conflict", "revision_conflict");
     static final String OUTCOME_UNKNOWN = "outcome_unknown";
+    static final String INTERNAL_ERROR = "internal_error";
 
     private final GraphRoundRepository rounds;
     private final JdbcGraphPublicationPreparationRepository journal;
@@ -121,7 +125,7 @@ public final class GraphRoundPreparer implements RoundPreparation {
         if (last.request().isEmpty()) return Optional.empty();
         String code = last.code().orElse("");
         if (OUTCOME_UNKNOWN.equals(code)) return Optional.of(target);
-        if (last.recoveryOf().isPresent() && TEMPORARY.contains(code)) return Optional.of(target);
+        if (last.recoveryOf().isPresent() && (TEMPORARY.contains(code) || INTERNAL_ERROR.equals(code))) return Optional.of(target);
         return Optional.empty();
     }
 
@@ -158,14 +162,15 @@ public final class GraphRoundPreparer implements RoundPreparation {
         } catch (PublicationException invalid) {
             result = GraphPublicationComposer.failed(invalid.code());
         } catch (RuntimeException unexpected) {
-            // Settle the row as the first attempt would (internal_error), so a failure that repeats does not pile up open rows.
-            log.error("graph publication preparation {}: recovery failed unexpectedly: {}", id, unexpected.getClass().getName());
-            result = GraphPublicationComposer.failed("internal_error");
+            // Close this row (a failure that repeats does not pile up open rows); the original stays unsettled (unsettled()), so the
+            // same fixed inputs are recovered again after the wait. The stack trace is kept: a repeating failure needs a person.
+            log.error("graph publication preparation {}: recovery failed unexpectedly", id, unexpected);
+            result = GraphPublicationComposer.failed(INTERNAL_ERROR);
         }
         journal.complete(id, result, clock.instant());
         String code = JdbcGraphPublicationPreparationRepository.code(result);
         log.info("graph publication preparation {}: recovery of {} answered {}", id, target, code);
-        return !OUTCOME_UNKNOWN.equals(code) && !TEMPORARY.contains(code);
+        return !OUTCOME_UNKNOWN.equals(code) && !INTERNAL_ERROR.equals(code) && !TEMPORARY.contains(code);
     }
 
     private void prepare(String roundId, long trigger) {
