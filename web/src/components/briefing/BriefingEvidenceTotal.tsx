@@ -10,7 +10,7 @@ export default function BriefingEvidenceTotal({
   const count = new Set(items?.flatMap((item) => item.evidenceIds)).size;
   return count > 0 ? (
     <p className={`${NOTE} mt-4 border-t border-zoop-border pt-3 tabular-nums`}>
-      근거 문서 {count}건
+      근거 {count}건
     </p>
   ) : null;
 }

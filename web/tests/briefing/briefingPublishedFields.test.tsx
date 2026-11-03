@@ -152,7 +152,7 @@ describe.each([
       }),
       compact,
     );
-    expect(await screen.findByText('근거 문서 3건')).toBeTruthy();
+    expect(await screen.findByText('근거 3건')).toBeTruthy();
   });
 
   it('B1 omits the total when no evidence IDs exist, even with a reported count', async () => {
@@ -161,7 +161,7 @@ describe.each([
       compact,
     );
     await openIssues();
-    expect(screen.queryByText(/^근거 문서 \d+건$/)).toBeNull();
+    expect(screen.queryByText(/^근거 \d+건$/)).toBeNull();
   });
 
   it('회차 판단이 null이면 영역을 그리지 않는다', async () => {
