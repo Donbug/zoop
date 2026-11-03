@@ -27,12 +27,18 @@ public final class HttpRoundClient implements RoundRunClient, RoundHandoffClient
         transport = new AiHttpTransport(settings);
     }
 
-    @Override
-    public RoundRun request(String roundId) {
+    /** Build once, persist before send, and pass the saved bytes to every retransmission. */
+    public static byte[] runBody(String roundId) {
         ObjectNode body = StrictJson.newObject();
         body.put("schemaVersion", RoundWire.RUN_SCHEMA);
         body.put("roundId", checked(roundId));
-        Reply reply = transport.exchange(AiOperation.ROUND_RUN, "POST", transport.uri(RUNS), StrictJson.write(body), roundId,
+        return StrictJson.write(body);
+    }
+
+    @Override
+    public RoundRun requestRun(String roundId, byte[] body) {
+        checked(roundId);
+        Reply reply = transport.exchange(AiOperation.ROUND_RUN, "POST", transport.uri(RUNS), body, roundId,
                 RoundWire.rejections(), 202, 200);
         return AiHttpTransport.decode(reply, () -> RoundWire.run(reply.body(), roundId));
     }
@@ -43,17 +49,22 @@ public final class HttpRoundClient implements RoundRunClient, RoundHandoffClient
         return AiHttpTransport.decode(reply, () -> RoundWire.run(reply.body(), roundId));
     }
 
-    @Override
-    public RoundHandoff request(Request request) {
+    public static byte[] handoffBody(Request request) {
         ObjectNode body = StrictJson.newObject();
         body.put("schemaVersion", RoundWire.HANDOFF_SCHEMA);
         body.put("roundId", checked(request.roundId()));
         request.ingestionRoundId().ifPresent(id -> body.put("ingestionRoundId", id));
         request.planId().ifPresent(id -> body.put("planId", id));
         body.set("bindings", bindings(request.bindings()));
-        Reply reply = transport.exchange(AiOperation.ROUND_HANDOFF, "POST", transport.uri(HANDOFFS), StrictJson.write(body),
-                request.roundId(), RoundWire.rejections(), 202, 200);
-        return AiHttpTransport.decode(reply, () -> RoundWire.handoff(reply.body(), request.roundId()));
+        return StrictJson.write(body);
+    }
+
+    @Override
+    public RoundHandoff requestHandoff(String roundId, byte[] body) {
+        checked(roundId);
+        Reply reply = transport.exchange(AiOperation.ROUND_HANDOFF, "POST", transport.uri(HANDOFFS), body,
+                roundId, RoundWire.rejections(), 202, 200);
+        return AiHttpTransport.decode(reply, () -> RoundWire.handoff(reply.body(), roundId));
     }
 
     @Override

@@ -82,7 +82,7 @@ class NativeObservation(NativeWire):
     published_at: str | None
     modified_at: str | None
     source_revision: str | None
-    media_type: Literal["text/html", "application/pdf"]
+    media_type: Literal["text/html", "application/pdf", "application/json"]
     publisher: str | None = Field(default=None, min_length=1, max_length=200)
     language: str | None = Field(default=None, min_length=2, max_length=35)
     provenance: Literal["collected_http"] | None = None
@@ -121,6 +121,138 @@ class NativeProjection(NativeWire):
     raw_locators: list[NativeLocator] = Field(min_length=1)
 
 
+ProjectionProfile = Literal["korea-kogl1-caption-boundary-1", "eu-commission-pdf-body-ranges-1",
+                            "eu-commission-json-html-body-ranges-1", "eu-commission-html-body-ranges-1"]
+
+
+class NativeProjectionDescriptor(NativeWire):
+    profile: ProjectionProfile
+    descriptor_hash: Hash
+
+
+class NativeProjectionProvenance(NativeProjectionDescriptor):
+    parent_document_version: Hash
+    boundary_decision_revision: str = Field(min_length=1, max_length=200)
+    rights_receipt_hash: Hash
+
+
+class NativeExcludedSlot(NativeWire):
+    dom_path: str = Field(min_length=1)
+    slot: Literal["text", "tail"]
+
+
+class NativeCaptionProjection(NativeProjectionProvenance):
+    profile: Literal["korea-kogl1-caption-boundary-1"]
+    excluded_source_slots: list[NativeExcludedSlot] = Field(min_length=1)
+
+
+class NativeRetainedRange(NativeWire):
+    page_number: int = Field(gt=0)
+    page_text_hash: Hash
+    source_start: int = Field(ge=0)
+    source_end: int = Field(gt=0)
+    text_utf8_sha256: Hash
+    review_unit_id: str = Field(min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def bounds(self):
+        if self.source_start >= self.source_end:
+            raise ValueError("positive source interval required")
+        return self
+
+
+class NativePdfProjection(NativeProjectionProvenance):
+    profile: Literal["eu-commission-pdf-body-ranges-1"]
+    parent_document_id: Name
+    parent_raw_version: Hash
+    selection_hash: Hash
+    retained_source_ranges: list[NativeRetainedRange] = Field(min_length=1, max_length=10000)
+
+    @model_validator(mode="after")
+    def selection(self):
+        previous = None
+        for span in self.retained_source_ranges:
+            if previous and (span.page_number < previous.page_number or
+                             (span.page_number == previous.page_number and span.source_start < previous.source_end)):
+                raise ValueError("disjoint source-ordered ranges required")
+            previous = span
+        if digest([span.wire() for span in self.retained_source_ranges]) != self.selection_hash:
+            raise ValueError("native selection hash mismatch")
+        return self
+
+
+class NativeHtmlSpan(NativeExcludedSlot):
+    source_start: int = Field(ge=0)
+    source_end: int = Field(gt=0)
+    text_utf8_sha256: Hash
+
+    @model_validator(mode="after")
+    def bounds(self):
+        if self.source_start >= self.source_end:
+            raise ValueError("positive source interval required")
+        return self
+
+
+class NativeHtmlUnit(NativeWire):
+    unit_id: str = Field(min_length=1, max_length=200)
+    dom_path: Name
+    classification: Literal["commission-narrative", "original-dateline", "public-official-statement"]
+    spans: list[NativeHtmlSpan] = Field(min_length=1, max_length=1000)
+    text_utf8_sha256: Hash
+
+
+class NativeHtmlParent(NativeWire):
+    document_id: Name
+    raw_version: Hash
+    raw_hash: Hash
+    collection_receipt_sha256: Hash
+
+
+class NativeHtmlRepresentation(NativeWire):
+    source_hash: Hash
+    representation_hash: Hash
+    mapping_hash: Hash
+    parser_profile: "NativeParserProfile"
+
+
+class NativeJsonHtmlRepresentation(NativeHtmlRepresentation):
+    decoder: Literal["ec-presscorner-json-html-1"]
+    json_pointer: Literal["/docuLanguageResource/htmlContent"]
+    decoded_html_utf8_sha256: Hash
+    expected_reference: str = Field(min_length=1, max_length=200)
+    expected_language: str = Field(min_length=2, max_length=35)
+
+
+class NativeHtmlBodyProjection(NativeProjectionDescriptor):
+    profile: Literal["eu-commission-html-body-ranges-1"]
+    parent: NativeHtmlParent
+    representation: NativeHtmlRepresentation
+    parent_binding_hash: Hash
+    boundary_decision_revision: str = Field(min_length=1, max_length=200)
+    rights_receipt_hash: Hash
+    selection_hash: Hash
+    retained_units: list[NativeHtmlUnit] = Field(min_length=1, max_length=1000)
+
+    @model_validator(mode="after")
+    def bindings(self):
+        if self.parent_binding_hash != digest({"parent": self.parent.wire(), "representation": self.representation.wire()}):
+            raise ValueError("native raw parent binding mismatch")
+        if self.selection_hash != digest([unit.wire() for unit in self.retained_units]):
+            raise ValueError("native selection hash mismatch")
+        if self.representation.parser_profile.text_projection is not None:
+            raise ValueError("native baseline profile required")
+        return self
+
+
+class NativeJsonHtmlBodyProjection(NativeHtmlBodyProjection):
+    profile: Literal["eu-commission-json-html-body-ranges-1"]
+    representation: NativeJsonHtmlRepresentation
+
+
+NativeTextProjection = Annotated[NativeCaptionProjection | NativePdfProjection | NativeHtmlBodyProjection |
+                                 NativeJsonHtmlBodyProjection, Field(discriminator="profile")]
+
+
 class NativeParserProfile(NativeWire):
     parser: Name
     lxml: Name
@@ -130,6 +262,7 @@ class NativeParserProfile(NativeWire):
     html_scope: Name
     pdf_extraction: Name
     article_xpath: str | None = Field(alias="articleXPath")
+    text_projection: NativeProjectionDescriptor | None = None
 
 
 class NativeLocatorMetadata(NativeWire):
@@ -142,6 +275,7 @@ class NativeLocatorMetadata(NativeWire):
     limitations: list[str]
     page_count: int | None = Field(default=None, ge=1)
     empty_page_count: int | None = Field(default=None, ge=0)
+    text_projection: NativeTextProjection | None = None
 
 
 class ObservationExport(NativeWire):
@@ -158,6 +292,35 @@ class ObservationExport(NativeWire):
             raise ValueError("native identity mismatch")
         if d.text_artifact_id != "text-" + d.document_version or m.raw_artifact_id != "raw-" + m.raw_hash:
             raise ValueError("native artifact mismatch")
+        descriptor, projection = m.parser_profile.text_projection, m.text_projection
+        if ("text_projection" in m.parser_profile.model_fields_set and descriptor is None or
+                "text_projection" in m.model_fields_set and projection is None or
+                (descriptor is None) != (projection is None)):
+            raise ValueError("native projection metadata required together")
+        if projection is not None:
+            if (descriptor.profile, descriptor.descriptor_hash) != (projection.profile, projection.descriptor_hash):
+                raise ValueError("native projection descriptor mismatch")
+            if isinstance(projection, NativePdfProjection):
+                if (o.media_type != "application/pdf" or projection.parent_document_id != d.document_id or
+                        projection.parent_raw_version != m.raw_version or m.page_count is None or
+                        any(span.page_number > m.page_count for span in projection.retained_source_ranges)):
+                    raise ValueError("native PDF projection identity mismatch")
+            elif isinstance(projection, NativeHtmlBodyProjection):
+                expected_media = "application/json" if isinstance(projection, NativeJsonHtmlBodyProjection) else "text/html"
+                parent = projection.parent
+                if (o.media_type != expected_media or o.collection is None or
+                        (parent.document_id, parent.raw_version, parent.raw_hash, parent.collection_receipt_sha256) !=
+                        (d.document_id, m.raw_version, m.raw_hash, o.collection.receipt.sha256)):
+                    raise ValueError("native HTML body projection identity mismatch")
+                if isinstance(projection, NativeJsonHtmlBodyProjection) and m.parser_profile.article_xpath != "/html/body":
+                    raise ValueError("native JSON member scope mismatch")
+            elif o.media_type != "text/html":
+                raise ValueError("native caption projection media mismatch")
+        if o.media_type == "application/json" and not isinstance(projection, NativeJsonHtmlBodyProjection):
+            raise ValueError("native JSON profile required")
+        if o.collection is not None and (o.collection.body_sha256 != m.raw_hash or
+                o.collection.content_type.split(";", 1)[0].strip().lower() != o.media_type):
+            raise ValueError("native collection body/media mismatch")
         if digest(d.text) != d.source_hash:
             raise ValueError("native source hash mismatch")
         if digest([d.document_id, m.raw_version, m.parser_profile.wire(), d.cleaner_version, d.source_hash, m.mapping_hash]) != d.document_version:

@@ -88,7 +88,7 @@ class GraphRoundRepositoryPostgresTest {
 
     /** Rows are guarded against DELETE; TRUNCATE (no row triggers) is the test's way out. */
     private static void clean() {
-        jdbc.execute("TRUNCATE graph_round_events, graph_rounds");
+        jdbc.execute("TRUNCATE graph_round_requests, graph_round_events, graph_rounds");
     }
 
     @BeforeEach
@@ -301,6 +301,28 @@ class GraphRoundRepositoryPostgresTest {
         assertEquals(List.of(ROUND_1), rounds.page(null, SLOT_2, 10).stream().map(GraphRound::roundId).toList());
         assertEquals(List.of(ROUND_2), rounds.page(GraphRoundStage.IMPORTED, null, 10).stream().map(GraphRound::roundId).toList());
         assertEquals(1, rounds.page(null, null, 1).size());
+    }
+
+    @Test
+    void requestJournalIsImmutableAndFencedAndFutureSlotsAreNotDue() {
+        rounds.create(ROUND_1, SLOT_1, "system:scheduler", NOW);
+        rounds.create(ROUND_2, SLOT_2, "system:scheduler", NOW);
+        assertEquals(List.of(ROUND_1), rounds.due(NOW, 10).stream().map(GraphRound::roundId).toList());
+        GraphRound first = claimed(ROUND_1, "task-a");
+        byte[] original = com.zoop.ai.http.HttpRoundClient.runBody(ROUND_1);
+        RoundServiceBinding binding = new RoundServiceBinding(DIGEST);
+        assertTrue(rounds.saveRequest(first, "run", original, binding, NOW));
+        assertFalse(rounds.saveRequest(first, "run", new byte[] {1}, binding, NOW));
+        var saved = rounds.request(ROUND_1, "run").orElseThrow();
+        org.junit.jupiter.api.Assertions.assertArrayEquals(original, saved.body());
+        assertEquals(Optional.of(binding), saved.binding());
+        assertEquals(com.zoop.common.json.Canonical.sha256(original),
+                jdbc.queryForObject("SELECT body_sha256 FROM graph_round_requests WHERE round_id = ?", String.class, ROUND_1));
+        assertThrows(DataAccessException.class, () -> jdbc.update("UPDATE graph_round_requests SET service_binding = ?", "b".repeat(64)));
+        assertThrows(DataAccessException.class, () -> jdbc.update("DELETE FROM graph_round_requests"));
+        GraphRound taken = rounds.claim(ROUND_1, "task-b", Duration.ofMinutes(10), NOW.plusSeconds(601)).orElseThrow();
+        assertFalse(rounds.saveRequest(first, "freeze", original, binding, NOW.plusSeconds(602)));
+        assertTrue(rounds.saveRequest(taken, "freeze", original, binding, NOW.plusSeconds(602)));
     }
 
     @Test

@@ -51,6 +51,62 @@ manifest의 정확한 최상위 모양은 `{"schemaVersion":"zoop-operating-inpu
 | `ingestionStateDirectory` | 승인된 공통 native ingestion 원장의 절대 경로. 모든 incoming·snapshot 관측이 이 원장에서 해석되어야 하며 운영 원장·출력 경로와 겹치면 거절 |
 | `sources` | 공통 ingestion 관측의 현재 source registry 절대 경로. 첫 유효 set의 경로와 다르면 거절하며 현재 scope·grant 검사는 계속 수행 |
 
+### 완료된 공개 수집 배치 등록
+
+`zoop-ai-operate register-collection --config "$ZOOP_OPERATING_CONFIG" --batch "$ZOOP_COLLECTION_BATCH"`는 완료된 `collection.json`을 해시로 확인한 뒤, 같은 ingestion 원장에 원문을 준비하고 대상마다 일반 운영 set 하나를 등록합니다. `--config`는 이미 초기화된 운영 설정이고 `--batch`는 아래 요청 파일입니다. 이 명령의 범위는 로컬 준비와 S2 등록까지이며, 수집·모델 전송·S3 실행은 별도 승인과 명령이 필요합니다. `--manifest`, `--max-sets`, `--set-id`, `--reason`은 함께 사용할 수 없습니다.
+
+요청은 닫힌 `zoop-operating-collection-registration-1` 객체입니다. 아래 필드는 모두 필수이며 `topic`만 명시적으로 `null`일 수 있습니다. 입력 파일은 일반 파일이어야 하고 symlink를 거부하며 최대 2,000,000바이트입니다.
+
+| 필드 | 계약 |
+| --- | --- |
+| `schemaVersion` | `zoop-operating-collection-registration-1` |
+| `sources`, `ingestionStateDirectory` | 현재 공개 registry와 승인된 공통 ingestion 디렉터리의 정규 절대 경로. ingestion은 운영 원장·출력·수집 inputRoot·요청/설정/registry 파일·앱/S1/PoC 예약 경로와 겹칠 수 없음 |
+| `sourceId`, `scopeId` | 현재 `collected-http` source와 정확한 scope |
+| `collection` | `{file, sha256}`. `file`은 source inputRoot 아래 `collections/<collectionId>/collection.json`; SHA-256은 저장된 결과 파일 바이트의 해시 |
+| `roundId`, `checkpointRevision` | 영속 ingestion round ID와 최초의 0 이상 CAS revision. 재등록에도 같은 값을 사용 |
+| `provenance`, `promptVersion`, `catalogue`, `snapshot`, `topic` | 기존 extraction Submit의 명시적 값. provenance는 `executionMode: live`, `recordingKind: provider`이며 `sourceKind`는 실제 입력에 맞게 지정. catalogue·snapshot은 revision을 포함한 전체 객체; topic은 기존 TopicConfig 또는 `null` |
+| `sets` | 수집 target 순서의 1–50개 `{candidateId, setId, extractionJobId, relationJobId, stageAllowances}`. 모든 target과 일대일 대응하고 ID는 유일해야 함. 일곱 allowance의 키·범위는 일반 manifest와 동일 |
+
+저장된 결과의 `state: complete`, 모든 target의 성공 상태, manifest·page의 핀과 순서·본문/receipt 참조를 확인합니다. CLI 출력의 `manifestPath`·`replayed`를 덧붙인 객체나 일부 성공한 collection은 입력으로 사용할 수 없습니다. 본문과 receipt의 검증·파싱은 기존 ingestion이 담당합니다. 이러한 로컬 해시는 바이트 일치의 근거이며 외부 취득 사실을 독립적으로 증명하는 서명은 아닙니다.
+
+원래 manifest를 `window: null`로 가져오므로 page의 `coverageThrough: null`과 기존 checkpoint-through를 유지합니다. 날짜가 없거나 날짜만 있거나 시간대가 불명확하면 그대로 보존합니다. native round가 complete이면서 전체 target이 text-ready이고 hold·error·ambiguity가 없어야 등록합니다. 하나라도 준비되지 않으면 실제 native 상태와 전체 documentRefs를 반환하고 등록은 시작하지 않습니다. 대상 간 중복 본문도 정확한 관측별 set을 유지하며 snapshot은 운영자가 제공한 사건·근거만 사용합니다. 생성되는 일반 운영 manifest에도 20,000,000바이트 상한을 적용합니다.
+
+기존 owner lock 안에서 `Budget.bind`로 source/collection별 전체 요청 digest를 먼저 고정합니다. 준비나 등록이 중단되면 **같은 요청 파일**로 `register-collection`을 다시 실행합니다. descriptor·경로·round/CAS·핀·ID·allowance 중 하나라도 바꾸면 `operating_collection_input_conflict`입니다. 준비 실패 후에도 intent가 남을 수 있으며, 이 intent와 set/job 수용은 별도입니다. 기존 set, admission 이후 중단된 set, native hold·attempt와 pause/stop 제어는 원래 신원을 유지합니다.
+
+출력 schema는 `zoop-operating-collection-registration-result-1`입니다. 정상 결과는 `status`, `requestDigest`, `collection` 핀, `ingestion`, `manifest`, `registration`, `error`를 가집니다. `registration.registered`는 등록 호출이 반환한 ID이며 `interruptedSetId`는 실패 도중 이미 수용되었을 수도 있는 ID, `notAttempted`는 나머지 ID입니다. `status: registered`와 종료 코드 0은 정확한 입력의 등록을 뜻하며 분석 완료와는 구분합니다. 준비/등록 미완료는 `status: incomplete`와 종료 코드 2입니다. 권한 있는 metadata를 제공할 수 없으면 `schemaVersion`·`error.code`만 반환하고, 로컬 진행이 남았을 수 있으면 `localProgressMayExist: true`를 덧붙입니다. 강제 중단으로 출력이 없을 때는 같은 요청으로 복구해야 합니다.
+
+공개 read·store·quote-display 권한은 incoming과 모든 snapshot 관측에 필요하며 각 set의 수용·동결을 시작하기 직전과 최종 응답 직전에 확인합니다. 기존 job 재등록에도 같은 검사를 적용합니다. 배치에서 처음 읽은 registry가 바뀌면 다음 set의 등록을 중단하고, 이미 등록된 prefix와 핀은 보존하되 응답 metadata는 숨깁니다. 최초 import는 receipt의 acquisition grant ID/revision을 현재 grant와 대조하므로 바뀐 경우 `collection_receipt_invalid`를 그대로 처리해야 합니다. 현재 읽기 권한이 유효해도 이미 동결된 job의 이전 grant binding이 향후 전송을 허용한다는 뜻은 아닙니다. 등록에는 model-send·키·live-send gate가 필요하지 않으며 실제 전송 승인은 기존 정확한 purpose/recipient 검사와 별도로 받아야 합니다. 등록은 기존 metered funding을 사용하므로 누적 USD 상한이 필요한 작업에는 이 모드를 그대로 적용할 수 없습니다.
+
+등록 결과의 원래 set ID를 `run --set-id`로 선택해 따로 실행한 뒤, 운영자가 그 set의 S3/S2 핀과 canonical·decisions·bindings 파일을 담은 manifest로 기존 `zoop-ai-handoff freeze`와 `export`를 호출합니다. 완료 여부는 원래 unit과 영속 `complete` 상태, 선택한 모든 S3 job의 `ready`·현재 delivery를 함께 확인해야 합니다. 완료된 set은 다음 `run` 응답에서 빠지므로 빈 `sets`만으로 판단하면 안 됩니다. handoff는 명시한 source 집합을 검증하며 수집 배치 전체와의 일치는 운영자가 책임집니다. 한 manifest에는 S3 source를 최대 20개까지 넣을 수 있습니다. 21–50개를 전달할 때는 아래의 분할 사전 검사로 원래 집합의 누락·중복과 같은 이슈의 연결 관계를 확인합니다. export 결과는 앱 import와 공개 활성화 전의 `publication: not-published`입니다.
+
+### handoff 분할 사전 검사 (#493 수집 배치 전달)
+
+`zoop-ai-handoff partition-check`는 독립적으로 고정한 원래 수집·승인 선택 집합을 기준으로 제안된 manifest들을 검사합니다. canonical 이슈를 공유하는 S3 job들을 하나의 연결 성분으로 묶으며, 매핑이 없는 job도 단독 성분으로 셉니다. 같은 이슈가 여러 manifest에 걸치거나 한 연결 성분이 **고유 S3 job 20개**를 넘으면 `invalid`입니다. 반복되는 snapshot member가 있어도 job 수는 줄어들지 않습니다.
+
+```sh
+zoop-ai-handoff partition-check < "$ZOOP_HANDOFF_PARTITION_CONFIG"
+```
+
+입력은 기존 handoff CLI와 같이 stdin의 65,536바이트 이하 닫힌 JSON입니다. 이 명령의 경로는 설정 안에서 지정합니다. 파일 참조는 모두 `{"path": "/absolute/input.json", "sha256": "<파일 바이트의 SHA-256>"}` 형식이며 일반 파일·크기·symlink 검사는 기존 owner 규칙을 따릅니다.
+
+| 필드 | 계약 |
+| --- | --- |
+| `schemaVersion`, `scope`, `sourceKind` | `zoop-partition-check-1`, 원래 모집단을 설명하는 문자열, `actual` 또는 `synthetic` |
+| `universe` | 원래 수집 또는 승인된 선택에서 독립적으로 보존한 `{"sources": [SourcePin, ...]}` 파일 참조. S3 identity/input digest, S2 identity/input/result digest, review digest를 모두 고정합니다 |
+| `canonical` | 실제 member의 권위 있는 canonical registry 파일 참조. S2 job·input digest·kind·ref가 정확히 일치해야 합니다 |
+| `contexts` | 원래 source와 관측을 기존 owner에 연결하는 `zoop-handoff-source-contexts-1` 파일 참조 |
+| `partitions` | 하나 이상의 `{manifest, canonical, decisions, bindings}` 객체. 각 값은 파일 참조이며 manifest 안의 operator 파일 해시와 일치해야 합니다 |
+| `operatingManifests` | 선택 사항인 원래 `zoop-operating-input-manifest-1` 파일 참조 목록. 지정하면 전체 S2/S3 집합과 실제 extraction 요청도 `universe`·원장과 대조합니다 |
+
+`universe`는 제안된 분할 manifest들을 합쳐 만들지 않습니다. 승인된 일부만 대상으로 삼았다면 `scope`에 그 범위를 명시합니다. 임의의 파일이 전체 수집을 대표한다는 운영자의 주장을 이 검사만으로 인증할 수는 없습니다.
+
+출력은 canonical JSON인 `zoop-partition-check-result-1`입니다. 종료 코드는 `valid: 0`, `invalid: 1`, `blocked: 2`입니다. `inputs`의 역할별 해시, `counts`, `components`, `issues`, `findings`를 보존합니다. 원래 job의 누락·중복·예상 밖 job·핀 불일치, canonical 매핑 차이, representative와 field verdict·geography·structural·FOLLOWS 참조의 분할 내 결합을 확인합니다. `findings[].effect`는 `partition-invalid`, `whole-freeze-error`, `issue-exclusion`, `item-exclusion`, `source-blocked`를 구분합니다.
+
+member는 기존 `Contexts.open`·`handoff.load_source`·`members_of`를 통해 현재 권한과 원장 무결성을 확인한 뒤 읽습니다. recorded `candidate`인 S2 event와 고정 snapshot event의 모든 member를 사용하며 HOLD/REJECT를 membership 필터로 바꾸지 않습니다. S3 공유 lock은 분할 분석이 끝날 때까지 유지하고, 응답 직전에 모든 원천을 owner loader로 다시 읽어 현재 권한·upstream 결합·정확한 review digest를 재검증합니다. 이 최종 검사를 통과해야 `memberInventoryComplete: true`와 정확한 source pin·event inventory를 반환하고 매핑이 없는 member도 별도로 보고합니다. 최종 검사가 막히면 `blocked`로 남으며 준비한 member inventory·counts·issue·component와 그로부터 나온 findings를 응답에서 걷어냅니다. 보존 archive를 검사할 때는 전체 원장·sidecar·권한 파일을 사본으로 준비하고 context의 운영 경로만 사본에 맞춰 다시 고정합니다. source registry의 역사적 `inputRoot`는 유지합니다.
+
+`valid`는 분할의 정합성만 뜻합니다. 연결 관계는 선언된 canonical ID에 한정되며, 서로 다른 ID의 의미상 동일성, 분할 간 public ID 충돌, manifest 전체의 execution mode 일치는 이 결과와 별도로 확인해야 합니다. 실제 freeze의 근거·관계·요약 검증과 앱 import·활성화 승인은 각각 기존 절차를 따릅니다. 20개를 넘는 연결 성분은 별도 판단이 필요합니다. 기존 수동 관계 선택은 여러 basis 중 하나를 고를 수 있으므로 모든 근거를 보존하는 무손실 분할 대안으로 취급하면 안 됩니다.
+
+
 ### 명령과 환경
 
 설치된 패키지에서 다음 순서로 실행합니다. `ZOOP_OPERATING_CONFIG`와 `ZOOP_OPERATING_MANIFEST`는 운영자가 준비한 파일 경로를 가리키는 셸 변수입니다.
@@ -88,21 +144,25 @@ raw receipt와 비용 정산은 같은 운영 원장 transaction에 저장합니
 
 직접 runtime을 쓰는 승인된 owner는 `ZOOP_AI_PIPELINE_LIVE_PROFILE=operating-metered-v1`, `ZOOP_AI_PIPELINE_OPERATING_POLICY`(policy만 담긴 JSON 파일), `ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR`, `ZOOP_AI_PIPELINE_OPERATING_SET`, `ZOOP_AI_PIPELINE_OPERATING_OWNER`와 기존 모델 설정을 전달합니다. owner token은 `Budget.owner()`가 발급하며 같은 프로세스의 소유권과 등록된 set binding을 검증합니다. 일반 운영자는 이 내부 token을 만들지 않고 위 CLI를 사용합니다.
 
-합성 loopback 검증은 `python scripts/operating_smoke.py`로 실행합니다. `--faults`는 실제 CLI의 유지보수 pause/resume, 제어 writer와 예약의 경합·대기 초과 후 동일 attempt 재개, drain 중 usage 오류, 검증 기술 오류, 등록 거절·수정 및 미등록 frontier를 검사합니다. `--shared-handoff`는 두 배치의 서로 다른 native 입력·job을 공유 출력에 쓴 뒤 기존 `handoff.current(strict=True)`가 모든 선택된 S3/S2 upstream을 함께 읽는지 확인합니다. 이 검사는 source 소비 경로의 증명이며 공개 게시 승인과는 구분합니다. `--long-job`은 두 요청을 각각 151초 지연시켜 job이 300초를 넘어도 완료하는지 확인합니다. 배포에는 artifact digest, 단일 실행 대상, 영속 경로, 실제 lifecycle, 계정·quota·secret 참조와 stop-before-start 절차가 필요합니다.
+합성 검증은 `python scripts/operating_smoke.py`로 실행합니다. `--faults`는 실제 CLI의 유지보수 pause/resume, 제어 writer와 예약의 경합·대기 초과 후 동일 attempt 재개, drain 중 usage 오류, 검증 기술 오류, 등록 거절·수정 및 미등록 frontier를 검사합니다. `--long-job`은 loopback 요청 두 건을 각각 151초 지연시켜 job이 300초를 넘어도 완료하는지 확인합니다.
+
+`--shared-handoff`는 직접 작성한 서로 다른 합성 문서 두 건을 실제 `register-collection` CLI로 등록하고, 원래 set ID를 선택해 한 건씩 실행한 뒤 실제 handoff CLI로 동결·export합니다. 실행 transport는 `httpx.MockTransport`이며 소켓·하위 프로세스 접근을 차단합니다. `window`·`coverageThrough`의 null, 날짜 정밀도, 영속 완료 상태, 원래 S2/S3 membership, 금전 receipt 이후 중단 시 같은 attempt 복구를 확인합니다. 명시적으로 작성한 canonical·공개 결정·문서 binding으로 이슈 2개와 `INVOLVES` 2개가 나오는지, 원래 관측·정확한 인용 해시·manifest/bundle/content digest가 맞는지 검사합니다. 같은 등록·실행·동결 요청의 재사용은 추가 호출 없이 처리되고, 같은 handoff ID의 핀 변경은 충돌하며 quote-display 권한 회수 후 export는 본문을 보류해야 합니다. 이 증명은 운영자가 지정한 유한 집합의 handoff까지이며, 실제 수집·클라우드 실행·앱 공개는 별도 검증 대상입니다.
+
+배포에는 artifact digest, 단일 실행 대상, 영속 경로, 실제 lifecycle, 계정·quota·secret 참조와 stop-before-start 절차가 필요합니다.
 
 | 명령 | 모듈 | wire schema | 상태 파일 |
 | --- | --- | --- | --- |
 | `zoop-ai-collect run` | `zoop_ai_pipeline.collection_cli` | `zoop-collection-1` (policy `zoop-collection-policy-1`) | 상태 DB 없음. source `inputRoot/collections/<collectionId>/`에만 원본 bytes·receipt·manifest를 쓴다 |
 | `zoop-ai-collector {run,checkpoint,restore,status}` | `zoop_ai_pipeline.collector_cli` | checkpoint manifest `zoop-collector-checkpoint-1` | 컨테이너 수집 entry. 아래 비공개 뉴스·Korea 코퍼스·official source 수집을 한 controller로 돌리고 `/var/lib/zoop-collector/{private,korea,official}` 상태를 S3 checkpoint로 보존한다. 계약·환경변수·종료 코드·SIGTERM 시간은 [`docs/development/collector-container.md`](../../docs/development/collector-container.md) |
-| `zoop-ai-ingest {run,tick,resume,inspect,export}` | `zoop_ai_pipeline.ingestion_cli` | `zoop-ingestion-s2-1` | `ingestion.sqlite3` |
+| `zoop-ai-ingest {run,tick,resume,inspect,export,round-inventory}` | `zoop_ai_pipeline.ingestion_cli` | `zoop-ingestion-s2-1`; 내부 metadata 읽기는 `zoop-ingestion-round-inventory-1` | `ingestion.sqlite3`; `round-inventory`는 읽기 전용 |
 | `zoop-ai-extract {run,submit,enqueue-round,plan-round,resume,inspect,cancel}` | `zoop_ai_pipeline.extraction_cli` | `zoop-extraction-s2-2` | `extraction.sqlite3` (`plan-round`는 원장을 열지 않고 새 계획 디렉터리 하나만 씀) |
 | `zoop-ai-relation {run,submit,inspect,resume,review,cancel,live-binding}` | `zoop_ai_pipeline.relation_cli` | `zoop-relation-s3` | `relation.sqlite3` |
 | `zoop-ai-dependents` (하위 명령 없음, stdin 변경 1건) | `zoop_ai_pipeline.dependency_cli` | `zoop-dependency-s4` | 위 세 원장을 읽기 전용으로만 연다(쓰는 상태 파일 없음) |
 | `zoop-ai-graph {init,freeze,project,recover,inspect,read,focus}` | `zoop_ai_pipeline.graph_projection_cli` | `zoop-graph-projection-1` (plan `zoop-graph-plan-2`) | `graph.sqlite3` + 이 원장 하나에 묶인 별도 Neo4j 5 database의 **비공개** version(공개 아님) |
 | `zoop-ai-issue-summary {submit,run,resume,inspect,export,cancel,live-binding}` | `zoop_ai_pipeline.issue_summary_cli` | `zoop-issue-summary-1` (policy `zoop-issue-summary-policy-1`) | `issue-summary.sqlite3`; 위 세 원장과 운영자 파일을 읽기 전용으로만 열고 handoff·Neo4j·app은 쓰지 않음 |
-| `zoop-ai-handoff {freeze,freeze-round,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `-8`/decisions `-4`/policy `-2` 또는 bundle `-9`/decisions `-5`/policy `-3`) | `handoff.sqlite3` + `bundles/<sha256>.json`; 원천 원장은 읽기 전용. `freeze-round`는 window로 좁힌 운영자 파일 두 개를 `--files-dir`에 설치 |
+| `zoop-ai-handoff {freeze,freeze-round,check-round,partition-check,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `-8`/decisions `-4`/policy `-2` 또는 bundle `-9`/decisions `-5`/policy `-3`); 분할 검사는 `zoop-partition-check-1` | `handoff.sqlite3` + `bundles/<sha256>.json`; `partition-check`는 source만 읽고, `check-round`는 원천 완료 상태만 읽고, `freeze-round`는 window로 좁힌 운영자 파일을 `--files-dir`에 설치 |
 | `zoop-ai-handoff-exposure` | `zoop_ai_pipeline.handoff_exposure_cli` | `zoop-handoff-exposure-1` | handoff 원장·고정 artifact를 읽기만 함. 원천 변경 조회는 ingestion·extraction 원장도 읽으며 relation·Neo4j·앱 원장은 열지 않음 |
-| `zoop-ai-operate {init,register,run,status,pause,resume,stop,force-stop}` | `zoop_ai_pipeline.operating` | `zoop-operating-runtime-config-1` / `zoop-operating-input-manifest-1` | 운영 전용 `live-budget.sqlite3`와 공유 `stateDirectory/s2`, `stateDirectory/s3` 원장 |
+| `zoop-ai-operate {init,register,register-collection,run,status,pause,resume,stop,force-stop}` | `zoop_ai_pipeline.operating` | `zoop-operating-runtime-config-1` / `zoop-operating-input-manifest-1` / `zoop-operating-collection-registration-1` | 운영 전용 `live-budget.sqlite3`와 공유 `stateDirectory/s2`, `stateDirectory/s3` 원장; `register-collection`은 승인된 공통 ingestion도 준비 |
 
 세 원장(ingestion/extraction/relation)은 서로의 디렉터리를 `--ingestion-state-dir`/`--extraction-state-dir` 경로로 읽기 전용으로 엽니다(그래서 한 프로젝트입니다). ingestion과 handoff·graph·dependents는 모델·provider 호출이 없고, S2·S3는 기본이 authored replay이며 명시적 live 게이트(`ZOOP_AI_PIPELINE_LIVE_ENABLED`, S1의 `ZOOP_AI_LIVE_ENABLED`와 별개)와 허용된 단계에서만 provider를 한 번씩 호출합니다. live 설정·예산·receipt·실패 코드는 [`docs/development/ai-runtime-setup.md`](../../docs/development/ai-runtime-setup.md)(§10)를 따르고, 모듈은 `live_runtime.py`(전송·binding·예산 gate; 오프라인 `python -m zoop_ai_pipeline.live_runtime binding|check`)·`live_prompts.py`·`live_jev.py`·`live_budget.py`입니다. 공개 route, 앱 문서 등록·게시, S1 DB 쓰기는 하지 않습니다. `zoop-ai-dependents`는 세 원장을 읽기만 하는 S4의 일부(영향 대상 조회)이며 철회·재생성은 하지 않습니다. `zoop-ai-graph`는 이들 위에서 **완료된 S3 job 하나**를 읽기 전용으로만 소비해 `graph.sqlite3`와 원장에 묶인 Neo4j 한 곳에만 쓰며(아래 절), 그 밖의 네트워크·모델·provider 호출은 없습니다. `zoop-ai-ingest export`는 기본으로 `read`·`quote-display`만 요구하며, 앱 문서 import처럼 내보낸 텍스트를 **저장**하는 소비자는 `--require-store`(export 전용)로 현재 grant의 `store`까지 요구합니다. 이 확인도 호출마다 현재 registry로 CLI 안에서 하며 소비자가 registry를 읽지 않습니다.
 
@@ -118,6 +178,25 @@ raw receipt와 비용 정산은 같은 운영 원장 transaction에 저장합니
 합성 검증은 `scripts/public_unknown_fields_smoke.py --root NEW_DIRECTORY --fixtures NEW_FIXTURE_DIRECTORY`로 실행합니다. 설치된 CLI로 동결한 `export-unknown-fields.json`과 `public-unknown-fields-cases.json`을 Python·서비스·Java가 함께 사용하며, 엄격한 달력 분류는 기존 `mention-time-vectors.json`으로 별도 검사합니다.
 
 **live 원천 인용 프로토콜(2026-10-30).** 다섯 생성 단계는 요청 안의 원천 구간 `segmentId`를 선택합니다(`zoop-live-source-segments-1`, prompt revision 2, live S2 adapter 3). 매핑된 구간과 줄바꿈 문맥은 한 번 전달하고, 원시 응답을 영수증에 보존한 뒤 소유 어댑터가 선택을 기존 exact native citation으로 확장합니다. relation의 null scope는 미기재이며 non-null scope를 각각 검증합니다(기존 0.90/0.80 게이트 유지). 추출 프롬프트는 원문에 명시된 국가의 ISO alpha-2 표기, 원문이 뒷받침하는 ISO 시각 정밀도 또는 null을 요구합니다. 합성 loopback 검증 명령은 `PYTHONPATH=ai/pipeline/src <pipeline-python> ai/pipeline/scripts/extraction_smoke.py --live-loopback`입니다.
+
+**선택형 인용 enum 출력 계약.** `ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT=citation-enum-1`을 명시하면 extract·compare·topic·relation·impact의 응답 스키마를 요청별로 구체화합니다. 기존 카탈로그의 null이 아닌 `segmentId`를 원래 순서대로 단일 공유 citation `$def`의 enum에 넣습니다. 기본 계약은 revision 2의 프롬프트·카탈로그·좌표·확장 규칙과 기존 바이트를 유지하며, 선택하지 않은 binding에는 `outputContract`가 없습니다.
+
+새 binding 버전은 `zoop-live-runtime-1-citation-enum-1`이며, 자금 프로필의 기존 접미사가 뒤에 붙습니다. `generation.outputContract`에는 계약 이름·컴파일러 버전·제한 정책을 고정하고, 단계별 `templateSchemaDigest`에는 변경하지 않은 템플릿 digest를 고정합니다. prepared의 `schemaDigest`는 실제 요청별 스키마의 digest이고 `requestDigest`는 그 스키마를 포함한 전체 body의 digest입니다. 생성 receipt는 해당 `prepared`를 담습니다. S2/S3 소유자는 원시 receipt를 먼저 영속화한 뒤 동결된 native 입력으로 prepared를 다시 만들고 정확히 대조합니다. 이 과정을 거친 `answer(..., prepared=expected)`만 구체 스키마 검증과 기존 native 인용 확장으로 진행하며, operating 프로필에도 같은 규칙을 적용합니다.
+
+지원 경로는 pipeline family의 OpenAI-compatible `gpt-6-luna` strict `json_schema`입니다. Go JSON-object·직접 DeepSeek·다른 family에 이 출력 계약을 선택하면 admission 전에 `live_output_route_unsupported`로 거절합니다. 이 계약을 선택한 capped OpenAI 실행은 Standard 단일 경로를 사용합니다. 기존 계약의 실행·읽기 의미와 summary·S1·독립 typed Choice verifier 계약은 그대로 유지합니다.
+
+| 구체 스키마·요청 제한 | 상한 |
+|---|---:|
+| 도메인 enum을 포함한 전체 enum 값 | 1,000 |
+| 문자열 enum 값이 250개를 초과할 때 해당 값들의 총 문자 수 | 15,000 |
+| 속성명·정의명·enum 문자열 값의 총 문자 수 | 120,000 |
+| 전체 속성 수 / 참조를 해석한 object·array 중첩 | 5,000 / 10 |
+| 전체 canonical 요청의 UTF-8 바이트 수 | 300,000 |
+
+준비 단계와 prepared 소비 경계가 전체 구체 스키마를 검사합니다. 제한 초과는 `live_output_schema_limits` 또는 `live_request_too_large`, 지원하지 않는 스키마 구조는 `live_output_schema_unsupported`로 전송·예약 전에 거절합니다. 빈 카탈로그에서는 모든 인용 배열에 `maxItems:0`을 적용하고, 빈 enum이나 대체 ID는 만들지 않습니다. 추출·주제의 빈 결과, 근거 없는 비교·관계의 HOLD, impact의 `undetermined`·빈 인용 처리는 기존 native 정책이 결정합니다.
+
+오프라인 회귀 검증은 `tests/test_citation_output_contract.py`에서 실행합니다. enum은 요청에 제공된 ID의 소속만 제한하며, 원문과 주장을 연결하는 grounding·member 문서 제한·독립 검증은 계속 필요합니다. 검증 범위는 합성 입력의 native S2/S3 경로와 동결된 응답의 오프라인 계약 검사입니다. 별도 승인된 공급자 합성 probe 2건은 enum·빈 배열 구조를 수용했지만 실제 데이터의 근거 선택 품질이나 운영 적용을 입증하지는 않습니다. 새 유료 probe와 실패 사례 재분석은 각각 별도 승인이 필요합니다.
+
 
 
 **원본 mention(bundle `-2`부터).** 각 이슈의 `mentions[]`는 그 이슈의 source event가 가리키는 S2 mention을 있는 그대로 담습니다. 신원은 (문서 ID, 문서 버전, 로컬 mention ID)이며(로컬 ID는 문서 버전 안에서만 유일), 앱 article·version은 운영자 binding에서 옵니다. 한 mention을 두 upstream(event candidate와 snapshot member)이 싣더라도 기록은 하나입니다. `title`·`action`·`target`·`eventTime`·`period`·`assertionStatus`·`background`와 참여자의 `sourceCompanyId`·`name`·`role`은 S2 후보/snapshot 값 그대로(순서 포함)이고 `verification`은 항상 `"none"`입니다. `timePrecision`은 형식으로만 계산하며 넓히지 않습니다. 참여자의 `companyId`는 이 mention을 싣는 **모든** upstream이 같은 공개 회사로 매핑하고 그 회사를 bundle이 `companies`로 게시할 때만 채우며, 아니면 null입니다(참여자 자체는 항상 보존; 역할은 확인된 역할도 `INVOLVES`도 아닙니다). mention의 `evidenceIds`는 그 mention 자신의 정확한 인용 근거이고 이슈의 `evidenceIds`는 mention 근거와 geography 근거의 합집합입니다. 같은 신원을 싣는 member들이 값을 다르게 말하면 `mention_values_conflict`, mention 시각을 추측 없이 분류할 수 없으면 `mention_event_time_unsupported`로 **이슈 전체**를 보이게 제외합니다(병합·마지막 값 우선 없음; `-1`이면 공개됐을 수 있는 이슈입니다). field decision·support·approval·publisher·impact 값은 만들지 않으며, source event·counts·digest 공식·`policy`는 `-1`과 같아 운영자 attestation digest가 그대로 유효합니다.
@@ -191,7 +270,9 @@ zoop-ai-handoff freeze-round --state-dir HANDOFF --relation-state-dir … --extr
 
 CLI는 handoff writer를 열기 전에 이 선택과 현재 전달 권한 검사를 읽기 전용으로 수행합니다. `freeze_round`도 staging 전에 같은 선택 규칙을 적용합니다. 모든 후보가 이전 분석 계약이면 `window_empty`로 끝나며 원장과 설치 파일을 그대로 유지합니다. 새 manifest는 master decisions에 명시된 policy를 유지하므로 decisions-4/P2는 bundle-8, decisions-5/P3는 bundle-9로 생성됩니다.
 
-`selection` 보고서(`zoop-ai-handoff-selection-1`)는 고려한 **모든** S3 job을 `{jobId, status(selected|not_ready|awaiting_mapping|withheld|unavailable|out_of_window|cancelled), code, roundId, sourceId, slot, page, ordinal, upstreamJobId[, neverFrozen]}`로 나열합니다(조용히 빠지는 job 없음). 기본 `handoffId`는 정렬한 manifest 내용(`sources`·좁힌 파일 hash·bindings hash)의 digest(`hr-<sha256>`)라서, window와 운영자 파일이 같으면 새 slot이어도 **같은 handoffId**이고 이미 있는 행을 그대로 돌려줍니다(window 밖의 미매핑 job이 늘어도 같음). 공개 ID(이슈 ID·`INVOLVES` 간선 ID·`ev-` ID)는 운영자 결정·앱 article binding·span에서만 나오므로 번들마다 같은 항목은 같은 ID입니다.
+회차 HTTP의 최초 접수는 `zoop-ai-handoff check-round --state-dir HANDOFF --relation-state-dir S3 --extraction-state-dir S2 --ingestion-state-dir I --sources R --canonical C --round-id ROUND [--plan-id PLAN --plan-root ROOT]`를 사용합니다. 정확한 계획 단위와 자기 회차에 접수된 native S3 작업이 모두 ready 또는 cancelled여야 `state:complete`를 반환합니다. 그 밖에는 `analysis_incomplete`이며 handoff 원장·private bindings·설치 디렉터리를 만들지 않습니다. 이 검사는 완료 여부만 증명하고, 실제 freeze는 기존 pre-writer 선택·현재 권한 검사를 다시 수행합니다.
+
+`selection` 보고서(`zoop-ai-handoff-selection-1`)는 고려한 모든 S3 job의 `jobId`·`inputDigest`, `status`·`code`, `roundId`·`sourceId`·`slot`·`page`·`ordinal`, `upstreamJobId`·`upstreamInputDigest`를 보존합니다. 성공한 freeze는 기존 ready handoff에 같은 `(jobId,inputDigest)`가 있는지 `neverFrozen`으로 표시합니다. 기본 `handoffId`는 정렬한 manifest 내용과 파일 hash의 digest(`hr-<sha256>`)이므로 같은 window·운영자 파일·bindings는 같은 ID를 가집니다. 공개 ID는 운영자 결정·앱 article binding·span에서 유도합니다.
 
 예약 뒤 중단된 handoff는 먼저 `zoop-ai-handoff recover --state-dir HANDOFF`의 stdin에 `{"schemaVersion":"zoop-ai-handoff-1","handoffId":"…"}`를 전달해 정리합니다. artifact가 없어 `failed`로 확정되면 운영자가 `freeze-round`에 **`--recovery-attempt-id ATTEMPT`를 명시**해 같은 입력으로 새 handoff를 만들 수 있습니다. 값은 `[A-Za-z0-9._:-]`의 1~200자이며, manifest 내용과 이 값을 함께 hash하여 새 ID를 정합니다. 같은 입력·같은 값으로 반복하면 회차가 바뀌어도 같은 행을 돌려줍니다. 옵션을 생략하면 원래 ID와 그 상태를 돌려주며, 기존 실패 행과 시도 기록은 그대로 보존합니다.
 
@@ -753,6 +834,73 @@ PYTHONDONTWRITEBYTECODE=1 ai/pipeline/.venv/bin/python ai/pipeline/scripts/inges
 
 wire schema는 `zoop-ingestion-s2-1`이며 공용 OpenAPI나 S1 schema를 바꾸지 않았다. 정확한 문서/version을 고른 `inspect`만 현재 read 권한으로 내부 S1 `Document` projection을 반환한다. 원문 span 해석에는 quote-display도 요구한다. S2-2가 쓰도록 정확한 관측(round/source/page/ordinal/document/rawVersion/documentVersion)의 서버 소유 URL·title·publishedAt과 grant를 반환하는 읽기 전용 `ingestion_cli export`를 추가했다. HTML 위치는 decoded DOM text/tail 좌표이고 PDF 위치는 frozen page-extracted text 좌표이지 raw byte·glyph geometry가 아니다. 이 문서는 앱 Dataset에 등록되거나 게시되지 않는다. 실제 공급원/정기 수집·기업/이슈 연결·공개 등록/게시·유료 의미 검증은 구현 완료로 주장하지 않는다. 명령·registry·manifest·한계와 실행 증거는 [AI 실행 계약의 S2-1 절](../../docs/design/ai-system.md#s2-1-독립-오프라인-원문-준비와-검사)을 따른다.
 
+### Explicit caption-boundary preparation
+
+For an individually reviewed `collected-http` HTML item, `Scope.textProjection` accepts the closed `TextProjection` contract in `ingestion_contracts.py`. Its `profile` is `korea-kogl1-caption-boundary-1`. Omit the whole field for ordinary preparation; the default scope wire, parser profile and historical version identities remain unchanged.
+
+| Descriptor member | Required binding |
+| --- | --- |
+| `parent` | Original `documentId`, `rawVersion`, `documentVersion`, `rawHash`, `sourceHash`, `representationHash`, `mappingHash`, and `parserProfile`. `sourceHash` hashes the canonical JSON string, as in the ordinary export. Preparation reproduces these pins from the original bytes before projecting. |
+| `excludedCaptionPaths` | Exact absolute original DOM paths of all reviewed `figcaption` elements in the selected body. Each must be a nonempty caption directly inside an image-bearing `figure`; unsupported media or incomplete boundaries produce a hold. |
+| `rightsReceipt` | `{path, sha256}` for the existing item-local rights JSON. The absolute path is read with the ordinary bounded, symlink-refusing reader; its hash, original `bodySha256`, text-only license declaration and notice must match. |
+| `boundaryDecision` | `revision`, `status` (`approved`, `proposal`, or `hold`), `retainedScope: article-prose-only`, `reviewedCaptionPaths`, and nonblank `evidence`. The reviewed paths must equal the excluded paths. Only an explicit approved item decision permits native preparation; ambiguous retained prose stays in hold. |
+
+Create a new derivation registry and ingestion namespace with the original source/scope/inputRoot and acquisition grant ID/revision. Keep the original manifest, collection receipt, body and metadata. Run the existing `zoop-ai-ingest run`, then select the new version with `inspect` or `export`. The descriptor digest enters the opt-in parser profile, preparation key and new `documentVersion`; `documentId`, `rawVersion`, acquisition provenance and publication precision remain original. A projection is another preparation of the same article, not another source article.
+
+Only caption content is excluded: the caption element's own tail, ordinary figure text and all retained prose remain exact. Original source slots stay private; mapped barriers prevent a quote from crossing excluded content. `locatorMetadata.textProjection` exposes the descriptor hash, parent version, decision revision, rights-receipt hash and excluded slot coordinates. Provider requests use the derived `document.text`; hiding locators alone does not remove transmitted text.
+
+This is preparation authority. A future current grant must reproduce the frozen projected configuration and separately authorize each model-send purpose/recipient; it cannot authorize an unprojected observation. Fresh projected S2 jobs require separate approval and new request pins. Candidates 14 and 41 were structurally preflighted against retained HTML: one and two caption boundaries were excluded, respectively, while actual native CLI runs retained `projection_boundary_review_required` under proposal decisions. Their future current registries remain disabled. The synthetic derived CLI export was consumed by the unchanged Java `IngestionExportParser`, preserving its closed document shape, original acquisition hash and day precision.
+
+AI supplies technical boundary proposals and local preparation proof. BE owns the current data's mapping/evidence/public-decision review and HOLD classification; team publication requires that review and separate approval. Automatic activation remains disabled.
+
+### Reviewed Commission PDF body ranges
+
+`Scope.textProjection` is a profile-discriminated union. The HTML `TextProjection` contract above stays exact; `PdfBodyProjection` uses `eu-commission-pdf-body-ranges-1` for `collected-http` PDFs with `articleXPath: null`. Its bounded `members` list selects by exact `(documentId, rawVersion)`. Each member binds the complete original parent pins, original collection-receipt SHA-256, `allowedRanges`, a hash-pinned item `rightsReceipt`, and one `boundaryDecision`. Every observation must match its member's collection-receipt pin before preparation-cache reuse; a mismatch durably holds that observation with `projection_collection_receipt_mismatch` while preserving the prepared version for correctly bound observations.
+
+Each range identifies a `reviewUnitId`, positive `pageNumber`, original `pageTextHash`, Unicode `sourceStart`/`sourceEnd`, and exact substring UTF-8 SHA-256. Ranges must be disjoint and source-ordered. `boundaryDecision.selectionHash` is `digest(allowedRanges)` in supplied order. Its retained scope is `commission-narrative-and-original-dateline`; only `status: approved` permits native preparation.
+
+The item receipt uses `zoop-eu-pdf-body-rights-1`. It binds the original `bodySha256`, parent document version and selection hash, qualified Commission CC BY applicability, notice, hash-pinned evidence, attribution/change notice, and classified `reviewUnits`. Account for every original non-whitespace character, including excluded headers, contacts and unrelated digest material. A selected narrative, dateline or public-official-statement unit must retain every reviewed span, including paragraphs spanning pages. Classification and permission remain explicit operator decisions; a public office-holder attribution is not automatically a press-contact record.
+
+Preparation reproduces the original bounded PDF page extraction and parent hashes, then maps only the selected complete units. Original page sources stay private and unchanged. Omission/page barriers prevent quote stitching. The public export keeps its existing shape; `locatorMetadata.textProjection` contains only hashes, identities, decision revision and retained coordinates. Every generation/verifier route uses the derived body or exact quotes from it.
+
+Keep the original source/scope/inputRoot, acquisition grant revision, manifest, receipt and metadata in a new derivation registry and ingestion namespace. The **whole descriptor** enters the parser profile: changing any member changes every re-prepared cohort version and requires fresh analysis pins. Day-precision publication stays day precision; API publication timestamps are separate evidence.
+
+Projected registries require a feature-aware pipeline/CLI reader. Pre-feature readers reject `textProjection`; the unchanged Java export shape does not establish compatibility with an older AI service image. Integrate and release the feature-aware runtime before operating projected inputs. Preparation approval, provider transmission and public publication remain separate gates.
+
+### Reviewed Commission JSON-member and direct HTML bodies
+
+Two independent opt-in profiles retain complete positive DOM units:
+
+| Profile | Acquired representation | Scope |
+| --- | --- | --- |
+| `eu-commission-json-html-body-ranges-1` | Original `application/json` response | `/html/body` within the fixed `/docuLanguageResource/htmlContent` member |
+| `eu-commission-html-body-ranges-1` | Original `text/html` response | One explicit enclosing canonical DOM path |
+
+The JSON decoder `ec-presscorner-json-html-1` requires strict UTF-8, unique object keys, finite numbers, valid Unicode strings, and the member's exact expected reference/language. The raw artifact and collection body hash identify the original response. The decoded HTML UTF-8 hash identifies a derived representation. HTML entities are subsequently decoded by the pinned native parser. DOM `text`/`tail` offsets count Unicode code points, including one position per astral character; they are neither raw JSON byte offsets nor markup offsets.
+
+Each closed descriptor member binds a raw `parent` (`documentId`, `rawVersion`, `rawHash`, `collectionReceiptSha256`), a `representation` containing baseline source/representation/mapping hashes and the baseline parser profile, and complete `selectedUnits`. JSON representations additionally bind the fixed decoder/pointer, decoded HTML hash, expected reference and expected language. `parentBindingHash` is `digest({parent, representation})`; it represents a raw-parent binding rather than a previously prepared parent document version.
+
+Units identify an original paragraph, heading or list item, classification, ordered exact DOM-slot spans and prepared-text UTF-8 hash. Their own root tail is outside the unit. Preparation reproduces the member-wide baseline, checks whole-unit coverage, source order and disjointness, and copies original spans through the native mapper. Unsafe children refuse preparation. Unit boundaries and omissions create citation barriers. `boundaryDecision.selectionHash` is `digest(selectedUnits)` in source order. Only `status: approved` with retained scope `selected-complete-commission-narrative-units` is executable.
+
+Selected unit roots must be independent: duplicate roots and ancestor/descendant selections are refused. Ordering follows the baseline's rendered clean intervals, while original source-slot intervals must remain disjoint. Final preparation maps only the approved trimmed spans, retaining original source indices and explicit unit/internal barriers.
+
+The hash-pinned item receipt uses `zoop-eu-html-body-rights-1`: original `bodySha256`, `parentBindingHash`, `selectionHash`, qualified Commission CC BY applicability, notice, bounded hash-pinned evidence, attribution and changes notice. Current source authority, exact observation inventory routing, model purpose/recipient permission and public publication remain separate gates.
+
+The native document collector accepts JSON only when its `Policy` explicitly includes `application/json` in `allowedMediaTypes` and `jsonBodyProfile: eu-commission-json-html-body-ranges-1`. Shared `HttpPolicy` supplies transport bounds and contact validation to private and official-source adapters; their JSON API containers are governed by those adapters rather than an EC body approval. The shared fetcher derives JSON Accept support from each transport's allowed media. Native policies without JSON retain their original wire and Accept header. Acquisition still requests identity encoding and rejects compressed responses. Previously retained client-decompressed captures remain offline review evidence until genuine native acquisition and item rights bind them.
+
+Use the offline review command on retained bytes before authoring a native descriptor:
+
+```sh
+PYTHONPATH=ai/pipeline/src ai/pipeline/.venv/bin/python ai/pipeline/scripts/ec_body_review.py \
+  --raw /absolute/review/response.bin --media-type application/json \
+  --article-xpath /html/body --expected-reference IP/08/426 --expected-language EN \
+  --unit-path /html/body/h2 --unit-path '/html/body/p[8]'
+```
+
+Its `status: review`, raw/decoded pins, baseline hashes, complete units and selection hash are review evidence. Native identities and acquisition/rights bindings are supplied only by the authorized native flow. Direct HTML uses the same command with `--media-type text/html`, its own enclosing path and selected unit paths. Preserve that page's independent publication evidence.
+
+`inspect` resolves selected DOM spans with their JSON-member/raw/decoded binding; `export` exposes the same representation and retained coordinates under typed `locatorMetadata.textProjection`. Observation media stays JSON for JSON inputs. The existing document/raw-version/sourceHash formulas and omitted default projection serialization stay unchanged. Feature-aware service and Java readers recognize both profiles; deploy those readers together with the preparing runtime.
+
 ## 정기 회차 컨트롤러 (S2-1 `tick`, FS058·요구 70의 오프라인 일부)
 
 `zoop-ai-ingest tick`은 시계 한 번의 읽기를 **가장 최근에 도래한 slot 하나**로 바꾸고, 그 slot의 회차를 기존 engine으로 **최대 한 번** 진행한다. 새 DB·table·column·migration·console script가 없고 기존 engine 동작도 바꾸지 않으며 새 서비스·모델·provider·네트워크·cron·AWS도 없다. **이 명령은 trigger를 배포하지 않는다.** 누가 언제 `tick`을 부를지(cron·AWS 등)는 이 저장소에 없고 FS058은 완료되지 않았다(아래 "하지 않는 일").
@@ -935,11 +1083,15 @@ ai/pipeline/.venv/bin/python ai/pipeline/scripts/extraction_smoke.py --live-loop
 
 **완료 회차의 서비스 실행 계획 `plan-round`(CLI 전용, 오프라인).** `zoop-ai-extract plan-round --ingestion-state-dir I --sources R --principal P --output DIR --selection POLICY [--replay F [--topic-replay T]]`는 완료된 회차와 명시한 이월 관측에서 새 계획 디렉터리를 만듭니다. 출력은 `approvals.json`(S2 승인 항목), `relation-upstreams.json`(S3 입력 쌍), `manifest.json`(계획 ID·digest·S2 제출 필드·선택 근거), `receipt.json`(앞 세 파일의 digest)입니다. 수동 모드에서는 사람이 계획을 검토해 오프라인 설치하고, 온라인 모드에서는 사전 정책에 따라 같은 계획을 접수합니다([서비스 안내](../service/README.md)). 계획 생성과 모델 실행 승인은 별개입니다.
 
-`POLICY`는 `zoop-extraction-round-selection-1` JSON으로, 고정한 `asOf`와 양의 정수 `maxAgeSeconds`가 필수입니다. 기본값은 `limit:8`, `cadenceMinutes:30`이며, `carryover`·`inFlight`·`settled`에는 정확한 `ObservationRef` 배열을 전달합니다. 정책이 없으면 `plan_selection_policy_required`입니다. 원래 수집 회차의 `window.through`를 나이 기준으로 사용하며, 오래된 적격 이월분부터 신규 관측보다 먼저 선택합니다. 전체 관측 신원으로 중복·진행 중·처리 완료를 제외하고 현재 권한을 확인한 뒤 한도를 적용합니다. `too_old`·누락/미래 슬롯은 명시적으로 제외하고, 한도 초과 관측은 manifest의 `carryover`에 원래 신원 그대로 남깁니다. native manifest의 `selection`·`selectionReport`는 재검증 근거이며 HTTP 접수 manifest의 닫힌 형식은 유지합니다. 영속 이월 큐와 동시 접수 예약은 서비스가 소유합니다.
+`POLICY`는 `zoop-extraction-round-selection-1` JSON으로, 고정한 `asOf`와 양의 정수 `maxAgeSeconds`가 필수입니다. `limit`은 1~8(기본 8), `cadenceMinutes`는 30이며, `carryover`·`inFlight`·`settled`에는 정확한 `ObservationRef` 배열을 전달합니다. 정책이 없으면 `plan_selection_policy_required`입니다. 원래 수집 회차의 `window.through`를 나이 기준으로 사용하며, 오래된 적격 이월분부터 신규 관측보다 먼저 선택합니다. 정확한 관측 신원으로 중복·진행 중·완료를 제외하고 현재 권한을 확인한 뒤 한도를 적용합니다. `too_old`는 종결 제외이며 `round_limit`만 원래 신원 그대로 이월합니다. native manifest의 `selection`·`selectionReport`는 재검증 근거이고 HTTP admission manifest의 닫힌 형식은 유지합니다. 이전 정책 없는 계획은 원래 신원으로 읽기 검증합니다. 운영용 나이 한도는 사람이 별도로 정해야 합니다.
+
+연속 HTTP producer의 내부 선택은 `zoop-extraction-round-selection-2`를 사용합니다. `asOf`·`maxAgeSeconds`·`limit`·`cadenceMinutes`와 최대 8개의 정확한 `observations`를 고정하며, 명시하지 않은 관측을 현재 회차에서 암묵적으로 더하지 않습니다. 같은 관측의 원래 슬롯·현재 권한을 다시 검사해 계획을 재구성합니다. 기존 selection-v1과 정책 없는 계획은 각자의 원래 바이트 규칙으로 계속 검증합니다.
+
+내부 읽기 명령 `zoop-ai-ingest round-inventory --state-dir I --sources R`은 `zoop-ingestion-round-inventory-1` 요청의 `sourceId`·`scopeId`·`asOf`·`maxAgeSeconds`를 받습니다. `limit:0`은 checkpoint만 읽고, 기본 64건(최대 100)의 페이지는 완료·준비된 관측의 식별자와 원래 슬롯만 반환합니다. `next` cursor를 `after`로, 첫 페이지의 revision을 `checkpointRevision`으로 넘기며 페이지 사이 checkpoint가 바뀌면 거절합니다. 원문·네트워크·native 쓰기는 없습니다. pristine 상태와 손상·잠금·hot WAL을 구분하고, 읽기 불능을 빈 checkpoint로 대체하지 않습니다.
 
 작업 ID는 계획 ID와 정확한 관측에서 유도한 `s2p-` 접두를 사용하여 `enqueue-round`의 `s2r-` 작업과 구분합니다. 서비스는 기존 CLI 작업을 HTTP 작업으로 재사용하지 않습니다. replay 계획은 분석 fixture와 필요한 topic fixture의 해시를, live 계획은 런타임 identity를 고정합니다(live에 fixture를 주면 `fixture_not_allowed`). 같은 입력을 같은 출력 경로에 다시 주면 기존 파일을 바꾸지 않고, 다른 입력은 거절합니다. 기존 경로를 덮어쓰지 않는 원자적 이름 변경을 지원하지 않는 플랫폼도 거절합니다. 계획 생성 시에는 구문·현재 원천 권한을 확인하며, snapshot 근거와 실행 문맥은 실제 dispatch에서 검사합니다.
 
-**하지 않는 일.** 설치된 approvals를 자동으로 만들거나 바꾸지 않고, 유료 호출 승인·예산도 내지 않는다. 공개 `JobCreate`의 `planId` 처리는 구현했다고 주장하지 않는다(BE 대기). 실제 공급원·모델 품질·자동 주기 실행은 이 범위가 아니다.
+계획 생성은 현재 source 권한과 명시된 선택 정책에 따라 입력을 고정하는 단계입니다. 실제 S2/S3 실행은 별도의 서비스 admission·model-send·예산 규칙을 따르며, 앱 `analyze_plan` 큐와 회차 HTTP가 이 계획을 소비합니다([회차 계약](../../api/docs/GRAPH_ROUND.md)).
 
 **검증(2026-10-22, 로컬, 모델 호출 0).** 단위 시험 6개와 설치된 `plan-round`를 쓰는 실제 HTTP 시험 2개(주제 단계와 S3 `ready` 포함)가 통과했다.
 

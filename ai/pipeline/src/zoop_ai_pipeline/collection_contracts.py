@@ -23,7 +23,7 @@ _INSTANT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(
 _LOCAL = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?$")
 
 
-class Policy(Wire):
+class HttpPolicy(Wire):
     schema_version: Literal["zoop-collection-policy-1"]
     user_agent: str = Field(min_length=1, max_length=200)
     contact_url: str | None = Field(default=None, min_length=1, max_length=1000)
@@ -81,6 +81,24 @@ class Policy(Wire):
                 raise ValueError("contact requires the existing bare product/version, not a browser or another comment")
             if len(self.effective_user_agent) > 200:
                 raise ValueError("effective user agent exceeds 200 ASCII characters")
+        return self
+
+
+class Policy(HttpPolicy):
+    allowed_media_types: list[Literal["text/html", "application/pdf", "application/json"]] = Field(min_length=1, max_length=3)
+    json_body_profile: Literal["eu-commission-json-html-body-ranges-1"] | None = None
+
+    @model_serializer(mode="wrap")
+    def _without_unspecified_profile(self, handler):
+        dumped = super()._without_unspecified_contact(handler)
+        if self.json_body_profile is None:
+            dumped.pop("jsonBodyProfile" if "jsonBodyProfile" in dumped else "json_body_profile", None)
+        return dumped
+
+    @model_validator(mode="after")
+    def native_json_profile(self):
+        if ("application/json" in self.allowed_media_types) != (self.json_body_profile is not None):
+            raise ValueError("JSON collection requires its explicit EC body profile")
         return self
 
 

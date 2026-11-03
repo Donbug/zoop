@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { mapAppearanceStyles } from '@/components/common/map-appearance-styles';
 import { createMockGraph } from '@/mocks/graph/response';
 import { toG6Data } from '@/components/graph/graph-model';
 import {
@@ -11,6 +12,70 @@ import {
   defaultAppearance,
   styleGraph,
 } from '@/components/graph/graph-appearance';
+
+test.each(['model', 'appearance'] as const)(
+  'D-GRP-01 A: dark unselected company and issue labels use ink in the %s path',
+  (path) => {
+    const root = document.documentElement;
+    const ink = root.style.getPropertyValue('--color-zoop-ink');
+    const muted = root.style.getPropertyValue('--color-zoop-muted');
+    const theme = root.dataset.theme;
+    root.dataset.theme = 'dark';
+    root.style.setProperty('--color-zoop-ink', '#fafafa');
+    root.style.setProperty('--color-zoop-muted', '#d4d4d4');
+    try {
+      const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      const [chosen, other] = graph.nodes.filter((n) => n.kind === 'company');
+      const base = toG6Data(graph, 1200, 700, chosen.id);
+      // A theme repaint receives labels from the previous light frame.
+      const previousFrame = {
+        ...base,
+        nodes: base.nodes?.map((node) => ({
+          ...node,
+          style: { ...node.style, labelFill: '#212121' },
+        })),
+      };
+      const data =
+        path === 'model'
+          ? base
+          : styleGraph(previousFrame, { variant: 'improved', theme: 'dark' });
+      for (const node of data.nodes ?? [])
+        expect(node.style?.labelFill).toBe('#fafafa');
+      const selected = data.nodes!.find((n) => n.id === chosen.id)!.style!;
+      const normal = data.nodes!.find((n) => n.id === other.id)!.style!;
+      expect(selected.labelFontWeight).toBe(800);
+      expect(normal.labelFontWeight).toBe(path === 'model' ? 500 : 600);
+      expect(
+        Number(selected.labelFontSize) / Number(normal.labelFontSize),
+      ).toBeCloseTo(24 / 19);
+    } finally {
+      if (theme === undefined) delete root.dataset.theme;
+      else root.dataset.theme = theme;
+      if (ink) root.style.setProperty('--color-zoop-ink', ink);
+      else root.style.removeProperty('--color-zoop-ink');
+      if (muted) root.style.setProperty('--color-zoop-muted', muted);
+      else root.style.removeProperty('--color-zoop-muted');
+    }
+  },
+);
+
+test.each(['light', 'dark'] as const)(
+  'D-GRP-01 A: %s pressed filter ink keeps the existing accent and selected backgrounds',
+  (theme) => {
+    const classes = mapAppearanceStyles({ variant: 'improved', theme });
+    const prefix =
+      '[&_.relationship-graph-filters_button[aria-pressed=true][aria-pressed=true]]:';
+    expect(classes).toContain(
+      `${prefix}text-[var(--map-${theme === 'dark' ? 'ink' : 'accent'})]!`,
+    );
+    if (theme === 'dark')
+      expect(classes).not.toContain(`${prefix}text-[var(--map-accent)]!`);
+    expect(classes).toContain(`${prefix}bg-[var(--map-selected)]!`);
+    expect(classes).toContain(
+      '[&_.relationship-mode_button[aria-pressed=true][aria-pressed=true]]:bg-[var(--map-accent)]!',
+    );
+  },
+);
 
 test('D-GRP-01: default comparison does not change the existing graph', () => {
   const data = toG6Data(

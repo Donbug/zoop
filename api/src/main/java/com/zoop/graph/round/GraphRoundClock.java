@@ -19,6 +19,7 @@ import java.util.Optional;
  * {@code round-yyyyMMdd'T'HHmm} in that zone, the form the row's CHECK and the AI contract expect. Pure: no clock of its own.
  */
 public final class GraphRoundClock {
+    static final ZoneId SLOT_ZONE = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter ID = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmm");
 
     /** One slot of the calendar; {@code freezeOnly} slots ask for a carry-only freeze without a run. */
@@ -37,6 +38,9 @@ public final class GraphRoundClock {
     }
 
     public GraphRoundClock(ZoneId zone, LocalTime first, Duration interval, int count, List<LocalTime> freezeOnly) {
+        if (!SLOT_ZONE.equals(zone)) {
+            throw new GraphRoundConfigurationException("zone", "must be Asia/Seoul for the round wire identity");
+        }
         this.zone = zone;
         this.first = first;
         this.interval = interval;

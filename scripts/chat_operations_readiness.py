@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed until chatbot network, grant, retention and rollback decisions exist.
+"""Fail closed until chatbot network, grant, provider, retention and rollback decisions exist.
 
 This checker consumes references and role names, never endpoint URLs, credentials,
 grant bodies, questions or answers. It also re-validates the raw live-spike evidence so
@@ -37,22 +37,39 @@ def _spike_report():
 spike = _spike_report()
 
 
-SCHEMA = "zoop-chat-operations-readiness-1"
+def _web_preflight():
+    name = "chat_web_provider_preflight"
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, Path(__file__).resolve().with_name(name + ".py"))
+    if spec is None or spec.loader is None:
+        raise ImportError(name)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+web = _web_preflight()
+
+
+SCHEMA = "zoop-chat-operations-readiness-2"
 COMMIT = re.compile(r"[0-9a-f]{40}")
 SLUG = re.compile(r"[a-z0-9][a-z0-9._-]{1,63}")
 REFERENCE = re.compile(r"[A-Z][A-Z0-9_-]{1,63}(?:#[A-Za-z0-9._-]{1,64})?")
 
 ROOT_KEYS = {
     "schemaVersion", "candidateCommit", "environment", "recordedAt", "decisions",
-    "preflight", "rollout",
+    "preflight", "webPreflight", "rollout",
 }
 DECISION_KEYS = {"status", "selection", "decisionRef", "ownerRole", "approvedAt"}
 PREFLIGHT_KEYS = {
     "status", "observedAt", "endpointRevision", "evidenceRef",
     "bearerChallengeObserved", "redirectFollowed",
 }
+WEB_PREFLIGHT_KEYS = {"provider", "credentialRevision", "evidenceRef"}
 ROLLOUT_KEYS = {
-    "mcpEnabled", "agentEnabled", "enableChangeRef", "rollbackOwnerRole",
+    "mcpEnabled", "agentEnabled", "webEnabled", "enableChangeRef", "rollbackOwnerRole",
 }
 
 # The exact selections make a generic "approved" checkbox insufficient. Changes to
@@ -70,6 +87,12 @@ DECISIONS: dict[str, set[str]] = {
     "keyRotation": {"dual-key-rollover-approved"},
     "incidentResponse": {"disable-rollback-owners-assigned"},
     "evidenceRetention": {"raw-live-evidence-retention-approved"},
+    "webProvider": {"naver-api-hub-webkr-approved"},
+    "webUsageRights": {"title-snippet-link-redisplay-approved"},
+    "webRetention": {"request-cache-and-chat-citation-retention-approved"},
+    "webPrivacy": {"public-query-no-member-data-approved"},
+    "webProcessingRegion": {"provider-processing-region-approved"},
+    "webCostControl": {"request-caps-and-billing-alerts-approved"},
 }
 
 
@@ -166,10 +189,23 @@ def load(path: Path) -> dict[str, Any]:
         "evidenceRef": _reference(raw_preflight["evidenceRef"], "preflight.evidenceRef"),
     }
 
+    raw_web_preflight = _object(root["webPreflight"], "webPreflight")
+    _exact_keys(raw_web_preflight, WEB_PREFLIGHT_KEYS, "webPreflight")
+    if raw_web_preflight["provider"] != "naver-api-hub-webkr":
+        raise ReadinessError("webPreflight.provider must be naver-api-hub-webkr")
+    web_preflight = {
+        "provider": raw_web_preflight["provider"],
+        "credentialRevision": _slug(
+            raw_web_preflight["credentialRevision"], "webPreflight.credentialRevision"
+        ),
+        "evidenceRef": _reference(raw_web_preflight["evidenceRef"], "webPreflight.evidenceRef"),
+    }
+
     raw_rollout = _object(root["rollout"], "rollout")
     _exact_keys(raw_rollout, ROLLOUT_KEYS, "rollout")
-    if raw_rollout["mcpEnabled"] is not False or raw_rollout["agentEnabled"] is not False:
-        raise ReadinessError("both feature flags must remain false while readiness is assessed")
+    if (raw_rollout["mcpEnabled"] is not False or raw_rollout["agentEnabled"] is not False
+            or raw_rollout["webEnabled"] is not False):
+        raise ReadinessError("all chatbot feature flags must remain false while readiness is assessed")
     rollout = {
         "enableChangeRef": _reference(raw_rollout["enableChangeRef"], "rollout.enableChangeRef"),
         "rollbackOwnerRole": _slug(raw_rollout["rollbackOwnerRole"], "rollout.rollbackOwnerRole"),
@@ -180,11 +216,12 @@ def load(path: Path) -> dict[str, Any]:
         "recordedAt": root["recordedAt"],
         "decisions": decisions,
         "preflight": preflight,
+        "webPreflight": web_preflight,
         "rollout": rollout,
     }
 
 
-def evaluate(manifest: dict[str, Any], live_evidence: Path) -> dict[str, Any]:
+def evaluate(manifest: dict[str, Any], live_evidence: Path, web_evidence: Path) -> dict[str, Any]:
     try:
         spike_metadata, runs = spike.load(live_evidence)
         spike_report = spike.report(spike_metadata, runs, spike.DEFAULT_MIN_SAMPLES)
@@ -193,6 +230,18 @@ def evaluate(manifest: dict[str, Any], live_evidence: Path) -> dict[str, Any]:
     failures = list(spike_report["failures"])
     if spike_metadata["candidateCommit"] != manifest["candidateCommit"]:
         failures.append("live spike candidateCommit differs from readiness candidateCommit")
+    try:
+        web_report = web.load(web_evidence)
+    except web.PreflightError as error:
+        raise ReadinessError(f"web preflight evidence is invalid: {error}") from None
+    if web_report["candidateCommit"] != manifest["candidateCommit"]:
+        failures.append("web preflight candidateCommit differs from readiness candidateCommit")
+    if web_report["provider"] != manifest["webPreflight"]["provider"]:
+        failures.append("web preflight provider differs from readiness manifest")
+    if web_report["credentialRevision"] != manifest["webPreflight"]["credentialRevision"]:
+        failures.append("web preflight credentialRevision differs from readiness manifest")
+    if _time(web_report["observedAt"], "web preflight observedAt") > _time(manifest["recordedAt"], "recordedAt"):
+        failures.append("web preflight observedAt is after readiness recordedAt")
     return {
         "schemaVersion": SCHEMA,
         "candidateCommit": manifest["candidateCommit"],
@@ -203,6 +252,13 @@ def evaluate(manifest: dict[str, Any], live_evidence: Path) -> dict[str, Any]:
             name: value["decisionRef"] for name, value in manifest["decisions"].items()
         },
         "preflightEvidenceRef": manifest["preflight"]["evidenceRef"],
+        "webPreflightEvidenceRef": manifest["webPreflight"]["evidenceRef"],
+        "webPreflight": {
+            "provider": web_report["provider"],
+            "observedAt": web_report["observedAt"],
+            "itemCount": web_report["itemCount"],
+            "responseBytes": web_report["responseBytes"],
+        },
         "enableChangeRef": manifest["rollout"]["enableChangeRef"],
         "liveSpike": {
             "gate": spike_report["gate"],
@@ -217,10 +273,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path, help="content-free operations readiness manifest")
     parser.add_argument("live_evidence", type=Path, help="raw zoop-chat-live-spike-1 evidence")
+    parser.add_argument("web_preflight_evidence", type=Path,
+                        help="content-free zoop-chat-web-provider-preflight-1 evidence")
     parser.add_argument("--output", type=Path, help="optional content-free JSON report path")
     args = parser.parse_args(argv)
     try:
-        result = evaluate(load(args.manifest), args.live_evidence)
+        result = evaluate(load(args.manifest), args.live_evidence, args.web_preflight_evidence)
     except ReadinessError as error:
         print(json.dumps({"schemaVersion": SCHEMA, "gate": "invalid", "error": str(error)}, ensure_ascii=False))
         return 64

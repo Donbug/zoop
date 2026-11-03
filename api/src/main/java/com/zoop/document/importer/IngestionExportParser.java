@@ -45,7 +45,7 @@ public final class IngestionExportParser {
     private static final Set<String> GRANT = Set.of("grantId", "revision");
     private static final Set<String> DOCUMENT = Set.of("documentId", "documentVersion", "sourceId", "textArtifactId",
             "inputKind", "cleanerVersion", "text", "sourceHash", "rawLocators");
-    private static final Set<String> MEDIA_TYPES = Set.of("text/html", "application/pdf");
+    private static final Set<String> MEDIA_TYPES = Set.of("text/html", "application/pdf", "application/json");
     /** Present together, and only for an observation collected over HTTP; an authored export has neither key. */
     private static final Set<String> COLLECTED_KEYS = Set.of("provenance", "collection");
     /**
@@ -132,6 +132,7 @@ public final class IngestionExportParser {
         Instant observedAt = timestamp(observation.string("observedAt"), DocumentImportFailure.EXPORT_INVALID);
         CollectedProvenance collected = observation.has("provenance")
                 ? collected(observation, root.object("locatorMetadata")) : null;
+        htmlBodyProjection(observation, root.object("locatorMetadata"), expected);
 
         Instant publishedAt = null;
         LocalDate publishedDate = null;
@@ -214,6 +215,72 @@ public final class IngestionExportParser {
         return type == Character.SPACE_SEPARATOR || type == Character.LINE_SEPARATOR || type == Character.PARAGRAPH_SEPARATOR;
     }
 
+    private static void htmlBodyProjection(StrictJson.Obj observation, StrictJson.Obj metadata, Observation expected) {
+        boolean json = "application/json".equals(observation.string("mediaType"));
+        if (!metadata.has("textProjection") || metadata.isNull("textProjection")) {
+            require(!json);
+            return;
+        }
+        StrictJson.Obj projection = metadata.object("textProjection");
+        String profile = projection.string("profile");
+        boolean jsonProfile = "eu-commission-json-html-body-ranges-1".equals(profile);
+        boolean htmlProfile = "eu-commission-html-body-ranges-1".equals(profile);
+        require(!json || jsonProfile);
+        if (!jsonProfile && !htmlProfile) return;
+        require(observation.has("collection"));
+        require((jsonProfile ? "application/json" : "text/html").equals(observation.string("mediaType")));
+        projection.exactly(Set.of("profile", "descriptorHash", "parent", "representation", "parentBindingHash",
+                "selectionHash", "boundaryDecisionRevision", "rightsReceiptHash", "retainedUnits"));
+        StrictJson.Obj descriptor = metadata.object("parserProfile").object("textProjection")
+                .exactly(Set.of("profile", "descriptorHash"));
+        require(profile.equals(descriptor.string("profile")));
+        require(projection.string("descriptorHash").equals(descriptor.string("descriptorHash")));
+        for (String hash : Set.of("descriptorHash", "parentBindingHash", "selectionHash", "rightsReceiptHash")) {
+            require(StrictJson.SHA256.matcher(projection.string(hash)).matches());
+        }
+        bounded(projection.string("boundaryDecisionRevision"), 200);
+        StrictJson.Obj parent = projection.object("parent")
+                .exactly(Set.of("documentId", "rawVersion", "rawHash", "collectionReceiptSha256"));
+        require(expected.documentId().equals(parent.string("documentId")));
+        require(expected.rawVersion().equals(parent.string("rawVersion")));
+        require(metadata.string("rawHash").equals(parent.string("rawHash")));
+        require(observation.object("collection").object("receipt").string("sha256")
+                .equals(parent.string("collectionReceiptSha256")));
+        StrictJson.Obj representation = projection.object("representation").keys(
+                Set.of("sourceHash", "representationHash", "mappingHash", "parserProfile"),
+                jsonProfile ? Set.of("decoder", "jsonPointer", "decodedHtmlUtf8Sha256", "expectedReference", "expectedLanguage") : Set.of());
+        for (String hash : Set.of("sourceHash", "representationHash", "mappingHash")) {
+            require(StrictJson.SHA256.matcher(representation.string(hash)).matches());
+        }
+        representation.object("parserProfile");
+        if (jsonProfile) {
+            require("ec-presscorner-json-html-1".equals(representation.string("decoder")));
+            require("/docuLanguageResource/htmlContent".equals(representation.string("jsonPointer")));
+            require(StrictJson.SHA256.matcher(representation.string("decodedHtmlUtf8Sha256")).matches());
+            bounded(representation.string("expectedReference"), 200);
+            bounded(representation.string("expectedLanguage"), 35);
+            require("/html/body".equals(metadata.object("parserProfile").string("articleXPath")));
+        }
+        var units = projection.objects("retainedUnits");
+        require(!units.isEmpty() && units.size() <= 1000);
+        for (StrictJson.Obj unit : units) {
+            unit.exactly(Set.of("unitId", "domPath", "classification", "spans", "textUtf8Sha256"));
+            bounded(unit.string("unitId"), 200);
+            require(unit.string("domPath").startsWith("/html/"));
+            require(Set.of("commission-narrative", "original-dateline", "public-official-statement").contains(unit.string("classification")));
+            require(StrictJson.SHA256.matcher(unit.string("textUtf8Sha256")).matches());
+            var spans = unit.objects("spans");
+            require(!spans.isEmpty() && spans.size() <= 1000);
+            for (StrictJson.Obj span : spans) {
+                span.exactly(Set.of("domPath", "slot", "sourceStart", "sourceEnd", "textUtf8Sha256"));
+                require(span.string("domPath").startsWith("/html/"));
+                require(Set.of("text", "tail").contains(span.string("slot")));
+                require(span.count("sourceStart") < span.count("sourceEnd"));
+                require(StrictJson.SHA256.matcher(span.string("textUtf8Sha256")).matches());
+            }
+        }
+    }
+
     /**
      * The acquisition facts of a collected observation, validated in the closed form the ledger writes. The body hash must be
      * the export's own raw hash, the declared publication fields must be mutually consistent, and every time keeps the
@@ -234,6 +301,7 @@ public final class IngestionExportParser {
         Instant fetchedAt = timestamp(collection.string("fetchedAt"), DocumentImportFailure.EXPORT_INVALID);
         String finalUrl = collection.string("finalUrl");
         String contentType = collection.string("contentType");
+        require(contentType.split(";", 2)[0].strip().equalsIgnoreCase(observation.string("mediaType")));
         if (finalUrl.isEmpty() || Text.codePoints(finalUrl) > MAX_URL_CODE_POINTS || !Text.storable(finalUrl)
                 || Text.codePoints(contentType) > MAX_COLLECTION_CODE_POINTS || !Text.storable(contentType)) {
             throw failure(DocumentImportFailure.METADATA_UNSUPPORTED);

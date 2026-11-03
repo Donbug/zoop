@@ -305,3 +305,91 @@ def expand(stage: str, payload: dict, value: Any) -> Any:
         return node
 
     return visit({k: v for k, v in value.items() if k != "citationFormat"}, schema)
+
+
+OUTPUT_CONTRACT = "citation-enum-1"
+OUTPUT_COMPILER = "zoop-citation-enum-compiler-1"
+OUTPUT_LIMITS = {"enumValues": 1000, "largeStringEnumThreshold": 250, "largeStringEnumCharacters": 15000,
+                 "nameAndValueCharacters": 120000, "properties": 5000, "nesting": 10}
+
+
+def check_output_limits(schema: dict) -> None:
+    """Count the complete concrete schema once; resolve references only for maximum container depth."""
+    enums = characters = properties = 0
+    supported = {"$ref", "$defs", "type", "properties", "required", "additionalProperties", "items", "enum", "anyOf", "maxItems"}
+
+    def count(node: dict) -> None:
+        nonlocal enums, characters, properties
+        if set(node) - supported:
+            raise ValueError("live_output_schema_unsupported")
+        values = node.get("enum", [])
+        if "enum" in node and not values:
+            raise ValueError("live_output_schema_unsupported")
+        enums += len(values)
+        strings = [v for v in values if isinstance(v, str)]
+        length = sum(map(len, strings))
+        characters += length
+        if len(strings) > OUTPUT_LIMITS["largeStringEnumThreshold"] and length > OUTPUT_LIMITS["largeStringEnumCharacters"]:
+            raise ValueError("live_output_schema_limits")
+        props, definitions = node.get("properties", {}), node.get("$defs", {})
+        properties += len(props)
+        characters += sum(map(len, props)) + sum(map(len, definitions))
+        if node.get("type") == "object" and (node.get("additionalProperties") is not False or set(node.get("required", [])) != set(props)):
+            raise ValueError("live_output_schema_unsupported")
+        for child in (*props.values(), *definitions.values(), *node.get("anyOf", [])):
+            count(child)
+        if "items" in node:
+            count(node["items"])
+
+    def depth(node: dict, active: frozenset[str] = frozenset()) -> int:
+        if "$ref" in node:
+            ref = node["$ref"]
+            if not ref.startswith("#/$defs/") or ref in active or ref[8:] not in schema.get("$defs", {}):
+                raise ValueError("live_output_schema_unsupported")
+            return depth(schema["$defs"][ref[8:]], active | {ref})
+        children = [*node.get("properties", {}).values(), *node.get("anyOf", [])]
+        if "items" in node:
+            children.append(node["items"])
+        return int(node.get("type") in {"object", "array"}) + max((depth(child, active) for child in children), default=0)
+
+    if schema.get("type") != "object" or "anyOf" in schema:
+        raise ValueError("live_output_schema_unsupported")
+    count(schema)
+    if (enums > OUTPUT_LIMITS["enumValues"] or characters > OUTPUT_LIMITS["nameAndValueCharacters"]
+            or properties > OUTPUT_LIMITS["properties"] or depth(schema) > OUTPUT_LIMITS["nesting"]):
+        raise ValueError("live_output_schema_limits")
+
+
+def citation_schema(stage: str, segment_ids: list[str]) -> dict:
+    """Compile one shared citation definition, preserving the existing template and exact catalogue order."""
+    schema = copy.deepcopy(SPECS[stage].schema)
+    citations = [name for name, node in schema.get("$defs", {}).items() if set(node.get("properties", {})) == {"segmentId"}]
+    if len(citations) != 1 or any(type(key) is not str for key in segment_ids) or len(set(segment_ids)) != len(segment_ids):
+        raise ValueError("live_output_schema_unsupported")
+    citation = "#/$defs/" + citations[0]
+    arrays = 0
+
+    def constrain(node: dict, *, item: bool = False) -> None:
+        nonlocal arrays
+        if "segmentId" in node.get("properties", {}) and node is not schema["$defs"][citations[0]]:
+            raise ValueError("live_output_schema_unsupported")
+        if node.get("$ref") == citation and not item:
+            raise ValueError("live_output_schema_unsupported")
+        if "items" in node:
+            if node["items"].get("$ref") == citation:
+                if node.get("type") != "array":
+                    raise ValueError("live_output_schema_unsupported")
+                arrays += 1
+                if not segment_ids:
+                    node["maxItems"] = 0
+            constrain(node["items"], item=True)
+        for child in (*node.get("properties", {}).values(), *node.get("$defs", {}).values(), *node.get("anyOf", [])):
+            constrain(child)
+
+    constrain(schema)
+    if not arrays:
+        raise ValueError("live_output_schema_unsupported")
+    if segment_ids:
+        schema["$defs"][citations[0]]["properties"]["segmentId"]["enum"] = list(segment_ids)
+    check_output_limits(schema)
+    return schema

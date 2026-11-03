@@ -105,3 +105,88 @@ def test_a_third_concurrent_export_is_service_busy_without_starting_a_child():
     with pytest.raises(ApiError) as caught:
         reads.export(ObservationExportRequest.model_validate(SELECTOR), Observation())
     assert (caught.value.status, caught.value.code) == (503, "service_busy") and reads.process.calls == []
+
+
+def projected_export(profile):
+    value = copy.deepcopy(EXPORT)
+    descriptor = {"profile": profile, "descriptorHash": "d" * 64}
+    metadata = value["locatorMetadata"]
+    metadata["parserProfile"]["textProjection"] = descriptor
+    projection = {**descriptor, "parentDocumentVersion": VERSION,
+                  "boundaryDecisionRevision": "approved-1", "rightsReceiptHash": "e" * 64}
+    if profile == "korea-kogl1-caption-boundary-1":
+        projection["excludedSourceSlots"] = [{"domPath": "/html/body/article/figure/figcaption", "slot": "text"}]
+    else:
+        value["observation"]["mediaType"] = "application/pdf"
+        ranges = [{"pageNumber": 1, "pageTextHash": "f" * 64, "sourceStart": 0, "sourceEnd": len(TEXT),
+                   "textUtf8Sha256": "1" * 64, "reviewUnitId": "body-1"}]
+        projection.update(parentDocumentId="doc-1", parentRawVersion=RAW, selectionHash=digest(ranges),
+                          retainedSourceRanges=ranges)
+        metadata.update(pageCount=1, emptyPageCount=0)
+    metadata["textProjection"] = projection
+    version = digest(["doc-1", RAW, metadata["parserProfile"], "exact-copy-1", SOURCE_HASH, MAPPING])
+    value["observation"]["documentVersion"] = value["document"]["documentVersion"] = version
+    value["document"]["textArtifactId"] = "text-" + version
+    value["document"]["rawLocators"][0]["locatorId"] = "loc-" + digest([version, RUN, MAPPING])
+    return value
+
+
+@pytest.mark.parametrize("profile", ["korea-kogl1-caption-boundary-1", "eu-commission-pdf-body-ranges-1"])
+def test_projected_native_export_preserves_exact_metadata_and_unicode(profile):
+    value = projected_export(profile)
+    selector = {key: value["observation"][key] for key in SELECTOR if key != "schemaVersion"}
+    request = ObservationExportRequest.model_validate({"schemaVersion": SELECTOR["schemaVersion"], **selector})
+    raw = ObservationReads(Scripted(Outcome("result", result=value, exit_code=0))).export(request, Observation())
+    from zoop_ai_service.handoff_runtime import canonical
+    assert raw == (canonical(value) + "\n").encode("utf-8")
+
+
+@pytest.mark.parametrize("profile", ["korea-kogl1-caption-boundary-1", "eu-commission-pdf-body-ranges-1"])
+@pytest.mark.parametrize("fault", ["extra", "private-receipt", "hash", "profile", "missing", "null", "descriptor", "identity"])
+def test_projected_metadata_contract_failures_are_refused(profile, fault):
+    value = projected_export(profile)
+    metadata = value["locatorMetadata"]
+    projection = metadata["textProjection"]
+    if fault == "extra":
+        projection["unexpected"] = "untrusted"
+    elif fault == "private-receipt":
+        projection["rightsReceipt"] = {"path": "/private/receipt.json", "content": "private"}
+    elif fault == "hash":
+        projection["rightsReceiptHash"] = "not-a-hash"
+    elif fault == "profile":
+        projection["profile"] = "unknown-profile"
+    elif fault == "missing":
+        del metadata["textProjection"]
+    elif fault == "null":
+        metadata["textProjection"] = None
+    elif fault == "descriptor":
+        projection["descriptorHash"] = "0" * 64
+    else:
+        value["document"]["documentVersion"] = "0" * 64
+    assert refused(Outcome("result", result=value, exit_code=0)).code == "runtime_contract_mismatch"
+
+
+@pytest.mark.parametrize("fault", ["extra", "page", "hash", "bounds", "order", "selection", "parent", "slot"])
+def test_projected_source_boundaries_are_strict(fault):
+    profile = "korea-kogl1-caption-boundary-1" if fault == "slot" else "eu-commission-pdf-body-ranges-1"
+    value = projected_export(profile)
+    projection = value["locatorMetadata"]["textProjection"]
+    if fault == "slot":
+        projection["excludedSourceSlots"][0]["slot"] = "attribute"
+    elif fault == "parent":
+        projection["parentRawVersion"] = "0" * 64
+    elif fault == "selection":
+        projection["selectionHash"] = "0" * 64
+    else:
+        span = projection["retainedSourceRanges"][0]
+        if fault == "extra":
+            span["text"] = TEXT
+        elif fault == "page":
+            span["pageNumber"] = 0
+        elif fault == "hash":
+            span["pageTextHash"] = "BAD"
+        elif fault == "bounds":
+            span["sourceEnd"] = span["sourceStart"]
+        else:
+            projection["retainedSourceRanges"].append(copy.deepcopy(span))
+    assert refused(Outcome("result", result=value, exit_code=0)).code == "runtime_contract_mismatch"

@@ -32,7 +32,7 @@ from urllib.parse import quote, urljoin, urlsplit
 import httpx
 from pydantic import ValidationError
 
-from .collection_contracts import SCHEMA, Policy, Request, Target, declared_published
+from .collection_contracts import SCHEMA, HttpPolicy, Policy, Request, Target, declared_published
 from .ingestion_contracts import (MAX_INPUT, Authority, Collected, FileRef, IngestionFailure, Item, Manifest, Receipt, byte_hash,
     canonical, digest, now, reserved_state_roots)
 from .ingestion_url import LOOPBACK_HOSTS, canonical_url
@@ -222,7 +222,7 @@ class _AuthorityChanged(IngestionFailure):
 
 
 class Fetcher:
-    def __init__(self, policy: Policy, hosts: list[str], resolver: Resolver = system_resolver,
+    def __init__(self, policy: HttpPolicy, hosts: list[str], resolver: Resolver = system_resolver,
                  authority_guard: Callable[[], None] | None = None):
         self.policy, self.hosts, self.resolver = policy, frozenset(hosts), resolver
         self.authority_guard = authority_guard
@@ -295,7 +295,10 @@ class Fetcher:
             time.sleep(wait)
         target = httpx.URL(url)
         pinned = target.copy_with(host=self._pin(target, host, deadline))
-        headers = {"User-Agent": self.policy.effective_user_agent, "Accept": "text/html, application/pdf;q=0.9", "Accept-Encoding": "identity",
+        accept = "text/html, application/pdf;q=0.9"
+        if "application/json" in self.policy.allowed_media_types:
+            accept += ", application/json"
+        headers = {"User-Agent": self.policy.effective_user_agent, "Accept": accept, "Accept-Encoding": "identity",
                    "Host": target.netloc.decode("ascii")}
         extensions = {"sni_hostname": host, "timeout": dict.fromkeys(("connect", "read", "write", "pool"), self._remaining(deadline))}
 

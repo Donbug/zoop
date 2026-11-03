@@ -43,8 +43,14 @@ import tools.jackson.databind.JsonNode;
  *     handoffs of the named versions (default: the active version and the imported ones after it). The report must answer
  *     exactly that change and those handoffs. A query failure writes nothing; a re-run of a recorded request asks nothing.</li>
  * <li>{@code lift}: the only way an exclusion ends. A report never lifts anything, however small or empty (rule 4). Refused when
- *     a target changed after the lift's {@code expectedRevision}: a lift never undoes a change its operator did not see.</li>
+ *     a target changed after the lift's {@code expectedRevision}: a lift never undoes a change its operator did not see. With
+ *     {@code laterVersions} the same targets are lifted in every imported version after the named one (a report applied them
+ *     there while they waited) and, for the targets an activation carried from the named one, in every version that still holds
+ *     the copy of that decision (followed through carries of those copies), imported before or after it, under the same stale
+ *     check. A copy the operator changed on its version after the carry is that version's own decision and stays.</li>
  * </ul>
+ * An activation appends changes of its own ({@link DisclosureExclusionCarry}, cause {@code carried}): the public version's
+ * unlifted exclusions, carried to the version being activated.
  * Every command that ran to an outcome is recorded by its {@code requestId} in the transaction of its change. A re-run of the same
  * request (an empty result file, {@code outcome_unknown}) returns that stored result and changes nothing again; the same id with
  * another request is refused. A commit that may or may not have happened is {@code outcome_unknown}, never "nothing written".
@@ -320,16 +326,44 @@ public final class DisclosureExclusionService {
             throw new ExclusionException(ExclusionFailure.VERSIONS_INVALID);
         return commit(request, () -> {
             if (request.expectedRevision() > repository.revision()) throw new ExclusionException(ExclusionFailure.REVISION_STALE);
-            Map<Target, Long> lastChanged = repository.lastChanged(request.graphVersionId());
-            if (request.targets().stream().anyMatch(t -> lastChanged.getOrDefault(t, 0L) > request.expectedRevision())) {
-                throw new ExclusionException(ExclusionFailure.REVISION_STALE);
+            // The versions this lift covers are resolved under the lock: the named one and, with laterVersions, every imported
+            // version after it (a reported copy of the same targets may sit there) with all the targets, and every other version
+            // that still holds a carried copy of the named version's decision, with only those targets: an exclusion the operator
+            // took there, also after such a copy, is not the named version's decision. The stale check covers every version the
+            // decision was carried through, kept copies included, except that a carry between versions of this set copied a
+            // decision the set already holds: it is no new change.
+            Map<String, List<Target>> covered = new LinkedHashMap<>();
+            Map<String, List<Target>> checked = new LinkedHashMap<>();
+            covered.put(request.graphVersionId(), request.targets());
+            if (request.laterVersions()) {
+                repository.laterVersions(request.graphVersionId()).forEach(versionId -> covered.put(versionId, request.targets()));
+                var copies = repository.carriedCopies(request.graphVersionId(), request.targets());
+                copies.current().forEach((versionId, copied) ->
+                        covered.putIfAbsent(versionId, request.targets().stream().filter(copied::contains).toList()));
+                checked.putAll(covered);
+                copies.traced().forEach((versionId, copied) ->
+                        checked.putIfAbsent(versionId, request.targets().stream().filter(copied::contains).toList()));
+            } else {
+                checked.putAll(covered);
             }
-            Set<Target> current = repository.excluded(request.graphVersionId());
-            List<Target> lifted = request.targets().stream().filter(current::contains).toList();
-            List<Target> notExcluded = request.targets().stream().filter(t -> !current.contains(t)).toList();
-            List<VersionChange> versions = List.of(new VersionChange(request.graphVersionId(), null, true, byKind(lifted),
-                    byKind(notExcluded)));
-            return write("lift", "operator", null, request, Map.of(request.graphVersionId(), lifted), versions);
+            List<String> versionIds = List.copyOf(checked.keySet());
+            for (String versionId : versionIds) {
+                Map<Target, Long> lastChanged = repository.lastChanged(versionId, versionIds);
+                if (checked.get(versionId).stream().anyMatch(t -> lastChanged.getOrDefault(t, 0L) > request.expectedRevision())) {
+                    throw new ExclusionException(ExclusionFailure.REVISION_STALE);
+                }
+            }
+            Map<String, List<Target>> lifted = new LinkedHashMap<>();
+            List<VersionChange> versions = new ArrayList<>();
+            for (String versionId : covered.keySet()) {
+                List<Target> targets = covered.get(versionId);
+                Set<Target> current = repository.excluded(versionId);
+                List<Target> moved = targets.stream().filter(current::contains).toList();
+                List<Target> notExcluded = targets.stream().filter(t -> !current.contains(t)).toList();
+                lifted.put(versionId, moved);
+                versions.add(new VersionChange(versionId, null, true, byKind(moved), byKind(notExcluded)));
+            }
+            return write("lift", "operator", null, request, lifted, versions);
         });
     }
 
@@ -378,8 +412,8 @@ public final class DisclosureExclusionService {
             return new ExclusionResult(action, ExclusionResult.UNCHANGED, repository.revision(), versions);
         }
         long revision = repository.revision() + 1;
-        repository.insertChange(revision, action, cause, reportSha256, request.reason(), request.operator());
-        targets.forEach((versionId, list) -> list.forEach(target -> repository.insertTarget(revision, versionId, target)));
+        repository.insertChange(revision, action, cause, reportSha256, null, request.reason(), request.operator());
+        targets.forEach((versionId, list) -> repository.insertTargets(revision, versionId, list));
         return new ExclusionResult(action, ExclusionResult.APPLIED, revision, versions);
     }
 

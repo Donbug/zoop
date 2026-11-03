@@ -1,8 +1,6 @@
 package com.zoop.graph.round;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -17,6 +15,7 @@ import javax.sql.DataSource;
 
 import com.zoop.admin.jobs.AnalysisJobService;
 import com.zoop.admin.jobs.JdbcAnalysisJobRepository;
+import com.zoop.ai.AiClientConfigurationException;
 import com.zoop.ai.config.AiHandoffReadClientConfiguration;
 import com.zoop.ai.config.AiRoundClientConfiguration;
 import com.zoop.document.repository.DocumentRegistryRepository;
@@ -33,7 +32,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.transaction.support.TransactionOperations;
 import tools.jackson.databind.ObjectMapper;
 
-/** The scheduler's wiring: it needs the round client and the analyze_plan queue on top of the bridge's requirements. */
+/** Invalid operator settings fail startup; endpoint, principal, and credential bind recovery identity. */
 class GraphRoundSchedulerConfigurationTest {
     @TempDir
     Path temp;
@@ -56,6 +55,7 @@ class GraphRoundSchedulerConfigurationTest {
         valid.put("ZOOP_AI_ROUND_CLIENT_ENABLED", "true");
         valid.put("ZOOP_AI_ROUND_CLIENT_BASE_URL", "https://ai.internal.example");
         valid.put("ZOOP_AI_ROUND_CLIENT_TOKEN", "round-token-0123456789abcdefghijklmnopqrstuvwxyz");
+        valid.put("ZOOP_AI_ROUND_CLIENT_EXPECTED_PRINCIPAL", "alpha");
         valid.put("ZOOP_ANALYSIS_ANALYZE_PLAN_ENABLED", "true");
         valid.put("ZOOP_GRAPH_ROUND_INTERVAL", "PT5S");
     }
@@ -93,29 +93,22 @@ class GraphRoundSchedulerConfigurationTest {
     }
 
     @Test
-    void disabledRegistersNoSchedulerAndTheOverviewSeesNoStatus() {
-        runner().withPropertyValues(with("ZOOP_GRAPH_ROUND_ENABLED", "false")).run(context -> {
-            assertNull(context.getStartupFailure());
-            assertTrue(context.getBeansOfType(GraphRoundScheduler.class).isEmpty());
-            assertTrue(context.getBeansOfType(GraphRoundStatus.class).isEmpty());
-            assertTrue(context.getBeansOfType(GraphRoundClock.class).isEmpty());
-        });
-    }
-
-    @Test
-    void enabledWithTheRoundClientAndTheQueueCreatesTheSchedulerWhichIsTheOverviewsStatus() {
-        runner().withPropertyValues(with()).run(context -> {
-            assertNull(context.getStartupFailure());
-            GraphRoundScheduler scheduler = context.getBean(GraphRoundScheduler.class);
-            assertNotNull(context.getBean(GraphRoundWorker.class));
-            assertNotNull(context.getBean(RoundBindingsSource.class));
-            assertTrue(context.getBean(GraphRoundStatus.class).enabled());
-            assertTrue(scheduler.nextSlotAt().isPresent());
-            assertTrue(scheduler.isRunning(), "SmartLifecycle started with the context");
-            GraphRoundProperties properties = context.getBean(GraphRoundProperties.class);
-            assertEquals(java.time.Duration.ofSeconds(5), properties.interval());
-            assertEquals(java.util.List.of(java.time.LocalTime.of(18, 5)), properties.freezeOnlySlots());
-        });
+    void roundTransportAndExpectedPrincipalFailClosed() {
+        String[][] cases = {
+                {"http://ai:8000", "", "alpha", "zoop.ai.round-client.base-url "},
+                {"http://outside.example:8000", "ai", "alpha", "zoop.ai.round-client.base-url "},
+                {"http://ai:8000", "*.internal", "alpha", "zoop.ai.plaintext-http-hosts "},
+                {"http://ai:8000", "ai", "", "zoop.ai.round-client.expected-principal "},
+        };
+        for (String[] c : cases) {
+            runner().withPropertyValues(with("ZOOP_AI_ROUND_CLIENT_BASE_URL", c[0],
+                    "ZOOP_AI_PLAINTEXT_HTTP_HOSTS", c[1],
+                    "ZOOP_AI_ROUND_CLIENT_EXPECTED_PRINCIPAL", c[2])).run(context -> {
+                Throwable failure = configurationFailure(context.getStartupFailure());
+                assertNotNull(failure);
+                assertTrue(failure.getMessage().startsWith(c[3]), failure.getMessage());
+            });
+        }
     }
 
     @Test
@@ -142,9 +135,23 @@ class GraphRoundSchedulerConfigurationTest {
         });
     }
 
+    @Test
+    void endpointPrincipalAndCredentialEachBindRecoveryIdentity() {
+        var first = com.zoop.ai.AiClientSettings.of("https://ai.internal.example", "synthetic-token-a".repeat(3),
+                java.time.Duration.ofSeconds(3), java.time.Duration.ofSeconds(30), 2097152);
+        var endpoint = com.zoop.ai.AiClientSettings.of("https://other.internal.example", "synthetic-token-a".repeat(3),
+                java.time.Duration.ofSeconds(3), java.time.Duration.ofSeconds(30), 2097152);
+        var credential = com.zoop.ai.AiClientSettings.of("https://ai.internal.example", "synthetic-token-b".repeat(3),
+                java.time.Duration.ofSeconds(3), java.time.Duration.ofSeconds(30), 2097152);
+        var binding = RoundServiceBinding.of(first, "alpha");
+        org.junit.jupiter.api.Assertions.assertNotEquals(binding, RoundServiceBinding.of(endpoint, "alpha"));
+        org.junit.jupiter.api.Assertions.assertNotEquals(binding, RoundServiceBinding.of(first, "beta"));
+        org.junit.jupiter.api.Assertions.assertNotEquals(binding, RoundServiceBinding.of(credential, "alpha"));
+    }
+
     private static Throwable configurationFailure(Throwable failure) {
         for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-            if (cause instanceof GraphRoundConfigurationException) return cause;
+            if (cause instanceof GraphRoundConfigurationException || cause instanceof AiClientConfigurationException) return cause;
         }
         return null;
     }

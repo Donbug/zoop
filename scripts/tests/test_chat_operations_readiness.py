@@ -86,9 +86,15 @@ def manifest(candidate: str = "a" * 40) -> dict:
             "bearerChallengeObserved": True,
             "redirectFollowed": False,
         },
+        "webPreflight": {
+            "provider": "naver-api-hub-webkr",
+            "credentialRevision": "naver-search-key-v1",
+            "evidenceRef": "RUN-1242#web",
+        },
         "rollout": {
             "mcpEnabled": False,
             "agentEnabled": False,
+            "webEnabled": False,
             "enableChangeRef": "OPS-42",
             "rollbackOwnerRole": "platform-oncall",
         },
@@ -96,75 +102,133 @@ def manifest(candidate: str = "a" * 40) -> dict:
 
 
 class ChatOperationsReadinessTest(unittest.TestCase):
-    def _files(self, manifest_value: dict, evidence_value: dict):
+    def _files(self, manifest_value: dict, evidence_value: dict, web_candidate: str = "a" * 40):
         directory = tempfile.TemporaryDirectory(dir=ROOT)
         root = Path(directory.name)
         manifest_path = root / "readiness.json"
         evidence_path = root / "live.json"
+        web_path = root / "web.json"
         manifest_path.write_text(json.dumps(manifest_value), encoding="utf-8")
         evidence_path.write_text(json.dumps(evidence_value), encoding="utf-8")
-        return directory, manifest_path, evidence_path
+        web_path.write_text(json.dumps({
+            "schemaVersion": readiness.web.SCHEMA,
+            "candidateCommit": web_candidate,
+            "provider": readiness.web.PROVIDER,
+            "credentialRevision": "naver-search-key-v1",
+            "observedAt": "2026-10-29T00:35:00+00:00",
+            "status": "passed",
+            "httpStatus": 200,
+            "itemCount": 1,
+            "responseBytes": 100,
+            "redirectFollowed": False,
+            "responseContractObserved": True,
+        }), encoding="utf-8")
+        return directory, manifest_path, evidence_path, web_path
 
     def test_complete_manifest_and_matching_live_gate_pass(self):
-        directory, manifest_path, evidence_path = self._files(manifest(), live_evidence())
+        directory, manifest_path, evidence_path, web_path = self._files(manifest(), live_evidence())
         with directory:
-            result = readiness.evaluate(readiness.load(manifest_path), evidence_path)
+            result = readiness.evaluate(readiness.load(manifest_path), evidence_path, web_path)
         self.assertEqual("passed", result["gate"])
         self.assertEqual(20, result["liveSpike"]["runs"])
+        self.assertEqual("RUN-1242#web", result["webPreflightEvidenceRef"])
 
     def test_missing_decision_and_unapproved_retention_are_rejected(self):
         value = manifest()
         del value["decisions"]["privacyDisclosure"]
-        directory, manifest_path, _ = self._files(value, live_evidence())
+        directory, manifest_path, _, _ = self._files(value, live_evidence())
         with directory, self.assertRaisesRegex(readiness.ReadinessError, "privacyDisclosure"):
             readiness.load(manifest_path)
         value = manifest()
         value["decisions"]["openaiRetention"]["selection"] = "store-false"
-        directory, manifest_path, _ = self._files(value, live_evidence())
+        directory, manifest_path, _, _ = self._files(value, live_evidence())
         with directory, self.assertRaisesRegex(readiness.ReadinessError, "responses-store-true-approved"):
             readiness.load(manifest_path)
         value = manifest()
         value["decisions"]["openaiRetention"]["selection"] = ["responses-store-true-approved"]
-        directory, manifest_path, _ = self._files(value, live_evidence())
+        directory, manifest_path, _, _ = self._files(value, live_evidence())
         with directory, self.assertRaisesRegex(readiness.ReadinessError, "responses-store-true-approved"):
             readiness.load(manifest_path)
 
     def test_urls_and_enabled_flags_are_rejected(self):
         value = manifest()
         value["decisions"]["httpsIngress"]["decisionRef"] = "https://tickets.example/42"
-        directory, manifest_path, _ = self._files(value, live_evidence())
+        directory, manifest_path, _, _ = self._files(value, live_evidence())
         with directory, self.assertRaisesRegex(readiness.ReadinessError, "not a URL or secret"):
             readiness.load(manifest_path)
         value = manifest()
         value["rollout"]["mcpEnabled"] = True
-        directory, manifest_path, _ = self._files(value, live_evidence())
+        directory, manifest_path, _, _ = self._files(value, live_evidence())
+        with directory, self.assertRaisesRegex(readiness.ReadinessError, "feature flags"):
+            readiness.load(manifest_path)
+
+        value = manifest()
+        value["rollout"]["webEnabled"] = True
+        directory, manifest_path, _, _ = self._files(value, live_evidence())
         with directory, self.assertRaisesRegex(readiness.ReadinessError, "feature flags"):
             readiness.load(manifest_path)
 
     def test_preflight_must_observe_bearer_without_redirect(self):
         value = manifest()
         value["preflight"]["bearerChallengeObserved"] = False
-        directory, manifest_path, _ = self._files(value, live_evidence())
+        directory, manifest_path, _, _ = self._files(value, live_evidence())
         with directory, self.assertRaisesRegex(readiness.ReadinessError, "401 Bearer"):
             readiness.load(manifest_path)
         value = manifest()
         value["preflight"]["redirectFollowed"] = True
-        directory, manifest_path, _ = self._files(value, live_evidence())
+        directory, manifest_path, _, _ = self._files(value, live_evidence())
         with directory, self.assertRaisesRegex(readiness.ReadinessError, "must not follow"):
             readiness.load(manifest_path)
 
-    def test_commit_mismatch_and_incomplete_live_matrix_fail_closed(self):
-        directory, manifest_path, evidence_path = self._files(manifest(), live_evidence("b" * 40))
+    def test_web_preflight_is_provider_bound_and_fail_closed(self):
+        value = manifest()
+        value["webPreflight"]["provider"] = "synthetic"
+        directory, manifest_path, _, _ = self._files(value, live_evidence())
+        with directory, self.assertRaisesRegex(readiness.ReadinessError, "naver-api-hub-webkr"):
+            readiness.load(manifest_path)
+
+        directory, manifest_path, evidence_path, web_path = self._files(
+            manifest(), live_evidence(), web_candidate="b" * 40
+        )
         with directory:
-            result = readiness.evaluate(readiness.load(manifest_path), evidence_path)
+            result = readiness.evaluate(readiness.load(manifest_path), evidence_path, web_path)
+        self.assertEqual("failed", result["gate"])
+        self.assertTrue(any("web preflight candidateCommit" in failure for failure in result["failures"]))
+
+        directory, manifest_path, evidence_path, web_path = self._files(manifest(), live_evidence())
+        web_value = json.loads(web_path.read_text(encoding="utf-8"))
+        web_value["credentialRevision"] = "different-key-v2"
+        web_path.write_text(json.dumps(web_value), encoding="utf-8")
+        with directory:
+            result = readiness.evaluate(readiness.load(manifest_path), evidence_path, web_path)
+        self.assertEqual("failed", result["gate"])
+        self.assertTrue(any("credentialRevision" in failure for failure in result["failures"]))
+
+    def test_web_approvals_are_required(self):
+        value = manifest()
+        del value["decisions"]["webUsageRights"]
+        directory, manifest_path, _, _ = self._files(value, live_evidence())
+        with directory, self.assertRaisesRegex(readiness.ReadinessError, "webUsageRights"):
+            readiness.load(manifest_path)
+
+        value = manifest()
+        value["decisions"]["webCostControl"]["selection"] = "request-caps-only"
+        directory, manifest_path, _, _ = self._files(value, live_evidence())
+        with directory, self.assertRaisesRegex(readiness.ReadinessError, "request-caps-and-billing-alerts-approved"):
+            readiness.load(manifest_path)
+
+    def test_commit_mismatch_and_incomplete_live_matrix_fail_closed(self):
+        directory, manifest_path, evidence_path, web_path = self._files(manifest(), live_evidence("b" * 40))
+        with directory:
+            result = readiness.evaluate(readiness.load(manifest_path), evidence_path, web_path)
         self.assertEqual("failed", result["gate"])
         self.assertIn("candidateCommit differs", result["failures"][-1])
 
         evidence = live_evidence()
         evidence["runs"] = [run for run in evidence["runs"] if run["scenario"] != "tools-8-rounds-3"]
-        directory, manifest_path, evidence_path = self._files(manifest(), evidence)
+        directory, manifest_path, evidence_path, web_path = self._files(manifest(), evidence)
         with directory:
-            result = readiness.evaluate(readiness.load(manifest_path), evidence_path)
+            result = readiness.evaluate(readiness.load(manifest_path), evidence_path, web_path)
         self.assertEqual("failed", result["gate"])
         self.assertTrue(any("tools-8-rounds-3" in failure for failure in result["failures"]))
 

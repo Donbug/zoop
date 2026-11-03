@@ -13,7 +13,8 @@ from pydantic import ValidationError
 
 from . import ingestion_parsers as parsers
 from .ingestion_contracts import (SCHEMA, reserved_state_roots, MAX_INPUT, Authority, Export, IngestionFailure, Inspect, Item,
-    Manifest, Receipt, Registry, Run, byte_hash, canonical, digest, now, read_file, timestamp)
+    Manifest, Receipt, Registry, Run, PdfBodyProjection, PdfRightsReceipt, HtmlBodyProjection, JsonHtmlBodyProjection,
+    HtmlRightsReceipt, byte_hash, canonical, digest, now, read_file, timestamp)
 
 PROVENANCE = {"authored-files": "authored_control", "collected-http": "collected_http", "retained-private": "retained_private"}
 
@@ -204,7 +205,7 @@ class Ingestor:
         if (manifest.source_id, manifest.scope_id) != (request.source_id, request.scope_id) or manifest.pages[0].cursor != scope.initial_cursor:
             raise IngestionFailure("fixture_scope_conflict")
         # Validate all relative refs before any manifest-issued file access.
-        config, parser = source.configuration(scope), parsers.profile(scope.article_xpath)
+        config, parser = source.configuration(scope), parsers.profile(scope.article_xpath, scope.text_projection)
         input_digest = digest({"request": request.wire(), "configuration": config, "parser": parser})
         existing = self.store.one("SELECT * FROM rounds WHERE id=? AND source=?", (request.round_id, request.source_id))
         if existing and existing["input_digest"] != input_digest:
@@ -353,8 +354,21 @@ class Ingestor:
                 self.db.execute("UPDATE candidates SET document=?,raw_version=?,ambiguity=?,new_raw=? WHERE round=? AND source=? AND page=? AND ordinal=?", (document, raw_version, ambiguity, int(new_raw), *key))
         raw_record = self.store.one("SELECT * FROM raw_versions WHERE id=?", (raw_version,))
         self.authority.admit(row["source"], scope.scope_id, item, raw_record["raw_hash"])
-        if json.loads(row["parser"]) != parsers.profile(scope.article_xpath):
+        if json.loads(row["parser"]) != parsers.profile(scope.article_xpath, scope.text_projection):
             raise IngestionFailure("parser_profile_changed")
+        projection = scope.text_projection
+        member = None
+        if isinstance(projection, (PdfBodyProjection, HtmlBodyProjection)):
+            member = next((m for m in projection.members if
+                (m.parent.document_id, m.parent.raw_version) == (raw_record["document"], raw_version)), None)
+            if (member is not None and item.collection is not None
+                    and (member.parent.collection_receipt_sha256 if isinstance(projection, HtmlBodyProjection)
+                         else member.collection_receipt_sha256) != item.collection.receipt.sha256):
+                self._authorize(row)
+                with self.store.transaction(lambda: self._authorize(row)):
+                    self.db.execute("UPDATE candidates SET hold=?,failure=NULL WHERE round=? AND source=? AND page=? AND ordinal=?",
+                        ("projection_collection_receipt_mismatch", *key))
+                return
         preparation_key = digest([raw_version, json.loads(row["parser"]), json.loads(row["request"])["cleanerVersion"]])
         prior = self.store.one("SELECT * FROM preparations WHERE key=?", (preparation_key,))
         self._authorize(row)
@@ -367,7 +381,71 @@ class Ingestor:
             current = self.store.one("SELECT ambiguity FROM candidates WHERE round=? AND source=? AND page=? AND ordinal=?", key)
             if not item.supplier_document_id and current["ambiguity"] == "source_identity_ambiguous":
                 raise IngestionFailure("source_identity_ambiguous")
-            if item.private is not None and item.private.record_schema == "zoop-official-source-record-1":
+            if scope.text_projection is not None:
+                if isinstance(projection, (PdfBodyProjection, HtmlBodyProjection)) and member is None:
+                    raise IngestionFailure("projection_member_missing")
+                selected = member if member is not None else projection
+                parent = selected.parent
+                baseline_profile = parsers.profile(scope.article_xpath)
+                if isinstance(projection, HtmlBodyProjection):
+                    if ((parent.document_id, parent.raw_version, parent.raw_hash, selected.representation.parser_profile.wire())
+                            != (raw_record["document"], raw_version, raw_record["raw_hash"], baseline_profile)):
+                        raise IngestionFailure("projection_parent_mismatch")
+                else:
+                    parent_version = digest([raw_record["document"], raw_version, baseline_profile,
+                        json.loads(row["request"])["cleanerVersion"], parent.source_hash, parent.mapping_hash])
+                    if ((parent.document_id, parent.raw_version, parent.raw_hash, parent.parser_profile, parent.document_version)
+                            != (raw_record["document"], raw_version, raw_record["raw_hash"], baseline_profile, parent_version)):
+                        raise IngestionFailure("projection_parent_mismatch")
+                if item.collection is None:
+                    raise IngestionFailure("projection_media_unsupported")
+                if isinstance(projection, HtmlBodyProjection):
+                    expected_media = "application/json" if isinstance(projection, JsonHtmlBodyProjection) else "text/html"
+                    if item.media_type != expected_media:
+                        raise IngestionFailure("projection_media_unsupported")
+                elif member is not None:
+                    if item.media_type != "application/pdf" or scope.article_xpath is not None:
+                        raise IngestionFailure("projection_media_unsupported")
+                elif item.media_type != "text/html":
+                    raise IngestionFailure("projection_media_unsupported")
+                if selected.boundary_decision.status != "approved":
+                    raise IngestionFailure("projection_boundary_review_required")
+                try:
+                    rights_raw = read_file(Path(selected.rights_receipt.path), MAX_INPUT)
+                except OSError as exc:
+                    raise IngestionFailure("projection_rights_receipt_invalid") from exc
+                if byte_hash(rights_raw) != selected.rights_receipt.sha256:
+                    raise IngestionFailure("projection_rights_receipt_hash_mismatch")
+                try:
+                    rights = json.loads(rights_raw)
+                except ValueError as exc:
+                    raise IngestionFailure("projection_rights_receipt_invalid") from exc
+                if member is not None:
+                    try:
+                        rights = (HtmlRightsReceipt if isinstance(projection, HtmlBodyProjection) else PdfRightsReceipt).model_validate(rights)
+                        for evidence in rights.evidence:
+                            if byte_hash(read_file(Path(evidence.path), MAX_INPUT)) != evidence.sha256:
+                                raise IngestionFailure("projection_rights_evidence_mismatch")
+                    except (ValidationError, OSError, ValueError) as exc:
+                        raise IngestionFailure("projection_rights_receipt_invalid") from exc
+                    if isinstance(projection, HtmlBodyProjection):
+                        binding = (rights.body_sha256, rights.parent_binding_hash, rights.selection_hash)
+                        expected_binding = (parent.raw_hash, selected.parent_binding_hash, selected.boundary_decision.selection_hash)
+                    else:
+                        binding = (rights.body_sha256, rights.parent_document_version, rights.selection_hash)
+                        expected_binding = (parent.raw_hash, parent.document_version, selected.boundary_decision.selection_hash)
+                    if binding != expected_binding:
+                        raise IngestionFailure("projection_rights_receipt_invalid")
+                elif (not isinstance(rights, dict) or rights.get("bodySha256") != raw_record["raw_hash"]
+                        or rights.get("license") != "KOGL-type-1-text-only"
+                        or not isinstance(rights.get("notice"), str) or not rights["notice"].strip()):
+                    raise IngestionFailure("projection_rights_receipt_invalid")
+            if scope.text_projection is not None:
+                parsed = parsers.prepare(raw, item.media_type, scope.article_xpath, projection=projection,
+                    pdf_member=member if isinstance(projection, PdfBodyProjection) else None,
+                    pdf_rights=rights if isinstance(projection, PdfBodyProjection) else None,
+                    html_member=member if isinstance(projection, HtmlBodyProjection) else None)
+            elif item.private is not None and item.private.record_schema == "zoop-official-source-record-1":
                 parsed = parsers.prepare(raw, item.media_type, scope.article_xpath, retained_schema=item.private.record_schema)
             else:
                 parsed = parsers.prepare(raw, item.media_type, scope.article_xpath)
@@ -393,6 +471,8 @@ class Ingestor:
                    "cleanerVersion": json.loads(row["request"])["cleanerVersion"]}
         self._authorize(row)
         with self.store.transaction(lambda: self._authorize(row)):
+            if scope.text_projection is not None:
+                self.store.blob(rights_raw)
             self.db.execute("INSERT INTO versions VALUES(?,?,?,?)", (version, raw_record["document"], raw_version, canonical(content)))
             self.db.execute("INSERT INTO preparations VALUES(?,?,?,NULL,NULL)", (preparation_key, raw_version, version))
             self.db.execute("UPDATE candidates SET version=?,new_text=1,failure=NULL WHERE round=? AND source=? AND page=? AND ordinal=?", (version, *key))
@@ -550,7 +630,7 @@ class Ingestor:
             "textArtifactId": "text-" + version["id"], "inputKind": "body", "cleanerVersion": content["cleanerVersion"],
             "text": content["text"], "sourceHash": content["textHash"], "rawLocators": content["rawLocators"]}
         metadata = {k: content[k] for k in ("rawArtifactId", "rawHash", "rawVersion", "representationHash", "mappingHash", "parserProfile", "limitations")}
-        for name in ("pageCount", "emptyPageCount"):
+        for name in ("pageCount", "emptyPageCount", "textProjection"):
             if name in content:
                 metadata[name] = content[name]
         return source, version, content, projection, metadata

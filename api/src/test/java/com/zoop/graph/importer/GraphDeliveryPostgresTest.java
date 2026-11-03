@@ -299,6 +299,44 @@ class GraphDeliveryPostgresTest {
                                 AND success ORDER BY installed_rank
                             """, String.class));
             assertEquals(1, upgradeJdbc.queryForObject("""
+                    SELECT count(*) FROM flyway_schema_history WHERE version = '20261102150000' AND success
+                    """, Integer.class));
+            assertEquals(1, upgradeJdbc.queryForObject("""
+                    SELECT count(*) FROM information_schema.columns
+                    WHERE table_schema = ? AND table_name = 'graph_rounds' AND column_name = 'ingestion_round_id'
+                    """, Integer.class, schema));
+        } finally {
+            jdbc.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+        }
+    }
+
+    @Test void requestJournalUpgradesAlreadyAppliedApprovedChatDocumentsWithoutRewritingHistory() {
+        String schema = "round_upgrade_" + UUID.randomUUID().toString().replace("-", "");
+        var upgradeSource = source(schema);
+        var upgradeJdbc = new JdbcTemplate(upgradeSource);
+        try {
+            Flyway.configure().dataSource(upgradeSource).schemas(schema).defaultSchema(schema)
+                    .target("20261101100000").outOfOrder(false).load().migrate();
+            var history = upgradeJdbc.queryForList("SELECT * FROM flyway_schema_history ORDER BY installed_rank");
+            assertEquals("20261101100000", history.getLast().get("version"));
+            assertEquals(List.of("chat_document_versions"), upgradeJdbc.queryForList("""
+                    SELECT table_name FROM information_schema.tables
+                    WHERE table_schema = ? AND table_name IN ('chat_document_versions', 'graph_round_requests')
+                    ORDER BY table_name
+                    """, String.class, schema));
+            var candidate = Flyway.configure().dataSource(upgradeSource).schemas(schema).defaultSchema(schema)
+                    .outOfOrder(false).load();
+            candidate.migrate();
+            candidate.validate();
+            assertEquals(history, upgradeJdbc.queryForList(
+                    "SELECT * FROM flyway_schema_history ORDER BY installed_rank LIMIT ?", history.size()));
+            // Other domains can legitimately add forward migrations after the request journal.
+            assertEquals(0, candidate.info().pending().length);
+            assertEquals(1, upgradeJdbc.queryForObject("""
+                    SELECT count(*) FROM flyway_schema_history WHERE version = '20261102150000' AND success
+                    """, Integer.class));
+            assertEquals(0, upgradeJdbc.queryForObject("SELECT count(*) FROM graph_round_requests", Integer.class));
+            assertEquals(1, upgradeJdbc.queryForObject("""
                     SELECT count(*) FROM information_schema.columns
                     WHERE table_schema = ? AND table_name = 'graph_rounds' AND column_name = 'ingestion_round_id'
                     """, Integer.class, schema));

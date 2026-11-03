@@ -15,8 +15,8 @@ import tools.jackson.databind.JsonNode;
  */
 public interface RoundHandoffClient {
 
-    /** {@code POST /internal/v1/round-handoffs}: idempotent on the round id. */
-    RoundHandoff request(Request request);
+    /** Send the immutable journal's original POST bytes with the same round identity. */
+    RoundHandoff requestHandoff(String roundId, byte[] body);
 
     /** {@code GET /internal/v1/round-handoffs/{roundId}}. */
     RoundHandoff handoffStatus(String roundId);
@@ -39,8 +39,7 @@ public interface RoundHandoffClient {
      * One round handoff as the service reports it.
      *
      * @param handoffId      the frozen handoff ({@code hr-…}, derived from the manifest content) with its two digests, {@code ready} only
-     * @param selection      the producer's selection report ({@code zoop-ai-handoff-selection-1}), kept opaque: the app records only
-     *                       counts of it on the round timeline
+     * @param selection      the producer's selection report; status and exclusion-reason counts are recorded on the timeline
      * @param code           the service's reason for {@code analysis_incomplete}, {@code no_public_material} or {@code failed}
      */
     record RoundHandoff(String roundId, State state, Optional<String> handoffId, Optional<String> manifestDigest,

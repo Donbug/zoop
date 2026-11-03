@@ -20,7 +20,6 @@ export function appearanceColors(appearance: GraphAppearance) {
   return {
     ink: dark ? '#fafafa' : '#212121',
     paper: dark ? '#262626' : '#ffffff',
-    muted: dark ? '#d4d4d4' : '#212121',
     line: dark ? '#a5a9b1' : '#71757c',
     selected:
       appearance.variant === 'improved'
@@ -71,10 +70,7 @@ export function styleGraph(
             : colors.ink,
         stroke: dark ? '#747478' : '#b8b8b6',
         haloStroke: colors.ink,
-        labelFill:
-          node.data?.kind === 'company' && !node.data?.chosen
-            ? colors.muted
-            : colors.ink,
+        labelFill: colors.ink,
         labelBackgroundFill: colors.paper,
         labelBackgroundStroke: dark ? '#6b6b70' : '#bababa',
         // Dimmed nodes fade more on a dark map; keep them legible as context.

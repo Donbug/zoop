@@ -106,7 +106,8 @@ def read_jobs(source: Source, extraction: Path, ingestion: Path) -> list[Job]:
 def frozen_jobs(store: Store) -> set:
     """The S3 jobs pinned by any `ready` handoff of this ledger (any bundle contract: the job was delivered to an importer once)."""
     try:
-        return {s["relation"]["jobId"] for row in store.db.execute("SELECT manifest FROM handoffs WHERE state='ready'") for s in json.loads(row["manifest"])["sources"]}
+        return {(s["relation"]["jobId"], s["relation"]["inputDigest"]) for row in store.db.execute("SELECT manifest FROM handoffs WHERE state='ready'")
+                for s in json.loads(row["manifest"])["sources"]}
     except (ValueError, KeyError, TypeError):
         raise ExtractionFailure("handoff_state_invalid") from None
 
@@ -125,9 +126,11 @@ def plan_units(plan_root: Path, plan_id: str, round_id: str) -> set:
 # ---------------------------------------------------------------------------------------------- selection ----------------------------
 
 def entry(job: Job | None, status: str, code: str | None = None, **more) -> dict:
-    base = {"jobId": job.job_id if job else None, "status": status, "code": code, "roundId": job.round_id if job else None,
+    base = {"jobId": job.job_id if job else None, "inputDigest": job.input_digest if job else None,
+            "status": status, "code": code, "roundId": job.round_id if job else None,
             "sourceId": job.source_id if job else None, "slot": job.slot if job else None, "page": job.page if job else None,
-            "ordinal": job.ordinal if job else None, "upstreamJobId": job.upstream[0] if job else None}
+            "ordinal": job.ordinal if job else None, "upstreamJobId": job.upstream[0] if job else None,
+            "upstreamInputDigest": job.upstream[1] if job else None}
     return {**base, **more}
 
 
@@ -144,6 +147,16 @@ def own_round_gate(jobs: list[Job], round_id: str, units: set) -> list[dict]:
             blocking.append({"jobId": None, "upstreamJobId": upstream[0], "code": "relation_job_missing"})
         blocking.extend({"jobId": job.job_id, "upstreamJobId": upstream[0], "code": job.state} for job in found if job.state not in ("ready", "cancelled"))
     return blocking
+
+
+def completion_round(paths: SourcePaths, round_id: str, plan_root: Path | None, plan_id: str | None) -> dict:
+    """Read the exact plan and own-round completion before accepting a freeze request."""
+    units = plan_units(plan_root, plan_id, round_id) if plan_id else set()
+    with Source(paths) as source:
+        blocking = own_round_gate(read_jobs(source, paths.extraction, paths.ingestion), round_id, units)
+    if blocking:
+        raise ExtractionFailure("analysis_incomplete", {"roundId": round_id, "jobs": blocking})
+    return {"schemaVersion": SCHEMA, "roundId": round_id, "state": "complete"}
 
 
 def classify(jobs: list[Job], mapped: set) -> tuple[list[Job], list[dict]]:
@@ -439,14 +452,14 @@ def _select_window(source: Source, paths: RoundPaths, registry: Registry, round_
         except ExtractionFailure as exc:
             report.append(entry(job, "withheld", exc.code))
             continue
-        if len(window) == WINDOW:
-            report.append(entry(job, "out_of_window", "window_full"))
-            continue
         relation = {"jobId": job.job_id, "inputDigest": job.input_digest}
         try:
             result = gate(source, relation, None)
         except Withheld as exc:
             report.append(entry(job, "withheld", exc.code))
+            continue
+        if len(window) == WINDOW:
+            report.append(entry(job, "out_of_window", "window_full"))
             continue
         window.append(job)
         report.append(entry(job, "selected"))
@@ -477,8 +490,7 @@ def freeze_round(store: Store, paths: RoundPaths, round_id: str, plan_id: str | 
         window, pins, kinds, selection = _select_window(source, paths, registry, round_id, plan_id)
         previously_frozen = frozen_jobs(store)
         for item in selection["jobs"]:
-            if item["status"] == "out_of_window":
-                item["neverFrozen"] = item["jobId"] not in previously_frozen
+            item["neverFrozen"] = (item["jobId"], item["inputDigest"]) not in previously_frozen
         with _staging() as stage_name:
             stage = Path(stage_name)
             upstreams = {job.upstream for job in window}

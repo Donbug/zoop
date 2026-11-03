@@ -47,6 +47,14 @@ public interface GraphRoundRepository {
      */
     Optional<GraphRound> extend(GraphRound held, Duration lease, Instant now);
 
+    /** Private first-request bytes; a missing service binding requires manual reconciliation. */
+    record SavedRequest(byte[] body, Optional<RoundServiceBinding> binding) {}
+
+    Optional<SavedRequest> request(String roundId, String kind);
+
+    /** Commit original bytes before POST under the original owner/token/stage fence. */
+    boolean saveRequest(GraphRound expected, String kind, byte[] body, RoundServiceBinding binding, Instant at);
+
     /**
      * Applies the patch and appends the event in one transaction, only while the row is still at {@code expected}'s stage under
      * {@code expected}'s lease token (fenced); the lease is kept with an open stage and dropped with a terminal one. Empty when

@@ -689,8 +689,8 @@ PRIMARY KEY(chat_job_id, attempt_no)
 ### 37–39. disclosure_exclusion_changes, disclosure_exclusion_targets, disclosure_exclusion_requests — 공개 제외(FS081)
 
 ```text
-disclosure_exclusion_changes: revision bigint PK; action text(exclude|lift); cause text(source-change|relation-retraction|operator)
-  report_sha256 text?(exclude만); reason text; operator text; changed_at timestamptz
+disclosure_exclusion_changes: revision bigint PK; action text(exclude|lift); cause text(source-change|relation-retraction|legacy-operator|publication-operator|carried|operator)
+  report_sha256 text?(운영자 exclude만: 보고서 SHA, legacy·publication은 등록 receipt SHA); base_version_id text?(carried만: 제외를 가진 원본 버전 id, 복합 publication 아님, FK 아님); reason text; operator text; changed_at timestamptz
 disclosure_exclusion_targets: revision FK; graph_version_id FK graph_versions ON DELETE CASCADE
   target_kind text(issue|relation|evidence|article); target_id text; article_version text(article만, 아니면 '')
   PRIMARY KEY(revision, graph_version_id, target_kind, target_id, article_version)
@@ -698,7 +698,7 @@ disclosure_exclusion_requests: request_id text PK; request_sha256 text; action t
   revision bigint(명령이 남긴 제외 revision); result jsonb(결과 문서); recorded_at timestamptz
 ```
 
-공개된 버전의 내용을 **그 버전에서만** 공개 조회에서 뺀다(권리 철회, 관계 오연결). 생산자가 정정한 새 인계 묶음에서 같은 이슈·간선 ID를 다시 쓸 수 있어서 전역 집합으로 두지 않는다. snapshot은 바꾸지 않고, 읽을 때 현재 제외를 overlay로 적용한다. 변경 하나는 운영자 명령 하나(AI 영향 조회 보고서의 `exclude`, 또는 사유를 적은 `lift`)이며, 대상의 현재 상태는 그 대상의 마지막 변경이다. 빈 보고서나 이전보다 작은 보고서로는 해제하지 않는다. `revision`은 앱 전체 제외 카운터(`DisclosureExclusions.revision`)로, 공통 publication_state 잠금 아래 MAX+1로 할당하고 커밋까지 잠금을 유지한다. 읽는 쪽(공개 조회·활성화 사전 검사)은 잠금 없이 한 문장으로 읽는다. 결과(`applied`·`unchanged`)에 이른 명령은 같은 트랜잭션에서 `disclosure_exclusion_requests`에 명령 ID·요청 hash·결과를 남긴다. 같은 ID의 재실행(결과 유실·커밋 결과 불명)은 저장한 결과만 돌려주고 아무것도 바꾸지 않으며, 같은 ID의 다른 요청은 거절한다. 해제(`lift`)는 운영자가 본 제외 revision(`expectedRevision`)을 함께 보내고, 그 뒤에 바뀐 대상이 있으면 거절한다. 세 테이블은 UPDATE·DELETE를 거절하며, 대상 행만 버전 삭제와 함께 지워진다. 기사(`article`) 대상은 그래프 밖 소비자(기업 문서 목록·S1·브리핑·채팅·캐시·Neo4j)를 위해 기록만 하고, 그래프 조회는 이슈·관계·근거를 적용한다.
+공개된 버전의 내용을 **그 버전에서만** 공개 조회에서 뺀다(권리 철회, 관계 오연결). 생산자가 정정한 새 인계 묶음에서 같은 이슈·간선 ID를 다시 쓸 수 있어서 전역 집합으로 두지 않는다. snapshot은 바꾸지 않고, 읽을 때 현재 제외를 overlay로 적용한다. 변경 하나는 운영자 명령 하나(AI 영향 조회 보고서의 `exclude`, 또는 사유를 적은 `lift`)이거나, 활성화가 그때까지 공개 중이던 버전의 원본들이 가진 미해제 제외를 활성화하는 버전의 새 원본에 복사한 이월(`cause='carried'`, `base_version_id`가 제외를 가진 원본 버전, #55 A-14)이며, 대상의 현재 상태는 그 대상의 마지막 변경이다. 빈 보고서나 이전보다 작은 보고서로는 해제하지 않는다. `revision`은 앱 전체 제외 카운터(`DisclosureExclusions.revision`)로, 공통 publication_state 잠금 아래 MAX+1로 할당하고 커밋까지 잠금을 유지한다. 읽는 쪽(공개 조회·활성화 사전 검사)은 잠금 없이 한 문장으로 읽는다. 결과(`applied`·`unchanged`)에 이른 명령은 같은 트랜잭션에서 `disclosure_exclusion_requests`에 명령 ID·요청 hash·결과를 남긴다. 같은 ID의 재실행(결과 유실·커밋 결과 불명)은 저장한 결과만 돌려주고 아무것도 바꾸지 않으며, 같은 ID의 다른 요청은 거절한다. 해제(`lift`)는 운영자가 본 제외 revision(`expectedRevision`)을 함께 보내고, 그 뒤에 바뀐 대상이 있으면 거절한다. 세 테이블은 UPDATE·DELETE를 거절하며, 대상 행만 버전 삭제와 함께 지워진다. 기사(`article`) 대상은 그래프 밖 소비자(기업 문서 목록·S1·브리핑·채팅·캐시·Neo4j)를 위해 기록만 하고, 그래프 조회는 이슈·관계·근거를 적용한다.
 
 ## 4. 핵심 관계도
 

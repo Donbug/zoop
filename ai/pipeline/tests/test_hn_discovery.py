@@ -134,6 +134,14 @@ def test_native_document_policy_still_refuses_json():
             "maxTotalBytes": 10000, "minIntervalSeconds": 1.0, "allowedMediaTypes": ["application/json"]})
 
 
+def test_discovery_json_transport_uses_its_own_media_contract(site):
+    route_json(site, "/v0/newstories.json", [])
+    response = _JsonFetcher(config(site)).fetch(site.url("/v0/newstories.json"))
+    assert response.body == b"[]" and response.media_type == "application/json"
+    assert all("application/json" in entry["headers"]["accept"] and
+               entry["headers"]["accept-encoding"] == "identity" for entry in site.log)
+
+
 @pytest.mark.parametrize(("robots", "code"), [(b"User-agent: *\nDisallow: /\n", "robots_denied"),
                                                    (b"malformed robots", "robots_malformed")])
 def test_robots_are_real_gates(site, tmp_path, robots, code):

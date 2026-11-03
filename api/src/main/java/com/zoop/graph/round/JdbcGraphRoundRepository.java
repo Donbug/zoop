@@ -73,6 +73,7 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
     public List<GraphRound> due(Instant now, int limit) {
         return jdbc.query(SELECT + """
                 WHERE stage NOT IN """ + TERMINAL + """
+                  AND slot_at <= :now
                   AND (next_attempt_at IS NULL OR next_attempt_at <= :now)
                 ORDER BY slot_at LIMIT :limit
                 """, new MapSqlParameterSource("now", stamp(now)).addValue("limit", limit), JdbcGraphRoundRepository::round);
@@ -115,6 +116,40 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
                 """ + COLUMNS, new MapSqlParameterSource("id", held.roundId()).addValue("stage", held.stage().wire())
                 .addValue("owner", mine.owner()).addValue("token", mine.token()).addValue("until", stamp(now.plus(lease)))
                 .addValue("now", stamp(now)), JdbcGraphRoundRepository::round));
+    }
+
+    @Override
+    public Optional<SavedRequest> request(String roundId, String kind) {
+        return first(jdbc.query("SELECT body, body_sha256, service_binding FROM graph_round_requests WHERE round_id = :id AND kind = :kind",
+                new MapSqlParameterSource("id", roundId).addValue("kind", kind), (rs, row) -> {
+                    byte[] body = rs.getBytes("body");
+                    if (!com.zoop.common.json.Canonical.sha256(body).equals(rs.getString("body_sha256"))) {
+                        throw new IllegalStateException("round request digest mismatch");
+                    }
+                    String digest = rs.getString("service_binding");
+                    return new SavedRequest(body, Optional.ofNullable(digest).map(RoundServiceBinding::new));
+                }));
+    }
+
+    @Override
+    public boolean saveRequest(GraphRound expected, String kind, byte[] body, RoundServiceBinding binding, Instant at) {
+        return tx.execute(ignored -> {
+            Lease lease = expected.lease().orElseThrow(() -> new IllegalArgumentException("the round must be claimed first"));
+            // Keep the original lease row locked until the potentially-sent identity commits.
+            var held = jdbc.query("""
+                    SELECT round_id FROM graph_rounds
+                    WHERE round_id = :id AND stage = :stage AND lease_owner = :owner AND lease_token = :token
+                    FOR UPDATE
+                    """, new MapSqlParameterSource("id", expected.roundId()).addValue("stage", expected.stage().wire())
+                    .addValue("owner", lease.owner()).addValue("token", lease.token()), (rs, row) -> rs.getString(1));
+            if (held.isEmpty()) return false;
+            return jdbc.update("""
+                    INSERT INTO graph_round_requests (round_id, kind, body, body_sha256, service_binding, created_at)
+                    VALUES (:id, :kind, :body, :sha256, :binding, :at) ON CONFLICT (round_id, kind) DO NOTHING
+                    """, new MapSqlParameterSource("id", expected.roundId()).addValue("kind", kind)
+                    .addValue("body", body).addValue("sha256", com.zoop.common.json.Canonical.sha256(body))
+                    .addValue("binding", binding.digest()).addValue("at", stamp(at))) == 1;
+        });
     }
 
     /**

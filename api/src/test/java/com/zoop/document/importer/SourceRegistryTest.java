@@ -144,6 +144,78 @@ class SourceRegistryTest {
     }
 
     @Test
+    void projectedCollectedScopesKeepTheCurrentGrantDecision() {
+        for (String descriptor : List.of(
+                """
+                {"profile":"korea-kogl1-caption-boundary-1","parent":{},"excludedCaptionPaths":["/html/body/figure"],
+                 "rightsReceipt":{},"boundaryDecision":{}}
+                """,
+                """
+                {"profile":"eu-commission-pdf-body-ranges-1","members":[
+                 {"parent":{},"collectionReceiptSha256":"%s","allowedRanges":[{}],
+                  "rightsReceipt":{},"boundaryDecision":{}}]}
+                """.formatted("a".repeat(64)),
+                """
+                {"profile":"eu-commission-json-html-body-ranges-1","members":[
+                 {"parent":{"documentId":"doc-synthetic","rawVersion":"%s","rawHash":"%s","collectionReceiptSha256":"%s"},
+                  "representation":{},"parentBindingHash":"%s","selectedUnits":[{}],
+                  "rightsReceipt":{},"boundaryDecision":{}}]}
+                """.formatted("a".repeat(64), "b".repeat(64), "c".repeat(64), "d".repeat(64)),
+                """
+                {"profile":"eu-commission-html-body-ranges-1","members":[
+                 {"parent":{"documentId":"doc-synthetic","rawVersion":"%s","rawHash":"%s","collectionReceiptSha256":"%s"},
+                  "representation":{},"parentBindingHash":"%s","selectedUnits":[{}],
+                  "rightsReceipt":{},"boundaryDecision":{}}]}
+                """.formatted("a".repeat(64), "b".repeat(64), "c".repeat(64), "d".repeat(64)))) {
+            ObjectNode root = valid();
+            source(root).put("adapter", "collected-http");
+            scope(root).set("textProjection", JSON.readTree(descriptor));
+            assertNull(denial(parse(root)));
+            source(root).put("adapter", "authored-files");
+            assertInvalid(bytes(root));
+            source(root).put("adapter", "collected-http");
+            grant(root).putArray("allowedOperations").add("read").add("quote-display");
+            assertEquals("source_operation_denied", denial(parse(root)));
+            grant(root).put("enabled", false);
+            assertEquals("source_rights_unknown_or_denied", denial(parse(root)));
+        }
+    }
+
+    @Test
+    void projectionRecognitionIsVersionedAndTypedWithoutOpeningScopeSettings() {
+        ObjectNode root = valid();
+        scope(root).putNull("textProjection");
+        assertNull(denial(parse(root)));
+        source(root).put("adapter", "collected-http");
+        for (String descriptor : List.of("false", "[]", "{}", """
+                {"profile":"eu-commission-pdf-body-ranges-2","members":[]}
+                """, """
+                {"profile":"eu-commission-pdf-body-ranges-1","members":"all"}
+                """, """
+                {"profile":"eu-commission-pdf-body-ranges-1","members":[false]}
+                """, """
+                {"profile":"korea-kogl1-caption-boundary-1","parent":false,
+                 "excludedCaptionPaths":[],"rightsReceipt":{},"boundaryDecision":{}}
+                """, """
+                {"profile":"eu-commission-json-html-body-ranges-1","members":[]}
+                """, """
+                {"profile":"eu-commission-html-body-ranges-1","members":"all"}
+                """, """
+                {"profile":"eu-commission-json-html-body-ranges-1","members":[false]}
+                """, """
+                {"profile":"eu-commission-json-html-body-ranges-2","members":[]}
+                """, """
+                {"profile":"eu-commission-html-body-ranges-1","members":[],"mediaType":"application/json"}
+                """)) {
+            scope(root).set("textProjection", JSON.readTree(descriptor));
+            assertInvalid(bytes(root));
+        }
+        scope(root).putNull("textProjection");
+        scope(root).put("futureSetting", true);
+        assertInvalid(bytes(root));
+    }
+
+    @Test
     void supportedPythonIsoExpiriesKeepTheirExistingPermission() {
         for (String expiry : List.of("2030-01-01T00:00Z", "2030-01-01T00:00:00Z",
                 "2030-01-01t00:00:00Z", "2030-01-01T00:00:00.123456000Z",

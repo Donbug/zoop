@@ -82,7 +82,6 @@ test('D-COM-01 theme: shared dark text matches the approved briefing palette and
   ]).toEqual(['#fafafa', '#d4d4d4', '#a3a3a3']);
   const canvas = appearanceColors({ variant: 'improved', theme: 'dark' });
   expect(canvas.ink).toBe(dark['zoop-ink']);
-  expect(canvas.muted).toBe(dark['zoop-muted']);
 });
 
 test.each(['@theme', ":root[data-theme='dark']"])(

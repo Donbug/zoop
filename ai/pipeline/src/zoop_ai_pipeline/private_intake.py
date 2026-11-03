@@ -21,7 +21,7 @@ from urllib.parse import parse_qsl, urlsplit, urlunsplit
 from pydantic import Field, model_serializer, model_validator
 
 from .collection import Fetcher, Rules, parse_robots
-from .collection_contracts import Policy
+from .collection_contracts import HttpPolicy
 from .collector_control import NO_CONTROL
 from .ingestion_contracts import MAX_RAW, IngestionFailure, Wire, byte_hash, canonical, digest, now, reserved_state_roots
 from .ingestion_parsers import prepare, profile
@@ -45,7 +45,7 @@ ENGLISH_MONTHS = {name: month for month, name in enumerate(
      "July", "August", "September", "October", "November", "December"), 1)}
 
 
-class PrivatePolicy(Policy):
+class PrivatePolicy(HttpPolicy):
     max_requests: int = Field(ge=1)
     max_total_seconds: int = Field(ge=1)
     max_total_bytes: int = Field(ge=1)

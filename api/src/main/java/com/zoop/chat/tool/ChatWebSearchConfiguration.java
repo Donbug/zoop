@@ -9,8 +9,9 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Registers {@code web.search} only when {@code zoop.chat.web.enabled=true} (off by default). The provider is chosen by
- * {@code zoop.chat.web.provider}: only {@code synthetic} exists until a real one is selected (web search design 7), and
- * startup is refused for anything else rather than running without a provider. Registered, the tool is never planned by
+ * {@code zoop.chat.web.provider}: {@code synthetic} for fixtures, or {@code naver-api-hub-webkr}, the adapter whose use still
+ * waits for the open decisions of web search design 7. Startup is refused for anything else, and for a provider missing its
+ * credentials, rather than running without a provider. Registered, the tool is never planned by
  * the router ({@link ChatToolRegistry#bound}); it is an MCP tool of the agent path, whose answers cite its hits as
  * {@code web_result} (web search design 6).
  */
@@ -18,10 +19,15 @@ import org.springframework.context.annotation.Configuration;
 @ConditionalOnProperty(name = "zoop.chat.web.enabled", havingValue = "true")
 public class ChatWebSearchConfiguration {
     @Bean
-    ChatWebSearchProvider chatWebSearchProvider(@Value("${zoop.chat.web.provider:none}") String provider) {
+    ChatWebSearchProvider chatWebSearchProvider(@Value("${zoop.chat.web.provider:none}") String provider,
+            @Value("${zoop.chat.web.naver-api-hub.client-id:}") String clientId,
+            @Value("${zoop.chat.web.naver-api-hub.client-secret:}") String clientSecret) {
         if (SyntheticWebSearchProvider.ID.equals(provider)) return new SyntheticWebSearchProvider();
-        throw new IllegalStateException("zoop.chat.web.enabled needs zoop.chat.web.provider=synthetic; no real web search "
-                + "provider is selected yet");
+        if (NaverApiHubWebSearchProvider.ID.equals(provider)) {
+            return new NaverApiHubWebSearchProvider(clientId, clientSecret);
+        }
+        throw new IllegalStateException("zoop.chat.web.enabled needs a supported zoop.chat.web.provider"
+                + " (synthetic or " + NaverApiHubWebSearchProvider.ID + ")");
     }
 
     @Bean

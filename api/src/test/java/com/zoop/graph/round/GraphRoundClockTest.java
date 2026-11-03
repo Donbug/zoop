@@ -58,6 +58,12 @@ class GraphRoundClockTest {
     }
 
     @Test
+    void timezoneFreeWireIdsAlwaysMeanKoreanCalendarSlots() {
+        assertThrows(GraphRoundConfigurationException.class,
+                () -> new GraphRoundClock(ZoneId.of("UTC"), LocalTime.of(9, 5), Duration.ofMinutes(30), 18, List.of()));
+    }
+
+    @Test
     void thePropertiesRefuseACalendarThatCrossesMidnightOrRepeatsASlot() {
         assertThrows(GraphRoundConfigurationException.class, () -> properties("23:05", "PT30M", 3, List.of()));
         assertThrows(GraphRoundConfigurationException.class, () -> properties("09:05", "PT30M", 18, List.of("09:35")));

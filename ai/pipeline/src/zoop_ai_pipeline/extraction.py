@@ -1027,7 +1027,10 @@ class Extractor:
         elif (receipt.get("attemptId"), receipt.get("stage"), receipt.get("bindingIdentity")) != (attempt, stage, live["bindingDigest"]):
             raise ExtractionFailure("receipt_binding_mismatch")
         try:
-            answer = decoder.answer(stage, receipt)
+            if "outputContract" in frozen.get("generation", {}):
+                answer = decoder.answer(stage, receipt, prepared=decoder.prepare(stage, payload))
+            else:
+                answer = decoder.answer(stage, receipt)
         except LiveFailure as exc:
             if exc.uncertain:
                 raise ProviderResponseUnknown(exc.code) from exc

@@ -1,7 +1,8 @@
 """Operator-only AI -> backend public graph HANDOFF (`zoop-ai-handoff`). Never a BFF route, S1 command, app writer, activator, publisher or FS081 withdrawal.
 
-stdin: one JSON object (<= 65,536 bytes): the manifest for `freeze`, `{schemaVersion, handoffId}` for the others. stdout: one canonical JSON object.
-Exit 0 for a ledger result or a current export; exit 2 for an error or a withheld export (`delivery.status=withheld`, no content). No network, model or
+stdin: one JSON object (<= 65,536 bytes): the manifest for `freeze`, a pinned partition configuration for `partition-check`,
+`{schemaVersion, handoffId}` for the others. stdout: one canonical JSON object. `partition-check` exits 0/1/2 for valid/invalid/blocked.
+Other commands exit 0 for a ledger result or a current export; exit 2 for an error or a withheld export (`delivery.status=withheld`, no content). No network, model or
 provider call; no source ledger is written (a freeze whose decisions pin an issue-summary result reads that job ledger read-only; export never opens it). No credential,
 path or message is ever printed.
 
@@ -26,10 +27,10 @@ from pydantic import ValidationError
 from .handoff import Handoff, HandoffPaths, Store, open_legacy_history, require_current_sources
 from .handoff_contracts import ID, MAX_COMMAND, SCHEMA, ExtractionFailure, Manifest, Selector, canonical
 from .handoff_contexts import configured, source_flags
-from .handoff_round import RoundPaths, check_files_dir, freeze_round, preflight_round
+from .handoff_round import RoundPaths, SourcePaths, check_files_dir, completion_round, freeze_round, preflight_round
 from .ingestion_contracts import IngestionFailure
 
-COMMANDS = ("freeze", "freeze-round", "recover", "inspect", "export")
+COMMANDS = ("freeze", "freeze-round", "check-round", "partition-check", "recover", "inspect", "export")
 SOURCED = frozenset({"freeze", "export"})                  # commands that consult the source ledgers, grants and the operator files
 WRITERS = {"freeze": "create", "recover": "write"}          # everything else opens the ledger read-only
 PLAN_ID = re.compile(r"s2plan-[0-9a-f]{64}")
@@ -44,7 +45,7 @@ def _error(code: str, detail: dict | None = None) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=COMMANDS)
-    parser.add_argument("--state-dir", required=True, type=Path)
+    parser.add_argument("--state-dir", type=Path, help="handoff ledger directory; required except for partition-check")
     parser.add_argument("--relation-state-dir", type=Path)
     parser.add_argument("--extraction-state-dir", type=Path)
     parser.add_argument("--ingestion-state-dir", type=Path)
@@ -63,6 +64,29 @@ def main() -> int:
     args = parser.parse_args()
     store = None
     try:
+        if args.command == "partition-check":
+            from .handoff_partition import check
+
+            if any(value is not None for name, value in vars(args).items() if name != "command"):
+                raise ExtractionFailure("input_or_configuration_invalid")
+            raw = sys.stdin.buffer.read(MAX_COMMAND + 1)
+            if len(raw) > MAX_COMMAND:
+                raise ExtractionFailure("command_input_limit")
+            result = check(raw)
+            print(canonical(result))
+            return {"valid": 0, "invalid": 1, "blocked": 2}[result["status"]]
+        if args.state_dir is None:
+            raise ExtractionFailure("input_or_configuration_invalid")
+        if args.command == "check-round":
+            required = (args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources, args.canonical)
+            if any(value is None for value in required) or not args.round_id or not re.fullmatch(ID, args.round_id) \
+                    or (args.plan_id is None) != (args.plan_root is None) \
+                    or (args.plan_id is not None and not PLAN_ID.fullmatch(args.plan_id)) \
+                    or any(value is not None for value in (args.decisions, args.bindings, args.files_dir, args.recovery_attempt_id,
+                                                          args.issue_summary_state_dir, args.source_contexts, args.source_contexts_sha256)):
+                raise ExtractionFailure("input_or_configuration_invalid")
+            print(canonical(completion_round(SourcePaths(*required), args.round_id, args.plan_root, args.plan_id)))
+            return 0
         rounded = args.command == "freeze-round"
         sourced = args.command in SOURCED or rounded
         flags = (args.relation_state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources, args.canonical, args.decisions, args.bindings)

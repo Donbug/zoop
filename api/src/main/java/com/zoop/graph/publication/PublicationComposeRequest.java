@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 import com.zoop.common.json.StrictJson;
+import tools.jackson.databind.node.ObjectNode;
 
 public record PublicationComposeRequest(String baseVersionId, List<String> incomingVersionIds, String expectedActiveVersionId,
         String expectedBaseReceiptSha256, Map<String, String> incomingReceiptPins, long expectedRuleRevision,
@@ -46,6 +47,18 @@ public record PublicationComposeRequest(String baseVersionId, List<String> incom
                     GraphPublicationReader.revision(root, "expectedRuleRevision"), GraphPublicationReader.revision(root, "expectedReviewRevision"),
                     required(root.string("decisionsSha256"), StrictJson.SHA256), required(root.string("operator"), OPERATOR));
         } catch (StrictJson.Malformed malformed) { throw invalid(); }
+    }
+    /** The request document {@link #parse} reads, so a prepared request can be kept and rerun as an operator compose. */
+    public ObjectNode wire() {
+        ObjectNode root = StrictJson.newObject();
+        root.put("schemaVersion", SCHEMA); root.put("baseVersionId", baseVersionId);
+        root.set("incomingVersionIds", GraphPublicationReader.json(incomingVersionIds));
+        root.put("expectedActiveVersionId", expectedActiveVersionId); root.put("expectedBaseReceiptSha256", expectedBaseReceiptSha256);
+        var pins = root.putArray("incomingReceiptPins");
+        new TreeMap<>(incomingReceiptPins).forEach((id, sha) -> { var pin = pins.addObject(); pin.put("versionId", id); pin.put("sha256", sha); });
+        root.put("expectedRuleRevision", expectedRuleRevision); root.put("expectedReviewRevision", expectedReviewRevision);
+        root.put("decisionsSha256", decisionsSha256); root.put("operator", operator);
+        return root;
     }
     private static String optional(String value, Pattern pattern) { return value == null ? null : required(value, pattern); }
     private static String required(String value, Pattern pattern) { if (!pattern.matcher(value).matches()) throw invalid(); return value; }
