@@ -110,6 +110,7 @@ FROM graph_publication_preparations ORDER BY id DESC LIMIT 20;
 | `ZOOP_GRAPH_ROUND_LOOKBACK` | 기동 시 이만큼 전까지의 지난 슬롯 행을 만듦(기본 `PT30M`) |
 | `ZOOP_GRAPH_ROUND_MAX_OPEN_ROUNDS` | 한 바퀴에 전진시키는 열린 회차 수(기본 3) |
 | `ZOOP_GRAPH_ROUND_ANALYSIS_WAIT_DEADLINE` | R4 대기 상한(기본 `PT2H`; `ZOOP_ANALYSIS_ANALYZE_PLAN_ATTEMPT_DEADLINE`보다 길게) |
+| `ZOOP_GRAPH_ROUND_COMMANDS_ENABLED` | 공개 Web(scheduler 없음)에서 관리자 회차 명령을 받습니다(아래 "공개 Web의 관리자 명령"). 기본 `false`. `ZOOP_GRAPH_ROUND_ENABLED=true`인 writer에서는 의미 없음 |
 | `ZOOP_GRAPH_ROUND_PREPARE_ENABLED` | `true`면 바퀴 끝의 자동 준비를 등록합니다(위 "자동 준비" 절). 기본 `false` |
 | `ZOOP_GRAPH_ROUND_OPERATOR` | 수입 요청의 `operator`(기본 `scheduler`, 운영자 요청 알파벳 `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`). 회차의 `started_by`와는 별개 |
 | `ZOOP_GRAPH_ROUND_WAIT_RETRY_AFTER` / `BUSY_RETRY_AFTER` | 대기 단계 재시도 간격(기본 `PT1M` / `PT5M`) |
@@ -143,6 +144,13 @@ R7은 관측 전체를 최초 확인과 commit 직전 재확인에서 **두 번 
 
 관리자 응답은 회차 상태와 코드만 제공하며 private 요청 journal의 본문·서비스 binding을 반환하지 않습니다. 두 명령은 #275 멱등 계약을 따르고 감사 이력에 `pipeline.round.retry`·`pipeline.round.start`를 남깁니다. `started_by`는 바뀌지 않습니다. 끝난 분석 job의 `analysis_failed`는 이전 이벤트의 `failedAt`보다 우선하여 `plan_ready`부터 재개합니다.
 
+**공개 Web의 관리자 명령(#55 PR-P4).** scheduler는 writer 프로세스에서만 돕니다. 두 명령은 회차 행만 바꾸고 실제 진행은 writer scheduler의 다음 바퀴가 하므로, 공개 Web은 `ZOOP_GRAPH_ROUND_COMMANDS_ENABLED=true`이면 회차 달력과 writer heartbeat 상태만 등록해 명령을 받습니다(`GraphRoundCommandsConfiguration`, scheduler·bridge 없음, 같은 프로세스에서 `ZOOP_GRAPH_ROUND_ENABLED=true`이면 적용하지 않음). 달력 설정(`ZOOP_GRAPH_ROUND_ZONE`·`FIRST_SLOT_AT`·`SLOT_INTERVAL`·`SLOT_COUNT`·`FREEZE_ONLY`)은 writer와 같은 값을 씁니다. "스케줄러가 없으면 404"는 그대로이며, 공개 Web에서는 **살아 있는 writer가 없으면** 404입니다.
+
+- **heartbeat(`graph_round_scheduler_ticks`):** writer의 scheduler는 바퀴와 별도의 스레드(`graph-round-heartbeat`)로 `interval`마다 자기 행(owner, 시작 시각, beat 시각, 간격, 마지막 바퀴 시각, 회차 달력 digest)을 갱신하고, 정상 종료 때 바퀴 실행기를 먼저 멈춘 뒤 행을 지웁니다. beat 시각과 살아 있음 판단은 DB 시계(`clock_timestamp()`)라 두 호스트의 시계 차이와 무관합니다. 다만 "지금 시작"(`startGraphRound`에 `slotAt` 없음)의 분은 명령을 받은 공개 Web 호스트의 시계로 정합니다. 하루 동안 갱신이 없는 행은 scheduler가 시작할 때 정리합니다. 바퀴와 분리했으므로 수입·준비로 바퀴가 길어도 writer가 멈춘 것으로 보이지 않습니다.
+- **살아 있음:** beat가 그 행의 간격 3배 안이고 회차 달력 digest가 공개 Web 자신의 달력과 같으면 살아 있습니다(달력이 다른 writer는 로그를 남기고 세지 않음: 공개 Web이 만드는 회차 ID·현재 분이 writer와 달라지므로). 공개 Web의 overview `rounds.enabled`·`lastTickAt`은 가장 최근의 살아 있는 writer 값, `nextSlotAt`은 공개 Web 자신의 달력으로 계산합니다(응답 스키마는 같음). heartbeat는 별도 읽기 전용 트랜잭션으로 읽으므로 읽기 실패가 overview·명령의 트랜잭션을 깨지 않습니다(그동안 DB 연결을 하나 더 씀, 관리자 요청 수는 연결 풀보다 훨씬 적음). 읽지 못하면 overview는 꺼진 것으로 보이고 명령은 `SOURCE_UNAVAILABLE`(재시도 가능)입니다. 한 번 읽은 값은 1초 동안 다시 씁니다. 살아 있는 writer가 둘 이상이면(단일 writer 위반) 로그에 남깁니다.
+- **재생:** 살아 있는 writer 확인은 새 명령에만 합니다. 이미 처리된 명령을 같은 `Idempotency-Key`로 다시 보내면 writer 재시작 중에도 저장된 응답을 돌려줍니다(#275).
+- **drain 중:** writer를 멈추면 행이 지워져 공개 Web의 두 명령은 바로 404가 됩니다. 비정상 종료면 간격 3배가 지난 뒤 404입니다.
+
 ## 시험
 
 - `GraphRoundRepositoryPostgresTest`(`graph-postgres`): migration·제약·guard trigger(식별·끝난 회차 재개·버전 연결 변경), lease와 token(갱신 유지·인계 시 새 token·조건부 연장 `extend`), fenced advance(옛 holder·stale stage → 기록 없음), `link`(트랜잭션 밖 거절·rollback에 따라 취소·fencing·`newestImported`가 연결만 된 미완료 행을 봄), retry 뒤에도 `version_committed_at`과 순서 기준이 남음(열은 한 번만 씀), due·page.
@@ -151,6 +159,7 @@ R7은 관측 전체를 최초 확인과 commit 직전 재확인에서 **두 번 
 - `GraphRoundImportConfigurationTest`: 꺼짐·웹 전용·설정 닫힘(snapshot source, read client, CLI 경로, import-source, operator), 실제 observation client 설정의 HTTP 기동·loopback export, 비활성 client와 잔존 CLI 세 설정의 거절·경로 미노출, CLI 선택 시 활성 HTTP client와 무관한 CLI 필수 조건.
 - `GraphRoundSchedulerConfigurationTest`: 꺼짐이면 스케줄러·상태 없음, 켜면 스케줄러가 overview의 `GraphRoundStatus`, round 클라이언트·analyze-plan 미설정·달력 오류는 설정 이름으로 기동 거절.
 - `GraphRoundWorkerTest`의 준비 단계: 바퀴 끝에 한 번 부르고, 준비의 실패가 회차와 바퀴를 바꾸지 않음. `GraphRoundPreparerTest`: 결과를 모르는 시도의 판단, 기동 거절(회차 꺼짐·자동 활성화·snapshot source·root·현재 권한). `GraphPublicationPreparePostgresTest`의 회차 경로: 새 수입마다 한 번 `staged`, 값 변경은 한 번 기록, commit 뒤 중단 → 고정 입력 복구 `unchanged`, compose 전 중단 → 고정 입력으로 `staged`, 활성 이동 뒤 복구 → `active_conflict` 뒤 새 준비, 수입 lock 사용 중이면 다음 바퀴, 기록 trigger.
+- `GraphRoundHeartbeatTest`: 공개 Web 상태가 가장 최근의 살아 있는 writer를 보고 간격 3배가 지나면 꺼짐, heartbeat를 읽지 못하면 꺼짐, scheduler가 자기 행을 쓰고 종료 때 지움. `GraphRoundTicksPostgresTest`(`graph-postgres`): 행 갱신·삭제, writer 둘의 순서, 하루 지난 행 정리, owner 형식. `GraphRoundSchedulerConfigurationTest`: 명령만 켠 공개 Web에 달력·heartbeat 상태만 있고 scheduler·bridge 없음, 꺼짐·비웹이면 없음, writer는 자기 달력·상태를 유지. `GraphRoundAdminCommandServiceTest`: 달력이 있어도 살아 있는 writer가 없으면 두 명령 404, 아무것도 쓰지 않음.
 - `GraphRoundClockTest`: 하루 18+1 슬롯(KST), 반열린 구간·자정 넘김, 다음 슬롯, 회차 id 형식, 달력 검증.
 - `GraphRoundWorkerTest`(가짜 AI 라우트·큐·bridge): 정규 슬롯 R1→R7 전진과 이벤트·선택 결과 개수, 새 자료 없음·freeze 전용 슬롯의 계획 없는 freeze와 `no_public_material`→`skipped`, `round_busy`(`Retry-After`)·전송 실패 대기와 4xx 거절(`failedAt`), 단계 상한 `run_timeout`과 분석 상한 `analysis_timeout`, 분석 실패·계획 거절·큐 미설정, lookback 열기와 다른 인스턴스 lease 존중. lease 만료 뒤 다른 인스턴스가 인계해 실패·해제까지 마친 행에 늦은 결과를 쓰지 않음(새 claim은 다시 놓음), 만료만 된 lease는 token을 유지한 채 연장되어 결과 보존, 끝난 분석 job의 실패는 `failedAt=plan_ready`, R3 상한은 `analysis_queue_timeout`(`failedAt=plan_ready`).
 - `HttpRoundClientTest`(loopback stub): 요청 본문·멱등 키·bindings 포함, 상태 문서 닫힘·상태별 필수 필드, 오류 envelope, 5xx 뒤 `requestMaybeProcessed`.

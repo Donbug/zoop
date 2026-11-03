@@ -76,8 +76,8 @@ public class GraphRoundSchedulerConfiguration {
 
     @Bean
     GraphRoundScheduler graphRoundScheduler(GraphRoundWorker worker, GraphRoundClock calendar, Clock clock,
-            GraphRoundProperties properties) {
-        return new GraphRoundScheduler(worker, calendar, clock, properties.interval());
+            GraphRoundProperties properties, GraphRoundTicks ticks) {
+        return new GraphRoundScheduler(worker, calendar, clock, properties.interval(), ticks);
     }
 
     /** The lease owner of this instance: host name plus a per-start suffix, so two instances or a restart never share one. */
@@ -89,6 +89,7 @@ public class GraphRoundSchedulerConfiguration {
             host = "instance";
         }
         String safe = host.replaceAll("[^A-Za-z0-9.-]", "-");
+        if (safe.isEmpty()) safe = "instance";
         return (safe.length() > 40 ? safe.substring(0, 40) : safe) + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 }

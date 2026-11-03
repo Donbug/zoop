@@ -34,6 +34,7 @@ import com.zoop.graph.round.GraphRoundClock;
 import com.zoop.graph.round.GraphRoundEvent.Outcome;
 import com.zoop.graph.round.GraphRoundPatch;
 import com.zoop.graph.round.GraphRoundStage;
+import com.zoop.graph.round.GraphRoundStatus;
 import com.zoop.graph.round.InMemoryGraphRoundRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,7 +57,9 @@ class GraphRoundAdminCommandServiceTest {
     void setUp() {
         beans.addBean("clock", new GraphRoundClock(ZoneId.of("Asia/Seoul"), LocalTime.of(9, 5), Duration.ofMinutes(30), 18,
                 List.of(LocalTime.of(18, 5))));
-        service = new GraphRoundAdminCommandService(rounds, beans.getBeanProvider(GraphRoundClock.class), idempotency, audit,
+        beans.addBean("status", alive(true));
+        service = new GraphRoundAdminCommandService(rounds, beans.getBeanProvider(GraphRoundClock.class),
+                beans.getBeanProvider(GraphRoundStatus.class), idempotency, audit,
                 JsonMapper.builder().build(), Clock.fixed(NOW, ZoneOffset.UTC));
         when(idempotency.claimIdempotency(anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), any()))
                 .thenAnswer(invocation -> {
@@ -162,7 +165,7 @@ class GraphRoundAdminCommandServiceTest {
                 eq("round-20261030T1000"), eq("req-6"), any());
 
         GraphRoundAdminCommandService later = new GraphRoundAdminCommandService(rounds, beans.getBeanProvider(GraphRoundClock.class),
-                idempotency, audit, JsonMapper.builder().build(), Clock.fixed(NOW.plusSeconds(90), ZoneOffset.UTC));
+                beans.getBeanProvider(GraphRoundStatus.class), idempotency, audit, JsonMapper.builder().build(), Clock.fixed(NOW.plusSeconds(90), ZoneOffset.UTC));
         assertEquals(now, later.start(null, "key-6", ADMIN, "req-6b"), "the same key replays although the minute moved on");
 
         GraphRoundOut named = service.start(new GraphRoundStartRequest("2026-10-30T02:05:00Z"), "key-7", ADMIN, "req-7");
@@ -178,11 +181,72 @@ class GraphRoundAdminCommandServiceTest {
     @Test
     void withoutASchedulerBothCommandsAreNotFound() {
         GraphRoundAdminCommandService none = new GraphRoundAdminCommandService(rounds,
-                new StaticListableBeanFactory().getBeanProvider(GraphRoundClock.class), idempotency, audit, JsonMapper.builder().build(),
+                new StaticListableBeanFactory().getBeanProvider(GraphRoundClock.class),
+                new StaticListableBeanFactory().getBeanProvider(GraphRoundStatus.class), idempotency, audit, JsonMapper.builder().build(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
         assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class, () -> none.start(null, "k", ADMIN, "r")).getErrorCode());
         failed("round-20261030T0905", Instant.parse("2026-10-30T00:05:00Z"), GraphRoundStage.SCHEDULED, "run_timeout");
         assertEquals(ErrorCode.RESOURCE_NOT_FOUND,
                 assertThrows(CustomException.class, () -> none.retry("round-20261030T0905", "k", ADMIN, "r")).getErrorCode());
+    }
+
+    @Test
+    void inThePublicWebTheCommandsAreNotFoundWhileNoWriterIsAlive() {
+        // The public web has the calendar (commands enabled) but reads the scheduler from the writers' heartbeats (#55 PR-P4).
+        var web = new StaticListableBeanFactory();
+        web.addBean("clock", new GraphRoundClock(ZoneId.of("Asia/Seoul"), LocalTime.of(9, 5), Duration.ofMinutes(30), 18,
+                List.of(LocalTime.of(18, 5))));
+        web.addBean("status", alive(false));
+        GraphRoundAdminCommandService stale = new GraphRoundAdminCommandService(rounds, web.getBeanProvider(GraphRoundClock.class),
+                web.getBeanProvider(GraphRoundStatus.class), idempotency, audit, JsonMapper.builder().build(), Clock.fixed(NOW, ZoneOffset.UTC));
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class, () -> stale.start(null, "k", ADMIN, "r")).getErrorCode());
+        failed("round-20261030T0905", Instant.parse("2026-10-30T00:05:00Z"), GraphRoundStage.SCHEDULED, "run_timeout");
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND,
+                assertThrows(CustomException.class, () -> stale.retry("round-20261030T0905", "k", ADMIN, "r")).getErrorCode());
+        assertTrue(rounds.findBySlot(Instant.parse("2026-10-30T01:00:00Z")).isEmpty(), "nothing was written");
+    }
+
+    @Test
+    void aReplayOfACommandThatTookEffectAnswersEvenWhileTheWriterRestarts() {
+        var writer = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var web = new StaticListableBeanFactory();
+        web.addBean("clock", new GraphRoundClock(ZoneId.of("Asia/Seoul"), LocalTime.of(9, 5), Duration.ofMinutes(30), 18,
+                List.of(LocalTime.of(18, 5))));
+        web.addBean("status", new GraphRoundStatus() {
+            @Override public boolean enabled() { return writer.get(); }
+            @Override public java.util.Optional<Instant> nextSlotAt() { return java.util.Optional.empty(); }
+            @Override public java.util.Optional<Instant> lastTickAt() { return java.util.Optional.empty(); }
+        });
+        GraphRoundAdminCommandService commands = new GraphRoundAdminCommandService(rounds, web.getBeanProvider(GraphRoundClock.class),
+                web.getBeanProvider(GraphRoundStatus.class), idempotency, audit, JsonMapper.builder().build(), Clock.fixed(NOW, ZoneOffset.UTC));
+        GraphRoundOut started = commands.start(null, "key-replay", ADMIN, "req-r1");
+        writer.set(false);
+        assertEquals(started, commands.start(null, "key-replay", ADMIN, "req-r2"), "the stored answer, not 404 (#275)");
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
+                () -> commands.start(new GraphRoundStartRequest("2026-10-30T02:05:00Z"), "key-new", ADMIN, "req-r3")).getErrorCode());
+    }
+
+    @Test
+    void anUnreadableHeartbeatIsSourceUnavailableNotNoWriter() {
+        var web = new StaticListableBeanFactory();
+        web.addBean("clock", new GraphRoundClock(ZoneId.of("Asia/Seoul"), LocalTime.of(9, 5), Duration.ofMinutes(30), 18,
+                List.of(LocalTime.of(18, 5))));
+        web.addBean("status", new GraphRoundStatus() {
+            @Override public boolean enabled() { return false; }
+            @Override public boolean available() { return false; }
+            @Override public java.util.Optional<Instant> nextSlotAt() { return java.util.Optional.empty(); }
+            @Override public java.util.Optional<Instant> lastTickAt() { return java.util.Optional.empty(); }
+        });
+        GraphRoundAdminCommandService unread = new GraphRoundAdminCommandService(rounds, web.getBeanProvider(GraphRoundClock.class),
+                web.getBeanProvider(GraphRoundStatus.class), idempotency, audit, JsonMapper.builder().build(), Clock.fixed(NOW, ZoneOffset.UTC));
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class, () -> unread.start(null, "k-u", ADMIN, "r")).getErrorCode());
+    }
+
+    private static GraphRoundStatus alive(boolean enabled) {
+        return new GraphRoundStatus() {
+            @Override public boolean enabled() { return enabled; }
+            @Override public java.util.Optional<Instant> nextSlotAt() { return java.util.Optional.empty(); }
+            @Override public java.util.Optional<Instant> lastTickAt() { return java.util.Optional.empty(); }
+        };
     }
 }
