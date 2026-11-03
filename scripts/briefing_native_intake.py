@@ -84,22 +84,35 @@ def collect(cfg,round,root):
     catalogue=json.loads(Path(cfg['companyCatalogue']).read_bytes())
     companies=[{'companyId':c['company_id'],'name':c['name'],'aliases':c['aliases'],'ticker':c['ticker']} for c in catalogue['companies']]
     eligible=[]
-    for row in result['documents']:
-        exported=json.loads((root/'collection'/row['exportFile']).read_bytes())
-        native=root/'collection/native/collections'/('item-'+row['candidate']['newsId'])
+    # Reuse unprocessed acquisitions from this owned worker, without fetching them or changing their clocks.
+    cohorts=[(root,result)]
+    for package in sorted(base.glob('*/collection-result.json')):
+        if package.parent!=root and not package.is_symlink():cohorts.append((package.parent,json.loads(package.read_bytes())))
+    processed=set()
+    for ready_path in base.glob('*/*-native-v2/ready.json'):
+        ready=json.loads(ready_path.read_bytes());processed.add((ready['documentId'],ready['documentVersion']))
+    seen=set()
+    for collection_root,cohort in cohorts:
+      for row in cohort['documents']:
+        identity=(row['documentId'],row['documentVersion'])
+        observed=datetime.fromisoformat(row['fetchedAt'])
+        if identity in seen or identity in processed or not datetime.fromisoformat(round['windowFrom'])<observed<=datetime.fromisoformat(round['windowTo']):continue
+        seen.add(identity)
+        exported=json.loads((collection_root/'collection'/row['exportFile']).read_bytes())
+        native=collection_root/'collection/native/collections'/('item-'+row['candidate']['newsId'])
         raw=(native/'bodies'/(row['nativeBodySha256']+'.bin')).read_bytes()
         require(b.digest(raw)==row['nativeBodySha256'],'native_body_pin')
         matches=source_matches(relevance_text(raw),companies)
-        if matches:eligible.append((row,exported,matches))
+        if matches:eligible.append((row,exported,matches,collection_root))
     eligible.sort(key=lambda x:(x[0]['candidate']['publicationDay'],x[0]['candidate']['newsId']),reverse=True)
     require(bool(eligible),'no_current_company_source')
     # One source set leaves at least four physical calls for briefing generation/verification and bounded repairs.
-    chosen,exported,matches=eligible[0]
+    chosen,exported,matches,selected_root=eligible[0]
     write_once(root/'selected-source.json',{'candidate':chosen['candidate'],'documentId':exported['document']['documentId'],
         'documentVersion':exported['document']['documentVersion'],'matchedCompanyIds':matches,
-        'nativeBodySha256':chosen['nativeBodySha256'],'nativeReceiptSha256':chosen['nativeReceiptSha256'],
+        'nativeBodySha256':chosen['nativeBodySha256'],'nativeReceiptSha256':chosen['nativeReceiptSha256'],'collectionRoot':str(selected_root),
         'coverage':{'complete':False,'candidateDocuments':len(eligible),'selectedDocuments':1,'collection':result['counts']}})
-    return chosen,exported,companies
+    return chosen,exported,companies,selected_root
 
 class NativeTransport(httpx.BaseTransport):
     def __init__(self,session,budget,root):
@@ -223,9 +236,9 @@ def prepare(cfg,round):
     root=collection_root/(round['id']+'-native-v2');root.mkdir(mode=0o700,parents=True,exist_ok=True)
     if (root/'ready.json').exists():return json.loads((root/'ready.json').read_bytes())
     require(not (root/'native.started.json').exists(),'native_interrupted_requires_recovery')
-    chosen,exported,companies=collect(cfg,round,collection_root)
+    chosen,exported,companies,selected_collection=collect(cfg,round,collection_root)
     runtime_type=configure_runtime(cfg,root,round['windowTo']);pure=runtime_type.from_env()
-    original=collection_root/'collection/items'/chosen['candidate']['newsId']
+    original=selected_collection/'collection/items'/chosen['candidate']['newsId']
     sources=Path(cfg['authorityRoot'])/('source-'+root.name+'.json');sources.parent.mkdir(mode=0o700,parents=True,exist_ok=True);current=json.loads((original/'sources.json').read_bytes())
     grant=current['sources'][0]['grant'];grant.update({'grantId':root.name+'-processing','revision':'kogl1-prospective-v2',
         'allowedOperations':['read','store','quote-display','model-send'],
