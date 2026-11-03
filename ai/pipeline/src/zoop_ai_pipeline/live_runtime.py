@@ -64,6 +64,8 @@ SET_FUNDED_PREPARED = "zoop-live-prepared-3"
 SET_FUNDED_RECEIPT = "zoop-live-receipt-3"
 CHAIN_RECEIPT = "zoop-live-chain-receipt-1"
 OUTPUT_SUFFIX = "-citation-enum-1"
+REFERENCE_OUTPUT = "citation-refs-default-1"
+REFERENCE_SUFFIX = "-citation-refs-default-1"
 
 GENERATION_STAGES = ("extract", "compare", "topic", "relation", "impact")
 VERIFY_STAGES = ("verify-relation", "verify-impact")
@@ -290,7 +292,7 @@ class LiveRuntime:
                  budget_identity: str, send: dict[str, Any] | None, send_code: str, family: Family = PIPELINE,
                  funding: dict | None = None, finish_by: str | None = None, output_contract: str | None = None):
         self._operating = isinstance(funding, dict) and funding.get("mode") == MODE
-        if output_contract not in (None, live_prompts.OUTPUT_CONTRACT):
+        if output_contract not in (None, live_prompts.OUTPUT_CONTRACT, REFERENCE_OUTPUT):
             raise LiveFailure("live_output_contract_unsupported")
         if output_contract is not None and (family is not PIPELINE or model != MODEL):
             raise LiveFailure("live_output_route_unsupported")
@@ -460,7 +462,7 @@ class LiveRuntime:
             suffix = next((suffix for suffix in (FUNDED_SUFFIX, SET_FUNDED_SUFFIX, FINISH_FUNDED_SUFFIX) if version.endswith(suffix)), "")
             funded = bool(suffix)
             base_version = version.removesuffix(suffix) if funded else version
-            family = FAMILIES[base_version.removesuffix(OUTPUT_SUFFIX)]
+            family = FAMILIES[base_version.removesuffix(OUTPUT_SUFFIX).removesuffix(REFERENCE_SUFFIX)]
             generation, verifier = binding["generation"], binding["verifier"]
             funding = binding.get("funding")
             runtime = cls(model=generation["model"], effort=generation["reasoningEffort"], max_output=generation["maxOutputTokens"],
@@ -537,8 +539,8 @@ class LiveRuntime:
                 "limits": {"maxRequestBytes": MAX_REQUEST_BYTES, "maxVerifierRequestBytes": MAX_VERIFIER_REQUEST_BYTES,
                            "maxResponseBytes": MAX_RESPONSE_BYTES, "inputOverheadTokens": INPUT_OVERHEAD_TOKENS}}
         if self._output_contract:
-            body["version"] += OUTPUT_SUFFIX
-            body["generation"]["outputContract"] = {"name": self._output_contract, "compiler": live_prompts.OUTPUT_COMPILER,
+            body["version"] += REFERENCE_SUFFIX if self._output_contract == REFERENCE_OUTPUT else OUTPUT_SUFFIX
+            body["generation"]["outputContract"] = {"name": self._output_contract, "compiler": "zoop-citation-refs-compiler-1" if self._output_contract == REFERENCE_OUTPUT else live_prompts.OUTPUT_COMPILER,
                                                      "limits": live_prompts.OUTPUT_LIMITS}
         if self._operating:
             body["funding"] = self._funding
@@ -602,6 +604,16 @@ class LiveRuntime:
         nano = input_bound * rate_in + output_max * rate_out
         return {"inputTokensUpperBound": input_bound, "outputTokensMax": output_max, "worstCaseNanoUsd": nano, "worstCaseUsd": usd(nano)}
 
+    def _output_schema(self, stage: str, ids: list[str]) -> dict:
+        if self._output_contract != REFERENCE_OUTPUT:
+            return live_prompts.citation_schema(stage, ids)
+        # The standard reference contract still expands against the exact owner-only catalogue.
+        # Its separate binding never changes the historical enum or default contracts.
+        import copy
+        schema = copy.deepcopy(self._family.generation[stage].schema)
+        live_prompts.check_output_limits(schema)
+        return schema
+
     def prepare(self, stage: str, payload: dict) -> dict[str, Any]:
         """Pure: the exact provider request for a native stage preimage, with deterministic metadata. No HTTP, no budget write."""
         entry = self._entry(stage)
@@ -613,7 +625,7 @@ class LiveRuntime:
                 spec = self._family.generation[stage]
                 if self._output_contract:
                     shown, references = live_prompts.catalogue(stage, payload)
-                    schema = live_prompts.citation_schema(stage, list(references))
+                    schema = self._output_schema(stage, list(references))
                     messages = [{"role": "system", "content": spec.system}, {"role": "user", "content": canonical(shown)}]
                 else:
                     schema, messages = spec.schema, spec.messages(payload)
@@ -668,7 +680,7 @@ class LiveRuntime:
                 messages = body["messages"]
                 shown = json.loads(messages[1]["content"])
                 ids = [segment["segmentId"] for src in shown["sources"] for segment in src["segments"] if segment["segmentId"] is not None]
-                schema = live_prompts.citation_schema(stage, ids)
+                schema = self._output_schema(stage, ids)
                 expected_body = {"model": self._model, "messages": [{"role": "system", "content": spec.system},
                                   {"role": "user", "content": canonical(shown)}],
                                  "response_format": {"type": "json_schema", "json_schema": {"name": spec.schema_name, "strict": True, "schema": schema}},

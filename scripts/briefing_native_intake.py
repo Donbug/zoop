@@ -163,10 +163,10 @@ def configure_runtime(cfg,root,cutoff):
         'ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT':'high','ZOOP_AI_PIPELINE_LIVE_MAX_OUTPUT_TOKENS':'12000',
         'ZOOP_AI_PIPELINE_LIVE_TIMEOUT_SECONDS':'180','ZOOP_AI_PIPELINE_LIVE_MAX_CALLS':'12','ZOOP_AI_PIPELINE_LIVE_MAX_USD':'1',
         'ZOOP_AI_PIPELINE_LIVE_SHARED_MAX_USD':'0.9','ZOOP_AI_PIPELINE_LIVE_PERSONAL_MAX_USD':'0.1',
-        'ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR':str(root/'native-budget'),'ZOOP_AI_PIPELINE_LIVE_PROFILE':'overnight-funded-v1',
+        'ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR':str(root/'native-budget'),'ZOOP_AI_PIPELINE_LIVE_PROFILE':'admitted-set-capped-v4',
         'ZOOP_AI_PIPELINE_LIVE_RUN_ID':root.name,'ZOOP_AI_PIPELINE_LIVE_SET_ID':root.name,
         'ZOOP_AI_PIPELINE_LIVE_ADMIT_FROM':start.strftime('%Y-%m-%dT%H:%M:%SZ'),'ZOOP_AI_PIPELINE_LIVE_ADMIT_UNTIL':(start+timedelta(seconds=60)).strftime('%Y-%m-%dT%H:%M:%SZ'),
-        'ZOOP_AI_PIPELINE_LIVE_FINISH_BY':end.strftime('%Y-%m-%dT%H:%M:%SZ'),'ZOOP_AI_PIPELINE_LIVE_NOT_AFTER':end.strftime('%Y-%m-%dT%H:%M:%SZ'),'ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT':'',
+        'ZOOP_AI_PIPELINE_LIVE_FINISH_BY':end.strftime('%Y-%m-%dT%H:%M:%SZ'),'ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT':'citation-refs-default-1',
         'ZOOP_AI_BASE_URL':'https://api.openai.com/v1','TYPESAFE_BASE_URL':'https://api.typesafe.ai/v1','TYPESAFE_VALIDATION_MODEL':'jev-1.14.0',
         'ZOOP_AI_API_KEY':b.read_key(Path(cfg['keyFile'])),'TYPESAFE_API_KEY':read_verifier(Path(cfg['verifierKeyFile']))})
     return LiveRuntime
@@ -244,8 +244,13 @@ def prepare(cfg,round):
     request={'schemaVersion':'zoop-extraction-s2-2','jobId':root.name+'-s2','provenance':{'sourceKind':'actual','executionMode':'live','recordingKind':'provider'},
         'promptVersion':'briefing-native-v2-standard','incoming':selector,'catalogue':{'revision':'server-catalogue-'+b.digest(b.canonical(companies))[:16],'companies':companies},
         'snapshot':{'revision':'fresh-document-no-prior-native-mentions','events':[]},'topic':None}
-    # Standard native source-segment contract keeps literal citation checks without large enums.
-    # Non-set funding pins the default tier/deadline without provider fallback; the outer ledger enforces the shared hard caps.
+    from zoop_ai_pipeline.live_budget import Budget as NativeBudget
+    from zoop_ai_pipeline.live_funding import capped_set_funding_policy
+    policy=capped_set_funding_policy(root.name,os.environ['ZOOP_AI_PIPELINE_LIVE_ADMIT_FROM'],
+        os.environ['ZOOP_AI_PIPELINE_LIVE_ADMIT_UNTIL'],1000000000,900000000,100000000)
+    metering=NativeBudget(root/'native-budget',1000000000,12,funding=policy,
+        bucket_caps={'shared':900000000,'personal':100000000},finish_by=os.environ['ZOOP_AI_PIPELINE_LIVE_FINISH_BY'])
+    metering.admit_set(root.name,b.digest(b.canonical(request)),{'extract':1,'compare':1,'topic':0,'relation':1,'impact':4,'verify-relation':4,'verify-impact':4})
     claim={'round':round,'requestKey':'source-'+b.digest(b.canonical(request)),'purpose':'generation','trigger':'scheduler','adminId':None,
         'inputArtifactId':None,'inputDigest':b.digest(b.canonical(request))}
     pipe=CommandPipe(cfg['ledgerCommand']);session=UsageSession(pipe,claim,root/'usage')
