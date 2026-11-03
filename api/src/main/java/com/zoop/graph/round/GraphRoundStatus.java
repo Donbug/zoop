@@ -32,4 +32,9 @@ public interface GraphRoundStatus {
 
     /** When the scheduler last ran. */
     Optional<Instant> lastTickAt();
+
+    /** False when the status could not be read (the database away), so "no scheduler" is not claimed then. */
+    default boolean available() {
+        return true;
+    }
 }

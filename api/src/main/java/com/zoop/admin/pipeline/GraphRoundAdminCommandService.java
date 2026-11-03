@@ -24,6 +24,7 @@ import com.zoop.graph.round.GraphRoundEvent.Outcome;
 import com.zoop.graph.round.GraphRoundPatch;
 import com.zoop.graph.round.GraphRoundRepository;
 import com.zoop.graph.round.GraphRoundStage;
+import com.zoop.graph.round.GraphRoundStatus;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -37,7 +38,8 @@ import tools.jackson.databind.node.ObjectNode;
  * The two admin commands on rounds (A-ADM-03, #55): {@code retryGraphRound} resumes a failed round at the stage it failed, under
  * the same round id (the AI side's idempotency keys are bound to it), and {@code startGraphRound} opens a row for a slot by
  * hand ({@code started_by = admin:<id>}). Both only mark the row; the scheduler's next pass does the work, so both are 404
- * while no scheduler runs here. Both are idempotent under the #275 contract (same key and body replay, another body
+ * while no scheduler is alive: in the writer the scheduler is here, in the public web ({@code zoop.graph.round.commands-enabled})
+ * it is a writer whose heartbeat is fresh (#55 PR-P4). Both are idempotent under the #275 contract (same key and body replay, another body
  * conflicts) through the shared {@code idempotency_records}, and both leave an audit row.
  */
 @Service
@@ -47,15 +49,18 @@ public class GraphRoundAdminCommandService {
 
     private final GraphRoundRepository rounds;
     private final ObjectProvider<GraphRoundClock> calendar;
+    private final ObjectProvider<GraphRoundStatus> status;
     private final JdbcAnalysisJobRepository idempotency;
     private final AdminAuditRepository audit;
     private final ObjectMapper mapper;
     private final Clock clock;
 
     public GraphRoundAdminCommandService(GraphRoundRepository rounds, ObjectProvider<GraphRoundClock> calendar,
-            JdbcAnalysisJobRepository idempotency, AdminAuditRepository audit, ObjectMapper mapper, Clock clock) {
+            ObjectProvider<GraphRoundStatus> status, JdbcAnalysisJobRepository idempotency, AdminAuditRepository audit, ObjectMapper mapper,
+            Clock clock) {
         this.rounds = rounds;
         this.calendar = calendar;
+        this.status = status;
         this.idempotency = idempotency;
         this.audit = audit;
         this.mapper = mapper;
@@ -65,8 +70,9 @@ public class GraphRoundAdminCommandService {
     @Transactional
     public GraphRoundOut retry(String roundId, String idempotencyKey, AdminPrincipal admin, String requestId) {
         if (roundId == null || !roundId.matches("round-[0-9]{8}T[0-9]{4}")) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
-        requireScheduler();
+        requireCalendar();
         return idempotent(admin, START_PATH + "/" + roundId + "/retry", idempotencyKey, roundId, hash("retry", roundId), () -> {
+            requireLiveScheduler();
             GraphRound round = rounds.find(roundId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
             if (round.stage() != GraphRoundStage.FAILED) throw new CustomException(ErrorCode.REVISION_CONFLICT);
             GraphRoundStage resume = resumeStage(round);
@@ -88,13 +94,14 @@ public class GraphRoundAdminCommandService {
 
     @Transactional
     public GraphRoundOut start(GraphRoundStartRequest request, String idempotencyKey, AdminPrincipal admin, String requestId) {
-        GraphRoundClock clockOfSlots = requireScheduler();
+        GraphRoundClock clockOfSlots = requireCalendar();
         Instant now = clock.instant();
         boolean current = request == null || request.slotAt() == null;
         Instant slotAt = current ? clockOfSlots.minute(now) : parse(request.slotAt());
         String roundId = clockOfSlots.roundId(slotAt);
         // The request hash names what the admin sent, not the minute it arrived in: a replay of "start now" replays.
         return idempotent(admin, START_PATH, idempotencyKey, roundId, hash("start", current ? "now" : roundId), () -> {
+            requireLiveScheduler();
             if (rounds.findBySlot(slotAt).isPresent() || rounds.find(roundId).isPresent()) {
                 throw new CustomException(ErrorCode.REVISION_CONFLICT);
             }
@@ -141,10 +148,23 @@ public class GraphRoundAdminCommandService {
         return resumeStage(round, rounds.events(round.roundId()));
     }
 
-    private GraphRoundClock requireScheduler() {
+    /** The slot calendar: present where the commands are on (the writer, or the public web with commands enabled). */
+    private GraphRoundClock requireCalendar() {
         GraphRoundClock clockOfSlots = calendar.getIfAvailable();
         if (clockOfSlots == null) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
         return clockOfSlots;
+    }
+
+    /**
+     * A scheduler that will do the work: checked for a new command only, after the replay check, so a replay of a command that
+     * already took effect returns its stored answer even while the writer is restarting (#275).
+     */
+    private void requireLiveScheduler() {
+        GraphRoundStatus scheduler = status.getIfAvailable(() -> GraphRoundStatus.DISABLED);
+        if (scheduler.enabled()) return;
+        // Unread is not "no writer": a database failure answers as every other one here does.
+        if (!scheduler.available()) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, true);
+        throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
     }
 
     private static Instant parse(String slotAt) {

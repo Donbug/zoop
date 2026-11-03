@@ -110,6 +110,11 @@ public final class GraphRoundWorker {
         this.preparation = preparation;
     }
 
+    /** This instance's lease owner: host name plus a per-start suffix. */
+    public String owner() {
+        return owner;
+    }
+
     public Optional<Instant> lastTick() {
         return Optional.ofNullable(lastTick);
     }
