@@ -107,7 +107,7 @@ def make_publication(prepared,frozen,selection,passed,calls,assessed,checked,now
         'schedule':{'morning':'09:20','evening':'17:30','confirmed':True},
         'selection':{'basis':'market','reason':'현재 공개 그래프에 보존된 자료 범위에서 검증한 사업 중요도와 신규 정보입니다.'},
         'failures':[{'section':'collection','code':'limited_source_coverage','message':'전체 뉴스·시장 지표를 수집한 결과가 아닙니다.','retryable':False,'asOf':r['windowTo']}]}
-    items=[]; analyses=[]
+    items=[]; analyses=[]; details={}
     for record in passed:
         view.prove_issue(record,calls)
         value=selected_view.materialize(record,metadata,now);item=value['item'];iid=record['issueId']
@@ -119,10 +119,17 @@ def make_publication(prepared,frozen,selection,passed,calls,assessed,checked,now
         item['reportedAt']=max(s['publishedAt'] for s in candidate['sources'].values())
         item['matchedCompanyIds']=[];item['documentSentiments']=[]
         documents=sorted({s['documentId'] for s in candidate['sources'].values()})
-        item['sourceSupport']={'articleCount':len(documents),'knownLineageCount':0,'independentSourceCount':0,'unknownLineageArticles':documents,'duplicateGroups':[]}
+        item['sourceSupport']={'articleCount':len(documents),'knownLineageCount':None,'independentSourceCount':None,'unknownLineageArticles':documents,'duplicateGroups':[]}
         item['summary']['text']='\n'.join(c['takeaway']['text']+' '+c['newInformation']['text']+' 다음 확인: '+' '.join(x['text'] for x in c['conditions']) for c in record['draft']['companies'])
         item['summary']['evidenceIds']=sorted({e for c in record['draft']['companies'] for field in ['takeaway','newInformation'] for e in c[field]['evidenceIds']} |
             {e for c in record['draft']['companies'] for x in c['conditions'] for e in x['evidenceIds']})
+        detail=value['detail'];detail['summary']=copy.deepcopy(item['summary']);detail['companies']=copy.deepcopy(item['companies'])
+        detail['metadata']=copy.deepcopy(metadata)
+        detail['evidence']=[{'id':sid,'quote':s['quote'],'documentId':s['documentId'],'documentVersion':s['documentVersion'],
+            'title':s.get('title') or '', 'publisher':s.get('publisher') or '', 'url':s['url'],'publishedAt':s['publishedAt'],
+            'quoteVerified':True,'sourceKind':s['sourceKind'],'bodySha256':s['bodySha256'],'bodyContext':None} for sid,s in candidate['sources'].items()]
+        detail['claims']=[{**copy.deepcopy(c[key]),'type':kind} for c in record['draft']['companies'] for key,kind in [('newInformation','fact'),('impact','outlook'),('outlook','outlook')]]
+        details[iid]=detail
         items.append(item);analyses.append(value['analysis'])
     payload={'id':r['id'],'date':r['date'],'edition':r['edition'],'scheduledAt':r['scheduledAt'],'generatedAt':now,
         'dataWindow':{'start':r['windowFrom'],'end':r['windowTo'],'openStart':False},'graphVersion':prepared['graphVersion'],
@@ -130,7 +137,7 @@ def make_publication(prepared,frozen,selection,passed,calls,assessed,checked,now
         'items':items,'references':{'eventIds':[i['eventId'] for i in items],
             'evidenceIds':sorted({e for i in items for e in i['evidenceIds']}),'companyIds':sorted({c['id'] for i in items for c in i['companies']})},
         'emptyReason':None if items else 'no_issues_in_window','marketVariables':None,'metadata':metadata,'outlook':None}
-    snapshot={'sourceBindings':prepared['sourceBindings'],'marketSummary':{'status':'unavailable','reason':'회차 마감에 결속된 시장 요약·지표 입력이 없습니다.'},
+    snapshot={'sourceBindings':prepared['sourceBindings'],'itemDetails':details,'marketSummary':{'status':'unavailable','reason':'회차 마감에 결속된 시장 요약·지표 입력이 없습니다.'},
         'serverGeneration':{'version':'briefing-server-v1','inputSha256':prepared['inputSha256'],'coverage':prepared['coverage'],'analyses':analyses,'records':passed,'selected':selection['selected']}}
     row={'round':{k:frozen[k] for k in ['roundId','date','edition','cutoff']},'selection':selection,'assessments':assessed,
          'selectionVerification':checked,'passed':passed}

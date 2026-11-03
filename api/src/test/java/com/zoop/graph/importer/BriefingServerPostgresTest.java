@@ -180,6 +180,12 @@ class BriefingServerPostgresTest {
             var response=http.send(java.net.http.HttpRequest.newBuilder(uri).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
             assertEquals(200,response.statusCode(),response.body());
             var dto=com.zoop.common.json.StrictJson.parseObject(response.body());assertEquals("published",dto.string("status"));assertEquals(1,dto.array("items").size());
+            String event=dto.array("items").get(0).path("eventId").asString();
+            var detailUri=java.net.URI.create("http://127.0.0.1:"+port+"/api/v1/briefings/brf-2026-11-02-morning/items/"+event);
+            var detail=http.send(java.net.http.HttpRequest.newBuilder(detailUri).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,detail.statusCode(),detail.body());
+            var evidence=com.zoop.common.json.StrictJson.parseObject(detail.body()).array("evidence").get(0);
+            assertEquals(jdbc.queryForObject("SELECT quote FROM evidence WHERE id=?",String.class,evidence.path("id").asString()),evidence.path("quote").asString());assertEquals("",evidence.path("publisher").asString());
             byte[] original=Files.readAllBytes(grant);Files.writeString(grant,new String(original,StandardCharsets.UTF_8).replace("\"enabled\":true","\"enabled\":false"));
             var denied=http.send(java.net.http.HttpRequest.newBuilder(uri).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
             assertEquals(503,denied.statusCode());Files.write(grant,original);

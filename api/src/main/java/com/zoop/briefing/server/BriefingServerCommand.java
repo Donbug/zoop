@@ -98,7 +98,7 @@ public final class BriefingServerCommand {
             for(var e:visible.evidence()) {
                 if(!issue.evidenceIds().contains(e.evidenceId())) continue;
                 var article=visible.articles().stream().filter(a -> a.articleId().equals(e.articleId()) && a.version().equals(e.articleVersion())).findFirst().orElseThrow();
-                var rows=jdbc.queryForList("SELECT a.provider,v.published_at,t.storage_uri,t.sha256,t.bytes FROM articles a JOIN article_versions v ON v.article_id=a.id JOIN artifacts t ON t.id=v.text_artifact_id WHERE a.id=? AND v.version=? AND a.access_status='available'",e.articleId(),e.articleVersion());
+                var rows=jdbc.queryForList("SELECT a.provider,a.kind,v.title,v.publisher,v.published_at,t.storage_uri,t.sha256,t.bytes FROM articles a JOIN article_versions v ON v.article_id=a.id JOIN artifacts t ON t.id=v.text_artifact_id WHERE a.id=? AND v.version=? AND a.access_status='available'",e.articleId(),e.articleVersion());
                 if(rows.size()!=1) reject(); var row=rows.getFirst(); var grant=findGrant(grantRoot,current,row.get("provider").toString());
                 if(grant==null || !inScope(row.get("provider").toString(),e.articleId(),e.articleVersion(),row.get("sha256").toString())) {denied++;continue;}
                 if(row.get("published_at")==null) {outside++;continue;}
@@ -111,7 +111,7 @@ public final class BriefingServerCommand {
                 int points=text.codePointCount(0,text.length()); if(e.start()<0||e.end()>points||e.start()>=e.end()) reject();
                 String quote=text.substring(text.offsetByCodePoints(0,e.start()),text.offsetByCodePoints(0,e.end()));
                 var s=sources.putObject(e.evidenceId()).put("evidenceId",e.evidenceId()).put("documentId",e.articleId()).put("documentVersion",e.articleVersion())
-                    .put("bodySha256",row.get("sha256").toString()).put("quote",quote).put("url",article.url()).put("publishedAt",at.toString())
+                    .put("bodySha256",row.get("sha256").toString()).put("title",(String)row.get("title")).put("publisher",(String)row.get("publisher")).put("sourceKind",(String)row.get("kind")).put("quote",quote).put("url",article.url()).put("publishedAt",at.toString())
                     .put("grantId",grant.string("grantId")).put("grantRevision",grant.string("revision"));
                 s.putArray("recipients").add("openai"); evidenceIds.add(e.evidenceId());
             }
@@ -210,9 +210,10 @@ public final class BriefingServerCommand {
                 var e=visible.evidence().stream().filter(v->v.evidenceId().equals(id)).findFirst().orElseThrow();
                 if(!e.articleId().equals(pin.string("documentId"))||!e.articleVersion().equals(pin.string("documentVersion")))reject();
                 var article=visible.articles().stream().filter(a->a.articleId().equals(e.articleId())&&a.version().equals(e.articleVersion())).findFirst().orElseThrow();
-                var row=jdbc.queryForMap("SELECT v.published_at,t.storage_uri,t.sha256,t.bytes FROM article_versions v JOIN artifacts t ON t.id=v.text_artifact_id WHERE v.article_id=? AND v.version=?",e.articleId(),e.articleVersion());
+                var row=jdbc.queryForMap("SELECT v.title,v.publisher,v.published_at,t.storage_uri,t.sha256,t.bytes FROM article_versions v JOIN artifacts t ON t.id=v.text_artifact_id WHERE v.article_id=? AND v.version=?",e.articleId(),e.articleVersion());
                 Instant at=((Timestamp)row.get("published_at")).toInstant();
-                String provider=jdbc.queryForObject("SELECT provider FROM articles WHERE id=?",String.class,e.articleId());
+                var articleInfo=jdbc.queryForMap("SELECT provider,kind FROM articles WHERE id=?",e.articleId());String provider=articleInfo.get("provider").toString();
+                if(!Objects.equals(row.get("title"),pin.stringOrNull("title"))||!Objects.equals(row.get("publisher"),pin.stringOrNull("publisher"))||!articleInfo.get("kind").equals(pin.string("sourceKind")))reject();
                 if(!inScope(provider,e.articleId(),e.articleVersion(),row.get("sha256").toString()))reject();
                 if(!at.isAfter(from)||at.isAfter(to)||!at.equals(Instant.parse(pin.string("publishedAt")))||!article.url().equals(pin.string("url"))||!row.get("sha256").equals(pin.string("bodySha256")))reject();
                 String text=new String(files.readVerified(row.get("storage_uri").toString(),row.get("sha256").toString(),((Number)row.get("bytes")).longValue()),java.nio.charset.StandardCharsets.UTF_8);
@@ -240,6 +241,7 @@ public final class BriefingServerCommand {
         var proposed=new BriefingRound(round.string("id"),LocalDate.parse(round.string("date")),round.string("edition"),Instant.parse(round.string("scheduledAt")),
             Instant.parse(round.string("windowFrom")),Instant.parse(round.string("windowTo")),false,"published",Instant.now(),Instant.parse(payload.string("generatedAt")),prepared.string("graphVersion"),payload.node(),snapshot.node(),comparison);
         BriefingSnapshotValidator.validate(proposed);
+        for(JsonNode item:payload.array("items"))BriefingItemDetailValidator.validate(proposed,item,snapshot.raw("itemDetails").path(item.path("eventId").asString()),new com.zoop.briefing.storage.BriefingRoundRepository(jdbc));
         if(!readAccess.mayRead(proposed,"briefing-server-publish"))reject();
         var ledger=new BriefingUsageLedger(named,new DataSourceTransactionManager(source),artifacts,Duration.ofSeconds(120));
         return ledger.publish(request.string("attemptId"),request.string("ownerToken"),()->{
