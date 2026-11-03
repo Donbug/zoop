@@ -54,4 +54,5 @@ def main():
 if __name__=='__main__':
     try:main()
     except Exception as error:
-        print('briefing-runtime-stopped:'+type(error).__name__,file=sys.stderr);raise SystemExit(1)
+        scope='temporary' if str(getattr(error,'filename','')).startswith('/tmp/') else 'artifact' if str(getattr(error,'filename','')).startswith('/mnt/zoop-artifacts') else 'state' if str(getattr(error,'filename','')).startswith('/mnt/zoop-briefing') else 'other'
+        print('briefing-runtime-stopped:'+type(error).__name__+':scope='+scope+':errno='+str(getattr(error,'errno',None)),file=sys.stderr);raise SystemExit(1)

@@ -12,7 +12,7 @@ docker build -f deployment/briefing/Dockerfile --build-arg API_IMAGE=zoop-api:br
 docker run --rm zoop-briefing:runtime --check
 ```
 
-The `api-container` required CI job builds both images and runs the credential-free entrypoint check. The entrypoint requires `BRIEFING_SERVER_ENABLED=true`; no environment or secret values are baked into the image. Run finite dedicated tasks with read-only root and writable private `/tmp`; leave the dedicated service at zero to prevent an extra continuous producer. Task user is 100:101. Do not replace or enable the shared AI reader's paid processing to run this producer.
+The `api-container` required CI job builds both images and runs the credential-free entrypoint check. The entrypoint requires `BRIEFING_SERVER_ENABLED=true`; no environment or secret values are baked into the image. Run finite dedicated tasks with read-only root and writable private `/tmp`; leave the dedicated service at zero to prevent an extra continuous producer. Task user is 100:101. The image declares `/tmp` as a volume owned by that user with mode 0700 so the ECS ephemeral bind mount retains writable private permissions; no provider key is written to EFS. Do not replace or enable the shared AI reader's paid processing to run this producer.
 
 | Runtime variable | Required meaning |
 | --- | --- |
