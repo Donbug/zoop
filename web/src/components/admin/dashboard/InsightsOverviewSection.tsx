@@ -10,8 +10,8 @@ import { count, formatPercent } from '@/components/admin/common/adminStyles';
 import {
   MetricBasis,
   MetricValue,
-  unavailableLabel,
 } from '@/components/admin/stats/insightsFormat';
+import { unavailableLabel } from '@/components/admin/stats/metricLabels';
 import { useAsyncData } from '@/hooks/useAsyncData';
 
 // A-ADM-01 이용·선호도(7일) (FS072, getInsightsOverview). 대시보드 조회와 따로 실패·재시도한다.

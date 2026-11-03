@@ -677,6 +677,12 @@ test('D-COM-02 D16 opens only actual claim evidence in the shared drawer and ret
   expect(drawer.closest('[aria-label="뉴스·공시"]')).toBeNull();
   expect(drawer.closest('.fixed')?.classList.contains('inset-0')).toBe(true);
   expect(document.body.classList.contains('overflow-hidden')).toBe(true);
+  // 근거 창은 다음 프레임에 제목으로 포커스를 옮기고, Escape는 창 안에서만 받는다.
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      within(drawer).getByRole('heading', { name: '근거 문서' }),
+    ),
+  );
   await userEvent.keyboard('{Escape}');
   expect(screen.queryByRole('dialog')).toBeNull();
   expect(document.body.classList.contains('overflow-hidden')).toBe(false);
