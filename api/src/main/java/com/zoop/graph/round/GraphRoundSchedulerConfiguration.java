@@ -61,7 +61,7 @@ public class GraphRoundSchedulerConfiguration {
     GraphRoundWorker graphRoundWorker(GraphRoundRepository rounds, GraphRoundClock calendar, ObjectProvider<RoundRunClient> runs,
             ObjectProvider<RoundHandoffClient> handoffs, RoundAnalysisQueue analysis, RoundBindingsSource bindings,
             GraphRoundImportBridge bridge, GraphRoundProperties properties, ObjectProvider<AiRoundClientProperties> settings,
-            ObjectProvider<AiTransportProperties> transport, Clock clock) {
+            ObjectProvider<AiTransportProperties> transport, ObjectProvider<RoundPreparation> preparation, Clock clock) {
         RoundRunClient runClient = runs.getIfAvailable();
         RoundHandoffClient handoffClient = handoffs.getIfAvailable();
         AiRoundClientProperties clientProperties = settings.getIfAvailable();
@@ -71,7 +71,7 @@ public class GraphRoundSchedulerConfiguration {
         RoundServiceBinding binding = RoundServiceBinding.of(clientProperties.toSettings(transport.getObject()),
                 clientProperties.expectedPrincipal());
         return new GraphRoundWorker(rounds, calendar, runClient, handoffClient, analysis, bindings, bridge, properties,
-                binding, clock, owner());
+                binding, clock, owner(), preparation.getIfAvailable(() -> RoundPreparation.NONE));
     }
 
     @Bean
