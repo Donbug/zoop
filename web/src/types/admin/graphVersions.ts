@@ -45,6 +45,21 @@ export type GraphVersionList = {
   nextCursor: string | null;
 };
 
+/**
+ * activateGraphVersion의 mode. forward는 아직 표시한 적 없는 버전(새 후보·합성 fixture)으로 바꾸고, rollback은 실제로
+ * 표시했던 실데이터 버전으로 되돌린다. 서버는 표시했던 실데이터 버전을 forward로 받지 않는다(422).
+ */
+export type GraphVersionActivationMode = 'forward' | 'rollback';
+
+/** 버전 상태로 정하는 mode: 표시한 적 있는(activatedAt) 실데이터 버전은 되돌리기, 나머지는 전환. */
+export function activationModeOf(
+  version: Pick<GraphVersion, 'kind' | 'activatedAt'>,
+): GraphVersionActivationMode {
+  return version.kind !== 'fixture' && version.activatedAt !== null
+    ? 'rollback'
+    : 'forward';
+}
+
 export type GraphVersionActivated = {
   activeVersionId: string;
   previousActiveVersionId: string | null;

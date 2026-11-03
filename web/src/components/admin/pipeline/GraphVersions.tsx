@@ -12,10 +12,11 @@ import {
 import { BUTTON, TD, TH, count } from '@/components/admin/common/adminStyles';
 import GraphVersionForm from '@/components/admin/pipeline/GraphVersionForm';
 import { useCursorPages } from '@/hooks/useCursorPages';
-import type {
-  GraphDbVersionStatus,
-  GraphVersion,
-  GraphVersionActivation,
+import {
+  activationModeOf,
+  type GraphDbVersionStatus,
+  type GraphVersion,
+  type GraphVersionActivation,
 } from '@/types/admin/graphVersions';
 import { formatKst } from '@/util/format';
 
@@ -33,7 +34,8 @@ const activationLabel: Record<GraphVersionActivation['action'], string> = {
 
 // A-ADM-03 그래프 버전 탭 (FS059, listGraphVersions·activateGraphVersion)
 // - 지금 사용자에게 보이는 버전, 버전 목록(최신 먼저), 전환 이력을 보여 준다.
-// - 이미 있는 버전으로만 바꾼다. 원장에서 새 버전 게시(publishGraphVersion)는 API가 아직 없다.
+// - 이미 있는 버전으로만 바꾼다. 표시한 적 없는 버전은 전환(forward), 표시했던 실데이터 버전은 되돌리기(rollback).
+// - 원장에서 새 버전 게시(publishGraphVersion)는 API가 아직 없다.
 export default function GraphVersions({
   onActivated,
 }: {
@@ -72,8 +74,8 @@ export default function GraphVersions({
           <strong className="font-num text-zoop-ink">
             {activeVersionId ?? '없음'}
           </strong>
-          . 이미 있는 버전으로만 바꿀 수 있어요. 새 버전 게시는 아직 지원하지
-          않아요.
+          . 이미 있는 버전으로만 바꿀 수 있고, 이전에 표시했던 버전은 되돌리기로
+          바꿔요. 새 버전 게시는 아직 지원하지 않아요.
         </Note>
         {stale && (
           <div
@@ -115,7 +117,9 @@ export default function GraphVersions({
               setNotice(
                 result.idempotent
                   ? `${result.activeVersionId}는 이미 표시 중이에요.`
-                  : `${result.activeVersionId}로 바꿨어요.`,
+                  : activationModeOf(target) === 'rollback'
+                    ? `${result.activeVersionId}로 되돌렸어요.`
+                    : `${result.activeVersionId}로 바꿨어요.`,
               );
               versions.reload();
               if (!result.idempotent) onActivated?.();
@@ -189,20 +193,35 @@ export default function GraphVersions({
                     {version.reason ?? '–'}
                   </td>
                   <td className={`${TD} text-right whitespace-nowrap`}>
-                    {version.id !== activeVersionId && !stale && (
-                      <button
-                        type="button"
-                        disabled={pending}
-                        aria-label={`${version.id}로 전환`}
-                        onClick={() => {
-                          setNotice(null);
-                          setTarget(version);
-                        }}
-                        className={BUTTON}
-                      >
-                        전환
-                      </button>
-                    )}
+                    {version.id !== activeVersionId &&
+                      !stale &&
+                      (activationModeOf(version) === 'rollback' ? (
+                        <button
+                          type="button"
+                          disabled={pending}
+                          aria-label={`${version.id}로 되돌리기`}
+                          onClick={() => {
+                            setNotice(null);
+                            setTarget(version);
+                          }}
+                          className={BUTTON}
+                        >
+                          되돌리기
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={pending}
+                          aria-label={`${version.id}로 전환`}
+                          onClick={() => {
+                            setNotice(null);
+                            setTarget(version);
+                          }}
+                          className={BUTTON}
+                        >
+                          전환
+                        </button>
+                      ))}
                   </td>
                 </tr>
               ))}

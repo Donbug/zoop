@@ -204,6 +204,7 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     expect(call.body).toEqual({
       reason: '이전 버전으로 되돌림',
       expectedActiveVersionId: 'v2',
+      mode: 'forward',
     });
     const [headers] = headersOf('/activate');
     expect(headers.get('X-CSRF-Token')).toBe('csrf-admin');
@@ -214,7 +215,104 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     });
     const [, v2, v1] = within(table).getAllByRole('row');
     expect(await within(v1).findByText('표시 중')).toBeTruthy();
-    expect(within(v2).getByRole('button', { name: 'v2로 전환' })).toBeTruthy();
+    // v2는 표시했던 실데이터 버전이라 전환(forward)이 아니라 되돌리기(rollback)로만 바꾼다.
+    expect(within(v2).queryByRole('button', { name: 'v2로 전환' })).toBeNull();
+    expect(
+      within(v2).getByRole('button', { name: 'v2로 되돌리기' }),
+    ).toBeTruthy();
+  });
+
+  test('표시했던 실데이터 버전은 되돌리기(rollback)로 보내고, 아직 표시하지 않은 버전은 전환(forward)이다', async () => {
+    let active = 'v3';
+    const versions = (): GraphVersionList => ({
+      activeVersionId: active,
+      items: [
+        version({ id: 'v3', sequence: 3, active: active === 'v3' }),
+        version({
+          id: 'v2',
+          active: active === 'v2',
+          activatedAt: '2026-10-21T03:05:00Z',
+        }),
+        version({
+          id: 'v4',
+          sequence: 4,
+          active: false,
+          activatedAt: null,
+          reason: '자동 준비 후보',
+        }),
+      ],
+      activations: [],
+      nextCursor: null,
+    });
+    server.on('GET', VERSIONS, () => json(versions()));
+    server.on('POST', ACTIVATE, () => {
+      active = 'v2';
+      return json({
+        activeVersionId: 'v2',
+        previousActiveVersionId: 'v3',
+        idempotent: false,
+      });
+    });
+    const { user } = open();
+
+    const table = await screen.findByRole('table', {
+      name: '그래프 버전 목록',
+    });
+    expect(
+      within(table).getByRole('button', { name: 'v4로 전환' }),
+    ).toBeTruthy();
+    await user.click(
+      within(table).getByRole('button', { name: 'v2로 되돌리기' }),
+    );
+    const form = screen.getByRole('form', { name: '그래프 버전 되돌리기' });
+    expect(within(form).getByText(/이전에 표시했던 버전이에요/)).toBeTruthy();
+    await user.type(
+      within(form).getByLabelText('전환 사유(감사 로그에 남아요)'),
+      '새 버전 문제로 되돌림',
+    );
+    await user.click(
+      within(form).getByRole('button', { name: 'v2로 되돌리기' }),
+    );
+
+    expect(await screen.findByText('v2로 되돌렸어요.')).toBeTruthy();
+    const [call] = server.calls('POST', ACTIVATE);
+    expect(call.params.versionId).toBe('v2');
+    expect(call.body).toEqual({
+      reason: '새 버전 문제로 되돌림',
+      expectedActiveVersionId: 'v3',
+      mode: 'rollback',
+    });
+  });
+
+  test('되돌릴 수 없는 버전이라는 거절(422)은 그 이유로 알린다', async () => {
+    server.on('GET', VERSIONS, () =>
+      json({
+        activeVersionId: 'v3',
+        items: [
+          version({ id: 'v3', sequence: 3 }),
+          version({ id: 'v2', active: false }),
+        ],
+        activations: [],
+        nextCursor: null,
+      }),
+    );
+    server.on('POST', ACTIVATE, () => apiError(422, 'INVALID_REQUEST'));
+    const { user } = open();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'v2로 되돌리기' }),
+    );
+    const form = screen.getByRole('form', { name: '그래프 버전 되돌리기' });
+    await user.type(
+      within(form).getByLabelText('전환 사유(감사 로그에 남아요)'),
+      '되돌림',
+    );
+    await user.click(
+      within(form).getByRole('button', { name: 'v2로 되돌리기' }),
+    );
+    expect(
+      await within(form).findByText(/표시된 적이 없어 되돌릴 수 없어요/),
+    ).toBeTruthy();
   });
 
   test('그 사이 다른 관리자가 바꿨으면(409) 새로 고치라고 알린다', async () => {
@@ -296,7 +394,13 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
       ...base,
       items: [
         ...base.items,
-        version({ id: 'v0', sequence: 0, active: false, reason: null }),
+        version({
+          id: 'v0',
+          sequence: 0,
+          active: false,
+          activatedAt: null,
+          reason: null,
+        }),
       ],
     };
     server.on('GET', VERSIONS, () => json(three));
@@ -336,7 +440,14 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
       query.get('cursor')
         ? json({
             ...list('v1'),
-            items: [version({ id: 'v0', sequence: 0, active: false })],
+            items: [
+              version({
+                id: 'v0',
+                sequence: 0,
+                active: false,
+                activatedAt: null,
+              }),
+            ],
             nextCursor: null,
           })
         : json({
@@ -395,7 +506,14 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
       query.get('cursor')
         ? json({
             ...list('v1'),
-            items: [version({ id: 'v0', sequence: 0, active: false })],
+            items: [
+              version({
+                id: 'v0',
+                sequence: 0,
+                active: false,
+                activatedAt: null,
+              }),
+            ],
             nextCursor: null,
           })
         : json({
