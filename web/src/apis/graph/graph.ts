@@ -108,7 +108,7 @@ export async function getGraph(request: GraphRequest): Promise<GraphResponse> {
   return marketMap(request, graph);
 }
 
-/** 시장 전체 지도(기업 중심 보기 제외)에는 사건 없는 기업도 연결 없는 기업으로 보인다. */
+/** D-GRP-01: 시장 전체에는 등록 기업을 모두 표시하고 관계는 공개 스냅샷만 사용한다. */
 function marketMap(request: GraphRequest, graph: GraphResponse) {
   return request.mode === 'all' && !request.companyId
     ? withCatalogCompanies(graph)

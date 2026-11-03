@@ -114,27 +114,18 @@ export function toG6Data(
   width: number,
   height: number,
   expandedId?: string | null,
-  forcedNodes: string[] = [],
+  _forcedNodes: string[] = [],
   emphasizedNodes: Set<string> = new Set(),
 ): GraphData {
+  void _forcedNodes;
   const summary = graphSummary(data);
   const personal = data.metadata.mode === 'personal';
   const scale = personal ? 0.69 : 1;
   const positions = relationshipPositions(data);
-  const followsIds = new Set(
-    data.edges
-      .filter((e) => e.relationType === 'FOLLOWS')
-      .flatMap((e) => [e.source, e.target]),
-  );
-  const visible = data.nodes.filter(
-    (n) =>
-      forcedNodes.includes(n.id) ||
-      n.kind === 'company' ||
-      n.isFocus ||
-      n.id === expandedId ||
-      (summary.incident.get(n.id)?.length ?? 0) > 1 ||
-      followsIds.has(n.id),
-  );
+  // D-GRP-01: every public issue stays on the canvas. Folding single-company
+  // issues hid both the issue and its only INVOLVES edge, making related
+  // companies look disconnected even though the API returned the relation.
+  const visible = data.nodes;
   const nodeIds = new Set(visible.map((n) => n.id));
   const result: GraphData = {
     nodes: visible.map((n) => {
@@ -146,18 +137,6 @@ export function toG6Data(
         ? companyNodeSize(summary.companyIssueCounts.get(n.id) ?? 0, scale)
         : 7 * scale;
       const badges = [
-        ...(company && summary.folded.has(n.id)
-          ? [
-              {
-                text: `ϟ${summary.folded.get(n.id)}`,
-                placement: 'right-top' as const,
-                fill: themeColor('muted'),
-                background: false,
-                fontSize: 7.178 * scale,
-                fontFamily: 'SUIT Variable',
-              },
-            ]
-          : []),
         ...(n.holding || n.watch
           ? [
               {

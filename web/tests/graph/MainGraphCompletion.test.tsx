@@ -580,7 +580,10 @@ it('D-GRP-01 지도 안내는 개발용 MOCK 문구 없이 보유·관심 표기
   await userEvent.click(
     await screen.findByRole('button', { name: '지도 데이터 안내' }),
   );
-  const info = await screen.findByText(/개별 사건은 ϟ 숫자로/);
+  const info = await screen.findByText(/등록된 기업 전체와 공개 사건/);
+  expect(info.textContent).toContain(
+    '관계선이 없는 기업은 현재 공개 사건이 연결되지 않은 기업',
+  );
   expect(info.textContent).toContain('이름 아래에 보유 또는 관심이라고');
   expect(info.textContent).toContain(
     '노드 크기와 거리는 인과 관계나 중요도를 뜻하지',

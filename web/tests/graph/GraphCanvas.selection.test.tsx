@@ -69,6 +69,9 @@ vi.mock('@antv/g6', () => ({
     layout = canvas.layout;
     fitView = canvas.fitView;
     setPlugins = canvas.setPlugins;
+    getPluginInstance() {
+      return undefined;
+    }
     setZoomRange = canvas.setZoomRange;
     getZoom = canvas.getZoom;
     getZoomRange = canvas.getZoomRange;
@@ -269,10 +272,10 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(canvas.zoomTo).not.toHaveBeenCalled();
   });
 
-  it('D-GRP-01 Shift+Enter on a folded event expands it first and fits its neighborhood after that draw', async () => {
+  it('D-GRP-01 Shift+Enter on a single-company event fits its visible neighborhood', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const onSelect = vi.fn();
-    const view = render(<GraphCanvas data={data} onSelect={onSelect} />);
+    render(<GraphCanvas data={data} onSelect={onSelect} />);
     const host = screen.getByRole('img');
     Object.defineProperty(host, 'clientWidth', {
       configurable: true,
@@ -287,23 +290,14 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       (
         canvas.setData.mock.lastCall![0] as { nodes: { id: string }[] }
       ).nodes.map((node) => node.id);
-    expect(drawnIds()).not.toContain('mock-issue-20');
+    expect(drawnIds()).toContain('mock-issue-20');
     canvas.zoomTo.mockClear();
     fireEvent.keyDown(
       screen.getByRole('button', { name: '사건: 삼성전자 개별 공시 (예시)' }),
       { key: 'Enter', shiftKey: true },
     );
-    await waitFor(() => expect(onSelect).toHaveBeenCalledWith('mock-issue-20'));
-    expect(canvas.zoomTo).not.toHaveBeenCalled();
-    view.rerender(
-      <GraphCanvas
-        data={data}
-        onSelect={onSelect}
-        selectedId="mock-issue-20"
-      />,
-    );
-    await waitFor(() => expect(drawnIds()).toContain('mock-issue-20'));
     await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
+    expect(onSelect).not.toHaveBeenCalled();
     expect(canvas.zoomTo.mock.lastCall![0]).toBeLessThanOrEqual(1.8);
   });
 
@@ -1096,25 +1090,26 @@ describe('D-GRP-02 · canvas selection bridge', () => {
 
   it('enables the desktop minimap only above sixty visible nodes', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
-    const { rerender } = render(<GraphCanvas data={data} />);
+    const smallIds = new Set(data.nodes.slice(0, 50).map((node) => node.id));
+    const small = {
+      ...data,
+      nodes: data.nodes.filter((node) => smallIds.has(node.id)),
+      edges: data.edges.filter(
+        (edge) => smallIds.has(edge.source) && smallIds.has(edge.target),
+      ),
+    };
+    const { rerender } = render(<GraphCanvas data={small} />);
     const host = screen.getByRole('img');
     Object.defineProperty(host, 'clientWidth', {
       configurable: true,
       value: 1200,
     });
+    Object.defineProperty(host, 'clientHeight', {
+      configurable: true,
+      value: 800,
+    });
     await waitFor(() => expect(canvas.setPlugins).toHaveBeenCalledWith([]));
-    const company = data.nodes.find((node) => node.kind === 'company')!;
-    const large = {
-      ...data,
-      nodes: [
-        ...data.nodes,
-        ...Array.from({ length: 70 }, (_, index) => ({
-          ...company,
-          id: `more-${index}`,
-        })),
-      ],
-    };
-    rerender(<GraphCanvas data={large} />);
+    rerender(<GraphCanvas data={data} />);
     await waitFor(() =>
       expect(canvas.setPlugins).toHaveBeenLastCalledWith([
         expect.objectContaining({ type: 'minimap', size: [192, 128] }),
@@ -1456,7 +1451,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(canvas.created).toHaveBeenCalledOnce();
     expect(canvas.destroyed).not.toHaveBeenCalled();
   });
-  it('opens a folded event from the keyboard and retains it when it is the focus target', async () => {
+  it('opens a single-company event from the keyboard and retains it when it is the focus target', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const onSelect = vi.fn();
     const props = {
