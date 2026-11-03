@@ -61,7 +61,7 @@ only/limit/returned/maskingCounts만 포함한다. 질문·답변·평가 사유
 
 ## 재검증
 
-새 테스트는 `TranscriptMaskerTest`, `TranscriptServiceTest`,
+새 테스트는 `TranscriptMaskerTest`, `TranscriptServiceTest`, `TranscriptSchemaTest`,
 `TranscriptPostgresTest`와 웹 `tests/admin/adminInsights.test.tsx`에 있다.
 피드백 목록의 sessionId 연결은 `AiResultFeedbackPostgresTest`에서 확인한다.
 PostgreSQL 테스트는 기존 `auth-postgres` 태그와 DB_URL 조건을 사용한다.
