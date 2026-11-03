@@ -22,10 +22,14 @@ class RoundConfig:
     max_age_seconds: int
     limit: int
     handoff_binding: dict
+    eligibility: dict | None = None
 
     def binding(self):
-        return {"profile": str(self.profile_path), "sha256": self.profile_sha256,
-                "ingestionCommand": str(self.ingestion_command), "handoff": self.handoff_binding}
+        binding = {"profile": str(self.profile_path), "sha256": self.profile_sha256,
+                   "ingestionCommand": str(self.ingestion_command), "handoff": self.handoff_binding}
+        if self.eligibility is not None:
+            binding["eligibility"] = {key: value for key, value in self.eligibility.items() if key != "calendarJson"}
+        return binding
 
 
 def load_round(environ, *, extraction, relation, handoff, observation, plan_root):
@@ -42,7 +46,7 @@ def load_round(environ, *, extraction, relation, handoff, observation, plan_root
         raw = read_file(path, 2_000_000)
         doc = decode(raw)
         if set(doc) != {"schemaVersion", "sourceId", "scopeId", "initialFrom", "fixtureManifest", "descriptor", "selection"} \
-                or doc["schemaVersion"] != "zoop-ai-round-profile-1":
+                or doc["schemaVersion"] not in {"zoop-ai-round-profile-1", "zoop-ai-round-profile-2"}:
             raise ValueError("profile shape")
         if any(not isinstance(doc[k], str) or not 1 <= len(doc[k]) <= 200 for k in ("sourceId", "scopeId")):
             raise ValueError("source scope")
@@ -50,10 +54,39 @@ def load_round(environ, *, extraction, relation, handoff, observation, plan_root
         if initial.tzinfo is None:
             raise ValueError("initial timestamp")
         selection = doc["selection"]
-        if set(selection) != {"maxAgeSeconds", "limit", "cadenceMinutes"} or type(selection["maxAgeSeconds"]) is not int \
-                or selection["maxAgeSeconds"] <= 0 or type(selection["limit"]) is not int or not 1 <= selection["limit"] <= 8 \
+        eligibility = None
+        if type(selection["limit"]) is not int or not 1 <= selection["limit"] <= 8 \
                 or type(selection["cadenceMinutes"]) is not int or selection["cadenceMinutes"] != 30:
             raise ValueError("selection policy")
+        if doc["schemaVersion"] == "zoop-ai-round-profile-1":
+            if set(selection) != {"maxAgeSeconds", "limit", "cadenceMinutes"}:
+                raise ValueError("selection policy")
+            max_age = selection["maxAgeSeconds"]
+        else:
+            if set(selection) != {"eligibility", "limit", "cadenceMinutes"}:
+                raise ValueError("selection policy")
+            policy = selection["eligibility"]
+            if policy["kind"] == "elapsed-age-1":
+                if set(policy) != {"kind", "maxAgeSeconds"}:
+                    raise ValueError("elapsed policy")
+                max_age = policy["maxAgeSeconds"]
+                eligibility = policy
+            elif policy["kind"] == "through-next-business-day-close-1":
+                if set(policy) != {"kind", "calendar", "inventoryMaxAgeSeconds"} \
+                        or set(policy["calendar"]) != {"path", "sha256"}:
+                    raise ValueError("calendar policy")
+                calendar_path = _file(policy["calendar"]["path"], PROFILE)
+                calendar_raw = read_file(calendar_path, 1_500_000)
+                if sha(calendar_raw) != policy["calendar"]["sha256"]:
+                    raise ValueError("calendar digest")
+                eligibility = {"kind": policy["kind"], "calendarJson": calendar_raw.decode("utf-8"),
+                               "calendarSha256": policy["calendar"]["sha256"],
+                               "inventoryMaxAgeSeconds": policy["inventoryMaxAgeSeconds"]}
+                max_age = policy["inventoryMaxAgeSeconds"]
+            else:
+                raise ValueError("eligibility mode")
+        if type(max_age) is not int or max_age <= 0:
+            raise ValueError("age bound")
         descriptor = doc["descriptor"]
         if set(descriptor) != {"schemaVersion", "provenance", "promptVersion", "catalogue", "snapshot", "topic"} \
                 or descriptor["schemaVersion"] != "zoop-extraction-s2-2":
@@ -64,4 +97,4 @@ def load_round(environ, *, extraction, relation, handoff, observation, plan_root
     handoff_binding = {"command": str(handoff.command), "state": str(handoff.state_dir), "canonical": str(handoff.canonical_path),
                        "decisions": str(handoff.decisions_path), "sources": str(handoff.sources_path)}
     return RoundConfig(path, sha(raw), observation.command, doc["sourceId"], doc["scopeId"], doc["initialFrom"], fixture,
-                       descriptor, selection["maxAgeSeconds"], selection["limit"], handoff_binding)
+                       descriptor, max_age, selection["limit"], handoff_binding, eligibility)

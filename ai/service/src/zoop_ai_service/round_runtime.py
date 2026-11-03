@@ -14,7 +14,9 @@ def interpret(schema, code, raw):
         text = raw.decode("utf-8")
         value = json.loads(text, object_pairs_hook=_duplicate_free, parse_constant=_no_constant)
         expected = ({"zoop-extraction-service-plan-receipt-1": "zoop-extraction-s2-2",
-                     "zoop-ingestion-round-inventory-1": "zoop-ingestion-s2-1"}.get(schema, schema) if code == 2 else schema)
+                     "zoop-ingestion-round-inventory-1": "zoop-ingestion-s2-1",
+                     "zoop-ingestion-round-inventory-2": "zoop-ingestion-s2-1",
+                     "zoop-ai-round-calendar-check-1": "zoop-ingestion-s2-1"}.get(schema, schema) if code == 2 else schema)
         if canonical(value) != text.removesuffix("\n") or value.get("schemaVersion") != expected:
             raise ValueError("native wire")
         if "error" in value:
@@ -46,7 +48,12 @@ class RoundProcess:
     def inventory(self, body):
         cfg, extraction = self.config.rounds, self.config.extraction
         return self.call([str(cfg.ingestion_command), "round-inventory", "--state-dir", str(extraction.ingestion_state_dir),
-                          "--sources", str(extraction.sources_path)], body, "zoop-ingestion-round-inventory-1")
+                          "--sources", str(extraction.sources_path)], body, body["schemaVersion"])
+
+    def calendar(self, body):
+        cfg, extraction = self.config.rounds, self.config.extraction
+        return self.call([str(cfg.ingestion_command), "round-calendar", "--state-dir", str(extraction.ingestion_state_dir),
+                          "--sources", str(extraction.sources_path)], body, "zoop-ai-round-calendar-check-1")
 
     def plan(self, owner, body, selection, output):
         e = self.config.extraction

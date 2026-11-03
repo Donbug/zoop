@@ -31,7 +31,7 @@ def facade(store):
     service._wake, service._stop = threading.Event(), threading.Event()
     service._log = lambda event: None
     service.profile = SimpleNamespace(max_age_seconds=86400, limit=8, source_id="shared", scope_id="scope",
-                                      initial_from="2026-10-30T00:00:00+09:00", descriptor={})
+                                      initial_from="2026-10-30T00:00:00+09:00", descriptor={}, eligibility=None)
     return service
 
 
@@ -389,3 +389,53 @@ def test_long_history_stays_private_and_pending_candidates_survive_bounded_selec
         assert store.db.execute("SELECT count(*) FROM observation_claims").fetchone()[0] == 8009
     finally:
         store.close()
+
+
+def test_profile_modes_keep_legacy_binding_bytes_and_refuse_state_rebinding(tmp_path):
+    from zoop_ai_service.config import ConfigError
+    from zoop_ai_service.round_config import PROFILE, load_round
+    from zoop_ai_service.plan_authority import canonical
+    root = tmp_path.resolve()
+    profile, fixture, calendar = (root / name for name in ("profile.json", "fixture.json", "calendar.json"))
+    fixture.write_text("{}")
+    calendar.write_text('{"operatorReview":"authored profile pin test"}')
+    handoff = SimpleNamespace(source_contexts=None, command=fixture, state_dir=root / "handoff",
+                              canonical_path=fixture, decisions_path=fixture, sources_path=fixture)
+    kwargs = dict(extraction=object(), relation=object(), handoff=handoff,
+                  observation=SimpleNamespace(source_contexts=None, command=fixture), plan_root=root / "plans")
+    doc = {"schemaVersion": "zoop-ai-round-profile-1", "sourceId": "synthetic-source", "scopeId": "body",
+           "initialFrom": "2026-10-16T00:00:00+09:00", "fixtureManifest": str(fixture),
+           "descriptor": {"schemaVersion": "zoop-extraction-s2-2", "provenance": {}, "promptVersion": "authored",
+                          "catalogue": {}, "snapshot": {}, "topic": None},
+           "selection": {"maxAgeSeconds": 291600, "limit": 8, "cadenceMinutes": 30}}
+    raw = canonical(doc).encode()
+    profile.write_bytes(raw)
+    old = load_round({PROFILE: str(profile)}, **kwargs)
+    expected = {"profile": str(profile), "sha256": hashlib.sha256(raw).hexdigest(), "ingestionCommand": str(fixture),
+                "handoff": {"command": str(fixture), "state": str(root / "handoff"), "canonical": str(fixture),
+                            "decisions": str(fixture), "sources": str(fixture)}}
+    assert canonical(old.binding()) == canonical(expected)
+    store = RoundStore(root, old.binding())
+    ref = {"roundId": "slot-original", "sourceId": "synthetic-source", "page": 0, "ordinal": 0}
+    _, row = store.reserve("alpha", "run", ROUND, b"old request", {"started": False})
+    store.claim_observations(store.claim(row), [ref], [])
+    store.close()
+    doc.update(schemaVersion="zoop-ai-round-profile-2", selection={"limit": 8, "cadenceMinutes": 30, "eligibility": {
+        "kind": "through-next-business-day-close-1", "calendar": {"path": str(calendar),
+        "sha256": hashlib.sha256(calendar.read_bytes()).hexdigest()}, "inventoryMaxAgeSeconds": 291600}})
+    profile.write_text(canonical(doc))
+    new = load_round({PROFILE: str(profile)}, **kwargs)
+    assert new.binding()["sha256"] != old.binding()["sha256"]
+    assert new.binding()["eligibility"] == {"kind": "through-next-business-day-close-1",
+        "calendarSha256": hashlib.sha256(calendar.read_bytes()).hexdigest(), "inventoryMaxAgeSeconds": 291600}
+    with pytest.raises(ConfigError) as mismatch:
+        RoundStore(root, new.binding())
+    assert mismatch.value.reason == "round_binding_mismatch"
+    preserved = RoundStore(root, old.binding())
+    assert preserved.claimed([ref]) == {canonical(ref)}
+    assert preserved.get("alpha", "run", ROUND)["result"]["code"] == "round_outcome_unknown"
+    preserved.close()
+    calendar.write_text("changed bytes")
+    with pytest.raises(ConfigError) as changed:
+        load_round({PROFILE: str(profile)}, **kwargs)
+    assert changed.value.reason == "round_profile_invalid"

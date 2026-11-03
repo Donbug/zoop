@@ -23,12 +23,12 @@ def write(path, value):
     return path
 
 
-def initial():
+def initial(origin_day="2026-10-17", next_slot=None):
     world = World(ROOT)
     items = [doc_item(world, "main")]
-    manifest = world.covering("service-round", slot("09:05"), items, {"main": page(EVT, SUP)})
-    empty_manifest = world.covering("empty-round", slot("10:05"), [])
-    tick = world.tick(at("09:05:00"), initial=at("00:00:00"), manifest=manifest, state="ingestion")
+    manifest = world.covering("service-round", slot("09:05", origin_day), items, {"main": page(EVT, SUP)})
+    empty_manifest = world.covering("empty-round", next_slot or slot("10:05"), [])
+    tick = world.tick(at("09:05:00", origin_day), initial=at("00:00:00", origin_day), manifest=manifest, state="ingestion")
     assert tick["round"]["state"] == "complete"
     head, refs = world.refs(tick["tick"]["roundId"])
     ref = {"roundId": head["roundId"], "sourceId": head["sourceId"],
@@ -90,5 +90,15 @@ def author(approvals, replay):
 
 
 if __name__ == "__main__":
-    result = author(Path(sys.argv[3]), Path(sys.argv[4])) if len(sys.argv) > 3 else initial()
+    if sys.argv[3:4] == ["--calendar-fixture"]:
+        result = initial(sys.argv[4], sys.argv[5])
+    elif sys.argv[3:4] == ["--initialize-ledgers"]:
+        from zoop_ai_pipeline.extraction import Store as ExtractionStore
+        from zoop_ai_pipeline.relation import Store as RelationStore
+        extraction, relation = map(Path, sys.argv[4:6])
+        ExtractionStore(extraction, ROOT / "ingestion").close()
+        RelationStore(relation, extraction, ROOT / "ingestion").close()
+        result = {"state": "initialized"}
+    else:
+        result = author(Path(sys.argv[3]), Path(sys.argv[4])) if len(sys.argv) > 3 else initial()
     print(canonical(result))

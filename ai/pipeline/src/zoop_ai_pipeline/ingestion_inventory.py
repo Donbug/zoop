@@ -7,10 +7,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from .ingestion import Ingestor, Store
-from .ingestion_contracts import Authority, IngestionFailure, Wire, timestamp
+from .ingestion_contracts import Authority, IngestionFailure, Wire, byte_hash, canonical, timestamp
+from .round_calendar import CalendarEligibility
 
 SCHEMA = "zoop-ingestion-round-inventory-1"
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
@@ -50,6 +51,31 @@ class Inventory(Wire):
         timestamp(value)
         return value
 
+class CalendarCursor(Cursor):
+    binding: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class CalendarInventory(Inventory):
+    schema_version: Literal["zoop-ingestion-round-inventory-2"]
+    eligibility: CalendarEligibility
+    after: CalendarCursor | None = None
+
+    @model_validator(mode="after")
+    def retrieval_bound(self):
+        if self.max_age_seconds != self.eligibility.inventory_max_age_seconds:
+            raise ValueError("calendar inventory bound mismatch")
+        return self
+
+
+def parse_inventory(value):
+    model = CalendarInventory if value.get("schemaVersion") == "zoop-ingestion-round-inventory-2" else Inventory
+    return model.model_validate(value)
+
+
+def cursor_binding(request, revision):
+    return byte_hash(canonical({"sourceId": request.source_id, "scopeId": request.scope_id, "asOf": request.as_of,
+                                "eligibility": request.eligibility.wire(), "checkpointRevision": revision}).encode())
+
 
 def inventory(request: Inventory, root: Path, authority: Authority) -> dict:
     """Only complete, timed, prepared, unambiguous observations in the explicit age window are candidates.
@@ -58,8 +84,12 @@ def inventory(request: Inventory, root: Path, authority: Authority) -> dict:
     exact-observation claims decide which relevant candidates remain available. Missing/foreign/partial state is not adopted.
     """
     authority.check(request.source_id, request.scope_id, OPERATIONS)
-    result = {"schemaVersion": SCHEMA, "sourceId": request.source_id, "scopeId": request.scope_id,
+    calendar = request.eligibility.calendar() if isinstance(request, CalendarInventory) else None
+    if calendar is not None:
+        calendar.business(timestamp(request.as_of))
+    result = {"schemaVersion": request.schema_version, "sourceId": request.source_id, "scopeId": request.scope_id,
               "asOf": request.as_of, "maxAgeSeconds": request.max_age_seconds,
+              **({"eligibility": request.eligibility.wire()} if calendar is not None else {}),
               "checkpoint": {"revision": 0, "through": None}, "observations": [], "next": None}
     try:
         store = Store(root, existing=True)
@@ -82,6 +112,8 @@ def inventory(request: Inventory, root: Path, authority: Authority) -> dict:
         revision = result["checkpoint"]["revision"]
         if request.checkpoint_revision is not None and request.checkpoint_revision != revision:
             raise IngestionFailure("checkpoint_stale")
+        if calendar is not None and request.after is not None and request.after.binding != cursor_binding(request, revision):
+            raise IngestionFailure("calendar_cursor_binding_mismatch")
         if request.limit == 0:
             return result
         store.db.create_function("round_slot_micros", 1, micros, deterministic=True)
@@ -95,6 +127,16 @@ def inventory(request: Inventory, root: Path, authority: Authority) -> dict:
         """
         now = micros(request.as_of)
         args = [request.source_id, request.scope_id, now - request.max_age_seconds * 1_000_000, now]
+        if calendar is not None:
+            # Validate owner-derived slots before SQL calls: SQLite hides exceptions raised by UDFs.
+            slots = store.db.execute("""
+                SELECT DISTINCT json_extract(request,'$.window.through') AS slot FROM rounds
+                WHERE source=? AND json_extract(request,'$.scopeId')=? AND state='complete'
+                  AND round_slot_micros(json_extract(request,'$.window.through')) BETWEEN ? AND ?
+            """, args).fetchall()
+            eligible_slots = {row["slot"] for row in slots if calendar.eligible(row["slot"], request.as_of)}
+            store.db.create_function("calendar_eligible", 1, lambda value: value in eligible_slots, deterministic=True)
+            query += " AND calendar_eligible(json_extract(r.request,'$.window.through'))"
         if request.after is not None:
             query += " AND (round_slot_micros(json_extract(r.request,'$.window.through')),c.round,c.page,c.ordinal) > (?,?,?,?)"
             args += [micros(request.after.slot), request.after.round_id, request.after.page, request.after.ordinal]
@@ -114,6 +156,8 @@ def inventory(request: Inventory, root: Path, authority: Authority) -> dict:
         if len(rows) > request.limit:
             last = rows[request.limit - 1]
             result["next"] = {"slot": last["slot"], "roundId": last["round"], "page": last["page"], "ordinal": last["ordinal"]}
+            if calendar is not None:
+                result["next"]["binding"] = cursor_binding(request, revision)
         authority.check(request.source_id, request.scope_id, OPERATIONS,
                         json.loads(checkpoint["config"]) if checkpoint is not None else None)
         return result

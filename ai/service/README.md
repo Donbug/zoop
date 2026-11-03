@@ -141,6 +141,8 @@ Verifier가 종료 코드 2와 닫힌 `zoop-extraction-s2-2` 오류 envelope를 
 
 profile의 필수 키는 `schemaVersion`, `sourceId`, `scopeId`, `initialFrom`, `fixtureManifest`, `descriptor`, `selection`입니다. `descriptor`는 기존 extraction의 `schemaVersion`·`provenance`·`promptVersion`·`catalogue`·`snapshot`·`topic`을 담습니다. `selection`은 `cadenceMinutes:30`, 1~8의 `limit`, 양의 정수 `maxAgeSeconds`를 모두 명시해야 합니다. **운영용 maxAgeSeconds 기본값은 없습니다.** 합성 smoke의 긴 나이 한도는 시험 설정입니다. canonical 매핑·공개 decisions·모델 실행 정책과 예산은 각각 사람 운영자가 준비합니다.
 
+`zoop-ai-round-profile-2`는 명시적 eligibility 분기로 경과시간 정책과 유한 달력 정책을 구분합니다. 달력 파일·SHA·조회 상한, 새 binding과 내부 selection-v3, 비영업일 응답·freeze 규칙은 [AI 영업일 달력 profile](CALENDAR_ELIGIBILITY.md)을 따릅니다. 위 profile-1 설정의 바이트와 의미는 유지합니다.
+
 | 경로 | scope | 접수·조회 규칙 |
 |---|---|---|
 | `POST /internal/v1/round-runs` | `round.run` | 닫힌 `zoop-ai-round-run-1` 요청, `roundId`와 같은 `Idempotency-Key`, 본문 최대 1,024바이트 |

@@ -141,9 +141,28 @@ class RoundService:
             return {"noWork": "outside_operating_window"}
         if slot.minute not in {5, 35}:
             return {"noWork": "not_due"}
+        policy = self.profile.eligibility
+        as_of = stamp(self.clock())
+        if policy is not None and policy["kind"] == "through-next-business-day-close-1":
+            outcome = self.process.calendar({"schemaVersion": "zoop-ai-round-calendar-check-1", "eligibility": policy,
+                                             "slot": slot.isoformat(), "asOf": as_of})
+            if outcome.kind == "error":
+                return {"failure": outcome.code}
+            if outcome.kind != "result":
+                return {"failure": "runtime_unavailable" if not outcome.started else "round_outcome_unknown"}
+            result = outcome.result
+            if set(result) != {"schemaVersion", "calendarSha256", "requiredInventoryMaxAgeSeconds", "businessDay"} \
+                    or result["schemaVersion"] != "zoop-ai-round-calendar-check-1" \
+                    or result["calendarSha256"] != policy["calendarSha256"] \
+                    or type(result["requiredInventoryMaxAgeSeconds"]) is not int \
+                    or not 0 < result["requiredInventoryMaxAgeSeconds"] <= self.profile.max_age_seconds \
+                    or type(result["businessDay"]) is not bool:
+                return {"failure": "runtime_binding_mismatch"}
+            if not result["businessDay"]:
+                return {"noWork": "non_business_day"}
         tick = {"schemaVersion": "zoop-ingestion-s2-1", "sourceId": self.profile.source_id, "scopeId": self.profile.scope_id,
                 "now": slot.isoformat()}
-        return {"tick": tick, "asOf": stamp(self.clock()), "descriptor": self.profile.descriptor}
+        return {"tick": tick, "asOf": as_of, "descriptor": self.profile.descriptor}
 
     @staticmethod
     def _failure(row, code):
@@ -160,6 +179,9 @@ class RoundService:
         request = {"schemaVersion": "zoop-ingestion-round-inventory-1", "sourceId": self.profile.source_id,
                    "scopeId": self.profile.scope_id, "asOf": row["context"]["asOf"],
                    "maxAgeSeconds": self.profile.max_age_seconds, "limit": limit, "after": after, "checkpointRevision": revision}
+        calendar = self.profile.eligibility is not None and self.profile.eligibility["kind"] == "through-next-business-day-close-1"
+        if calendar:
+            request.update(schemaVersion="zoop-ingestion-round-inventory-2", eligibility=self.profile.eligibility)
         outcome = self.process.inventory(request)
         native = self._outcome(row, outcome, seen, "round-inventory")
         if native is None:
@@ -167,8 +189,9 @@ class RoundService:
         if outcome.kind == "error":
             self.store.save(row, self._failure(row, outcome.code))
             return None
-        if any(native.get(key) != request[key] for key in ("schemaVersion", "sourceId", "scopeId", "asOf", "maxAgeSeconds")) \
-                or set(native) != {"schemaVersion", "sourceId", "scopeId", "asOf", "maxAgeSeconds", "checkpoint", "observations", "next"} \
+        pins = ("schemaVersion", "sourceId", "scopeId", "asOf", "maxAgeSeconds", *(("eligibility",) if calendar else ()))
+        if any(native.get(key) != request[key] for key in pins) \
+                or set(native) != {*pins, "checkpoint", "observations", "next"} \
                 or set(native["checkpoint"]) != {"revision", "through"} \
                 or type(native["checkpoint"]["revision"]) is not int or native["checkpoint"]["revision"] < 0 \
                 or revision is not None and native["checkpoint"]["revision"] != revision \
@@ -207,8 +230,14 @@ class RoundService:
                 refs.append(ref)
             following = native["next"]
             if following is not None:
-                if not refs or following != {"slot": native["observations"][-1]["slot"], "roundId": refs[-1]["roundId"],
-                                             "page": refs[-1]["page"], "ordinal": refs[-1]["ordinal"]}:
+                expected = {"slot": native["observations"][-1]["slot"], "roundId": refs[-1]["roundId"],
+                            "page": refs[-1]["page"], "ordinal": refs[-1]["ordinal"]} if refs else None
+                policy = self.profile.eligibility
+                if expected is not None and policy is not None and policy["kind"] == "through-next-business-day-close-1":
+                    expected["binding"] = hashlib.sha256(canonical({
+                        "sourceId": self.profile.source_id, "scopeId": self.profile.scope_id, "asOf": row["context"]["asOf"],
+                        "eligibility": policy, "checkpointRevision": revision}).encode()).hexdigest()
+                if following != expected or not refs:
                     raise ApiError(500, "runtime_binding_mismatch")
             claimed = self.store.claimed(refs)
             exhausted = following is None
@@ -220,12 +249,19 @@ class RoundService:
                         break
             if len(selected) == self.profile.limit or following is None:
                 row["context"]["inventory"] = {"checkpoint": native["checkpoint"], "exhausted": exhausted}
+                policy = self.profile.eligibility
+                if policy is not None:
+                    return {"schemaVersion": "zoop-extraction-round-selection-3", "asOf": row["context"]["asOf"],
+                            "eligibility": policy, "limit": self.profile.limit, "cadenceMinutes": 30, "observations": selected}
                 return {"schemaVersion": "zoop-extraction-round-selection-2", "asOf": row["context"]["asOf"],
                         "maxAgeSeconds": self.profile.max_age_seconds, "limit": self.profile.limit,
                         "cadenceMinutes": 30, "observations": selected}
             after = following
 
     def _plan(self, row, seen):
+        if "failure" in row["context"]:
+            self.store.save(row, self._failure(row, row["context"]["failure"]))
+            return
         if "noWork" in row["context"]:
             self.store.save(row, {"schemaVersion": "zoop-ai-round-run-1", "roundId": row["round_id"],
                                   "state": "no_new_material", "code": row["context"]["noWork"]})

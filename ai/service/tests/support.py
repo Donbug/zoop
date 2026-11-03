@@ -114,6 +114,7 @@ class Workspace:
     def env(self, **overrides: str | None) -> dict[str, str]:
         env = {
             "PATH": "/usr/bin:/bin",
+            "PYTHONPATH": str(SERVICE_ROOT / "src"),
             "ZOOP_AI_SERVICE_PRINCIPALS": self.credentials.principals_json(),
             "ZOOP_AI_SERVICE_STATE_DIR": str(self.state),
             "ZOOP_AI_WORKER_STATE_DIR": str(self.worker),

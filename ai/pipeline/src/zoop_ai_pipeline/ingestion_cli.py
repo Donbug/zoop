@@ -11,13 +11,14 @@ from pydantic import ValidationError
 from .ingestion import Ingestor, Store
 from .ingestion_contracts import SCHEMA, MAX_INPUT, Authority, Export, IngestionFailure, Inspect, Resume, Run, Tick, canonical
 from .ingestion_schedule import clock, latest_slot, not_due, tick
-from .ingestion_inventory import Inventory, inventory
+from .ingestion_inventory import parse_inventory, inventory
+from .round_calendar import review
 from .private_processing import select_authority
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("run", "resume", "inspect", "export", "tick", "round-inventory"))
+    parser.add_argument("command", choices=("run", "resume", "inspect", "export", "tick", "round-inventory", "round-calendar"))
     parser.add_argument("--state-dir", required=True, type=Path)
     authority_options = parser.add_mutually_exclusive_group(required=True)
     authority_options.add_argument("--sources", type=Path)
@@ -31,10 +32,12 @@ def main() -> int:
         if len(raw) > MAX_INPUT:
             raise IngestionFailure("command_input_limit")
         incoming = json.loads(raw)
-        if args.command == "round-inventory":
+        if args.command in ("round-inventory", "round-calendar"):
             if args.private_processing is not None or args.fixture_manifest is not None or args.require_store:
                 raise IngestionFailure("input_or_configuration_invalid")
-            print(canonical(inventory(Inventory.model_validate(incoming), args.state_dir, Authority(args.sources))))
+            result = review(incoming) if args.command == "round-calendar" else inventory(
+                parse_inventory(incoming), args.state_dir, Authority(args.sources))
+            print(canonical(result))
             return 0
         if args.command == "tick":
             if args.private_processing is not None:

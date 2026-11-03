@@ -176,7 +176,9 @@ def cli_plan(world, out, rid, selection):
         path = out.with_suffix(".selection.json")
         path.write_text(json.dumps(selection.wire()), encoding="utf-8")
         args += ["--selection", str(path)]
-    done = subprocess.run([sys.executable, "-c", GUARD + "\nrunpy.run_module('zoop_ai_pipeline.extraction_cli', run_name='__main__')", *args],
+    source = str(Path(__file__).resolve().parents[1] / "src")
+    done = subprocess.run([sys.executable, "-c", GUARD + "\nimport sys; sys.path.insert(0, " + repr(source) +
+                           ")\nrunpy.run_module('zoop_ai_pipeline.extraction_cli', run_name='__main__')", *args],
                           input=json.dumps(descriptor(rid, events=[world.event])).encode(), capture_output=True, timeout=60,
                           env={"PATH": os.defpath, "HOME": str(Path.home()), "PYTHONDONTWRITEBYTECODE": "1", **ownership_env()})
     assert done.stderr == b"" and done.stdout.count(b"\n") == 1
