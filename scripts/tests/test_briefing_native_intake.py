@@ -72,6 +72,23 @@ class IntakeTests(unittest.TestCase):
         self.assertEqual([cfg['originalSourceAuthority'],str(self.root/'authority/new-authorities.json')],json.loads(before)['delegates'])
         native.initialize_authority(cfg)
         self.assertEqual(before,(self.root/'authority/serving-delegates.json').read_bytes())
+    def test_completed_source_without_public_company_link_is_withheld_without_relabeling(self):
+        session=Mock();source={'state':'ready','delivery':{'status':'current'},'relations':[]}
+        result=native.source_qualification(self.root,source,session)
+        self.assertEqual('no_verified_company_involvement',result['reason'])
+        self.assertEqual(0,result['additionalModelCalls']);self.assertEqual('withheld',session.outcome)
+        self.assertEqual('source_qualification',session.stage)
+        self.assertEqual(source,{'state':'ready','delivery':{'status':'current'},'relations':[]})
+        session.send.assert_not_called()
+    def test_pending_or_structural_relation_cannot_qualify_as_public_involvement(self):
+        relation={'eligibility':{'status':'eligible','reviewPending':True},'type':'PARTICIPATES_IN',
+            'direction':'directed','connection':'direct','subject':{'kind':'company'},'object':{'kind':'event'},'citations':[{'evidenceId':'synthetic'}]}
+        for name,overrides in [('pending',{}),('structural',{'type':'SUPPLIES','eligibility':{'status':'eligible','reviewPending':False}})]:
+            root=self.root/name;root.mkdir();r={**relation,**overrides}
+            self.assertEqual('withheld',native.source_qualification(root,{'state':'ready','delivery':{'status':'current'},'relations':[r]},Mock())['status'])
+        eligible={**relation,'eligibility':{'status':'eligible','reviewPending':False}}
+        self.assertIsNone(native.source_qualification(self.root,{'state':'ready','delivery':{'status':'current'},'relations':[eligible]},Mock()))
+
     def test_share_controls_and_next_article_are_not_company_news(self):
         companies=[{'companyId':'synthetic-kakao','name':'카카오','aliases':[]},
             {'companyId':'synthetic-samsung','name':'삼성전자','aliases':[]}]

@@ -1,5 +1,5 @@
 """Render task-local private config from ECS Secret environment; never print secret values."""
-import json,os,sys,tempfile
+import json,os,re,sys,tempfile
 from pathlib import Path
 from urllib.parse import urlsplit
 import briefing_server_runtime as runtime
@@ -55,4 +55,5 @@ if __name__=='__main__':
     try:main()
     except Exception as error:
         scope='temporary' if str(getattr(error,'filename','')).startswith('/tmp/') else 'artifact' if str(getattr(error,'filename','')).startswith('/mnt/zoop-artifacts') else 'state' if str(getattr(error,'filename','')).startswith('/mnt/zoop-briefing') else 'other'
-        print('briefing-runtime-stopped:'+type(error).__name__+':scope='+scope+':errno='+str(getattr(error,'errno',None)),file=sys.stderr);raise SystemExit(1)
+        code=str(error) if isinstance(error,ValueError) and re.fullmatch(r'briefing_server_[a-z0-9_]{1,150}',str(error)) else None
+        print('briefing-runtime-stopped:'+type(error).__name__+':scope='+scope+':errno='+str(getattr(error,'errno',None))+':code='+str(code),file=sys.stderr);raise SystemExit(1)

@@ -230,6 +230,21 @@ def handoff(root,sources,ingestion,exported,s2,s3,companies):
         return manifest,envelope
     finally:store.close()
 
+
+def source_qualification(root,s3,session):
+    """A completed native analysis can still provide no independently eligible public company link."""
+    require(s3.get('state')=='ready' and s3.get('delivery',{}).get('status')=='current','native_s3_not_current')
+    approved=[r for r in s3['relations'] if r['eligibility']['status']=='eligible' and not r['eligibility']['reviewPending']
+        and r['type']=='PARTICIPATES_IN' and r['direction']=='directed' and r['connection']=='direct'
+        and r['subject']['kind']=='company' and r['object']['kind']=='event'
+        and r['citations'] and not any('error' in c for c in r['citations'])]
+    if approved:return None
+    result={'schemaVersion':SCHEMA,'status':'withheld','reason':'no_verified_company_involvement',
+        'relationCandidates':len(s3['relations']),'additionalModelCalls':0}
+    write_once(root/'source-qualification.json',result)
+    session.stage='source_qualification';session.outcome='withheld'
+    return result
+
 def prepare(cfg,round):
     from zoop_ai_pipeline import extraction,relation
     from zoop_ai_pipeline.extraction_contracts import Submit
@@ -287,6 +302,8 @@ def prepare(cfg,round):
                 'upstream':{'jobId':s2['jobId'],'inputDigest':s2['inputDigest']}}),relation.Fixtures(None,None))
             finally:store.close()
             write_once(root/'s3-result.json',s3);require(s3['state']=='ready' and s3['delivery']['status']=='current','native_s3_not_ready')
+            qualification=source_qualification(root,s3,session)
+            if qualification is not None:return qualification
             manifest,envelope=handoff(root,sources,ingestion,exported,s2,s3,companies)
             result={'schemaVersion':SCHEMA,'root':str(root),'sourceFile':str(sources),'ingestionState':str(ingestion),
                 'observation':selector,'manifest':manifest,'handoffReceipt':envelope.get('receipt'),
@@ -374,7 +391,11 @@ def run_slot(cfg,edition,cutoff=None,recover_unpaid=False):
         try:
             baseline=native_command(cfg,'state',{},root/'baseline.request.json');write_once(root/'baseline.json',baseline)
             print(json.dumps({'roundId':round['id'],'stage':'bounded_source_collection','cutoff':slot.isoformat()}),flush=True)
-            ready=prepare(cfg,round);register_authority(cfg,ready)
+            ready=prepare(cfg,round)
+            if ready.get('status')=='withheld':
+                print(json.dumps({'roundId':round['id'],'status':'requires_recovery','reason':ready['reason']}),flush=True)
+                require(False,'source_quality_withheld')
+            register_authority(cfg,ready)
             incoming=native_command(cfg,'import',ready,root/'import.request.json');write_once(root/'imported.json',incoming)
             require(datetime.now(server.KST)<slot-timedelta(seconds=10),'native_after_cutoff')
             activated=native_command(cfg,'activate',{'baseline':baseline,'incoming':incoming},root/'activate.request.json')
