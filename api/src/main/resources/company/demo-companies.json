@@ -487,6 +487,188 @@
         "sector": "Semiconductors & Related Devices",
         "businessSummary": "반도체 설계 자산(Arm 아키텍처와 CPU 설계)을 칩 기업에 라이선스하는 영국 기업이다. 스마트폰 칩 대부분이 Arm 설계를 쓰며, 칩을 직접 생산하지 않고 라이선스·로열티로 수익을 낸다."
       }
+    },
+    {
+      "company_id": "KRX:000270",
+      "name": "기아",
+      "ticker": "000270",
+      "aliases": [
+        "Kia",
+        "Kia Corporation"
+      ],
+      "brand_color": "#05141F",
+      "logo": "kia.svg",
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "송호성, 송민수",
+        "foundedDate": "1944-12-10",
+        "websiteUrl": "https://www.kia.com/kr",
+        "sector": "자동차용 엔진 및 자동차 제조업",
+        "businessSummary": "승용차, 버스·트럭, 특수 목적 차량을 만들어 판매하는 한국의 완성차 기업이다. 현대자동차그룹 계열사이며 전기차도 생산한다."
+      }
+    },
+    {
+      "company_id": "KRX:005380",
+      "name": "현대자동차",
+      "ticker": "005380",
+      "aliases": [
+        "Hyundai Motor",
+        "Hyundai Motor Company"
+      ],
+      "brand_color": "#002C5E",
+      "logo": "hyundai.svg",
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "정의선, 무뇨스 바르셀로 호세 안토니오, 최영일",
+        "foundedDate": "1967-12-29",
+        "websiteUrl": "https://www.hyundai.com",
+        "sector": "자동차용 엔진 및 자동차 제조업",
+        "businessSummary": "승용차, 버스, 트럭과 자동차 부품을 만들어 판매하는 한국의 완성차 기업이다. 차량 정비 사업도 한다."
+      }
+    },
+    {
+      "company_id": "KRX:006400",
+      "name": "삼성SDI",
+      "ticker": "006400",
+      "aliases": [
+        "Samsung SDI"
+      ],
+      "brand_color": "#1428A0",
+      "logo": "samsung.svg",
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "최주선",
+        "foundedDate": "1970-01-20",
+        "websiteUrl": "https://www.samsungsdi.co.kr",
+        "sector": "일차전지 및 이차전지 제조업",
+        "businessSummary": "이차전지와 전자재료를 만드는 삼성 계열 기업이다. 전기차와 전자기기에 쓰이는 배터리를 공급한다."
+      }
+    },
+    {
+      "company_id": "KRX:009150",
+      "name": "삼성전기",
+      "ticker": "009150",
+      "aliases": [
+        "Samsung Electro-Mechanics"
+      ],
+      "brand_color": "#1428A0",
+      "logo": "samsung.svg",
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "장덕현",
+        "foundedDate": "1973-08-08",
+        "websiteUrl": "https://www.samsungsem.com",
+        "sector": "전자부품 제조업",
+        "businessSummary": "적층세라믹콘덴서(MLCC) 같은 수동소자, 카메라·통신 모듈, 반도체 패키지 기판을 만드는 삼성 계열 전자부품 기업이다."
+      }
+    },
+    {
+      "company_id": "KRX:028260",
+      "name": "삼성물산",
+      "ticker": "028260",
+      "aliases": [
+        "Samsung C&T"
+      ],
+      "brand_color": "#1428A0",
+      "logo": "samsung.svg",
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "오세철, 이재언, 송규종",
+        "foundedDate": "1963-12-23",
+        "websiteUrl": "https://www.samsungcnt.com",
+        "sector": "기타 전문 도매업",
+        "businessSummary": "건설, 상사(무역·도소매), 패션 사업을 하는 삼성 계열 기업이다. 리조트 사업도 한다."
+      }
+    },
+    {
+      "company_id": "KRX:030200",
+      "name": "KT",
+      "ticker": "030200",
+      "aliases": [
+        "케이티"
+      ],
+      "brand_color": "#E40B18",
+      "logo": "kt.svg",
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "박윤영",
+        "foundedDate": "1981-12-10",
+        "websiteUrl": "https://www.kt.com",
+        "sector": "전기 통신업",
+        "businessSummary": "유무선 통신과 인터넷 서비스를 제공하는 한국의 통신 사업자다. 기업용 네트워크·전용회선과 전자상거래 사업도 한다."
+      }
+    },
+    {
+      "company_id": "KRX:032640",
+      "name": "LG유플러스",
+      "ticker": "032640",
+      "aliases": [
+        "LG Uplus"
+      ],
+      "brand_color": "#A50034",
+      "logo": "lg.svg",
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "홍범식",
+        "foundedDate": "1996-07-11",
+        "websiteUrl": "https://www.uplus.co.kr",
+        "sector": "전기 통신업",
+        "businessSummary": "이동통신, 인터넷, 데이터 서비스를 제공하는 LG 계열 통신 사업자다. 단말기 유통과 부가통신 사업도 한다."
+      }
+    },
+    {
+      "company_id": "KRX:047050",
+      "name": "포스코인터내셔널",
+      "ticker": "047050",
+      "aliases": [
+        "POSCO International"
+      ],
+      "brand_color": "#05507D",
+      "logo": "posco-international.svg",
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "이계인",
+        "foundedDate": "2000-12-27",
+        "websiteUrl": "https://www.poscointl.com",
+        "sector": "상품 중개업",
+        "businessSummary": "철강·철강원료, 이차전지 소재, 곡물 등을 거래하는 포스코 계열 종합상사다. 천연가스 발전과 신재생 에너지 사업도 한다."
+      }
+    },
+    {
+      "company_id": "KRX:066570",
+      "name": "LG전자",
+      "ticker": "066570",
+      "aliases": [
+        "LG Electronics"
+      ],
+      "brand_color": "#A50034",
+      "logo": "lg.svg",
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "류재철",
+        "foundedDate": "2002-04-01",
+        "websiteUrl": "https://www.lge.co.kr",
+        "sector": "통신 및 방송 장비 제조업",
+        "businessSummary": "TV와 냉장고·세탁기 같은 가전제품을 만드는 LG 계열 전자 기업이다. 자동차 전장 부품 사업도 한다."
+      }
     }
   ]
 }

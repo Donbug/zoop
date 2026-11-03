@@ -452,9 +452,9 @@ source registry의 권리와 원장 파일은 전체 실행 전후로, artifact 
 
 ## 기본 기업 카탈로그 적재
 
-`src/main/resources/company/demo-companies.json`은 팀이 확정한 24개 기업 목록입니다. `prototype/` 파일이나 DB를 실행 중에 읽지 않습니다. 종목 코드가 없는 OpenAI·Anthropic은 `ORG:OPENAI`, `ORG:ANTHROPIC` ID를 사용하며 `ticker`, `exchange_code`, `market`은 비워 둡니다. `brand_source`는 색상·로고 출처가 확인된 경우에만 넣고, 단순 홈페이지 주소는 `null`로 둡니다. 향후 GraphDB에서도 같은 회사 ID를 써야 합니다.
+`src/main/resources/company/demo-companies.json`은 팀이 확정한 33개 기업 목록입니다(처음 확정한 24개와, first47 그래프 데이터가 참조하는 9개: 기아·현대자동차·삼성SDI·삼성전기·삼성물산·KT·LG유플러스·포스코인터내셔널·LG전자). `prototype/` 파일이나 DB를 실행 중에 읽지 않습니다. 그래프 handoff와 legacy import는 참조하는 기업이 DB `companies`에 같은 ID·이름으로 있어야 통과합니다(`company_mismatch`). legacy import 실행(`zoop.legacy-real-import.enabled=true`)은 시작 시 카탈로그 적재를 하지 않으므로, 새 기업은 그 전에 일반 기동이나 `catalog-import` 실행으로 DB에 들어가 있어야 합니다. 브리핑의 기업 이름 허용 검사(`BriefingNativeImpactPolicy`)도 이 파일을 읽으므로 목록에 추가한 기업은 브리핑 대상에도 들어갑니다. 종목 코드가 없는 OpenAI·Anthropic은 `ORG:OPENAI`, `ORG:ANTHROPIC` ID를 사용하며 `ticker`, `exchange_code`, `market`은 비워 둡니다. `brand_source`는 색상·로고 출처가 확인된 경우에만 넣고, 단순 홈페이지 주소는 `null`로 둡니다. 향후 GraphDB에서도 같은 회사 ID를 써야 합니다.
 
-`DB_URL`·`DB_USERNAME`·`DB_PASSWORD`를 `api/.env` 또는 OS 환경변수로 설정하고 API를 시작하면 Flyway migration `V20261014163000__seed_confirmed_companies.sql`이 **최초 한 번** 24개 기업을 적재하고, `V20261015090000__add_company_brand_source.sql`이 내부 출처 컬럼을 추가합니다. 그 다음 앱 시작 시 번들 JSON을 읽어 같은 기업 ID의 값을 갱신합니다. 이후 JSON을 바꿔 다시 시작해도 ID 기준으로 변경된 행만 갱신하며 중복 삽입하지 않습니다. 다른 기업 및 이를 참조하는 분석 기록은 삭제하지 않습니다. PostgreSQL 컨테이너만 시작하면 Flyway와 JSON 적재가 실행되지 않으므로 API도 시작해야 합니다. `api/.env`를 사용한다면 `api` 디렉터리에서 앱을 실행하세요.
+`DB_URL`·`DB_USERNAME`·`DB_PASSWORD`를 `api/.env` 또는 OS 환경변수로 설정하고 API를 시작하면 Flyway migration `V20261014163000__seed_confirmed_companies.sql`이 **최초 한 번** 처음 확정한 24개 기업을 적재하고, `V20261015090000__add_company_brand_source.sql`이 내부 출처 컬럼을 추가합니다. 그 다음 앱 시작 시 번들 JSON을 읽어 같은 기업 ID의 값을 갱신하고, migration에 없는 기업(추가한 9개)은 새로 넣습니다. 이후 JSON을 바꿔 다시 시작해도 ID 기준으로 변경된 행만 갱신하며 중복 삽입하지 않습니다. 다른 기업 및 이를 참조하는 분석 기록은 삭제하지 않습니다. PostgreSQL 컨테이너만 시작하면 Flyway와 JSON 적재가 실행되지 않으므로 API도 시작해야 합니다. `api/.env`를 사용한다면 `api` 디렉터리에서 앱을 실행하세요.
 
 카탈로그 JSON을 수정해 로컬 DB에 다시 반영할 때에만 `api` 디렉터리에서 명시적 적재 명령을 사용합니다.
 
