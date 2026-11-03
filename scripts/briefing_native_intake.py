@@ -158,7 +158,10 @@ class NativeTransport(httpx.BaseTransport):
         self.session._finish(self.session._receipt(key,state,True,inp,out,b.digest(answer),None if state=='succeeded' else 'provider_http_error',parsed.get('model')))
         headers={k:v for k,v in response.headers.items() if k.lower() not in ('content-encoding','content-length','transfer-encoding')}
         return httpx.Response(response.status_code,headers=headers,content=answer,request=request)
-    def close(self):self.peer.close()
+    def close(self):
+        # Individual runtime HTTP clients borrow this transport; the slot owns its lifetime.
+        pass
+    def shutdown(self):self.peer.close()
 
 def read_verifier(path):
     import stat
@@ -291,7 +294,7 @@ def prepare(cfg,round):
                 'bodySha256':b.digest(exported['document']['text'].encode()),'readyAt':b.now()}
             write_once(root/'ready.json',result);return result
     finally:
-        if transport:transport.close()
+        if transport:transport.shutdown()
         os.environ.pop('ZOOP_AI_API_KEY',None);os.environ.pop('TYPESAFE_API_KEY',None)
         pipe.close()
 

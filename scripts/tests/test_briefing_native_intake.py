@@ -31,6 +31,17 @@ class IntakeTests(unittest.TestCase):
             reservation=budget.reserve(raw);budget.settle(reservation,b'{"usage":{"input_tokens":1,"output_tokens":1}}')
         with self.assertRaisesRegex(ValueError,'round_budget'):budget.reserve(json.dumps({'model':'gpt-6-luna','store':False,'service_tier':'default','max_output_tokens':10,'instructions':'seventeenth'}).encode())
         self.assertEqual(12,peer.handle_request.call_count)
+    def test_each_http_client_borrows_transport_until_explicit_slot_shutdown(self):
+        peer=Mock();peer.handle_request.side_effect=lambda req:httpx.Response(200,json={'usage':{'prompt_tokens':10,'completion_tokens':2}},request=req)
+        transport,session,_=self.setup_transport(peer)
+        for number in (1,2):
+            with httpx.Client(transport=transport) as client:
+                request=self.request(number)
+                client.send(request)
+        self.assertEqual(2,peer.handle_request.call_count)
+        peer.close.assert_not_called()
+        transport.shutdown();peer.close.assert_called_once()
+
     def test_unknown_native_transport_never_retries_or_turns_unknown_usage_into_zero(self):
         peer=Mock();peer.handle_request.side_effect=httpx.ReadTimeout('synthetic')
         transport,session,_=self.setup_transport(peer)
