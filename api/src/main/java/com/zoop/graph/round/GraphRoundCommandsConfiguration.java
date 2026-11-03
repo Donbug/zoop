@@ -1,6 +1,9 @@
 package com.zoop.graph.round;
 
 import java.time.Clock;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -27,7 +30,11 @@ public class GraphRoundCommandsConfiguration {
     }
 
     @Bean
-    GraphRoundStatus graphRoundCommandsStatus(GraphRoundTicks ticks, Clock clock) {
-        return new TickedGraphRoundStatus(ticks, clock);
+    GraphRoundStatus graphRoundCommandsStatus(GraphRoundTicks ticks, GraphRoundClock graphRoundCommandsClock, Clock clock,
+            PlatformTransactionManager transactions) {
+        TransactionTemplate own = new TransactionTemplate(transactions);
+        own.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        own.setReadOnly(true);
+        return new TickedGraphRoundStatus(ticks, graphRoundCommandsClock, clock, own);
     }
 }

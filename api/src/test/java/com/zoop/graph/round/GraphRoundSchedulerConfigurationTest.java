@@ -84,7 +84,7 @@ class GraphRoundSchedulerConfigurationTest {
                 .withBean(ObjectMapper.class, ObjectMapper::new)
                 .withBean(Clock.class, Clock::systemUTC)
                 .withUserConfiguration(AiHandoffReadClientConfiguration.class, AiRoundClientConfiguration.class,
-                        GraphRoundImportConfiguration.class, GraphRoundSchedulerConfiguration.class);
+                        GraphRoundImportConfiguration.class, GraphRoundSchedulerConfiguration.class, GraphRoundCommandsConfiguration.class);
     }
 
     private String[] with(String... extra) {
@@ -103,9 +103,11 @@ class GraphRoundSchedulerConfigurationTest {
                 .withBean(GraphRoundRepository.class, InMemoryGraphRoundRepository::new)
                 .withBean(GraphRoundTicks.class, () -> Mockito.mock(GraphRoundTicks.class))
                 .withBean(Clock.class, Clock::systemUTC)
+                .withBean(org.springframework.transaction.PlatformTransactionManager.class,
+                        () -> Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class))
                 .withUserConfiguration(GraphRoundCommandsConfiguration.class, GraphRoundImportConfiguration.class,
                         GraphRoundSchedulerConfiguration.class);
-        web.withPropertyValues("zoop.graph.round.commands-enabled=true").run(context -> {
+        web.withPropertyValues("ZOOP_GRAPH_ROUND_COMMANDS_ENABLED=true").withInitializer(new ConfigDataApplicationContextInitializer()).run(context -> {
             assertNull(context.getStartupFailure());
             assertEquals(1, context.getBeansOfType(GraphRoundClock.class).size());
             assertInstanceOf(TickedGraphRoundStatus.class, context.getBean(GraphRoundStatus.class));

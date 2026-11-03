@@ -48,6 +48,15 @@ public final class GraphRoundClock {
         this.freezeOnly = List.copyOf(freezeOnly);
     }
 
+    /**
+     * A digest of this calendar (zone, first slot, interval, count, freeze-only slots): a writer records it with its heartbeat, so
+     * the public web, which names round ids and the current minute with its own calendar, counts only a writer with the same one.
+     */
+    public String digest() {
+        return com.zoop.common.json.Canonical.sha256((zone + "|" + first + "|" + interval + "|" + count + "|" + freezeOnly)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     /** The slots with {@code from < slotAt <= to}, oldest first. */
     public List<Slot> slotsBetween(Instant from, Instant to) {
         List<Slot> found = new ArrayList<>();

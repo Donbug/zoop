@@ -206,6 +206,26 @@ class GraphRoundAdminCommandServiceTest {
         assertTrue(rounds.findBySlot(Instant.parse("2026-10-30T01:00:00Z")).isEmpty(), "nothing was written");
     }
 
+    @Test
+    void aReplayOfACommandThatTookEffectAnswersEvenWhileTheWriterRestarts() {
+        var writer = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var web = new StaticListableBeanFactory();
+        web.addBean("clock", new GraphRoundClock(ZoneId.of("Asia/Seoul"), LocalTime.of(9, 5), Duration.ofMinutes(30), 18,
+                List.of(LocalTime.of(18, 5))));
+        web.addBean("status", new GraphRoundStatus() {
+            @Override public boolean enabled() { return writer.get(); }
+            @Override public java.util.Optional<Instant> nextSlotAt() { return java.util.Optional.empty(); }
+            @Override public java.util.Optional<Instant> lastTickAt() { return java.util.Optional.empty(); }
+        });
+        GraphRoundAdminCommandService commands = new GraphRoundAdminCommandService(rounds, web.getBeanProvider(GraphRoundClock.class),
+                web.getBeanProvider(GraphRoundStatus.class), idempotency, audit, JsonMapper.builder().build(), Clock.fixed(NOW, ZoneOffset.UTC));
+        GraphRoundOut started = commands.start(null, "key-replay", ADMIN, "req-r1");
+        writer.set(false);
+        assertEquals(started, commands.start(null, "key-replay", ADMIN, "req-r2"), "the stored answer, not 404 (#275)");
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
+                () -> commands.start(new GraphRoundStartRequest("2026-10-30T02:05:00Z"), "key-new", ADMIN, "req-r3")).getErrorCode());
+    }
+
     private static GraphRoundStatus alive(boolean enabled) {
         return new GraphRoundStatus() {
             @Override public boolean enabled() { return enabled; }

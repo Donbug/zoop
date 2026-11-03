@@ -81,6 +81,11 @@ zoop:
       # import-source cli runs the installed zoop-ai-ingest export --require-store for the observation re-check (local,
       # single-instance operation); http uses zoop.ai.observation-export-client and is the ECS/shared-nothing path.
       enabled: ${ZOOP_GRAPH_ROUND_ENABLED:false}
+      # The admin round commands in a web process without a scheduler (the public web, #55 PR-P4).
+      commands-enabled: ${ZOOP_GRAPH_ROUND_COMMANDS_ENABLED:false}
+      # The automatic preparation at the end of a scheduler pass (#55 PR-P3).
+      prepare:
+        enabled: ${ZOOP_GRAPH_ROUND_PREPARE_ENABLED:false}
       interval: ${ZOOP_GRAPH_ROUND_INTERVAL:PT15S}
       lease: ${ZOOP_GRAPH_ROUND_LEASE:PT2M}
       zone: ${ZOOP_GRAPH_ROUND_ZONE:Asia/Seoul}

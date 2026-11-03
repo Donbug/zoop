@@ -19,7 +19,8 @@ import static org.junit.jupiter.api.Assertions.*;
 /** The scheduler heartbeat table (#55 PR-P4) against the real migrations, on a schema of its own. */
 @Tag("graph-postgres")
 class GraphRoundTicksPostgresTest {
-    private static final Instant NOW = Instant.parse("2026-11-03T01:00:00Z");
+    private static final Instant STARTED = Instant.parse("2026-11-03T00:00:00Z");
+    private static final String DIGEST = "d".repeat(64);
     private String schema;
     private JdbcTemplate jdbc;
     private GraphRoundTicks ticks;
@@ -43,28 +44,31 @@ class GraphRoundTicksPostgresTest {
         if (jdbc != null) jdbc.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
     }
 
-    @Test void aBeatUpdatesItsRowInPlaceAndAStopRemovesIt() {
-        ticks.beat(tick("writer-a-0000000a", NOW, Optional.empty()));
-        ticks.beat(tick("writer-a-0000000a", NOW.plusSeconds(15), Optional.of(NOW.plusSeconds(10))));
+    @Test void aBeatUpdatesItsRowInPlaceByTheDatabaseClockAndAStopRemovesIt() {
+        ticks.beat("writer-a-0000000a", STARTED, Duration.ofSeconds(15), Optional.empty(), DIGEST);
+        ticks.beat("writer-a-0000000a", STARTED, Duration.ofSeconds(15), Optional.of(STARTED.plusSeconds(10)), DIGEST);
         List<Tick> rows = ticks.all();
         assertEquals(1, rows.size());
-        assertEquals(NOW.plusSeconds(15), rows.getFirst().beatAt());
-        assertEquals(NOW.minusSeconds(3600), rows.getFirst().startedAt(), "the start time is the first beat's");
-        assertEquals(Optional.of(NOW.plusSeconds(10)), rows.getFirst().lastPassAt());
-        assertEquals(Duration.ofSeconds(15), rows.getFirst().interval());
+        Tick tick = rows.getFirst();
+        assertTrue(tick.alive(), "beaten just now, by the database's clock");
+        assertEquals(STARTED, tick.startedAt());
+        assertEquals(Optional.of(STARTED.plusSeconds(10)), tick.lastPassAt());
+        assertEquals(DIGEST, tick.calendarDigest());
         ticks.remove("writer-a-0000000a");
         assertEquals(List.of(), ticks.all());
     }
 
-    @Test void twoWritersAreBothSeenNewestFirstAndADaySilentRowIsPruned() {
-        ticks.beat(tick("writer-old-0000000c", NOW.minus(Duration.ofDays(2)), Optional.empty()));
-        ticks.beat(tick("writer-a-0000000a", NOW.minusSeconds(5), Optional.empty()));
-        ticks.beat(tick("writer-b-0000000b", NOW, Optional.empty()));
-        assertEquals(List.of("writer-b-0000000b", "writer-a-0000000a"), ticks.all().stream().map(Tick::owner).toList());
-        assertThrows(Exception.class, () -> ticks.beat(tick("not an owner", NOW, Optional.empty())));
-    }
-
-    private static Tick tick(String owner, Instant beatAt, Optional<Instant> lastPassAt) {
-        return new Tick(owner, NOW.minusSeconds(3600), beatAt, Duration.ofSeconds(15), lastPassAt, Optional.of(NOW.plusSeconds(300)));
+    @Test void aSilentRowIsNotAliveAndADaySilentRowIsPruned() {
+        ticks.beat("writer-a-0000000a", STARTED, Duration.ofSeconds(15), Optional.empty(), DIGEST);
+        jdbc.update("""
+                INSERT INTO graph_round_scheduler_ticks (owner, started_at, beat_at, interval_ms, calendar_digest)
+                VALUES ('writer-b-0000000b', now(), clock_timestamp() - interval '46 seconds', 15000, ?),
+                       ('writer-old-0000000c', now(), clock_timestamp() - interval '2 days', 15000, ?)
+                """, DIGEST, DIGEST);
+        var rows = ticks.all();
+        assertEquals(List.of(true, false, false), rows.stream().map(Tick::alive).toList());
+        ticks.beat("writer-a-0000000a", STARTED, Duration.ofSeconds(15), Optional.empty(), DIGEST);
+        assertEquals(List.of("writer-a-0000000a", "writer-b-0000000b"), ticks.all().stream().map(Tick::owner).toList());
+        assertThrows(Exception.class, () -> ticks.beat("not an owner", STARTED, Duration.ofSeconds(15), Optional.empty(), DIGEST));
     }
 }

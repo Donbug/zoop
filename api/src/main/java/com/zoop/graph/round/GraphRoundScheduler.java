@@ -74,7 +74,7 @@ public final class GraphRoundScheduler implements SmartLifecycle, GraphRoundStat
     /** Writes this scheduler's row; a failure (the database away) is logged and the next beat tries again. */
     void beat() {
         try {
-            ticks.beat(new GraphRoundTicks.Tick(worker.owner(), startedAt, clock.instant(), interval, worker.lastTick(), nextSlotAt()));
+            ticks.beat(worker.owner(), startedAt, interval, worker.lastTick(), calendar.digest());
         } catch (Throwable unavailable) {
             log.warn("graph round heartbeat not written ({})", unavailable.getClass().getSimpleName());
         }
@@ -83,6 +83,7 @@ public final class GraphRoundScheduler implements SmartLifecycle, GraphRoundStat
     @Override
     public synchronized void stop() {
         if (executor == null) return;
+        executor.shutdown(); // no new pass once the web is told this writer is gone
         heartbeat.shutdown();
         try {
             // A beat in flight must not write the row back after it is removed.
@@ -96,7 +97,6 @@ public final class GraphRoundScheduler implements SmartLifecycle, GraphRoundStat
         } catch (RuntimeException unavailable) {
             log.warn("graph round heartbeat row not removed ({}); it ages out", unavailable.getClass().getSimpleName());
         }
-        executor.shutdown();
         try {
             if (!executor.awaitTermination(STOP_WAIT.toMillis(), TimeUnit.MILLISECONDS)) {
                 log.warn("graph round pass still in progress after {}; the context goes on closing", STOP_WAIT);

@@ -146,8 +146,9 @@ R7은 관측 전체를 최초 확인과 commit 직전 재확인에서 **두 번 
 
 **공개 Web의 관리자 명령(#55 PR-P4).** scheduler는 writer 프로세스에서만 돕니다. 두 명령은 회차 행만 바꾸고 실제 진행은 writer scheduler의 다음 바퀴가 하므로, 공개 Web은 `ZOOP_GRAPH_ROUND_COMMANDS_ENABLED=true`이면 회차 달력과 writer heartbeat 상태만 등록해 명령을 받습니다(`GraphRoundCommandsConfiguration`, scheduler·bridge 없음, 같은 프로세스에서 `ZOOP_GRAPH_ROUND_ENABLED=true`이면 적용하지 않음). 달력 설정(`ZOOP_GRAPH_ROUND_ZONE`·`FIRST_SLOT_AT`·`SLOT_INTERVAL`·`SLOT_COUNT`·`FREEZE_ONLY`)은 writer와 같은 값을 씁니다. "스케줄러가 없으면 404"는 그대로이며, 공개 Web에서는 **살아 있는 writer가 없으면** 404입니다.
 
-- **heartbeat(`graph_round_scheduler_ticks`):** writer의 scheduler는 바퀴와 별도의 스레드(`graph-round-heartbeat`)로 `interval`마다 자기 행(owner, 시작 시각, beat 시각, 간격, 마지막 바퀴 시각, 다음 슬롯)을 갱신하고, 정상 종료 때 행을 지웁니다. 하루 동안 갱신이 없는 행은 정리합니다. 바퀴와 분리했으므로 수입·준비로 바퀴가 길어도 writer가 멈춘 것으로 보이지 않습니다.
-- **살아 있음:** beat가 그 행의 간격 3배 안이면 살아 있습니다. 공개 Web의 overview `rounds.enabled`·`lastTickAt`·`nextSlotAt`은 가장 최근의 살아 있는 writer 값이며(응답 스키마는 같음), 읽을 수 없으면 꺼진 것으로 봅니다. 살아 있는 writer가 둘 이상이면(단일 writer 위반) 로그에 남깁니다.
+- **heartbeat(`graph_round_scheduler_ticks`):** writer의 scheduler는 바퀴와 별도의 스레드(`graph-round-heartbeat`)로 `interval`마다 자기 행(owner, 시작 시각, beat 시각, 간격, 마지막 바퀴 시각, 회차 달력 digest)을 갱신하고, 정상 종료 때 바퀴 실행기를 먼저 멈춘 뒤 행을 지웁니다. beat 시각과 살아 있음 판단은 DB 시계(`clock_timestamp()`)라 두 호스트의 시계 차이와 무관합니다. 하루 동안 갱신이 없는 행은 정리합니다. 바퀴와 분리했으므로 수입·준비로 바퀴가 길어도 writer가 멈춘 것으로 보이지 않습니다.
+- **살아 있음:** beat가 그 행의 간격 3배 안이고 회차 달력 digest가 공개 Web 자신의 달력과 같으면 살아 있습니다(달력이 다른 writer는 로그를 남기고 세지 않음: 공개 Web이 만드는 회차 ID·현재 분이 writer와 달라지므로). 공개 Web의 overview `rounds.enabled`·`lastTickAt`은 가장 최근의 살아 있는 writer 값, `nextSlotAt`은 공개 Web 자신의 달력으로 계산합니다(응답 스키마는 같음). heartbeat는 별도 읽기 전용 트랜잭션으로 읽으므로 읽기 실패가 overview를 깨지 않으며, 그때는 꺼진 것으로 봅니다. 살아 있는 writer가 둘 이상이면(단일 writer 위반) 로그에 남깁니다.
+- **재생:** 살아 있는 writer 확인은 새 명령에만 합니다. 이미 처리된 명령을 같은 `Idempotency-Key`로 다시 보내면 writer 재시작 중에도 저장된 응답을 돌려줍니다(#275).
 - **drain 중:** writer를 멈추면 행이 지워져 공개 Web의 두 명령은 바로 404가 됩니다. 비정상 종료면 간격 3배가 지난 뒤 404입니다.
 
 ## 시험

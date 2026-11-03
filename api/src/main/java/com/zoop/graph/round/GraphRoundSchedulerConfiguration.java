@@ -89,6 +89,7 @@ public class GraphRoundSchedulerConfiguration {
             host = "instance";
         }
         String safe = host.replaceAll("[^A-Za-z0-9.-]", "-");
+        if (safe.isEmpty()) safe = "instance";
         return (safe.length() > 40 ? safe.substring(0, 40) : safe) + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 }
