@@ -391,3 +391,87 @@ jobs:
           test "$API_TESTS_RESULT" = success
           test "$API_GRAPH_RESULT" = success
           test "$API_RESULT" = success
+
+  deploy-web-dev:
+    name: deploy-web-dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [required-ci]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      WEB_BUCKET_NAME: zoop-dev-web-512138915880
+      CLOUDFRONT_DISTRIBUTION_ID: E2WIGGJBK20K7J
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Validate deployment variables
+        shell: bash
+        run: |
+          set -euo pipefail
+          for variable_name in AWS_REGION AWS_DEPLOY_ROLE_ARN; do
+            if [ -z "${!variable_name:-}" ]; then
+              echo "::error::$variable_name is not configured in the dev environment."
+              exit 1
+            fi
+          done
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: '10.34.6'
+          run_install: false
+          package_json_file: web/package.json
+      - name: Build the production web bundle
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+      - name: Write immutable deployment metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          deployed_at="$(date -u +'%Y-%m-%dT%H:%M:%S.000Z')"
+          printf '{\n  "gitSha": "%s",\n  "deployedAtUtc": "%s"\n}\n' \
+            "$GITHUB_SHA" "$deployed_at" > web/dist/release.json
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: zoop-web-deploy-${{ github.run_id }}
+      - name: Publish web files
+        shell: bash
+        run: |
+          aws s3 sync web/dist "s3://$WEB_BUCKET_NAME" --delete
+          aws s3 cp web/dist/index.html "s3://$WEB_BUCKET_NAME/index.html" \
+            --cache-control 'no-cache, no-store, must-revalidate' \
+            --content-type 'text/html'
+          aws s3 cp web/dist/release.json "s3://$WEB_BUCKET_NAME/release.json" \
+            --cache-control 'no-cache, no-store, must-revalidate' \
+            --content-type 'application/json'
+      - name: Invalidate CloudFront and wait for completion
+        shell: bash
+        run: |
+          invalidation_id="$(aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths '/*' \
+            --query 'Invalidation.Id' \
+            --output text)"
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --id "$invalidation_id"
+          {
+            echo '## Web Dev deployment'
+            echo
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Bucket: \`$WEB_BUCKET_NAME\`"
+            echo "- CloudFront invalidation: \`$invalidation_id\`"
+          } >> "$GITHUB_STEP_SUMMARY"
