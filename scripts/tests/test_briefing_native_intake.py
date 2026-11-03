@@ -51,7 +51,8 @@ class IntakeTests(unittest.TestCase):
             cls=native.configure_runtime({'keyFile':str(self.root/'openai'),'verifierKeyFile':str(self.root/'typesafe')},
                 self.root,(datetime.now(timezone.utc)+timedelta(minutes=30)).isoformat())
             runtime=cls.from_env(need_send=True)
-            self.assertEqual('citation-enum-1',os.environ['ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT'])
+            self.assertEqual('',os.environ['ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT'])
+            self.assertEqual('overnight-funded-v1',os.environ['ZOOP_AI_PIPELINE_LIVE_PROFILE'])
             self.assertNotIn('fallback',runtime.binding()['generation'])
     def test_new_authority_does_not_copy_or_replace_original_routes(self):
         cfg={**self.cfg,'authorityRoot':str(self.root/'authority'),'originalSourceAuthority':'/synthetic/original-serving-authorities.json'}

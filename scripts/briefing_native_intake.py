@@ -78,7 +78,8 @@ def collect(cfg,round,root):
                 'evidence':[rights['policyUrl'],rights['rule']],'expiresAt':None},
             'rightsEvidence':refs['rights'],'exclusionManifest':refs['exclusions']}
         write_once(config_path,config)
-    config=Config.model_validate_json(config_path.read_bytes());result=run(config)
+    config=Config.model_validate_json(config_path.read_bytes())
+    result=json.loads((root/'collection-result.json').read_bytes()) if (root/'collection-result.json').exists() else run(config)
     write_once(root/'collection-result.json',result)
     catalogue=json.loads(Path(cfg['companyCatalogue']).read_bytes())
     companies=[{'companyId':c['company_id'],'name':c['name'],'aliases':c['aliases'],'ticker':c['ticker']} for c in catalogue['companies']]
@@ -157,15 +158,15 @@ def configure_runtime(cfg,root,cutoff):
     from zoop_ai_pipeline.live_runtime import LiveRuntime
     start=datetime.now(timezone.utc)
     end=datetime.fromisoformat(cutoff).astimezone(timezone.utc)
-    require((end-start).total_seconds()>600,'native_preparation_window')
+    require((end-start).total_seconds()>190,'native_preparation_window')
     os.environ.update({'ZOOP_AI_PIPELINE_LIVE_ENABLED':'1','ZOOP_AI_PIPELINE_LIVE_MODEL':'gpt-6-luna',
         'ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT':'high','ZOOP_AI_PIPELINE_LIVE_MAX_OUTPUT_TOKENS':'12000',
         'ZOOP_AI_PIPELINE_LIVE_TIMEOUT_SECONDS':'180','ZOOP_AI_PIPELINE_LIVE_MAX_CALLS':'12','ZOOP_AI_PIPELINE_LIVE_MAX_USD':'1',
         'ZOOP_AI_PIPELINE_LIVE_SHARED_MAX_USD':'0.9','ZOOP_AI_PIPELINE_LIVE_PERSONAL_MAX_USD':'0.1',
-        'ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR':str(root/'native-budget'),'ZOOP_AI_PIPELINE_LIVE_PROFILE':'admitted-set-capped-v4',
+        'ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR':str(root/'native-budget'),'ZOOP_AI_PIPELINE_LIVE_PROFILE':'overnight-funded-v1',
         'ZOOP_AI_PIPELINE_LIVE_RUN_ID':root.name,'ZOOP_AI_PIPELINE_LIVE_SET_ID':root.name,
         'ZOOP_AI_PIPELINE_LIVE_ADMIT_FROM':start.strftime('%Y-%m-%dT%H:%M:%SZ'),'ZOOP_AI_PIPELINE_LIVE_ADMIT_UNTIL':(start+timedelta(seconds=60)).strftime('%Y-%m-%dT%H:%M:%SZ'),
-        'ZOOP_AI_PIPELINE_LIVE_FINISH_BY':end.strftime('%Y-%m-%dT%H:%M:%SZ'),'ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT':'citation-enum-1',
+        'ZOOP_AI_PIPELINE_LIVE_FINISH_BY':end.strftime('%Y-%m-%dT%H:%M:%SZ'),'ZOOP_AI_PIPELINE_LIVE_NOT_AFTER':end.strftime('%Y-%m-%dT%H:%M:%SZ'),'ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT':'',
         'ZOOP_AI_BASE_URL':'https://api.openai.com/v1','TYPESAFE_BASE_URL':'https://api.typesafe.ai/v1','TYPESAFE_VALIDATION_MODEL':'jev-1.14.0',
         'ZOOP_AI_API_KEY':b.read_key(Path(cfg['keyFile'])),'TYPESAFE_API_KEY':read_verifier(Path(cfg['verifierKeyFile']))})
     return LiveRuntime
@@ -218,14 +219,15 @@ def prepare(cfg,round):
     from zoop_ai_pipeline.extraction_contracts import Submit
     from zoop_ai_pipeline.relation_contracts import Submit as RelationSubmit
     from zoop_ai_pipeline.ingestion_contracts import Authority
-    root=Path(cfg['work'])/'native'/round['id'];root.mkdir(mode=0o700,parents=True,exist_ok=True)
+    collection_root=Path(cfg['work'])/'native'/round['id']
+    root=collection_root/(round['id']+'-native-v2');root.mkdir(mode=0o700,parents=True,exist_ok=True)
     if (root/'ready.json').exists():return json.loads((root/'ready.json').read_bytes())
     require(not (root/'native.started.json').exists(),'native_interrupted_requires_recovery')
-    chosen,exported,companies=collect(cfg,round,root)
+    chosen,exported,companies=collect(cfg,round,collection_root)
     runtime_type=configure_runtime(cfg,root,round['windowTo']);pure=runtime_type.from_env()
-    original=root/'collection/items'/chosen['candidate']['newsId']
-    sources=Path(cfg['authorityRoot'])/('source-'+round['id']+'.json');sources.parent.mkdir(mode=0o700,parents=True,exist_ok=True);current=json.loads((original/'sources.json').read_bytes())
-    grant=current['sources'][0]['grant'];grant.update({'grantId':round['id']+'-processing','revision':'kogl1-prospective-v1',
+    original=collection_root/'collection/items'/chosen['candidate']['newsId']
+    sources=Path(cfg['authorityRoot'])/('source-'+root.name+'.json');sources.parent.mkdir(mode=0o700,parents=True,exist_ok=True);current=json.loads((original/'sources.json').read_bytes())
+    grant=current['sources'][0]['grant'];grant.update({'grantId':root.name+'-processing','revision':'kogl1-prospective-v2',
         'allowedOperations':['read','store','quote-display','model-send'],
         'purposes':[pure.purpose(stage) for stage in ('extract','compare','topic','relation','impact','verify-relation','verify-impact')],
         'recipients':sorted({pure.recipient(stage) for stage in ('extract','compare','topic','relation','impact','verify-relation','verify-impact')}),
@@ -233,21 +235,17 @@ def prepare(cfg,round):
     write_once(sources,current)
     ingestion=original/'ingestion';authority=Authority(sources)
     def current_rights():
+        require(datetime.now(timezone.utc)<datetime.fromisoformat(round['windowTo']).astimezone(timezone.utc)-timedelta(seconds=190),'native_dispatch_deadline')
         authority.check('korea-portal',chosen['candidate']['newsId'],('read','store','quote-display','model-send'))
         require(json.loads((original/'rights.json').read_bytes())==chosen['rights'],'rights_pin')
     # Prospective grant is read anew by native engines; no acquisition registry or old source grant is edited.
     source=extraction.Sources(ingestion,authority)
     selector={k:exported['observation'][k] for k in ['roundId','sourceId','page','ordinal','documentId','rawVersion','documentVersion']}
-    request={'schemaVersion':'zoop-extraction-s2-2','jobId':round['id']+'-s2','provenance':{'sourceKind':'actual','executionMode':'live','recordingKind':'provider'},
-        'promptVersion':'briefing-native-v1','incoming':selector,'catalogue':{'revision':'server-catalogue-'+b.digest(b.canonical(companies))[:16],'companies':companies},
+    request={'schemaVersion':'zoop-extraction-s2-2','jobId':root.name+'-s2','provenance':{'sourceKind':'actual','executionMode':'live','recordingKind':'provider'},
+        'promptVersion':'briefing-native-v2-standard','incoming':selector,'catalogue':{'revision':'server-catalogue-'+b.digest(b.canonical(companies))[:16],'companies':companies},
         'snapshot':{'revision':'fresh-document-no-prior-native-mentions','events':[]},'topic':None}
-    from zoop_ai_pipeline.live_budget import Budget as NativeBudget
-    from zoop_ai_pipeline.live_funding import capped_set_funding_policy
-    policy=capped_set_funding_policy(root.name,os.environ['ZOOP_AI_PIPELINE_LIVE_ADMIT_FROM'],
-        os.environ['ZOOP_AI_PIPELINE_LIVE_ADMIT_UNTIL'],1000000000,900000000,100000000)
-    metering=NativeBudget(root/'native-budget',1000000000,12,funding=policy,
-        bucket_caps={'shared':900000000,'personal':100000000},finish_by=os.environ['ZOOP_AI_PIPELINE_LIVE_FINISH_BY'])
-    metering.admit_set(root.name,b.digest(b.canonical(request)),{'extract':1,'compare':1,'topic':0,'relation':1,'impact':4,'verify-relation':4,'verify-impact':4})
+    # Standard native source-segment contract keeps literal citation checks without large enums.
+    # Non-set funding pins the default tier/deadline without provider fallback; the outer ledger enforces the shared hard caps.
     claim={'round':round,'requestKey':'source-'+b.digest(b.canonical(request)),'purpose':'generation','trigger':'scheduler','adminId':None,
         'inputArtifactId':None,'inputDigest':b.digest(b.canonical(request))}
     pipe=CommandPipe(cfg['ledgerCommand']);session=UsageSession(pipe,claim,root/'usage')
@@ -264,7 +262,7 @@ def prepare(cfg,round):
             write_once(root/'s2-result.json',s2);require(s2['state']=='ready' and s2['delivery']['status']=='current','native_s2_not_ready')
             store=relation.Store(root/'s3',root/'s2',ingestion)
             try:s3=relation.Engine(store,source,root/'s2',ingestion,lambda need_send:factory(need_send=need_send)).run(RelationSubmit.model_validate({
-                'schemaVersion':'zoop-relation-s3','jobId':round['id']+'-s3','provenance':request['provenance'],
+                'schemaVersion':'zoop-relation-s3','jobId':root.name+'-s3','provenance':request['provenance'],
                 'upstream':{'jobId':s2['jobId'],'inputDigest':s2['inputDigest']}}),relation.Fixtures(None,None))
             finally:store.close()
             write_once(root/'s3-result.json',s3);require(s3['state']=='ready' and s3['delivery']['status']=='current','native_s3_not_ready')
@@ -315,18 +313,20 @@ def register_authority(cfg,ready):
 def native_command(cfg,operation,request,path):
     return server.java({**cfg,'serverCommand':cfg['nativeCommand']},operation,request,path)
 
-def run_slot(cfg,edition,cutoff=None):
+def run_slot(cfg,edition,cutoff=None,recover_unpaid=False):
     """One finite ECS task per slot. Collection starts before cutoff; publication starts at cutoff."""
     import time,psycopg
     from psycopg.rows import dict_row
     now=datetime.now(server.KST)
     hour,minute=(9,20) if edition=='morning' else (17,30)
     slot=datetime.fromisoformat(cutoff).astimezone(server.KST) if cutoff else now.replace(hour=hour,minute=minute,second=0,microsecond=0)
-    require(slot.date()==now.date() and slot>now+timedelta(minutes=10),'slot_preparation_window')
+    require(slot.date()==now.date() and slot>now+timedelta(minutes=4 if recover_unpaid else 10),'slot_preparation_window')
     start=(slot-timedelta(days=1)).replace(hour=17,minute=30) if edition=='morning' else slot.replace(hour=9,minute=20)
     round={'id':'brf-'+str(slot.date())+'-'+edition,'date':str(slot.date()),'edition':edition,
         'scheduledAt':slot.isoformat(),'windowFrom':start.isoformat(),'windowTo':slot.isoformat()}
-    root=Path(cfg['work'])/'native'/round['id'];root.mkdir(mode=0o700,parents=True,exist_ok=True)
+    collection_root=Path(cfg['work'])/'native'/round['id']
+    root=collection_root/'recovery-standard-v2' if recover_unpaid else collection_root
+    root.mkdir(mode=0o700,parents=True,exist_ok=True)
     initialize_authority(cfg)
     with psycopg.connect(cfg['dsn'],autocommit=True,row_factory=dict_row) as conn:
         # The same lock as the original common producer also fences overlapping ECS deliveries.
@@ -334,10 +334,22 @@ def run_slot(cfg,edition,cutoff=None):
         existing=conn.execute('SELECT * FROM briefing_common_schedule_jobs WHERE round_date=%s AND edition=%s',(slot.date(),edition)).fetchone()
         if existing:
             if server.published(conn,existing):print(json.dumps({'roundId':round['id'],'status':'already_published','newModelCalls':0}),flush=True);return
-            # A fresh scheduler delivery must not replay a failed or unknown previous task.
-            require(False,'existing_slot_requires_explicit_recovery')
-        conn.execute('INSERT INTO briefing_common_schedule_jobs(id,round_date,edition,scheduled_at,window_from) VALUES(%s,%s,%s,%s,%s)',
-            (round['id'],slot.date(),edition,slot,start))
+            # Explicit recovery is restricted to this proved-unsent schema compilation failure.
+            require(recover_unpaid and existing['status']=='requires_recovery' and existing['scheduled_at']==slot and existing['window_from']==start,'existing_slot_requires_explicit_recovery')
+            require(conn.execute('SELECT count(*) AS n FROM ai_executions e JOIN briefing_attempts a ON a.id=e.briefing_attempt_id WHERE a.round_id=%s',(round['id'],)).fetchone()['n']==0,'recovery_has_model_calls')
+            require(conn.execute("SELECT count(*) AS n FROM briefing_attempts WHERE round_id=%s AND status IN ('queued','running','verifying')",(round['id'],)).fetchone()['n']==0,'recovery_has_active_owner')
+            result=json.loads((collection_root/'s2-result.json').read_bytes())
+            require(result['failure']['code']=='live_output_schema_limits' and not result['calls'],'recovery_not_proved_unsent')
+            import sqlite3
+            with sqlite3.connect((collection_root/'native-budget/live-budget.sqlite3').as_uri()+'?mode=ro',uri=True) as check:
+                require(check.execute('SELECT count(*) FROM reservations').fetchone()[0]==0,'recovery_has_reservations')
+            require(not any(json.loads(p.read_bytes())['roundId']==round['id'] for p in (Path(cfg['work'])/'budget').glob('*.json')),'recovery_has_physical_reservations')
+            write_once(root/'unpaid-recovery.json',{'previousState':'live_output_schema_limits','previousModelCalls':0,'newContract':'native-standard-no-fallback','recoveredAt':b.now(),'authorizationRef':cfg['authorizationRef']})
+            conn.execute("UPDATE briefing_common_schedule_jobs SET status='queued',finished_at=NULL WHERE id=%s AND status='requires_recovery'",(round['id'],))
+        else:
+            require(not recover_unpaid,'recovery_requires_existing_slot')
+            conn.execute('INSERT INTO briefing_common_schedule_jobs(id,round_date,edition,scheduled_at,window_from) VALUES(%s,%s,%s,%s,%s)',
+                (round['id'],slot.date(),edition,slot,start))
         try:
             baseline=native_command(cfg,'state',{},root/'baseline.request.json');write_once(root/'baseline.json',baseline)
             print(json.dumps({'roundId':round['id'],'stage':'bounded_source_collection','cutoff':slot.isoformat()}),flush=True)

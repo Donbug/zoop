@@ -40,13 +40,13 @@ def main():
     if sys.argv[1:]==['--initialize-authority']:
         import briefing_native_intake
         briefing_native_intake.initialize_authority(cfg);print('briefing-source-authority-initialized');return
-    if len(sys.argv)>2 and sys.argv[1]=='--slot' and sys.argv[2] in ('morning','evening'):
+    if len(sys.argv)>2 and sys.argv[1] in ('--slot','--recover-unpaid-slot') and sys.argv[2] in ('morning','evening'):
         import briefing_native_intake,signal
         def timeout(signum,frame):raise TimeoutError('finite_slot_execution_limit')
         signal.signal(signal.SIGALRM,timeout);signal.alarm(45*60)
         cutoff=sys.argv[4] if len(sys.argv)==5 and sys.argv[3]=='--cutoff' else None
         if len(sys.argv) not in (3,5) or (len(sys.argv)==5 and sys.argv[3]!='--cutoff'):raise ValueError('slot_arguments')
-        briefing_native_intake.run_slot(cfg,sys.argv[2],cutoff);return
+        briefing_native_intake.run_slot(cfg,sys.argv[2],cutoff,recover_unpaid=sys.argv[1]=='--recover-unpaid-slot');return
     private_file(temp/'config.json',json.dumps(cfg))
     sys.argv=['briefing_server_runtime','--config',str(temp/'config.json')]
     runtime.main()
