@@ -166,7 +166,7 @@ def configure_runtime(cfg,root,cutoff):
         'ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR':str(root/'native-budget'),'ZOOP_AI_PIPELINE_LIVE_PROFILE':'admitted-set-capped-v4',
         'ZOOP_AI_PIPELINE_LIVE_RUN_ID':root.name,'ZOOP_AI_PIPELINE_LIVE_SET_ID':root.name,
         'ZOOP_AI_PIPELINE_LIVE_ADMIT_FROM':start.strftime('%Y-%m-%dT%H:%M:%SZ'),'ZOOP_AI_PIPELINE_LIVE_ADMIT_UNTIL':(start+timedelta(seconds=60)).strftime('%Y-%m-%dT%H:%M:%SZ'),
-        'ZOOP_AI_PIPELINE_LIVE_FINISH_BY':end.strftime('%Y-%m-%dT%H:%M:%SZ'),'ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT':'citation-refs-default-1',
+        'ZOOP_AI_PIPELINE_LIVE_FINISH_BY':(end+timedelta(seconds=180)).strftime('%Y-%m-%dT%H:%M:%SZ'),'ZOOP_AI_PIPELINE_LIVE_OUTPUT_CONTRACT':'citation-refs-default-1',
         'ZOOP_AI_BASE_URL':'https://api.openai.com/v1','TYPESAFE_BASE_URL':'https://api.typesafe.ai/v1','TYPESAFE_VALIDATION_MODEL':'jev-1.14.0',
         'ZOOP_AI_API_KEY':b.read_key(Path(cfg['keyFile'])),'TYPESAFE_API_KEY':read_verifier(Path(cfg['verifierKeyFile']))})
     return LiveRuntime
