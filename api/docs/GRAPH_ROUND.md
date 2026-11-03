@@ -2,7 +2,7 @@
 
 그래프 수입을 30분 회차마다 실행하는 작업의 앱(api) 쪽 계약입니다. 스케줄러는 AI `round-runs`·`round-handoffs`, 기존 `analyze_plan` 큐와 비활성 수입기를 연결합니다. 기본값은 꺼짐이며, 켤 때는 새로 결속된 AI 쓰기 가능 profile과 앱 수입 principal을 준비해야 합니다([AI 설정](../../ai/service/README.md#회차-http-실행선택-기본-꺼짐)).
 
-`ZOOP_GRAPH_ROUND_IMPORT_SOURCE=http`이면 handoff와 관측 모두 AI 서비스의 HTTP로 읽습니다. API는 AI 원장에 직접 접근하지 않습니다. 회차 하나의 `imported`는 비활성 incoming 버전 등록이며, 누적 composition과 활성화는 별도 승인된 작업입니다. 현재 publication·CAS·현재 권한 규칙은 [누적 발행 계약](GRAPH_READ_HANDOFF.md#누적-발행과-원본별-현재-권한)을 그대로 따릅니다.
+`ZOOP_GRAPH_ROUND_IMPORT_SOURCE=http`이면 handoff와 관측 모두 AI 서비스의 HTTP로 읽습니다. API는 AI 원장에 직접 접근하지 않습니다. 회차 하나의 `imported`는 비활성 incoming 버전 등록이며, 누적 composition과 활성화는 별도 승인된 작업입니다. 현재 publication·CAS·현재 권한 규칙은 [누적 발행 계약](GRAPH_READ_HANDOFF.md#누적-발행과-원본별-현재-권한)을 그대로 따릅니다. 정기 운영에서 앱이 의존하는 AI 쪽 규칙(달력, 회차당 한도와 이월, 공급, 누적 묶음, 상한)은 아래 [정기 운영 계약](#정기-운영-계약)에 모았습니다.
 
 ## 회차 한 바퀴
 
@@ -159,8 +159,62 @@ R7은 관측 전체를 최초 확인과 commit 직전 재확인에서 **두 번 
 - `AnalyzePlanPersistencePostgresTest`(`auth-postgres`): `createForSystem`이 system actor로 계획·job·감사 행을 만들고 같은 계획은 재사용, 실패한 job은 retry job 1개.
 - `PipelineOverviewPostgresTest`(`auth-postgres`): 기존 검사 + `rounds` 섹션(`enabled=false`, null 시각, 배열)이 직렬화됨.
 
+## 정기 운영 계약
+
+AI 담당과 BE가 2026-11-03까지 확정한 정기 운영 규칙 중 **앱이 의존하는 것**을 정본으로 옮긴 절입니다(#55). 근거는 #407의 AI 최종 회신(2026-10-29)과 그 뒤 팀 결정, 2026-11-02~03 AI·BE 운영 계약 교신, AI PR #532(영업일 달력)입니다. AI 쪽 구현 세부는 [AI 서비스 안내](../../ai/service/README.md#회차-http-실행선택-기본-꺼짐)와 [AI 영업일 달력 profile](../../ai/service/CALENDAR_ELIGIBILITY.md)을 따릅니다. **앱 쪽은 이 규칙들을 위해 코드를 바꾸지 않습니다.** 다만 달력 모드(영업일 판단, `non_business_day`, 다음 영업일 기한, 조회 상한 검사)는 AI 쓰기 profile이 `zoop-ai-round-profile-2`의 달력 정책(`through-next-business-day-close-1`)으로 기동된 뒤에야 적용됩니다. 경과 시간 정책이나 `zoop-ai-round-profile-1`로 기동한 AI 서비스는 요일·공휴일을 구분하지 않습니다.
+
+### 역할
+
+| 담당 | 맡는 일 |
+|---|---|
+| 앱 | 회차 스케줄러(R1~R7), `analyze_plan` 큐, 비활성 수입, 회차 경로 자동 준비(비활성 candidate까지, #530), 관리자 retry·수동 시작, 수동 CAS 활성화 |
+| AI | 수집, tick, plan-round, freeze, 관측 export, 영업일 달력, 회차당 한도와 이월, admission 정책(비용 상한) |
+| 사람 | 공개 승인(승인자)과 CAS 실행(BE). 자동 활성화는 쓰지 않습니다(`ZOOP_GRAPH_AUTO_ACTIVATION_ENABLED=false`) |
+
+### 달력과 슬롯
+
+- 앱 달력은 **매일** KST 09:05~17:35 30분 간격 18슬롯과 18:05 freeze 전용 슬롯입니다(설정 기본값). 앱에는 요일·공휴일 규칙이 없고, 같은 DB를 쓰는 모든 API 프로세스의 달력 설정은 같은 값이어야 합니다(공개 Web이 관리자 회차 명령을 받는 후속 변경에서 writer의 달력과 같은지 확인합니다).
+- 영업일·공휴일 판단은 AI 달력이 합니다(profile-2 달력 정책). 비영업일 슬롯은 R1 접수 뒤 R2 조회에서 AI가 기존 응답 `state=no_new_material`, `code=non_business_day`를 돌려주며 수집·계획·분석을 시작하지 않습니다. 앱은 이를 평소의 `no_new_material`과 같이 `analysis_done`으로 전진시켜 계획 없는 freeze를 요청하며, `code`는 이벤트 detail에만 남깁니다. freeze가 `ready`이면(이전에 접수된 작업의 carry 결과) 수입하고, `window_empty`이면 `skipped`입니다.
+- scheduler를 도는 프로세스(writer)는 비영업일에도 멈추지 않습니다. 비영업일에는 새 회차의 수집·분석·모델 호출이 없습니다. 이미 접수된 S2·S3 작업은 휴일에도 실행·복구될 수 있습니다.
+- 공휴일 목록, 달력의 유효 범위(`endDate`), 갱신과 승인(`operationalApproval`)은 AI 소관입니다. 달력 범위를 넘긴 슬롯은 AI가 새 회차 접수를 거부합니다. 앱은 그 거부 코드를 회차 이벤트에 기록하고 평소의 실패·대기 규칙을 그대로 적용합니다.
+
+### 회차당 한도와 이월
+
+- AI plan-round가 회차당 최대 8건(profile `limit`)을 고르고, 넘친 관측은 원래 신원과 원래 수집 구간을 유지한 채 다음 회차로 이월합니다(오래된 것부터). 앱은 한도를 모르고 계획을 그대로 접수합니다. 하루 최대 8 × 18 = 144건입니다.
+- 이월된 관측의 자동 선택 자격은 원래 수집 구간(`window.through`) 날짜의 **다음 영업일 18:05**까지입니다(AI 달력 기준). 기한이 지난 관측은 삭제하지 않고 보존하되 자동 선택에서 빠지며, 재투입은 사람이 분류한 뒤 정합니다. 자동 재시도는 없습니다.
+- 달력 모드 AI profile의 조회 상한(`selection.eligibility.inventoryMaxAgeSeconds`. 경과 시간 정책에서는 `maxAgeSeconds`가 경과 시간 필터)은 달력에서 계산한 "영업일 09:05 원점에서 다음 영업일 18:05까지"의 최댓값 이상이어야 하고, AI 서비스가 기동 때 검사합니다(2026-11-03~2027-03-31 달력 기준 464,400초). 고정 일수 가정은 쓰지 않습니다. 이 값은 앱 설정이 아닙니다.
+- profile 값은 AI 원장 binding에 묶이므로 정규 운영 profile을 기동하기 전에 확정합니다. 기동 뒤에 바꾸면 drain과 새 상태 디렉터리가 필요합니다.
+
+### 공급과 coverage
+
+- AI는 각 회차 5분 전에 수집을 시작합니다. 완료 보장이 아닙니다.
+- 회차의 coverage는 **그 시점까지 AI가 실제로 영속 보관한 관측의 범위**입니다. 공급원 전체를 수집했다는 주장이 아니며 수집기의 `coverageThrough:null`은 유지됩니다. 슬롯 뒤에 처음 보관된 자료는 실제 관측 시점의 다음 구간으로 갑니다. 이미 확보했으나 처리가 늦어진 관측의 원래 구간은 유지됩니다.
+- AI round-run은 roundId 단위로 종결됩니다. 같은 roundId·같은 바이트는 저장된 결과를 돌려주고(200), 다른 바이트는 409 `request_conflict`입니다. 그래서 AI가 `failed`로 답한 회차(`run_failed:<code>`)는 관리자 retry로 다시 실행되지 않고 같은 결과를 다시 받으며, 다음 슬롯이 마지막 성공 경계부터 이어받는 것이 복구 경로입니다. AI에 닿지 못해 끝난 R1·R2 실패(`run_timeout` 등)와 분석·freeze·수입 단계의 실패는 retry로 저장된 바이트 그대로 재개합니다.
+
+### 누적 묶음과 공개 범위
+
+- 묶음 하나가 앱 버전 하나입니다. AI는 freeze마다 원장 전체에서 가장 새로운 ready S3 job 최대 20개를 고르고 이전 묶음의 `sources`를 이어 쓰지 않습니다. withheld job은 사유만 남기고 범위에서 빠지며 20개 자리를 차지하지 않습니다(팀 결정 1).
+- 앱은 새 계획이 없는 슬롯과 18:05 freeze 전용 슬롯에도 freeze를 요청합니다. handoffId는 manifest 내용에서 파생되므로 같은 내용이면 같은 id이고 수입은 `unchanged`입니다.
+- 이전 슬롯을 건너뛰어도 내용을 잃지 않는 세 조건과 순서 보호는 위 [수입 bridge](#수입-bridge-r7-graphroundimportbridge) 절을 따릅니다.
+- 정정 통지 v1: decisions·canonical·검수 변경은 다음 묶음에 반영됩니다. 이미 공개된 버전에서 내려야 하는 항목은 변경을 만든 운영 책임자가 `exclude-query`로 처리하고, 미해제 제외는 활성화 때 새 버전으로 이월됩니다(A-14, #467). 과거 버전은 바꾸지 않습니다.
+- bindings는 매 회차 전체 범위(`DocumentBindingsScope.ALL`)를 freeze 요청에 넣습니다(A-10).
+
+### 시간·비용 상한
+
+- 비용 상한은 AI admission 정책의 `limits.maxUnits`가 맡습니다. `quota_exhausted`는 회차 실패이며 운영자가 재시도하지 않습니다(운영 절차). 앱의 retry 판정은 이 코드를 막지 않으므로 retry하면 같은 계획을 다시 접수합니다. 앱에는 비용 상한이 없습니다.
+- `ZOOP_ANALYSIS_ANALYZE_PLAN_ATTEMPT_DEADLINE`은 회차당 8건의 S2·S3를 AI가 직렬로 실행한 실측 이상으로 둡니다(초기 90m, 기본 30m). 앱의 `analyze_plan` 실행기는 job을 한 번에 하나씩 처리하므로, R4 대기는 자기 분석 시간에 앞선 회차의 대기열을 더한 시간입니다. 그래서 `ZOOP_GRAPH_ROUND_ANALYSIS_WAIT_DEADLINE`은 attempt deadline보다 길고, 한 회차 분석이 30분을 넘는 날의 대기열까지 덮어야 합니다. 분석이 슬롯보다 길어도 다음 슬롯은 시작하고 끝난 job은 끝난 뒤 첫 freeze에 들어가지만, 회차당 평균 분석이 30분을 넘으면 대기열이 하루 동안 계속 길어지므로 하루 144건은 상한일 뿐입니다. 그때는 AI 회차당 한도를 낮춥니다.
+- 30분은 회차 간격이지 분석 허용 시간이나 SLA가 아닙니다([책임 절](GRAPH_READ_HANDOFF.md#수집분석-실행과-공개-스케줄의-책임)).
+
+### 운영 전제와 열린 것
+
+- 실제로 동시에 실행되는 scheduler holder는 하나입니다(위 배포 제약). 토큰·endpoint 교체 전에는 drain합니다.
+- 공개는 승인 뒤 수동 CAS이고 자동 준비(#530)는 비활성 candidate까지입니다.
+- 첫 공급원, 일일 공급량, funding 계정은 이 계약 밖이며 AI·공개 승인자가 정합니다.
+- 아직 열린 것: AI 달력 승인(`operationalApproval`), AI 쓰기 profile을 달력 모드로 새 상태에서 기동, 실제 공급 연결, 첫 공급원의 공개 적합성.
+
 ## 다음
 
-- 합성 연속 회차 검증은 새로운 DB·artifact root에서 실행하고 Java 요청 journal, native 단일 실행, 재시작 뒤 GET-first 복구, 비활성 수입과 기존 활성 포인터 유지를 함께 확인합니다. 운영 profile을 켜는 결정과 별개입니다.
+- 합성 연속 회차 중 새 DB·artifact root에서 두 회차의 비활성 수입, 기존 활성 포인터 유지, 비영업일 계획 없는 freeze는 `api/scripts/graph_round_smoke.py`(#537)로 확인합니다. 앱 재시작 뒤 GET-first 복구는 아직 종단 검증에 없습니다. 운영 profile을 켜는 결정과 별개입니다.
 - R8 활성화 결과를 회차 행에 사후 기록(`recordActivation`), 큐 대기 지표, 관리자 응답의 `ingestionRoundId`·`versionCommittedAt` 노출(OpenAPI 변경).
-- 버전 보존·정리 명령은 PR-R3.
+- 버전 보존·정리 명령은 만들지 않습니다(2026-11-03 보류). 명세는 버전·스냅샷 보존만 요구하고, publication과 그 원본 버전은 삭제가 막혀 있으며(`graph_publications` 불변 trigger, 원본 FK RESTRICT), 같은 내용의 freeze는 새 버전을 만들지 않습니다. 정규 회차를 켠 뒤 버전 수나 artifact 용량이 실제 문제가 되면 다시 검토합니다.
+- `quota_exhausted` 분석 실패를 retry 판정에서 막을지(지금은 운영 절차로만 막음).
