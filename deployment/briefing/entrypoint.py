@@ -17,6 +17,10 @@ def main():
     key=os.environ.pop('OPENAI_API_KEY')
     if not key or any(c.isspace() for c in key):raise ValueError('provider_key_format')
     private_file(temp/'provider-key','OPENAI_API_KEY='+key+'\n')
+    if os.environ.get('TYPESAFE_API_KEY'):
+        verifier=os.environ.pop('TYPESAFE_API_KEY')
+        if not verifier or any(c.isspace() for c in verifier):raise ValueError('verifier_key_format')
+        private_file(temp/'verifier-key','TYPESAFE_API_KEY='+verifier+'\n')
     endpoint=urlsplit(os.environ['DB_URL'].removeprefix('jdbc:'))
     dsn={'host':endpoint.hostname,'port':endpoint.port or 5432,'dbname':endpoint.path.lstrip('/'),
          'user':os.environ['DB_USERNAME'],'password':os.environ['DB_PASSWORD'],'application_name':'zoop-briefing-server-v1'}
@@ -28,6 +32,21 @@ def main():
          'serverCommand':launcher[:3]+['-Dloader.main=com.zoop.briefing.server.BriefingServerCommand']+launcher[3:]+['org.springframework.boot.loader.launch.PropertiesLauncher'],
          'ledgerCommand':launcher[:3]+['-Dloader.main=com.zoop.briefing.usage.BriefingUsageCommand']+launcher[3:]+['org.springframework.boot.loader.launch.PropertiesLauncher','--stdio'],
          'inputGraceSeconds':1800}
+    cfg.update({'companyCatalogue':'/opt/zoop/briefing/company-catalogue.json',
+        'authorityRoot':os.environ.get('BRIEFING_SERVER_AUTHORITY_ROOT','/mnt/zoop-artifacts/briefing_server_authority'),
+        'originalSourceAuthority':'/mnt/zoop-authority/serving-authorities.json','verifierKeyFile':str(temp/'verifier-key'),
+        'nativeCommand':launcher[:3]+['-Dloader.main=com.zoop.briefing.server.BriefingNativeCommand']+launcher[3:]+['org.springframework.boot.loader.launch.PropertiesLauncher']})
+    os.environ.update({'ZOOP_STATE_DIR':'/tmp/zoop-unused-app-state','ZOOP_AI_WORKER_STATE_DIR':'/tmp/zoop-unused-ai-worker-state'})
+    if sys.argv[1:]==['--initialize-authority']:
+        import briefing_native_intake
+        briefing_native_intake.initialize_authority(cfg);print('briefing-source-authority-initialized');return
+    if len(sys.argv)>2 and sys.argv[1]=='--slot' and sys.argv[2] in ('morning','evening'):
+        import briefing_native_intake,signal
+        def timeout(signum,frame):raise TimeoutError('finite_slot_execution_limit')
+        signal.signal(signal.SIGALRM,timeout);signal.alarm(45*60)
+        cutoff=sys.argv[4] if len(sys.argv)==5 and sys.argv[3]=='--cutoff' else None
+        if len(sys.argv) not in (3,5) or (len(sys.argv)==5 and sys.argv[3]!='--cutoff'):raise ValueError('slot_arguments')
+        briefing_native_intake.run_slot(cfg,sys.argv[2],cutoff);return
     private_file(temp/'config.json',json.dumps(cfg))
     sys.argv=['briefing_server_runtime','--config',str(temp/'config.json')]
     runtime.main()

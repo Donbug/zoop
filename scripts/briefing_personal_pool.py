@@ -29,7 +29,7 @@ def compile_pool(frozen, row, calls, registry, previous_id=None, baseline=None):
         iid = c['issueId']; a = assessed['assessments'][iid]
         sources = []
         for sid, s in c['sources'].items():
-            bound = registry.get((s['documentId'], 'sha256-' + s['bodySha256']))
+            bound = registry.get((s['documentId'], s.get('documentVersion') or 'sha256-' + s['bodySha256']))
             if bound is None:
                 # Retain the whole assessed pool; current access checks will exclude this source.
                 bound = {'documentId': s['documentId'], 'documentVersion': 'sha256-' + s['bodySha256'],

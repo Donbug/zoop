@@ -62,7 +62,8 @@ class BriefingServerPostgresTest {
     private Path grant;
     private Path work;
 
-    @BeforeEach void start() throws Exception {
+    @BeforeEach void start(org.junit.jupiter.api.TestInfo info) throws Exception {
+        boolean dayOnly=info.getTestMethod().orElseThrow().getName().startsWith("dayOnlySource");
         schema = "prepare_" + UUID.randomUUID().toString().replace("-", "");
         url = System.getenv("ZOOP_COMPANY_TEST_DB_URL");
         if (url == null || !url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/zoop_company_test_19")) {
@@ -103,7 +104,7 @@ class BriefingServerPostgresTest {
                 registry.insertArticleIfAbsent(HandoffFixtures.ARTICLE_ID, "news", HandoffFixtures.SOURCE, NOW);
                 registry.insertArtifactIfAbsent(new ArtifactRow(textId, "extracted_text", stored.uri(), stored.sha256(), stored.bytes(), "text/plain; charset=utf-8", NOW));
                 registry.insertVersionIfAbsent(new VersionRow(HandoffFixtures.ARTICLE_ID, HandoffFixtures.ARTICLE_VERSION, "합성 제목", null,
-                        "https://example.invalid/a", Instant.parse("2026-10-08T00:00:00Z"), null, "datetime", null, textId,
+                        "https://example.invalid/a", dayOnly?null:Instant.parse("2026-10-08T00:00:00Z"), dayOnly?java.time.LocalDate.parse("2026-10-08"):null, dayOnly?"day":"datetime", null, textId,
                         Instant.parse("2026-10-14T01:02:03.456789Z")));
             });
         }
@@ -216,6 +217,61 @@ class BriefingServerPostgresTest {
         assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM ai_executions WHERE retry_unit_id IS NOT NULL",Integer.class));
         assertEquals(1,jdbc.queryForObject("SELECT count(DISTINCT retry_unit_id) FROM ai_executions WHERE retry_unit_id IS NOT NULL",Integer.class));
     }
+    @Test void briefingIntakeActivationKeepsEveryExistingGraphRecord() throws Exception {
+        String first=publish(importNative(HandoffFixtures.Spec.standard()));server();
+        var env=new java.util.HashMap<String,String>();
+        env.put("DB_URL",url);env.put("DB_USERNAME","company_test");env.put("DB_PASSWORD",password());
+        env.put("BRIEFING_SERVER_WORK_ROOT",work.toString());env.put("BRIEFING_USAGE_ARTIFACT_ROOT",temp.toRealPath().resolve("producer").toString());
+        env.put("ZOOP_DOCUMENT_READ_GRANTS",grant.toString());env.put("ZOOP_DOCUMENT_READ_INGESTION_SOURCES",authority.toString());
+        env.put("BRIEFING_SERVER_AUTHORITY_ROOT",temp.toRealPath().toString());env.put("BRIEFING_SERVER_ADDITIVE_GRAPH_ALLOWED","true");
+        env.put("BRIEFING_SERVER_AUTHORIZATION_REF","synthetic-additive-test");
+        var command=new com.zoop.briefing.server.BriefingNativeCommand(env);var baseline=command.state();
+        var before=reader().read(first).snapshot();
+        String second=importNative(HandoffFixtures.Spec.standard().withIssueId("issue-second-intake"));
+        var request=com.zoop.common.json.StrictJson.newObject();request.set("baseline",baseline);
+        request.putObject("incoming").put("sourceVersion",second).put("receiptSha256",registry.findArtifact("artifact-receipt-"+second).orElseThrow().sha256());
+        var result=command.activate(com.zoop.common.json.StrictJson.Obj.of(request));
+        assertEquals(first,result.path("previousGraphVersion").asString());
+        var after=reader().read(result.path("graphVersion").asString()).snapshot();
+        assertTrue(after.issues().containsAll(before.issues()));assertTrue(after.relations().containsAll(before.relations()));
+        assertTrue(after.evidence().containsAll(before.evidence()));assertTrue(after.articles().containsAll(before.articles()));
+        assertTrue(versions.everActivated(result.path("graphVersion").asString()));
+        assertThrows(IllegalStateException.class,()->command.activate(com.zoop.common.json.StrictJson.Obj.of(request)));
+    }
+
+    @Test void dayOnlySourceUsesObservedClockAndPreservesNullPublicationInstant() throws Exception {
+        var spec=HandoffFixtures.Spec.standard().withPublication("2026-10-08","day");
+        var built=HandoffFixtures.build(spec.withHandoffId("day-source-"+UUID.randomUUID()));
+        var ingestion=new HandoffFixtures.FakeIngestion();
+        ingestion.serve=selector->{
+            var exported=com.zoop.common.json.StrictJson.parseObject(HandoffFixtures.standardIngestionExport());
+            var observation=(ObjectNode)exported.raw("observation");
+            observation.putNull("publishedAt");observation.put("provenance","collected_http");
+            var collection=observation.putObject("collection").put("provenance","collected_http").put("collectionId","synthetic-day-source");
+            collection.putObject("receipt").put("file","collections/synthetic-day-source/receipts/"+"7".repeat(64)+".json").put("sha256","7".repeat(64));
+            collection.put("fetchedAt","2026-10-14T01:02:03.456789Z").put("finalUrl","https://example.invalid/a").put("httpStatus",200)
+                .put("contentType","text/html").put("bodySha256","9".repeat(64)).put("documentKind","news").put("network","synthetic_loopback");
+            collection.putObject("published").put("raw","2026-10-08").put("precision","day").put("date","2026-10-08").put("basis","declared");
+            return com.zoop.common.json.StrictJson.write(exported.node());
+        };
+        var importer=new GraphHandoffImporter(new HandoffFixtures.FakeHandoff(built.envelopeBytes()),ingestion,
+                new IngestionExportParser(),files,registry,graph,transaction,CLOCK);
+        var imported=importer.run(built.request());
+        assertTrue(imported.succeeded(),new String(GraphHandoffResultWriter.toBytes(imported),StandardCharsets.UTF_8));publish(built.versionId());
+        var input=server().prepare(com.zoop.common.json.StrictJson.Obj.of(request("morning")));
+        var source=input.path("candidates").get(0).path("sources").values().iterator().next();
+        assertTrue(source.path("publishedAt").isNull());assertEquals("2026-10-08",source.path("publishedDate").asString());
+        assertEquals("2026-10-14T01:02:03.456789Z",source.path("availableAt").asString());
+        server().check(com.zoop.common.json.StrictJson.Obj.of(input));runProducer("morning","normal");
+        assertEquals("2026-10-08",jdbc.queryForObject("SELECT published_payload->'items'->0->>'reportedAt' FROM briefing_rounds",String.class));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM briefing_rounds WHERE published_at IS NOT NULL",Integer.class));
+        var pool=com.zoop.common.json.StrictJson.parseObject(jdbc.queryForObject("SELECT snapshot::text FROM briefing_personal_pools",String.class));
+        var poolSource=pool.array("candidates").get(0).path("sources").get(0);
+        assertTrue(poolSource.path("publishedAt").isNull());
+        assertEquals(HandoffFixtures.ARTICLE_VERSION,poolSource.path("documentVersion").asString());
+        assertEquals("synthetic-briefing",poolSource.path("grantId").asString());
+    }
+
     @Test void unavailableInputIsAFailedPrepareAttemptWithoutAnyModelCall() throws Exception {
         server();runProducer("morning","input-failed");
         assertEquals("failed",jdbc.queryForObject("SELECT status FROM briefing_attempts",String.class));

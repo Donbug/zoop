@@ -40,10 +40,15 @@ class Budget:
         self.authority()
         require(re.fullmatch(r"brf-\d{4}-\d{2}-\d{2}-(morning|evening)",self.round_id),"round_identity")
         request=json.loads(encoded);require(request['model']=='gpt-6-luna' and request['store'] is False and not request.get('tools') and request.get('service_tier')=='default','model_policy')
+        return self.reserve_physical(encoded,request['max_output_tokens'],'openai','gpt-6-luna')
+    def reserve_physical(self,encoded,output,provider,model,phase="briefing",input_multiplier=1):
+        self.authority()
+        require(re.fullmatch(r"brf-\d{4}-\d{2}-\d{2}-(morning|evening)",self.round_id),'round_identity')
+        require(type(input_multiplier) is int and 1<=input_multiplier<=100,'input_multiplier')
+        require((provider,model) in [('openai','gpt-6-luna'),('typesafe','jev-1.14.0')] and type(output) is int and 0<=output<=100000,'physical_model_policy')
         root=Path(self.cfg['work'])/'budget';root.mkdir(mode=0o700,exist_ok=True)
         key=hashlib.sha256(encoded).hexdigest();day=str(datetime.now(KST).date())
-        # Same conservative token envelope used by the existing briefing request recorder.
-        reserve=(Decimal(2*len(encoded)+4096)*Decimal('.5')+Decimal(request['max_output_tokens'])*Decimal('1.5'))/1000000
+        reserve=(Decimal((2*len(encoded)+4096)*input_multiplier)*Decimal('.5')+Decimal(output)*Decimal('1.5'))/1000000
         with (root/'.lock').open('a+') as lock:
             fcntl.flock(lock,fcntl.LOCK_EX)
             rows=[json.loads(p.read_bytes()) for p in root.glob('*.json')]
@@ -53,22 +58,26 @@ class Budget:
                 done=root/'finished'/(r['requestDigest']+'.json')
                 return Decimal(json.loads(done.read_bytes())['upperUsd']) if done.exists() else Decimal(r['reservedUpperUsd'])
             require(len(own)<16 and sum(map(amount,own),Decimal(0))+reserve<=1,'round_budget')
+            require(phase in ('native','briefing') and (phase!='native' or sum(r.get('phase')=='native' for r in own)<12),'native_phase_call_limit')
             require(sum(map(amount,today),Decimal(0))+reserve<=2,'daily_budget')
             write_once(root/(key+'.json'),{'requestDigest':key,'roundId':self.round_id,'day':day,'reservedUpperUsd':str(reserve),'reservedAt':b.now(),
-                'costBasis':'openai-2026-11-03-standard-upper-envelope-v1','currency':'USD','actualCost':None,
+                'provider':provider,'model':model,'phase':phase,'costBasis':'briefing-2026-11-03-conservative-upper-envelope-v2','currency':'USD','actualCost':None,
                 'authorizationRef':self.cfg.get('authorizationRef')})
         return key,reserve
     def dispatch(self,encoded,reservation):
-        key,reserve=reservation;root=Path(self.cfg['work'])/'budget'
         status,raw=self.transport(encoded)
+        self.settle(reservation,raw)
+        return status,raw
+    def settle(self,reservation,raw):
+        key,reserve=reservation;root=Path(self.cfg['work'])/'budget'
         try:response=json.loads(raw)
         except (ValueError,UnicodeError):response={}
         usage=response.get('usage') or {}
+        usage={'input_tokens':usage.get('input_tokens',usage.get('prompt_tokens')),'output_tokens':usage.get('output_tokens',usage.get('completion_tokens'))}
         known=all(type(usage.get(k)) is int and usage[k]>=0 for k in ('input_tokens','output_tokens'))
         cost=(Decimal(usage['input_tokens'])*Decimal('.5')+Decimal(usage['output_tokens'])*Decimal('1.5'))/1000000 if known else reserve
         (root/'finished').mkdir(mode=0o700,exist_ok=True)
         write_once(root/'finished'/(key+'.json'),{'requestDigest':key,'upperUsd':str(cost),'usageKnown':known,'actualCost':None,'finishedAt':b.now()})
-        return status,raw
     def __call__(self,encoded):
         return self.dispatch(encoded,self.reserve(encoded))
 
@@ -107,6 +116,11 @@ def make_publication(prepared,frozen,selection,passed,calls,assessed,checked,now
         'schedule':{'morning':'09:20','evening':'17:30','confirmed':True},
         'selection':{'basis':'market','reason':'현재 공개 그래프에 보존된 자료 범위에서 검증한 사업 중요도와 신규 정보입니다.'},
         'failures':[{'section':'collection','code':'limited_source_coverage','message':'전체 뉴스·시장 지표를 수집한 결과가 아닙니다.','retryable':False,'asOf':r['windowTo']}]}
+    nominal=('09:20' if r['edition']=='morning' else '17:30')
+    if datetime.fromisoformat(r['scheduledAt']).astimezone(KST).strftime('%H:%M')!=nominal:
+        metadata['failures'].append({'section':'schedule','code':'initial_delayed_publication',
+            'message':'초기 운영 검증 회차입니다. 실제 자료 마감은 '+r['windowTo']+'이며 정규 출퇴근 시각으로 소급하지 않았습니다.',
+            'retryable':False,'asOf':r['windowTo']})
     items=[]; analyses=[]; details={}
     for record in passed:
         view.prove_issue(record,calls)
@@ -116,7 +130,7 @@ def make_publication(prepared,frozen,selection,passed,calls,assessed,checked,now
         for link in item['companies']:
             original=next(c for c in candidate['companies'] if c['companyId']==link['id'])
             link['relationType']=original['relationType']
-        item['reportedAt']=max(s['publishedAt'] for s in candidate['sources'].values())
+        item['reportedAt']=max(candidate['sources'].values(), key=lambda s:s.get('availableAt') or s['publishedAt']).get('publishedAt') or max(s.get('publishedDate') or s['publishedAt'][:10] for s in candidate['sources'].values())
         item['matchedCompanyIds']=[];item['documentSentiments']=[]
         documents=sorted({s['documentId'] for s in candidate['sources'].values()})
         item['sourceSupport']={'articleCount':len(documents),'knownLineageCount':None,'independentSourceCount':None,'unknownLineageArticles':documents,'duplicateGroups':[]}
@@ -125,6 +139,8 @@ def make_publication(prepared,frozen,selection,passed,calls,assessed,checked,now
             {e for c in record['draft']['companies'] for x in c['conditions'] for e in x['evidenceIds']})
         detail=value['detail'];detail['summary']=copy.deepcopy(item['summary']);detail['companies']=copy.deepcopy(item['companies'])
         detail['metadata']=copy.deepcopy(metadata)
+        if any(s.get('eligibilityBasis')=='first_observed' for s in candidate['sources'].values()):
+            detail['limitations'].append('일자만 공개된 출처는 발행 시각을 추정하지 않고 최초 수집 시각으로 회차에 포함했습니다. 수집 시각이 뉴스 발표 시각을 뜻하지 않습니다.')
         detail['evidence']=[{'id':sid,'quote':s['quote'],'documentId':s['documentId'],'documentVersion':s['documentVersion'],
             'title':s.get('title') or '', 'publisher':s.get('publisher') or '', 'url':s['url'],'publishedAt':s['publishedAt'],
             'quoteVerified':True,'sourceKind':s['sourceKind'],'bodySha256':s['bodySha256'],'bodyContext':None} for sid,s in candidate['sources'].items()]

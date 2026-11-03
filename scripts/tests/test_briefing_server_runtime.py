@@ -31,7 +31,8 @@ class BudgetTests(unittest.TestCase):
         self.assertEqual(1,len(list((Path(self.temp.name)/'budget').glob('*.json'))))
     def test_cost_reservation_above_round_cap_does_not_send(self):
         budget=runtime.Budget(self.cfg,'brf-2026-11-03-morning',lambda:None,self.transport)
-        with self.assertRaisesRegex(ValueError,'round_budget'):budget(self.request(output=1000000))
+        request=json.loads(self.request());request['instructions']='x'*1100000
+        with self.assertRaisesRegex(ValueError,'round_budget'):budget(json.dumps(request).encode())
         self.assertFalse(self.calls)
     def test_daily_cap_is_execution_date_even_for_historical_rounds(self):
         root=Path(self.temp.name)/'budget';root.mkdir()

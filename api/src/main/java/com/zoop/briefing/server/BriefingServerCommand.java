@@ -98,11 +98,12 @@ public final class BriefingServerCommand {
             for(var e:visible.evidence()) {
                 if(!issue.evidenceIds().contains(e.evidenceId())) continue;
                 var article=visible.articles().stream().filter(a -> a.articleId().equals(e.articleId()) && a.version().equals(e.articleVersion())).findFirst().orElseThrow();
-                var rows=jdbc.queryForList("SELECT a.provider,a.kind,v.title,v.publisher,v.published_at,t.storage_uri,t.sha256,t.bytes FROM articles a JOIN article_versions v ON v.article_id=a.id JOIN artifacts t ON t.id=v.text_artifact_id WHERE a.id=? AND v.version=? AND a.access_status='available'",e.articleId(),e.articleVersion());
+                var rows=jdbc.queryForList("SELECT a.provider,a.kind,v.title,v.publisher,v.published_at,v.published_date,v.publication_precision,v.collected_at,t.storage_uri,t.sha256,t.bytes FROM articles a JOIN article_versions v ON v.article_id=a.id JOIN artifacts t ON t.id=v.text_artifact_id WHERE a.id=? AND v.version=? AND a.access_status='available'",e.articleId(),e.articleVersion());
                 if(rows.size()!=1) reject(); var row=rows.getFirst(); var grant=findGrant(grantRoot,current,row.get("provider").toString());
                 if(grant==null || !inScope(row.get("provider").toString(),e.articleId(),e.articleVersion(),row.get("sha256").toString())) {denied++;continue;}
-                if(row.get("published_at")==null) {outside++;continue;}
-                Instant at=((Timestamp)row.get("published_at")).toInstant(); if(!at.isAfter(from)||at.isAfter(cutoff)) {outside++;continue;}
+                BriefingSourceClock sourceClock;
+                try { sourceClock=BriefingSourceClock.read(row); } catch(IllegalArgumentException unknown) {outside++;continue;}
+                Instant at=sourceClock.availableAt(); if(!at.isAfter(from)||at.isAfter(cutoff)) {outside++;continue;}
                 String docKey=e.articleId()+"\n"+e.articleVersion();
                 if(bound.add(docKey)) bindings.addObject().put("documentId",e.articleId()).put("documentVersion",e.articleVersion()).put("grantId",grant.string("grantId"))
                     .put("grantRevision",grant.string("revision")).putArray("recipients").add("openai");
@@ -111,8 +112,9 @@ public final class BriefingServerCommand {
                 int points=text.codePointCount(0,text.length()); if(e.start()<0||e.end()>points||e.start()>=e.end()) reject();
                 String quote=text.substring(text.offsetByCodePoints(0,e.start()),text.offsetByCodePoints(0,e.end()));
                 var s=sources.putObject(e.evidenceId()).put("evidenceId",e.evidenceId()).put("documentId",e.articleId()).put("documentVersion",e.articleVersion())
-                    .put("bodySha256",row.get("sha256").toString()).put("title",(String)row.get("title")).put("publisher",(String)row.get("publisher")).put("sourceKind",(String)row.get("kind")).put("quote",quote).put("url",article.url()).put("publishedAt",at.toString())
+                    .put("bodySha256",row.get("sha256").toString()).put("title",(String)row.get("title")).put("publisher",(String)row.get("publisher")).put("sourceKind",(String)row.get("kind")).put("quote",quote).put("url",article.url())
                     .put("grantId",grant.string("grantId")).put("grantRevision",grant.string("revision"));
+                sourceClock.put(s);
                 s.putArray("recipients").add("openai"); evidenceIds.add(e.evidenceId());
             }
             if(sources.isEmpty()) continue;
@@ -133,7 +135,7 @@ public final class BriefingServerCommand {
         if(bindings.isEmpty()) throw new IllegalStateException("briefing_grants_and_sources_required");
         // A historical import is not evidence of complete current collection. Never turn absent fresh input into "no news".
         if(candidates.isEmpty()) throw new IllegalStateException("current_window_evidence_required");
-        result.putObject("coverage").put("scope","currently_published_graph_only").put("completeMarketCoverage",false).put("outsideWindowOrUnknownClock",outside).put("modelPermissionExcluded",denied);
+        result.putObject("coverage").put("scope","currently_published_graph_only").put("completeMarketCoverage",false).put("dayPrecisionPolicy","first_observed_not_publication_time").put("outsideWindowOrUnknownClock",outside).put("modelPermissionExcluded",denied);
         var previous=result.putObject("previous").put("status","unavailable");
         var ids=jdbc.queryForList("SELECT id FROM briefing_rounds WHERE status='published' AND published_at<=? AND scheduled_at<? AND ((?='evening' AND edition='morning' AND round_date=?::date) OR (?='morning' AND edition='evening' AND round_date<?::date)) ORDER BY scheduled_at DESC LIMIT 1",String.class,Timestamp.from(cutoff),Timestamp.from(cutoff),round.string("edition"),round.string("date"),round.string("edition"),round.string("date"));
         if(!ids.isEmpty()) {
@@ -210,12 +212,12 @@ public final class BriefingServerCommand {
                 var e=visible.evidence().stream().filter(v->v.evidenceId().equals(id)).findFirst().orElseThrow();
                 if(!e.articleId().equals(pin.string("documentId"))||!e.articleVersion().equals(pin.string("documentVersion")))reject();
                 var article=visible.articles().stream().filter(a->a.articleId().equals(e.articleId())&&a.version().equals(e.articleVersion())).findFirst().orElseThrow();
-                var row=jdbc.queryForMap("SELECT v.title,v.publisher,v.published_at,t.storage_uri,t.sha256,t.bytes FROM article_versions v JOIN artifacts t ON t.id=v.text_artifact_id WHERE v.article_id=? AND v.version=?",e.articleId(),e.articleVersion());
-                Instant at=((Timestamp)row.get("published_at")).toInstant();
+                var row=jdbc.queryForMap("SELECT v.title,v.publisher,v.published_at,v.published_date,v.publication_precision,v.collected_at,t.storage_uri,t.sha256,t.bytes FROM article_versions v JOIN artifacts t ON t.id=v.text_artifact_id WHERE v.article_id=? AND v.version=?",e.articleId(),e.articleVersion());
+                var sourceClock=BriefingSourceClock.read(row); Instant at=sourceClock.availableAt();
                 var articleInfo=jdbc.queryForMap("SELECT provider,kind FROM articles WHERE id=?",e.articleId());String provider=articleInfo.get("provider").toString();
                 if(!Objects.equals(row.get("title"),pin.stringOrNull("title"))||!Objects.equals(row.get("publisher"),pin.stringOrNull("publisher"))||!articleInfo.get("kind").equals(pin.string("sourceKind")))reject();
                 if(!inScope(provider,e.articleId(),e.articleVersion(),row.get("sha256").toString()))reject();
-                if(!at.isAfter(from)||at.isAfter(to)||!at.equals(Instant.parse(pin.string("publishedAt")))||!article.url().equals(pin.string("url"))||!row.get("sha256").equals(pin.string("bodySha256")))reject();
+                if(!at.isAfter(from)||at.isAfter(to)||!sourceClock.matches(pin)||!article.url().equals(pin.string("url"))||!row.get("sha256").equals(pin.string("bodySha256")))reject();
                 String text=new String(files.readVerified(row.get("storage_uri").toString(),row.get("sha256").toString(),((Number)row.get("bytes")).longValue()),java.nio.charset.StandardCharsets.UTF_8);
                 if(!text.substring(text.offsetByCodePoints(0,e.start()),text.offsetByCodePoints(0,e.end())).equals(pin.string("quote")))reject();
             }

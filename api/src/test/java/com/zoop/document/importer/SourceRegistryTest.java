@@ -37,6 +37,31 @@ class SourceRegistryTest {
     private static final Instant NOW = Instant.parse("2026-10-20T05:00:00Z");
     private static final String SOURCE = "synthetic-source";
 
+    @Test void delegatesKeepOriginalOwnerRevocationLive(@TempDir Path temp) throws Exception {
+        temp=temp.toRealPath();
+        var original=temp.resolve("original.json");Files.write(original,bytes(valid()));
+        var added=temp.resolve("added.json");Files.write(added,bytes(registry(entry(SOURCE,"new-grant","rev-2"))));
+        var overlay=JSON.createObjectNode().put("schemaVersion",SourceRegistry.DELEGATES_SCHEMA);
+        overlay.putArray("delegates").add(original.toString()).add(added.toString());
+        var path=temp.resolve("overlay.json");Files.write(path,bytes(overlay));var current=SourceRegistry.read(path);
+        assertNull(current.denial(SOURCE,"grant-1","rev-1",NOW));assertNull(current.denialForUrl(SOURCE,"new-grant","rev-2","https://example.invalid/a",NOW));
+        var revoked=valid();grant(revoked).put("enabled",false);Files.write(original,bytes(revoked));
+        assertEquals("source_rights_unknown_or_denied",current.denial(SOURCE,"grant-1","rev-1",NOW));
+        assertNull(current.denial(SOURCE,"new-grant","rev-2",NOW));
+        Files.write(added,bytes(valid()));
+        assertThrows(SourceRegistry.Invalid.class,()->current.denial(SOURCE,"grant-1","rev-1",NOW));
+    }
+    @Test void nestedOrUnreadableDelegateNeverFallsBackToAnotherGrant(@TempDir Path temp) throws Exception {
+        temp=temp.toRealPath();
+        var known=temp.resolve("known.json");Files.write(known,bytes(valid()));
+        var nested=temp.resolve("nested.json");var value=JSON.createObjectNode().put("schemaVersion",SourceRegistry.DELEGATES_SCHEMA);
+        value.putArray("delegates").add(known.toString());Files.write(nested,bytes(value));
+        var overlay=temp.resolve("overlay.json");((ArrayNode)value.get("delegates")).add(nested.toString());Files.write(overlay,bytes(value));
+        assertThrows(SourceRegistry.Invalid.class,()->SourceRegistry.read(overlay).denial(SOURCE,"grant-1","rev-1",NOW));
+        Files.delete(nested);
+        assertThrows(SourceRegistry.Invalid.class,()->SourceRegistry.read(overlay).denial(SOURCE,"grant-1","rev-1",NOW));
+    }
+
     /** One source exactly as the smoke fixtures write it (authored files, one scope, a known enabled grant). */
     private static ObjectNode entry(String sourceId, String grantId, String revision) {
         ObjectNode source = JSON.createObjectNode();

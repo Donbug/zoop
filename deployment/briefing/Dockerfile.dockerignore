@@ -18,3 +18,10 @@
 !api/src/main/resources/briefing/
 !api/src/main/resources/briefing/prompts/
 !api/src/main/resources/briefing/prompts/**
+!ai/pipeline/
+!ai/pipeline/src/
+!ai/pipeline/src/**
+!api/src/main/resources/company/
+!api/src/main/resources/company/demo-companies.json
+**/__pycache__
+**/*.pyc
