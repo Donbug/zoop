@@ -34,16 +34,18 @@ public class JdbcTranscriptRepository implements TranscriptRepository {
     @Override public List<Summary> list(String only, Instant asOf, Instant beforeAt, String beforeId, int limit) {
         var args = new ArrayList<Object>();
         // Correlated aggregate subqueries avoid multiplying votes by other jobs in the session.
-        for (int n = 0; n < 3; n++) args.add(Timestamp.from(asOf));
+        for (int n = 0; n < 7; n++) args.add(Timestamp.from(asOf));
         String sql = """
                 SELECT s.id,s.member_id,m.email,m.display_name,s.created_at,
                   COALESCE((SELECT max(j.asked_at) FROM chat_jobs j WHERE j.session_id=s.id AND j.asked_at<=?),s.created_at) last_at,
                   (SELECT count(*) FROM chat_jobs j WHERE j.session_id=s.id AND j.asked_at<=?) messages,
                   COALESCE((SELECT j.question FROM chat_jobs j WHERE j.session_id=s.id AND j.asked_at<=? ORDER BY j.seq LIMIT 1),'') preview,
                   (SELECT count(*) FROM ai_result_feedback f JOIN chat_jobs j ON j.id=f.chat_job_id
-                    WHERE j.session_id=s.id AND f.member_id=s.member_id AND f.feature='chatbot_answer' AND f.value='up') up,
+                    WHERE j.session_id=s.id AND f.member_id=s.member_id AND f.feature='chatbot_answer' AND f.value='up'
+                      AND f.updated_at<=? AND j.asked_at<=?) up,
                   (SELECT count(*) FROM ai_result_feedback f JOIN chat_jobs j ON j.id=f.chat_job_id
-                    WHERE j.session_id=s.id AND f.member_id=s.member_id AND f.feature='chatbot_answer' AND f.value='down') down
+                    WHERE j.session_id=s.id AND f.member_id=s.member_id AND f.feature='chatbot_answer' AND f.value='down'
+                      AND f.updated_at<=? AND j.asked_at<=?) down
                 FROM chat_sessions s JOIN members m ON m.id=s.member_id
                 """ + where(only, asOf, args);
         if (beforeAt != null) {

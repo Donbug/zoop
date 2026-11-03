@@ -8,6 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.zoop.admin.auth.service.AdminSessionCookie;
 import com.zoop.admin.auth.service.AdminSessionService;
 import com.zoop.common.request.RequestIdFilter;
+import com.zoop.auth.service.CsrfKeyRing;
+import com.zoop.auth.service.SignedCursor;
+import com.zaxxer.hikari.HikariDataSource;
 import jakarta.servlet.http.Cookie;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -23,13 +26,21 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
+import javax.sql.DataSource;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** FS066-03 / A-ADM-02b: real authorization, snapshot queries and committed audits, synthetic data only. */
 @SpringBootTest(properties = {
         "ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=test",
         "ZOOP_AUTH_CSRF_KEYS=test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         "ZOOP_AUTH_ALLOWED_ORIGINS=https://zoop.example",
-        "zoop.admin.transcript-readers=transcript-admin-allowed"
+        "zoop.admin.transcript-readers=transcript-admin-allowed",
+        "spring.datasource.hikari.maximum-pool-size=1",
+        "spring.datasource.hikari.connection-timeout=1000",
+        // Flyway itself opens two migration connections; keep it off the one-connection application pool.
+        "spring.flyway.url=${DB_URL}",
+        "spring.flyway.user=${DB_USERNAME}",
+        "spring.flyway.password=${DB_PASSWORD}"
 })
 @Tag("auth-postgres")
 @EnabledIfEnvironmentVariable(named = "DB_URL", matches = "jdbc:postgresql:.*")
@@ -41,6 +52,9 @@ class TranscriptPostgresTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired AdminSessionService sessions;
     @Autowired ObjectMapper mapper;
+    @Autowired CsrfKeyRing keys;
+    @Autowired DataSource dataSource;
+    @Autowired TranscriptRepository repository;
     @MockitoSpyBean TranscriptMasker masker;
     @MockitoSpyBean TranscriptAudit audit;
     @MockitoSpyBean TranscriptReadPolicy policy;
@@ -80,14 +94,19 @@ class TranscriptPostgresTest {
     }
 
     private String job(String conversation, int seq, String question, String answer) {
+        return job(conversation, seq, question, answer, Instant.now());
+    }
+
+    private String job(String conversation, int seq, String question, String answer, Instant askedAt) {
         String id = "job-" + UUID.randomUUID();
         var result = mapper.createObjectNode().put("answer", answer); result.putArray("citations").addObject().put("evidenceId", "synthetic-evidence");
         jdbc.update("""
                 INSERT INTO chat_jobs(id,session_id,seq,question,request_hash,asked_at,frozen_context,frozen_selection,
                     status,outcome,message_id,result,result_schema_version,created_at,updated_at,finished_at)
-                VALUES(?,?,?,?,repeat('a',64),now(),'{"items":[{"kind":"company","id":"synthetic-company","label":"합성 기업"}]}',
-                    '{"contextIds":[],"evidenceIds":[],"evidencePool":[]}', 'completed','answered',?,?::jsonb,'synthetic-v1',now(),now(),now())
-                """, id, conversation, seq, question, "message-" + UUID.randomUUID(), result.toString());
+                VALUES(?,?,?,?,repeat('a',64),?,'{"items":[{"kind":"company","id":"synthetic-company","label":"합성 기업"}]}',
+                    '{"contextIds":[],"evidenceIds":[],"evidencePool":[]}', 'completed','answered',?,?::jsonb,'synthetic-v1',?,?,?)
+                """, id, conversation, seq, question, Timestamp.from(askedAt), "message-" + UUID.randomUUID(), result.toString(),
+                Timestamp.from(askedAt), Timestamp.from(askedAt), Timestamp.from(askedAt));
         return id;
     }
 
@@ -192,5 +211,63 @@ class TranscriptPostgresTest {
         doReturn(false).when(policy).allows(any());
         mvc.perform(get("/api/v1/admin/transcripts/" + session).cookie(allowed).param("purpose", "품질 점검"))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.messages").doesNotExist());
+    }
+
+    @Test void oneConnectionPoolCompletesReadsAndDeniedAuditsAfterReleasingTheReadTransaction() throws Exception {
+        assertEquals(1, assertInstanceOf(HikariDataSource.class, dataSource).getMaximumPoolSize());
+        doAnswer(call -> {
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive(), "masking must follow read commit");
+            return call.callRealMethod();
+        }).when(masker).mask(anyString(), any());
+        mvc.perform(get("/api/v1/admin/transcripts").cookie(allowed).param("purpose", "품질 점검"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/admin/transcripts/" + session).cookie(allowed).param("purpose", "품질 점검"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/admin/transcripts/" + session).cookie(denied))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/transcripts/" + session).cookie(allowed))
+                .andExpect(status().isUnprocessableContent());
+        assertEquals(4L, jdbc.queryForObject("SELECT count(*) FROM audit_logs WHERE admin_id IN (?,?) AND action='transcript.view'", Long.class, ALLOWED, DENIED));
+    }
+
+    private tools.jackson.databind.JsonNode page(String only, String cursor) throws Exception {
+        var request = get("/api/v1/admin/transcripts").cookie(allowed).param("purpose", "품질 점검")
+                .param("only", only).param("limit", "1");
+        if (cursor != null) request.param("cursor", cursor);
+        return mapper.readTree(mvc.perform(request).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+    }
+
+    @Test void cursorPagesAndDislikedFilterExcludeVotesAddedOrChangedAfterTheirAsOf() throws Exception {
+        String changedSession = session(Instant.now().minusSeconds(60));
+        String changedJob = job(changedSession, 1, "변경 전 질문", "답변"); vote(changedJob, "down", null);
+        String addedSession = session(Instant.now().minusSeconds(120));
+        String addedJob = job(addedSession, 1, "추가 전 질문", "답변"); vote(addedJob, "down", null);
+        var first = page("all", null);
+        var dislikedFirst = page("disliked", null);
+        String cursor = first.path("nextCursor").asText();
+        var position = SignedCursor.decode(mapper, keys, "admin-transcript-cursor-v1", cursor, TranscriptService.Position.class);
+        var after = Timestamp.from(position.asOf().plusSeconds(60));
+        jdbc.update("UPDATE ai_result_feedback SET value='up',updated_at=? WHERE chat_job_id=?", after, changedJob);
+        String lateJob = job(addedSession, 2, "늦은 질문", "답변"); vote(lateJob, "down", null);
+        jdbc.update("UPDATE ai_result_feedback SET updated_at=? WHERE chat_job_id=?", after, lateJob);
+        var changed = page("all", cursor);
+        assertEquals(changedSession, changed.at("/items/0/id").asText());
+        assertEquals(0, changed.at("/items/0/up").asInt());
+        assertEquals(0, changed.at("/items/0/down").asInt());
+        var added = page("all", changed.path("nextCursor").asText());
+        assertEquals(addedSession, added.at("/items/0/id").asText());
+        assertEquals(1, added.at("/items/0/down").asInt());
+        var disliked = page("disliked", dislikedFirst.path("nextCursor").asText());
+        assertEquals(addedSession, disliked.at("/items/0/id").asText());
+        assertEquals(1, disliked.at("/items/0/down").asInt());
+    }
+
+    @Test void voteCountsAlsoExcludeJobsAskedAfterTheSnapshotEvenWhenTheVoteTimestampIsEarlier() {
+        Instant asOf = Instant.now().plusSeconds(60);
+        String futureJob = job(session, 2, "미래 시각 질문", "답변", asOf.plusSeconds(60)); vote(futureJob, "down", null);
+        var row = repository.list("all", asOf, null, null, 100).stream()
+                .filter(item -> item.session().id().equals(session)).findFirst().orElseThrow();
+        assertEquals(1, row.down());
+        assertEquals(1, row.messages());
     }
 }

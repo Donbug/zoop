@@ -17,6 +17,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import tools.jackson.databind.json.JsonMapper;
 
 class TranscriptServiceTest {
@@ -30,8 +33,14 @@ class TranscriptServiceTest {
     private final TranscriptMasker masker = spy(new TranscriptMasker());
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final CsrfKeyRing keys = new CsrfKeyRing("test", "test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
-    private final TranscriptService service = new TranscriptService(policy, repository, masker, audit, mapper, keys,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+    private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+    private final TranscriptService service = service();
+
+    private TranscriptService service() {
+        when(transactions.getTransaction(any())).thenAnswer(call -> new SimpleTransactionStatus());
+        return new TranscriptService(policy, repository, masker, audit, mapper, keys,
+                Clock.fixed(NOW, ZoneOffset.UTC), transactions, new TranscriptPseudonym("", keys));
+    }
 
     private void allow() { when(policy.allows(ADMIN)).thenReturn(true); }
     private void detailFixture() {
@@ -50,7 +59,7 @@ class TranscriptServiceTest {
 
     @Test void adminAllAloneCannotReadAndPermissionIsCheckedBeforePurposeOrRepository() {
         code(ErrorCode.ACCESS_DENIED, () -> service.detail(ADMIN, null, ID, "request"));
-        verifyNoInteractions(repository, masker);
+        verifyNoInteractions(repository, masker, transactions);
         verify(audit).record(eq(ADMIN), eq(ID), isNull(), eq("denied"), eq("request"), isNull(), isNull(), eq(0), eq(Map.of()));
     }
 
@@ -68,6 +77,14 @@ class TranscriptServiceTest {
         verifyNoInteractions(repository);
     }
 
+    @ParameterizedTest @ValueSource(strings={"2026-11-03", "2026.11.03", "2026/11/03", "20261103"})
+    void acceptsAReportDateInThePurpose(String date) {
+        detailFixture();
+        service.detail(ADMIN, date + " 신고 건 확인", ID, "request");
+        verify(audit).record(eq(ADMIN), eq(ID), eq(date + " 신고 건 확인"), eq("succeeded"), anyString(),
+                isNull(), isNull(), eq(1), any());
+    }
+
     @Test void returnsOnlyMaskedFieldsAndWritesTheAuditBeforeReturning() {
         detailFixture();
         var out = service.detail(ADMIN, "  응답 품질 검토  ", ID, "request");
@@ -78,12 +95,15 @@ class TranscriptServiceTest {
         assertFalse(wire.contains(OWNER.id())); assertFalse(wire.contains(OWNER.email())); assertFalse(wire.contains("010-2345-6789"));
         assertEquals("answered", out.messages().getFirst().status());
         assertEquals(1, out.messages().getFirst().citationCount());
-        var order = inOrder(policy, repository, masker, audit);
+        var order = inOrder(policy, repository, transactions, masker, audit);
         order.verify(policy).allows(ADMIN); order.verify(repository).find(ID);
         order.verify(repository).jobs(ID); order.verify(repository).votes(ID);
+        order.verify(transactions).commit(any());
         order.verify(masker, atLeastOnce()).mask(anyString(), eq(OWNER));
         order.verify(audit).record(eq(ADMIN), eq(ID), eq("응답 품질 검토"), eq("succeeded"), eq("request"),
                 isNull(), isNull(), eq(1), eq(out.masking().counts()));
+        verify(transactions).getTransaction(argThat(definition -> definition.isReadOnly()
+                && definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
     }
 
     @Test void auditFailureNeverReturnsAMaskedOrRawBody() {

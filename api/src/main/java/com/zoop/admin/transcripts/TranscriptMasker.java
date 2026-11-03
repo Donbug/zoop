@@ -26,38 +26,68 @@ public class TranscriptMasker {
             new Rule("account", "[계좌번호]", Pattern.compile("(?<![A-Za-z0-9])\\d(?:[ -]?\\d){7,24}(?![A-Za-z0-9])")));
     private static final Pattern QUERY = Pattern.compile("([?&])([^=&#\\s]+)=([^&#\\s]+)");
     private static final Pattern TOKEN_KEY = Pattern.compile("(?i).*token.*|.*password.*|.*secret.*|.*authorization.*|api[-_]?key|.*signature.*|sig|.*credential.*");
+    private static final String DEFAULT_OWNER_NAME = "회원";
+    private static final Pattern DATE = Pattern.compile(
+            "(?<!\\d)(?:19|20)\\d{2}([./-]?)(?:0[1-9]|1[0-2])\\1(?:0[1-9]|[12]\\d|3[01])(?!\\d)");
 
     public static final List<String> RULE_NAMES = List.of("URL 토큰", "이메일", "회원 식별자", "주민등록번호",
             "전화번호", "카드번호", "계좌번호", "이름");
 
     /** Purpose must not itself copy personal data into audit_logs. */
     public static boolean containsSensitive(String value) {
-        return RULES.stream().anyMatch(rule -> rule.pattern().matcher(value).find())
-                || !query(value, new LinkedHashMap<>()).equals(value);
+        return !redact(value, null, new LinkedHashMap<>()).equals(value);
     }
 
     public Masked mask(String input, Owner owner) {
         if (input == null || input.length() > 1_000_000) throw new IllegalArgumentException("Masking input unavailable");
         Map<String, Integer> counts = new LinkedHashMap<>();
+        return new Masked(redact(input, owner, counts), Map.copyOf(counts));
+    }
+
+    private static String redact(String input, Owner owner, Map<String, Integer> counts) {
         String text = query(input, counts);
         // Full email first; otherwise a member id contained in an email could split the address.
-        for (int index = 0; index < RULES.size(); index++) {
-            Rule rule = RULES.get(index);
-            var matcher = rule.pattern().matcher(text);
-            int count = 0;
-            while (matcher.find()) count++;
-            if (count > 0) {
-                counts.merge(rule.kind(), count, Integer::sum);
-                text = matcher.replaceAll(rule.replacement());
-            }
-            if (index == 0 && owner != null) text = literal(text, owner.id(), "[회원]", "userId", counts);
+        text = apply(RULES.getFirst(), text, counts);
+        if (owner != null) text = literal(text, owner.id(), "[회원]", "userId", counts);
+        // Split around valid date shapes, so numeric rules cannot consume any part of a protected date.
+        // No sentinel tokens are inserted into user input (which could otherwise collide with a placeholder).
+        var dates = DATE.matcher(text);
+        var output = new StringBuilder();
+        int offset = 0;
+        while (dates.find()) {
+            output.append(numbers(text.substring(offset, dates.start()), counts)).append(dates.group());
+            offset = dates.end();
         }
+        text = output.append(numbers(text.substring(offset), counts)).toString();
         if (owner != null) {
             // Non-standard stored email/name values are masked literally too.
             text = literal(text, owner.email(), "[이메일]", "email", counts);
-            text = literal(text, owner.name(), "[이름]", "name", counts);
+            if (owner.name() != null && !DEFAULT_OWNER_NAME.equals(owner.name())
+                    && owner.name().codePointCount(0, owner.name().length()) >= 2)
+                text = literal(text, owner.name(), "[이름]", "name", counts);
         }
-        return new Masked(text, Map.copyOf(counts));
+        return text;
+    }
+
+    private static String numbers(String input, Map<String, Integer> counts) {
+        String text = input;
+        for (int index = 1; index < RULES.size(); index++) text = apply(RULES.get(index), text, counts);
+        return text;
+    }
+
+    private static String apply(Rule rule, String input, Map<String, Integer> counts) {
+        var matcher = rule.pattern().matcher(input);
+        var output = new StringBuilder();
+        while (matcher.find()) {
+            boolean amount = "account".equals(rule.kind()) && matcher.group().chars().allMatch(Character::isDigit)
+                    && matcher.end() < input.length() && "원억만주%".indexOf(input.charAt(matcher.end())) >= 0;
+            if (amount) matcher.appendReplacement(output, Matcher.quoteReplacement(matcher.group()));
+            else {
+                counts.merge(rule.kind(), 1, Integer::sum);
+                matcher.appendReplacement(output, Matcher.quoteReplacement(rule.replacement()));
+            }
+        }
+        return matcher.appendTail(output).toString();
     }
 
     private static String query(String input, Map<String, Integer> counts) {

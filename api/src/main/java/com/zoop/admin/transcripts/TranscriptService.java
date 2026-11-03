@@ -7,25 +7,23 @@ import com.zoop.auth.service.SignedCursor;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.Canonical;
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import static com.zoop.admin.transcripts.TranscriptHttpSchemas.*;
 
 /** FS066-03: current permission → purpose → snapshot read → masking → committed audit → response. */
 @Service
-@Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
 public class TranscriptService {
     private static final String CURSOR_PURPOSE = "admin-transcript-cursor-v1";
     private final TranscriptReadPolicy policy;
@@ -35,12 +33,23 @@ public class TranscriptService {
     private final ObjectMapper mapper;
     private final CsrfKeyRing keys;
     private final Clock clock;
+    private final TransactionTemplate reads;
+    private final TranscriptPseudonym pseudonyms;
 
     public TranscriptService(TranscriptReadPolicy policy, TranscriptRepository repository, TranscriptMasker masker,
-            TranscriptAudit audit, ObjectMapper mapper, CsrfKeyRing keys, Clock clock) {
+            TranscriptAudit audit, ObjectMapper mapper, CsrfKeyRing keys, Clock clock,
+            PlatformTransactionManager transactions, TranscriptPseudonym pseudonyms) {
         this.policy = policy; this.repository = repository; this.masker = masker; this.audit = audit;
         this.mapper = mapper; this.keys = keys; this.clock = clock;
+        this.pseudonyms = pseudonyms;
+        this.reads = new TransactionTemplate(transactions);
+        this.reads.setReadOnly(true);
+        this.reads.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
     }
+
+    private record ListSnapshot(long total, List<TranscriptRepository.Summary> rows) { }
+    private record DetailSnapshot(TranscriptRepository.Session session, List<TranscriptRepository.Job> jobs,
+            List<TranscriptRepository.Vote> votes) { }
 
     public record Position(String keyId, String admin, String filters, int limit, Instant asOf,
             Instant beforeAt, String beforeId) implements SignedCursor.Position { }
@@ -56,14 +65,16 @@ public class TranscriptService {
             Position position = decode(cursor, admin.adminId(), filters, requestedLimit);
             if (position != null) limit = position.limit();
             Instant asOf = position == null ? clock.instant() : position.asOf();
-            long total = repository.total(filter, asOf);
-            var rows = repository.list(filter, asOf, position == null ? null : position.beforeAt(),
-                    position == null ? null : position.beforeId(), limit + 1);
+            int readLimit = limit;
+            var snapshot = reads.execute(status -> new ListSnapshot(repository.total(filter, asOf),
+                    List.copyOf(repository.list(filter, asOf, position == null ? null : position.beforeAt(),
+                            position == null ? null : position.beforeId(), readLimit + 1))));
+            var rows = snapshot.rows();
             List<Summary> items = new ArrayList<>();
             for (var row : rows.stream().limit(limit).toList()) {
                 String masked = mask(row.preview(), row.session().owner(), counts);
                 String preview = masked.substring(0, masked.offsetByCodePoints(0, Math.min(120, masked.codePointCount(0, masked.length()))));
-                items.add(new Summary(row.session().id(), pseudonym(row.session().owner().id()), "member",
+                items.add(new Summary(row.session().id(), pseudonyms.forMember(row.session().owner().id()), "member",
                         row.session().startedAt(), row.lastAt(), row.messages(), preview, row.up(), row.down()));
             }
             String next = null;
@@ -73,7 +84,7 @@ public class TranscriptService {
                         new Position(keys.activeKeyId(), admin.adminId(), filters, limit, asOf, last.startedAt(), last.id()));
             }
             record(admin, null, purpose, "succeeded", requestId, filter, limit, items.size(), counts);
-            return new Page(List.copyOf(items), next, total);
+            return new Page(List.copyOf(items), next, snapshot.total());
         } catch (CustomException error) {
             if (error.getErrorCode() == ErrorCode.AUDIT_UNAVAILABLE) throw error;
             record(admin, null, purpose, error.getErrorCode() == ErrorCode.INVALID_REQUEST || error.getErrorCode() == ErrorCode.INVALID_CURSOR
@@ -92,9 +103,12 @@ public class TranscriptService {
         Map<String, Integer> counts = new LinkedHashMap<>();
         try {
             if (!target.equals(sessionId)) invalid();
-            var session = repository.find(sessionId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-            var jobs = repository.jobs(sessionId);
-            var votes = repository.votes(sessionId);
+            var snapshot = reads.execute(status -> new DetailSnapshot(
+                    repository.find(sessionId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND)),
+                    List.copyOf(repository.jobs(sessionId)), List.copyOf(repository.votes(sessionId))));
+            var session = snapshot.session();
+            var jobs = snapshot.jobs();
+            var votes = snapshot.votes();
             List<Message> messages = new ArrayList<>();
             for (var job : jobs) {
                 JsonNode result = object(job.result()), failure = object(job.failure()), context = object(job.context());
@@ -121,7 +135,7 @@ public class TranscriptService {
                         job.outcome() == null ? job.status() : job.outcome(), reason, List.copyOf(labels), citations.size(),
                         new Feedback(up, down, List.copyOf(reasons))));
             }
-            var detail = new Detail(session.id(), pseudonym(session.owner().id()), "member", session.startedAt(),
+            var detail = new Detail(session.id(), pseudonyms.forMember(session.owner().id()), "member", session.startedAt(),
                     List.copyOf(messages), new Masking(true, TranscriptMasker.RULE_NAMES, Map.copyOf(counts)));
             record(admin, target, purpose, "succeeded", requestId, null, null, messages.size(), counts);
             return detail;
@@ -166,11 +180,6 @@ public class TranscriptService {
                     || !safeTarget(p.beforeId()).equals(p.beforeId()))) throw new IllegalArgumentException();
             return p;
         } catch (RuntimeException error) { throw new CustomException(ErrorCode.INVALID_CURSOR); }
-    }
-
-    private String pseudonym(String memberId) {
-        return "user-" + HexFormat.of().formatHex(keys.sign(keys.activeKeyId(), "admin-transcript-user-v1",
-                memberId.getBytes(StandardCharsets.UTF_8)).orElseThrow()).substring(0, 20);
     }
 
     private String mask(String value, TranscriptMasker.Owner owner, Map<String, Integer> counts) {
