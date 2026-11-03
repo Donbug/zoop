@@ -650,7 +650,7 @@ export default function GraphCanvas({
   ) {
     const host = container.current;
     if (!host || graph.destroyed || !host.clientWidth || !host.clientHeight)
-      return;
+      return false;
     const hostRect = host.getBoundingClientRect();
     const root = host.parentElement;
     const overlays = [
@@ -712,12 +712,12 @@ export default function GraphCanvas({
         height: -hostRect.top,
       });
     const safe = freeViewport(host.clientWidth, host.clientHeight, obstacles);
-    if (safe.width < 40 || safe.height < 40) return;
+    if (safe.width < 40 || safe.height < 40) return false;
     const visibleNodes = graph
       .getNodeData()
       .filter((node) => node.style?.visibility !== 'hidden');
     const allFootprints = visibleNodes.map(fitFootprint);
-    if (!allFootprints.length) return;
+    if (!allFootprints.length) return false;
     // The zoom-out floor is the scale that keeps the full visible graph inside
     // the unobstructed viewport, with 0.53 as the floor for naturally small maps.
     // Recompute after data, layout and viewport changes.
@@ -728,13 +728,13 @@ export default function GraphCanvas({
     );
     graph.setZoomRange([zoomOutFloor, MAX_GRAPH_ZOOM]);
     if (graph.getZoom() < zoomOutFloor) await graph.zoomTo(zoomOutFloor, false);
-    if (rangeOnly) return;
+    if (rangeOnly) return true;
     const footprints = ids
       ? visibleNodes
           .filter((node) => ids.has(String(node.id)))
           .map(fitFootprint)
       : allFootprints;
-    if (!footprints.length) return;
+    if (!footprints.length) return false;
     const fit = fitZoom(footprints, safe, maxZoom);
     const motion = animate ? cameraMotion(animate) : false;
     // G6 5.1.1은 확대와 이동을 함께 움직이는 transform을 Graph에 공개하지 않아 viewport에서 직접 부른다.
@@ -775,10 +775,10 @@ export default function GraphCanvas({
         },
         motion,
       );
-      return;
+      return true;
     }
     await graph.zoomTo(fit.zoom, false);
-    if (graph.destroyed) return;
+    if (graph.destroyed) return false;
     const center = graph.getViewportByCanvas(fit.center);
     await graph.translateBy(
       [
@@ -787,6 +787,7 @@ export default function GraphCanvas({
       ],
       false,
     );
+    return true;
   }
   const [neighborhoodRequest, setNeighborhoodRequest] = useState<{
     id: string;
@@ -1153,7 +1154,10 @@ export default function GraphCanvas({
         const visibleCount =
           rendered.nodes?.filter((node) => node.style?.visibility !== 'hidden')
             .length ?? 0;
-        minimapShown.current = visibleCount > 60 && host.clientWidth >= 768;
+        minimapShown.current =
+          visibleCount > 60 &&
+          host.clientWidth >= 768 &&
+          host.clientHeight >= 320;
         const minimapEdges = new Set(
           rendered.edges
             ?.filter((edge) => edge.style?.visibility !== 'hidden')
@@ -1558,6 +1562,20 @@ export default function GraphCanvas({
           [camera.position[0] - current[0], camera.position[1] - current[1]],
           false,
         );
+      } else {
+        // The initial graph is rendered before the data-sync effect can observe
+        // the new instance. Fit that first frame here so a fresh visitor does
+        // not open on an unscaled corner of the full public graph.
+        const fitted = await fitVisibleGraph(
+          graph,
+          undefined,
+          MAX_GRAPH_ZOOM,
+          false,
+        );
+        if (fitted) {
+          fitPending.current = false;
+          defaultZoomPending.current = false;
+        }
       }
       instance.current = graph;
       syncSelection();
