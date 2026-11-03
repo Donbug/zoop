@@ -21,6 +21,13 @@ test('D-COM-01 D12 checks exactly two periods per company/cutoff and reuses them
   expect(server.calls('GET', '/api/v1/companies/:id/prices')).toHaveLength(2);
   rerender({ ...props });
   expect(server.calls('GET', '/api/v1/companies/:id/prices')).toHaveLength(2);
+  rerender({ ...props, enabled: false });
+  expect(result.current['1d'].data).toBeNull();
+  rerender({ ...props, enabled: true });
+  await waitFor(() =>
+    expect(result.current['1d'].data?.status).toBe('unavailable'),
+  );
+  expect(server.calls('GET', '/api/v1/companies/:id/prices')).toHaveLength(2);
   rerender({ ...props, asOf: '2026-10-07T03:00:00Z' });
   await waitFor(() =>
     expect(server.calls('GET', '/api/v1/companies/:id/prices')).toHaveLength(4),
