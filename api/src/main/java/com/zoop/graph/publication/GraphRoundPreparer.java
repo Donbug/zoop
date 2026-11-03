@@ -85,6 +85,10 @@ public final class GraphRoundPreparer implements RoundPreparation {
         Optional<GraphRoundImportLock.Held> held = lock.tryAcquire();
         if (held.isEmpty()) return;
         try (GraphRoundImportLock.Held ignored = held.get()) {
+            // Read again under the lock: an import another instance committed meanwhile is the one this attempt answers.
+            newest = publications.newestImport();
+            if (newest.isEmpty()) return;
+            trigger = newest.get();
             Optional<Preparation> last = journal.latest();
             if (!due(last, trigger, now)) return;
             Optional<Long> unsettled = last.flatMap(GraphRoundPreparer::unsettled);
@@ -153,6 +157,10 @@ public final class GraphRoundPreparer implements RoundPreparation {
             result = GraphPublicationPreparer.operatorCompose(reader, publications, composer, PublicationComposeRequest.parse(request), decisions);
         } catch (PublicationException invalid) {
             result = GraphPublicationComposer.failed(invalid.code());
+        } catch (RuntimeException unexpected) {
+            // Settle the row as the first attempt would (internal_error), so a failure that repeats does not pile up open rows.
+            log.error("graph publication preparation {}: recovery failed unexpectedly: {}", id, unexpected.getClass().getName());
+            result = GraphPublicationComposer.failed("internal_error");
         }
         journal.complete(id, result, clock.instant());
         String code = JdbcGraphPublicationPreparationRepository.code(result);
