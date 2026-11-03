@@ -349,6 +349,14 @@ class App:
             self.client.close()
 
 
+def proxy_findings(proxy):
+    """AI calls that lost the transport or answered 5xx, and the distinct 4xx answers (the app's status-first 404s are expected)."""
+    lost = [e for e in proxy.events if not isinstance(e["status"], int) or e["status"] >= 500]
+    refusals = sorted({(e["method"], e["path"], e["status"], e.get("errorCode")) for e in proxy.events
+                       if isinstance(e["status"], int) and e["status"] >= 400})
+    return lost, refusals
+
+
 def stages(detail):
     return [(event["stage"], event["outcome"], event.get("code")) for event in detail["events"]]
 
@@ -424,11 +432,6 @@ def run(args):
         record("app-used-every-ai-route", {("POST", "round-runs"), ("POST", "plan-admissions"), ("POST", "extraction-jobs"),
                                           ("POST", "relation-jobs"), ("POST", "round-handoffs"), ("GET", "graph-handoffs"),
                                           ("POST", "observations")} <= calls, sorted(calls))
-        record("no-proxy-errors", not proxy.errors, proxy.errors)
-        lost = [e for e in proxy.events if not isinstance(e["status"], int) or e["status"] >= 500]
-        record("no-ai-transport-loss-or-5xx", not lost, lost)
-        refusals = sorted({(e["method"], e["path"], e["status"], e.get("errorCode")) for e in proxy.events
-                           if isinstance(e["status"], int) and e["status"] >= 400})
         ticks_after_friday = ai.commands("ingestion").count("tick")
 
         # Round 2: Saturday is not a business day in the AI calendar.
@@ -451,6 +454,10 @@ def run(args):
         record("no-provider-or-network", not (ai.root / "network-attempt").exists())
         record("only-admin-started-rounds", db.scalar("SELECT count(*) FROM graph_rounds WHERE started_by NOT LIKE 'admin:%'") == 0
                and db.scalar("SELECT count(*) FROM graph_rounds") == 2)
+        # Proxy checks cover every AI call of both rounds (Friday and Saturday), so a retried failure in either is not lost.
+        lost, refusals = proxy_findings(proxy)
+        record("no-proxy-errors", not proxy.errors, proxy.errors)
+        record("no-ai-transport-loss-or-5xx", not lost, lost)
         report = {"state": "passed", "checks": checks, "fridayRound": friday, "saturdayRound": saturday, "graphVersionId": version,
                   "handoffId": row["handoff"]["handoffId"], "saturdayStage": row2["stage"], "planId": planned["plan"]["planId"],
                   "authoredProviderCalls": authored["providerCalls"], "providerCalls": 0, "heldSeconds": round(held, 1),
@@ -459,6 +466,9 @@ def run(args):
         return report
     except BaseException as error:
         report = {"state": "failed", "checks": checks, "error": type(error).__name__, "message": str(error)[:2000]}
+        if proxy is not None:
+            lost, refusals = proxy_findings(proxy)
+            report.update(proxyErrors=proxy.errors, aiTransportLossOr5xx=lost, aiRefusals=[list(item) for item in refusals])
         raise
     finally:
         (out / "report.json").write_text(canonical(report) + "\n")
