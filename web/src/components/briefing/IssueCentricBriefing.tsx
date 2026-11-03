@@ -15,6 +15,8 @@ import {
   type BriefingIssueView,
 } from '@/util/briefingIssueView';
 import { briefingTime } from '@/util/briefingTime';
+import { eventTimeText } from '@/util/event-time';
+import BriefingEvidenceTotal from './BriefingEvidenceTotal';
 import { validIssueIntelligence } from '@/util/issueIntelligence';
 import {
   readingGroups,
@@ -458,6 +460,11 @@ function IssueCard({
   const item = group.members[0].item;
   const recordOpen = useBriefingIssueTracking(result.id, item.eventId);
   const displayedItem = { ...item, rank };
+  // D-BRF-01·02 B3: 프로토타입에 묶음 시각 규칙이 없어 단일 사건만 표시한다.
+  const happened =
+    compact && group.members.length === 1
+      ? eventTimeText(item.eventTime, item.timePrecision)
+      : null;
   const companies = groupCompanies(group);
   const facts = uniqueText(
     group.members.flatMap((v) =>
@@ -531,6 +538,7 @@ function IssueCard({
               : '연결 기업 미확인'}{' '}
             · 관련 기업 {companies.length}곳 · 근거 {evidenceCount}건
             {group.members.length === 1 && articleCount(item)}
+            {happened && ` · 발생 ${happened}`}
           </span>
         </summary>
         {open && (
@@ -884,6 +892,7 @@ export default function IssueCentricBriefing({
               : '이 회차에 새로 선정된 핵심 이슈가 없습니다. 복기·수집 상태는 위 안내를 확인하세요.'}
           </p>
         )}
+        <BriefingEvidenceTotal items={items} />
       </section>
       <PriorIssueFollowUps key={result.id} result={result} />
     </div>

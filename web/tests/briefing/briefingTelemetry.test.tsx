@@ -171,7 +171,7 @@ test('D-BRF-01·02 records a full-reading issue map link without changing its de
     name: '이 회차 관계 그래프에서 보기',
   });
   expect(link.getAttribute('href')).toBe(
-    '/?round=fixture-morning&select=node%3Afixture-event',
+    '/?round=fixture-morning&select=node%3Afixture-event&focus=fixture-event&hops=1',
   );
   await user.click(link);
   expect(router.state.location.pathname).toBe('/');

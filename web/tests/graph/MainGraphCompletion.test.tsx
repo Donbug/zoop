@@ -636,6 +636,50 @@ it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도�
   expect(router.state.location.search).not.toContain('round=');
 });
 
+it('D-BRF-04 B2 preserves the round snapshot, event focus at one hop and selected issue panel together', async () => {
+  anonymous();
+  vi.mocked(getGraph).mockImplementation(async (request) =>
+    createMockGraph(request),
+  );
+  const roundId = 'brf-2026-09-17-evening';
+  vi.mocked(getBriefingGraphBasis).mockResolvedValue({
+    roundId,
+    date: '2026-09-17',
+    edition: 'evening',
+    status: 'available',
+    message: null,
+    reason: null,
+    publishedAt: '2026-09-17T09:11:00Z',
+    dataAsOf: '2026-09-17T09:10:00Z',
+    graphVersion: 'fixture-v1',
+    keyIssueIds: ['mock-issue-1'],
+    companyIds: [],
+    correctionCount: 0,
+  });
+  setup(
+    `/?round=${roundId}&focus=mock-issue-1&hops=1&select=node%3Amock-issue-1`,
+  );
+  const canvas = await screen.findByTestId('graph-canvas');
+  await waitFor(() =>
+    expect(canvas.getAttribute('data-focus')).toBe('mock-issue-1'),
+  );
+  expect(canvas.getAttribute('data-hops')).toBe('1');
+  expect(canvas.getAttribute('data-view-owner')).toContain(`:round:${roundId}`);
+  expect(
+    screen
+      .getByRole('button', { name: 'HBM4 공급 계약 선택' })
+      .getAttribute('aria-pressed'),
+  ).toBe('true');
+  expect(
+    screen.getByRole('complementary', { name: '회차 핵심 이슈 상세' }),
+  ).toBeTruthy();
+  expect(
+    vi
+      .mocked(getGraph)
+      .mock.calls.some(([request]) => request.round === roundId),
+  ).toBe(true);
+});
+
 it('과거 회차 저장본 부재는 재시도 오류와 구분하고 현재 그래프로 이동할 수 있다', async () => {
   anonymous();
   const basis = {

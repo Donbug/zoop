@@ -599,9 +599,13 @@ describe('D-BRF-01/02 new issue/company AI revision', () => {
     value.issueReading!.baseResultVersion = 'another-version';
     expect(validIssueReading(value)).toBeNull();
   });
-  it('shows the selection rationale before expansion and keeps original IDs/actions inside the reviewed group', async () => {
+  it('D-BRF-01 B1·B3 keeps evidence totals and omits invented times from reviewed groups', async () => {
     const user = userEvent.setup(),
       value = reviewed();
+    value.items[0].eventTime = '2026-10-20';
+    value.items[0].timePrecision = 'day';
+    value.items[1].eventTime = '2026-10-21';
+    value.items[1].timePrecision = 'day';
     render(
       <MemoryRouter>
         <IssueCentricBriefing
@@ -611,6 +615,8 @@ describe('D-BRF-01/02 new issue/company AI revision', () => {
       </MemoryRouter>,
     );
     const title = screen.getByText('같은 결정과 조건부 후속 절차');
+    expect(title.closest('summary')!.textContent).not.toContain('발생');
+    expect(screen.getByText('근거 문서 3건')).toBeTruthy();
     expect(title.closest('summary')!.textContent).toContain('선정 이유');
     expect(title.closest('summary')!.textContent).toContain('자본정책');
     expect(
