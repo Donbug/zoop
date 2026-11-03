@@ -179,6 +179,15 @@ export default function CompanyDocumentPanel() {
   const member = useAuthStore(selectMemberId);
   const revision = useAuthStore((s) => s.sessionRevision);
   const closeEvidence = useGraphUiStore((s) => s.closeEvidence);
+  const claimEvidenceOpen = useGraphUiStore((s) => s.evidenceTarget !== null);
+  useLayoutEffect(() => {
+    if (!claimEvidenceOpen) return;
+    const wasLocked = document.body.classList.contains('overflow-hidden');
+    document.body.classList.add('overflow-hidden');
+    return () => {
+      if (!wasLocked) document.body.classList.remove('overflow-hidden');
+    };
+  }, [claimEvidenceOpen]);
   const { params, updateQuery } = useRouteQuery();
   const asOf = params.get('asOf'),
     version = params.get('graphVersion'),
@@ -529,7 +538,13 @@ export default function CompanyDocumentPanel() {
           </button>
         </section>
       )}
-      {createPortal(<EvidenceDrawer />, document.body)}
+      {claimEvidenceOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[80]">
+            <EvidenceDrawer />
+          </div>,
+          document.body,
+        )}
     </section>
   );
 }

@@ -675,8 +675,11 @@ test('D-COM-02 D16 opens only actual claim evidence in the shared drawer and ret
     server.calls('GET', '/api/v1/evidence/:id')[0].query.get('graphVersion'),
   ).toBe('v1');
   expect(drawer.closest('[aria-label="뉴스·공시"]')).toBeNull();
+  expect(drawer.closest('.fixed')?.classList.contains('inset-0')).toBe(true);
+  expect(document.body.classList.contains('overflow-hidden')).toBe(true);
   await userEvent.keyboard('{Escape}');
   expect(screen.queryByRole('dialog')).toBeNull();
+  expect(document.body.classList.contains('overflow-hidden')).toBe(false);
   expect(document.activeElement).toBe(button);
 });
 test.each(['documentId', 'documentVersion', 'resultVersion'] as const)(
