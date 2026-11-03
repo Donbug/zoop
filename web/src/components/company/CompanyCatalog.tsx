@@ -166,7 +166,7 @@ export default function CompanyCatalog({
       aria-label="기업 선택"
       className={
         mobile
-          ? 'min-w-0 p-4 font-panel [&_section]:py-3!'
+          ? 'min-w-0 p-4 font-panel [&_section]:py-3! [&_input]:min-h-10 [&_input]:rounded-md [&_input]:border [&_input]:border-zoop-border [&_input]:bg-zoop-surface [&_input]:px-3 [&_input]:py-2 [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_button]:min-h-10 [&_button]:rounded-md [&_button]:border [&_button]:border-zoop-border [&_button]:px-3 [&_button]:py-2 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink'
           : dark
             ? 'min-w-0 rounded-xl border border-zoop-border bg-zoop-surface p-4 font-panel shadow-sm max-md:max-h-[320px] max-md:overflow-auto [&_section]:py-3!'
             : 'min-w-0 rounded-2xl bg-white p-4 font-panel shadow-sm max-md:max-h-[320px] max-md:overflow-auto [&_section]:py-3!'

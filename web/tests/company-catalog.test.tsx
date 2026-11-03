@@ -181,6 +181,11 @@ it('D-COM-01 D9 opens the same catalog in a mobile sheet, traps focus and return
   expect(
     within(sheet).getByRole('textbox', { name: '기업명·종목 코드' }),
   ).toBeTruthy();
+  const catalog = within(sheet).getByRole('complementary', {
+    name: '기업 선택',
+  });
+  expect(catalog.classList.contains('[&_input]:border')).toBe(true);
+  expect(catalog.classList.contains('[&_button]:min-h-10')).toBe(true);
   expect(view.container.inert).toBe(true);
   await waitFor(() => expect(document.activeElement).toBe(sheet));
   const close = within(sheet).getByRole('button', { name: '기업 전환 닫기' });
