@@ -1,7 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { beforeEach, it, expect } from 'vitest';
+import { beforeEach, it, expect, vi } from 'vitest';
 import CompanyCatalog from '@/components/company/CompanyCatalog';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { createFakeServer, json, apiError } from './support/fakeServer';
@@ -159,4 +159,64 @@ it('D-COM-01 keeps a failed watchlist distinct from an empty one and supports re
   failed = false;
   await userEvent.click(watch.getByRole('button', { name: '다시 시도' }));
   await watch.findByRole('link', { name: /삼성전자/ });
+});
+
+it('D-COM-01 D9 opens the same catalog in a mobile sheet, traps focus and returns it on Escape', async () => {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      matches: query.includes('max-width'),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+  const view = open();
+  const originalInert = view.container.inert;
+  const trigger = screen.getByRole('button', {
+    name: '삼성전자 · 다른 기업 보기',
+  });
+  expect(screen.queryByRole('complementary', { name: '기업 선택' })).toBeNull();
+  await userEvent.click(trigger);
+  const sheet = screen.getByRole('dialog', { name: '기업 전환' });
+  expect(
+    within(sheet).getByRole('textbox', { name: '기업명·종목 코드' }),
+  ).toBeTruthy();
+  const catalog = within(sheet).getByRole('complementary', {
+    name: '기업 선택',
+  });
+  expect(catalog.classList.contains('[&_input]:border')).toBe(true);
+  expect(catalog.classList.contains('[&_button]:min-h-10')).toBe(true);
+  expect(view.container.inert).toBe(true);
+  await waitFor(() => expect(document.activeElement).toBe(sheet));
+  const close = within(sheet).getByRole('button', { name: '기업 전환 닫기' });
+  await userEvent.tab();
+  expect(document.activeElement).toBe(close);
+  const links = await within(sheet).findAllByRole('link');
+  (links.at(-1) as HTMLElement).focus();
+  await userEvent.tab();
+  expect(document.activeElement).toBe(close);
+  await userEvent.tab({ shift: true });
+  expect(document.activeElement).toBe(links.at(-1));
+  await userEvent.keyboard('{Escape}');
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+  expect(view.container.inert).toBe(originalInert);
+});
+it('D-COM-01 D9 closes the mobile sheet when choosing a company', async () => {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+  open();
+  await userEvent.click(
+    screen.getByRole('button', { name: '삼성전자 · 다른 기업 보기' }),
+  );
+  const sheet = screen.getByRole('dialog', { name: '기업 전환' });
+  const [link] = await within(sheet).findAllByRole('link');
+  await userEvent.click(link);
+  expect(screen.queryByRole('dialog')).toBeNull();
 });

@@ -7,6 +7,7 @@ import { formatTimelineTime } from '@/util/event-time';
 import { ChangeRate } from '@/components/stocks/StockQuote';
 import BoltIcon from './BoltIcon';
 import {
+  Fragment,
   useCallback,
   useEffect,
   useEffectEvent,
@@ -64,6 +65,9 @@ import {
   versionOnlyAddress,
 } from './detail-model';
 import { useColorTheme } from '@/util/theme-color';
+import { useCompanyMapEntry } from '@/hooks/useCompanyMapEntry';
+import { useCompanyScroll } from '@/hooks/useCompanyScroll';
+import { useCompanyShortPrices } from '@/hooks/useCompanyShortPrices';
 
 // D-COM-01 B1: 백엔드 financials 컨트롤러가 생기면 계약을 확인하고 다시 켠다.
 const COMPANY_FINANCIALS_ENABLED = false;
@@ -260,6 +264,7 @@ export default function CompanyWorkspace() {
   const auth = useAuth();
   const revision = useAuthStore((s) => s.sessionRevision);
   const owner = auth.isAuthenticated ? `${auth.member?.id}:${revision}` : '';
+  const mapEntry = useCompanyMapEntry(`${id}|${owner}`);
   const period = (periods.find((p) => p.value === params.get('period'))
     ?.value ?? '1m') as ChartPeriod;
   const asOf = params.get('asOf'),
@@ -394,11 +399,28 @@ export default function CompanyWorkspace() {
     return () => document.removeEventListener('click', outside, true);
   }, [graphTimeOpen, paramsKey, location.key]);
   // 버전 단독 주소는 그 버전의 차트를 열 수 없다고 안내하므로 가격 조회도 시작하지 않는다.
-  const prices = useCompanyResource<Prices>(
-    invalid || versionOnly || !canLoadSections
+  const ordinaryPrices = useCompanyResource<Prices>(
+    invalid ||
+      versionOnly ||
+      !canLoadSections ||
+      (ready && (period === '1d' || period === '1w'))
       ? null
       : companyUrl(id, '/prices', { period, ...range }),
   );
+  const shortPrices = useCompanyShortPrices(
+    id,
+    asOf,
+    ready && !versionOnly && canLoadSections,
+  );
+  const prices =
+    ready && (period === '1d' || period === '1w')
+      ? shortPrices[period]
+      : ordinaryPrices;
+  function unavailablePeriod(value: ChartPeriod) {
+    const result =
+      value === '1d' || value === '1w' ? shortPrices[value].data : null;
+    return result?.status === 'unavailable' ? result.reason : null;
+  }
   useEffect(() => {
     // FS040: 처음 열 때의 기준 시점은 기업 응답의 공개 기준 시점과 그 버전이다. 가격 봉 시각은
     // 거래가 없는 날(주말·휴장)에 오래된 시점을 가리켜 이후 공개 자료를 빼거나 409를 만든다.
@@ -656,7 +678,7 @@ export default function CompanyWorkspace() {
   const highlighted = graph.data ? impactEdges(graph.data, impact.data) : [];
   function selectEvent(item: Events['items'][number], targetTab?: string) {
     updateQuery({
-      event: item.id,
+      event: !targetTab && eventId === item.id ? null : item.id,
       bucket: bucketKey(item, period),
       document: null,
       evidence: null,
@@ -684,6 +706,52 @@ export default function CompanyWorkspace() {
     if (window.matchMedia?.('(max-width: 1000px)').matches)
       graphPanel.current?.scrollIntoView({ block: 'start' });
   }
+  // D-COM-05 D4: 선택한 카드 바로 아래에 같은 상세 상태를 표시한다.
+  useCompanyScroll(
+    `${id}|${owner}`,
+    !company.loading &&
+      !prices.loading &&
+      !graph.loading &&
+      (tab !== 'events' || (!events.loading && !event.loading)),
+  );
+  const selectedEventDetails = eventId ? (
+    <div role="region" aria-label="선택 사건 상세" id="company-selected-event">
+      <Status resource={event} label="선택 사건" />
+      {event.data && (
+        <article>
+          <h3>{event.data.title}</h3>
+          <CompanyEventDetails
+            event={event.data}
+            owner={owner}
+            asOf={asOf}
+            graphVersion={version}
+          />
+          <p>
+            근거 인용 {event.data.evidenceIds.length}건 · 문서{' '}
+            {new Set(event.data.articles.map((article) => article.id)).size}건
+          </p>
+          {event.data.evidenceIds.map((evidenceId, index) => (
+            <button
+              key={evidenceId}
+              onClick={() =>
+                updateQuery({
+                  tab: 'documents',
+                  evidence: evidenceId,
+                  document: null,
+                  docScope: 'event',
+                })
+              }
+            >
+              근거 {index + 1} 보기
+            </button>
+          ))}
+          <Link to={`/?${eventMapQuery}`}>
+            이 사건 시점의 관계를 지도에서 보기
+          </Link>
+        </article>
+      )}
+    </div>
+  ) : null;
   if (invalid)
     return (
       <div
@@ -788,6 +856,11 @@ export default function CompanyWorkspace() {
           </p>
         )}
         <section aria-label="기업 개요">
+          {mapEntry && (
+            <Link className={ui.button} to={mapEntry}>
+              그래프로 돌아가기
+            </Link>
+          )}
           <Status resource={company} label="기업 정보" />
           {company.data && (
             <>
@@ -1054,6 +1127,8 @@ export default function CompanyWorkspace() {
                 <button
                   key={p.value}
                   aria-pressed={period === p.value}
+                  disabled={unavailablePeriod(p.value) !== null}
+                  title={unavailablePeriod(p.value) ?? undefined}
                   className="min-w-14 rounded-none! border-0! border-r! border-zoop-line! last:border-r-0!"
                   onClick={() => {
                     // 선택한 사건은 유지하고, 새 기간의 버킷으로 다시 맞춘다(FS044).
@@ -1067,6 +1142,12 @@ export default function CompanyWorkspace() {
                   }}
                 >
                   {p.label}
+                  {unavailablePeriod(p.value) !== null && (
+                    <span className="sr-only">
+                      {' '}
+                      · {unavailablePeriod(p.value)}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -1342,62 +1423,63 @@ export default function CompanyWorkspace() {
                               {items.map((item) => {
                                 const itemGraphTime = eventGraphTime(item);
                                 return (
-                                  <article
-                                    key={item.id}
-                                    className="flex flex-col gap-1 border-0! py-0! xl:grid xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start xl:gap-x-3 xl:[&>*]:col-start-1"
-                                  >
-                                    <p className="text-caption text-zoop-muted">
-                                      문서 {item.articleCount}건 ·{' '}
-                                      {relationLabel(item.relationTypes) ||
-                                        '직접 관계 미확인'}
-                                    </p>
-                                    <button
-                                      aria-pressed={eventId === item.id}
-                                      onClick={() => selectEvent(item)}
-                                      className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-left text-body! font-semibold text-zoop-ink underline-offset-4 hover:underline aria-pressed:underline"
-                                    >
-                                      {item.title}
-                                    </button>
-                                    <p className="text-caption text-zoop-muted tabular-nums">
-                                      {item.eventTime ? (
-                                        <time dateTime={item.eventTime}>
-                                          {formatTimelineTime(
-                                            item.eventTime,
-                                            item.timePrecision,
-                                          )}
-                                        </time>
-                                      ) : (
-                                        '시점 미상'
-                                      )}
-                                    </p>
-                                    <button
-                                      onClick={() =>
-                                        selectEvent(item, 'documents')
-                                      }
-                                      className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-caption! text-zoop-muted underline underline-offset-4"
-                                    >
-                                      근거 문서 {item.articleCount}건 보기
-                                    </button>
-                                    {itemGraphTime && (
+                                  <Fragment key={item.id}>
+                                    <article className="flex flex-col gap-1 border-0! py-0! xl:grid xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start xl:gap-x-3 xl:[&>*]:col-start-1">
+                                      <p className="text-caption text-zoop-muted">
+                                        문서 {item.articleCount}건 ·{' '}
+                                        {relationLabel(item.relationTypes) ||
+                                          '직접 관계 미확인'}
+                                      </p>
                                       <button
-                                        type="button"
-                                        aria-pressed={
-                                          sameInstant(
-                                            graphAsOf,
-                                            itemGraphTime,
-                                          ) && eventId === item.id
-                                        }
-                                        data-graph-time-trigger
-                                        aria-label={`${item.title} · 이 당시 관계그래프 보기`}
-                                        onClick={() =>
-                                          showEventGraph(item, itemGraphTime)
-                                        }
-                                        className="mt-1 inline-flex items-center gap-1.5 self-start whitespace-nowrap xl:col-start-2! xl:row-span-4 xl:row-start-1 xl:mt-0 xl:self-center"
+                                        aria-pressed={eventId === item.id}
+                                        onClick={() => selectEvent(item)}
+                                        className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-left text-body! font-semibold text-zoop-ink underline-offset-4 hover:underline aria-pressed:underline"
                                       >
-                                        <ClockIcon />이 당시 관계그래프 보기
+                                        {item.title}
                                       </button>
-                                    )}
-                                  </article>
+                                      <p className="text-caption text-zoop-muted tabular-nums">
+                                        {item.eventTime ? (
+                                          <time dateTime={item.eventTime}>
+                                            {formatTimelineTime(
+                                              item.eventTime,
+                                              item.timePrecision,
+                                            )}
+                                          </time>
+                                        ) : (
+                                          '시점 미상'
+                                        )}
+                                      </p>
+                                      <button
+                                        onClick={() =>
+                                          selectEvent(item, 'documents')
+                                        }
+                                        className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-caption! text-zoop-muted underline underline-offset-4"
+                                      >
+                                        근거 문서 {item.articleCount}건 보기
+                                      </button>
+                                      {itemGraphTime && (
+                                        <button
+                                          type="button"
+                                          aria-pressed={
+                                            sameInstant(
+                                              graphAsOf,
+                                              itemGraphTime,
+                                            ) && eventId === item.id
+                                          }
+                                          data-graph-time-trigger
+                                          aria-label={`${item.title} · 이 당시 관계그래프 보기`}
+                                          onClick={() =>
+                                            showEventGraph(item, itemGraphTime)
+                                          }
+                                          className="mt-1 inline-flex items-center gap-1.5 self-start whitespace-nowrap xl:col-start-2! xl:row-span-4 xl:row-start-1 xl:mt-0 xl:self-center"
+                                        >
+                                          <ClockIcon />이 당시 관계그래프 보기
+                                        </button>
+                                      )}
+                                    </article>
+                                    {eventId === item.id &&
+                                      selectedEventDetails}
+                                  </Fragment>
                                 );
                               })}
                             </div>
@@ -1425,62 +1507,23 @@ export default function CompanyWorkspace() {
                   <details>
                     <summary>시점 미상 사건 {visibleUnknown.length}건</summary>
                     {visibleUnknown.map((item) => (
-                      <p key={item.id}>
+                      <div key={item.id}>
                         <button onClick={() => selectEvent(item)}>
                           {item.title}
                         </button>{' '}
                         · 보도 시각{' '}
                         <ReferenceTime value={item.reportedAt} missing="미상" />{' '}
                         (사건 시각 아님)
-                      </p>
+                        {eventId === item.id && selectedEventDetails}
+                      </div>
                     ))}
                   </details>
                 )}
               </>
             )}
-            {eventId && (
-              <>
-                <Status resource={event} label="선택 사건" />
-                {event.data && (
-                  <article>
-                    <h3>{event.data.title}</h3>
-                    <CompanyEventDetails
-                      event={event.data}
-                      owner={owner}
-                      asOf={asOf}
-                      graphVersion={version}
-                    />
-                    <p>
-                      근거 인용 {event.data.evidenceIds.length}건 · 문서{' '}
-                      {
-                        new Set(
-                          event.data.articles.map((article) => article.id),
-                        ).size
-                      }
-                      건
-                    </p>
-                    {event.data.evidenceIds.map((evidenceId, index) => (
-                      <button
-                        key={evidenceId}
-                        onClick={() =>
-                          updateQuery({
-                            tab: 'documents',
-                            evidence: evidenceId,
-                            document: null,
-                            docScope: 'event',
-                          })
-                        }
-                      >
-                        근거 {index + 1} 보기
-                      </button>
-                    ))}
-                    <Link to={`/?${eventMapQuery}`}>
-                      이 사건 시점의 관계를 지도에서 보기
-                    </Link>
-                  </article>
-                )}
-              </>
-            )}
+            {!visibleItems.some((item) => item.id === eventId) &&
+              !visibleUnknown.some((item) => item.id === eventId) &&
+              selectedEventDetails}
           </section>
         )}
         {tab === 'documents' && canLoadSections && <CompanyDocumentPanel />}

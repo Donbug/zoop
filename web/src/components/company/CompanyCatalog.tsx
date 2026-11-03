@@ -1,5 +1,5 @@
 import LoadingIndicator from '@/components/common/LoadingIndicator';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { useCompanyResource, type Resource } from '@/hooks/useCompanyResource';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
@@ -7,6 +7,15 @@ import { useAuthStore, selectMemberId } from '@/stores/useAuthStore';
 import type { GraphResponse } from '@/types/map/graph';
 import CompanyCatalogRow, { type CatalogCompany } from './CompanyCatalogRow';
 import { useColorTheme } from '@/util/theme-color';
+import CompanyCatalogSheet from './CompanyCatalogSheet';
+
+function subscribeMobile(callback: () => void) {
+  const media = window.matchMedia?.('(max-width: 767px)');
+  media?.addEventListener('change', callback);
+  return () => media?.removeEventListener('change', callback);
+}
+const isMobile = () =>
+  window.matchMedia?.('(max-width: 767px)').matches ?? false;
 
 // D-COM-01 · Figma 637:2286. Member lists never use another session's result.
 export default function CompanyCatalog({
@@ -33,6 +42,10 @@ export default function CompanyCatalog({
   const member = useAuthStore(selectMemberId);
   const revision = useAuthStore((s) => s.sessionRevision);
   const owner = `${member ?? 'guest'}:${revision}`;
+  const mobile = useSyncExternalStore(subscribeMobile, isMobile, () => false);
+  const [openFor, setOpenFor] = useState<string | null>(null);
+  const open = mobile && openFor === `${id}|${owner}`;
+  if (!mobile && openFor !== null) setOpenFor(null);
   const [input, setInput] = useState('');
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState<string | null>(null);
@@ -148,13 +161,15 @@ export default function CompanyCatalog({
   const holdingIds = portfolio.data?.connected
     ? portfolio.data.holdings.map((h) => h.companyId)
     : [];
-  return (
+  const content = (
     <aside
       aria-label="기업 선택"
       className={
-        dark
-          ? 'min-w-0 rounded-xl border border-zoop-border bg-zoop-surface p-4 font-panel shadow-sm max-md:max-h-[320px] max-md:overflow-auto [&_section]:py-3!'
-          : 'min-w-0 rounded-2xl bg-white p-4 font-panel shadow-sm max-md:max-h-[320px] max-md:overflow-auto [&_section]:py-3!'
+        mobile
+          ? 'min-w-0 p-4 font-panel [&_section]:py-3! [&_input]:min-h-10 [&_input]:rounded-md [&_input]:border [&_input]:border-zoop-border [&_input]:bg-zoop-surface [&_input]:px-3 [&_input]:py-2 [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_button]:min-h-10 [&_button]:rounded-md [&_button]:border [&_button]:border-zoop-border [&_button]:px-3 [&_button]:py-2 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink'
+          : dark
+            ? 'min-w-0 rounded-xl border border-zoop-border bg-zoop-surface p-4 font-panel shadow-sm max-md:max-h-[320px] max-md:overflow-auto [&_section]:py-3!'
+            : 'min-w-0 rounded-2xl bg-white p-4 font-panel shadow-sm max-md:max-h-[320px] max-md:overflow-auto [&_section]:py-3!'
       }
     >
       <CompanyCatalogRow
@@ -283,5 +298,24 @@ export default function CompanyCatalog({
         {graph?.metadata.truncated && <p>조회 범위 내 연결 기업만 표시해요.</p>}
       </section>
     </aside>
+  );
+  if (!mobile) return content;
+  return (
+    <>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpenFor(`${id}|${owner}`)}
+        className="min-h-10 w-full"
+      >
+        {currentCompany?.name ?? '기업'} · 다른 기업 보기
+      </button>
+      {open && (
+        <CompanyCatalogSheet onClose={() => setOpenFor(null)}>
+          {content}
+        </CompanyCatalogSheet>
+      )}
+    </>
   );
 }

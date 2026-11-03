@@ -1,4 +1,9 @@
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
+import { useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
+import EvidenceDrawer from '@/components/evidence/EvidenceDrawer';
+import { useGraphUiStore } from '@/stores/useGraphUiStore';
+import { useAuthStore, selectMemberId } from '@/stores/useAuthStore';
 import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useCompanyResource, type Resource } from '@/hooks/useCompanyResource';
@@ -62,10 +67,12 @@ function Analysis({
   value,
   companyId,
   documentId,
+  onEvidence,
 }: {
   value: DocumentAnalysis;
   companyId: string;
   documentId: string;
+  onEvidence: (ids: string[]) => void;
 }) {
   // 기업 상세 라이트는 #491 이전 모양을 유지하고, 다크만 지도 개선 테마 표면을 쓴다.
   const dark = useColorTheme() === 'dark';
@@ -89,6 +96,32 @@ function Analysis({
         <details>
           <summary>제공된 문서 요약</summary>
           <p>{summary.text}</p>
+          {/* D-COM-02 D16: 저장된 주장과 실제 근거 ID만 기존 근거 창으로 전달한다. */}
+          {summary.claims.length > 0 && (
+            <ul className="space-y-2">
+              {summary.claims.map((claim, index) => (
+                <li key={claim.claimId}>
+                  <p>
+                    {claim.assertionKind === 'interpretation'
+                      ? '해석 · '
+                      : claim.assertionKind === 'limitation'
+                        ? '한계 · '
+                        : ''}
+                    {claim.text}
+                  </p>
+                  {claim.evidenceIds.length > 0 && (
+                    <button
+                      type="button"
+                      aria-label={`요약 ${index + 1} 근거 보기`}
+                      onClick={() => onEvidence(claim.evidenceIds)}
+                    >
+                      근거 {new Set(claim.evidenceIds).size}건 보기
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
           {summary.limitations.map((limitation, i) => (
             <p key={i}>한계 · {limitation}</p>
           ))}
@@ -142,6 +175,19 @@ export default function CompanyDocumentPanel() {
   // 기업 상세 라이트는 #491 이전 모양을 유지하고, 다크만 지도 개선 테마 표면을 쓴다.
   const dark = useColorTheme() === 'dark';
   const { id = '' } = useParams();
+  const location = useLocation();
+  const member = useAuthStore(selectMemberId);
+  const revision = useAuthStore((s) => s.sessionRevision);
+  const closeEvidence = useGraphUiStore((s) => s.closeEvidence);
+  const claimEvidenceOpen = useGraphUiStore((s) => s.evidenceTarget !== null);
+  useLayoutEffect(() => {
+    if (!claimEvidenceOpen) return;
+    const wasLocked = document.body.classList.contains('overflow-hidden');
+    document.body.classList.add('overflow-hidden');
+    return () => {
+      if (!wasLocked) document.body.classList.remove('overflow-hidden');
+    };
+  }, [claimEvidenceOpen]);
   const { params, updateQuery } = useRouteQuery();
   const asOf = params.get('asOf'),
     version = params.get('graphVersion'),
@@ -153,6 +199,30 @@ export default function CompanyDocumentPanel() {
   const selected = params.get('document'),
     evidenceId = params.get('evidence');
   const ready = exactTime(asOf);
+  useLayoutEffect(() => {
+    closeEvidence();
+    return closeEvidence;
+  }, [id, member, revision, asOf, version, location.key, closeEvidence]);
+  function showClaimEvidence(ids: string[], label: string) {
+    const map = new URLSearchParams({
+      mode: 'all',
+      focus: id,
+      hops: '1',
+      ...(asOf ? { asOf } : {}),
+      ...(version ? { graphVersion: version } : {}),
+    });
+    useGraphUiStore.getState().openEvidence({
+      kind: 'company',
+      id,
+      label,
+      evidenceIds: [...new Set(ids)],
+      mapContext: {
+        url: `/?${map}`,
+        ...(asOf ? { asOf } : {}),
+        ...(version ? { graphVersion: version } : {}),
+      },
+    });
+  }
   const snapshot = { asOf, graphVersion: version };
   const list = useCompanyResource<CompanyDocuments>(
     ready ? companyUrl(id, '/documents', { ...snapshot, kind }) : null,
@@ -361,7 +431,14 @@ export default function CompanyDocumentPanel() {
               >
                 문서 근거 선택 · {doc.quotes?.length ?? 0}건
               </button>
-              <Analysis value={doc} companyId={id} documentId={doc.id} />
+              <Analysis
+                value={doc}
+                companyId={id}
+                documentId={doc.id}
+                onEvidence={(ids) =>
+                  showClaimEvidence(ids, doc.title ?? '문서 요약')
+                }
+              />
             </article>
           ))}
           {activeDoc && (
@@ -443,6 +520,12 @@ export default function CompanyDocumentPanel() {
                   value={evidence.data}
                   companyId={id}
                   documentId={evidence.data.articleId}
+                  onEvidence={(ids) =>
+                    showClaimEvidence(
+                      ids,
+                      evidence.data?.article?.title ?? '문서 요약',
+                    )
+                  }
                 />
                 <p>
                   공개 버전 {evidence.data.metadata.graphVersion ?? '미제공'} ·
@@ -455,6 +538,13 @@ export default function CompanyDocumentPanel() {
           </button>
         </section>
       )}
+      {claimEvidenceOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[80]">
+            <EvidenceDrawer />
+          </div>,
+          document.body,
+        )}
     </section>
   );
 }

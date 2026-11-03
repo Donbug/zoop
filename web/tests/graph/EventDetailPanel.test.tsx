@@ -100,7 +100,9 @@ describe('D-GRP-02 · panel states and accessibility', () => {
     event.articles[0].title = null;
     event.articles[0].publisher = null;
     mocked.mockResolvedValue(event);
-    render(<EventDetailPanel {...props} geography={null} />);
+    render(<EventDetailPanel {...props} geography={null} />, {
+      wrapper: MemoryRouter,
+    });
     await screen.findByText('발생 시각 미상');
     expect(screen.getByText('지역 미제공')).toBeTruthy();
     expect(screen.getByText('직접 관련 기업이 없습니다.')).toBeTruthy();
@@ -159,7 +161,13 @@ it('D-GRP-02 AI에게 묻기는 onAction("ai")으로 사건 문맥을 넘겨요'
 });
 
 function Where() {
-  return <p data-testid="where">{useLocation().pathname}</p>;
+  const location = useLocation();
+  return (
+    <>
+      <p data-testid="where">{location.pathname}</p>
+      <output data-testid="from">{location.state?.from}</output>
+    </>
+  );
 }
 it('B4 opens a related company inside the router without reloading the document', async () => {
   const event = createMockEvent(props.id);
@@ -188,4 +196,5 @@ it('B4 opens a related company inside the router without reloading the document'
     `/companies/${encodeURIComponent(company.id)}`,
   );
   expect(window.location.href).toBe(before);
+  expect(screen.getByTestId('from').textContent).toBe('/');
 });

@@ -481,6 +481,9 @@ export default function CompanyDetailPanel(props: Props) {
           {/* 기업 머리 바로 아래에 주요 동작을 둔다(시세 박스보다 먼저). */}
           <div className={`company-actions ${ui.actions}`}>
             <Link
+              state={{
+                from: `${location.pathname}${location.search}${location.hash}`,
+              }}
               to={
                 props.companyDetailHref?.(company.id) ??
                 `/companies/${encodeURIComponent(company.id)}`
@@ -751,6 +754,9 @@ export default function CompanyDetailPanel(props: Props) {
                 최근 {VISIBLE_DOCUMENTS}건만 보여요. 전체 뉴스·공시는{' '}
                 <Link
                   className="underline"
+                  state={{
+                    from: `${location.pathname}${location.search}${location.hash}`,
+                  }}
                   to={documentsHref(
                     props.companyDetailHref?.(company.id) ??
                       `/companies/${encodeURIComponent(company.id)}`,
