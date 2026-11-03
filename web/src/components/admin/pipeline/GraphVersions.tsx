@@ -12,10 +12,11 @@ import {
 import { BUTTON, TD, TH, count } from '@/components/admin/common/adminStyles';
 import GraphVersionForm from '@/components/admin/pipeline/GraphVersionForm';
 import { useCursorPages } from '@/hooks/useCursorPages';
-import type {
-  GraphDbVersionStatus,
-  GraphVersion,
-  GraphVersionActivation,
+import {
+  activationModeOf,
+  type GraphDbVersionStatus,
+  type GraphVersion,
+  type GraphVersionActivation,
 } from '@/types/admin/graphVersions';
 import { formatKst } from '@/util/format';
 
@@ -25,6 +26,11 @@ const graphDbLabel: Record<GraphDbVersionStatus, string> = {
   unknown: '확인 불가',
 };
 
+/** 행 버튼 문구: 표시한 적 있는 버전은 되돌리기(rollback), 나머지는 전환(forward). */
+function verbOf(version: GraphVersion) {
+  return activationModeOf(version) === 'rollback' ? '되돌리기' : '전환';
+}
+
 const activationLabel: Record<GraphVersionActivation['action'], string> = {
   publish: '게시',
   activate: '전환',
@@ -33,7 +39,8 @@ const activationLabel: Record<GraphVersionActivation['action'], string> = {
 
 // A-ADM-03 그래프 버전 탭 (FS059, listGraphVersions·activateGraphVersion)
 // - 지금 사용자에게 보이는 버전, 버전 목록(최신 먼저), 전환 이력을 보여 준다.
-// - 이미 있는 버전으로만 바꾼다. 원장에서 새 버전 게시(publishGraphVersion)는 API가 아직 없다.
+// - 이미 있는 버전으로만 바꾼다. 표시한 적 없는 버전은 전환(forward), 표시했던 버전은 되돌리기(rollback).
+// - 원장에서 새 버전 게시(publishGraphVersion)는 API가 아직 없다.
 export default function GraphVersions({
   onActivated,
 }: {
@@ -72,8 +79,8 @@ export default function GraphVersions({
           <strong className="font-num text-zoop-ink">
             {activeVersionId ?? '없음'}
           </strong>
-          . 이미 있는 버전으로만 바꿀 수 있어요. 새 버전 게시는 아직 지원하지
-          않아요.
+          . 이미 있는 버전으로만 바꿀 수 있고, 이전에 표시했던 버전은 되돌리기로
+          바꿔요. 새 버전 게시는 아직 지원하지 않아요.
         </Note>
         {stale && (
           <div
@@ -105,17 +112,22 @@ export default function GraphVersions({
         {target && (
           <GraphVersionForm
             key={target.id}
-            version={target}
+            // 폼이 열린 채 목록을 다시 읽으면 같은 버전의 최신 상태(표시 이력 → mode)를 쓴다.
+            version={
+              versions.items.find((item) => item.id === target.id) ?? target
+            }
             activeVersionId={activeVersionId}
             stale={stale}
             onPendingChange={setPending}
             onCancel={() => setTarget(null)}
-            onDone={(result) => {
+            onDone={(result, mode) => {
               setTarget(null);
               setNotice(
                 result.idempotent
                   ? `${result.activeVersionId}는 이미 표시 중이에요.`
-                  : `${result.activeVersionId}로 바꿨어요.`,
+                  : mode === 'rollback'
+                    ? `${result.activeVersionId}로 되돌렸어요.`
+                    : `${result.activeVersionId}로 바꿨어요.`,
               );
               versions.reload();
               if (!result.idempotent) onActivated?.();
@@ -193,14 +205,14 @@ export default function GraphVersions({
                       <button
                         type="button"
                         disabled={pending}
-                        aria-label={`${version.id}로 전환`}
+                        aria-label={`${version.id}로 ${verbOf(version)}`}
                         onClick={() => {
                           setNotice(null);
                           setTarget(version);
                         }}
                         className={BUTTON}
                       >
-                        전환
+                        {verbOf(version)}
                       </button>
                     )}
                   </td>
