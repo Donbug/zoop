@@ -39,7 +39,7 @@ class Budget:
     def reserve(self,encoded):
         self.authority()
         require(re.fullmatch(r"brf-\d{4}-\d{2}-\d{2}-(morning|evening)",self.round_id),"round_identity")
-        request=json.loads(encoded);require(request['model']=='gpt-6-luna' and request['store'] is False and not request.get('tools') and request.get('service_tier','default')=='default','model_policy')
+        request=json.loads(encoded);require(request['model']=='gpt-6-luna' and request['store'] is False and not request.get('tools') and request.get('service_tier')=='default','model_policy')
         root=Path(self.cfg['work'])/'budget';root.mkdir(mode=0o700,exist_ok=True)
         key=hashlib.sha256(encoded).hexdigest();day=str(datetime.now(KST).date())
         # Same conservative token envelope used by the existing briefing request recorder.
@@ -81,6 +81,10 @@ class ServerUsageSession(UsageSession):
         return super().replay(stage.replace('-','_'),call)
 
 class RecordedClient(m.company.context.legacy.MarketSummaryClient):
+    def request(self,*args,**kwargs):
+        encoded,schema,prompt_sha=super().request(*args,**kwargs)
+        value=json.loads(encoded);value['service_tier']='default'
+        return b.canonical(value),schema,prompt_sha
     def call(self,stage,*args,**kwargs):
         if self.usage is not None:
             self.usage.feature='briefing-outlook' if stage.startswith('analysis') else 'briefing'

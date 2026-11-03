@@ -13,7 +13,7 @@ class BudgetTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.cfg={'work':self.temp.name};self.calls=[]
     def request(self,n=0,output=10):
-        return json.dumps({'model':'gpt-6-luna','store':False,'instructions':'proof'+str(n),'max_output_tokens':output}).encode()
+        return json.dumps({'model':'gpt-6-luna','store':False,'service_tier':'default','instructions':'proof'+str(n),'max_output_tokens':output}).encode()
     def transport(self,raw):
         self.calls.append(raw)
         return 200,b'{"status":"completed","usage":{"input_tokens":2,"output_tokens":1}}'
@@ -53,6 +53,12 @@ class BudgetTests(unittest.TestCase):
         self.assertFalse((Path(self.temp.name)/'budget').exists())
 
 class AdmissionTests(unittest.TestCase):
+    def test_provider_request_pins_standard_tier_instead_of_project_default(self):
+        from test_briefing_issue_intelligence import frozen
+        with tempfile.TemporaryDirectory() as temp:
+            client=runtime.RecordedClient(Path(temp),Mock(),16,prompt_root=runtime.m.PROMPTS)
+            data=frozen(1);raw,_,_=client.request('selection',{'frozen':data},'selection.md','unused',10000,runtime.m.assessment_schema(data))
+            self.assertEqual('default',json.loads(raw)['service_tier'])
     def test_denied_budget_never_starts_an_ai_execution(self):
         with tempfile.TemporaryDirectory() as temp:
             pipe=Mock();session=runtime.ServerUsageSession(pipe,{'purpose':'generation'},Path(temp)/'usage')
