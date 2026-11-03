@@ -14,7 +14,9 @@ def main():
         print('briefing-runtime-image-ready');return
     if os.environ.get('BRIEFING_SERVER_ENABLED')!='true':raise ValueError('explicit_server_enable_required')
     temp=Path(tempfile.mkdtemp(prefix='zoop-briefing-',dir='/tmp'))
-    private_file(temp/'provider-key',os.environ.pop('OPENAI_API_KEY'))
+    key=os.environ.pop('OPENAI_API_KEY')
+    if not key or any(c.isspace() for c in key):raise ValueError('provider_key_format')
+    private_file(temp/'provider-key','OPENAI_API_KEY='+key+'\n')
     endpoint=urlsplit(os.environ['DB_URL'].removeprefix('jdbc:'))
     dsn={'host':endpoint.hostname,'port':endpoint.port or 5432,'dbname':endpoint.path.lstrip('/'),
          'user':os.environ['DB_USERNAME'],'password':os.environ['DB_PASSWORD'],'application_name':'zoop-briefing-server-v1'}

@@ -147,7 +147,7 @@ def produce(cfg,job):
     write_once(work/'authorization.json',{'authorizationRef':cfg['authorizationRef'],'roundCalls':16,'roundUpperUsd':'1','dayUpperUsd':'2','model':'gpt-6-luna'})
     claim={'round':r,'requestKey':'server-'+prepared['inputSha256'],'purpose':'generation','trigger':'scheduler','adminId':None,
            'inputArtifactId':None,'inputDigest':prepared['inputSha256']}
-    pipe=CommandPipe(cfg['ledgerCommand']);session=ServerUsageSession(pipe,claim,work/'model'/'usage',estimate={'currency':'USD','priceVersion':'openai-luna-standard-20261103','inputPerMillion':'0.10','outputPerMillion':'0.50'})
+    pipe=CommandPipe(cfg['ledgerCommand']);session=ServerUsageSession(pipe,claim,work/'model'/'usage',estimate={'currency':'USD','priceVersion':'openai-luna-standard-20261103','inputPerMillion':0.10,'outputPerMillion':0.50})
     session.budget=Budget(cfg,r['id'],current,b.authenticated_transport(Path(cfg['keyFile'])))
     client=RecordedClient(work/'model',session.budget.transport,16,prompt_root=m.PROMPTS)
     try:

@@ -1,4 +1,5 @@
 import json
+import importlib.util,os,sys,types
 from datetime import datetime
 from pathlib import Path
 import tempfile
@@ -64,6 +65,22 @@ class AdmissionTests(unittest.TestCase):
             with patch.object(runtime.UsageSession,'invoke',return_value='recorded') as invoke:
                 self.assertEqual('recorded',session.invoke('analysis-verification',b'{}',Mock()))
                 self.assertEqual('analysis_verification',invoke.call_args.args[0])
+
+class EntrypointTests(unittest.TestCase):
+    def test_ecs_secret_becomes_the_existing_private_key_file_contract(self):
+        spec=importlib.util.spec_from_file_location('briefing_entrypoint_test',Path(__file__).resolve().parents[2]/'deployment/briefing/entrypoint.py')
+        entry=importlib.util.module_from_spec(spec);spec.loader.exec_module(entry)
+        with tempfile.TemporaryDirectory() as temp:
+            env={'BRIEFING_SERVER_ENABLED':'true','OPENAI_API_KEY':'synthetic-key-only','DB_URL':'jdbc:postgresql://example.invalid/db',
+                 'DB_USERNAME':'synthetic','DB_PASSWORD':'synthetic','BRIEFING_SERVER_WORK_ROOT':temp,'BRIEFING_SERVER_AUTHORIZATION_REF':'synthetic-budget'}
+            conninfo=types.ModuleType('psycopg.conninfo');conninfo.make_conninfo=lambda **kw:'synthetic-conninfo'
+            def inspect():
+                cfg=json.loads(Path(sys.argv[2]).read_bytes())
+                self.assertEqual('synthetic-key-only',runtime.b.read_key(Path(cfg['keyFile'])))
+                self.assertNotIn('OPENAI_API_KEY',os.environ)
+                self.assertEqual(0o600,Path(cfg['keyFile']).stat().st_mode&0o777)
+            with patch.dict(os.environ,env,clear=True),patch.dict(sys.modules,{'psycopg.conninfo':conninfo}),patch.object(sys,'argv',['entrypoint']),patch.object(entry.tempfile,'mkdtemp',return_value=temp),patch.object(entry.runtime,'main',side_effect=inspect):
+                entry.main()
 
 class ScheduleTests(unittest.TestCase):
     class Connection:
