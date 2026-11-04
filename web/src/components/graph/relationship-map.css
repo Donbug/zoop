@@ -410,7 +410,8 @@
   z-index: 3;
   top: 24px;
   right: 0;
-  width: 220px;
+  width: 280px;
+  max-width: min(280px, calc(100vw - 2rem));
   padding: 10px;
   border: 1px solid var(--color-zoop-line);
   border-radius: 3px;
@@ -510,15 +511,40 @@
 .company-list li {
   overflow: hidden;
   border-radius: 8px;
-  background: var(--color-zoop-soft);
+  border: 1px solid var(--color-zoop-line);
+  background-color: #fff !important;
 }
-.company-list button {
+.company-issue-list li {
+  border: 0;
+  border-radius: 0;
+}
+.company-list button:not(.company-issue-evidence) {
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 12px;
+  border: 0;
+  background-color: #fff !important;
   text-align: left;
+}
+.company-list .company-issue-evidence {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  padding: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+.company-panel .company-panel-scroll > section:has(> .company-section-title) {
+  background-color: #fff !important;
+}
+#company-detail-panel .company-related-companies li {
+  background-color: #fff !important;
+}
+#company-detail-panel .company-related-companies button {
+  background-color: #fff !important;
 }
 .company-list a,
 .company-document {

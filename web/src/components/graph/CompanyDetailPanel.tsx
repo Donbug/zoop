@@ -153,6 +153,7 @@ function Sparkline({ values }: { values: number[] }) {
     <svg
       className="company-sparkline"
       viewBox="0 0 280 84"
+      preserveAspectRatio="none"
       role="img"
       aria-label="최근 1개월 가격 추이"
     >
@@ -243,7 +244,7 @@ export default function CompanyDetailPanel(props: Props) {
     return (
       <li key={related.id}>
         <button
-          className="flex-row! items-center! gap-3!"
+          className="company-related-company-select flex-row! items-center! gap-3!"
           onClick={() => props.onSelectRelation?.(related.id)}
         >
           <CompanyLogo
@@ -263,14 +264,13 @@ export default function CompanyDetailPanel(props: Props) {
       </li>
     );
   };
-  // M9 · prototype node-panel.tsx:110-111: 연결이 없거나 이미 이 기업이 중심이면 중심 보기를 숨긴다.
+  // D-GRP-03 · D-GRP-07b: 연결이 있는 기업은 중심 보기와 전체 지도 전환을 제공한다.
   const canFocus =
-    props.focusId !== props.companyId &&
-    (!props.graph ||
-      props.graph.edges.some(
-        (edge) =>
-          edge.source === props.companyId || edge.target === props.companyId,
-      ));
+    !props.graph ||
+    props.graph.edges.some(
+      (edge) =>
+        edge.source === props.companyId || edge.target === props.companyId,
+    );
   const issueRow = (issue: PanelIssue, indirect: boolean) => {
     const tutorial = props.tutorialIssueId === issue.issueId;
     const evidenceIds = props.onIssueEvidence
@@ -281,7 +281,7 @@ export default function CompanyDetailPanel(props: Props) {
     return (
       <li key={issue.issueId}>
         <button
-          className={tutorial ? 'tutorial-target' : undefined}
+          className={`company-issue-select ${tutorial ? 'tutorial-target' : ''}`}
           data-tutorial-action={tutorial ? 'issue' : undefined}
           onClick={() => props.onSelectIssue(issue.issueId)}
         >
@@ -300,7 +300,7 @@ export default function CompanyDetailPanel(props: Props) {
           <div className="px-3 pb-2">
             <button
               type="button"
-              className="w-auto! rounded-panel border border-zoop-line bg-zoop-paper px-2.5! py-1! text-caption font-semibold text-zoop-ink hover:bg-zoop-soft"
+              className="company-issue-evidence w-auto! rounded-panel px-1! py-1! text-caption font-medium text-zoop-muted underline underline-offset-2 hover:text-zoop-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
               onClick={() =>
                 props.onIssueEvidence?.({
                   id: issue.issueId,
@@ -330,7 +330,7 @@ export default function CompanyDetailPanel(props: Props) {
     const rest = issues.slice(VISIBLE_ISSUES);
     return (
       <>
-        <ul className="company-list">
+        <ul className="company-list company-issue-list">
           {issues.slice(0, VISIBLE_ISSUES).map((i) => issueRow(i, indirect))}
         </ul>
         {rest.length > 0 && (
@@ -344,7 +344,7 @@ export default function CompanyDetailPanel(props: Props) {
             <summary>
               {label} {rest.length}건 더 보기
             </summary>
-            <ul className="company-list mt-2">
+            <ul className="company-list company-issue-list mt-2">
               {rest.map((issue) => issueRow(issue, indirect))}
             </ul>
           </details>
@@ -364,7 +364,7 @@ export default function CompanyDetailPanel(props: Props) {
   return (
     <aside
       id="company-detail-panel"
-      className={`company-panel ${ui.shell}`}
+      className={`company-panel ${ui.shell} rounded-panel`}
       style={props.panelWidth ? { width: `${props.panelWidth}px` } : undefined}
       data-screen-id="D-GRP-03"
       aria-label={`${name} 기업 상세`}
@@ -396,13 +396,6 @@ export default function CompanyDetailPanel(props: Props) {
             <h2 className={ui.title} ref={heading} tabIndex={-1}>
               {name}
             </h2>
-            {/* D-GRP-03: 별칭은 기업명 아래에서 펼쳐 확인해요. */}
-            {company && company.aliases.length > 0 && (
-              <details className="company-aliases">
-                <summary>기업명 더 보기</summary>
-                <p>{company.aliases.join(' · ')}</p>
-              </details>
-            )}
             {quote && (
               <>
                 <div className="company-price-row">
@@ -431,16 +424,6 @@ export default function CompanyDetailPanel(props: Props) {
                     · 전일 대비 · {quote.source.name}
                     {quote.source.delayNote ? ' · 지연 가능' : ''}
                   </span>
-                  <details className="company-source">
-                    <summary aria-label={`시세 출처: ${quote.source.name}`}>
-                      i
-                    </summary>
-                    <p>
-                      {quote.source.name} ·{' '}
-                      {quote.source.official ? '공식' : '공개 자료'} · 종목 기호{' '}
-                      {quote.source.symbol}
-                    </p>
-                  </details>
                 </div>
               </>
             )}
@@ -452,14 +435,6 @@ export default function CompanyDetailPanel(props: Props) {
           >
             ×
           </button>
-        </div>
-        <div className="company-identity">
-          <div className="company-statuses">
-            {(company?.holding || props.fallback.holding) && (
-              <span>보유 종목</span>
-            )}
-            {(company?.watch || props.fallback.watch) && <span>관심 종목</span>}
-          </div>
         </div>
       </header>
       {loading && (
@@ -505,7 +480,11 @@ export default function CompanyDetailPanel(props: Props) {
               </Link>
             )}
             {canFocus && (
-              <button onClick={props.onFocus}>기업 중심 그래프</button>
+              <button onClick={props.onFocus}>
+                {props.focusId === company.id
+                  ? '전체 지도 보기'
+                  : '기업 중심 그래프'}
+              </button>
             )}
             <button
               className={`bg-panel-ink! text-white! ${props.tutorialAi ? 'tutorial-target tutorial-ai-target' : ''}`}
@@ -560,10 +539,6 @@ export default function CompanyDetailPanel(props: Props) {
                 <p className="company-chart-range">
                   <span>{prices.points.at(0)?.time.slice(0, 10)}</span>
                   <span>{prices.points.at(-1)?.time.slice(0, 10)}</span>
-                </p>
-                <p className="company-caption">
-                  {prices.source.name} · 마지막 거래{' '}
-                  {prices.points.at(-1)?.time.slice(0, 10)}
                 </p>
               </figure>
             ) : data.prices?.status === 'unavailable' ? (
