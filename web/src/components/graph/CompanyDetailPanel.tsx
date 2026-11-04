@@ -190,7 +190,7 @@ export default function CompanyDetailPanel(props: Props) {
     heading.current?.focus();
   }, [props.companyId]);
   const [retry, setRetry] = useState(0);
-  const { data, loading, errors } = useCompanyData(
+  const { data, loading, marketLoading, errors } = useCompanyData(
     props.companyId,
     props.token,
     retry,
@@ -522,6 +522,13 @@ export default function CompanyDetailPanel(props: Props) {
           )}
           <section className={`company-quote ${ui.sectionFrame}`}>
             <h3 className="sr-only">시세</h3>
+            {/* 시세·가격·지표·보유는 그래프 응답과 따로 도착한다. 기다리는 동안 이 자리에만 표시한다. */}
+            {marketLoading && (
+              <LoadingIndicator
+                label="시세 정보를 불러오는 중"
+                className="flex min-h-12 w-full"
+              />
+            )}
             {quote ? (
               <>
                 <div className="company-stat-grid">

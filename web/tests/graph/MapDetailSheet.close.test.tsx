@@ -87,6 +87,7 @@ it.each(['loading', 'error'] as const)(
     const error = loading ? null : 'offline';
     vi.mocked(useCompanyData).mockReturnValue({
       loading,
+      marketLoading: loading,
       errors: loading ? {} : { company: 'offline' },
       data: null,
     });
