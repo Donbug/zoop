@@ -1,0 +1,13 @@
+{
+  "candidateCommit": "d0653ccf305cd533ca431d0456e91142f1d2b57e",
+  "credentialRevision": "naver-web-search-20261104",
+  "httpStatus": 200,
+  "itemCount": 1,
+  "observedAt": "2026-11-04T07:39:53.9817978+00:00",
+  "provider": "naver-api-hub-webkr",
+  "redirectFollowed": false,
+  "responseBytes": 376,
+  "responseContractObserved": true,
+  "schemaVersion": "zoop-chat-web-provider-preflight-1",
+  "status": "passed"
+}
