@@ -16,6 +16,7 @@ import type {
 import { kstMinuteToIso } from '@/util/format';
 import {
   apiError,
+  deferred,
   createFakeServer,
   json,
   type FakeServer,
@@ -500,5 +501,79 @@ describe('A-ADM-03 회차 탭 (#55)', () => {
       await screen.findByRole('button', { name: 'gv-synthetic로 전환' }),
     ).toBeTruthy();
     expect(server.calls('GET', VERSIONS)).toHaveLength(2);
+  });
+
+  test('버전 탭의 더 보기가 끝나기 전에 회차의 수입한 버전을 누르면 더 보기가 끝난 뒤 버전 목록을 다시 읽는다', async () => {
+    let importedNow = false;
+    const version = (id: string, sequence: number): GraphVersion => ({
+      id,
+      sequence,
+      kind: 'snapshot',
+      createdAt: '2026-11-03T01:30:00Z',
+      createdBy: 'importer',
+      reason: '합성 회차 수입',
+      sourceLabel: '합성 handoff',
+      policyVersion: null,
+      issueCount: 1,
+      relationCount: 1,
+      articleCount: 1,
+      candidateCount: null,
+      sha256: 'd'.repeat(64),
+      bytes: 1,
+      active: false,
+      activatedAt: null,
+      graphDb: { status: 'pending', pendingJobsAtCreation: 0, note: null },
+    });
+    const more = deferred<Response>();
+    let moreReads = 0;
+    const page = (items: GraphVersion[], nextCursor: string | null) =>
+      json({
+        activeVersionId: null,
+        items,
+        activations: [],
+        nextCursor,
+      } satisfies GraphVersionList);
+    server.on('GET', OVERVIEW, () => json(overview()));
+    server.on('GET', VERSIONS, ({ query }) => {
+      if (query.get('cursor')) {
+        moreReads += 1;
+        return moreReads === 1
+          ? more.promise
+          : page([version('gv-older', 1)], null);
+      }
+      return page(
+        importedNow
+          ? [version('gv-synthetic', 3), version('gv-old', 2)]
+          : [version('gv-old', 2)],
+        'c1',
+      );
+    });
+    server.on('GET', ROUNDS, () => list([imported]));
+    server.on('GET', ROUND, () => json(detail(imported)));
+    const { user } = open('/admin/pipeline?tab=versions');
+    await user.click(await screen.findByRole('button', { name: '더 보기' }));
+
+    importedNow = true;
+    await user.click(screen.getByRole('tab', { name: '회차' }));
+    const table = await screen.findByRole('table', {
+      name: '그래프 회차 목록',
+    });
+    await user.click(
+      within(table).getByRole('button', { name: 'round-20261103T1005' }),
+    );
+    const aside = screen.getByRole('complementary', { name: '회차 상세' });
+    await user.click(
+      await within(aside).findByRole('button', { name: 'gv-synthetic' }),
+    );
+    const firstPageReads = () =>
+      server.calls('GET', VERSIONS).filter(({ query }) => !query.get('cursor'))
+        .length;
+    expect(firstPageReads()).toBe(1);
+
+    more.resolve(page([version('gv-older', 1)], null));
+    expect(
+      await screen.findByRole('button', { name: 'gv-synthetic로 전환' }),
+    ).toBeTruthy();
+    expect(firstPageReads()).toBe(2);
   });
 });

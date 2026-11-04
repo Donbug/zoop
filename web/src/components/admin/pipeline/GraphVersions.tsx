@@ -79,15 +79,17 @@ export default function GraphVersions({
   const [pending, setPending] = useState(false);
   // 처음 연 뒤로 탭이 유지되므로, 회차가 수입한 새 버전을 보려면 다시 읽어야 한다.
   // 전환 중이면 읽지 않는다. 전환이 끝나면 목록을 다시 읽는다.
+  // 조회(처음 읽기·더 보기)가 진행 중이면 조용한 다시 읽기는 무시되므로, 끝난 뒤에 읽고 그때 처리한 것으로 기록한다.
+  const seenRefreshKey = useRef(refreshKey);
   const refresh = useEffectEvent(() => {
+    if (seenRefreshKey.current === refreshKey) return;
+    if (versions.status === 'loading' || versions.loadingMore) return;
+    seenRefreshKey.current = refreshKey;
     if (!pending) versions.reload({ quiet: true });
   });
-  const seenRefreshKey = useRef(refreshKey);
   useEffect(() => {
-    if (seenRefreshKey.current === refreshKey) return;
-    seenRefreshKey.current = refreshKey;
     refresh();
-  }, [refreshKey]);
+  }, [refreshKey, versions.status, versions.loadingMore]);
   const first = versions.pages[0];
   const activeVersionId = first?.activeVersionId ?? null;
   // 커서는 표시 버전을 고정하지 않는다. 더 불러온 쪽의 표시 버전이 첫 쪽과 다르면 목록이 섞인 것이므로
