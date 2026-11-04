@@ -1373,7 +1373,7 @@ describe('D-AI-01 · D-AI-02 prototype chat gaps (C1, C5-C9)', () => {
     expect(server.calls('POST', JOBS)).toHaveLength(0);
   });
 
-  it('C8 shows the evidence count and period the question was asked with', async () => {
+  it('C8 shows only the question without linked-target metadata', async () => {
     server.on('GET', CURRENT, () =>
       json(
         conversation([
@@ -1392,10 +1392,11 @@ describe('D-AI-01 · D-AI-02 prototype chat gaps (C1, C5-C9)', () => {
     await open();
     const card = await screen.findByRole('article', { name: 'HBM이 뭐야?' });
     expect(
-      within(card).getByText(
-        '연결한 대상: 삼성전자(기업) · 근거 3건 · 2026-10-01 ~ 2026-10-21',
-      ),
+      within(card).getByRole('heading', { name: 'HBM이 뭐야?' }),
     ).toBeTruthy();
+    expect(
+      within(card).queryByText(/연결한 대상|근거 3건|2026-10-01/),
+    ).toBeNull();
   });
 
   it('C9 opens the evidence of the cited articles in sources on the map', async () => {

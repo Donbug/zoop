@@ -13,6 +13,7 @@ import ImpactCue from '@/components/common/ImpactCue';
 import type { CompanyIssueImpactAssessment } from '@/types/map/impact-assessment';
 
 type Props = {
+  panelWidth?: number;
   tutorialEvidence?: boolean;
   tutorialAi?: boolean;
   tutorialSaving?: boolean;
@@ -43,6 +44,7 @@ const unique = (items: string[]) => [...new Set(items)];
 
 // WBS 6.6.26 · D-GRP-06 · Figma 619:8880
 export default function ImpactPathPanel({
+  panelWidth,
   companyId,
   tutorialEvidence = false,
   tutorialAi = false,
@@ -78,9 +80,6 @@ export default function ImpactPathPanel({
       [edge.source, edge.target].includes(companyId) &&
       [edge.source, edge.target].includes(issueId),
   );
-  const evidenceIds = unique(
-    impact?.steps.flatMap((step) => step.evidenceIds) ?? [],
-  );
   const connectedCompanies = graph.edges
     .filter(
       (edge) =>
@@ -103,7 +102,9 @@ export default function ImpactPathPanel({
 
   return (
     <aside
-      className={`event-panel ${ui.shell}`}
+      id="impact-path-panel"
+      className={`event-panel ${ui.shell} border-b-0! shadow-none!`}
+      style={panelWidth ? { width: `${panelWidth}px` } : undefined}
       data-screen-id="D-GRP-06"
       aria-labelledby="impact-panel-title"
       onKeyDown={(event) => {
@@ -384,7 +385,7 @@ export default function ImpactPathPanel({
               )}
             </section>
             <section
-              className={ui.section}
+              className={`${ui.section} border-b-0!`}
               aria-labelledby="impact-limit-title"
             >
               <h3 id="impact-limit-title">해석 한계</h3>
@@ -399,10 +400,6 @@ export default function ImpactPathPanel({
                 </li>
               </ul>
             </section>
-            <footer className={ui.footer}>
-              <p>{impact.metadata.source}</p>
-              <p>경로 근거 {evidenceIds.length}건 · 화면 ID D-GRP-06</p>
-            </footer>
           </>
         )}
       </div>

@@ -48,13 +48,6 @@ const ANSWER_STATUS_LABEL: Record<ChatResult['answerStatus'], string> = {
   guidance: '안내',
 };
 
-const KIND_LABEL: Record<string, string> = {
-  company: '기업',
-  issue: '사건',
-  edge: '관계',
-  evidence: '근거',
-};
-
 type Props = {
   job: ChatJob;
   /** 이 작업이 답한 확인 질문(대화 안에서 찾은 경우) */
@@ -86,41 +79,25 @@ function formatTime(value: string | null) {
 
 export default function ChatJobCard(props: Props) {
   const { job, answers } = props;
-  const linked = job.context.items;
   return (
     <article
-      className="flex flex-col gap-3 py-2"
+      // D-AI-01b / D-AI-02b: keep both sides of each message clear of the drawer edge.
+      className="flex flex-col gap-3 px-[6%] py-2"
       aria-labelledby={`chat-job-${job.id}`}
+      data-screen-id="D-AI-02b"
     >
       <div className="flex justify-end">
         <div className="max-w-[88%] rounded-[18px_18px_4px_18px] bg-zoop-soft px-3.5 py-2.5">
-          {answers && <p className={`${ui.muted} mb-1`}>확인 질문에 답하기</p>}
           <h3
             id={`chat-job-${job.id}`}
             className="mb-0! wrap-anywhere text-caption font-semibold leading-relaxed"
           >
             {job.question}
           </h3>
-          <p className={`${ui.muted} mt-1`}>
-            연결한 대상:{' '}
-            {linked.length
-              ? linked
-                  .map(
-                    (item) =>
-                      `${item.label}(${KIND_LABEL[item.kind] ?? item.kind})`,
-                  )
-                  .join(', ')
-              : '없음'}
-            {/* D-AI-01 · prototype chat-job-view.tsx:294-298: 질문에 묶인 근거 수와 기간 */}
-            {job.context.evidenceCount > 0 &&
-              ` · 근거 ${job.context.evidenceCount}건`}
-            {job.context.period &&
-              ` · ${job.context.period.start} ~ ${job.context.period.end}`}
-          </p>
         </div>
       </div>
       <div className="flex justify-start">
-        <section aria-label="AI 응답" className="min-w-0 max-w-[96%]">
+        <section aria-label="AI 응답" className="min-w-0 max-w-full">
           {answers && (
             <p className={`${ui.muted} mb-2`}>
               확인 질문 “{answers.question}”에 대한 답
@@ -200,22 +177,39 @@ function JobState({
   if (job.status === 'failed' && job.failure) {
     const failure = job.failure;
     return (
-      <div className={ui.state} role="alert">
-        <p className="mt-0!">{failure.message}</p>
+      <div
+        className="flex max-w-full flex-col items-start gap-3 rounded-[18px_18px_18px_4px] bg-zoop-soft px-4 py-3 text-caption leading-relaxed text-zoop-ink"
+        role="alert"
+      >
+        <p className="m-0!">{failure.message}</p>
         {failure.retry === 'rerun' && (
-          <button type="button" disabled={busy} onClick={() => onRetry(job)}>
+          <button
+            type="button"
+            className="text-left font-medium underline underline-offset-2 hover:text-zoop-muted disabled:opacity-50"
+            disabled={busy}
+            onClick={() => onRetry(job)}
+          >
             질문 다시 처리
           </button>
         )}
         {failure.retry === 'save_only' && (
-          <button type="button" disabled={busy} onClick={() => onRetry(job)}>
+          <button
+            type="button"
+            className="text-left font-medium underline underline-offset-2 hover:text-zoop-muted disabled:opacity-50"
+            disabled={busy}
+            onClick={() => onRetry(job)}
+          >
             저장 다시 시도
           </button>
         )}
         {failure.retry === null && (
           <>
             {onRewrite && (
-              <button type="button" onClick={() => onRewrite(job.question)}>
+              <button
+                type="button"
+                className="text-left font-medium underline underline-offset-2 hover:text-zoop-muted"
+                onClick={() => onRewrite(job.question)}
+              >
                 질문 고쳐서 새로 보내기
               </button>
             )}

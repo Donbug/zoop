@@ -18,6 +18,7 @@ import GraphIcon from './GraphIcon';
 
 interface Props {
   id: string;
+  panelWidth?: number;
   context: EventContext;
   /** 지도에 있는 기업 노드의 로고 */
   logoOf?: (companyId: string) => string | null | undefined;
@@ -48,6 +49,7 @@ function shortLabel(
 // D-GRP-04 · Figma 619:7557 · WBS 6.6.24 · FS023/024/055.
 export default function RelationDetailPanel({
   id,
+  panelWidth,
   context,
   logoOf,
   actionOf,
@@ -78,7 +80,9 @@ export default function RelationDetailPanel({
     .at(-1);
   return (
     <aside
-      className={`relation-panel ${ui.shell}`}
+      id="relation-detail-panel"
+      className={`relation-panel ${ui.shell} rounded-panel`}
+      style={panelWidth ? { width: `${panelWidth}px` } : undefined}
       data-screen-id="D-GRP-04"
       aria-labelledby="relation-title"
       onKeyDown={(event) => {

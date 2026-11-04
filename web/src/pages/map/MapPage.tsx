@@ -1470,6 +1470,7 @@ function MapWorkspace({
               <GraphFocusControls
                 label={focusNode.label}
                 hops={focusHops}
+                sidebarOpen={sidebarOpen}
                 onHopsChange={(hops) => updateQuery({ hops: String(hops) })}
                 onClear={() => updateQuery({ focus: null, hops: null })}
               />
@@ -1499,15 +1500,22 @@ function MapWorkspace({
                 />
               </div>
             )}
-            {companyNode &&
-              !impactIssueId &&
+            {(companyNode || eventId || edgeId || impactIssueId) &&
               !pathFrom &&
               !pathIsCollapsed &&
               !tutorialOpen && (
                 <div
                   role="separator"
-                  aria-label="기업 패널 너비 조절"
-                  aria-controls="company-detail-panel"
+                  aria-label="상세 패널 너비 조절"
+                  aria-controls={
+                    impactIssueId
+                      ? 'impact-path-panel'
+                      : companyNode
+                        ? 'company-detail-panel'
+                        : eventId
+                          ? 'event-detail-panel'
+                          : 'relation-detail-panel'
+                  }
                   aria-orientation="vertical"
                   aria-valuemin={COMPANY_PANEL_MIN_WIDTH}
                   aria-valuemax={COMPANY_PANEL_MAX_WIDTH}
@@ -1625,7 +1633,11 @@ function MapWorkspace({
                     openImpact(companyNode.id, issueId)
                   }
                   onFocus={() =>
-                    updateQuery({ focus: companyNode.id, hops: '1' })
+                    updateQuery(
+                      focusId === companyNode.id
+                        ? { focus: null, hops: null }
+                        : { focus: companyNode.id, hops: '1' },
+                    )
                   }
                   activeRelatedId={pairOther}
                   onSelectRelation={(companyId) =>
@@ -1697,6 +1709,7 @@ function MapWorkspace({
               )}
               {data && impactCompanyId && impactIssueId && !pathFrom && (
                 <ImpactPathPanel
+                  panelWidth={companyPanelWidth}
                   companyId={impactCompanyId}
                   issueId={impactIssueId}
                   context={eventContext}
@@ -1757,6 +1770,7 @@ function MapWorkspace({
                       companyDetailRouteFromMap(id, params.toString())
                     }
                     context={eventContext}
+                    panelWidth={companyPanelWidth}
                     geography={selectedNode?.geography ?? null}
                     logoOf={logoOf}
                     nodeIds={panelNodeIds}
@@ -1779,6 +1793,7 @@ function MapWorkspace({
                   key={edgeId}
                   id={edgeId}
                   context={eventContext}
+                  panelWidth={companyPanelWidth}
                   logoOf={logoOf}
                   actionOf={(issueId) =>
                     data?.nodes.find((node) => node.id === issueId)?.action

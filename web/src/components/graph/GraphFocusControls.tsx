@@ -1,6 +1,7 @@
 type Props = {
   label: string;
   hops: 1 | 2;
+  sidebarOpen?: boolean;
   onHopsChange: (hops: 1 | 2) => void;
   onClear: () => void;
 };
@@ -9,6 +10,7 @@ type Props = {
 export default function GraphFocusControls({
   label,
   hops,
+  sidebarOpen = false,
   onHopsChange,
   onClear,
 }: Props) {
@@ -16,7 +18,7 @@ export default function GraphFocusControls({
     <div
       data-screen-id="D-GRP-07b"
       role="group"
-      className="absolute top-4 left-9 z-10 flex min-h-11 max-w-[calc(100%-1rem)] items-center rounded-panel border border-zoop-line bg-zoop-paper p-1 font-panel text-body text-zoop-ink shadow-sm max-md:top-2 max-md:left-2"
+      className={`absolute top-4 z-10 flex min-h-11 max-w-[calc(100%-1rem)] items-center rounded-panel border border-zoop-line bg-zoop-paper p-1 font-panel text-body text-zoop-ink shadow-sm ${sidebarOpen ? 'left-[calc(280px+2rem)]' : 'left-9'} max-md:top-2 max-md:left-2`}
       aria-label={`${label} 중심 보기`}
     >
       <strong className="max-w-32 truncate px-2 text-body font-semibold max-md:max-w-24">
