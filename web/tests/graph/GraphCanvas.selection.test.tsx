@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import GraphCanvas from '@/components/graph/GraphCanvas';
+import GraphCanvas, { HOVER_INTENT_MS } from '@/components/graph/GraphCanvas';
 import { GraphAppearanceContext } from '@/components/graph/graph-appearance';
 import {
   EDGE_ANIMATION,
@@ -654,10 +654,22 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     await waitFor(() =>
       expect(canvas.handlers.has('node:pointerenter')).toBe(true),
     );
+    // D-GRP-01: brushing past the node (leaving before HOVER_INTENT_MS) shows nothing.
     act(() =>
       canvas.handlers.get('node:pointerenter')!({ target: { id: issue.id } }),
     );
-    expect(screen.getByRole('tooltip').textContent).toBe(issue.label);
+    act(() =>
+      canvas.handlers.get('node:pointerleave')!({ target: { id: issue.id } }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, HOVER_INTENT_MS + 50));
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    act(() =>
+      canvas.handlers.get('node:pointerenter')!({ target: { id: issue.id } }),
+    );
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByRole('tooltip').textContent).toBe(issue.label),
+    );
     act(() =>
       canvas.handlers.get('node:pointerleave')!({ target: { id: issue.id } }),
     );

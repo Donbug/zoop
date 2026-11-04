@@ -56,6 +56,22 @@ test('D-GRP-01 zoomed out, issues keep only their diamond until hovered or selec
   expect(style(issue.id).labelVisibility).toBe('visible');
 });
 
+test('D-GRP-01 the whole-graph fit shows issue diamonds only, even above the overview zoom', () => {
+  // 2026-11-04 리뷰: 촘촘한 지도는 0.45보다 크게 맞춰져도 전체 맞춤에서는 사건 제목을 숨겨요.
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const base = toG6Data(data, 1200, 700);
+  const issue = data.nodes.find((n) => n.kind === 'issue')!;
+  const visibility = (zoom: number) =>
+    readingStyles(base, data, {
+      ...context,
+      zoom,
+      wholeFitZoom: 0.6,
+    }).nodes!.find((node) => node.id === issue.id)!.style!.labelVisibility;
+  expect(visibility(0.6)).toBe('hidden');
+  expect(visibility(0.7)).toBe('hidden');
+  expect(visibility(0.75)).toBe('visible');
+});
+
 test('D-GRP-01 always-visible issue names do not reveal nodes hidden by filters', () => {
   const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
   const base = toG6Data(data, 1200, 700);
@@ -162,6 +178,61 @@ test('R1–R3 culls node and edge labels together, prioritizes selection and avo
     [{ id: 'body', box: { ...box, x: 300 } }],
   );
   expect([...result].sort()).toEqual(['company', 'edge', 'far']);
+});
+
+test('D-GRP-01 titles connected to the hovered or selected node are never culled', () => {
+  // 2026-11-04 리뷰: 머무르거나 클릭한 노드에 연결된 사건 제목은 겹쳐도 계속 보여요.
+  const box = { x: 0, y: 0, width: 100, height: 30 };
+  const entry = (id: string, priority: number, keep = false) => ({
+    id,
+    priority,
+    box,
+    distance: 0,
+    degree: 0,
+    evidence: 0,
+    keep,
+  });
+  const result = culledLabels(
+    [
+      entry('company', 1),
+      entry('linked-a', 5, true),
+      entry('linked-b', 5, true),
+      entry('other', 6),
+    ],
+    [],
+  );
+  expect([...result]).toEqual(['other']);
+});
+
+test('D-GRP-01 a selection keeps its connected titles while another node is hovered', () => {
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const base = toG6Data(data, 1200, 700);
+  const kind = (id: string) => data.nodes.find((n) => n.id === id)?.kind;
+  const link = data.edges.find(
+    (e) => new Set([kind(e.source), kind(e.target)]).size === 2,
+  )!;
+  const [company, issue] =
+    kind(link.source) === 'company'
+      ? [link.source, link.target]
+      : [link.target, link.source];
+  const other = data.nodes.find(
+    (n) =>
+      n.kind === 'company' &&
+      !data.edges.some(
+        (e) =>
+          (e.source === n.id || e.target === n.id) &&
+          (e.source === issue || e.target === issue),
+      ),
+  )!;
+  const visibility = (selected: string | null) =>
+    readingStyles(base, data, {
+      ...context,
+      zoom: 0.2,
+      anchor: other.id,
+      selected,
+    }).nodes!.find((node) => node.id === issue)!.style!.labelVisibility;
+  expect(visibility(null)).toBe('hidden');
+  expect(visibility(company)).toBe('visible');
 });
 
 test('R1 renderer integration measures actual label bounds and hides labels without deleting nodes', async () => {

@@ -132,8 +132,8 @@ test('D-GRP-01: sparse links get more room than a densely connected neighborhood
   const previousDenseMean = 191.91688130435122;
   expect(denseMean).toBeGreaterThanOrEqual(previousDenseMean * 1.3);
   expect(length(sparseEdge)).toBeGreaterThan(denseMean * 1.5);
-  // 2026-11-04 리뷰: 묶음 사이 여백을 180에서 418로 넓혔어요(55%, 다시 50%). 멀리 흩어지지는 않아요.
-  expect(isolatedNearest).toBeGreaterThanOrEqual(180 * 1.55 * 1.5 - 1e-9);
+  // 2026-11-04 리뷰: 넓혔던 묶음 사이 여백(418)을 다시 180으로 되돌렸어요. 멀리 흩어지지는 않아요.
+  expect(isolatedNearest).toBeGreaterThanOrEqual(180 - 1e-9);
   expect(isolatedNearest).toBeLessThanOrEqual(1200);
 });
 
@@ -162,10 +162,10 @@ test('D-GRP-01: a busy company spreads its single-company issues around fuller r
   const nearest = Math.min(
     ...leaves.flatMap((a, i) => leaves.slice(i + 1).map((b) => distance(a, b))),
   );
-  // 고리마다 6개씩 황금각으로 놓던 이전 배치는 가장 가까운 두 사건이 약 227까지 붙었어요.
-  expect(nearest).toBeGreaterThanOrEqual(250);
+  // 2026-11-04 리뷰로 사건을 기업 쪽으로 15% 당겼어요(고리 반지름·간격 × 0.85).
+  expect(nearest).toBeGreaterThanOrEqual(250 * 0.85);
   for (const leaf of leaves)
     expect(distance(leaf, points.get(company.id)!)).toBeGreaterThanOrEqual(
-      270 * 1.5 - 1e-9,
+      270 * 0.85 * 1.5 - 1e-9,
     );
 });

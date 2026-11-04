@@ -5,17 +5,15 @@ const cache = new WeakMap<GraphResponse, Map<string, Point>>();
 
 // Leaf-issue rings before the final 1.5× spread: first radius, ring gap and the arc reserved
 // per issue title (about one wrapped title wide at the default zoom).
-// D-GRP-01 (2026-11-04 review): issues sit 20% further apart (was 270/170/260).
-const LEAF_SPREAD = 1.2;
-const LEAF_RADIUS = 270 * LEAF_SPREAD;
-const LEAF_RING_GAP = 170 * LEAF_SPREAD;
-const LEAF_ARC = 260 * LEAF_SPREAD;
-// D-GRP-01 (2026-11-04 review): companies and shared issues sit 55%, then another 50%,
-// further apart so their lines stop crossing in one knot.
-const CORE_SPREAD = 1.55 * 1.5;
-const COMPANY_REPULSION = 4;
-// Issue–company links rest 50% longer, so an issue shared by several companies sits between them.
-const LINK_SLACK = 1.5;
+// D-GRP-01 (2026-11-04 review): the wider #546 spacing looked scattered on the public graph,
+// so spacing is back to the earlier map and company nodes grow instead (graph-model).
+// A later review the same day pulled issues 15% closer to their company and pushed
+// companies 25% further from each other (COMPANY_SPREAD).
+const LEAF_PULL = 0.85;
+const COMPANY_SPREAD = 1.25;
+const LEAF_RADIUS = 270 * LEAF_PULL;
+const LEAF_RING_GAP = 170 * LEAF_PULL;
+const LEAF_ARC = 260;
 const ringCapacity = (radius: number) =>
   Math.max(4, Math.floor((2 * Math.PI * radius) / LEAF_ARC));
 
@@ -31,9 +29,9 @@ export function leafRank(a: RankedNode, b: RankedNode) {
 
 // D-GRP-01 (2026-11-04 review): busy companies that share many issues used to pile up in
 // one knot of crossing lines. Keep every pair of companies at least this far apart (before
-// the final 1.5x), enough for both of their issue rings, then carry each shared issue
+// the final 1.5x), about twice the largest company node, then carry each shared issue
 // along with the companies it joins.
-const MIN_COMPANY_GAP = 2 * LEAF_RADIUS + 80;
+const MIN_COMPANY_GAP = 200 * COMPANY_SPREAD;
 function separateCompanies(
   core: GraphResponse['nodes'],
   neighbors: Map<string, Set<string>>,
@@ -92,9 +90,9 @@ export function compactRelationshipGroups(
   groups: string[][],
 ) {
   if (groups.length < 2) return;
-  // 최종 1.5배 확대를 적용하면 묶음 사이 여백은 418이 돼요(2026-11-04 리뷰로 55%, 다시 50% 넓힘).
-  const gap = 120 * CORE_SPREAD;
-  const minSide = 120 * CORE_SPREAD;
+  // 최종 1.5배 확대를 적용하면 묶음 사이 여백은 180이 돼요.
+  const gap = 120;
+  const minSide = 120;
   const boxes = groups
     .map((ids) => {
       const members = ids.map((id) => points.get(id)!);
@@ -190,9 +188,12 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
       .flatMap((e) => [e.source, e.target]),
   );
   // Folded leaves do not crowd their parent. Their anchors are retained for expansion.
+  // D-GRP-01 (2026-11-04 review): companies without any issue (catalog-only, #543) stay out
+  // of the solver. They used to push one side of the network, so all of 삼성전자's
+  // connections ended up in one direction. Group packing places them afterwards.
   const core = ordered.filter(
     (n) =>
-      n.kind === 'company' ||
+      (n.kind === 'company' && neighbors.get(n.id)!.size > 0) ||
       neighbors.get(n.id)!.size > 1 ||
       follows.has(n.id),
   );
@@ -227,12 +228,7 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
         const dx = a.x - b.x,
           dy = a.y - b.y;
         const distance = Math.max(1, Math.hypot(dx, dy));
-        // D-GRP-01 (2026-11-04 review): companies push each other harder than issues do,
-        // so companies sharing many issues no longer collapse into one knot of lines.
-        const companies =
-          core[i].kind === 'company' && core[j].kind === 'company';
-        const strength =
-          ((companies ? COMPANY_REPULSION : 1) * 180 ** 2) / distance;
+        const strength = 180 ** 2 / distance;
         const fx = (dx / distance) * strength,
           fy = (dy / distance) * strength;
         forceA.x += fx;
@@ -254,8 +250,7 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
         neighbors.get(edge.target)!.size,
       );
       const spacing = degree <= 1 ? 1.75 : degree === 2 ? 1.3 : 1;
-      const strength =
-        (distance ** 2 / (210 * (spacing * LINK_SLACK) ** 3)) * edge.weight;
+      const strength = (distance ** 2 / (210 * spacing ** 3)) * edge.weight;
       const fx = (dx / distance) * strength,
         fy = (dy / distance) * strength;
       forces.get(edge.source)!.x += fx;
@@ -305,8 +300,8 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
   const extent = Math.max(1600, Math.sqrt(nodes.length) * 230);
   const fit = Math.min(1, extent / spanX, extent / 1.6 / spanY);
   for (const point of nodes) {
-    point.x *= fit * 1.45 * CORE_SPREAD;
-    point.y *= fit * CORE_SPREAD;
+    point.x *= fit * 1.45 * COMPANY_SPREAD;
+    point.y *= fit * COMPANY_SPREAD;
   }
   separateCompanies(core, neighbors, points);
   // D-GRP-01: a company's single-company issues sit on rings around it. Each ring holds as many

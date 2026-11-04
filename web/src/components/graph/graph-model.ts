@@ -116,8 +116,9 @@ export function foldedIssues(
   return { hidden, counts };
 }
 
-/** D-GRP-01 (2026-11-04 review): issue diamonds were 7px and hard to spot. */
-export const ISSUE_NODE_SIZE = 30;
+/** D-GRP-01 (2026-11-04 reviews): issue nodes were 7px diamonds and hard to spot, then 30
+ * and 36, then 40. Now 48, so a diamond reads about 20-30% of a company node like the reference network. */
+export const ISSUE_NODE_SIZE = 48;
 
 /**
  * D-GRP-01: 0..1 evidence strength per issue on a log scale against the busiest
@@ -147,8 +148,9 @@ export function companyNodeSize(issueCount: number, scale = 1) {
           : issueCount <= 4
             ? 3
             : 4;
-  // D-GRP-01: 2026-11-04 review enlarged every level by 25% (was 36/44/52/68/88).
-  return [45, 55, 65, 85, 110][level] * scale;
+  // D-GRP-01: 2026-11-04 reviews enlarged every level by 25% (was 36/44/52/68/88), then
+  // by another 35% (was 45/55/65/85/110) when node spacing went back to the earlier map.
+  return [61, 74, 88, 115, 149][level] * scale;
 }
 
 export function focusNeighborhood(

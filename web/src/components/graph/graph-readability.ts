@@ -5,15 +5,21 @@ import { MIN_GRAPH_ZOOM } from './graph-zoom-range';
 
 /** Below this zoom issue titles are clipped to two lines (D-GRP-01 overview). */
 export const OVERVIEW_ZOOM = 0.45;
+/** Zooming in this much past the whole-graph fit brings issue titles back. */
+const WHOLE_FIT_MARGIN = 1.2;
 
 export type ReadingContext = {
   zoom: number;
   anchor: string | null;
+  /** Clicked node: its connected titles stay while another node is hovered, until deselected. */
+  selected?: string | null;
   edge: string | null;
   focus: string | null;
   path: ReadonlySet<string>;
   /** Elements kept bright while a selection dims the rest of the map (null: nothing dimmed). */
   bright?: ReadonlySet<string> | null;
+  /** Zoom that fits the whole visible graph. Issue titles stay hidden up to just above it. */
+  wholeFitZoom?: number;
 };
 export type LabelCandidate = {
   id: string;
@@ -22,7 +28,23 @@ export type LabelCandidate = {
   distance: number;
   degree: number;
   evidence: number;
+  /** Never culled: titles connected to the hovered or selected node (D-GRP-01, 2026-11-04). */
+  keep?: boolean;
 };
+
+/** The hovered/selected nodes and every node one edge away from them. */
+function anchorNeighbors(base: GraphData, context: ReadingContext) {
+  const anchors = new Set(
+    [context.anchor, context.selected].filter((id): id is string => !!id),
+  );
+  const related = new Set(anchors);
+  for (const e of base.edges ?? [])
+    if (anchors.has(String(e.source)) || anchors.has(String(e.target))) {
+      related.add(String(e.source));
+      related.add(String(e.target));
+    }
+  return related;
+}
 
 // D-GRP-01/01b · R1–R3. Only labels are culled; data, badges and positions stay intact.
 export function culledLabels(
@@ -61,6 +83,7 @@ export function culledLabels(
   )) {
     if (
       item.priority > 0 &&
+      !item.keep &&
       keys(item.box).some((key) =>
         cells
           .get(key)
@@ -83,13 +106,14 @@ export function readingStyles(
   context: ReadingContext,
 ): GraphData {
   const zoom = Math.max(MIN_GRAPH_ZOOM, context.zoom);
+  // D-GRP-01 (2026-11-04 review): the whole-graph fit shows only diamonds, even when a compact
+  // map fits above OVERVIEW_ZOOM. Titles come back once the user zooms in past the fit.
+  const overviewZoom = Math.max(
+    OVERVIEW_ZOOM,
+    (context.wholeFitZoom ?? 0) * WHOLE_FIT_MARGIN,
+  );
   const byId = new Map(data.nodes.map((n) => [n.id, n]));
-  const related = new Set(context.anchor ? [context.anchor] : []);
-  for (const e of base.edges ?? [])
-    if (e.source === context.anchor || e.target === context.anchor) {
-      related.add(String(e.source));
-      related.add(String(e.target));
-    }
+  const related = anchorNeighbors(base, context);
   return {
     nodes: base.nodes?.map((node) => {
       const source = byId.get(String(node.id));
@@ -105,7 +129,7 @@ export function readingStyles(
       // D-GRP-01 (2026-11-04 review): zoomed out, an issue is only a diamond that says
       // "there is an issue here"; its title and count come back on zoom, hover or selection.
       const overview =
-        source?.kind === 'issue' && zoom < OVERVIEW_ZOOM && !emphasized;
+        source?.kind === 'issue' && zoom < overviewZoom && !emphasized;
       return {
         ...node,
         style: {
@@ -127,7 +151,7 @@ export function readingStyles(
           // D-GRP-01: the zoomed-out overview shows two lines of each issue title; zooming in,
           // hovering or selecting brings back the whole title.
           labelMaxLines:
-            source?.kind === 'issue' && zoom < OVERVIEW_ZOOM && !emphasized
+            source?.kind === 'issue' && zoom < overviewZoom && !emphasized
               ? 2
               : Math.max(1, (source?.label ?? '').length),
           badges:
@@ -377,7 +401,7 @@ export async function applyGraphReading(
     };
   };
   const byId = new Map(data.nodes.map((n) => [n.id, n]));
-  const related = new Set<string>();
+  const related = anchorNeighbors(base, context);
   const degrees = new Map<string, number>();
   // Companies each issue touches on this map: shared issues always keep their diamond and lines.
   const companies = new Map<string, Set<string>>();
@@ -396,10 +420,6 @@ export async function applyGraphReading(
         issue.id,
         (companies.get(issue.id) ?? new Set()).add(company.id),
       );
-    if (edge.source === context.anchor || edge.target === context.anchor) {
-      related.add(String(edge.source));
-      related.add(String(edge.target));
-    }
   }
   const candidates: LabelCandidate[] = [],
     bodies: { id: string; box: Rect }[] = [];
@@ -464,6 +484,10 @@ export async function applyGraphReading(
         : 0,
       degree: degrees.get(id) ?? 0,
       evidence: source?.evidenceCount ?? 0,
+      // D-GRP-01 (2026-11-04 review): titles of issues connected to the hovered or clicked
+      // node stay while the pointer rests there or until the selection is cleared, even if
+      // they overlap. Unrelated titles yield to them instead.
+      keep: source?.kind === 'issue' && related.has(id),
     });
     labels.set(id, label);
   }

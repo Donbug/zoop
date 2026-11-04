@@ -63,6 +63,8 @@ import {
 } from './graph-zoom-range';
 
 const noHighlightedEdges: string[] = [];
+/** D-GRP-01: how long the pointer rests on a node before its connected issue titles show. */
+export const HOVER_INTENT_MS = 300;
 
 /** 접근성 목록에서 누른 버튼의 노드·연결선 id. 비활성 버튼은 고르지 않는다. */
 function accessibleTarget(target: EventTarget) {
@@ -267,10 +269,12 @@ export default function GraphCanvas({
         await applyGraphReading(graph, base, data, {
           zoom: graph.getZoom(),
           anchor: evidenceMode ? selected : (hovered.current ?? selected),
+          selected,
           edge: evidenceMode ? null : (hoveredEdge.current ?? selectedEdgeId),
           focus: focusId,
           path,
           bright: brightNodes.current,
+          wholeFitZoom: wholeFitZoom.current,
         });
       })
       .catch(() => {
@@ -300,6 +304,8 @@ export default function GraphCanvas({
   const defaultZoomPending = useRef(false);
   const followFit = useRef(true);
   const minimapShown = useRef(false);
+  /** D-GRP-01: zoom that fits the whole visible graph; issue titles stay hidden around it. */
+  const wholeFitZoom = useRef(0);
   // D-GRP-01/03: 상세 패널을 제외한 지도 영역의 중앙에 선택 노드를 유지한다.
   const centerTarget = useRef<string | null>(null);
   /**
@@ -582,7 +588,18 @@ export default function GraphCanvas({
   );
   const hoverSyncQueued = useRef(false);
   const hoverClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverIntentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverIntentId = useRef<string | null>(null);
+  /** Cancels the pending hover; with an id, only when that node's hover is pending. */
+  const cancelHoverIntent = (id?: string) => {
+    if (hoverIntentTimer.current === null) return;
+    if (id !== undefined && hoverIntentId.current !== id) return;
+    clearTimeout(hoverIntentTimer.current);
+    hoverIntentTimer.current = null;
+    hoverIntentId.current = null;
+  };
   const hoverNode = useEffectEvent((id: string | null) => {
+    cancelHoverIntent();
     if (hoverClearTimer.current !== null) {
       clearTimeout(hoverClearTimer.current);
       hoverClearTimer.current = null;
@@ -620,7 +637,23 @@ export default function GraphCanvas({
         if (!graph.destroyed) setRenderError(true);
       });
   });
+  // D-GRP-01 (2026-11-04 review): a pointer that only brushes past a node does not light up
+  // its connections; the hover counts once the pointer rests on the node for HOVER_INTENT_MS.
+  const enterNode = useEffectEvent((id: string) => {
+    cancelHoverIntent();
+    if (hovered.current === id) {
+      hoverNode(id);
+      return;
+    }
+    hoverIntentId.current = id;
+    hoverIntentTimer.current = setTimeout(() => {
+      hoverIntentTimer.current = null;
+      hoverIntentId.current = null;
+      hoverNode(id);
+    }, HOVER_INTENT_MS);
+  });
   const leaveNode = useEffectEvent((id: string) => {
+    cancelHoverIntent(id);
     // A late leave from the previous node must not clear the new node's hover.
     if (hovered.current !== id) return;
     setHoveredIssue(null);
@@ -781,6 +814,7 @@ export default function GraphCanvas({
     // the unobstructed viewport, with 0.53 as the floor for naturally small maps.
     // Recompute after data, layout and viewport changes.
     const wholeGraphFit = fitZoom(allFootprints, safe, MAX_GRAPH_ZOOM);
+    wholeFitZoom.current = wholeGraphFit.zoom;
     const zoomOutFloor = Math.max(
       MIN_GRAPH_ZOOM,
       Math.min(DEFAULT_GRAPH_ZOOM, wholeGraphFit.zoom),
@@ -1571,7 +1605,7 @@ export default function GraphCanvas({
         if (!dragged) selectNode(event.target.id);
       });
       graph.on('node:pointerenter', (event: IElementEvent) =>
-        hoverNode(event.target.id),
+        enterNode(event.target.id),
       );
       graph.on('node:pointerleave', (event: IElementEvent) =>
         leaveNode(event.target.id),
@@ -1708,6 +1742,7 @@ export default function GraphCanvas({
         clearTimeout(readingTimer.current);
         readingTimer.current = null;
       }
+      cancelHoverIntent();
       if (hoverClearTimer.current !== null) {
         clearTimeout(hoverClearTimer.current);
         hoverClearTimer.current = null;
