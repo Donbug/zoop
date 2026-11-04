@@ -35,7 +35,7 @@
 
 | 도메인 | 연결 작업 수 | 작업 목록 |
 | --- | --- | --- |
-| companies | 4 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
+| companies | 5 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | briefings | 16 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | chat | 9 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 

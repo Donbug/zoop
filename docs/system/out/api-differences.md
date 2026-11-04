@@ -97,6 +97,7 @@
 | blockMember | /api/v1/admin/members/{member_id}/block | /api/admin/members/{member_id}/block | 목표만 203 · BFF만 18 · 형식/필수/권한 변경 12 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | unblockMember | /api/v1/admin/members/{member_id}/unblock | /api/admin/members/{member_id}/unblock | 목표만 203 · BFF만 18 · 형식/필수/권한 변경 12 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | getCompanyFinancials | /api/v1/companies/{id}/financials | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
+| getCompanyIssueImpactAssessment | /api/v1/companies/{id}/issues/{issueId}/impact/assessment | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
 | getCompanyIssueImpact | /api/v1/companies/{id}/issues/{issueId}/impact | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
 | getPersonalizedBriefingIssues | /api/v1/briefings/{id}/personalized/issues | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
 | getPersonalizedBriefing | /api/v1/briefings/{id}/personalized | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |

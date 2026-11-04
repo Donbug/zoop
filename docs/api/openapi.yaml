@@ -8520,6 +8520,21 @@ paths:
         "404": {"$ref": "#/components/responses/Error404"}
         "422": {"$ref": "#/components/responses/Error422"}
         "503": {"$ref": "#/components/responses/Error503"}
+      x-zoop:
+        fsIds: ["FS022", "FS024", "FS055"]
+        nfsIds: ["NFS001", "NFS002", "NFS004", "NFS005", "NFS008"]
+        screenIds: ["D-GRP-06"]
+        wbsIds: ["6.1.2", "6.11.1", "6.6.6", "6.6.7", "6.6.9", "6.6.22", "6.6.24", "6.6.25", "6.6.26", "6.5.1"]
+        priority: "P1"
+        authority: "공개"
+        errorCodes: ["INVALID_REQUEST", "VERSION_UNAVAILABLE", "SOURCE_UNAVAILABLE"]
+        prototype:
+          method: null
+          path: null
+          operationId: null
+          differences:
+            - "기존 영향 경로 조회와 별개의 목표 API다. 공개 receipt에서 검증된 S3 영향 판정만 제공한다."
+        teamQuestions: []
   "/api/v1/companies/{id}/issues/{issueId}/impact":
     get:
       operationId: "getCompanyIssueImpact"
