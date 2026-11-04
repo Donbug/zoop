@@ -130,6 +130,7 @@ public class ExplicitBriefingService {
         }
         if(priority){
             presentation.set("personalPriority",PriorityPersonalAssembler.project(pool,roundId,round.windowTo().toString(),scope,prioritySelected,min,priorityViews));
+            if(out.has("verifiedPresentation"))((ObjectNode)out.get("verifiedPresentation")).set("personalPriority",presentation.get("personalPriority").deepCopy());
             pending=(int)prioritySelected.stream().filter(c->!priorityViews.get(c.path("issueId").asString()).path("priorityPersonal").isObject()).count();
         }
         presentation.put("emptyReason",selected.isEmpty()?"no_issues_in_window":null);
