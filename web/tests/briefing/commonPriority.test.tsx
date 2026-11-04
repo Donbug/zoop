@@ -154,3 +154,11 @@ test('D-BRF-02 shows verified business outlook and keeps it bound to company, ro
   item.aiAnalyses[0].evidenceIds = ['foreign'];
   expect(commonPriorityOf(response(v))).toBeNull();
 });
+
+test('accepts an equivalent UTC cutoff from the Spring API without rewriting the saved view', () => {
+  const v = value();
+  const result = response(v);
+  result.dataAsOf = '2026-10-30T00:20:00Z';
+  expect(commonPriorityOf(result)).toBe(v);
+  expect(v.cutoff).toBe('2026-10-30T09:20:00+09:00');
+});

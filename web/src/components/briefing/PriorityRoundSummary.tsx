@@ -1,3 +1,4 @@
+import { sameBriefingInstant } from '@/util/briefingTime';
 import type { BriefingResponse } from '@/types/briefing';
 import {
   BODY,
@@ -20,7 +21,7 @@ export default function PriorityRoundSummary({
   if (
     summary.schemaVersion !== 'briefing-priority-summary-v1' ||
     summary.roundId !== result.id ||
-    summary.cutoff !== result.dataAsOf ||
+    !sameBriefingInstant(summary.cutoff, result.dataAsOf) ||
     !summary.resultVersion ||
     !summary.text ||
     !Array.isArray(summary.evidenceIds) ||

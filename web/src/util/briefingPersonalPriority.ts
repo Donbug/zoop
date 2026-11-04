@@ -1,3 +1,4 @@
+import { sameBriefingInstant } from './briefingTime';
 import type { BriefingResponse } from '@/types/briefing';
 import { safeArticleUrl } from '@/components/graph/event-format';
 
@@ -134,7 +135,7 @@ function validV3Basis(
     before.issueId === issueId &&
     before.companyId === analysis.companyId &&
     before.roundId === roundId &&
-    before.cutoff === cutoff &&
+    sameBriefingInstant(before.cutoff, cutoff) &&
     typeof before.resultVersion === 'string' &&
     !!before.resultVersion &&
     before.resultVersion !== analysis.resultVersion &&
@@ -166,7 +167,7 @@ function validatePersonalPriority(
     !value ||
     value.schemaVersion !== 'personal-relative-priority-view-v1' ||
     value.roundId !== result.id ||
-    value.cutoff !== result.dataAsOf ||
+    !sameBriefingInstant(value.cutoff, result.dataAsOf) ||
     !value.resultVersion ||
     !Array.isArray(value.companyIds) ||
     !Array.isArray(value.items) ||
@@ -225,7 +226,7 @@ function validatePersonalPriority(
               (analysis) =>
                 !analysis ||
                 analysis.roundId !== result.id ||
-                analysis.cutoff !== result.dataAsOf ||
+                !sameBriefingInstant(analysis.cutoff, result.dataAsOf) ||
                 !validV3Basis(
                   analysis,
                   item.issueId,

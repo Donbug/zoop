@@ -338,3 +338,10 @@ test('preserves the pre-selection summary separately from personal issue judgmen
   );
   expect(details.open).toBe(true);
 });
+
+test('accepts the same personal cutoff when serialized in UTC', () => {
+  const v = priority();
+  const result = response(v);
+  result.dataAsOf = '2026-11-02T08:30:00Z';
+  expect(personalPriorityOf(result)).toBe(v);
+});

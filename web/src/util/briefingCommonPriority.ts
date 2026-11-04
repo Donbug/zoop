@@ -1,3 +1,4 @@
+import { sameBriefingInstant } from './briefingTime';
 import type { BriefingResponse } from '@/types/briefing';
 import { safeArticleUrl } from '@/components/graph/event-format';
 import type { BriefingBusinessAnalysis } from './briefingPersonalPriority';
@@ -64,7 +65,7 @@ function validateCommonPriority(
     !value ||
     value.schemaVersion !== 'common-relative-priority-view-v1' ||
     value.roundId !== result.id ||
-    value.cutoff !== result.dataAsOf ||
+    !sameBriefingInstant(value.cutoff, result.dataAsOf) ||
     !value.resultVersion ||
     !Array.isArray(value.items) ||
     value.items.length > 3 ||
@@ -134,7 +135,7 @@ function validateCommonPriority(
           companyIds.has(a.companyId) ||
           !item.companies.some((c) => c.companyId === a.companyId) ||
           a.roundId !== value.roundId ||
-          a.cutoff !== value.cutoff ||
+          !sameBriefingInstant(a.cutoff, value.cutoff) ||
           a.resultVersion !== item.analysisResultVersion ||
           a.verificationMode !== 'separate_request_same_model' ||
           !['positive', 'negative', 'mixed', 'watch'].includes(a.direction) ||
