@@ -41,7 +41,11 @@ def main():
     os.environ.update({'ZOOP_STATE_DIR':'/tmp/zoop-unused-app-state','ZOOP_AI_WORKER_STATE_DIR':'/tmp/zoop-unused-ai-worker-state'})
     if os.environ.get('BRIEFING_AUTO_CHAIN_ENABLED')=='true':
         import briefing_auto_chain
-        cfg.update({'autoChain':briefing_auto_chain.VERSION,'priorityContract':'priority-business-producer-v1','nativeCallLimit':6,'additiveGraphAllowed':os.environ.get('BRIEFING_SERVER_ADDITIVE_GRAPH_ALLOWED')=='true'})
+        cfg.update({'autoChain':briefing_auto_chain.VERSION,'priorityContract':'priority-business-producer-v1','nativeCallLimit':6,'additiveGraphAllowed':os.environ.get('BRIEFING_SERVER_ADDITIVE_GRAPH_ALLOWED')=='true',
+            'samsungNewsroomEnabled':os.environ.get('BRIEFING_SAMSUNG_NEWSROOM_ENABLED')=='true'})
+        if cfg['samsungNewsroomEnabled']:
+            cfg['sourceAuthorizationRef']=os.environ['BRIEFING_SOURCE_AUTHORIZATION_REF']
+            if not cfg['sourceAuthorizationRef'].strip():raise ValueError('explicit_company_source_authorization_required')
         if not (temp/'verifier-key').exists():raise ValueError('native_verifier_required')
         cfg['originalSourceAuthority']=os.environ['BRIEFING_ORIGINAL_SOURCE_AUTHORITY']
         cfg['originalReadGrants']=os.environ['BRIEFING_ORIGINAL_READ_GRANTS']

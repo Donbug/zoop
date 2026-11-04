@@ -20,7 +20,11 @@
 
 공통 분석은 회차당 한 번 생성하고 개인화는 같은 회차·이슈·입력 SHA의 검증 결과를 재사용한다. 새 분석이 필요한 이슈만 추가 호출하며 아래 회차/일 예산을 **모든 회원과 공통 작업이 공유**한다. 계정별로 예산을 새로 만들지 않는다. 예산이 부족하면 보류하며 근거나 검증을 생략해서 채우지 않는다.
 
-현재 수집 범위는 Korea 정책뉴스/보도자료의 기사별 KOGL1 **텍스트**다. 두 목록 각 1페이지, 최대 50 HTTP 요청·30개 문서·60MB·300초이며, 종목 목록과 관련된 1개 문서만 native 처리한다. 처리 완료·전송 불명확 항목은 자동 재시도하지 않는다. 이미지·첨부·제3자 저작물·권한 미확인 뉴스룸 기사는 제외한다. 부분 수집을 시장 전체로 표시하거나 입력 부족을 ‘새 소식 없음’으로 발행하지 않는다. 범위 확대는 별도 자료·예산 검토가 필요하다.
+Korea 정책뉴스·보도자료·해명자료의 기사별 KOGL1 **텍스트**를 최대 6페이지·100 HTTP 요청·60개 문서·100MB·360초 안에서 수집한다. 서로 다른 목록의 기사 번호 크기로 중요도를 정하지 않는다. 기업이 제목의 실제 계약·투자·실적·공급·제품·규제 사건에 직접 등장하는지와 사업 행위가 같은 문맥에 있는지를 **입력 검토 순서**에만 사용한다. 중요도·긍부정·선정 여부는 기존 native/독립 검증을 통과해야 한다. 회사명이 QR 도구나 공유 기능으로만 등장한 자료가 실제 사업 발표보다 먼저 처리되지 않게 한다. 짧은 원문이라는 이유만으로 배제하지 않는다.
+
+`BRIEFING_SAMSUNG_NEWSROOM_ENABLED=true`와 별도 `BRIEFING_SOURCE_AUTHORIZATION_REF`가 있으면 삼성전자 한국 뉴스룸의 **직접 제작 텍스트**도 검토한다. [공식 콘텐츠 이용 안내](https://news.samsung.com/kr/%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90-%EB%89%B4%EC%8A%A4%EB%A3%B8-%EC%BD%98%ED%85%90%EC%B8%A0-%EC%9D%B4%EC%9A%A9%EC%97%90-%EB%8C%80%ED%95%9C-%EC%95%88%EB%82%B4)를 실제로 확인하고 RSS의 자체 작성자와 기사 byline을 검사한다. 외부 기고·이미지·첨부는 사용하지 않는다. RSS 날짜는 탐색 순서만 정하며, 게시 시각·발행기관·본문은 실제 기사 응답에서 확인한다. 한 feed의 최근 후보 최대3개를 검토해 최대2개를 native 수집·정제하고 전체 입력 후보와 함께 정렬한다. 알 수 없는 게시 시각·미래 게시 시각·회차 밖 시각·정책 변경·접근 거부는 그대로 제외한다. 원문과 인용은 변경하지 않으며 생성 분석은 별도 결과다. 다른 기업 RSS가 접근 가능하다는 이유만으로 처리·공개 권한을 부여하지 않는다.
+
+회차당 native 처리 대상은 여전히 1개 문서이고 공유 16회 상한은 유지한다. 처리 완료뿐 아니라 판단 보류·전송 불명확한 native 준비도 원문 버전 단위로 자동 재전송하지 않는다. 부분 수집을 시장 전체로 표시하거나 입력 부족을 ‘새 소식 없음’으로 발행하지 않는다.
 
 ## 비활성 배포 준비
 
@@ -38,8 +42,11 @@
 | `OPENAI_API_KEY`, `TYPESAFE_API_KEY` | Secret 주입 후 임시 0600 파일로 이동. 이미지·EFS에 키 기록 금지 |
 | `ZOOP_BRIEFING_PERSONAL_SCHEDULER_MEMBER_IDS` | 개인화 자동화 허용 ID 목록. 기본 빈 값. API/worker/selected 승인 파일이 동일해야 함 |
 | `ZOOP_BRIEFING_SELECTED_GENERATION_ENABLED` | 별도 승인 후 필요한 개인화 추가 분석만 허용. 기본 false이며 공유 예산은 유지 |
+| `BRIEFING_SAMSUNG_NEWSROOM_ENABLED`, `BRIEFING_SOURCE_AUTHORIZATION_REF` | 기본 비활성. 직접 제작 텍스트·정책·작성자 검사를 통과한 자료만 추가. 개인화 허용 목록·모델 예산을 확대하지 않음 |
 
 설정 검토 후 `--initialize-authority`는 **새 소유 폴더만** 초기화한다. 새 read grant ID는 `briefing-kogl1-auto-v1`로 분리해 종전 `briefing-kogl1-live`도 원래 권한과 함께 보존한다. API의 `ZOOP_DOCUMENT_READ_INGESTION_SOURCES`는 그 폴더의 `serving-delegates.json`, `ZOOP_DOCUMENT_READ_GRANTS`는 `serving-grants.json`, artifact root는 기존 shared artifact root를 가리킨다. `zoop-grant-authority-delegates-1`은 기존 원본과 새 `grants.json`에 위임한다. 철회는 즉시 반영되고 중복 소유·중첩 delegate·읽기 실패는 차단된다. API/worker에는 이 reader가 포함된 동일 검토 버전이 필요하다.
+
+삼성 출처를 추가할 때는 worker 소유의 flat grant 파일에 새 grant ID만 원자적으로 추가한다. 기존 grant의 값이 다르면 덮어쓰지 않고 중단한다. 기존 정책·폐기·철회 기록은 유지한다. API가 새 source registry/근거를 읽으려면 worker의 전용 상태 EFS Access Point를 **읽기 전용**으로 연결해야 한다. API 역할에는 해당 Access Point의 `ClientMount`만 허용하고 `ClientWrite`를 추가하지 않는다. 다른 볼륨·이미지·환경변수·기존 IAM 정책을 유지하며, 실제 읽기 성공과 빈 probe 파일 쓰기 거부까지 확인한다. provider key/DB 자격 증명은 계속 `/tmp`에만 있어 이 마운트로 공유하지 않는다.
 
 새 migration은 추가하지 않으며 선행 PR과 최신 main의 migration이 필요하다. API/Web과 전용 worker는 다른 배포 대상이다. main의 자동 API 배포와 전용 worker·권한·스케줄러 활성화를 구분한다. 이 작업은 실제 배포나 활성화를 수행하지 않는다.
 

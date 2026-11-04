@@ -14,6 +14,31 @@ from briefing_usage import CommandPipe,UsageSession,write_once
 b=server.b
 require=server.require
 SCHEMA='briefing-native-intake-v1'
+INPUT_PRIORITY='briefing-source-priority-v2'
+BUSINESS_ACTION=re.compile(r'계약|수주|투자|인수|합병|매출|영업이익|손실|실적|공급|생산|양산|공장|출시|허가|승인|규제|제재|소송|리콜|가동.{0,8}중단|증자|배당|자사주|납품|도입|철회|취소|감산|증설|contract|revenue|earnings|investment|acqui|factory|production|launch|approval|recall|layoff',re.I)
+
+def source_priority(title,text,companies,matches):
+    """Input preparation order, never a business-importance or sentiment verdict."""
+    relevant=[c for c in companies if c['companyId'] in matches]
+    head=source_matches(title,relevant)
+    clauses=[p for p in re.split(r'[\n.!?。]+',text) if BUSINESS_ACTION.search(p)
+             and source_matches(p,relevant)]
+    score=(int(bool(head) and bool(BUSINESS_ACTION.search(title))),min(len(clauses),3),int(bool(head)))
+    return {'version':INPUT_PRIORITY,'rank':list(score),'headlineCompanyIds':head,
+            'businessClauseCount':len(clauses),'meaning':'preparation relevance only; native and independent verification still required'}
+
+def source_rank(entry):
+    row,_,_,_=entry
+    return (*row['inputPriority']['rank'],row['candidate']['publicationDay'],row['candidate']['url'])
+
+def attempted_documents(base):
+    processed=set()
+    for ready_path in base.glob('*/*-native-v2/ready.json'):
+        ready=json.loads(ready_path.read_bytes());processed.add((ready['documentId'],ready['documentVersion']))
+    for selected_path in base.glob('*/selected-source.json'):
+        if any(selected_path.parent.glob('*-native-v2/native.started.json')):
+            prior=json.loads(selected_path.read_bytes());processed.add((prior['documentId'],prior['documentVersion']))
+    return processed
 
 def atomic(path,value):
     path.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
@@ -68,10 +93,11 @@ def collect(cfg,round,root):
         config={'schemaVersion':'zoop-korea-corpus-1','planId':round['id']+'-sources-v1','stateDir':str(root/'collection'),
             'fromDay':str(start),'throughDay':str(until),'listingOrigin':'https://www.korea.kr','articleOrigin':'https://m.korea.kr',
             'exactHosts':['www.korea.kr','m.korea.kr'],
-            'channels':[{'name':'policy-news','maxPages':1,'maxDocuments':10},{'name':'press-release','maxPages':1,'maxDocuments':20}],
-            'maxListingPages':2,'maxCandidates':60,'maxDocuments':30,
+            'channels':[{'name':'policy-news','maxPages':2,'maxDocuments':20},{'name':'press-release','maxPages':3,'maxDocuments':35},
+                        {'name':'clarifications','maxPages':1,'maxDocuments':5}],
+            'maxListingPages':6,'maxCandidates':120,'maxDocuments':60,
             'policy':{'schemaVersion':'zoop-collection-policy-1','userAgent':'ZoopTextCorpus/1.0','timeoutSeconds':30,
-                'maxTotalSeconds':300,'maxRedirects':0,'maxRequests':50,'maxResponseBytes':5000000,'maxTotalBytes':60000000,
+                'maxTotalSeconds':360,'maxRedirects':0,'maxRequests':100,'maxResponseBytes':5000000,'maxTotalBytes':100000000,
                 'minIntervalSeconds':2.0,'allowedMediaTypes':['text/html'],'syntheticLoopback':False},
             'grant':{'grantId':round['id']+'-acquisition','revision':'kogl1-text-v1','sourceId':'korea-portal','enabled':True,
                 'rights':'known','allowedOperations':['read','store','quote-display'],'recipients':[],'purposes':[],
@@ -88,9 +114,8 @@ def collect(cfg,round,root):
     cohorts=[(root,result)]
     for package in sorted(base.glob('*/collection-result.json')):
         if package.parent!=root and not package.is_symlink():cohorts.append((package.parent,json.loads(package.read_bytes())))
-    processed=set()
-    for ready_path in base.glob('*/*-native-v2/ready.json'):
-        ready=json.loads(ready_path.read_bytes());processed.add((ready['documentId'],ready['documentVersion']))
+    # A withheld or unknown paid preparation is not a fresh source to send again.
+    processed=attempted_documents(base)
     seen=set()
     for collection_root,cohort in cohorts:
       for row in cohort['documents']:
@@ -102,16 +127,32 @@ def collect(cfg,round,root):
         native=collection_root/'collection/native/collections'/('item-'+row['candidate']['newsId'])
         raw=(native/'bodies'/(row['nativeBodySha256']+'.bin')).read_bytes()
         require(b.digest(raw)==row['nativeBodySha256'],'native_body_pin')
-        matches=source_matches(relevance_text(raw),companies)
-        if matches:eligible.append((row,exported,matches,collection_root))
-    eligible.sort(key=lambda x:(x[0]['candidate']['publicationDay'],x[0]['candidate']['newsId']),reverse=True)
+        text=relevance_text(raw);matches=source_matches(text,companies)
+        if matches:
+            row={**row,'inputPriority':source_priority(row['candidate']['title'],text,companies,matches)}
+            eligible.append((row,exported,matches,collection_root))
+    official_coverage={'enabled':cfg.get('samsungNewsroomEnabled') is True,'retained':0,'excludedOrUnavailable':0}
+    if cfg.get('samsungNewsroomEnabled') is True:
+        import briefing_samsung_intake as samsung
+        official=samsung.collect(cfg,round,root);official_coverage['retained']=len(official)
+        official_coverage['excludedOrUnavailable']=len(json.loads((root/'samsung-newsroom/result.json').read_bytes())['errors'])
+        for row,exported,selected_root in official:
+            identity=(row['documentId'],row['documentVersion'])
+            if identity in seen or identity in processed:continue
+            seen.add(identity)
+            text=exported['document']['text'];matches=source_matches(text,companies)
+            if matches:
+                row={**row,'inputPriority':source_priority(row['candidate']['title'],text,companies,matches)}
+                eligible.append((row,exported,matches,selected_root))
+    eligible.sort(key=source_rank,reverse=True)
     require(bool(eligible),'no_current_company_source')
     # One source set leaves at least four physical calls for briefing generation/verification and bounded repairs.
     chosen,exported,matches,selected_root=eligible[0]
     write_once(root/'selected-source.json',{'candidate':chosen['candidate'],'documentId':exported['document']['documentId'],
         'documentVersion':exported['document']['documentVersion'],'matchedCompanyIds':matches,
         'nativeBodySha256':chosen['nativeBodySha256'],'nativeReceiptSha256':chosen['nativeReceiptSha256'],'collectionRoot':str(selected_root),
-        'coverage':{'complete':False,'candidateDocuments':len(eligible),'selectedDocuments':1,'collection':result['counts']}})
+        'inputPriority':chosen['inputPriority'],
+        'coverage':{'complete':False,'candidateDocuments':len(eligible),'selectedDocuments':1,'collection':result['counts'],'samsungNewsroom':official_coverage}})
     return chosen,exported,companies,selected_root
 
 class NativeTransport(httpx.BaseTransport):
@@ -260,18 +301,18 @@ def prepare(cfg,round,observer=None):
     observer('collection','completed')
     observer('native','started')
     runtime_type=configure_runtime(cfg,root,round['windowTo']);pure=runtime_type.from_env()
-    original=selected_collection/'collection/items'/chosen['candidate']['newsId']
+    original=Path(chosen['nativeItemRoot']) if chosen.get('nativeItemRoot') else selected_collection/'collection/items'/chosen['candidate']['newsId']
     sources=Path(cfg['authorityRoot'])/('source-'+root.name+'.json');sources.parent.mkdir(mode=0o700,parents=True,exist_ok=True);current=json.loads((original/'sources.json').read_bytes())
-    grant=current['sources'][0]['grant'];grant.update({'grantId':root.name+'-processing','revision':'kogl1-prospective-v2',
+    grant=current['sources'][0]['grant'];grant.update({'grantId':root.name+'-processing','revision':'first-party-prospective-v1' if chosen.get('sourceId') else 'kogl1-prospective-v2',
         'allowedOperations':['read','store','quote-display','model-send'],
         'purposes':[pure.purpose(stage) for stage in ('extract','compare','topic','relation','impact','verify-relation','verify-impact')],
         'recipients':sorted({pure.recipient(stage) for stage in ('extract','compare','topic','relation','impact','verify-relation','verify-impact')}),
-        'evidence':grant['evidence']+['Prospective source processing for the user-authorized latest briefing; exact article badge, body and receipt pinned in selected-source.json.']})
+        'evidence':grant['evidence']+['Prospective source processing for the user-authorized latest briefing; exact article rights, body and receipt pinned in selected-source.json.']})
     write_once(sources,current)
     ingestion=original/'ingestion';authority=Authority(sources)
     def current_rights():
         require(datetime.now(timezone.utc)<datetime.fromisoformat(round['windowTo']).astimezone(timezone.utc)-timedelta(seconds=190),'native_dispatch_deadline')
-        authority.check('korea-portal',chosen['candidate']['newsId'],('read','store','quote-display','model-send'))
+        authority.check(chosen.get('sourceId','korea-portal'),chosen['candidate']['newsId'],('read','store','quote-display','model-send'))
         require(json.loads((original/'rights.json').read_bytes())==chosen['rights'],'rights_pin')
     # Prospective grant is read anew by native engines; no acquisition registry or old source grant is edited.
     source=extraction.Sources(ingestion,authority)
@@ -311,13 +352,26 @@ def prepare(cfg,round,observer=None):
             manifest,envelope=handoff(root,sources,ingestion,exported,s2,s3,companies)
             result={'schemaVersion':SCHEMA,'root':str(root),'sourceFile':str(sources),'ingestionState':str(ingestion),
                 'observation':selector,'manifest':manifest,'handoffReceipt':envelope.get('receipt'),
-                'sourceId':'korea-portal','documentId':exported['document']['documentId'],'documentVersion':exported['document']['documentVersion'],
+                'sourceId':chosen.get('sourceId','korea-portal'),'documentId':exported['document']['documentId'],'documentVersion':exported['document']['documentVersion'],
                 'bodySha256':b.digest(exported['document']['text'].encode()),'readyAt':b.now()}
             write_once(root/'ready.json',result);observer('native','completed');return result
     finally:
         if transport:transport.shutdown()
         os.environ.pop('ZOOP_AI_API_KEY',None);os.environ.pop('TYPESAFE_API_KEY',None)
         pipe.close()
+
+def ensure_grants(path,additions):
+    """Append owned grants without changing or copying any existing grant's values."""
+    with path.with_name('.grants-update.lock').open('a+') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        if not path.exists():write_once(path,{'schemaVersion':'zoop-ai-s1-1','grants':additions});return
+        value=json.loads(path.read_bytes());require(value.get('schemaVersion')=='zoop-ai-s1-1','grant_schema')
+        old={g['grantId']:g for g in value['grants']};require(len(old)==len(value['grants']),'duplicate_grant')
+        fresh=[]
+        for grant in additions:
+            require(grant['grantId'] not in old or old[grant['grantId']]==grant,'existing_grant_values_changed')
+            if grant['grantId'] not in old:fresh.append(grant)
+        if fresh:atomic(path,{**value,'grants':[*value['grants'],*fresh]})
 
 def initialize_authority(cfg):
     root=Path(cfg['authorityRoot']);root.mkdir(mode=0o700,parents=True,exist_ok=True)
@@ -326,13 +380,21 @@ def initialize_authority(cfg):
         'delegates':[cfg['originalSourceAuthority'],str(root/'new-authorities.json')]})
     if not (root/'new-authorities.json').exists():
         write_once(root/'new-authorities.json',{'schemaVersion':'zoop-ingestion-s2-1','revision':'empty-before-first-live-input','sources':[]})
-    write_once(root/'grants.json',{'schemaVersion':'zoop-ai-s1-1','grants':[{
+    additions=[{
         'grantId':'briefing-kogl1-auto-v1' if auto else 'briefing-kogl1-live',
         'revision':'prospective-20261104-auto-v1' if auto else 'prospective-20261103-v1','sourceId':'korea-portal','enabled':True,'rights':'known',
         'allowedOperations':['read','store','quote-display','model-send'],'recipients':['openai'],
         'purposes':['briefing-outlook','semantic-verification'],'evidence':['https://www.korea.kr/guide/copyRight.do',
             'Article-level KOGL1 text badge and exact native source/body scope required before every model send. '+cfg['authorizationRef']],
-        'expiresAt':None}]})
+        'expiresAt':None}]
+    if cfg.get('samsungNewsroomEnabled') is True:
+        from briefing_samsung_intake import SOURCE,NOTICE
+        additions.append({'grantId':'briefing-samsung-auto-v1','revision':'publisher-first-party-text-1',
+            'sourceId':SOURCE,'enabled':True,'rights':'known','allowedOperations':['read','store','quote-display','model-send'],
+            'recipients':['openai'],'purposes':['briefing-outlook','semantic-verification'],
+            'evidence':[NOTICE,'In-house article text only, checked creator/byline and immutable literal evidence; no images, attachments or external authors. '+cfg.get('sourceAuthorizationRef',cfg['authorizationRef'])],
+            'expiresAt':None})
+    ensure_grants(root/'grants.json',additions)
     if cfg.get('originalReadGrants'):
         write_once(root/'serving-grants.json',{'schemaVersion':'zoop-grant-authority-delegates-1','delegates':[cfg['originalReadGrants'],str(root/'grants.json')]})
     if not (root/'model-scope.json').exists():
