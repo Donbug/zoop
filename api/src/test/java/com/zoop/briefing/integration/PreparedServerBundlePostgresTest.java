@@ -42,7 +42,11 @@ class PreparedServerBundlePostgresTest {
         String base=System.getenv("DB_URL");
         if(base==null || !base.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/zoop_briefing_replay_258_test"))
             throw new IllegalArgumentException("only the task-owned disposable loopback DB is allowed");
-        return base+"?currentSchema="+SCHEMA;
+        try(var c=DriverManager.getConnection(base,user(),password());var s=c.createStatement();
+                var r=s.executeQuery("SELECT string_agg(DISTINCT n.nspname,',') FROM pg_extension e JOIN pg_namespace n ON n.oid=e.extnamespace")) {
+            r.next();String extensions=r.getString(1);
+            return base+"?currentSchema="+SCHEMA+",public"+(extensions==null?"":","+extensions);
+        }catch(java.sql.SQLException error){throw new IllegalStateException("test_database_extensions_unavailable",error);}
     }
     private static String user(){return System.getenv().getOrDefault("DB_USERNAME","briefing_test");}
     private static String password(){return System.getenv().getOrDefault("DB_PASSWORD","");}

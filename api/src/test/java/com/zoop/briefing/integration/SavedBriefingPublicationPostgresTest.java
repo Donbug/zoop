@@ -45,7 +45,15 @@ class SavedBriefingPublicationPostgresTest {
  @LocalServerPort int port;
  Map<String,List<JsonNode>> tables;ObjectNode manifest;String pref;String beforeSettings;String beforeFeedback;
  static Path root(){try{Path p=Files.createTempDirectory("saved-briefing-test-").toRealPath();Files.setPosixFilePermissions(p,java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));try(var files=ArtifactFileStore.at(p).open()){}Files.writeString(p.resolve("sources.json"),"{}");Files.writeString(p.resolve("grants.json"),"{}");return p;}catch(Exception e){throw new IllegalStateException(e);}}
- static String url(){return System.getenv("DB_URL")+(System.getenv("DB_URL").contains("?")?"&":"?")+"currentSchema="+SCHEMA;}
+ static String url(){
+  String base=System.getenv("DB_URL");var address=URI.create(base.substring(5));
+  if(!List.of("localhost","127.0.0.1","[::1]").contains(address.getHost())||!address.getPath().contains("test"))throw new IllegalArgumentException("disposable_local_database_required");
+  // CI has already installed pg_trgm while testing the public schema. A new
+  // schema must see its existing operator class without relocating the extension.
+  try(var c=DriverManager.getConnection(base,user(),password());var s=c.createStatement();var r=s.executeQuery("SELECT string_agg(DISTINCT n.nspname,',') FROM pg_extension e JOIN pg_namespace n ON n.oid=e.extnamespace")){
+   r.next();String extensions=r.getString(1);return base+(base.contains("?")?"&":"?")+"currentSchema="+SCHEMA+",public"+(extensions==null?"":","+extensions);
+  }catch(java.sql.SQLException error){throw new IllegalStateException("test_database_extensions_unavailable",error);}
+ }
  static String user(){return System.getenv().getOrDefault("DB_USERNAME","briefing_test");}
  static String password(){return System.getenv().getOrDefault("DB_PASSWORD","");}
  @DynamicPropertySource static void properties(DynamicPropertyRegistry p){

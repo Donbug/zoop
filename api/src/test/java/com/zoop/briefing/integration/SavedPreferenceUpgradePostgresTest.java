@@ -20,8 +20,10 @@ class SavedPreferenceUpgradePostgresTest {
         String url=System.getenv("DB_URL");var address=java.net.URI.create(url.substring(5));
         assertTrue(List.of("localhost","127.0.0.1","[::1]").contains(address.getHost()));assertTrue(address.getPath().contains("test"));
         String schema="demo_upgrade_"+UUID.randomUUID().toString().replace("-","");
-        var source=new DriverManagerDataSource(url+(url.contains("?")?"&":"?")+"currentSchema="+schema,
-            System.getenv().getOrDefault("DB_USERNAME","briefing_test"),System.getenv().getOrDefault("DB_PASSWORD",""));
+        String username=System.getenv().getOrDefault("DB_USERNAME","briefing_test"),password=System.getenv().getOrDefault("DB_PASSWORD","");
+        var owner=new JdbcTemplate(new DriverManagerDataSource(url,username,password));
+        String extensions=owner.queryForObject("SELECT string_agg(DISTINCT n.nspname,',') FROM pg_extension e JOIN pg_namespace n ON n.oid=e.extnamespace",String.class);
+        var source=new DriverManagerDataSource(url+(url.contains("?")?"&":"?")+"currentSchema="+schema+",public"+(extensions==null?"":","+extensions),username,password);
         var jdbc=new JdbcTemplate(source);
         try {
             Flyway.configure().dataSource(source).schemas(schema).defaultSchema(schema).outOfOrder(false).target("20261103110000").load().migrate();
