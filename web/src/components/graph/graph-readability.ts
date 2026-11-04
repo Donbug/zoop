@@ -30,7 +30,10 @@ export type LabelCandidate = {
   evidence: number;
   /** Never culled: titles connected to the hovered or selected node (D-GRP-01, 2026-11-04). */
   keep?: boolean;
+  /** Other sides the title may move to when its own box overlaps, in order of preference. */
+  alternatives?: { placement: LabelPlacement; box: Rect }[];
 };
+export type LabelPlacement = 'top' | 'bottom' | 'left' | 'right';
 
 /** The hovered/selected nodes and every node one edge away from them. */
 function anchorNeighbors(base: GraphData, context: ReadingContext) {
@@ -50,6 +53,8 @@ function anchorNeighbors(base: GraphData, context: ReadingContext) {
 export function culledLabels(
   candidates: LabelCandidate[],
   bodies: { id: string; box: Rect }[],
+  /** Filled with the side chosen for each title that has alternatives. */
+  placements?: Map<string, LabelPlacement>,
 ) {
   const cells = new Map<string, { id: string; box: Rect }[]>();
   const keys = (r: Rect) => {
@@ -81,20 +86,32 @@ export function culledLabels(
       b.evidence - a.evidence ||
       a.id.localeCompare(b.id),
   )) {
-    if (
-      item.priority > 0 &&
-      !item.keep &&
-      keys(item.box).some((key) =>
+    const free = (box: Rect) =>
+      !keys(box).some((key) =>
         cells
           .get(key)
           ?.some(
-            (other) =>
-              other.id !== item.id && intersects(item.box, other.box, 2),
+            (other) => other.id !== item.id && intersects(box, other.box, 2),
           ),
-      )
-    )
-      hidden.add(item.id);
-    else add(item);
+      );
+    if (item.priority === 0) {
+      add(item);
+      continue;
+    }
+    // D-GRP-01 (2026-11-04 review): an overlapping issue title first tries the other sides of
+    // its diamond, so titles shown on hover sit side by side instead of on top of each other.
+    const options = item.alternatives ?? [];
+    const fit = options.find((option) => free(option.box));
+    if (fit) {
+      placements?.set(item.id, fit.placement);
+      add({ id: item.id, box: fit.box });
+    } else {
+      // Nothing fits: the title goes back to its first side (shown anyway when kept).
+      const box = options[0]?.box ?? item.box;
+      if (options.length) placements?.set(item.id, options[0].placement);
+      if (item.keep || free(box)) add({ id: item.id, box });
+      else hidden.add(item.id);
+    }
   }
   return hidden;
 }
@@ -203,10 +220,22 @@ export function readingStyles(
   };
 }
 
+/** G6 label style for an issue title on one side of its diamond (top is the default). */
+const placementStyle = (side: LabelPlacement) => ({
+  labelPlacement: side,
+  labelOffsetY: side === 'top' ? -5 : side === 'bottom' ? 5 : 0,
+  labelOffsetX: side === 'left' ? -5 : side === 'right' ? 5 : 0,
+});
+
 /** Label styles last pushed per graph; a new base (setData) starts over. */
 const appliedLabels = new WeakMap<
   Graph,
-  { base: GraphData; styles: Map<string, string> }
+  {
+    base: GraphData;
+    styles: Map<string, string>;
+    /** Issue titles moved off their default top side to avoid an overlap. */
+    placements: Map<string, LabelPlacement>;
+  }
 >();
 
 /** Keys readingStyles derives from zoom; other label styles (colours) still come from the new data. */
@@ -296,7 +325,7 @@ export async function applyGraphReading(
   // Hover keeps the zoom, so most label styles are unchanged: only push and redraw the changed ones.
   let applied = appliedLabels.get(graph);
   if (!applied) {
-    applied = { base, styles: new Map() };
+    applied = { base, styles: new Map(), placements: new Map() };
     appliedLabels.set(graph, applied);
   } else if (applied.base !== base) {
     // setData keeps applied label styles on elements that stay (keepAppliedStyles);
@@ -323,6 +352,11 @@ export async function applyGraphReading(
       previous.set(id, key);
       return [{ id, style }];
     });
+  const { placements } = applied;
+  for (const node of styles.nodes ?? []) {
+    const side = placements.get(String(node.id));
+    if (side) node.style = { ...node.style, ...placementStyle(side) };
+  }
   const nodeUpdates = changed(styles.nodes, true);
   const edgeUpdates = changed(styles.edges);
   if (nodeUpdates.length) graph.updateNodeData(nodeUpdates);
@@ -427,6 +461,44 @@ export async function applyGraphReading(
   const anchor = base.nodes?.find(
     (n) => n.id === context.anchor || n.id === context.focus,
   );
+  // Screen boxes of an issue title on each side of its diamond; the side it sits on now
+  // keeps its measured box. Top first, then below, then beside (the count badge is top-right).
+  const sides = (
+    node: NonNullable<GraphData['nodes']>[number],
+    box: Rect,
+  ): { placement: LabelPlacement; box: Rect }[] => {
+    const [cx, cy] = graph.getViewportByCanvas([
+      Number(node.style?.x),
+      Number(node.style?.y),
+    ]);
+    if (!Number.isFinite(cx) || !Number.isFinite(cy)) return [];
+    const zoom = context.zoom;
+    const half = (Number(node.style?.size ?? 48) / 2) * zoom;
+    const gap = 5 * zoom;
+    const { width, height } = box;
+    const current = String(node.style?.labelPlacement ?? 'top');
+    const options: { placement: LabelPlacement; box: Rect }[] = [
+      {
+        placement: 'top',
+        box: { x: cx - width / 2, y: cy - half - gap - height, width, height },
+      },
+      {
+        placement: 'bottom',
+        box: { x: cx - width / 2, y: cy + half + gap, width, height },
+      },
+      {
+        placement: 'left',
+        box: { x: cx - half - gap - width, y: cy - height / 2, width, height },
+      },
+      {
+        placement: 'right',
+        box: { x: cx + half + gap, y: cy - height / 2, width, height },
+      },
+    ];
+    return options.map((option) =>
+      option.placement === current ? { ...option, box } : option,
+    );
+  };
   const anchorPoint = anchor
     ? graph.getViewportByCanvas([
         Number(anchor.style?.x),
@@ -488,6 +560,7 @@ export async function applyGraphReading(
       // node stay while the pointer rests there or until the selection is cleared, even if
       // they overlap. Unrelated titles yield to them instead.
       keep: source?.kind === 'issue' && related.has(id),
+      alternatives: source?.kind === 'issue' ? sides(node, box) : undefined,
     });
     labels.set(id, label);
   }
@@ -513,8 +586,25 @@ export async function applyGraphReading(
     });
     labels.set(id, label);
   }
-  const culled = culledLabels(candidates, bodies);
+  const chosen = new Map<string, LabelPlacement>();
+  const culled = culledLabels(candidates, bodies, chosen);
   for (const id of culled) showLabel(labels.get(id), false);
+  // Move titles whose side changed, then hide the culled ones again (a redraw shows them).
+  const moves = candidates.flatMap((candidate) => {
+    if (!candidate.alternatives?.length) return [];
+    const side = chosen.get(candidate.id) ?? 'top';
+    if (side === (placements.get(candidate.id) ?? 'top')) return [];
+    if (side === 'top') placements.delete(candidate.id);
+    else placements.set(candidate.id, side);
+    previous.delete(candidate.id);
+    return [{ id: candidate.id, style: placementStyle(side) }];
+  });
+  if (moves.length) {
+    graph.updateNodeData(moves);
+    await graph.draw();
+    if (graph.destroyed) return;
+    for (const id of culled) showLabel(labels.get(id), false);
+  }
   // D-GRP-01 (2026-11-04 review): a single-company issue whose title does not fit is
   // folded with its line too, so no line ends at an untitled diamond. Shared issues and the
   // selected company's issues keep their diamond and lines (only overlapping titles wait for zoom).

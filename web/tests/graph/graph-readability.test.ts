@@ -480,6 +480,10 @@ test('D-GRP-01 a folded issue takes its evidence badge along and both come back'
       !follows.has(n.id) &&
       summary.incident.get(n.id)?.length === 1,
   );
+  // Every title overlaps (cullingGraph): put every diamond on one spot too, so only a few
+  // titles find a free side and the rest fold.
+  for (const node of base.nodes ?? [])
+    node.style = { ...node.style, x: 45, y: 22 };
   const { graph, visible, room } = cullingGraph();
   await applyGraphReading(graph, base, data, { ...context, zoom: 1 });
   const hidden = singles.filter((n) => !visible(n.id, 'key'));
@@ -492,4 +496,29 @@ test('D-GRP-01 a folded issue takes its evidence badge along and both come back'
     expect(visible(n.id, 'key')).toBe(true);
     expect(visible(n.id, 'badge-0')).toBe(true);
   }
+});
+
+test('D-GRP-01 an overlapping issue title moves to a free side of its diamond', () => {
+  // 2026-11-04 리뷰: 호버로 보인 사건 제목이 겹치면 마름모의 빈 쪽(아래·왼쪽·오른쪽)으로 옮겨요.
+  const top = { x: 0, y: 0, width: 100, height: 20 };
+  const entry = (id: string, alternatives = true) => ({
+    id,
+    box: top,
+    priority: 5,
+    distance: 0,
+    degree: 0,
+    evidence: 0,
+    keep: true,
+    alternatives: alternatives
+      ? [
+          { placement: 'top' as const, box: top },
+          { placement: 'bottom' as const, box: { ...top, y: 60 } },
+        ]
+      : undefined,
+  });
+  const placements = new Map();
+  const hidden = culledLabels([entry('a'), entry('b')], [], placements);
+  expect([...hidden]).toEqual([]);
+  expect(placements.get('a')).toBe('top');
+  expect(placements.get('b')).toBe('bottom');
 });
