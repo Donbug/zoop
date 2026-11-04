@@ -912,6 +912,13 @@ export default function GraphCanvas({
         if (!current.destroyed) setRenderError(true);
       });
   });
+  // D-GRP-01 (2026-11-04): 기억한 카메라 없이 주소의 select로 노드를 고른 채 열면, 전체 맞춤(넓은 지도에서는
+  // 배율 0.07 안팎)에 머물러 고른 노드가 10px 남짓으로 보이고 연결 사건 제목만 겹쳐 보였다.
+  // 이때는 첫 그리기 뒤 더블클릭처럼 고른 노드와 연결 이웃에 맞춘다.
+  const openOnSelection = useEffectEvent(() => {
+    if (selected && data.nodes.some((node) => node.id === selected))
+      pendingNeighborhood.current = selected;
+  });
   /** 키보드 Shift+Enter. 지금 그려지지 않은(접힌) 노드면 먼저 골라 펼치고, 다음 그리기 뒤에 맞춘다. */
   function requestNeighborhood(id: string) {
     const drawn = renderedData.current?.nodes?.some(
@@ -1786,6 +1793,7 @@ export default function GraphCanvas({
           fitPending.current = false;
           defaultZoomPending.current = false;
         }
+        openOnSelection();
       }
       instance.current = graph;
       syncSelection();
