@@ -42,6 +42,13 @@ class SourcePriorityTests(unittest.TestCase):
                 (root/'selected-source.json').write_text(json.dumps({'documentId':state,'documentVersion':'original'}))
                 (native/'native.started.json').write_text('{}')
             self.assertEqual({('withheld','original'),('unknown','original')},n.attempted_documents(base))
+    def test_late_trial_window_does_not_change_next_days_regular_schedule(self):
+        from briefing_server_runtime import publication_schedule
+        r={'date':'2026-11-05','edition':'morning','scheduledAt':'2026-11-05T08:30:00+09:00','windowFrom':'2026-11-04T23:30:00+09:00'}
+        cfg={'schedule':{'morning':'08:30','evening':'17:30','effectiveFrom':'2026-11-05','testEveningAt':'2026-11-04T23:30:00+09:00'}}
+        original=copy.deepcopy(r)
+        self.assertEqual({'morning':'08:30','evening':'17:30','confirmed':True},publication_schedule(r,cfg))
+        self.assertEqual(original,r)
 
 class OfficialFeedTests(unittest.TestCase):
     def test_actual_native_collection_and_ingestion_keep_original_body_clock_and_publisher(self):
