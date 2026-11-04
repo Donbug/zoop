@@ -182,11 +182,11 @@ def test_verification_policy_holds_whatever_is_uncertain():
          "prohibitedAdvice": "no"},
         {"claims": [{"claimId": "s1c0", "support": None, "unsupportedCausality": "no"}],
          "prohibitedAdvice": "no"}]
-    assert verdicts(choice("supported", confidence=0.5), 0.02)[0]["claims"][0]["support"] == "hold"
+    assert verdicts(choice("supported", p=0.14, confidence=0.5), 0.02)[0]["claims"][0]["support"] == "hold"
     assert verdicts(choice("contradicted"), 0.02)[0]["claims"][0]["support"] == "contradicted"
     assert verdicts(choice("insufficient"), 0.02)[0]["claims"][0]["support"] == "hold"
     assert verdicts(choice("supported"), 0.02, 0.95)[0]["claims"][0]["unsupportedCausality"] == "yes"
-    assert verdicts(choice("supported"), 0.02, 0.5)[0]["claims"][0]["unsupportedCausality"] == "hold"
+    assert verdicts(choice("supported"), 0.02, 0.75)[0]["claims"][0]["unsupportedCausality"] == "hold"
     assert verdicts(choice("supported"), 0.95)[0]["prohibitedAdvice"] == "yes"
     assert verdicts(choice("supported"), 0.5)[0]["prohibitedAdvice"] == "hold"
 
@@ -273,7 +273,7 @@ def test_chat_support_uses_the_calibrated_evidence_gate():
     verdict = chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL)
     assert verdict.sections[0].claims[0].support == "supported"
 
-    raw["answers"]["s0c0-support"] = choice("supported", 0.34, 0.09)
+    raw["answers"]["s0c0-support"] = choice("supported", 0.34, 0.04)
     assert chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL).sections[0].claims[0].support == "hold"
 
     raw["answers"]["s0c0-support"] = choice("insufficient", 0.40, 0.80)

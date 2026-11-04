@@ -9,7 +9,7 @@ as reported; the application applies its own thresholds (0.70 take, 0.35 review,
 
 Verification: per claim, a support Choice for grounded sections (`supported` / `contradicted` / `insufficient`) and an
 unsupported-causality Noul, plus a prohibited-advice Noul for every section. The dev-chat evidence gate accepts a supported
-probability >= 0.30 with confidence >= 0.10. Causality is held only above 0.50; prohibited advice keeps the conservative
+probability >= 0.15 with confidence >= 0.05. Causality is held only above 0.75; prohibited advice keeps the conservative
 >= 0.90 / <= 0.10 thresholds.
 """
 from __future__ import annotations
@@ -23,10 +23,10 @@ from .contracts import digest
 
 API = "systemone"
 MODEL = native_jev.MODEL
-ADAPTER_REVISION = "zoop-jev-chat-8"
-CHAT_CHOICE_PROBABILITY = 0.30
-CHAT_CHOICE_CONFIDENCE = 0.10
-CHAT_CAUSALITY_FALSE = 0.50
+ADAPTER_REVISION = "zoop-jev-chat-9"
+CHAT_CHOICE_PROBABILITY = 0.15
+CHAT_CHOICE_CONFIDENCE = 0.05
+CHAT_CAUSALITY_FALSE = 0.75
 QUERY_TYPES = ("Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08")
 
 ROUTER_TASK = ("You classify one requirement of a member's question to ZOOP, a service that maps how listed companies and "

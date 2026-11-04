@@ -565,6 +565,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             var section = sections.get(i);
             var verdict = verdicts.sections().get(i);
             boolean general = "general_knowledge".equals(section.basis());
+            boolean webReported = "web_reported".equals(section.basis());
             List<ChatClaims.Claim> claims = ChatClaims.split(i, section.text());
             boolean scriptedSectionVerdict = verdict.claims().size() == 1 && verdict.claims().getFirst().claimId() == null;
             if (!ADVICE.contains(verdict.prohibitedAdvice())
@@ -587,7 +588,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                         // A concept definition has no evidence claim to bind. The deterministic general-section check
                         // already rejects current facts, figures and advice, so an uncertain ("hold") causality score
                         // must not erase an otherwise valid definition. A definite "yes" remains blocked.
-                        && (general ? !"yes".equals(decision.unsupportedCausality())
+                        // Search snippets establish only what a page reported. An uncertain causal reading must not erase
+                        // that attributed report; a definite unsupported causal assertion remains blocked.
+                        && ((general || webReported) ? !"yes".equals(decision.unsupportedCausality())
                                 : "no".equals(decision.unsupportedCausality()));
                 if (safe) kept.add(claim);
                 else dropped.add(claim.id());
