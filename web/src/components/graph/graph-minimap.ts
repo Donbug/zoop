@@ -1,3 +1,6 @@
+// Shared by the G6 option and its camera-fit adapter (padding on each side).
+export const MINIMAP_PADDING = 10;
+
 type MinimapHost = {
   getPluginInstance: (key: string) => unknown;
   off: (event: string, handler: () => void) => unknown;
@@ -49,8 +52,8 @@ function fitContent(plugin: Overview) {
     ];
     if (
       !values.every(Number.isFinite) ||
-      width <= 20 ||
-      height <= 20 ||
+      width <= MINIMAP_PADDING * 2 ||
+      height <= MINIMAP_PADDING * 2 ||
       max[0] < min[0] ||
       max[1] < min[1]
     )
@@ -61,8 +64,8 @@ function fitContent(plugin: Overview) {
     if (key === previous && camera === previousCamera) return;
     const point = [center[0], center[1], center[2] ?? 0];
     const zoom = Math.min(
-      (width - 20) / Math.max(1, max[0] - min[0]),
-      (height - 20) / Math.max(1, max[1] - min[1]),
+      (width - MINIMAP_PADDING * 2) / Math.max(1, max[0] - min[0]),
+      (height - MINIMAP_PADDING * 2) / Math.max(1, max[1] - min[1]),
     );
     camera.gotoLandmark(
       camera.createLandmark(`graph-overview-content:${key}`, {

@@ -38,7 +38,7 @@ import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
 import { applyGraphReading, keepAppliedStyles } from './graph-readability';
 import { applyMapDimming, restoreMapDimming } from './graph-dimming';
-import { configureMinimap } from './graph-minimap';
+import { configureMinimap, MINIMAP_PADDING } from './graph-minimap';
 import { graphText, loadGraphFonts } from './graph-fonts';
 import {
   cameraMotion,
@@ -1164,7 +1164,7 @@ export default function GraphCanvas({
                   type: 'minimap',
                   key: 'graph-overview',
                   size: [192, 128],
-                  padding: 10,
+                  padding: MINIMAP_PADDING,
                   position: 'right-bottom',
                   // G6 passes this value to classList.add: it must be one token.
                   className: 'graph-overview',
@@ -1671,7 +1671,7 @@ export default function GraphCanvas({
   }
   return (
     <div
-      className="relationship-canvas [&_.graph-overview]:rounded-panel [&_.graph-overview]:border [&_.graph-overview]:border-panel-line [&_.graph-overview]:bg-zoop-paper [&_.graph-overview]:shadow-lg [&_.graph-overview]:bottom-16! [&_.graph-overview]:top-auto!"
+      className="relationship-canvas [&_.graph-overview]:rounded-panel [&_.graph-overview]:border [&_.graph-overview]:border-panel-line! [&_.graph-overview]:bg-zoop-paper! [&_.graph-overview]:shadow-lg [&_.graph-overview]:bottom-16! [&_.graph-overview]:top-auto!"
       data-testid="graph-canvas"
       onWheel={(event) => {
         if (tutorialPhase === 'zoom' && event.deltaY !== 0)
@@ -1682,7 +1682,7 @@ export default function GraphCanvas({
         ref={container}
         // G6 writes an inline position: relative on its container, which would size the host by
         // its own canvas. Keep it pinned to the map surface so each new graph measures full size.
-        className={`relationship-g6 absolute! inset-0 [&_.graph-overview]:bg-zoop-paper! [&_.graph-overview]:border-zoop-line! ${(tutorialLocked && !tutorialCameraEnabled) || tutorialPhase ? 'pointer-events-none' : ''} ${tutorialPhase ? 'opacity-35' : ''}`}
+        className={`relationship-g6 absolute! inset-0 ${(tutorialLocked && !tutorialCameraEnabled) || tutorialPhase ? 'pointer-events-none' : ''} ${tutorialPhase ? 'opacity-35' : ''}`}
         data-tutorial-action={tutorialCameraEnabled ? 'move' : undefined}
         aria-disabled={Boolean(tutorialPhase)}
         role="img"

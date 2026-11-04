@@ -1112,7 +1112,11 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     rerender(<GraphCanvas data={data} />);
     await waitFor(() =>
       expect(canvas.setPlugins).toHaveBeenLastCalledWith([
-        expect.objectContaining({ type: 'minimap', size: [192, 128] }),
+        expect.objectContaining({
+          type: 'minimap',
+          size: [192, 128],
+          padding: 10,
+        }),
       ]),
     );
     Object.defineProperty(host, 'clientWidth', {
