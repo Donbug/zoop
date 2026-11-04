@@ -284,31 +284,14 @@ class ImagePublicationWorkflowTests(unittest.TestCase):
                 self.assertLess(steps.index(checkout), steps.index(gate))
                 credentials = [step for step in steps if step.get("uses", "").startswith("aws-actions/configure-aws-credentials@")]
                 self.assertEqual(len(credentials), 2)
-                operation_context = "env.DEPLOY_OPERATION" if kind == "api" else "inputs.operation"
                 for step, operation_name, role in zip(credentials, ("stage-image", "deploy"),
                                                      ("AWS_IMAGE_STAGE_ROLE_ARN", "AWS_DEPLOY_ROLE_ARN")):
                     self.assertLess(steps.index(gate), steps.index(step))
-                    self.assertEqual(step["if"], "${{ " + operation_context + " == '" + operation_name + "' }}")
+                    self.assertEqual(step["if"], "${{ inputs.operation == '" + operation_name + "' }}")
                     self.assertEqual(step["with"]["role-to-assume"], "${{ vars." + role + " }}")
                 for step in steps:
                     if "task-definition" in step.get("uses", "") or step.get("name") == "Download current task definition":
-                        self.assertEqual(step["if"], "${{ " + operation_context + " == 'deploy' }}")
-
-    def test_api_pushes_to_main_auto_deploy_after_ci(self):
-        workflow = self.workflows["api"]
-        self.assertEqual(workflow["on"]["push"]["branches"], ["main"])
-        self.assertEqual(set(workflow["on"]["push"]["paths"]), {
-            "api/**", "scripts/require_ci.py", ".github/workflows/deploy-api-dev.yml",
-        })
-        self.assertEqual(
-            workflow["env"]["DEPLOY_OPERATION"],
-            "${{ github.event_name == 'push' && 'deploy' || inputs.operation }}",
-        )
-        wait = next(step for step in workflow["jobs"]["deploy"]["steps"]
-                    if step.get("name") == "Wait for CI on the pushed main commit")
-        self.assertEqual(wait["if"], "${{ github.event_name == 'push' }}")
-        self.assertIn("actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA", wait["run"])
-        self.assertIn("Timed out waiting for CI", wait["run"])
+                        self.assertEqual(step["if"], "${{ inputs.operation == 'deploy' }}")
 
     def test_image_build_publishes_run_specific_tag_digest_and_commit_receipt(self):
         for kind, workflow in self.workflows.items():
