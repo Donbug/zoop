@@ -67,11 +67,11 @@
       ],
       "expect": {
         "path": "agent",
-        "decisions": ["w1:denied", "c1:approved", "w2:denied"],
-        "tools": ["company.read"],
+        "decisions": ["w1:denied", "c1:approved", "w2:approved"],
+        "tools": ["company.read", "web.search"],
         "outcome": "answered",
         "answerBasis": "evidence_grounded",
-        "notices": [],
+        "notices": ["web_no_results"],
         "coverage": ["r1:answered"]
       }
     },
