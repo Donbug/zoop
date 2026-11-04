@@ -1730,18 +1730,6 @@ export default function GraphCanvas({
           <span className="block">연결 없는 사건</span>
         </button>
       )}
-      <div className="relationship-source [&_p]:break-keep">
-        <p>SOURCE · {data.metadata.source}</p>
-        <p>
-          AS OF{' '}
-          {new Intl.DateTimeFormat('sv-SE', {
-            timeZone: 'Asia/Seoul',
-            dateStyle: 'short',
-            timeStyle: 'short',
-          }).format(new Date(data.metadata.asOf))}{' '}
-          KST
-        </p>
-      </div>
       {tutorialPhase === 'pan' && (
         <button
           className="absolute z-20 grid size-32 -translate-x-1/2 -translate-y-1/2 touch-none place-items-center rounded-full border-2 border-dashed border-zoop-ink bg-zoop-paper/75 px-3 text-center text-caption font-bold text-zoop-ink focus-visible:outline-4"

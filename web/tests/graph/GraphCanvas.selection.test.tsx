@@ -236,6 +236,14 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(canvas.handlers.has('node:dragend')).toBe(false);
   });
 
+  it('D-GRP-01 hides the source and snapshot timestamp from the map canvas', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+
+    expect(screen.queryByText(/SOURCE ·/)).toBeNull();
+    expect(screen.queryByText(/AS OF/)).toBeNull();
+  });
+
   it('D-GRP-01 double click fits the visible neighborhood and the tutorial blocks double click', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const view = render(<GraphCanvas data={data} />);

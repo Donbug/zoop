@@ -41,6 +41,7 @@ describe('D-GRP-04 · relation rail states', () => {
     await act(async () => pending.resolve(detail));
     expect(screen.getByText('방향 없음')).toBeTruthy();
     expect(screen.getByText('확인 시점 미제공')).toBeTruthy();
+    expect(screen.queryByText(/조회 기준/)).toBeNull();
     const panel = screen.getByRole('complementary');
     expect(panel.getAttribute('data-screen-id')).toBe('D-GRP-04');
     const buttons = within(panel).getAllByRole('button', {

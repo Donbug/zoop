@@ -220,6 +220,22 @@ beforeEach(() => {
 });
 
 describe('A-ADM-01 운영 대시보드 (FS072)', () => {
+  test('긴 그래프 버전 ID는 인접한 요약 칸을 침범하지 않도록 줄바꿈한다', async () => {
+    const versionId = `gv-${'23c3df238ff2ee4243cf0c37542e82f4eab9'.repeat(3)}`;
+    server.on('GET', DASHBOARD, () =>
+      json(
+        dashboard({
+          graph: { ...dashboard().graph!, activeVersionId: versionId },
+        }),
+      ),
+    );
+    openDashboard();
+
+    const version = await screen.findByText(versionId);
+    expect(version.className).toContain('break-all');
+    expect(version.closest('dd')).toBeTruthy();
+  });
+
   test('요약 지표 5개와 각 영역을 와이어프레임대로 보여 준다', async () => {
     server.on('GET', DASHBOARD, () =>
       json(

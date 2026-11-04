@@ -3,7 +3,7 @@ import SavedResultFeedback from '@/components/common/SavedResultFeedback';
 import { Link, useLocation } from 'react-router-dom';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import { LoadingSpinner } from '@/components/common/LoadingIndicator';
-import { PHASES } from '@/components/ai/chat-phases';
+import { PHASE_LABEL } from '@/components/ai/chat-phases';
 import {
   formatPublishedAt,
   safeArticleUrl,
@@ -88,41 +88,56 @@ export default function ChatJobCard(props: Props) {
   const { job, answers } = props;
   const linked = job.context.items;
   return (
-    <article className={ui.section} aria-labelledby={`chat-job-${job.id}`}>
-      {answers && (
-        <p className={ui.muted}>확인 질문 “{answers.question}”에 대한 답</p>
-      )}
-      <h3 id={`chat-job-${job.id}`} className="mb-0! wrap-anywhere">
-        {job.question}
-      </h3>
-      <p className={ui.muted}>
-        연결한 대상:{' '}
-        {linked.length
-          ? linked
-              .map(
-                (item) =>
-                  `${item.label}(${KIND_LABEL[item.kind] ?? item.kind})`,
-              )
-              .join(', ')
-          : '없음'}
-        {/* D-AI-01 · prototype chat-job-view.tsx:294-298: 질문에 묶인 근거 수와 기간 */}
-        {job.context.evidenceCount > 0 &&
-          ` · 근거 ${job.context.evidenceCount}건`}
-        {job.context.period &&
-          ` · ${job.context.period.start} ~ ${job.context.period.end}`}
-      </p>
-      <div className="mt-3">
-        <JobState {...props} />
-        {job.status === 'completed' &&
-          job.result?.outcome === 'answered' &&
-          job.feedbackVersion && (
-            <SavedResultFeedback
-              feature="chatbot_answer"
-              targetId={job.result.messageId}
-              targetVersion={job.feedbackVersion}
-              subject="이 AI 답변"
-            />
+    <article
+      className="flex flex-col gap-3 py-2"
+      aria-labelledby={`chat-job-${job.id}`}
+    >
+      <div className="flex justify-end">
+        <div className="max-w-[88%] rounded-[18px_18px_4px_18px] bg-zoop-soft px-3.5 py-2.5">
+          {answers && <p className={`${ui.muted} mb-1`}>확인 질문에 답하기</p>}
+          <h3
+            id={`chat-job-${job.id}`}
+            className="mb-0! wrap-anywhere text-caption font-semibold leading-relaxed"
+          >
+            {job.question}
+          </h3>
+          <p className={`${ui.muted} mt-1`}>
+            연결한 대상:{' '}
+            {linked.length
+              ? linked
+                  .map(
+                    (item) =>
+                      `${item.label}(${KIND_LABEL[item.kind] ?? item.kind})`,
+                  )
+                  .join(', ')
+              : '없음'}
+            {/* D-AI-01 · prototype chat-job-view.tsx:294-298: 질문에 묶인 근거 수와 기간 */}
+            {job.context.evidenceCount > 0 &&
+              ` · 근거 ${job.context.evidenceCount}건`}
+            {job.context.period &&
+              ` · ${job.context.period.start} ~ ${job.context.period.end}`}
+          </p>
+        </div>
+      </div>
+      <div className="flex justify-start">
+        <section aria-label="AI 응답" className="min-w-0 max-w-[96%]">
+          {answers && (
+            <p className={`${ui.muted} mb-2`}>
+              확인 질문 “{answers.question}”에 대한 답
+            </p>
           )}
+          <JobState {...props} />
+          {job.status === 'completed' &&
+            job.result?.outcome === 'answered' &&
+            job.feedbackVersion && (
+              <SavedResultFeedback
+                feature="chatbot_answer"
+                targetId={job.result.messageId}
+                targetVersion={job.feedbackVersion}
+                subject="이 AI 답변"
+              />
+            )}
+        </section>
       </div>
     </article>
   );
@@ -140,36 +155,25 @@ function JobState({
 }: Props) {
   if (job.status === 'queued' || job.status === 'running') {
     const current = job.status === 'running' ? job.phase : null;
-    const index = PHASES.findIndex((step) => step.phase === current);
     return (
-      <div className={ui.state}>
-        <p className="mt-0!">
-          {job.status === 'queued' ? (
-            '질문을 접수했어요.'
-          ) : (
-            <>
-              <LoadingSpinner size="sm" />
-              <span>
-                {' '}
-                답변을 준비하고 있어요. 검증을 마친 답변만 보여 드려요.
-              </span>
-            </>
-          )}
-        </p>
-        {job.status === 'running' && (
-          <ol className="m-0 flex list-none flex-wrap gap-1.5 p-0">
-            {PHASES.map((step, i) => (
-              <li
-                key={step.phase}
-                className={ui.badge}
-                aria-current={i === index ? 'step' : undefined}
-              >
-                {i === index ? <strong>{step.label}</strong> : step.label}
-              </li>
-            ))}
-          </ol>
-        )}
-        <button type="button" onClick={() => onCancel(job)}>
+      <div
+        className="flex flex-wrap items-center gap-x-3 gap-y-2 py-1"
+        role="status"
+        aria-busy="true"
+      >
+        <span className="inline-flex items-center gap-2 text-caption text-zoop-muted">
+          <LoadingSpinner size="sm" />
+          {job.status === 'queued'
+            ? '질문을 처리할 차례를 기다리고 있어요.'
+            : current
+              ? `${PHASE_LABEL[current]} 중이에요.`
+              : '답변을 준비하고 있어요.'}
+        </span>
+        <button
+          type="button"
+          className="text-caption text-zoop-muted underline underline-offset-2 hover:text-zoop-ink"
+          onClick={() => onCancel(job)}
+        >
           질문 취소
         </button>
       </div>

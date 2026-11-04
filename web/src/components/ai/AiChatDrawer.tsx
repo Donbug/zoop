@@ -57,11 +57,19 @@ type Props = {
 export default function AiChatDrawer({ onViewOnMap, returnFocusTo }: Props) {
   const isOpen = useAiChatStore((state) => state.isOpen);
   const close = useAiChatStore((state) => state.close);
+  const [showHistory, setShowHistory] = useState(false);
   const { checking, isAuthenticated, member } = useAuth();
   const location = useLocation();
   if (!isOpen) return null;
   return (
-    <DrawerShell onClose={close} returnFocusTo={returnFocusTo}>
+    <DrawerShell
+      onClose={() => {
+        setShowHistory(false);
+        close();
+      }}
+      returnFocusTo={returnFocusTo}
+      showHistory={showHistory}
+    >
       {checking ? (
         <LoadingIndicator
           label="로그인 상태를 확인하고 있어요."
@@ -72,6 +80,7 @@ export default function AiChatDrawer({ onViewOnMap, returnFocusTo }: Props) {
           key={member.id}
           memberId={member.id}
           onViewOnMap={onViewOnMap}
+          onHistoryViewChange={setShowHistory}
         />
       ) : (
         <div className={ui.state}>
@@ -92,15 +101,23 @@ export default function AiChatDrawer({ onViewOnMap, returnFocusTo }: Props) {
 function DrawerShell({
   onClose,
   returnFocusTo,
+  showHistory,
   children,
 }: {
   onClose: () => void;
   returnFocusTo?: RefObject<HTMLElement | null>;
+  showHistory: boolean;
   children: ReactNode;
 }) {
   const dialog = useRef<HTMLElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const opener = useRef<HTMLElement | null>(null);
+  const resizeStart = useRef<{
+    pointerId: number;
+    x: number;
+    width: number;
+  } | null>(null);
+  const [width, setWidth] = useState(440);
 
   useEffect(() => {
     opener.current = document.activeElement as HTMLElement | null;
@@ -126,7 +143,8 @@ function DrawerShell({
       />
       <aside
         ref={dialog}
-        className={`${ui.shell} relative w-[440px]! max-w-full shadow-[0_25px_50px_-12px_rgb(0_0_0/0.25)]`}
+        className={`${ui.shell} relative max-w-full shadow-[0_25px_50px_-12px_rgb(0_0_0/0.25)]`}
+        style={{ width: `${width}px` }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="ai-chat-title"
@@ -156,22 +174,104 @@ function DrawerShell({
           }
         }}
       >
-        <header className={`${ui.header} border-b border-panel-line`}>
+        <div
+          role="separator"
+          aria-label="챗봇 패널 너비 조절"
+          aria-orientation="vertical"
+          aria-valuemin={320}
+          aria-valuemax={720}
+          aria-valuenow={width}
+          tabIndex={0}
+          className="absolute top-0 bottom-0 left-0 z-20 w-1.5 cursor-col-resize touch-none focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-panel-control"
+          onPointerDown={(event) => {
+            event.currentTarget.setPointerCapture(event.pointerId);
+            resizeStart.current = {
+              pointerId: event.pointerId,
+              x: event.clientX,
+              width,
+            };
+          }}
+          onPointerMove={(event) => {
+            const start = resizeStart.current;
+            if (!start || start.pointerId !== event.pointerId) return;
+            const max = Math.max(320, Math.min(720, window.innerWidth - 24));
+            setWidth(
+              Math.max(
+                320,
+                Math.min(max, start.width + start.x - event.clientX),
+              ),
+            );
+          }}
+          onPointerUp={(event) => {
+            if (resizeStart.current?.pointerId === event.pointerId)
+              resizeStart.current = null;
+          }}
+          onPointerCancel={() => {
+            resizeStart.current = null;
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+            event.preventDefault();
+            const direction = event.key === 'ArrowLeft' ? 1 : -1;
+            const max = Math.max(320, Math.min(720, window.innerWidth - 24));
+            setWidth((current) =>
+              Math.max(320, Math.min(max, current + direction * 24)),
+            );
+          }}
+        />
+        <header className="relative flex shrink-0 justify-end px-4 pt-3 pb-1">
           <h2
             id="ai-chat-title"
             ref={heading}
             tabIndex={-1}
-            className={`${ui.title} outline-none`}
+            className="absolute top-5 left-14 text-body font-semibold leading-5 text-panel-ink"
           >
-            AI에게 묻기
+            {showHistory ? (
+              '대화 기록'
+            ) : (
+              <span className="relative inline-flex items-center">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  className="absolute -left-10 top-1/2 size-[18px] -translate-y-1/2"
+                  fill="none"
+                >
+                  <path
+                    d="M5 5.5h14A1.5 1.5 0 0 1 20.5 7v9a1.5 1.5 0 0 1-1.5 1.5h-7L7 21v-3.5H5A1.5 1.5 0 0 1 3.5 16V7A1.5 1.5 0 0 1 5 5.5Z"
+                    stroke="currentColor"
+                    strokeLinejoin="round"
+                    strokeWidth="1.6"
+                  />
+                  <path
+                    d="M8 10h8M8 13h5"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeWidth="1.5"
+                  />
+                </svg>
+                채팅
+              </span>
+            )}
           </h2>
           <button
             type="button"
-            className={`absolute top-4 right-4 ${ui.close}`}
+            className="grid size-9 shrink-0 place-items-center rounded-full text-panel-secondary transition-colors hover:bg-panel-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-panel-ink"
             aria-label="AI 질문 창 닫기"
             onClick={onClose}
           >
-            ×
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="size-6"
+              fill="none"
+            >
+              <path
+                d="m6 6 12 12M18 6 6 18"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="1.8"
+              />
+            </svg>
           </button>
         </header>
         {children}
@@ -183,11 +283,14 @@ function DrawerShell({
 function ChatPanel({
   memberId,
   onViewOnMap,
+  onHistoryViewChange,
 }: {
   memberId: string;
   onViewOnMap?: Props['onViewOnMap'];
+  onHistoryViewChange: (show: boolean) => void;
 }) {
   const target = useAiChatStore((state) => state.context);
+  const contextSource = useAiChatStore((state) => state.contextSource);
   const draft = useAiChatStore((state) => state.draft);
   const setDraft = useAiChatStore((state) => state.setDraft);
   const chat = useChatConversation(memberId);
@@ -198,6 +301,7 @@ function ChatPanel({
   const [offered, setOffered] = useState(target);
   const [replyTo, setReplyTo] = useState<ChatJob | null>(null);
   const [view, setView] = useState<'chat' | 'history'>('chat');
+  const [menuOpen, setMenuOpen] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
 
@@ -211,7 +315,8 @@ function ChatPanel({
   const checked = targets
     .filter((item) => item.checked)
     .map((item) => item.target);
-  const useTarget = checked.length > 0;
+  const activeTargets = contextSource === 'header' ? [] : checked;
+  const useTarget = activeTargets.length > 0;
   const locked =
     chat.load.kind !== 'ready' ||
     chat.sending ||
@@ -242,7 +347,7 @@ function ChatPanel({
     if (!sendable) return;
     const sent = replyTo
       ? await chat.reply(replyTo, null, draft)
-      : await chat.ask(draft, contextFromTargets(checked));
+      : await chat.ask(draft, contextFromTargets(activeTargets));
     if (sent) {
       setDraft('');
       setReplyTo(null);
@@ -263,9 +368,11 @@ function ChatPanel({
   }
 
   async function startNew() {
+    setMenuOpen(false);
     if (await chat.startNew()) {
       setReplyTo(null);
       setView('chat');
+      onHistoryViewChange(false);
     }
   }
 
@@ -275,6 +382,7 @@ function ChatPanel({
     const opened = await chat.open(id);
     if (opened && changed) setReplyTo(null);
     setView('chat');
+    onHistoryViewChange(false);
   }
 
   const byId = new Map(chat.jobs.map((job) => [job.id, job]));
@@ -287,28 +395,56 @@ function ChatPanel({
 
   return (
     <>
-      <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-2">
-        <p className={ui.muted}>
-          질문 대상: {useTarget ? checked.map(targetLabel).join(', ') : '없음'}
-        </p>
-        <div className="flex shrink-0 gap-2">
-          <button
-            type="button"
-            className={ui.button}
-            aria-pressed={view === 'history'}
-            onClick={() => setView(view === 'history' ? 'chat' : 'history')}
+      <div className="absolute top-3 right-14 z-30">
+        <button
+          type="button"
+          className="grid size-9 place-items-center rounded-full text-panel-secondary transition-colors hover:bg-panel-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-panel-ink"
+          aria-label="대화 메뉴"
+          aria-expanded={menuOpen}
+          aria-haspopup="menu"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="size-5"
+            fill="currentColor"
           >
-            대화 기록
-          </button>
-          <button
-            type="button"
-            className={ui.button}
-            disabled={!chat.canSwitch}
-            onClick={() => void startNew()}
+            <circle cx="12" cy="5" r="1.8" />
+            <circle cx="12" cy="12" r="1.8" />
+            <circle cx="12" cy="19" r="1.8" />
+          </svg>
+        </button>
+        {menuOpen && (
+          <div
+            role="menu"
+            aria-label="대화 메뉴"
+            className="absolute top-11 right-0 z-30 min-w-44 rounded-xl border border-panel-line bg-white p-1.5 shadow-lg"
           >
-            새 대화
-          </button>
-        </div>
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-caption text-panel-ink hover:bg-panel-soft focus-visible:outline-2 focus-visible:outline-panel-ink"
+              aria-pressed={view === 'history'}
+              onClick={() => {
+                setMenuOpen(false);
+                setView('history');
+                onHistoryViewChange(true);
+              }}
+            >
+              대화 기록
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-caption text-panel-ink hover:bg-panel-soft focus-visible:outline-2 focus-visible:outline-panel-ink disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={!chat.canSwitch}
+              onClick={() => void startNew()}
+            >
+              새 대화
+            </button>
+          </div>
+        )}
       </div>
       {view === 'history' ? (
         <ChatHistoryList
@@ -319,56 +455,68 @@ function ChatPanel({
             if (id === chat.sessionId) setReplyTo(null);
             chat.forget(id);
           }}
-          onBack={() => setView('chat')}
+          onBack={() => {
+            setView('chat');
+            onHistoryViewChange(false);
+          }}
         />
       ) : (
         <>
-          <div className={ui.scroll}>
-            <section className={ui.section} aria-labelledby="ai-chat-target">
-              <h3 id="ai-chat-target">질문에 연결할 대상</h3>
-              {targets.length ? (
-                <ul className="flex flex-col gap-2">
-                  {targets.map((item, index) => (
-                    <li key={`${item.target.kind}:${item.target.id}`}>
-                      <label className="flex items-start gap-2">
-                        <input
-                          type="checkbox"
-                          checked={item.checked}
-                          onChange={(event) =>
-                            setTargets(
-                              targets.map((other, at) =>
-                                at === index
-                                  ? { ...other, checked: event.target.checked }
-                                  : other,
-                              ),
-                            )
-                          }
-                          className="mt-0.5"
-                        />
-                        <span>
-                          <span className={ui.itemTitle}>
-                            {targetLabel(item.target)}
+          <div className={`${ui.scroll} flex flex-col`}>
+            {contextSource !== 'header' && (
+              <section
+                className={`${ui.section} shrink-0`}
+                aria-labelledby="ai-chat-target"
+              >
+                <h3 id="ai-chat-target">질문에 연결할 대상</h3>
+                {targets.length ? (
+                  <ul className="flex flex-col gap-2">
+                    {targets.map((item, index) => (
+                      <li key={`${item.target.kind}:${item.target.id}`}>
+                        <label className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={item.checked}
+                            onChange={(event) =>
+                              setTargets(
+                                targets.map((other, at) =>
+                                  at === index
+                                    ? {
+                                        ...other,
+                                        checked: event.target.checked,
+                                      }
+                                    : other,
+                                ),
+                              )
+                            }
+                            className="peer sr-only"
+                          />
+                          <span
+                            aria-hidden="true"
+                            className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border border-panel-control bg-white transition-colors peer-checked:border-[5px] peer-checked:border-panel-ink peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-panel-ink"
+                          />
+                          <span>
+                            <span className={ui.itemTitle}>
+                              {targetLabel(item.target)}
+                            </span>
+                            <span className={`${ui.muted} block`}>
+                              {TARGET_KIND[item.target.kind]}
+                              {item.target.evidenceIds?.length
+                                ? ` · 근거 ${item.target.evidenceIds.length}건`
+                                : ''}
+                            </span>
                           </span>
-                          <span className={`${ui.muted} block`}>
-                            {TARGET_KIND[item.target.kind]}
-                            {item.target.evidenceIds?.length
-                              ? ` · 근거 ${item.target.evidenceIds.length}건`
-                              : ''}
-                            {item.target.mapContext?.graphVersion
-                              ? ` · 그래프 ${item.target.mapContext.graphVersion}`
-                              : ''}
-                          </span>
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className={ui.muted}>
-                  지도에서 기업이나 사건을 고르면 질문에 연결할 수 있어요.
-                </p>
-              )}
-            </section>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className={ui.muted}>
+                    지도에서 기업이나 사건을 고르면 질문에 연결할 수 있어요.
+                  </p>
+                )}
+              </section>
+            )}
 
             <div aria-live="polite" className="sr-only">
               {announced ? statusText(announced) : ''}
@@ -387,39 +535,35 @@ function ChatPanel({
                 onNew={() => void startNew()}
               />
             )}
-            {chat.load.kind === 'ready' && chat.jobs.length === 0 && (
-              <p className={ui.state}>
-                궁금한 점을 입력해 보세요. 일반 개념은 바로 물을 수 있고, “그
-                기업”처럼 대상을 가리키는 질문은 어떤 대상인지 되물을 수 있어요.
-              </p>
-            )}
             {chat.load.kind === 'ready' &&
               chat.jobs.length === 0 &&
               !chat.pending && (
                 <section
-                  className={ui.section}
-                  aria-labelledby="ai-chat-suggestions"
+                  className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-10 text-center"
+                  aria-label="새 대화 시작"
                 >
-                  <h3 id="ai-chat-suggestions">추천 질문</h3>
-                  <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-                    {SUGGESTIONS.map((question) => (
-                      <li key={question}>
-                        <button
-                          type="button"
-                          className={`${ui.button} w-full justify-start text-left`}
-                          disabled={locked || !useTarget}
-                          onClick={() => void suggest(question)}
-                        >
-                          {question}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  {!useTarget && (
-                    <p className={ui.muted}>
-                      추천 질문은 질문에 연결할 대상을 고른 뒤 보낼 수 있어요.
-                    </p>
-                  )}
+                  <span className="grid size-12 place-items-center rounded-full bg-zoop-soft text-zoop-ink">
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      className="size-6"
+                    >
+                      <path
+                        d="M12 2.75 14.2 9.8 21.25 12l-7.05 2.2L12 21.25 9.8 14.2 2.75 12 9.8 9.8 12 2.75Z"
+                        stroke="currentColor"
+                        strokeLinejoin="round"
+                        strokeWidth="1.6"
+                      />
+                      <path
+                        d="m19 2 .7 2.3L22 5l-2.3.7L19 8l-.7-2.3L16 5l2.3-.7L19 2Z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </span>
+                  <h3 className="m-0 text-title-sm font-semibold leading-snug text-panel-ink">
+                    무엇을 함께 살펴볼까요?
+                  </h3>
                 </section>
               )}
             {chat.jobs.map((job) => (
@@ -468,8 +612,29 @@ function ChatPanel({
             <div ref={end} aria-hidden="true" />
           </div>
 
+          {chat.load.kind === 'ready' &&
+            chat.jobs.length === 0 &&
+            !chat.pending && (
+              <section className="shrink-0 px-4 pt-3" aria-label="추천 질문">
+                <ul className="m-0 flex list-none flex-col items-start gap-2 p-0">
+                  {SUGGESTIONS.map((question) => (
+                    <li key={question}>
+                      <button
+                        type="button"
+                        className="inline-flex max-w-full items-center gap-2 rounded-full bg-panel-soft px-4 py-2.5 text-left text-caption leading-relaxed text-panel-ink transition-colors hover:bg-zoop-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-panel-ink disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={locked || !useTarget}
+                        onClick={() => void suggest(question)}
+                      >
+                        {question}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
           <form
-            className="shrink-0 border-t border-panel-line px-4 py-3"
+            className="shrink-0 px-4 pt-3 pb-4"
             onSubmit={(event) => {
               event.preventDefault();
               void submit();
@@ -491,7 +656,7 @@ function ChatPanel({
                 </button>
               </p>
             )}
-            <div className="flex items-end gap-2">
+            <div className="rounded-2xl border border-panel-line bg-white p-3 transition-colors focus-within:border-panel-control">
               <label className="sr-only" htmlFor="ai-chat-input">
                 질문
               </label>
@@ -499,7 +664,7 @@ function ChatPanel({
                 id="ai-chat-input"
                 ref={input}
                 rows={2}
-                className="min-h-10 flex-1 resize-none rounded-panel border border-panel-line px-3 py-2 text-caption leading-[18px] focus-visible:outline-2 focus-visible:outline-panel-ink"
+                className="min-h-12 w-full resize-none border-0 bg-transparent px-1 py-1 text-caption leading-[18px] focus:outline-none"
                 placeholder="질문을 입력해 주세요"
                 value={draft}
                 aria-describedby="ai-chat-hint"
@@ -515,27 +680,18 @@ function ChatPanel({
                   }
                 }}
               />
-              <button
-                type="submit"
-                className={ui.button}
-                disabled={!sendable}
-                aria-busy={chat.sending}
-              >
-                {chat.sending ? '보내는 중' : '보내기'}
-              </button>
+              <div className="flex items-center justify-end pt-2">
+                <button
+                  type="submit"
+                  className={ui.button}
+                  disabled={!sendable}
+                  aria-busy={chat.sending}
+                >
+                  {chat.sending ? '보내는 중' : '보내기'}
+                </button>
+              </div>
             </div>
             <div id="ai-chat-hint" className={`${ui.muted} mt-1`}>
-              {chat.active && (
-                <p className="m-0">
-                  이 대화의 질문을 처리하는 동안에는 새 질문을 보낼 수 없어요.
-                </p>
-              )}
-              {!useTarget && !replyTo && (
-                <p className="m-0">
-                  연결한 대상이 없어요. 질문에 기업 이름을 적거나 위에서 대상을
-                  골라 주세요.
-                </p>
-              )}
               {length > MAX_QUESTION - 500 && (
                 <p
                   className={
@@ -545,7 +701,6 @@ function ChatPanel({
                   {length}/{MAX_QUESTION}자
                 </p>
               )}
-              <p className="m-0">AI가 생성한 답변이며 투자 권유가 아니에요.</p>
             </div>
           </form>
         </>
