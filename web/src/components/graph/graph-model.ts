@@ -193,10 +193,9 @@ export function toG6Data(
   width: number,
   height: number,
   expandedId?: string | null,
-  _forcedNodes: string[] = [],
+  forcedNodes: string[] = [],
   emphasizedNodes: Set<string> = new Set(),
 ): GraphData {
-  void _forcedNodes;
   const summary = graphSummary(data);
   const personal = data.metadata.mode === 'personal';
   const scale = personal ? 0.69 : 1;
