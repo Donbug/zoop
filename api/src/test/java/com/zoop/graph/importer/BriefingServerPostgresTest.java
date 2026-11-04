@@ -212,6 +212,7 @@ class BriefingServerPostgresTest {
         e.put("JAVA",Path.of(System.getProperty("java.home"),"bin/java").toString());
         Path log=temp.resolve("auto-smoke.log");process.redirectErrorStream(true).redirectOutput(log.toFile());var child=process.start();
         assertTrue(child.waitFor(180,java.util.concurrent.TimeUnit.SECONDS));assertEquals(0,child.exitValue(),Files.readString(log));
+        System.out.println("Synthetic chain proof: "+Files.readString(temp.resolve("auto-proof.json")));
         var round=new com.zoop.briefing.storage.BriefingRoundRepository(jdbc).findById("brf-2026-11-04-morning").orElseThrow();
         com.zoop.briefing.query.BriefingSnapshotValidator.validate(round);assertEquals("published",round.status());
         assertTrue(round.publicSnapshot().at("/commonPriority/items/0/sources/0/publishedAt").isNull());
@@ -277,6 +278,15 @@ class BriefingServerPostgresTest {
                 var revoked=http.send(java.net.http.HttpRequest.newBuilder(uri).header("Cookie","zoop_session="+token).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
                 assertEquals(503,revoked.statusCode());
             } finally {Files.write(leaf,approved);}
+            // Optional local browser gate; no environment setting in CI, no production endpoint or clock override.
+            String browser=System.getenv("ZOOP_BRIEFING_AUTO_BROWSER");
+            if(browser!=null){
+                Path marker=Path.of(browser);assertTrue(marker.isAbsolute());
+                Files.writeString(marker,"{\"api\":\"http://127.0.0.1:"+port+"\",\"round\":\""+round.id()+"\"}");
+                long end=System.nanoTime()+java.util.concurrent.TimeUnit.MINUTES.toNanos(5);
+                while(!Files.exists(marker.resolveSibling(marker.getFileName()+".done"))&&System.nanoTime()<end)Thread.sleep(250);
+                assertTrue(Files.exists(marker.resolveSibling(marker.getFileName()+".done")),"local browser gate timed out");
+            }
         }
     }
 

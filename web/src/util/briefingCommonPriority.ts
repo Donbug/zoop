@@ -115,6 +115,9 @@ function validateCommonPriority(
         (s) =>
           !s.evidenceId ||
           !s.quote ||
+          [s.title, s.publisher].some(
+            (v) => v !== undefined && (typeof v !== 'string' || !v.trim()),
+          ) ||
           !safeArticleUrl(s.url) ||
           !Number.isFinite(prioritySourceAvailable(s)) ||
           prioritySourceAvailable(s) > cutoff ||

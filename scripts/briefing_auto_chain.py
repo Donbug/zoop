@@ -12,7 +12,7 @@ import briefing_priority_server as producer
 from briefing_usage import write_once
 server=native.server
 VERSION='briefing-auto-chain-v1'
-LEAD=18*60
+LEAD={'morning':20*60,'evening':30*60}
 
 
 def round_for(day,edition):
@@ -89,7 +89,7 @@ def work_once(cfg,*,now=None,connect=None,run=None):
     with connect() as conn:
         for edition in ('morning','evening'):
             r=round_for(instant.date(),edition);slot=datetime.fromisoformat(r['windowTo']);left=(slot-instant).total_seconds()
-            if left>LEAD:continue
+            if left>LEAD[edition]:continue
             existing=conn.execute('SELECT * FROM briefing_common_schedule_jobs WHERE round_date=%s AND edition=%s',(instant.date(),edition)).fetchone()
             if existing:
                 # No automatic replay of a claimed, completed, failed or interrupted slot.

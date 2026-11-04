@@ -214,6 +214,9 @@ function validatePersonalPriority(
           (s) =>
             !s ||
             !s.quote ||
+            [s.title, s.publisher].some(
+              (v) => v !== undefined && (typeof v !== 'string' || !v.trim()),
+            ) ||
             !s.evidenceId ||
             !safeArticleUrl(s.url) ||
             !Number.isFinite(prioritySourceAvailable(s)) ||

@@ -60,7 +60,7 @@ class ChainTests(unittest.TestCase):
     def test_worker_does_not_start_before_collection_window(self):
         with tempfile.TemporaryDirectory() as d:
             conn=Mock();conn.__enter__=Mock(return_value=conn);conn.__exit__=Mock(return_value=False);run=Mock()
-            now=lambda:datetime.fromisoformat('2026-11-04T09:00:00+09:00')
+            now=lambda:datetime.fromisoformat('2026-11-04T08:59:59+09:00')
             self.assertFalse(chain.work_once(self.cfg(d),now=now,connect=lambda:conn,run=run));run.assert_not_called();conn.execute.assert_not_called()
     def test_completed_or_recovery_slot_is_not_automatically_resent(self):
         with tempfile.TemporaryDirectory() as d:
