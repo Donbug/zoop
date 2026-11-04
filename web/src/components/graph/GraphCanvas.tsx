@@ -639,7 +639,7 @@ export default function GraphCanvas({
   });
   // D-GRP-01 (2026-11-04 review): a pointer that only brushes past a node does not light up
   // its connections; the hover counts once the pointer rests on the node for HOVER_INTENT_MS.
-  const enterNode = useEffectEvent((id: string) => {
+  const intendHover = useEffectEvent((id: string) => {
     cancelHoverIntent();
     if (hovered.current === id) {
       hoverNode(id);
@@ -1464,7 +1464,7 @@ export default function GraphCanvas({
     };
     const enterNode = (id: string) => {
       if (pending) pending.node = id;
-      else hoverNode(id);
+      else intendHover(id);
     };
     const leaveNodeLater = (id: string) => {
       if (!pending) leaveNode(id);
@@ -1483,6 +1483,8 @@ export default function GraphCanvas({
     };
     const startPan = () => {
       if (pending) return;
+      // 머무르기 판정(HOVER_INTENT_MS)을 기다리던 노드는 끌기로 지나친 것이므로 hover로 치지 않는다.
+      cancelHoverIntent();
       // 끌기 직전에 노드를 벗어나 해제를 기다리던 중이면 그 노드는 이미 떠난 것으로 본다.
       const leaving = hoverClearTimer.current !== null;
       if (leaving) {
@@ -1502,7 +1504,11 @@ export default function GraphCanvas({
         if (edge === null) leaveEdge();
         else enterEdge(edge);
       }
-      if (node !== hovered.current) hoverNode(node);
+      // 손을 뗀 자리의 노드도 머무르기 판정을 거친다. 떠난 hover는 바로 푼다.
+      if (node !== hovered.current) {
+        if (node === null) hoverNode(null);
+        else intendHover(node);
+      }
     };
     let pointerStart: {
       pointerId: number;
