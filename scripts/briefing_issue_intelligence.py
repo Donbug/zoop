@@ -243,7 +243,8 @@ def price_signal(candidate):
             'basis': list(next(iter(bases))), 'keys': [list(k) for k in unique]}
 
 
-def select(frozen, assessed, verified, previous_selected=()):
+def select(frozen, assessed, verified, previous_selected=(), *, minimum_importance=2):
+    require(minimum_importance in (1, 2), 'importance_threshold')
     validate_assessments(assessed, frozen)
     base.validate_schema(verified, verification_schema([c['issueId'] for c in frozen['candidates']]))
     eligible, rejected = [], []
@@ -251,7 +252,7 @@ def select(frozen, assessed, verified, previous_selected=()):
     for c in frozen['candidates']:
         iid = c['issueId']; a = assessed['assessments'][iid]
         reason = ('assessment_not_supported' if not verified['checks'][iid]['supported'] else
-                  'importance_below_core_threshold' if a['businessImportance'] < 2 else
+                  'importance_below_core_threshold' if a['businessImportance'] < minimum_importance else
                   'repeat_or_uncertain' if a['informationChange'] in ('repeat', 'uncertain') else None)
         if iid in previous:
             old = previous[iid]

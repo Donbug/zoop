@@ -34,4 +34,20 @@ class SelectedGenerationServiceTest {
         when(selection.select("r",owner,choice,"req")).thenReturn(json.createObjectNode().put("selectionVersion","s").put("pendingAnalysisCount",1));
         assertThrows(CustomException.class,()->new SelectedGenerationService(selection,pools,repo,false).create("r",owner,new SelectedGenerationService.Request(choice,"s"),"req"));verifyNoInteractions(repo);
     }
+    @Test void prioritySelectionQueuesVersionedInputsEvenWhenLegacyCoreListIsEmpty(){
+        var value=json.createObjectNode().put("roundId","r").put("dataAsOf","2026-11-04T00:20:00Z").put("selectionVersion","s").put("poolVersion","p").put("pendingAnalysisCount",1);
+        value.set("choice",json.valueToTree(choice));var presentation=value.putObject("presentation");presentation.putArray("items");presentation.putObject("personalPriority").putArray("items").addObject().put("issueId","relative");
+        var pool=json.createObjectNode().put("inputSha256","p").put("priorityContract",PriorityPersonalAssembler.VERSION);
+        var c=pool.putArray("candidates").addObject().put("issueId","relative");
+        c.putObject("priorityAnalysisInput").put("roundId","r").put("issueId","relative").put("inputSha256","new-sha");
+        when(selection.select("r",owner,choice,"req")).thenReturn(value);when(pools.pool("r")).thenReturn(Optional.of(pool));
+        when(repo.enqueue(eq("owner"),eq("r"),eq("s"),any(),any())).thenReturn("job");
+        var job=json.createObjectNode().put("id","job").put("selectionVersion","s");job.set("choice",json.valueToTree(choice));when(repo.job("owner","r","job")).thenReturn(Optional.of(job));
+        new SelectedGenerationService(selection,pools,repo,true).create("r",owner,new SelectedGenerationService.Request(choice,"s"),"req");
+        var snapshot=org.mockito.ArgumentCaptor.forClass(tools.jackson.databind.JsonNode.class);
+        verify(repo).enqueue(eq("owner"),eq("r"),eq("s"),any(),snapshot.capture());
+        assertEquals("relative",snapshot.getValue().at("/selectedIssueIds/0").asString());
+        assertEquals("new-sha",snapshot.getValue().at("/inputs/0/inputSha256").asString());
+        assertEquals(PriorityPersonalAssembler.VERSION,snapshot.getValue().path("priorityContract").asString());
+    }
 }
