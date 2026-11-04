@@ -32,6 +32,7 @@ const ROUND = `${ROUNDS}/:roundId`;
 const RETRY = `${ROUNDS}/:roundId/retry`;
 const JOBS = '/api/v1/admin/jobs';
 const VERSIONS = '/api/v1/admin/graph/versions';
+const ACTIVATE = `${VERSIONS}/:versionId/activate`;
 
 const signedIn: AdminSession = {
   authenticated: true,
@@ -575,5 +576,75 @@ describe('A-ADM-03 회차 탭 (#55)', () => {
       await screen.findByRole('button', { name: 'gv-synthetic로 전환' }),
     ).toBeTruthy();
     expect(firstPageReads()).toBe(2);
+  });
+  test('버전 전환 요청 중에 회차의 수입한 버전을 누르고 전환이 실패해도 버전 목록을 다시 읽는다', async () => {
+    let importedNow = false;
+    const version = (id: string, sequence: number): GraphVersion => ({
+      id,
+      sequence,
+      kind: 'snapshot',
+      createdAt: '2026-11-03T01:30:00Z',
+      createdBy: 'importer',
+      reason: '합성 회차 수입',
+      sourceLabel: '합성 handoff',
+      policyVersion: null,
+      issueCount: 1,
+      relationCount: 1,
+      articleCount: 1,
+      candidateCount: null,
+      sha256: 'd'.repeat(64),
+      bytes: 1,
+      active: false,
+      activatedAt: null,
+      graphDb: { status: 'pending', pendingJobsAtCreation: 0, note: null },
+    });
+    const activation = deferred<Response>();
+    server.on('GET', OVERVIEW, () => json(overview()));
+    server.on('GET', VERSIONS, () =>
+      json({
+        activeVersionId: null,
+        items: importedNow
+          ? [version('gv-synthetic', 2), version('gv-old', 1)]
+          : [version('gv-old', 1)],
+        activations: [],
+        nextCursor: null,
+      } satisfies GraphVersionList),
+    );
+    server.on('POST', ACTIVATE, () => activation.promise);
+    server.on('GET', ROUNDS, () => list([imported]));
+    server.on('GET', ROUND, () => json(detail(imported)));
+    const { user } = open('/admin/pipeline?tab=versions');
+    await user.click(
+      await screen.findByRole('button', { name: 'gv-old로 전환' }),
+    );
+    const form = screen.getByRole('form', { name: '그래프 버전 전환' });
+    await user.type(
+      within(form).getByLabelText('전환 사유(감사 로그에 남아요)'),
+      '합성 전환',
+    );
+    await user.click(
+      within(form).getByRole('button', { name: 'gv-old로 전환' }),
+    );
+    await waitFor(() => expect(server.calls('POST', ACTIVATE)).toHaveLength(1));
+
+    importedNow = true;
+    await user.click(screen.getByRole('tab', { name: '회차' }));
+    const table = await screen.findByRole('table', {
+      name: '그래프 회차 목록',
+    });
+    await user.click(
+      within(table).getByRole('button', { name: 'round-20261103T1005' }),
+    );
+    const aside = screen.getByRole('complementary', { name: '회차 상세' });
+    await user.click(
+      await within(aside).findByRole('button', { name: 'gv-synthetic' }),
+    );
+    expect(server.calls('GET', VERSIONS)).toHaveLength(1);
+
+    activation.resolve(apiError(409, 'REVISION_CONFLICT'));
+    expect(
+      await screen.findByRole('button', { name: 'gv-synthetic로 전환' }),
+    ).toBeTruthy();
+    expect(server.calls('GET', VERSIONS)).toHaveLength(2);
   });
 });
