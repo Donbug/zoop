@@ -43,16 +43,17 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>The summary is receipt-only: it never reaches the public graph snapshot. Reading it for {@code getEvent} is the caller's
  * job and must apply the current-rights and asOf gate to EVERY basis quote, not only to the cited ones.
  */
-final class HandoffIssueSummary {
+public final class HandoffIssueSummary {
     static final String POLICY = "zoop-issue-summary-policy-1";
     static final int MAX_QUOTES = 60;
     static final int MAX_CLAIMS = 5;
     static final int MAX_CLAIM_QUOTES = 5;
     static final int MAX_CLAIM_TEXT = 280;
     static final String LANGUAGE = "ko";
-    static final String NOT_REQUESTED = "not-requested";
-    static final String TEMPORAL_PENDING = "temporal-review-pending";
-    static final String INPUT_TOO_LARGE = "input-too-large";
+    /** The deterministic producer codes, shared with the read side so getEvent names the same literals the verifier admits. */
+    public static final String NOT_REQUESTED = "not-requested";
+    public static final String TEMPORAL_PENDING = "temporal-review-pending";
+    public static final String INPUT_TOO_LARGE = "input-too-large";
     private static final Set<String> DETERMINISTIC = Set.of(NOT_REQUESTED, TEMPORAL_PENDING, INPUT_TOO_LARGE);
     private static final Set<String> JOB_CODES = Set.of("producer-invalid", "verifier-hold", "verifier-reject");
     private static final Set<String> HELD = Set.of("HOLD", "REJECT");

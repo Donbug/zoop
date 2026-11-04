@@ -9,6 +9,8 @@ import type { EventContext } from '@/types/map/event';
 import type { GraphResponse } from '@/types/map/graph';
 import type { StructuralSupplyLink } from '@/types/map/relation';
 import StructuralRelationSection from './StructuralRelationSection';
+import ImpactCue from '@/components/common/ImpactCue';
+import type { CompanyIssueImpactAssessment } from '@/types/map/impact-assessment';
 
 type Props = {
   tutorialEvidence?: boolean;
@@ -19,6 +21,11 @@ type Props = {
   context: EventContext;
   graph: GraphResponse;
   impact: Impact | null;
+  assessment?: CompanyIssueImpactAssessment | null;
+  assessmentLoading?: boolean;
+  assessmentError?: string | null;
+  assessmentRetryable?: boolean;
+  onAssessmentRetry?: () => void;
   loading: boolean;
   error: string | null;
   errorCode?: string | null;
@@ -44,6 +51,11 @@ export default function ImpactPathPanel({
   context,
   graph,
   impact,
+  assessment,
+  assessmentLoading = false,
+  assessmentError = null,
+  assessmentRetryable = false,
+  onAssessmentRetry = () => {},
   loading,
   error,
   retryable = true,
@@ -239,6 +251,76 @@ export default function ImpactPathPanel({
                 </p>
               )}
             </section>
+            {impact.pathStatus === 'direct_available' && (
+              <section
+                className={ui.section}
+                aria-labelledby="impact-assessment-title"
+              >
+                <h3 id="impact-assessment-title">기사 인용 영향 평가</h3>
+                <p className={ui.muted}>
+                  인용 문장에 나타난 사업상 효과를 검증한 결과입니다. 주가나
+                  실적의 방향을 예측하지 않습니다.
+                </p>
+                {assessmentLoading && (
+                  <LoadingIndicator
+                    label="검증된 영향 평가를 불러오는 중입니다."
+                    className="flex min-h-12 w-full"
+                  />
+                )}
+                {assessmentError && (
+                  <div role="alert" className="space-y-2">
+                    <p>영향 평가를 불러오지 못했습니다. {assessmentError}</p>
+                    {assessmentRetryable && (
+                      <button className={ui.button} onClick={onAssessmentRetry}>
+                        다시 시도
+                      </button>
+                    )}
+                  </div>
+                )}
+                {!assessmentLoading &&
+                  !assessmentError &&
+                  assessment?.status === 'unavailable' && (
+                    <p className={ui.muted}>
+                      {assessmentMessage(assessment.reason)}
+                    </p>
+                  )}
+                {!assessmentLoading &&
+                  !assessmentError &&
+                  assessment?.status === 'available' && (
+                    <ol className="m-0 list-none space-y-3 p-0">
+                      {assessment.results.map((result, index) => (
+                        <li
+                          key={result.impactId}
+                          className="space-y-2 border-t border-panel-line pt-3"
+                        >
+                          <ImpactCue tone={result.label} badge>
+                            {impactLabels[result.label]}
+                          </ImpactCue>
+                          {(result.provenance.executionMode === 'replay' ||
+                            result.provenance.sourceKind === 'synthetic') && (
+                            <p className={ui.muted}>
+                              합성 재생 시험 결과 · 실제 뉴스에 대한 실시간 AI
+                              판정이 아닙니다.
+                            </p>
+                          )}
+                          {effectGroups(result).map(
+                            ({ label, evidenceIds }) => (
+                              <button
+                                key={`${index}-${label}`}
+                                type="button"
+                                className={`${ui.button} mr-2 mt-1`}
+                                onClick={() => onEvidence(evidenceIds)}
+                              >
+                                {label} {evidenceIds.length}건 보기
+                              </button>
+                            ),
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+              </section>
+            )}
             {structuralEdge && (
               <StructuralImpactDetails
                 key={`${structuralEdge.id}:${JSON.stringify(context)}`}
@@ -326,6 +408,44 @@ export default function ImpactPathPanel({
       </div>
     </aside>
   );
+}
+
+const impactLabels = {
+  positive: '긍정',
+  negative: '부정',
+  mixed: '긍정·부정 혼재',
+  undetermined: '판단 보류',
+} as const;
+
+function assessmentMessage(reason: CompanyIssueImpactAssessment['reason']) {
+  switch (reason) {
+    case 'no_public_path':
+      return '공개된 직접 연결이 없어 영향 평가를 찾을 수 없습니다.';
+    case 'not_recorded':
+      return '이 그래프 버전에는 저장된 영향 평가가 없습니다.';
+    case 'evidence_unavailable':
+      return '현재 공개 권한을 확인할 수 있는 근거가 없어 평가를 표시하지 않습니다.';
+    case 'issue_impact_not_produced':
+      return '이 관계 유형에 대한 영향 평가는 아직 제공되지 않습니다.';
+    case 'not_verified':
+    default:
+      return '공개할 수 있도록 검증된 영향 평가가 없습니다.';
+  }
+}
+
+function effectGroups(result: CompanyIssueImpactAssessment['results'][number]) {
+  const labels = {
+    positive: '긍정 근거',
+    negative: '부정 근거',
+    neutral: '중립 근거',
+    uncertain: '불확실 근거',
+  } as const;
+  return (Object.keys(labels) as (keyof typeof labels)[])
+    .map((effect) => ({
+      label: labels[effect],
+      evidenceIds: result.effects[effect],
+    }))
+    .filter((group) => group.evidenceIds.length > 0);
 }
 
 function StructuralImpactDetails({

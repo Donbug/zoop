@@ -20,14 +20,28 @@ const projectionLabel: Record<ProjectionStatus, string> = {
 // - 규칙 요약은 [규칙] 탭에 있으므로 여기서 다시 보이지 않는다.
 export default function PipelineOverview({
   onOpenJobs,
+  onOpenRounds,
 }: {
   onOpenJobs: () => void;
+  onOpenRounds: () => void;
 }) {
   const revision = useAdminSessionStore((state) => state.revision);
-  return <OverviewContent key={revision} onOpenJobs={onOpenJobs} />;
+  return (
+    <OverviewContent
+      key={revision}
+      onOpenJobs={onOpenJobs}
+      onOpenRounds={onOpenRounds}
+    />
+  );
 }
 
-function OverviewContent({ onOpenJobs }: { onOpenJobs: () => void }) {
+function OverviewContent({
+  onOpenJobs,
+  onOpenRounds,
+}: {
+  onOpenJobs: () => void;
+  onOpenRounds: () => void;
+}) {
   const overview = useAsyncData(getPipelineOverview);
   useAdminRefresh(overview.reload, 10000);
 
@@ -43,7 +57,7 @@ function OverviewContent({ onOpenJobs }: { onOpenJobs: () => void }) {
     );
 
   const o = overview.data;
-  const { jobs } = o;
+  const { jobs, rounds } = o;
   return (
     <section aria-label="이슈 관제 개요" className="flex flex-col gap-3">
       {overview.refreshError && (
@@ -107,6 +121,29 @@ function OverviewContent({ onOpenJobs }: { onOpenJobs: () => void }) {
           작업 로그 보기
         </button>
       </div>
+      {rounds && (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-caption">
+          <span className="font-semibold">그래프 회차</span>
+          <span>
+            {/* enabled=false는 실행기가 없을 때와 실행기 상태를 읽지 못했을 때 모두 온다. */}
+            {rounds.enabled
+              ? '회차 실행기 동작 중'
+              : '회차 실행기 꺼짐 또는 확인 불가'}
+          </span>
+          {rounds.enabled && (
+            <span className="font-num text-zoop-muted tabular-nums">
+              다음 회차 {formatKst(rounds.nextSlotAt)} · 마지막 확인{' '}
+              {formatKst(rounds.lastTickAt)}
+            </span>
+          )}
+          <span className="tabular-nums">
+            진행 중 {count(rounds.openRounds)}건
+          </span>
+          <button type="button" className={BUTTON} onClick={onOpenRounds}>
+            회차 보기
+          </button>
+        </div>
+      )}
       <p className="text-caption text-zoop-faint">
         조회 {formatKst(o.asOf)} · 10초마다 자동 갱신
       </p>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { listGraphVersions } from '@/apis/admin/graphVersions';
 import {
   Empty,
@@ -65,15 +65,43 @@ const activationLabel: Record<GraphVersionActivation['action'], string> = {
 // - 원장에서 새 버전 게시(publishGraphVersion)는 API가 아직 없다.
 export default function GraphVersions({
   onActivated,
+  refreshKey = 0,
 }: {
   /** 표시 버전이 바뀌면 후보의 공개 표시 상태도 다시 읽게 알린다. */
   onActivated?: () => void;
+  /** 회차 상세에서 버전 탭으로 올 때마다 바뀐다. 바뀌면 목록을 조용히 다시 읽는다(#55). */
+  refreshKey?: number;
 } = {}) {
   const versions = useCursorPages(listGraphVersions);
   const [target, setTarget] = useState<GraphVersion | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // 전환 요청이 진행 중인지. 진행 중에는 다른 버전을 고르거나 폼을 바꾸지 못하게 한다.
   const [pending, setPending] = useState(false);
+  // 처음 연 뒤로 탭이 유지되므로, 회차가 수입한 새 버전을 보려면 다시 읽어야 한다.
+  // 전환 중이거나 조회(처음 읽기·더 보기·다시 읽기)가 진행 중이면 조용한 다시 읽기를 할 수 없으므로,
+  // 끝난 뒤(전환은 성공·실패와 관계없이)에 읽고 그때 처리한 것으로 기록한다.
+  const seenRefreshKey = useRef(refreshKey);
+  const refresh = useEffectEvent(() => {
+    if (seenRefreshKey.current === refreshKey) return;
+    if (
+      pending ||
+      versions.status === 'loading' ||
+      versions.loadingMore ||
+      versions.refreshing
+    )
+      return;
+    seenRefreshKey.current = refreshKey;
+    versions.reload({ quiet: true });
+  });
+  useEffect(() => {
+    refresh();
+  }, [
+    refreshKey,
+    pending,
+    versions.status,
+    versions.loadingMore,
+    versions.refreshing,
+  ]);
   const first = versions.pages[0];
   const activeVersionId = first?.activeVersionId ?? null;
   // 커서는 표시 버전을 고정하지 않는다. 더 불러온 쪽의 표시 버전이 첫 쪽과 다르면 목록이 섞인 것이므로
@@ -151,6 +179,8 @@ export default function GraphVersions({
                     ? `${result.activeVersionId}로 되돌렸어요.`
                     : `${result.activeVersionId}로 바꿨어요.`,
               );
+              // 성공하면 여기서 목록을 처음부터 다시 읽으므로 기다리던 다시 읽기도 함께 처리된다.
+              seenRefreshKey.current = refreshKey;
               versions.reload();
               if (!result.idempotent) onActivated?.();
             }}
