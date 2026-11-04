@@ -1411,7 +1411,14 @@ export default function GraphCanvas({
     let dragged = false;
     const pointerDown = (event: PointerEvent) => {
       if (!graph || event.button !== 0) return;
-      // pointerup을 놓친 채(예: 창 밖에서 뗌) 다시 누르면 이전 끌기를 여기서 끝낸다.
+      // 끌던 손가락이 있는데 다른 손가락이 더 닿으면 그 손가락은 무시해 첫 손가락의 끌기를 유지한다.
+      // 새 주 포인터(isPrimary)가 내려오면 이전 포인터는 pointerup을 놓친 것이므로 이전 끌기를 여기서 끝낸다.
+      if (
+        pointerStart &&
+        event.pointerId !== pointerStart.pointerId &&
+        !event.isPrimary
+      )
+        return;
       endPan();
       const bounds = host.getBoundingClientRect();
       const position = graph.getPosition();
@@ -1432,8 +1439,18 @@ export default function GraphCanvas({
       };
     };
     const pointerMove = (event: PointerEvent) => {
+      if (!pointerStart || event.pointerId !== pointerStart.pointerId) return;
+      // 브라우저 밖에서 버튼을 놓아 pointerup을 놓쳤으면, 버튼 없이 돌아온 첫 움직임에서 끌기를 끝낸다.
+      // 터치는 닿지 않은 채 움직이지 않으므로 마우스·펜만 본다.
       if (
-        pointerStart &&
+        (event.pointerType === 'mouse' || event.pointerType === 'pen') &&
+        event.buttons === 0
+      ) {
+        pointerStart = null;
+        endPan();
+        return;
+      }
+      if (
         Math.hypot(
           event.clientX - pointerStart.x,
           event.clientY - pointerStart.y,
@@ -1478,6 +1495,11 @@ export default function GraphCanvas({
       pointerStart = null;
       endPan();
     };
+    // 끌던 중 창이 포커스를 잃으면(다른 창으로 전환) pointerup이 오지 않으므로 여기서 끝낸다.
+    const windowBlur = () => {
+      pointerStart = null;
+      endPan();
+    };
     const stopFollowing = (event: WheelEvent) => {
       if (event.deltaY !== 0 && currentTutorialPhase() === 'zoom')
         wheelPending = true;
@@ -1499,6 +1521,7 @@ export default function GraphCanvas({
     host.addEventListener('pointermove', pointerMove);
     window.addEventListener('pointerup', pointerUp);
     window.addEventListener('pointercancel', pointerCancel);
+    window.addEventListener('blur', windowBlur);
     host.addEventListener('wheel', stopFollowing, { passive: true });
     window.addEventListener('zoop:graph-viewport-change', viewportChanged);
     hovered.current = null;
@@ -1711,6 +1734,7 @@ export default function GraphCanvas({
       host.removeEventListener('pointermove', pointerMove);
       window.removeEventListener('pointerup', pointerUp);
       window.removeEventListener('pointercancel', pointerCancel);
+      window.removeEventListener('blur', windowBlur);
       host.removeEventListener('wheel', stopFollowing);
       window.removeEventListener('zoop:graph-viewport-change', viewportChanged);
       observer?.disconnect();
