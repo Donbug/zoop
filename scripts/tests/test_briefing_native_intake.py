@@ -42,6 +42,19 @@ class IntakeTests(unittest.TestCase):
         peer.close.assert_not_called()
         transport.shutdown();peer.close.assert_called_once()
 
+    def test_priority_chain_preserves_ten_calls_for_the_business_producer(self):
+        self.cfg['nativeCallLimit']=6
+        peer=Mock();peer.handle_request.side_effect=lambda req:httpx.Response(200,json={'usage':{'prompt_tokens':10,'completion_tokens':2}},request=req)
+        transport,_,budget=self.setup_transport(peer)
+        for i in range(6):transport.handle_request(self.request(i))
+        with self.assertRaisesRegex(ValueError,'native_phase_call_limit'):transport.handle_request(self.request(6))
+        for i in range(10):
+            raw=json.dumps({'model':'gpt-6-luna','store':False,'service_tier':'default','instructions':'priority'+str(i),'max_output_tokens':10}).encode()
+            reservation=budget.reserve(raw);budget.settle(reservation,b'{"usage":{"input_tokens":1,"output_tokens":1}}')
+        seventeenth=json.loads(raw);seventeenth['instructions']='seventeenth'
+        with self.assertRaisesRegex(ValueError,'round_budget'):budget.reserve(json.dumps(seventeenth).encode())
+        self.assertEqual(6,peer.handle_request.call_count)
+
     def test_unknown_native_transport_never_retries_or_turns_unknown_usage_into_zero(self):
         peer=Mock();peer.handle_request.side_effect=httpx.ReadTimeout('synthetic')
         transport,session,_=self.setup_transport(peer)
