@@ -1,3 +1,4 @@
+import { prioritySourceTime } from '@/util/briefingSourceTime';
 import type {
   PersonalPriority,
   BriefingBusinessAnalysis,
@@ -294,7 +295,7 @@ export default function PersonalPriorityIssues({
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        {briefingTime(s.publishedAt)} · 원문 보기 ↗
+                        {prioritySourceTime(s)} · 원문 보기 ↗
                       </a>
                     </div>
                   ))}

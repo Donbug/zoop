@@ -1,3 +1,4 @@
+import { prioritySourceTime } from '@/util/briefingSourceTime';
 import type { CommonPriority } from '@/util/briefingCommonPriority';
 import { briefingTime } from '@/util/briefingTime';
 import { BODY, EMPTY, FOCUS_RING, NOTE } from './briefingStyles';
@@ -117,7 +118,7 @@ export default function CommonPriorityIssues({
                         rel="noopener noreferrer"
                         className={`text-caption underline ${FOCUS_RING}`}
                       >
-                        {briefingTime(s.publishedAt)} · 원문 보기 ↗
+                        {prioritySourceTime(s)} · 원문 보기 ↗
                       </a>
                     </div>
                   ))}

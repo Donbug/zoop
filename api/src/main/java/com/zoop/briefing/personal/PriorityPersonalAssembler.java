@@ -36,7 +36,7 @@ final class PriorityPersonalAssembler {
                 item.putArray("priorAnalysis");item.putArray("aiAnalyses");var connections=item.putArray("connections");
                 for(var c:PersonalBriefingService.matched(candidate,scope))connections.addObject().put("companyId",c.path("companyId").asString()).put("name",c.path("name").asString()).put("reason",c.path("reason").asString());
                 var sources=item.putArray("sources");for(var s:candidate.path("sources")){
-                    var source=sources.addObject();for(String k:List.of("evidenceId","quote","url","publishedAt"))source.set(k,s.path(k).deepCopy());
+                    var source=sources.addObject();for(String k:List.of("evidenceId","quote","url","publishedAt","publishedDate","availableAt","eligibilityBasis"))if(s.has(k))source.set(k,s.path(k).deepCopy());
                 }
             }
             items.add(item);

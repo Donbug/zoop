@@ -148,7 +148,7 @@ public class PersonalBriefingPreferences {
                         throw new IllegalArgumentException("unreadable personal priority candidate");
                     for (var source : item.path("sources")) {
                         var original = candidate.path("sources").valueStream().filter(c -> c.path("evidenceId").equals(source.path("evidenceId"))).findFirst().orElseThrow();
-                        for (String key : List.of("quote", "url", "publishedAt"))
+                        for (String key : List.of("quote", "url", "publishedAt", "publishedDate", "availableAt", "eligibilityBasis"))
                             if (!original.path(key).equals(source.path(key))) throw new IllegalArgumentException("personal priority source mismatch");
                     }
                     for (var connection : item.path("connections"))

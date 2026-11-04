@@ -7,7 +7,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 /** Optional saved presentation projections. Publication/owner/source guards are applied before returning them. */
 public final class BriefingPrioritySchemas {
     private BriefingPrioritySchemas() { }
-    public record PrioritySource(String evidenceId, String quote, String url, Instant publishedAt) { }
+    public record PrioritySource(String evidenceId, String quote, String url, @Schema(nullable=true) Instant publishedAt,
+        @Schema(requiredMode=Schema.RequiredMode.NOT_REQUIRED,nullable=true) java.time.LocalDate publishedDate,
+        @Schema(requiredMode=Schema.RequiredMode.NOT_REQUIRED,nullable=true) Instant availableAt,
+        @Schema(requiredMode=Schema.RequiredMode.NOT_REQUIRED,nullable=true) String eligibilityBasis) { }
     public record PriorityCompany(String companyId, String name, String reason) { }
     public record PriorityPrice(String companyName, String baseline, String latest, String changeRate, String currency, Instant observedAt) { }
     public record PriorityPreviousChange(String status, String text) { }

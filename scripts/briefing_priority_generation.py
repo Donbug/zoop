@@ -1,5 +1,6 @@
 """Fresh, receipt-bound business views for the priority read contract. No DB/provider initialization."""
 import copy
+import briefing_source_time as source_time
 from pathlib import Path
 import briefing_issue_intelligence as m
 import briefing_issue_intelligence_view as receipts
@@ -26,8 +27,7 @@ def freeze(inputs, scope):
         m.check_seal(f)
         c.require(all(f[k] == first[k] for k in ('roundId', 'date', 'edition', 'cutoff')), 'priority_mixed_rounds')
         for source in f['sources'].values():
-            c.require(bool(source.get('publishedAt')), 'priority_precise_publication_time_required')
-            c.require(c.aware(source['publishedAt']) <= c.aware(f['cutoff']), 'priority_future_source')
+            c.require(source_time.available(source) <= c.aware(f['cutoff']), 'priority_future_source')
         assessment = f['selection']['assessment']; targets = []
         for target in f['targets']:
             targets.append({'companyId': target['companyId'], 'name': target['companyName'],
@@ -102,7 +102,7 @@ def item(record, issue_id):
             # This is a new scheduled round, not a same-round legacy rewrite. No fabricated old baseline.
             analysis['comparison'] = {'status': 'newly_selected', 'baseline': None}
         analyses.append(analysis)
-    sources = [{k: s[k] for k in ('evidenceId', 'quote', 'url', 'publishedAt')} for s in issue['sources'].values()]
+    sources = [source_time.projection(s) for s in issue['sources'].values()]
     out = {'issueId': issue_id, 'kind': 'new_issue' if personal else issue['kind'],
         'title': answer['headline']['text'], 'topicTag': answer['topicTag'], 'reason': answer['subline']['text'],
         'originRoundId': f['roundId'], 'originCutoff': f['cutoff'], 'sources': sources, 'aiAnalyses': analyses}
