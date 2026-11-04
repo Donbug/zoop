@@ -117,6 +117,7 @@ public class SavedBriefingPublisher {
             require(Integer.valueOf(1).equals(jdbc.queryForObject("SELECT count(*) FROM briefing_personal_preferences WHERE id=? AND member_id=? AND scope='demo' AND revision=? AND created_at=? AND choice=?::jsonb",Integer.class,pref,member,revision,Timestamp.from(imported),tables.get("briefing_personal_preferences").getFirst().path("choice").toString())),"demo_preference_unbound");
             require(tables.get("briefing_personal_deliveries").size()==seen.size(),"personal_round_count");
             Set<String> delivered=new HashSet<>();
+            Map<String,String> deliveryIds=new java.util.LinkedHashMap<>();
             for(var source:tables.get("briefing_personal_deliveries")) {
                 String id="prep-delivery-"+Canonical.sha256(text(source,"id")+"\n"+pref).substring(0,24),rid=text(source,"round_id");
                 require(seen.contains(rid)&&delivered.add(rid),"foreign_or_duplicate_delivery_round");
@@ -126,12 +127,18 @@ public class SavedBriefingPublisher {
                     AND selection_sha256=encode(sha256(convert_to(selection_snapshot::text,'UTF8')),'hex')
                     AND result_sha256=encode(sha256(convert_to(result_snapshot::text,'UTF8')),'hex')
                     """,Integer.class,id,member,rid,pref,source.path("selection_snapshot").toString(),source.path("result_snapshot").toString())),"delivery_changed");
-                var restored=personal.get(rid,new MemberPrincipal(member,"saved-import"),true,"saved-result-publication");
-                require("ready".equals(restored.path("status").asString())&&id.equals(restored.path("id").asString()),"personal_read_denied");
+                deliveryIds.put(rid,id);
+            }
+            var ids=StrictJson.newObject().putArray("ids");seen.stream().sorted().forEach(ids::add);
+            var personalIds=StrictJson.newObject().putArray("ids");deliveryIds.values().stream().sorted().forEach(personalIds::add);
+            // The receipt is invisible outside this transaction until every actual
+            // owner read below succeeds. Any failure rolls it back with publication.
+            if(!repeated)jdbc.update("INSERT INTO briefing_result_imports(request_sha256,manifest_sha256,member_id,round_ids,delivery_ids) VALUES(?,?,?,?::jsonb,?::jsonb)",request,manifestSha,member,ids.toString(),personalIds.toString());
+            for(var delivery:deliveryIds.entrySet()){
+                var restored=personal.get(delivery.getKey(),new MemberPrincipal(member,"saved-import"),true,"saved-result-publication");
+                require("ready".equals(restored.path("status").asString())&&delivery.getValue().equals(restored.path("id").asString()),"personal_read_denied");
             }
             currentGrantFile(finalization.string("grantsSha256"));
-            var ids=StrictJson.newObject().putArray("ids");seen.stream().sorted().forEach(ids::add);
-            if(!repeated)jdbc.update("INSERT INTO briefing_result_imports(request_sha256,manifest_sha256,member_id,round_ids) VALUES(?,?,?,?::jsonb)",request,manifestSha,member,ids.toString());
             return StrictJson.newObject().put("publishedRounds",seen.size()).put("demoDeliveries",seen.size()).put("reused",repeated).put("newAiCalls",0);
         });
     }

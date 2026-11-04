@@ -24,6 +24,7 @@ CREATE TABLE briefing_result_imports (
  manifest_sha256 text NOT NULL CHECK(manifest_sha256 ~ '^[0-9a-f]{64}$'),
  member_id text NOT NULL REFERENCES members(id) ON DELETE CASCADE,
  round_ids jsonb NOT NULL CHECK(jsonb_typeof(round_ids)='array'),
+ delivery_ids jsonb NOT NULL CHECK(jsonb_typeof(delivery_ids)='array'),
  applied_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TRIGGER preserve_briefing_result_import BEFORE UPDATE ON briefing_result_imports

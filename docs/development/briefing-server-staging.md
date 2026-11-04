@@ -76,7 +76,7 @@ python3 scripts/render_briefing_staging_sql.py \
 
 `V20261104140000`은 기존 설정을 `scheduled` 범위로 보존하고 새 반입 데모 설정에 별도 리비전 공간을 추가한다. 데모 리비전 1과 실제 설정 리비전 1이 공존할 수 있다. 데모 설정은 설정 조회·최초 보유/관심 초기화·09:20/17:30 스케줄 대상에서 제외한다. 스케줄 delivery가 demo 설정을 참조하면 DB에서도 거부한다. 기존 발행본·설정 값·사용자 평가 행은 변경하지 않는다.
 
-반입 데모 설정의 생성 시각은 명시한 현재 반입 준비 시각이며, 과거 시험 프로필의 저장 시각을 대상 회원의 설정 이력으로 소급하지 않는다. 원래 시험 설정과 적용 시각은 `archive/`에 그대로 남는다. `--imported-at`은 시간대가 필요하며 확정 묶음의 값과 다르면 거부한다. 데모 결과는 기존 로그인·`personal-demo-enabled` 경로로만 조회하며 현재 회원 설정이 없어도 보존 결과를 읽을 수 있다. 해당 플래그는 일반 서비스의 자동 생성 설정과 별개다.
+반입 데모 설정의 생성 시각은 명시한 현재 반입 준비 시각이며, 과거 시험 프로필의 저장 시각을 대상 회원의 설정 이력으로 소급하지 않는다. 원래 시험 설정과 적용 시각은 `archive/`에 그대로 남는다. `--imported-at`은 시간대가 필요하며 확정 묶음의 값과 다르면 거부한다. 최종 발행 영수증에 delivery ID가 등록된 보존 데모는 해당 회원만 `demo=true`로 조회하며 현재 회원 설정이 없어도 읽을 수 있다. 수동 생성용 `personal-demo-enabled`는 켤 필요가 없다. 이 플래그를 끄면 화면에 새 생성 버튼도 나오지 않는다. 미발행 데모나 다른 회원 결과는 이 조회 경로에 포함되지 않는다.
 
 ## 4. 권한·근거 결속을 새 사본에 확정
 
@@ -134,7 +134,7 @@ java -jar api.jar \
   --zoop.briefing.saved-publication.bundle=/private/output/finalized-bundle \
   --zoop.briefing.saved-publication.manifest-sha256=FINAL_MANIFEST_SHA256 \
   --zoop.briefing.saved-publication.result=/private/results/new-publication-result.json \
-  --zoop.briefing.personal-demo-enabled=true \
+  --zoop.briefing.personal-demo-enabled=false \
   --zoop.briefing.personal-scheduler-enabled=false \
   --zoop.briefing.common-scheduler-enabled=false \
   --zoop.briefing.selected-generation-enabled=false
@@ -146,7 +146,7 @@ DB·`zoop.document-read.grants`·`artifact-root`·`ingestion-sources`·artifact 
 
 완료 요청은 `briefing_result_imports`에 해시로 기록한다. 같은 manifest·회원·요청을 새 결과 경로로 재실행하면 재발행하지 않고 검증만 수행한다. 발행 후 staged SQL을 다시 실행해 상태를 초기화하지 않는다. 장애 뒤에는 기존 영수증과 발행기를 사용한다. 활성 지도·회원 보유/관심·실제 설정·기존 평가 기록은 수정하지 않는다.
 
-5. 비회원 공통 조회, 대상 회원 개인화 조회, 다른 회원의 비노출, 시세·근거·전체 보기를 확인한다. 데모는 별도 플래그로 허용한 범위이며 정식 자동 개인화 운영 이력으로 표시하지 않는다.
+5. 비회원 공통 조회, 대상 회원 개인화 조회, 다른 회원의 비노출, 시세·근거·전체 보기를 확인한다. 보존 데모는 반입 영수증의 회원·delivery ID 범위에서만 조회하며 정식 자동 개인화 운영 이력으로 표시하지 않는다.
 
 ## 공개 전 남은 조건
 

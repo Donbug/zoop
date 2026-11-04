@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Authored data only: real native-source guards, transaction rollback and authenticated HTTP, no model transport. */
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
  "ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=test","ZOOP_AUTH_CSRF_KEYS=test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
- "zoop.briefing.personal-demo-enabled=true","zoop.briefing.personal-scheduler-enabled=false","zoop.briefing.common-scheduler-enabled=false"})
+ "zoop.briefing.personal-demo-enabled=false","zoop.briefing.personal-scheduler-enabled=false","zoop.briefing.common-scheduler-enabled=false"})
 @EnabledIfEnvironmentVariable(named="DB_URL",matches="jdbc:postgresql:.*")
 @Tag("briefing-postgres")
 @DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_CLASS)
@@ -135,6 +135,8 @@ class SavedBriefingPublicationPostgresTest {
   assertEquals(401,get("/api/v1/briefings/"+ROUND+"/personalized/delivery?demo=true",null).statusCode());
   var personal=get("/api/v1/briefings/"+ROUND+"/personalized/delivery?demo=true",sessions.issue(MEMBER,null,"test").token());
   assertEquals(200,personal.statusCode(),personal.body());assertEquals("ready",JSON.readTree(personal.body()).path("status").asString());
+  assertFalse(preferences.settings(new MemberPrincipal(MEMBER,"test")).path("demoEnabled").asBoolean());
+  assertThrows(com.zoop.common.exception.CustomException.class,()->preferences.prepare(ROUND,new MemberPrincipal(MEMBER,"test"),true,"live-pref","manual-demo-refused"));
   jdbc.update("""
    INSERT INTO members SELECT (jsonb_populate_record(NULL::members,to_jsonb(m)||'{"id":"other-owner","analytics_key":"other-owner","email":"other@example.invalid","email_key":"other@example.invalid"}'::jsonb)).*
    FROM members m WHERE id=?
@@ -147,6 +149,10 @@ class SavedBriefingPublicationPostgresTest {
   assertThrows(RuntimeException.class,()->publisher.publish(manifest,"e".repeat(64),tables));
   assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM briefing_result_imports",Integer.class));
   assertNull(jdbc.queryForObject("SELECT published_at FROM briefing_rounds WHERE id=?",java.sql.Timestamp.class,ROUND));
+ }
+ @Test void stagedDemoWithoutMatchingPublicationReceiptIsNeverReadable() {
+  assertEquals("not_published",preferences.get(ROUND,new MemberPrincipal(MEMBER,"test"),true,"unpublished-import").path("status").asString());
+  assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class));
  }
  @Test void declaredGraphCannotReplaceMissingRealRegistrationAndAllWritesRollback(){
   ((ObjectNode)manifest.path("finalization").path("rounds").get(0)).put("snapshotSha256","f".repeat(64));

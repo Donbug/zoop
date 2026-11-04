@@ -119,15 +119,15 @@ function MemberScheduledPersonalBriefing({
               '보유·관심 종목으로 기본 설정했습니다. 다음 회차부터 적용합니다.',
             );
           setDelivery(published);
-          if (saved.demoEnabled)
-            void call<Delivery>(`${path}/delivery?demo=true`, 'GET')
-              .then((p) => {
-                if (epoch.current === token) setPreview(p);
-              })
-              .catch(() => {
-                if (epoch.current === token)
-                  setError('데모 기록을 불러오지 못했어요.');
-              });
+          void call<Delivery>(`${path}/delivery?demo=true`, 'GET')
+            .then((p) => {
+              if (epoch.current === token)
+                setPreview(p.mode === 'demo' ? p : undefined);
+            })
+            .catch(() => {
+              if (epoch.current === token)
+                setError('데모 기록을 불러오지 못했어요.');
+            });
         })
         .catch(() => {
           if (epoch.current === token)
@@ -486,31 +486,34 @@ function MemberScheduledPersonalBriefing({
           </p>
         )}
       </section>
-      {settings?.demoEnabled && (
+      {(settings?.demoEnabled || preview?.selection) && (
         <details className={`${CARD} space-y-3`}>
           <summary className={`cursor-pointer text-sm ${FOCUS_RING}`}>
-            데모 미리보기
+            {settings?.demoEnabled ? '데모 미리보기' : '저장된 데모 브리핑'}
           </summary>
           <p className={`${NOTE} mt-3`}>
             저장된 데모는 당시 시험한 종목으로 보존합니다. 현재 보유·관심 종목과
-            정기 설정을 변경하지 않습니다. 아래 버튼은 현재 설정으로 별도 데모를
-            만들며, 운영 화면에는 이 실행 버튼이 없습니다.
+            정기 설정을 변경하지 않습니다.
           </p>
-          <button
-            type="button"
-            disabled={
-              busy || !settings.preference || preview?.status === 'generating'
-            }
-            className={`${PRIMARY_BUTTON} mt-3 disabled:opacity-40`}
-            onClick={() => void demo()}
-          >
-            현재 설정으로 데모 보기
-          </button>
+          {settings?.demoEnabled && (
+            <button
+              type="button"
+              disabled={
+                busy ||
+                !settings?.preference ||
+                preview?.status === 'generating'
+              }
+              className={`${PRIMARY_BUTTON} mt-3 disabled:opacity-40`}
+              onClick={() => void demo()}
+            >
+              현재 설정으로 데모 보기
+            </button>
+          )}
           {preview?.selection && (
             <div className="mt-4 space-y-3">
               <p className={NOTE}>별도 데모 기록 · 이 회차에서 시험한 종목</p>
               {preview.preferenceRevision !==
-                settings.preference?.revisionId && (
+                settings?.preference?.revisionId && (
                 <p className={NOTE}>
                   보존된 데모 설정 · 현재 정기 설정과 별개입니다.
                 </p>

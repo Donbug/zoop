@@ -115,7 +115,22 @@ public class PersonalBriefingPreferences {
             o.set("selection",StrictJson.parseObject(r.getString(r.getString(8)==null?7:8)).node());return o;},args.toArray()).stream().findFirst();
     }
     public ObjectNode get(String round,MemberPrincipal p,boolean demo,String requestId){
-        member(p);if(demo&&!demoEnabled)throw new CustomException(ErrorCode.ACCESS_DENIED);
+        member(p);
+        if(demo&&!demoEnabled){
+            // An explicitly published saved import is readable by its owner even
+            // when manual demo generation is disabled. Never admit an unstaged,
+            // unaudited or another member's demo through this read-only path.
+            var imported=jdbc.query("""
+                SELECT d.id,d.preference_id FROM briefing_personal_deliveries d
+                JOIN briefing_personal_preferences p ON p.id=d.preference_id AND p.member_id=d.member_id AND p.scope='demo'
+                WHERE d.member_id=? AND d.round_id=? AND d.mode='demo' AND d.status='ready'
+                AND EXISTS(SELECT 1 FROM briefing_result_imports i WHERE i.member_id=d.member_id AND i.delivery_ids @> jsonb_build_array(d.id))
+                ORDER BY d.created_at DESC,d.id COLLATE "C" LIMIT 1
+                """,(r,i)->List.of(r.getString(1),r.getString(2)),p.memberId(),round);
+            if(imported.isEmpty())return json.createObjectNode().put("status","not_published").put("roundId",round);
+            return delivery(p.memberId(),round,true,imported.getFirst().get(1)).filter(d->d.path("id").asString().equals(imported.getFirst().getFirst()))
+                .map(x->response(x,requestId)).orElseThrow(()->new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
+        }
         return delivery(p.memberId(),round,demo,null).map(x->response(x,requestId)).orElseGet(()->json.createObjectNode().put("status","not_published").put("roundId",round));
     }
     private ObjectNode response(ObjectNode row,String requestId){
