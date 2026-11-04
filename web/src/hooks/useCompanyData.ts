@@ -13,8 +13,9 @@ import type { CompanyPanelData } from '@/types/map/company';
 type Errors = Partial<Record<keyof CompanyPanelData, string>>;
 
 export type CompanyDataState = {
-  data: CompanyPanelData | null;
-  /** 그래프 응답(기업·뉴스·공시)을 기다리는 중 */
+  /** 도착한 응답부터 채운다. company·documents는 그래프 응답, 나머지는 그 외 응답이다. */
+  data: Partial<CompanyPanelData> | null;
+  /** 그래프 응답(기업 사건·뉴스·공시)을 기다리는 중 */
   loading: boolean;
   /** 그 외 응답(시세·가격·지표·보유)을 기다리는 중 */
   marketLoading: boolean;
@@ -62,7 +63,7 @@ export function useCompanyData(
         loading: true,
         marketLoading: true,
       });
-      // 두 묶음은 따로 도착한다. 그래프 응답이 오면 패널을 먼저 그리고, 시세 공급자를 기다리지 않는다.
+      // 두 묶음은 따로 도착한다. 그래프 스냅샷 읽기가 느려도 시세·지표·보유는 먼저 보인다.
       const settle = (
         tasks: Partial<Record<keyof CompanyPanelData, Promise<unknown>>>,
         done: 'loading' | 'marketLoading',
@@ -141,10 +142,7 @@ export function useCompanyData(
       companyId,
     };
   return {
-    data:
-      !state.loading && state.data.company
-        ? (state.data as CompanyPanelData)
-        : null,
+    data: state.data,
     loading: state.loading,
     marketLoading: state.marketLoading,
     errors: state.errors,

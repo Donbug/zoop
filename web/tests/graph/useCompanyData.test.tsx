@@ -30,20 +30,24 @@ describe('useCompanyData', () => {
     });
   });
 
+  // 두 묶음이 모두 끝날 때까지 기다린다.
+  const settled = (state: { loading: boolean; marketLoading: boolean }) =>
+    expect(state.loading || state.marketLoading).toBe(false);
+
   it('한 섹션 실패를 격리하고 정상 섹션을 유지한다', async () => {
     vi.mocked(api.getCompanyMetrics).mockRejectedValue(
       new Error('지표 공급자 장애'),
     );
     const { result } = renderHook(() => useCompanyData('KRX:005930', null));
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.data?.company.name).toBe('삼성전자');
-    expect(result.current.data?.quote.status).toBe('available');
+    await waitFor(() => settled(result.current));
+    expect(result.current.data?.company?.name).toBe('삼성전자');
+    expect(result.current.data?.quote?.status).toBe('available');
     expect(result.current.errors.metrics).toBe('지표 공급자 장애');
   });
 
   it('로그인하지 않은 경우 개인 포트폴리오를 요청하지 않는다', async () => {
     const { result } = renderHook(() => useCompanyData('KRX:005930', null));
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => settled(result.current));
     expect(api.getPortfolio).not.toHaveBeenCalled();
     expect(result.current.data?.holding).toBeNull();
   });
@@ -68,31 +72,11 @@ describe('useCompanyData', () => {
     const { result } = renderHook(() =>
       useCompanyData('KRX:005930', 'member-token'),
     );
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => settled(result.current));
     expect(result.current.data?.holding).toBeNull();
   });
 
-  it('시세 응답을 기다리지 않고 그래프 응답이 오면 기업 정보를 먼저 반환한다', async () => {
-    let resolveQuote: (value: ReturnType<typeof mockQuote>) => void = () => {};
-    vi.mocked(api.getCompanyQuote).mockReturnValue(
-      new Promise((resolve) => {
-        resolveQuote = resolve;
-      }),
-    );
-    const { result } = renderHook(() => useCompanyData('KRX:005930', null));
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.data?.company.name).toBe('삼성전자');
-    expect(result.current.data?.documents).toBeDefined();
-    expect(result.current.marketLoading).toBe(true);
-    expect(result.current.data?.quote).toBeUndefined();
-
-    resolveQuote(mockQuote('KRX:005930'));
-    await waitFor(() => expect(result.current.marketLoading).toBe(false));
-    expect(result.current.data?.quote.status).toBe('available');
-    expect(result.current.data?.company.name).toBe('삼성전자');
-  });
-
-  it('시세 응답이 먼저 와도 그래프 응답 전에는 기업 정보를 반환하지 않는다', async () => {
+  it('그래프 응답을 기다리지 않고 시세·지표·가격·보유를 먼저 반환한다', async () => {
     let resolveCompany: (
       value: ReturnType<typeof mockCompany>,
     ) => void = () => {};
@@ -104,12 +88,46 @@ describe('useCompanyData', () => {
     const { result } = renderHook(() => useCompanyData('KRX:005930', null));
     await waitFor(() => expect(result.current.marketLoading).toBe(false));
     expect(result.current.loading).toBe(true);
-    expect(result.current.data).toBeNull();
+    expect(result.current.data?.quote?.status).toBe('available');
+    expect(result.current.data?.prices?.status).toBe('available');
+    expect(result.current.data?.metrics?.status).toBe('available');
+    expect(result.current.data?.holding).toBeNull();
+    expect(result.current.data?.company).toBeUndefined();
+    expect(result.current.data?.documents).toBeUndefined();
 
     resolveCompany(mockCompany('KRX:005930'));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.data?.company.name).toBe('삼성전자');
-    expect(result.current.data?.quote.status).toBe('available');
+    expect(result.current.data?.company?.name).toBe('삼성전자');
+    expect(result.current.data?.documents).toBeDefined();
+    expect(result.current.data?.quote?.status).toBe('available');
+  });
+
+  it('그래프 응답이 먼저 와도 시세 응답을 기다리지 않는다', async () => {
+    let resolveQuote: (value: ReturnType<typeof mockQuote>) => void = () => {};
+    vi.mocked(api.getCompanyQuote).mockReturnValue(
+      new Promise((resolve) => {
+        resolveQuote = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useCompanyData('KRX:005930', null));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.marketLoading).toBe(true);
+    expect(result.current.data?.company?.name).toBe('삼성전자');
+    expect(result.current.data?.quote).toBeUndefined();
+
+    resolveQuote(mockQuote('KRX:005930'));
+    await waitFor(() => expect(result.current.marketLoading).toBe(false));
+    expect(result.current.data?.quote?.status).toBe('available');
+    expect(result.current.data?.company?.name).toBe('삼성전자');
+  });
+
+  it('그래프 응답이 실패해도 시세 응답은 유지한다', async () => {
+    vi.mocked(api.getCompany).mockRejectedValue(new Error('그래프 조회 실패'));
+    const { result } = renderHook(() => useCompanyData('KRX:005930', null));
+    await waitFor(() => settled(result.current));
+    expect(result.current.data?.company).toBeUndefined();
+    expect(result.current.errors.company).toBe('그래프 조회 실패');
+    expect(result.current.data?.quote?.status).toBe('available');
   });
 
   it('keeps round selectors on documents but leaves latest prices independent', async () => {

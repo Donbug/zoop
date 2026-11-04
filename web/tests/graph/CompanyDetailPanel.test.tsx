@@ -31,6 +31,13 @@ const state = {
     holding: null,
   },
 };
+// 그래프 응답(company·documents)이 아직 없거나 실패한 상태
+const marketOnly = {
+  quote: state.data.quote,
+  metrics: state.data.metrics,
+  prices: state.data.prices,
+  holding: state.data.holding,
+};
 const fallback = {
   id: company.id,
   kind: 'company' as const,
@@ -202,23 +209,54 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     expect(screen.getByText('뉴스·공시')).toBeTruthy();
   });
 
-  it('시세 응답을 기다리는 동안에도 그래프 응답의 사건·뉴스를 먼저 보이고 시세 자리에만 로딩을 표시한다', () => {
+  it('그래프 응답을 기다리는 동안에도 노드 기업명·시세·차트·관련 기업을 먼저 보이고 사건·뉴스 자리에만 로딩을 표시한다', () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      loading: true,
+      data: marketOnly,
+    });
+    renderPanel();
+    expect(screen.getByRole('heading', { name: '삼성전자' })).toBeTruthy();
+    expect(
+      screen.getByRole('img', { name: '최근 1개월 가격 추이' }),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: '기업 상세' })).toBeTruthy();
+    expect(screen.getByText('NVIDIA')).toBeTruthy();
+    expect(screen.getByText('관련 사건을 불러오는 중')).toBeTruthy();
+    expect(screen.getByText('뉴스·공시를 불러오는 중')).toBeTruthy();
+    expect(screen.queryByText('직접 관련 사건')).toBeNull();
+    expect(screen.queryByText('표시할 뉴스·공시가 없습니다.')).toBeNull();
+  });
+
+  it('그래프 응답이 실패하면 시세는 그대로 두고 사건 자리에서 다시 시도한다', async () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      errors: { company: 'offline', documents: 'offline' },
+      data: marketOnly,
+    });
+    renderPanel();
+    expect(
+      screen.getByRole('img', { name: '최근 1개월 가격 추이' }),
+    ).toBeTruthy();
+    const alert = screen.getByText('관련 사건을 불러오지 못했습니다.');
+    const calls = vi.mocked(useCompanyData).mock.calls.length;
+    await userEvent.click(
+      within(alert.parentElement!).getByRole('button', { name: '다시 시도' }),
+    );
+    expect(vi.mocked(useCompanyData).mock.calls.at(-1)?.[2]).toBe(1);
+    expect(vi.mocked(useCompanyData).mock.calls.length).toBeGreaterThan(calls);
+  });
+
+  it('시세 응답을 기다리는 동안에는 시세 자리에만 로딩을 표시한다', () => {
     vi.mocked(useCompanyData).mockReturnValue({
       ...state,
       marketLoading: true,
-      data: {
-        company,
-        documents: mockDocuments(company.id),
-      } as typeof state.data,
+      data: { company, documents: mockDocuments(company.id) },
     });
     renderPanel();
     expect(screen.getByText('직접 관련 사건')).toBeTruthy();
-    expect(screen.getByText('뉴스·공시')).toBeTruthy();
     expect(screen.getByText('시세 정보를 불러오는 중')).toBeTruthy();
-    expect(screen.queryByText('기업 정보를 불러오는 중')).toBeNull();
-    expect(
-      screen.queryByRole('img', { name: '최근 1개월 가격 추이' }),
-    ).toBeNull();
+    expect(screen.queryByText('관련 사건을 불러오는 중')).toBeNull();
   });
 
   it('D-GRP-03 로고·종목코드·기업명·가격·등락·기준 시각을 머리에 모으고, 거래량 등 중요 정보는 회색 박스에 둔다', () => {

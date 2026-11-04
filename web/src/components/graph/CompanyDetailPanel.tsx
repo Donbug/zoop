@@ -207,7 +207,9 @@ export default function CompanyDetailPanel(props: Props) {
       setWatchOverride(props.watchSync.ids.includes(props.companyId));
   }
   const company = data?.company;
-  const watch = watchOverride ?? Boolean(company?.watch);
+  // 그래프 응답 전에는 지도 노드가 가진 관심 표시로 시작한다.
+  const watch =
+    watchOverride ?? Boolean(company?.watch ?? props.fallback.watch);
 
   async function toggleWatch() {
     if (!props.token || saving) return;
@@ -231,6 +233,7 @@ export default function CompanyDetailPanel(props: Props) {
   const quote = data?.quote?.status === 'available' ? data.quote : null;
   const prices = data?.prices?.status === 'available' ? data.prices : null;
   const metrics = data?.metrics?.status === 'available' ? data.metrics : null;
+  const holding = data?.holding;
   const name = company?.name ?? props.fallback.label;
   const logoUrl = companyLogo(
     props.fallback.id,
@@ -461,322 +464,330 @@ export default function CompanyDetailPanel(props: Props) {
           </div>
         </div>
       </header>
-      {loading && (
-        <LoadingIndicator
-          label="기업 정보를 불러오는 중"
-          className="company-panel-loading flex min-h-12 w-full"
-        />
-      )}
-      {!loading && !company && (
-        <div className="company-panel-fatal" role="alert">
-          <p>기업 정보를 불러오지 못했습니다.</p>
-          <button onClick={() => setRetry((value) => value + 1)}>
-            다시 시도
+      {/* 그래프 응답(사건·뉴스·공시)과 그 외 응답(시세·지표·보유)은 따로 도착한다. 패널은 바로 열고
+          기업명·로고·보유·관심은 지도 노드 값으로 먼저 보인다. 그래프 응답은 해당 섹션에서만 기다린다. */}
+      <div className={`company-panel-scroll ${ui.scroll}`}>
+        {/* 기업 머리 바로 아래에 주요 동작을 둔다(시세 박스보다 먼저). */}
+        <div className={`company-actions ${ui.actions}`}>
+          <Link
+            state={{
+              from: `${location.pathname}${location.search}${location.hash}`,
+            }}
+            to={
+              props.companyDetailHref?.(props.companyId) ??
+              `/companies/${encodeURIComponent(props.companyId)}`
+            }
+          >
+            기업 상세
+          </Link>
+          {props.token ? (
+            <button
+              onClick={() => void toggleWatch()}
+              disabled={saving}
+              aria-pressed={watch}
+            >
+              {saving ? '저장 중…' : watch ? '★ 관심 해제' : '☆ 관심 추가'}
+            </button>
+          ) : (
+            <Link to="/login" state={{ from: location }}>
+              로그인 후 관심 추가
+            </Link>
+          )}
+          {canFocus && (
+            <button onClick={props.onFocus}>기업 중심 그래프</button>
+          )}
+          <button
+            className={`bg-panel-ink! text-white! ${props.tutorialAi ? 'tutorial-target tutorial-ai-target' : ''}`}
+            disabled={props.tutorialSaving}
+            onClick={props.onAskAi}
+          >
+            AI에게 질문
           </button>
         </div>
-      )}
-      {company && (
-        <div className={`company-panel-scroll ${ui.scroll}`}>
-          {/* 기업 머리 바로 아래에 주요 동작을 둔다(시세 박스보다 먼저). */}
-          <div className={`company-actions ${ui.actions}`}>
-            <Link
-              state={{
-                from: `${location.pathname}${location.search}${location.hash}`,
-              }}
-              to={
-                props.companyDetailHref?.(company.id) ??
-                `/companies/${encodeURIComponent(company.id)}`
-              }
-            >
-              기업 상세
-            </Link>
-            {props.token ? (
-              <button
-                onClick={() => void toggleWatch()}
-                disabled={saving}
-                aria-pressed={watch}
-              >
-                {saving ? '저장 중…' : watch ? '★ 관심 해제' : '☆ 관심 추가'}
-              </button>
-            ) : (
-              <Link to="/login" state={{ from: location }}>
-                로그인 후 관심 추가
-              </Link>
-            )}
-            {canFocus && (
-              <button onClick={props.onFocus}>기업 중심 그래프</button>
-            )}
-            <button
-              className={`bg-panel-ink! text-white! ${props.tutorialAi ? 'tutorial-target tutorial-ai-target' : ''}`}
-              disabled={props.tutorialSaving}
-              onClick={props.onAskAi}
-            >
-              AI에게 질문
-            </button>
-          </div>
-          {watchError && (
-            <p className="company-watch-error" role="alert">
-              {watchError}{' '}
-              <button onClick={() => void toggleWatch()}>재시도</button>
+        {watchError && (
+          <p className="company-watch-error" role="alert">
+            {watchError}{' '}
+            <button onClick={() => void toggleWatch()}>재시도</button>
+          </p>
+        )}
+        <section className={`company-quote ${ui.sectionFrame}`}>
+          <h3 className="sr-only">시세</h3>
+          {/* 시세·가격·지표·보유는 그래프 응답과 따로 도착한다. 기다리는 동안 이 자리에만 표시한다. */}
+          {marketLoading && (
+            <LoadingIndicator
+              label="시세 정보를 불러오는 중"
+              className="flex min-h-12 w-full"
+            />
+          )}
+          {quote ? (
+            <>
+              <div className="company-stat-grid">
+                <span>
+                  거래량 <b>{number(quote.quote.volume)}</b>
+                </span>
+                <span>
+                  일중 범위{' '}
+                  <b>
+                    {number(quote.quote.dayLow)}–{number(quote.quote.dayHigh)}
+                  </b>
+                </span>
+                <span>
+                  52주 범위{' '}
+                  <b>
+                    {number(quote.quote.fiftyTwoWeekLow)}–
+                    {number(quote.quote.fiftyTwoWeekHigh)}
+                  </b>
+                </span>
+              </div>
+            </>
+          ) : data?.quote?.status === 'unavailable' ? (
+            <p className="company-unavailable">
+              시세 미제공 · {data.quote.reason}
+            </p>
+          ) : null}
+          <SectionError
+            message={errors.quote}
+            retry={() => setRetry((value) => value + 1)}
+          />
+          {prices ? (
+            <figure className="company-price-chart">
+              <figcaption>최근 1개월 시세 추이</figcaption>
+              <Sparkline values={prices.points.map((point) => point.close)} />
+              <p className="company-chart-range">
+                <span>{prices.points.at(0)?.time.slice(0, 10)}</span>
+                <span>{prices.points.at(-1)?.time.slice(0, 10)}</span>
+              </p>
+              <p className="company-caption">
+                {prices.source.name} · 마지막 거래{' '}
+                {prices.points.at(-1)?.time.slice(0, 10)}
+              </p>
+            </figure>
+          ) : data?.prices?.status === 'unavailable' ? (
+            <p className="company-unavailable">
+              가격 추이 미제공 · {data.prices.reason}
+            </p>
+          ) : null}
+          <SectionError
+            message={errors.prices}
+            retry={() => setRetry((value) => value + 1)}
+          />
+        </section>
+        <details className={`company-metrics ${ui.sectionFrame}`}>
+          <summary>
+            주요 지표 <span>{metrics ? `${metrics.items.length}개` : '—'}</span>
+          </summary>
+          {metrics?.items.map((item) => (
+            <p key={item.code}>
+              <span>{item.label}</span>
+              <b>{item.value}</b>
+            </p>
+          ))}
+          {data?.metrics?.status === 'unavailable' && (
+            <p className="company-unavailable">
+              지표 미제공 · {data.metrics.reason}
             </p>
           )}
-          <section className={`company-quote ${ui.sectionFrame}`}>
-            <h3 className="sr-only">시세</h3>
-            {/* 시세·가격·지표·보유는 그래프 응답과 따로 도착한다. 기다리는 동안 이 자리에만 표시한다. */}
-            {marketLoading && (
-              <LoadingIndicator
-                label="시세 정보를 불러오는 중"
-                className="flex min-h-12 w-full"
-              />
+          <SectionError
+            message={errors.metrics}
+            retry={() => setRetry((value) => value + 1)}
+          />
+        </details>
+        {(holding || errors.holding) && (
+          <section className={ui.sectionFrame}>
+            <div className="company-section-title">
+              <h3>가상 계좌 보유</h3>
+            </div>
+            {holding ? (
+              <div className="company-holding">
+                <span>
+                  수량 <b>{number(holding.quantity)}주</b>
+                </span>
+                <span>
+                  평균 단가{' '}
+                  <b>
+                    {number(holding.avgPrice)} {holding.avgPriceCurrency}
+                  </b>
+                </span>
+                <span>
+                  평가액{' '}
+                  <b>
+                    {holding.marketValue === null
+                      ? '제공되지 않음'
+                      : number(holding.marketValue)}
+                  </b>
+                </span>
+                <span>
+                  비중{' '}
+                  <b>{holding.weight === null ? '-' : `${holding.weight}%`}</b>
+                </span>
+              </div>
+            ) : errors.holding ? null : (
+              <p className="company-unavailable">
+                이 기업의 모의 보유 내역이 없습니다.
+              </p>
             )}
-            {quote ? (
-              <>
-                <div className="company-stat-grid">
-                  <span>
-                    거래량 <b>{number(quote.quote.volume)}</b>
-                  </span>
-                  <span>
-                    일중 범위{' '}
-                    <b>
-                      {number(quote.quote.dayLow)}–{number(quote.quote.dayHigh)}
-                    </b>
-                  </span>
-                  <span>
-                    52주 범위{' '}
-                    <b>
-                      {number(quote.quote.fiftyTwoWeekLow)}–
-                      {number(quote.quote.fiftyTwoWeekHigh)}
-                    </b>
-                  </span>
-                </div>
-              </>
-            ) : data.quote?.status === 'unavailable' ? (
-              <p className="company-unavailable">
-                시세 미제공 · {data.quote.reason}
-              </p>
-            ) : null}
             <SectionError
-              message={errors.quote}
-              retry={() => setRetry((value) => value + 1)}
-            />
-            {prices ? (
-              <figure className="company-price-chart">
-                <figcaption>최근 1개월 시세 추이</figcaption>
-                <Sparkline values={prices.points.map((point) => point.close)} />
-                <p className="company-chart-range">
-                  <span>{prices.points.at(0)?.time.slice(0, 10)}</span>
-                  <span>{prices.points.at(-1)?.time.slice(0, 10)}</span>
-                </p>
-                <p className="company-caption">
-                  {prices.source.name} · 마지막 거래{' '}
-                  {prices.points.at(-1)?.time.slice(0, 10)}
-                </p>
-              </figure>
-            ) : data.prices?.status === 'unavailable' ? (
-              <p className="company-unavailable">
-                가격 추이 미제공 · {data.prices.reason}
-              </p>
-            ) : null}
-            <SectionError
-              message={errors.prices}
+              message={errors.holding}
               retry={() => setRetry((value) => value + 1)}
             />
           </section>
-          <details className={`company-metrics ${ui.sectionFrame}`}>
-            <summary>
-              주요 지표{' '}
-              <span>{metrics ? `${metrics.items.length}개` : '—'}</span>
-            </summary>
-            {metrics?.items.map((item) => (
-              <p key={item.code}>
-                <span>{item.label}</span>
-                <b>{item.value}</b>
-              </p>
-            ))}
-            {data.metrics?.status === 'unavailable' && (
-              <p className="company-unavailable">
-                지표 미제공 · {data.metrics.reason}
-              </p>
+        )}
+        {!company && (
+          <section className={ui.sectionFrame}>
+            {loading ? (
+              <LoadingIndicator
+                label="관련 사건을 불러오는 중"
+                className="company-panel-loading flex min-h-12 w-full"
+              />
+            ) : (
+              <div className="company-panel-fatal" role="alert">
+                <p>관련 사건을 불러오지 못했습니다.</p>
+                <button onClick={() => setRetry((value) => value + 1)}>
+                  다시 시도
+                </button>
+              </div>
             )}
-            <SectionError
-              message={errors.metrics}
-              retry={() => setRetry((value) => value + 1)}
-            />
-          </details>
-          {(data.holding || errors.holding) && (
+          </section>
+        )}
+        {company && (
+          <>
             <section className={ui.sectionFrame}>
               <div className="company-section-title">
-                <h3>가상 계좌 보유</h3>
-              </div>
-              {data.holding ? (
-                <div className="company-holding">
-                  <span>
-                    수량 <b>{number(data.holding.quantity)}주</b>
-                  </span>
-                  <span>
-                    평균 단가{' '}
-                    <b>
-                      {number(data.holding.avgPrice)}{' '}
-                      {data.holding.avgPriceCurrency}
-                    </b>
-                  </span>
-                  <span>
-                    평가액{' '}
-                    <b>
-                      {data.holding.marketValue === null
-                        ? '제공되지 않음'
-                        : number(data.holding.marketValue)}
-                    </b>
-                  </span>
-                  <span>
-                    비중{' '}
-                    <b>
-                      {data.holding.weight === null
-                        ? '-'
-                        : `${data.holding.weight}%`}
-                    </b>
-                  </span>
+                <div className="flex items-center gap-1.5">
+                  <h3>직접 관련 사건</h3>
+                  <RelationHint
+                    label="직접 관련"
+                    text={relationHelp.INVOLVES}
+                  />
                 </div>
-              ) : errors.holding ? null : (
+                <span>{company.directIssues.length}</span>
+              </div>
+              {company.directIssues.length ? (
+                issueList(company.directIssues, false, '직접 관련 사건')
+              ) : (
                 <p className="company-unavailable">
-                  이 기업의 모의 보유 내역이 없습니다.
+                  직접 관련 사건이 없습니다.
                 </p>
               )}
-              <SectionError
-                message={errors.holding}
-                retry={() => setRetry((value) => value + 1)}
-              />
             </section>
-          )}
-          <section className={ui.sectionFrame}>
-            <div className="company-section-title">
-              <div className="flex items-center gap-1.5">
-                <h3>직접 관련 사건</h3>
-                <RelationHint label="직접 관련" text={relationHelp.INVOLVES} />
+            <section className={ui.sectionFrame}>
+              <div className="company-section-title">
+                <div className="flex items-center gap-1.5">
+                  <h3>간접 관련 사건</h3>
+                  <RelationHint
+                    label="간접 관련"
+                    text={`기사에 이 기업이 직접 나오지는 않지만 데이터로 이어진 사건입니다. ${relationHelp.STRUCTURALLY_RELATED_TO} ${relationHelp.FOLLOWS}`}
+                  />
+                </div>
+                <span>{indirect.length}</span>
               </div>
-              <span>{company.directIssues.length}</span>
+              {indirect.length ? (
+                issueList(indirect, true, '간접 관련 사건')
+              ) : (
+                <p className="company-unavailable">
+                  확인된 간접 관련 사건이 없습니다.
+                </p>
+              )}
+            </section>
+          </>
+        )}
+        <section className={ui.sectionFrame}>
+          <div className="company-section-title">
+            <div className="flex items-center gap-1.5">
+              <h3>관련 기업</h3>
+              <RelationHint label="관련 기업" text={relatedCompaniesHelp} />
             </div>
-            {company.directIssues.length ? (
-              issueList(company.directIssues, false, '직접 관련 사건')
-            ) : (
-              <p className="company-unavailable">직접 관련 사건이 없습니다.</p>
-            )}
-          </section>
-          <section className={ui.sectionFrame}>
-            <div className="company-section-title">
-              <div className="flex items-center gap-1.5">
-                <h3>간접 관련 사건</h3>
-                <RelationHint
-                  label="간접 관련"
-                  text={`기사에 이 기업이 직접 나오지는 않지만 데이터로 이어진 사건입니다. ${relationHelp.STRUCTURALLY_RELATED_TO} ${relationHelp.FOLLOWS}`}
-                />
-              </div>
-              <span>{indirect.length}</span>
-            </div>
-            {indirect.length ? (
-              issueList(indirect, true, '간접 관련 사건')
-            ) : (
-              <p className="company-unavailable">
-                확인된 간접 관련 사건이 없습니다.
-              </p>
-            )}
-          </section>
-          <section className={ui.sectionFrame}>
-            <div className="company-section-title">
-              <div className="flex items-center gap-1.5">
-                <h3>관련 기업</h3>
-                <RelationHint label="관련 기업" text={relatedCompaniesHelp} />
-              </div>
-              <span>{props.relatedCompanies.length}</span>
-            </div>
-            {props.relatedCompanies.length ? (
-              <>
-                <ul className="company-list company-related-companies">
-                  {props.relatedCompanies.slice(0, 5).map(relatedItem)}
-                </ul>
-                {/* 6곳부터는 접어 두고, 펼치면 나머지를 같은 목록으로 보여 준다. */}
-                {props.relatedCompanies.length > 5 && (
-                  <details className="company-aliases">
-                    <summary>
-                      관련 기업 {props.relatedCompanies.length - 5}곳 더 보기
-                    </summary>
-                    <ul className="company-list company-related-companies">
-                      {props.relatedCompanies.slice(5).map(relatedItem)}
-                    </ul>
-                  </details>
-                )}
-              </>
-            ) : (
-              <p className="company-unavailable">
-                확인된 관련 기업이 없습니다.
-              </p>
-            )}
-          </section>
-          <section className={ui.sectionFrame}>
-            <div className="company-section-title">
-              <h3>뉴스·공시</h3>
-              <span>{data.documents?.items.length ?? '—'}</span>
-            </div>
-            {documents.length ? (
-              <ul className="company-list">
-                {/* M7 · prototype company-summary.tsx:76-81: 최근 3건과 문서별 판정만 보이고, 전체는 기업 상세 문서 탭으로 보낸다. */}
-                {documents.slice(0, VISIBLE_DOCUMENTS).map((document) => (
-                  <li key={document.id}>
-                    {document.url ? (
-                      <a href={document.url} target="_blank" rel="noreferrer">
-                        <b>{document.title ?? '제목 없음'}</b>
-                        <span>
-                          {document.kind === 'news' ? '뉴스' : '공시'} ·{' '}
-                          {document.publisher ?? '출처 미상'} ·{' '}
-                          {document.publishedAt?.slice(0, 10) ?? '시각 미상'}
-                        </span>
-                      </a>
-                    ) : (
-                      <div className="company-document">
-                        <b>{document.title ?? '제목 없음'}</b>
-                        <span>
-                          {document.kind === 'news' ? '뉴스' : '공시'} ·{' '}
-                          {document.publisher ?? '출처 미상'} · 원문 링크 미제공
-                        </span>
-                      </div>
-                    )}
-                    <DocumentSentimentLine
-                      document={document}
-                      companyId={company.id}
-                    />
-                  </li>
-                ))}
+            <span>{props.relatedCompanies.length}</span>
+          </div>
+          {props.relatedCompanies.length ? (
+            <>
+              <ul className="company-list company-related-companies">
+                {props.relatedCompanies.slice(0, 5).map(relatedItem)}
               </ul>
-            ) : !errors.documents ? (
-              <p className="company-unavailable">
-                표시할 뉴스·공시가 없습니다.
-              </p>
-            ) : null}
-            {documents.length > VISIBLE_DOCUMENTS && (
-              <p className="company-unavailable mt-2">
-                최근 {VISIBLE_DOCUMENTS}건만 보여요. 전체 뉴스·공시는{' '}
-                <Link
-                  className="underline"
-                  state={{
-                    from: `${location.pathname}${location.search}${location.hash}`,
-                  }}
-                  to={documentsHref(
-                    props.companyDetailHref?.(company.id) ??
-                      `/companies/${encodeURIComponent(company.id)}`,
-                  )}
-                >
-                  기업 상세 문서
-                </Link>
-                에서 볼 수 있어요.
-              </p>
-            )}
-            <SectionError
-              message={errors.documents}
-              retry={() => setRetry((value) => value + 1)}
+              {/* 6곳부터는 접어 두고, 펼치면 나머지를 같은 목록으로 보여 준다. */}
+              {props.relatedCompanies.length > 5 && (
+                <details className="company-aliases">
+                  <summary>
+                    관련 기업 {props.relatedCompanies.length - 5}곳 더 보기
+                  </summary>
+                  <ul className="company-list company-related-companies">
+                    {props.relatedCompanies.slice(5).map(relatedItem)}
+                  </ul>
+                </details>
+              )}
+            </>
+          ) : (
+            <p className="company-unavailable">확인된 관련 기업이 없습니다.</p>
+          )}
+        </section>
+        <section className={ui.sectionFrame}>
+          <div className="company-section-title">
+            <h3>뉴스·공시</h3>
+            <span>{data?.documents?.items.length ?? '—'}</span>
+          </div>
+          {loading && (
+            <LoadingIndicator
+              label="뉴스·공시를 불러오는 중"
+              className="flex min-h-12 w-full"
             />
-          </section>
-        </div>
-      )}
+          )}
+          {documents.length ? (
+            <ul className="company-list">
+              {/* M7 · prototype company-summary.tsx:76-81: 최근 3건과 문서별 판정만 보이고, 전체는 기업 상세 문서 탭으로 보낸다. */}
+              {documents.slice(0, VISIBLE_DOCUMENTS).map((document) => (
+                <li key={document.id}>
+                  {document.url ? (
+                    <a href={document.url} target="_blank" rel="noreferrer">
+                      <b>{document.title ?? '제목 없음'}</b>
+                      <span>
+                        {document.kind === 'news' ? '뉴스' : '공시'} ·{' '}
+                        {document.publisher ?? '출처 미상'} ·{' '}
+                        {document.publishedAt?.slice(0, 10) ?? '시각 미상'}
+                      </span>
+                    </a>
+                  ) : (
+                    <div className="company-document">
+                      <b>{document.title ?? '제목 없음'}</b>
+                      <span>
+                        {document.kind === 'news' ? '뉴스' : '공시'} ·{' '}
+                        {document.publisher ?? '출처 미상'} · 원문 링크 미제공
+                      </span>
+                    </div>
+                  )}
+                  <DocumentSentimentLine
+                    document={document}
+                    companyId={props.companyId}
+                  />
+                </li>
+              ))}
+            </ul>
+          ) : !loading && !errors.documents ? (
+            <p className="company-unavailable">표시할 뉴스·공시가 없습니다.</p>
+          ) : null}
+          {documents.length > VISIBLE_DOCUMENTS && (
+            <p className="company-unavailable mt-2">
+              최근 {VISIBLE_DOCUMENTS}건만 보여요. 전체 뉴스·공시는{' '}
+              <Link
+                className="underline"
+                state={{
+                  from: `${location.pathname}${location.search}${location.hash}`,
+                }}
+                to={documentsHref(
+                  props.companyDetailHref?.(props.companyId) ??
+                    `/companies/${encodeURIComponent(props.companyId)}`,
+                )}
+              >
+                기업 상세 문서
+              </Link>
+              에서 볼 수 있어요.
+            </p>
+          )}
+          <SectionError
+            message={errors.documents}
+            retry={() => setRetry((value) => value + 1)}
+          />
+        </section>
+      </div>
     </aside>
   );
 }
