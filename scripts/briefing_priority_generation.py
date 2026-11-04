@@ -65,7 +65,10 @@ def generate(client, inputs, scope):
 
 def prove(record, calls):
     scope = record['scope']; frozen = record['frozen']; draft = record['draft']; checked = record['verification']
-    m.check_seal(frozen); c.validate(draft, frozen, scope)
+    m.check_seal(frozen)
+    expected = c.COMMON if scope == 'common' else c.PERSONAL
+    c.require(record['promptVersion'] == frozen['version'] == expected and frozen['producerVersion'] == VERSION, 'priority_version_binding')
+    c.validate(draft, frozen, scope)
     c.require(not c.failures(checked, frozen, scope), 'priority_unverified_record')
     unsigned = {k: v for k, v in record.items() if k != 'resultVersion'}
     c.require(record['resultVersion'] == record['promptVersion'] + '-' + b.digest(b.canonical(unsigned)), 'priority_record_digest')

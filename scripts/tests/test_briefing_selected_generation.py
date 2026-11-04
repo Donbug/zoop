@@ -85,7 +85,7 @@ class SelectedGenerationTests(unittest.TestCase):
                 'priorityContract':priority.VERSION,'serverLedgerCommand':['synthetic-java'],'serverBudgetWork':approval['serverBudgetWork']}
             auth.write_text(json.dumps(approval));auth.chmod(0o600);config.write_text(json.dumps(cfg));config.chmod(0o600)
             self.assertEqual(cfg,g.load_config(config))
-            for key,value in [('dsn',dsn+'2'),('serverBudgetWork',str(root/'other')),('priorityContract','legacy')]:
+            for key,value in [('dsn',dsn+'2'),('serverBudgetWork',str(root/'other')),('priorityContract','legacy'),('maxNewCalls',1),('maxAggregateCalls',8),('maxUsd','0.01')]:
                 config.write_text(json.dumps({**cfg,key:value}))
                 with self.assertRaises(ValueError):g.load_config(config)
 

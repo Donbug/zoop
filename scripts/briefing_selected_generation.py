@@ -164,7 +164,7 @@ def generation_client(conn,cfg,job_id,snapshot,out):
     session=Session(pipe,claim,out/'usage',estimate={'currency':'USD','priceVersion':'openai-luna-standard-20261103','inputPerMillion':0.10,'outputPerMillion':0.50})
     budget_cfg={**cfg,'work':cfg['serverBudgetWork']}
     session.budget=runtime.Budget(budget_cfg,snapshot['roundId'],lambda:current_authority(conn,cfg,snapshot,job_id),b.authenticated_transport(Path(cfg['keyFile'])))
-    client=runtime.RecordedClient(out,session.budget.transport,6,prompt_root=m.PROMPTS)
+    client=runtime.RecordedClient(out,session.budget.transport,min(6,cfg.get('maxNewCalls',6)),prompt_root=m.PROMPTS)
     try:
         with recorded(client,session):
             m.require(not session.terminal,'selected_completed_result_requires_recovery')
@@ -235,8 +235,9 @@ def process(conn,cfg,job_id):
             if getattr(client,'usage',None) is not None:client.usage.outcome='withheld' if withheld else 'available'
             status='ready' if not withheld else 'partial' if passed or len(snapshot['selectedIssueIds'])>len(snapshot['inputs']) else 'withheld'
             outcome={'passedIssueIds':passed,'withheld':withheld,'newCalls':len(client.new_calls),'reusedCalls':len(client.reused_calls),'model':b.MODEL,'verificationMode':'separate_request_same_model'}
-            conn.execute("UPDATE briefing_selected_generation_jobs SET status=%s,outcome=%s,finished_at=now() WHERE id=%s AND status='running'",(status,Jsonb(outcome),job_id))
-            print(json.dumps({'jobId':job_id,'status':status,'passed':len(passed),'withheld':len(withheld),'newCalls':len(client.new_calls)}),flush=True)
+        # The usage ledger must acknowledge completion before the member job becomes ready.
+        conn.execute("UPDATE briefing_selected_generation_jobs SET status=%s,outcome=%s,finished_at=now() WHERE id=%s AND status='running'",(status,Jsonb(outcome),job_id))
+        print(json.dumps({'jobId':job_id,'status':status,'passed':len(passed),'withheld':len(withheld),'newCalls':len(client.new_calls)}),flush=True)
     finally:
         for key in locks:conn.execute('SELECT pg_advisory_unlock(%s)',(key,))
 
@@ -271,6 +272,7 @@ def load_config(path):
         m.require(approval.get('scope')=='priority-selected-server-v1' and cfg.get('priorityContract')=='priority-business-producer-v1'
             and approval.get('databaseDsnSha256')==b.digest(cfg['dsn'].encode())
             and approval.get('serverBudgetWork')==cfg.get('serverBudgetWork')
+            and 6<=cfg['maxNewCalls'] and cfg['maxAggregateCalls']>=16 and Decimal(cfg['maxUsd'])>=1
             and isinstance(cfg['serverLedgerCommand'],list) and bool(cfg['serverLedgerCommand'])
             and target.scheme=='postgresql' and bool(target.hostname) and bool(target.path.strip('/')),'selected_exact_server_authorization')
     else:m.require(local,'local_worker_database')
