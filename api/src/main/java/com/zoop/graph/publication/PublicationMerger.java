@@ -33,7 +33,7 @@ public final class PublicationMerger {
     /** {@link #DECISIONS_SCHEMA} plus {@code labelCorrections}: a person's display name for a public issue, which no source value supplies. */
     public static final String DECISIONS_SCHEMA_2 = "zoop-graph-publication-decisions-2";
     public static final String LABEL_CORRECTIONS = "labelCorrections";
-    /** Longest corrected name, in Unicode code points (the first ten corrections run 25–46); a longer one is refused, never cut. */
+    /** Longest corrected name, in Unicode code points (not UTF-16 units); a longer one is refused, never cut or normalized. */
     public static final int MAX_LABEL_LENGTH = 120;
     public static final List<String> FIELDS = List.of("label", "action", "target", "assertionStatus", "eventTime", "period", "geography");
     private static final List<String> SELECTIONS = List.of("issueMappings", "fieldSelections", "relationSelections");
@@ -188,7 +188,7 @@ public final class PublicationMerger {
             Obj correction = corrections.get(publicId);
             if (correction != null) {
                 usedCorrections.add(publicId);
-                label = correctedLabel(correction, owners.get("label"), headline, originals, sources);
+                label = correctedLabel(correction, owners.get("label"), originals, sources);
             }
             Issue time = originals.get(owners.get("eventTime")); Issue geo = originals.get(owners.get("geography"));
             TreeSet<String> articleIds = new TreeSet<>(); TreeSet<String> evidenceIds = new TreeSet<>();
@@ -311,25 +311,35 @@ public final class PublicationMerger {
      * A person's display name for a public issue. It replaces only {@code label}: the headline owner, its proof, the representative
      * mention and every other field stay as the sources and selections decided them. The correction names the source value it
      * corrects ({@code expectedLabelDigest}, the digest of the owner's {@code label} as {@link #field} reads it), so a later source
-     * that changes that value stops the merge instead of carrying the old name forward. Its evidence is the label owner's own: the
-     * owner is already the issue's atomic proof (losing any of its evidence or articles hides the whole issue), so the corrected name
-     * never outlives the facts it cites, and no other member's evidence is needed to keep it.
+     * that changes that value stops the merge instead of carrying the old name forward. Its evidence is the label owner's own, because
+     * the correction replaces that owner's value and inherits its provenance: the owner is the issue's atomic proof (losing any of its
+     * evidence or articles hides the whole issue), so the corrected name never outlives the facts behind the value it replaces.
+     * When a selection moves the label owner, the carried correction must be restated with the new owner's evidence in the same
+     * decisions file; a correction grounded elsewhere is {@code mapping_unproven}, like any other evidence outside its owner.
      * A correction back to the source value withdraws the display change and keeps the record of both decisions.
      * Only people correct names: the automatic reviewer is refused here as well as by the operator compose.
      */
-    private static String correctedLabel(Obj correction, IssueRef owner, Issue headline, Map<IssueRef, Issue> originals,
-            Map<String, Contribution> sources) {
+    private static String correctedLabel(Obj correction, IssueRef owner, Map<IssueRef, Issue> originals, Map<String, Contribution> sources) {
         correction.exactly(Set.of("issueId", "expectedLabelDigest", "label", "evidenceRefs", "reviewer", "decisionRef", "decisionVersion"));
         audit(correction);
         if (automatic(correction)) throw failure("request_invalid");
         String expected = correction.string("expectedLabelDigest");
         if (!StrictJson.SHA256.matcher(expected).matches()) throw failure("request_invalid");
-        if (!expected.equals(Canonical.digest(field(headline, "label")))) throw failure("identity_conflict");
+        if (!expected.equals(Canonical.digest(field(originals.get(owner), "label")))) throw failure("identity_conflict");
         String label = correction.string("label");
         if (label.isBlank() || !label.equals(label.strip()) || label.codePointCount(0, label.length()) > MAX_LABEL_LENGTH
-                || label.codePoints().anyMatch(Character::isISOControl)) throw failure("request_invalid");
+                || !label.codePoints().allMatch(PublicationMerger::visible)) throw failure("request_invalid");
         if (!evidenceRefs(correction, originals, sources).equals(Set.of(owner))) throw failure("mapping_unproven");
         return label;
+    }
+
+    /** A code point a display name may carry: no control, format (zero-width, bidi override), separator, surrogate, private or unassigned. */
+    private static boolean visible(int codePoint) {
+        return switch (Character.getType(codePoint)) {
+            case Character.CONTROL, Character.FORMAT, Character.LINE_SEPARATOR, Character.PARAGRAPH_SEPARATOR,
+                    Character.SURROGATE, Character.PRIVATE_USE, Character.UNASSIGNED -> false;
+            default -> true;
+        };
     }
 
     /**

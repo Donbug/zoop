@@ -370,6 +370,27 @@ class PublicationMergerTest {
         ObjectNode mixed = corrected(published, "Name"); ((tools.jackson.databind.node.ArrayNode) correction(mixed).get("evidenceRefs")).add(evidenceRef(member));
         Obj both = PublicationMerger.combine(Obj.of(peopleLabel(published)), Obj.of(mixed));
         assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published, member), both, base.issueSources().keySet(), base.issueSources())));
+        // A selection that moves the owner to a member with the same text leaves a carried correction ungrounded until it is restated.
+        Obj moved = PublicationMerger.combine(Obj.of(corrected(published, "Name")), Obj.of(peopleLabelOf(member)));
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published, member), moved, base.issueSources().keySet(), base.issueSources())));
+        ObjectNode restated = corrected(member, "Name");
+        Obj regrounded = PublicationMerger.combine(moved, Obj.of(restated));
+        var movedMerge = PublicationMerger.merge(List.of(published, member), regrounded, base.issueSources().keySet(), base.issueSources());
+        assertEquals("Name", movedMerge.issues().getFirst().label());
+        assertEquals(member.issueRef("same"), movedMerge.issueSources().get("same").headlineSources().get("label"));
+        // Without a base the owner is the default one (the member carrying the public id first in source order): only its evidence counts.
+        Contribution twin = copy(published, 3);
+        Contribution earlier = published.sourceVersionId().compareTo(twin.sourceVersionId()) < 0 ? published : twin;
+        Contribution later = earlier == published ? twin : published;
+        assertEquals("Name", PublicationMerger.merge(List.of(published, twin), Obj.of(corrected(earlier, "Name")), Set.of()).issues().getFirst().label());
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published, twin), Obj.of(corrected(later, "Name")), Set.of())));
+        // Invisible code points are refused like control characters: zero-width space, bidi override, line separator, lone surrogate.
+        for (String bad : List.of("Name​", "삼성전자‮담합", "Na me", "Na\uD83Dme", "Name")) {
+            ObjectNode name = corrected(published, bad);
+            assertEquals("request_invalid", code(() -> PublicationMerger.merge(List.of(published), Obj.of(name), Set.of())), bad);
+        }
+        assertEquals("삼성전자·ASML, High NA EUV 도입 협력 계획 😀", PublicationMerger.merge(List.of(published),
+                Obj.of(corrected(published, "삼성전자·ASML, High NA EUV 도입 협력 계획 😀")), Set.of()).issues().getFirst().label());
         ObjectNode automatic = corrected(published, "Name"); correction(automatic).put("reviewer", PublicationMerger.AUTO_REVIEWER);
         assertTrue(PublicationMerger.claimsAutomaticReviewer(Obj.of(automatic)));
         assertEquals("request_invalid", code(() -> PublicationMerger.merge(List.of(published), Obj.of(automatic), Set.of())));
@@ -474,12 +495,16 @@ class PublicationMergerTest {
     }
 
     private static ObjectNode peopleLabel(Contribution published) {
+        return peopleLabelOf(published);
+    }
+    /** A person's label selection of issue {@code same} that takes {@code owner}'s value and cites its evidence. */
+    private static ObjectNode peopleLabelOf(Contribution owner) {
         ObjectNode people = (ObjectNode) PublicationMerger.emptyDecisions().node().deepCopy();
         var choice = ((tools.jackson.databind.node.ArrayNode) people.get("fieldSelections")).addObject();
         choice.put("issueId", "same"); choice.put("field", "label");
-        choice.put("expectedValueDigest", Canonical.digest(PublicationMerger.field(published.projection().issues().getFirst(), "label")));
-        choice.set("takeFrom", GraphPublicationReader.json(published.issueRef("same")));
-        choice.putArray("evidenceRefs").add(evidenceRef(published)); audit(choice);
+        choice.put("expectedValueDigest", Canonical.digest(PublicationMerger.field(owner.projection().issues().getFirst(), "label")));
+        choice.set("takeFrom", GraphPublicationReader.json(owner.issueRef("same")));
+        choice.putArray("evidenceRefs").add(evidenceRef(owner)); audit(choice);
         return people;
     }
     /** {@code other}'s source and evidence, with every headline field of {@code published}'s issue. */
