@@ -60,7 +60,11 @@ import {
   restoreTargets,
 } from '@/components/graph/graph-view';
 import IsolatedIssuesPanel from '@/components/graph/IsolatedIssuesPanel';
-import { GROUP_PREFIX, groupIssues } from '@/components/graph/issue-groups';
+import {
+  GROUP_PREFIX,
+  groupIssues,
+  viewRequest,
+} from '@/components/graph/issue-groups';
 import MapDetailSheet from '@/components/graph/MapDetailSheet';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useCompanyResource } from '@/hooks/useCompanyResource';
@@ -381,27 +385,20 @@ function MapWorkspace({
     retry,
     prefetch,
   );
-  // 저장본을 일시적으로 읽지 못한 경우만 다시 확인할 수 있다. 미기록·중단·
-  // 미발행·대상 비공개는 같은 요청을 반복해도 달라지지 않는 회차 상태다.
   // D-GRP-01: 같은 제목의 사건은 지도에 노드 하나로 그린다. 상세·근거·영향은 원래 사건 data로 찾는다.
   // 회차·튜토리얼은 핵심 사건·안내 대상을 원래 ID로 가리키므로 묶지 않는다.
+  // 묶음 그래프는 응답마다 한 번만 만든다. 렌더마다 새로 만들면 지도가 매번 다시 그려진다.
+  const groupable = !round && !tutorialOpen;
   const grouping = useMemo(
-    () => (data && !round && !tutorialOpen ? groupIssues(data) : null),
-    [data, round, tutorialOpen],
+    () => (data && groupable ? groupIssues(data) : null),
+    [data, groupable],
   );
   const mapData = grouping?.graph ?? data;
   const toView = (id: string | null | undefined) =>
     id ? (grouping?.groupOf.get(id) ?? id) : (id ?? null);
-  const viewCenterRequest = useMemo(
-    () =>
-      centerRequest && grouping
-        ? {
-            ...centerRequest,
-            id: grouping.groupOf.get(centerRequest.id) ?? centerRequest.id,
-          }
-        : centerRequest,
-    [centerRequest, grouping],
-  );
+  const viewCenterRequest = viewRequest(centerRequest, grouping);
+  // 저장본을 일시적으로 읽지 못한 경우만 다시 확인할 수 있다. 미기록·중단·
+  // 미발행·대상 비공개는 같은 요청을 반복해도 달라지지 않는 회차 상태다.
   const graphErrorRetryable =
     !unavailableReason || unavailableReason === 'snapshot_unavailable';
   const appliedMode = data?.metadata.mode ?? 'all';

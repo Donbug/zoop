@@ -105,3 +105,20 @@ export function groupIssues(data: GraphResponse): IssueGroups {
     edgeOf,
   };
 }
+
+type CenterRequest = { id: string; seq: number };
+const viewRequests = new WeakMap<CenterRequest, CenterRequest>();
+
+/** 묶인 사건으로 지도 이동을 요청하면 묶음 노드로 옮긴다. 같은 요청에는 같은 객체를 돌려준다. */
+export function viewRequest(
+  request: CenterRequest | null,
+  groups: IssueGroups | null,
+): CenterRequest | null {
+  const group = request && groups?.groupOf.get(request.id);
+  if (!request || !group) return request;
+  const cached = viewRequests.get(request);
+  if (cached?.id === group) return cached;
+  const next = { ...request, id: group };
+  viewRequests.set(request, next);
+  return next;
+}

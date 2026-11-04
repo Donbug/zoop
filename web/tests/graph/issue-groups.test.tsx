@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import IsolatedIssuesPanel from '@/components/graph/IsolatedIssuesPanel';
-import { groupIssues } from '@/components/graph/issue-groups';
+import { groupIssues, viewRequest } from '@/components/graph/issue-groups';
 import { toG6Data } from '@/components/graph/graph-model';
 import type { GraphEdge, GraphNode, GraphResponse } from '@/types/map/graph';
 
@@ -116,7 +116,7 @@ it('D-GRP-01 같은 제목 사건을 노드 하나로 묶고 기업 연결은 �
     view.edges.find((item) => item.relationType === 'SHARES_ISSUE')?.via,
   ).toEqual(['group:issue-a']);
   // 그리기 모델도 묶음 노드 하나만 만든다.
-  const g6 = toG6Data(view);
+  const g6 = toG6Data(view, 1200, 700);
   expect(g6.nodes?.filter((item) => item.id.startsWith('group:'))).toHaveLength(
     1,
   );
@@ -161,4 +161,15 @@ it('D-GRP-01 묶음 패널은 묶인 사건을 내용으로 구분해 보여 주
     }),
   );
   expect(select).toHaveBeenCalledWith('issue-a');
+});
+
+it('D-GRP-01 묶인 사건으로 이동을 요청하면 묶음 노드로 옮기고 같은 요청은 같은 객체로 둔다', () => {
+  const groups = groupIssues(graph());
+  const request = { id: 'issue-b', seq: 3 };
+  const moved = viewRequest(request, groups);
+  expect(moved).toEqual({ id: 'group:issue-a', seq: 3 });
+  expect(viewRequest(request, groups)).toBe(moved);
+  const plain = { id: 'issue-c', seq: 4 };
+  expect(viewRequest(plain, groups)).toBe(plain);
+  expect(viewRequest(null, groups)).toBeNull();
 });
