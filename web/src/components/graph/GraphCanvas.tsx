@@ -38,6 +38,7 @@ import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
 import { applyGraphReading, keepAppliedStyles } from './graph-readability';
 import { applyMapDimming, restoreMapDimming } from './graph-dimming';
+import { configureMinimap } from './graph-minimap';
 import { graphText, loadGraphFonts } from './graph-fonts';
 import {
   cameraMotion,
@@ -631,14 +632,7 @@ export default function GraphCanvas({
    * 그 연결을 끊고, 데이터나 위치가 바뀐 뒤에만 돌려받은 함수로 다시 그린다.
    */
   function minimapOnDataChange(graph: Graph) {
-    const plugin = minimapShown.current
-      ? (graph.getPluginInstance('graph-overview') as unknown as
-          { onDraw?: () => void; onRender?: () => void } | undefined)
-      : undefined;
-    if (!plugin?.onDraw || !plugin.onRender) return null;
-    graph.off('afterdraw', plugin.onDraw);
-    graph.off('afteranimate', plugin.onRender);
-    return plugin.onRender;
+    return minimapShown.current ? configureMinimap(graph) : null;
   }
   async function fitVisibleGraph(
     graph: Graph,
@@ -1170,6 +1164,7 @@ export default function GraphCanvas({
                   type: 'minimap',
                   key: 'graph-overview',
                   size: [192, 128],
+                  padding: 10,
                   position: 'right-bottom',
                   // G6 passes this value to classList.add: it must be one token.
                   className: 'graph-overview',
@@ -1687,7 +1682,7 @@ export default function GraphCanvas({
         ref={container}
         // G6 writes an inline position: relative on its container, which would size the host by
         // its own canvas. Keep it pinned to the map surface so each new graph measures full size.
-        className={`relationship-g6 absolute! inset-0 ${(tutorialLocked && !tutorialCameraEnabled) || tutorialPhase ? 'pointer-events-none' : ''} ${tutorialPhase ? 'opacity-35' : ''}`}
+        className={`relationship-g6 absolute! inset-0 [&_.graph-overview]:bg-zoop-paper! [&_.graph-overview]:border-zoop-line! ${(tutorialLocked && !tutorialCameraEnabled) || tutorialPhase ? 'pointer-events-none' : ''} ${tutorialPhase ? 'opacity-35' : ''}`}
         data-tutorial-action={tutorialCameraEnabled ? 'move' : undefined}
         aria-disabled={Boolean(tutorialPhase)}
         role="img"
