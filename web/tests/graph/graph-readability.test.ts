@@ -3,10 +3,14 @@ import {
   applyGraphReading,
   culledLabels,
   keepAppliedStyles,
+  OVERVIEW_ZOOM,
   readingStyles,
   type ReadingContext,
 } from '@/components/graph/graph-readability';
-import { toG6Data } from '@/components/graph/graph-model';
+import {
+  graphSummary as graphSummaryOf,
+  toG6Data,
+} from '@/components/graph/graph-model';
 import { createMockGraph } from '@/mocks/graph/response';
 import type { Graph, GraphData } from '@antv/g6';
 
@@ -19,7 +23,7 @@ const context: ReadingContext = {
 };
 
 test.each([0.1, 0.4, 0.53, 0.8, 1.5])(
-  'D-GRP-01 company and issue labels stay visible at zoom %s with text >=13px without moving or recoloring nodes',
+  'D-GRP-01 company labels stay visible at zoom %s (issue titles only from the overview zoom up) with text >=13px without moving or recoloring nodes',
   (zoom) => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const base = toG6Data(data, 1200, 700);
@@ -30,10 +34,27 @@ test.each([0.1, 0.4, 0.53, 0.8, 1.5])(
       );
       for (const key of ['x', 'y', 'fill', 'iconSrc', 'size'] as const)
         expect(node.style?.[key]).toEqual(base.nodes?.[i].style?.[key]);
-      expect(node.style?.labelVisibility).toBe('visible');
+      expect(node.style?.labelVisibility).toBe(
+        node.data?.kind === 'issue' && zoom < OVERVIEW_ZOOM
+          ? 'hidden'
+          : 'visible',
+      );
     }
   },
 );
+
+test('D-GRP-01 zoomed out, issues keep only their diamond until hovered or selected', () => {
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const base = toG6Data(data, 1200, 700);
+  const issue = data.nodes.find((n) => n.kind === 'issue')!;
+  const style = (anchor: string | null) =>
+    readingStyles(base, data, { ...context, zoom: 0.2, anchor }).nodes!.find(
+      (node) => node.id === issue.id,
+    )!.style!;
+  expect(style(null).labelVisibility).toBe('hidden');
+  expect(style(null).badges ?? []).toEqual([]);
+  expect(style(issue.id).labelVisibility).toBe('visible');
+});
 
 test('D-GRP-01 always-visible issue names do not reveal nodes hidden by filters', () => {
   const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
@@ -283,4 +304,121 @@ test('setData keeps the new label of an element whose label input changed', asyn
     changed.style?.labelFontSize,
   );
   expect(next.nodes?.[1].style?.labelFontSize).toBe(99);
+});
+
+test('D-GRP-01 wrapped label lines grow with the zoom-corrected font and the overview keeps two lines', () => {
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const base = toG6Data(data, 1200, 700);
+  const issue = data.nodes.find((n) => n.kind === 'issue')!;
+  const company = data.nodes.find((n) => n.kind === 'company')!;
+  const style = (zoom: number, id: string, anchor: string | null = null) =>
+    readingStyles(base, data, { ...context, zoom, anchor }).nodes!.find(
+      (node) => node.id === id,
+    )!.style!;
+  for (const zoom of [0.2, 0.53, 1.5]) {
+    const issueStyle = style(zoom, issue.id);
+    // G draws wrapped lines 16px apart by default; at 0.2 the font is 65px.
+    expect(Number(issueStyle.labelLineHeight)).toBeGreaterThan(
+      Number(issueStyle.labelFontSize),
+    );
+  }
+  expect(style(0.2, issue.id).labelMaxLines).toBe(2);
+  expect(style(0.2, issue.id).labelTextOverflow).toBe('ellipsis');
+  // Zooming in, or hovering/selecting the issue, shows the whole title again.
+  expect(style(0.53, issue.id).labelMaxLines).toBeGreaterThan(2);
+  expect(style(0.2, issue.id, issue.id).labelMaxLines).toBeGreaterThan(2);
+  expect(style(0.2, company.id).labelMaxLines).toBeGreaterThan(2);
+});
+
+/** A renderer whose labels all share one box (or each get their own), recording shape visibility. */
+function cullingGraph() {
+  const room = { overlap: true };
+  const shapes = new Map<string, { style: { visibility?: string } }>();
+  let slot = 0;
+  const shape = (id: string, name: string) => {
+    const key = `${id}/${name}`;
+    if (!shapes.has(key)) shapes.set(key, { style: {} });
+    const entry = shapes.get(key)!;
+    const offset = room.overlap ? 0 : (slot += 400);
+    return {
+      ...entry,
+      style: entry.style,
+      getRenderBounds: () =>
+        name === 'label'
+          ? { min: [offset, 10], max: [offset + 90, 35] }
+          : { min: [-5000, -5000], max: [-4990, -4990] },
+      attr: () => {},
+    };
+  };
+  const graph = {
+    destroyed: false,
+    draw: async () => {},
+    updateNodeData: () => {},
+    updateEdgeData: () => {},
+    getViewportByCanvas: (p: number[]) => p,
+    getCanvas: () => ({
+      document: {
+        getElementById: (id: string) => ({
+          getShape: (name: string) => shape(id, name),
+        }),
+      },
+    }),
+  } as unknown as Graph;
+  const visible = (id: string, name: string) =>
+    shapes.get(`${id}/${name}`)?.style.visibility !== 'hidden';
+  return { graph, visible, room };
+}
+
+test('D-GRP-01 overlapping titles never fold a follow-up issue or its FOLLOWS line', async () => {
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const follow = data.edges.find((e) => e.relationType === 'FOLLOWS')!;
+  // Leave each end of the chain with one company, so neither is protected as a shared issue.
+  const kept = new Set<string>();
+  data.edges = data.edges.filter((e) => {
+    const end = [follow.source, follow.target].find(
+      (id) =>
+        e.relationType !== 'FOLLOWS' && (e.source === id || e.target === id),
+    );
+    if (!end) return true;
+    if (kept.has(end)) return false;
+    kept.add(end);
+    return true;
+  });
+  const base = toG6Data(data, 1200, 700);
+  const { graph, visible } = cullingGraph();
+  await applyGraphReading(graph, base, data, { ...context, zoom: 1 });
+  for (const id of [follow.source, follow.target])
+    expect(visible(id, 'key')).toBe(true);
+  expect(visible(follow.id, 'key')).toBe(true);
+});
+
+test('D-GRP-01 a folded issue takes its evidence badge along and both come back', async () => {
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const base = toG6Data(data, 1200, 700);
+  const summary = graphSummaryOf(data);
+  const follows = new Set(
+    data.edges
+      .filter((e) => e.relationType === 'FOLLOWS')
+      .flatMap((e) => [e.source, e.target]),
+  );
+  const drawn = new Set(base.nodes?.map((n) => String(n.id)));
+  const singles = data.nodes.filter(
+    (n) =>
+      n.kind === 'issue' &&
+      drawn.has(n.id) &&
+      !follows.has(n.id) &&
+      summary.incident.get(n.id)?.length === 1,
+  );
+  const { graph, visible, room } = cullingGraph();
+  await applyGraphReading(graph, base, data, { ...context, zoom: 1 });
+  const hidden = singles.filter((n) => !visible(n.id, 'key'));
+  expect(hidden.length).toBeGreaterThan(0);
+  for (const n of hidden) expect(visible(n.id, 'badge-0')).toBe(false);
+  // The same shapes are shown again once every title has room.
+  room.overlap = false;
+  await applyGraphReading(graph, base, data, { ...context, zoom: 1 });
+  for (const n of hidden) {
+    expect(visible(n.id, 'key')).toBe(true);
+    expect(visible(n.id, 'badge-0')).toBe(true);
+  }
 });

@@ -9,7 +9,13 @@ import {
   Section,
   Table,
 } from '@/components/admin/common/AdminUi';
-import { BUTTON, TD, TH, count } from '@/components/admin/common/adminStyles';
+import {
+  BUTTON,
+  FOCUS_RING,
+  TD,
+  TH,
+  count,
+} from '@/components/admin/common/adminStyles';
 import GraphVersionForm from '@/components/admin/pipeline/GraphVersionForm';
 import { useCursorPages } from '@/hooks/useCursorPages';
 import {
@@ -25,6 +31,22 @@ const graphDbLabel: Record<GraphDbVersionStatus, string> = {
   pending: '반영 대기',
   unknown: '확인 불가',
 };
+
+/** A-ADM-03 출처: 칸보다 길면 '…'로 줄이고, 마우스를 올리면 툴팁으로, 누르면 펼쳐서 전체를 보여 준다. */
+function SourceLabel({ label }: { label: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-expanded={open}
+      onClick={() => setOpen((value) => !value)}
+      className={`block w-full rounded text-left ${open ? 'break-all' : 'truncate'} ${FOCUS_RING}`}
+    >
+      {label}
+    </button>
+  );
+}
 
 /** 행 버튼 문구: 표시한 적 있는 버전은 되돌리기(rollback), 나머지는 전환(forward). */
 function verbOf(version: GraphVersion) {

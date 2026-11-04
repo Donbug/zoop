@@ -3,6 +3,8 @@ import { createMockGraph } from '@/mocks/graph/response';
 import { mockMember } from '@/mocks/graph/fixture';
 import {
   companyNodeSize,
+  ISSUES_PER_COMPANY,
+  ISSUE_NODE_SIZE,
   graphSummary,
   toG6Data,
 } from '@/components/graph/graph-model';
@@ -115,15 +117,15 @@ describe('WBS 6.6.21 · D-GRP-01/01b mock/API contract', () => {
   });
   it('uses five activity sizes based on each company unique issue count', () => {
     expect([0, 1, 2, 4, 100].map((count) => companyNodeSize(count))).toEqual([
-      36, 44, 52, 68, 88,
+      45, 55, 65, 85, 110,
     ]);
 
     const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const rendered = toG6Data(graph, 1245, 705);
     const nvidia = rendered.nodes?.find((node) => node.id === 'NASDAQ:NVDA');
     const samsung = rendered.nodes?.find((node) => node.id === 'KRX:005930');
-    expect(nvidia?.style?.size).toBe(52);
-    expect(samsung?.style?.size).toBe(88);
+    expect(nvidia?.style?.size).toBe(65);
+    expect(samsung?.style?.size).toBe(110);
   });
   it('D-GRP-01 renders every public issue and relation without dangling edges', () => {
     const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
@@ -136,6 +138,61 @@ describe('WBS 6.6.21 · D-GRP-01/01b mock/API contract', () => {
     ).toBe(true);
     // Collision avoidance may move example coordinates, but remains stable.
     expect(toG6Data(graph, 1245, 705)).toEqual(rendered);
+  });
+  it('D-GRP-01 folds a busy company down to its five strongest issues until it is selected', () => {
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const company = graph.nodes.find((node) => node.kind === 'company')!;
+    const template = graph.nodes.find((node) => node.kind === 'issue')!;
+    const extra = Array.from({ length: 8 }, (_, index) => ({
+      ...template,
+      id: `issue-busy-${index}`,
+      isFocus: false,
+      evidenceCount: index,
+    }));
+    const busy = {
+      ...graph,
+      nodes: [company, ...extra],
+      edges: extra.map((issue, index) => ({
+        ...graph.edges[0],
+        id: `busy-${index}`,
+        source: issue.id,
+        target: company.id,
+        relationType: 'INVOLVES' as const,
+      })),
+    };
+    const ids = (data: ReturnType<typeof toG6Data>) =>
+      new Set(data.nodes?.map((node) => String(node.id)));
+    const folded = toG6Data(busy, 1245, 705);
+    // Most evidence first: issues 7..3 stay, 2..0 fold into the company badge.
+    expect(
+      [...ids(folded)].filter((id) => id.startsWith('issue-')),
+    ).toHaveLength(ISSUES_PER_COMPANY);
+    expect(ids(folded).has('issue-busy-7')).toBe(true);
+    expect(ids(folded).has('issue-busy-0')).toBe(false);
+    expect(folded.edges).toHaveLength(ISSUES_PER_COMPANY);
+    expect(
+      folded.nodes?.find((node) => node.id === company.id)?.data?.folded,
+    ).toBe(3);
+    // Selecting the company shows every issue; a forced issue stays on its own.
+    expect(ids(toG6Data(busy, 1245, 705, company.id)).size).toBe(9);
+    expect(
+      ids(toG6Data(busy, 1245, 705, null, ['issue-busy-0'])).has(
+        'issue-busy-0',
+      ),
+    ).toBe(true);
+  });
+  it('D-GRP-01 shades issues by evidence in one monotone ink', () => {
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const [weak, strong] = graph.nodes.filter((node) => node.kind === 'issue');
+    weak.evidenceCount = 1;
+    strong.evidenceCount = 8;
+    const rendered = toG6Data(graph, 1245, 705, null, [weak.id, strong.id]);
+    const style = (id: string) =>
+      rendered.nodes?.find((node) => node.id === id)?.style;
+    expect(style(strong.id)?.size).toBe(ISSUE_NODE_SIZE);
+    expect(style(strong.id)?.fill).toBe(style(weak.id)?.fill);
+    expect(Number(style(strong.id)?.fillOpacity)).toBe(1);
+    expect(Number(style(weak.id)?.fillOpacity)).toBeLessThan(0.6);
   });
   it('keeps a single-company issue and its relation visible before selection', () => {
     const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });

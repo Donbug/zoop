@@ -153,7 +153,9 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     const [, v2, v1] = within(table).getAllByRole('row');
     expect(within(v2).getByText('표시 중')).toBeTruthy();
     expect(within(v2).getByText('반영됨')).toBeTruthy();
-    expect(within(v2).queryByRole('button')).toBeNull();
+    expect(
+      within(v2).queryByRole('button', { name: /전환|되돌리기/ }),
+    ).toBeNull();
     expect(within(v1).getByText('합성')).toBeTruthy();
     expect(within(v1).getByText('반영 대기')).toBeTruthy();
     expect(within(v1).getByRole('button', { name: 'v1로 전환' })).toBeTruthy();
@@ -163,6 +165,29 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     });
     expect(within(history).getByText('v1 → v2')).toBeTruthy();
     expect(within(history).getByText('전환')).toBeTruthy();
+  });
+
+  test('긴 출처는 한 줄로 줄이고, 툴팁과 누르기로 전체를 보여 준다', async () => {
+    const longSource = `publication:${'a'.repeat(120)}`;
+    server.on('GET', VERSIONS, () => {
+      const body = list();
+      body.items[0] = { ...body.items[0], sourceLabel: longSource };
+      return json(body);
+    });
+    const { user } = open();
+
+    const table = await screen.findByRole('table', {
+      name: '그래프 버전 목록',
+    });
+    const source = within(table).getByRole('button', { name: longSource });
+    expect(source.getAttribute('title')).toBe(longSource);
+    expect(source.getAttribute('aria-expanded')).toBe('false');
+    expect(source.className).toContain('truncate');
+
+    await user.click(source);
+    expect(source.getAttribute('aria-expanded')).toBe('true');
+    expect(source.className).toContain('break-all');
+    expect(source.className).not.toContain('truncate');
   });
 
   test('사유를 받아 화면에서 본 표시 버전과 함께 전환을 보내고, 성공하면 목록을 다시 읽는다', async () => {

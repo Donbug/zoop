@@ -140,8 +140,13 @@ export function separateNodes(nodes: NodeData[]): NodeData[] {
     return result;
   }
   const positions = new Map<string, NodeData>();
-  for (const node of [...nodes].sort((a, b) =>
-    String(a.id).localeCompare(String(b.id)),
+  // D-GRP-01: companies claim their place first and issues move around them. Placing
+  // issues first pushed a busy company (삼성전자 339px) away from its own issues,
+  // leaving them all on one side of it.
+  const company = (node: NodeData) => (node.data?.kind === 'issue' ? 1 : 0);
+  for (const node of [...nodes].sort(
+    (a, b) =>
+      company(a) - company(b) || String(a.id).localeCompare(String(b.id)),
   )) {
     const original = nodeRect(node);
     let rect = original;

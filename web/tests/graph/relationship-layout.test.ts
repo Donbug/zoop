@@ -132,7 +132,40 @@ test('D-GRP-01: sparse links get more room than a densely connected neighborhood
   const previousDenseMean = 191.91688130435122;
   expect(denseMean).toBeGreaterThanOrEqual(previousDenseMean * 1.3);
   expect(length(sparseEdge)).toBeGreaterThan(denseMean * 1.5);
-  // 좌표 연산의 부동소수점 오차만 허용하고 실제 배치 거리는 바꾸지 않아요.
-  expect(isolatedNearest).toBeGreaterThanOrEqual(180 - 1e-9);
-  expect(isolatedNearest).toBeLessThanOrEqual(360);
+  // 2026-11-04 리뷰: 묶음 사이 여백을 180에서 418로 넓혔어요(55%, 다시 50%). 멀리 흩어지지는 않아요.
+  expect(isolatedNearest).toBeGreaterThanOrEqual(180 * 1.55 * 1.5 - 1e-9);
+  expect(isolatedNearest).toBeLessThanOrEqual(1200);
+});
+
+test('D-GRP-01: a busy company spreads its single-company issues around fuller rings', () => {
+  // 2026-11-04 공개 그래프: 삼성전자에만 연결된 사건이 19개였어요.
+  const fixture = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const company = fixture.nodes.find((node) => node.kind === 'company')!;
+  const issue = fixture.nodes.find((node) => node.kind === 'issue')!;
+  const issues = Array.from({ length: 19 }, (_, index) => ({
+    ...issue,
+    id: `issue-busy-${String(index).padStart(2, '0')}`,
+  }));
+  const graph = {
+    ...fixture,
+    nodes: [company, ...issues],
+    edges: issues.map((node, index) => ({
+      ...fixture.edges[0],
+      id: `busy-${index}`,
+      source: node.id,
+      target: company.id,
+      relationType: 'INVOLVES' as const,
+    })),
+  };
+  const points = relationshipPositions(graph);
+  const leaves = issues.map((node) => points.get(node.id)!);
+  const nearest = Math.min(
+    ...leaves.flatMap((a, i) => leaves.slice(i + 1).map((b) => distance(a, b))),
+  );
+  // 고리마다 6개씩 황금각으로 놓던 이전 배치는 가장 가까운 두 사건이 약 227까지 붙었어요.
+  expect(nearest).toBeGreaterThanOrEqual(250);
+  for (const leaf of leaves)
+    expect(distance(leaf, points.get(company.id)!)).toBeGreaterThanOrEqual(
+      270 * 1.5 - 1e-9,
+    );
 });

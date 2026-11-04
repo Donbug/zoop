@@ -207,6 +207,8 @@ export default function GraphCanvas({
   const hoveredEdge = useRef<string | null>(null);
   const readingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
+  /** Nodes left bright by the current dimming; the reading pass hides faded issue titles. */
+  const brightNodes = useRef<Set<string> | null>(null);
   const appliedStates = useRef({
     graph: null as Graph | null,
     rendered: null as ReturnType<typeof toG6Data> | null,
@@ -238,6 +240,7 @@ export default function GraphCanvas({
           edge: evidenceMode ? null : (hoveredEdge.current ?? selectedEdgeId),
           focus: focusId,
           path,
+          bright: brightNodes.current,
         });
       })
       .catch(() => {
@@ -519,6 +522,11 @@ export default function GraphCanvas({
           ? background
           : themeColor('paper');
       host?.setAttribute('data-map-dimmed', String(dimmed));
+      brightNodes.current = dimmed
+        ? new Set(
+            [...bright].filter(([, kind]) => kind === 'node').map(([id]) => id),
+          )
+        : null;
       applyMapDimming(graph, dimmed, bright, coverColor);
       scheduleReading();
     },
