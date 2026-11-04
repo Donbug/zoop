@@ -83,16 +83,60 @@ def test_downstream_loss_after_upstream_answer_is_recorded():
         client.sendall(b"POST /submit HTTP/1.1\r\nHost: proxy\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body)
         assert fault.entered.wait(5)
         assert proxy.events[0]["status"] == 202
-        # The app side gives up (a plain FIN close, the client-timeout path) before the proxy writes the held answer: a write
-        # would still land in the kernel buffer, so the proxy must notice the closed peer and record that the 202 was lost.
+        # The app side gives up (a plain close, the client-timeout path) before the proxy writes the held answer: the write
+        # lands in the closed peer's kernel buffer and is answered with a reset, which the proxy must record as the 202 lost.
         client.close()
         fault.release.set()
         lost = wait_for(lambda: [e for e in proxy.events if e["status"] == "downstream_lost"], timeout=5, what="downstream_lost event")
-        assert lost[0]["upstreamStatus"] == 202 and lost[0]["path"] == "/submit" and lost[0]["detectedBy"] == "peer_closed_before_write"
+        # Either the second write already fails with the reset, or the reset shows up as the pending error right after it.
+        assert lost[0]["upstreamStatus"] == 202 and lost[0]["path"] == "/submit"
+        assert lost[0]["detectedBy"] in ("write_failed", "reset_after_write"), lost
         assert len([e for e in proxy.events if e["status"] == 202]) == 1
         assert proxy.errors == []
     finally:
         fault.release.set()
+        proxy.close()
+        server.shutdown()
+        server.server_close()
+
+
+def test_half_closed_client_still_receives_the_answer():
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *_):
+            pass
+
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            payload = b'{"accepted":true}'
+            self.send_response(202)
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    proxy = HttpProxy(f"http://127.0.0.1:{server.server_address[1]}")
+    fault = proxy.arm("POST", "/submit")
+    host, port = proxy.url.replace("http://", "").split(":")
+    client = socket.create_connection((host, int(port)), timeout=10)
+    try:
+        body = b'{"fixed":"body"}'
+        client.sendall(b"POST /submit HTTP/1.1\r\nHost: proxy\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body)
+        assert fault.entered.wait(5)
+        # Only the sending side is shut down: the proxy sees EOF, but the client still reads, so the 202 must be delivered.
+        client.shutdown(socket.SHUT_WR)
+        fault.release.set()
+        answer = b""
+        while b'{"accepted":true}' not in answer:
+            chunk = client.recv(4096)
+            assert chunk, answer
+            answer += chunk
+        assert answer.startswith(b"HTTP/1.1 202")
+        assert [e["status"] for e in proxy.events] == [202]
+        assert proxy.errors == []
+    finally:
+        fault.release.set()
+        client.close()
         proxy.close()
         server.shutdown()
         server.server_close()

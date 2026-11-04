@@ -53,20 +53,27 @@ def legacy_history_matches(before, after):
     return True
 
 
-def peer_closed(connection):
-    """True when the peer has already closed (FIN read as EOF, or a reset) and nothing else is pending on the socket.
+def peer_state(connection, wait=0.0):
+    """What the peer socket shows within `wait` seconds: "open" (nothing, or pipelined data), "eof" or "reset".
 
-    The request body has been consumed, so readable data is either EOF, a reset or a pipelined request; only the first two
-    mean the answer cannot be delivered."""
-    try:
-        readable, _, _ = select.select([connection], [], [], 0)
-        if not readable:
-            return False
-        return connection.recv(1, socket.MSG_PEEK) == b""
-    except (ConnectionResetError, BrokenPipeError):
-        return True
-    except OSError:
-        return True
+    The request body has been consumed, so readable data is EOF, a reset or a pipelined request. EOF alone does not mean the
+    answer is lost: a client that only shut down its sending side still reads. A reset does. After a FIN, recv keeps
+    returning EOF even once the peer answered our write with a reset, so the reset is read from the socket's pending error
+    (SO_ERROR, EPIPE in CLOSE_WAIT), polled until the wait expires."""
+    deadline = time.monotonic() + wait
+    seen = "open"
+    while True:
+        try:
+            if connection.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR):
+                return "reset"
+            readable, _, _ = select.select([connection], [], [], 0)
+            if readable:
+                seen = "eof" if connection.recv(1, socket.MSG_PEEK) == b"" else "open"
+        except OSError:
+            return "reset"
+        if time.monotonic() >= deadline:
+            return seen
+        time.sleep(0.01)
 
 
 def wait_for(predicate, timeout=90, what="condition"):
@@ -188,10 +195,13 @@ class HttpProxy:
                         return
                     if rule:
                         payload = rule.transform_payload(response.status_code, payload)
-                    # The app may have given up (timeout, FIN or RST) while the answer was held: a write into the kernel buffer
-                    # would still succeed, so peer closure is checked positively before anything is written.
-                    if peer_closed(self.connection):
-                        lost("peer_closed_before_write")
+                    # The app may have given up (timeout, close or reset) while the answer was held. A reset seen before writing
+                    # is a certain loss. EOF is not: a client that shut down only its sending side still reads, and a client
+                    # that closed fully still accepts the write into its kernel buffer and answers it with a reset. So the
+                    # answer is always written, and after an EOF the socket is watched briefly for that reset.
+                    before = peer_state(self.connection)
+                    if before == "reset":
+                        lost("peer_reset_before_write")
                         return
                     self.send_response(response.status_code)
                     for key in ("Content-Type", "X-Request-ID", "ETag", "Retry-After"):
@@ -200,6 +210,8 @@ class HttpProxy:
                     self.send_header("Content-Length", str(len(payload)))
                     self.end_headers()
                     self.wfile.write(payload)
+                    if peer_state(self.connection, wait=0.2 if before == "eof" else 0.0) == "reset":
+                        lost("reset_after_write")
                 except (BrokenPipeError, ConnectionResetError) as error:
                     if response is None:
                         # The app reset the request before the upstream was called: a harness fault, as before.
