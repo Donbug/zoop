@@ -284,3 +284,27 @@ test('setData keeps the new label of an element whose label input changed', asyn
   );
   expect(next.nodes?.[1].style?.labelFontSize).toBe(99);
 });
+
+test('D-GRP-01 wrapped label lines grow with the zoom-corrected font and the overview keeps two lines', () => {
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const base = toG6Data(data, 1200, 700);
+  const issue = data.nodes.find((n) => n.kind === 'issue')!;
+  const company = data.nodes.find((n) => n.kind === 'company')!;
+  const style = (zoom: number, id: string, anchor: string | null = null) =>
+    readingStyles(base, data, { ...context, zoom, anchor }).nodes!.find(
+      (node) => node.id === id,
+    )!.style!;
+  for (const zoom of [0.2, 0.53, 1.5]) {
+    const issueStyle = style(zoom, issue.id);
+    // G draws wrapped lines 16px apart by default; at 0.2 the font is 65px.
+    expect(Number(issueStyle.labelLineHeight)).toBeGreaterThan(
+      Number(issueStyle.labelFontSize),
+    );
+  }
+  expect(style(0.2, issue.id).labelMaxLines).toBe(2);
+  expect(style(0.2, issue.id).labelTextOverflow).toBe('ellipsis');
+  // Zooming in, or hovering/selecting the issue, shows the whole title again.
+  expect(style(0.53, issue.id).labelMaxLines).toBeGreaterThan(2);
+  expect(style(0.2, issue.id, issue.id).labelMaxLines).toBeGreaterThan(2);
+  expect(style(0.2, company.id).labelMaxLines).toBeGreaterThan(2);
+});
