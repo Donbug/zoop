@@ -333,6 +333,16 @@ class EventDetailServiceTest {
             assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
                     () -> service.get(EUV, null, null, null, "r")).getErrorCode(), broken);
         }
+        // The key present with a non-object value is the same: only a receipt WITHOUT the key never produced a summary.
+        for (String notAnObject : List.of("null", "\"available\"", "[]", "7")) {
+            StrictJson.Obj receipt = bundle(false);
+            ((ObjectNode) receipt.node()).put("schemaVersion", "zoop-graph-handoff-bundle-8");
+            ((ObjectNode) receipt.objects("issues").get(0).node()).set("summary",
+                    StrictJson.parseObject("{\"summary\":" + notAnObject + "}").raw("summary"));
+            EventDetailService service = imported(receipt);
+            assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                    () -> service.get(EUV, null, null, null, "r")).getErrorCode(), notAnObject);
+        }
     }
 
     @Test

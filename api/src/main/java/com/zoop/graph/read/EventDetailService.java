@@ -174,7 +174,10 @@ public class EventDetailService {
                 .filter(s -> s.source().sourceVersionId().equals(labelOwner.sourceVersionId())
                         && s.issue().string("id").equals(labelOwner.issueId()))
                 .map(SourceIssue::issue).findFirst().orElseThrow(() -> new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
-        if (!handoff.has("summary") || !handoff.raw("summary").isObject()) return absent(SUMMARY_UNAVAILABLE);
+        // No key: a format that never carried a summary (bundle 5 and 6, legacy packages). A key whose value is not an
+        // object is a receipt the verifier would not have admitted, so it is undescribable, not absent data.
+        if (!handoff.has("summary")) return absent(SUMMARY_UNAVAILABLE);
+        if (!handoff.raw("summary").isObject()) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         try {
             return summary(handoff, handoff.object("summary"), inSnapshot, shown, asOf);
         } catch (StrictJson.Malformed malformed) {
