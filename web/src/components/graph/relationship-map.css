@@ -155,6 +155,27 @@
     margin-left: calc(-1 * var(--holdings-shift, 292px));
   }
 }
+/* 모바일은 패널이 지도 위에 쌓이므로 높이만큼 아래 여백도 줄여 지도가 함께 올라오게 한다. */
+@media (width < 40rem) {
+  .holdings-slot {
+    animation-name: holdings-slide-in-stacked;
+  }
+  .holdings-slot.is-closing {
+    animation-name: holdings-slide-out-stacked;
+  }
+}
+@keyframes holdings-slide-in-stacked {
+  from {
+    margin-left: calc(-1 * var(--holdings-shift, 100%));
+    margin-bottom: calc(-1 * var(--holdings-drop, 0px));
+  }
+}
+@keyframes holdings-slide-out-stacked {
+  to {
+    margin-left: calc(-1 * var(--holdings-shift, 100%));
+    margin-bottom: calc(-1 * var(--holdings-drop, 0px));
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .holdings-slot,
   .holdings-slot.is-closing {
