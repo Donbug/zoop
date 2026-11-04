@@ -135,6 +135,32 @@
   color: var(--color-zoop-muted);
   font-weight: 600;
 }
+/* 보유·관심 패널은 왼쪽에서 밀려 들어오고 왼쪽으로 밀려 나간다. 지도는 margin 변화로 함께 움직인다. */
+.relationship-body:has(> .holdings-slot) {
+  overflow-x: clip;
+}
+.holdings-slot {
+  animation: holdings-slide-in 220ms ease-out;
+}
+.holdings-slot.is-closing {
+  animation: holdings-slide-out 200ms ease-in forwards;
+}
+@keyframes holdings-slide-in {
+  from {
+    margin-left: calc(-1 * var(--holdings-shift, 292px));
+  }
+}
+@keyframes holdings-slide-out {
+  to {
+    margin-left: calc(-1 * var(--holdings-shift, 292px));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .holdings-slot,
+  .holdings-slot.is-closing {
+    animation: none;
+  }
+}
 .relationship-mode {
   display: flex;
   gap: 4px;
