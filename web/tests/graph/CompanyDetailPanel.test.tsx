@@ -20,6 +20,7 @@ vi.mock('@/apis/graph/companies', () => ({ setWatchlistCompany: vi.fn() }));
 const company = mockCompany('KRX:005930');
 const state = {
   loading: false,
+  documentsLoading: false,
   marketLoading: false,
   errors: {},
   data: {
@@ -213,6 +214,7 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     vi.mocked(useCompanyData).mockReturnValue({
       ...state,
       loading: true,
+      documentsLoading: true,
       data: marketOnly,
     });
     renderPanel();
@@ -245,6 +247,27 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     );
     expect(vi.mocked(useCompanyData).mock.calls.at(-1)?.[2]).toBe(1);
     expect(vi.mocked(useCompanyData).mock.calls.length).toBeGreaterThan(calls);
+  });
+
+  it('뉴스·공시 응답을 기다리는 동안에도 관련 사건과 관심 버튼을 먼저 보인다', async () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      documentsLoading: true,
+      data: { ...marketOnly, company },
+    });
+    vi.mocked(setWatchlistCompany).mockResolvedValue({
+      watchlistIds: [company.id],
+      version: 2,
+    } as never);
+    renderPanel('member-token');
+    expect(screen.getByText('직접 관련 사건')).toBeTruthy();
+    expect(screen.queryByText('관련 사건을 불러오는 중')).toBeNull();
+    expect(screen.getByText('뉴스·공시를 불러오는 중')).toBeTruthy();
+    expect(screen.queryByText('표시할 뉴스·공시가 없습니다.')).toBeNull();
+    const watch = screen.getByRole('button', { name: '☆ 관심 추가' });
+    expect(watch.hasAttribute('disabled')).toBe(false);
+    await userEvent.click(watch);
+    expect(setWatchlistCompany).toHaveBeenCalledWith(company.id, true);
   });
 
   it('시세 응답을 기다리는 동안에는 시세 자리에만 로딩을 표시한다', () => {

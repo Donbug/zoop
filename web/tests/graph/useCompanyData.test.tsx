@@ -30,9 +30,15 @@ describe('useCompanyData', () => {
     });
   });
 
-  // 두 묶음이 모두 끝날 때까지 기다린다.
-  const settled = (state: { loading: boolean; marketLoading: boolean }) =>
-    expect(state.loading || state.marketLoading).toBe(false);
+  // 기업, 뉴스·공시, 그 외 응답이 모두 끝날 때까지 기다린다.
+  const settled = (state: {
+    loading: boolean;
+    documentsLoading: boolean;
+    marketLoading: boolean;
+  }) =>
+    expect(state.loading || state.documentsLoading || state.marketLoading).toBe(
+      false,
+    );
 
   it('한 섹션 실패를 격리하고 정상 섹션을 유지한다', async () => {
     vi.mocked(api.getCompanyMetrics).mockRejectedValue(
@@ -93,13 +99,39 @@ describe('useCompanyData', () => {
     expect(result.current.data?.metrics?.status).toBe('available');
     expect(result.current.data?.holding).toBeNull();
     expect(result.current.data?.company).toBeUndefined();
-    expect(result.current.data?.documents).toBeUndefined();
+    // 뉴스·공시는 기업 응답과 따로 도착한다.
+    await waitFor(() => expect(result.current.documentsLoading).toBe(false));
+    expect(result.current.data?.documents).toBeDefined();
+    expect(result.current.loading).toBe(true);
 
     resolveCompany(mockCompany('KRX:005930'));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.data?.company?.name).toBe('삼성전자');
     expect(result.current.data?.documents).toBeDefined();
     expect(result.current.data?.quote?.status).toBe('available');
+  });
+
+  it('뉴스·공시 응답을 기다리지 않고 기업 응답을 먼저 반환한다', async () => {
+    let resolveDocuments: (
+      value: ReturnType<typeof mockDocuments>,
+    ) => void = () => {};
+    vi.mocked(api.getCompanyDocuments).mockReturnValue(
+      new Promise((resolve) => {
+        resolveDocuments = resolve;
+      }),
+    );
+    const { result } = renderHook(() =>
+      useCompanyData('KRX:005930', 'member-token'),
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.documentsLoading).toBe(true);
+    expect(result.current.data?.company?.name).toBe('삼성전자');
+    expect(result.current.data?.documents).toBeUndefined();
+
+    resolveDocuments(mockDocuments('KRX:005930'));
+    await waitFor(() => expect(result.current.documentsLoading).toBe(false));
+    expect(result.current.data?.documents).toBeDefined();
+    expect(result.current.data?.company?.name).toBe('삼성전자');
   });
 
   it('그래프 응답이 먼저 와도 시세 응답을 기다리지 않는다', async () => {

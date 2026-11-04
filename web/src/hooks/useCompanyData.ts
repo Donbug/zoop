@@ -13,10 +13,12 @@ import type { CompanyPanelData } from '@/types/map/company';
 type Errors = Partial<Record<keyof CompanyPanelData, string>>;
 
 export type CompanyDataState = {
-  /** 도착한 응답부터 채운다. company·documents는 그래프 응답, 나머지는 그 외 응답이다. */
+  /** 도착한 응답부터 채운다. company·documents는 그래프 응답(각각 따로 도착), 나머지는 그 외 응답이다. */
   data: Partial<CompanyPanelData> | null;
-  /** 그래프 응답(기업 사건·뉴스·공시)을 기다리는 중 */
+  /** 그래프 응답 중 기업(관련 사건·관심)을 기다리는 중 */
   loading: boolean;
+  /** 그래프 응답 중 뉴스·공시를 기다리는 중 */
+  documentsLoading: boolean;
   /** 그 외 응답(시세·가격·지표·보유)을 기다리는 중 */
   marketLoading: boolean;
   errors: Errors;
@@ -24,14 +26,14 @@ export type CompanyDataState = {
   contextKey?: string;
 };
 
+type Pending = 'loading' | 'documentsLoading' | 'marketLoading';
+
 type Parts = {
   companyId: string | null;
   contextKey: string;
   data: Partial<CompanyPanelData>;
   errors: Errors;
-  loading: boolean;
-  marketLoading: boolean;
-};
+} & Record<Pending, boolean>;
 
 export function useCompanyData(
   companyId: string | null,
@@ -47,6 +49,7 @@ export function useCompanyData(
     data: {},
     errors: {},
     loading: false,
+    documentsLoading: false,
     marketLoading: false,
   });
 
@@ -61,12 +64,14 @@ export function useCompanyData(
         data: {},
         errors: {},
         loading: true,
+        documentsLoading: true,
         marketLoading: true,
       });
-      // 두 묶음은 따로 도착한다. 그래프 스냅샷 읽기가 느려도 시세·지표·보유는 먼저 보인다.
+      // 기업, 뉴스·공시, 그 외 응답은 각각 도착하는 대로 반영한다. 그래프 스냅샷 읽기가 느려도
+      // 시세·지표·보유가 먼저 보이고, 뉴스·공시가 느려도 관련 사건·관심은 먼저 보인다.
       const settle = (
         tasks: Partial<Record<keyof CompanyPanelData, Promise<unknown>>>,
-        done: 'loading' | 'marketLoading',
+        done: Pending,
       ) => {
         const keys = Object.keys(tasks) as (keyof CompanyPanelData)[];
         void Promise.allSettled(Object.values(tasks)).then((results) => {
@@ -92,15 +97,18 @@ export function useCompanyData(
         });
       };
       settle(
+        { company: getCompany(companyId, { round, graphVersion, asOf }) },
+        'loading',
+      );
+      settle(
         {
-          company: getCompany(companyId, { round, graphVersion, asOf }),
           documents: getCompanyDocuments(companyId, {
             round,
             graphVersion,
             asOf,
           }),
         },
-        'loading',
+        'documentsLoading',
       );
       settle(
         {
@@ -129,6 +137,7 @@ export function useCompanyData(
     return {
       data: null,
       loading: false,
+      documentsLoading: false,
       marketLoading: false,
       errors: {},
       companyId: null,
@@ -137,6 +146,7 @@ export function useCompanyData(
     return {
       data: null,
       loading: true,
+      documentsLoading: true,
       marketLoading: true,
       errors: {},
       companyId,
@@ -144,6 +154,7 @@ export function useCompanyData(
   return {
     data: state.data,
     loading: state.loading,
+    documentsLoading: state.documentsLoading,
     marketLoading: state.marketLoading,
     errors: state.errors,
     companyId,

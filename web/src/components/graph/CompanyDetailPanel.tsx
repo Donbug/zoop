@@ -190,12 +190,8 @@ export default function CompanyDetailPanel(props: Props) {
     heading.current?.focus();
   }, [props.companyId]);
   const [retry, setRetry] = useState(0);
-  const { data, loading, marketLoading, errors } = useCompanyData(
-    props.companyId,
-    props.token,
-    retry,
-    props.context,
-  );
+  const { data, loading, documentsLoading, marketLoading, errors } =
+    useCompanyData(props.companyId, props.token, retry, props.context);
   // 이 지도에서 이미 저장한 관심 목록이 있으면 처음 열 때부터 그 목록을 쓴다(지도 노드 값은 갱신되지 않는다).
   const [watchOverride, setWatchOverride] = useState<boolean | null>(
     props.watchSync ? props.watchSync.ids.includes(props.companyId) : null,
@@ -735,7 +731,7 @@ export default function CompanyDetailPanel(props: Props) {
             <h3>뉴스·공시</h3>
             <span>{data?.documents?.items.length ?? '—'}</span>
           </div>
-          {loading && (
+          {documentsLoading && (
             <LoadingIndicator
               label="뉴스·공시를 불러오는 중"
               className="flex min-h-12 w-full"
@@ -771,7 +767,7 @@ export default function CompanyDetailPanel(props: Props) {
                 </li>
               ))}
             </ul>
-          ) : !loading && !errors.documents ? (
+          ) : !documentsLoading && !errors.documents ? (
             <p className="company-unavailable">표시할 뉴스·공시가 없습니다.</p>
           ) : null}
           {documents.length > VISIBLE_DOCUMENTS && (
