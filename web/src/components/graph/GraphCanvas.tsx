@@ -859,10 +859,8 @@ export default function GraphCanvas({
       });
     // The plugin creates its DOM asynchronously. Reserve its known geometry
     // on the first fit as well, before it has a measurable container.
-    // Mobile moves it left of the round zoom buttons (same breakpoint as max-md).
-    const mobile =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(width < 48rem)').matches;
+    // Mobile moves it left of the round zoom buttons (GraphMobileTools breakpoint).
+    const mobile = window.matchMedia?.('(max-width: 767px)').matches ?? false;
     obstacles.push({
       x: mobile ? 8 : host.clientWidth - 192,
       y: host.clientHeight - 64 - 128,
@@ -1424,7 +1422,10 @@ export default function GraphCanvas({
         lastFocused.current = focusId;
         // Resize changes layout coordinates. Center only after the new draw,
         // never on the previous layout before the detail rail has resized it.
-        if (centerTarget.current) await centerSelectedNode(graph, rendered);
+        if (centerTarget.current) {
+          cameraMoved = true;
+          await centerSelectedNode(graph, rendered);
+        }
         const pending = pendingNeighborhood.current;
         if (
           pending &&
@@ -1473,6 +1474,7 @@ export default function GraphCanvas({
             minimumZoom,
             Math.min(DEFAULT_GRAPH_ZOOM, maximumZoom),
           );
+          cameraMoved = true;
           await graph.zoomTo(initialZoom, false);
           followFit.current = false;
         }

@@ -1494,6 +1494,14 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(camera).toEqual({ position: [120, 80], zoom: 1.5 });
   });
 
+  it('D-GRP-01 does not undo a center request drawn together with the deselection', async () => {
+    const { camera, redraw } = await selectAndReturn();
+    canvas.zoomTo.mockClear();
+    await redraw({ centerRequest: { id: 'KRX:000660', seq: 1 } });
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    expect(camera.zoom).toBe(1.5);
+  });
+
   it('D-GRP-01 moves the mobile minimap left of the round zoom buttons', async () => {
     render(
       <GraphCanvas
