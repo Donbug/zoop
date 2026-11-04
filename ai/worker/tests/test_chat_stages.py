@@ -20,7 +20,7 @@ from zoop_ai.provider import ProviderError
 EV1 = "ev-" + "1" * 64
 EV2 = "ev-" + "2" * 64
 LIVE = {"ZOOP_AI_CHAT_LIVE_ENABLED": "1", "ZOOP_AI_CHAT_MAX_CALLS": "5", "ZOOP_AI_API_KEY": "luna-key-synthetic",
-        "ZOOP_AI_CHAT_ANSWER_MODEL": "gpt-6-luna", "ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT": "high",
+        "ZOOP_AI_CHAT_ANSWER_MODEL": "gpt-6-luna", "ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT": "medium",
         "TYPESAFE_API_KEY": "jev-key-synthetic", "ZOOP_AI_CHAT_JEV_MODEL": chat_jev.MODEL}
 
 
@@ -182,11 +182,11 @@ def test_verification_policy_holds_whatever_is_uncertain():
          "prohibitedAdvice": "no"},
         {"claims": [{"claimId": "s1c0", "support": None, "unsupportedCausality": "no"}],
          "prohibitedAdvice": "no"}]
-    assert verdicts(choice("supported", confidence=0.5), 0.02)[0]["claims"][0]["support"] == "hold"
+    assert verdicts(choice("supported", p=0.34, confidence=0.04), 0.02)[0]["claims"][0]["support"] == "hold"
     assert verdicts(choice("contradicted"), 0.02)[0]["claims"][0]["support"] == "contradicted"
     assert verdicts(choice("insufficient"), 0.02)[0]["claims"][0]["support"] == "hold"
     assert verdicts(choice("supported"), 0.02, 0.95)[0]["claims"][0]["unsupportedCausality"] == "yes"
-    assert verdicts(choice("supported"), 0.02, 0.5)[0]["claims"][0]["unsupportedCausality"] == "hold"
+    assert verdicts(choice("supported"), 0.02, 0.76)[0]["claims"][0]["unsupportedCausality"] == "hold"
     assert verdicts(choice("supported"), 0.95)[0]["prohibitedAdvice"] == "yes"
     assert verdicts(choice("supported"), 0.5)[0]["prohibitedAdvice"] == "hold"
 
@@ -225,7 +225,10 @@ def facts_input() -> dict[str, Any]:
          "asOf": "2026-10-21T00:00:00Z", "since": "2026-10-01T00:00:00Z", "queryScope": "targets",
          "targetIds": ["KRX:000660"], "evidenceLimit": 20, "changeLimit": 40, "evidenceRestricted": False, "truncated": True,
          "changes": [{"id": "iss-new", "kind": "issue", "name": "공급 계약", "change": "added"},
-                     {"id": "iss-old", "kind": "issue", "name": "이전 사건", "change": "removed"}]}]
+                     {"id": "iss-old", "kind": "issue", "name": "이전 사건", "change": "removed"}]},
+        {"kind": "graph_issue_membership", "requirementId": "r1", "issueId": "iss-new",
+         "issueTitle": "삼성전자, ASML과 차세대 반도체 제조 협력 확대",
+         "companyIds": ["KRX:005930", "NASDAQ:ASML"], "evidenceIds": [EV1], "graphVersion": "gv-new"}]
     return payload
 
 
@@ -258,6 +261,25 @@ def test_server_facts_reach_the_real_jev_http_builder_without_becoming_quotes(tm
         assert field not in outbound
 
 
+def test_chat_support_uses_the_calibrated_evidence_gate():
+    payload = facts_input()
+    payload["sections"] = [payload["sections"][0]]
+    payload["sections"][0]["claims"] = [{"claimId": "s0c0", "text":
+        "공개 그래프에서 삼성전자와 ASML은 ‘삼성전자, ASML과 차세대 반도체 제조 협력 확대’ 사건에 함께 포함되어 있습니다."}]
+    payload["sections"][0]["serverFacts"] = [payload["sections"][0]["serverFacts"][2]]
+    parsed = VerificationInput.model_validate(payload)
+    raw = {"model": chat_jev.MODEL, "answers": {"s0c0-support": choice("supported", 0.34, 0.11),
+           "s0c0-causality": noul(0.50), "s0-advice": noul(0.03)}}
+    verdict = chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL)
+    assert verdict.sections[0].claims[0].support == "supported"
+
+    raw["answers"]["s0c0-support"] = choice("supported", 0.34, 0.04)
+    assert chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL).sections[0].claims[0].support == "hold"
+
+    raw["answers"]["s0c0-support"] = choice("insufficient", 0.40, 0.80)
+    assert chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL).sections[0].claims[0].support == "supported"
+
+
 def test_canonical_facts_do_not_bypass_quote_grants(tmp_path):
     endpoint = Endpoint(jev_all())
     result = run(request("chat-verification", facts_input()), tmp_path, endpoint, registry=None)
@@ -275,6 +297,9 @@ def test_canonical_facts_do_not_bypass_quote_grants(tmp_path):
     lambda p: p["sections"][0]["serverFacts"][0]["companies"][0].update(quantity=100),
     lambda p: p["sections"][0]["serverFacts"][1].update(articleBody="not allowed"),
     lambda p: p["sections"][0]["serverFacts"][1]["changes"][0].update(name="가" * 301),
+    lambda p: p["sections"][0]["serverFacts"][2].update(graphVersion="gv-stale"),
+    lambda p: p["sections"][0]["serverFacts"][2].update(evidenceIds=[EV2]),
+    lambda p: p["sections"][0]["serverFacts"][2].update(companyIds=["member:self"]),
     lambda p: p["sections"][0]["serverFacts"][0].update(queryScope="named_companies", companyIds=["member:self"]),
     lambda p: p["sections"][0]["serverFacts"][0].update(companies=p["sections"][0]["serverFacts"][0]["companies"] * 3),
     lambda p: p["sections"][0]["serverFacts"][0]["companies"][0].update(held=False, watched=False),
@@ -464,7 +489,7 @@ def test_the_answer_request_is_strict_json_with_the_chat_prompt_and_its_answer_i
     assert result.status == "succeeded" and result.answer == good
     path, body, auth = endpoint.calls[0]
     assert path.endswith("/chat/completions") and auth == "Bearer luna-key-synthetic"
-    assert body["messages"][0]["content"] == chat_luna.PROMPT and body["reasoning_effort"] == "high"
+    assert body["messages"][0]["content"] == chat_luna.PROMPT and body["reasoning_effort"] == "medium"
     assert body["response_format"]["json_schema"]["strict"] is True
     assert result.receipt.usage.reasoning_tokens == 7
 
@@ -740,7 +765,7 @@ def test_path_pairs_keep_their_status_and_steps_name_only_quoted_evidence():
 
 def test_the_answer_prompt_explains_paths_and_its_version_moved():
     assert "status=cut" in chat_luna.PROMPT and "evidenceIds" in chat_luna.PROMPT
-    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-11-01-1-")
+    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-11-04-4-")
     assert "web_reported" in chat_luna.PROMPT and "web-search:" in chat_luna.PROMPT
 
 

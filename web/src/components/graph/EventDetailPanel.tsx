@@ -17,6 +17,7 @@ import {
 export type EventAction = 'evidence' | 'focus' | 'ai';
 interface Props {
   id: string;
+  panelWidth?: number;
   companyDetailHref?: (id: string) => string;
   context: EventContext;
   geography: GraphNode['geography'];
@@ -32,6 +33,7 @@ interface Props {
 // D-GRP-02 · Figma 619:6269 · WBS 6.6.22.
 export default function EventDetailPanel({
   id,
+  panelWidth,
   companyDetailHref,
   context,
   geography,
@@ -122,7 +124,9 @@ export default function EventDetailPanel({
   }
   return (
     <aside
-      className={`event-panel ${ui.shell}`}
+      id="event-detail-panel"
+      className={`event-panel ${ui.shell} rounded-panel`}
+      style={panelWidth ? { width: `${panelWidth}px` } : undefined}
       data-screen-id="D-GRP-02"
       aria-labelledby="event-panel-title"
       onKeyDown={(event) => {
@@ -172,7 +176,7 @@ export default function EventDetailPanel({
         {loading && (
           <LoadingIndicator
             label="사건 정보를 불러오는 중입니다."
-            className={`${ui.state} flex min-h-16 w-full`}
+            className="flex min-h-16 w-full justify-center py-6"
           />
         )}
         {error && (
@@ -356,12 +360,6 @@ export default function EventDetailPanel({
               nodeIds={nodeIds}
               onSelectNode={onSelectNode}
             />
-            <footer className={ui.footer}>
-              <p>{data.metadata.source}</p>
-              <p>
-                조회 기준 · {formatPublishedAt(data.metadata.asOf) ?? '미제공'}
-              </p>
-            </footer>
           </>
         )}
       </div>

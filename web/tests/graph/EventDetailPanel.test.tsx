@@ -38,6 +38,7 @@ describe('D-GRP-02 · panel states and accessibility', () => {
     const event = createMockEvent(props.id);
     await act(async () => pending.resolve(event));
     expect(screen.getByRole('heading', { name: event.title })).toBeTruthy();
+    expect(screen.queryByText(/조회 기준/)).toBeNull();
     const user = userEvent.setup();
     await user.tab();
     expect(document.activeElement).toBe(

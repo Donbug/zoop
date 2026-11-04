@@ -30,6 +30,11 @@ import org.springframework.transaction.TransactionException;
 abstract class GraphTargetTool implements ChatTool {
     /** Items one read returns at most (zoop-ai-chat-5 {@code Branch.items}). */
     static final int MAX_ITEMS = 50;
+    /**
+     * Current-authority checks may reread operator-owned EFS registries. Keep one graph read bounded while still returning
+     * every public target; evidence left unchecked is reported as truncated, never as absent or readable.
+     */
+    static final int MAX_EVIDENCE_CHECKS = 2;
 
     private final PublicGraphReader reader;
     private final ChatEvidenceAccess access;
@@ -86,6 +91,13 @@ abstract class GraphTargetTool implements ChatTool {
                 truncated = true;
                 break;
             }
+            // Once this call has spent its authority-check budget, later targets would carry labels without any
+            // independently checked evidence. Do not send those labels to the answer model: keep the newest targets that
+            // fit the budget and report the remainder as truncated instead.
+            if (!items.isEmpty() && checked.size() >= MAX_EVIDENCE_CHECKS) {
+                truncated = true;
+                break;
+            }
             List<String> evidence = new ArrayList<>();
             List<String> candidates = new ArrayList<>(ownEvidence(target));
             candidates.addAll(target.evidenceIds());
@@ -98,6 +110,11 @@ abstract class GraphTargetTool implements ChatTool {
                 } else if (passed.size() >= request.limit()) {
                     // Not read: it may or may not be readable, so the result says it was cut, never that there is none.
                     if (!checked.contains(evidenceId)) truncated = true;
+                } else if (checked.contains(evidenceId)) {
+                    // A previously denied span stays denied without repeating its current-authority read.
+                } else if (checked.size() >= MAX_EVIDENCE_CHECKS) {
+                    // Do not mistake an unchecked span for a denial when the per-call authority-check budget is spent.
+                    truncated = true;
                 } else if (checked.add(evidenceId) && readable(scope, version, evidenceId)) {
                     passed.add(evidenceId);
                     evidence.add(evidenceId);

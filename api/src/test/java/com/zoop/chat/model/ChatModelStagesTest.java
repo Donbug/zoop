@@ -513,6 +513,22 @@ class ChatModelStagesTest {
     }
 
     @Test
+    void verificationFallbackKeepsCheckedClaimsWhenTheSemanticVerifierIsUnavailable() {
+        var sections = List.of(
+                new ChatGeneratedAnswer.Section("general_knowledge", "HBM은 적층형 고대역폭 메모리입니다.",
+                        List.of("r1"), List.of()),
+                new ChatGeneratedAnswer.Section("evidence_grounded", "두 기업은 같은 사건에 포함됩니다.",
+                        List.of("r2"), List.of(EV_A)));
+        ChatSemanticVerdicts fallback = ChatModelStages.verificationFallback(sections);
+
+        assertEquals(2, fallback.sections().size());
+        assertNull(fallback.sections().get(0).claims().getFirst().support());
+        assertEquals("supported", fallback.sections().get(1).claims().getFirst().support());
+        assertTrue(fallback.sections().stream().allMatch(v -> "no".equals(v.prohibitedAdvice())
+                && v.claims().stream().allMatch(c -> "no".equals(c.unsupportedCausality()))));
+    }
+
+    @Test
     void aStageCutOffWhileItsOutcomeIsBeingWrittenIsStillRecorded() throws Exception {
         var writing = new CountDownLatch(1);
         var cutOff = new CountDownLatch(1);

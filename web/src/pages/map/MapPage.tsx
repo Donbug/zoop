@@ -3,6 +3,7 @@ import LoadingIndicator from '@/components/common/LoadingIndicator';
 import {
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -264,7 +265,37 @@ function MapWorkspace({
     id: string;
     owner: string;
   } | null>(null);
+  // 닫을 때는 왼쪽으로 밀려 나가는 애니메이션이 끝난 뒤 패널을 뺀다.
+  const [sidebarClosing, setSidebarClosing] = useState(false);
+  const sidebarSlot = useRef<HTMLDivElement>(null);
+  const sidebarShown = sidebarOpen || sidebarClosing;
+  // 패널 크기와 지도 사이 간격만큼 밀어야 지도도 같은 속도로 따라 움직인다.
+  // 가로 배치는 너비, 모바일 세로 배치는 높이를 쓴다.
+  function measureSidebarSlot() {
+    const slot = sidebarSlot.current;
+    if (!slot) return;
+    slot.style.setProperty('--holdings-shift', `${slot.offsetWidth + 12}px`);
+    slot.style.setProperty('--holdings-drop', `${slot.offsetHeight + 12}px`);
+  }
+  useLayoutEffect(measureSidebarSlot, [sidebarShown]);
+  useEffect(() => {
+    if (!sidebarClosing) return;
+    // animationend가 오지 않는 환경(동작 줄이기 설정 등)에서도 패널을 뺀다.
+    const timer = window.setTimeout(() => setSidebarClosing(false), 400);
+    return () => window.clearTimeout(timer);
+  }, [sidebarClosing]);
   function changeSidebar(open: boolean) {
+    const reduced =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // 열린 뒤 내용이 바뀌어 크기가 달라졌을 수 있으니 닫기 직전에 다시 잰다.
+    // 닫는 동안 목록 응답이 와도 패널이 커지지 않게 잰 높이로 고정한다.
+    const slot = sidebarSlot.current;
+    if (!open) {
+      measureSidebarSlot();
+      if (slot) slot.style.height = `${slot.offsetHeight}px`;
+    } else slot?.style.removeProperty('height');
+    setSidebarClosing(!open && sidebarOpen && !reduced);
     setSidebarPreference(open);
     try {
       localStorage.setItem(SIDEBAR_KEY, open ? '1' : '0');
@@ -1205,11 +1236,20 @@ function MapWorkspace({
             </div>
           </div>
           <div
-            className={`relationship-body${selectedPanel ? ` has-company-panel ${pathIsCollapsed ? '' : 'max-md:pb-[48dvh]!'}` : ''}${tutorialOpen || sidebarOpen ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
+            className={`relationship-body${selectedPanel ? ` has-company-panel ${pathIsCollapsed ? '' : 'max-md:pb-[48dvh]!'}` : ''}${tutorialOpen || sidebarShown ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
             aria-busy={loading}
           >
-            {sidebarOpen && (
-              <div id="holdings-sidebar" className="flex min-h-0 max-sm:w-full">
+            {sidebarShown && (
+              <div
+                id="holdings-sidebar"
+                ref={sidebarSlot}
+                inert={!sidebarOpen}
+                onAnimationEnd={(event) => {
+                  if (event.target === event.currentTarget && !sidebarOpen)
+                    setSidebarClosing(false);
+                }}
+                className={`holdings-slot flex min-h-0 max-sm:w-full${sidebarOpen ? '' : ' is-closing'}`}
+              >
                 <HoldingsSidebar
                   key={memoryOwner}
                   member={Boolean(token)}
@@ -1430,6 +1470,7 @@ function MapWorkspace({
               <GraphFocusControls
                 label={focusNode.label}
                 hops={focusHops}
+                sidebarOpen={sidebarOpen}
                 onHopsChange={(hops) => updateQuery({ hops: String(hops) })}
                 onClear={() => updateQuery({ focus: null, hops: null })}
               />
@@ -1459,15 +1500,22 @@ function MapWorkspace({
                 />
               </div>
             )}
-            {companyNode &&
-              !impactIssueId &&
+            {(companyNode || eventId || edgeId || impactIssueId) &&
               !pathFrom &&
               !pathIsCollapsed &&
               !tutorialOpen && (
                 <div
                   role="separator"
-                  aria-label="기업 패널 너비 조절"
-                  aria-controls="company-detail-panel"
+                  aria-label="상세 패널 너비 조절"
+                  aria-controls={
+                    impactIssueId
+                      ? 'impact-path-panel'
+                      : companyNode
+                        ? 'company-detail-panel'
+                        : eventId
+                          ? 'event-detail-panel'
+                          : 'relation-detail-panel'
+                  }
                   aria-orientation="vertical"
                   aria-valuemin={COMPANY_PANEL_MIN_WIDTH}
                   aria-valuemax={COMPANY_PANEL_MAX_WIDTH}
@@ -1585,7 +1633,11 @@ function MapWorkspace({
                     openImpact(companyNode.id, issueId)
                   }
                   onFocus={() =>
-                    updateQuery({ focus: companyNode.id, hops: '1' })
+                    updateQuery(
+                      focusId === companyNode.id
+                        ? { focus: null, hops: null }
+                        : { focus: companyNode.id, hops: '1' },
+                    )
                   }
                   activeRelatedId={pairOther}
                   onSelectRelation={(companyId) =>
@@ -1657,6 +1709,7 @@ function MapWorkspace({
               )}
               {data && impactCompanyId && impactIssueId && !pathFrom && (
                 <ImpactPathPanel
+                  panelWidth={companyPanelWidth}
                   companyId={impactCompanyId}
                   issueId={impactIssueId}
                   context={eventContext}
@@ -1717,6 +1770,7 @@ function MapWorkspace({
                       companyDetailRouteFromMap(id, params.toString())
                     }
                     context={eventContext}
+                    panelWidth={companyPanelWidth}
                     geography={selectedNode?.geography ?? null}
                     logoOf={logoOf}
                     nodeIds={panelNodeIds}
@@ -1739,6 +1793,7 @@ function MapWorkspace({
                   key={edgeId}
                   id={edgeId}
                   context={eventContext}
+                  panelWidth={companyPanelWidth}
                   logoOf={logoOf}
                   actionOf={(issueId) =>
                     data?.nodes.find((node) => node.id === issueId)?.action

@@ -13751,7 +13751,8 @@
             "enum": [
               "general_knowledge",
               "zoop_documented",
-              "evidence_grounded"
+              "evidence_grounded",
+              "web_reported"
             ],
             "title": "Basis"
           },

@@ -27,6 +27,11 @@ import {
 } from '@/util/briefingIssueReading';
 import { safeArticleUrl } from '@/components/graph/event-format';
 import MarketIndicators from './MarketIndicators';
+import CommonPriorityIssues from './CommonPriorityIssues';
+import PersonalPriorityIssues from './PersonalPriorityIssues';
+import PriorityRoundSummary from './PriorityRoundSummary';
+import { commonPriorityOf } from '@/util/briefingCommonPriority';
+import { personalPriorityOf } from '@/util/briefingPersonalPriority';
 import PriorIssueFollowUps from './PriorIssueFollowUps';
 import BriefingItemDetails from './BriefingItemDetails';
 import BriefingContinuity from './BriefingContinuity';
@@ -803,6 +808,8 @@ export default function IssueCentricBriefing({
     previous?.id === priorId ? previous : undefined,
   );
   const groups = readingGroups(result, views, compact);
+  const commonPriority = commonPriorityOf(result);
+  const personalPriority = personalPriorityOf(result);
   return (
     <div data-presentation="issue-centered">
       <MarketIndicators
@@ -811,8 +818,13 @@ export default function IssueCentricBriefing({
         showBaseline
       />
       {beforeIssues}
+      {commonPriority && (
+        <PriorityRoundSummary result={result} compact={compact} />
+      )}
       {result.items.length === 0 &&
         result.emptyReason === 'no_issues_in_window' &&
+        !commonPriority &&
+        !personalPriority &&
         !result.issueIntelligence &&
         !result.continuity &&
         !selectionDetails && (
@@ -848,14 +860,16 @@ export default function IssueCentricBriefing({
           <h3 className={SECTION_TITLE}>
             {beforeIssues ? '공통 핵심 이슈' : '핵심 이슈'}
           </h3>
-          {!result.issueIntelligence && !selectionDetails && (
-            <Link
-              to={`/?round=${encodeURIComponent(result.id)}`}
-              className={`text-caption underline ${FOCUS_RING}`}
-            >
-              이슈 관계 지도 ↗
-            </Link>
-          )}
+          {result.graphVersion &&
+            !result.issueIntelligence &&
+            !selectionDetails && (
+              <Link
+                to={`/?round=${encodeURIComponent(result.id)}`}
+                className={`text-caption underline ${FOCUS_RING}`}
+              >
+                이슈 관계 지도 ↗
+              </Link>
+            )}
         </div>
         {result.issueReading && !validIssueReading(result) && (
           <p role="alert" className={EMPTY}>
@@ -867,7 +881,24 @@ export default function IssueCentricBriefing({
             묶기 전 세부 사건별 분석과 평가를 원래 항목으로 보존한 보기입니다.
           </p>
         )}
-        {groups.length ? (
+        {(result.commonPriority && !commonPriority) ||
+        (result.personalPriority && !personalPriority) ? (
+          <p role="alert" className={EMPTY}>
+            새 표시 결과의 회차·근거 연결을 확인하지 못했습니다. 기존 발행
+            내용을 제공합니다.
+          </p>
+        ) : null}
+        {personalPriority ? (
+          <PersonalPriorityIssues
+            value={personalPriority}
+            evening={result.edition === 'evening'}
+          />
+        ) : commonPriority ? (
+          <CommonPriorityIssues
+            value={commonPriority}
+            evening={result.edition === 'evening'}
+          />
+        ) : groups.length ? (
           <ol className="space-y-3">
             {groups.map((group, index) => (
               <IssueCard
@@ -892,8 +923,65 @@ export default function IssueCentricBriefing({
               : '이 회차에 새로 선정된 핵심 이슈가 없습니다. 복기·수집 상태는 위 안내를 확인하세요.'}
           </p>
         )}
-        <BriefingEvidenceTotal items={items} />
+        {!personalPriority && !commonPriority && (
+          <BriefingEvidenceTotal items={items} />
+        )}
+        {(personalPriority || commonPriority) &&
+          !compact &&
+          groups.length > 0 && (
+            <details className="mt-4">
+              <summary
+                className={`cursor-pointer text-body font-semibold ${FOCUS_RING}`}
+              >
+                기존 발행 이슈의 전체 분석·시세·근거
+              </summary>
+              {(commonPriority?.legacyAnalysisScopeWarning ||
+                personalPriority?.items.some(
+                  (item) => item.analysisOmittedReason,
+                )) && (
+                <p className={`${NOTE} mt-3`}>
+                  아래 원본 분석에는 별개 사건이 섞여 있어 위의 새 이슈 카드에는
+                  사용하지 않았습니다. 비교용으로 보존한 내용입니다.
+                </p>
+              )}
+              <ol className="mt-3 space-y-3">
+                {groups.map((group, index) => (
+                  <IssueCard
+                    key={group.id}
+                    group={group}
+                    rank={index + 1}
+                    comparisonState={comparisonState}
+                    compact={false}
+                    result={result}
+                    renderExtra={renderExtra}
+                    selectionDetails={selectionDetails}
+                    corrections={group.members.flatMap(
+                      (m) => issueCorrections?.get(m.item.eventId) ?? [],
+                    )}
+                  />
+                ))}
+              </ol>
+            </details>
+          )}
       </section>
+      {personalPriority &&
+        result.marketSummary &&
+        'text' in result.marketSummary && (
+          <details open={!compact} className={SECTION}>
+            <summary
+              className={`cursor-pointer text-body font-semibold ${FOCUS_RING}`}
+            >
+              기존 기준의 회차 요약·전망 (보존)
+            </summary>
+            <p className={`${NOTE} mt-3`}>
+              개인 종목 기준으로 다시 선정하기 전에 작성한 요약입니다. 위 핵심
+              이슈 목록과 구분해 보존합니다.
+            </p>
+            <p className={`${BODY} mt-3 whitespace-pre-line`}>
+              {result.marketSummary.text}
+            </p>
+          </details>
+        )}
       <PriorIssueFollowUps key={result.id} result={result} />
     </div>
   );

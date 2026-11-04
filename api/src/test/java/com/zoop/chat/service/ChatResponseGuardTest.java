@@ -74,14 +74,13 @@ class ChatResponseGuardTest {
     }
 
     @Test
-    void aSyntheticWebCitationIsShownAgainAndAnyOtherProvidersIsWithheld() {
-        // Until a real provider's redisplay rights are decided (web search design 7), only the synthetic one is shown again.
+    void anApprovedWebCitationIsShownAgainAndAnyOtherProviderIsWithheld() {
         var job = job(List.of(), web("synthetic"));
         assertSame(job, guard(Set.of()).job(job, "r"), "no evidence record is read for a web hit");
+        var naver = job(List.of(), web(com.zoop.chat.tool.NaverApiHubWebSearchProvider.ID));
+        assertSame(naver, guard(Set.of()).job(naver, "r"), "NAVER redisplay is operator-approved for zoop-dev");
         assertEquals(ChatResponseGuard.WITHHELD_ANSWER, guard(Set.of()).job(job(List.of(), web("other")), "r").result()
                 .answer());
-        assertEquals(ChatResponseGuard.WITHHELD_ANSWER, guard(Set.of()).job(job(List.of(),
-                web(com.zoop.chat.tool.NaverApiHubWebSearchProvider.ID)), "r").result().answer());
     }
 
     private static ChatResult web(String provider) {

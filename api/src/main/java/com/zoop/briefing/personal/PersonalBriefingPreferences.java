@@ -37,7 +37,7 @@ public class PersonalBriefingPreferences {
     }
     private Optional<ObjectNode> preference(String member,String where,Object...extra){
         var args=new ArrayList<Object>();args.add(member);args.addAll(Arrays.asList(extra));
-        return jdbc.query("SELECT id,revision,choice,created_at,effective_from FROM briefing_personal_preferences WHERE member_id=? "+where+" ORDER BY revision DESC LIMIT 1",(r,i)->{
+        return jdbc.query("SELECT id,revision,choice,created_at,effective_from FROM briefing_personal_preferences WHERE member_id=? AND scope='scheduled' "+where+" ORDER BY revision DESC LIMIT 1",(r,i)->{
             var o=json.createObjectNode().put("revisionId",r.getString(1)).put("revision",r.getInt(2));o.set("choice",StrictJson.parseObject(r.getString(3)).node());
             o.put("savedAt",r.getTimestamp(4).toInstant().toString()).put("effectiveFrom",r.getTimestamp(5).toInstant().toString());return o;},args.toArray()).stream().findFirst();
     }
@@ -115,7 +115,22 @@ public class PersonalBriefingPreferences {
             o.set("selection",StrictJson.parseObject(r.getString(r.getString(8)==null?7:8)).node());return o;},args.toArray()).stream().findFirst();
     }
     public ObjectNode get(String round,MemberPrincipal p,boolean demo,String requestId){
-        member(p);if(demo&&!demoEnabled)throw new CustomException(ErrorCode.ACCESS_DENIED);
+        member(p);
+        if(demo&&!demoEnabled){
+            // An explicitly published saved import is readable by its owner even
+            // when manual demo generation is disabled. Never admit an unstaged,
+            // unaudited or another member's demo through this read-only path.
+            var imported=jdbc.query("""
+                SELECT d.id,d.preference_id FROM briefing_personal_deliveries d
+                JOIN briefing_personal_preferences p ON p.id=d.preference_id AND p.member_id=d.member_id AND p.scope='demo'
+                WHERE d.member_id=? AND d.round_id=? AND d.mode='demo' AND d.status='ready'
+                AND EXISTS(SELECT 1 FROM briefing_result_imports i WHERE i.member_id=d.member_id AND i.delivery_ids @> jsonb_build_array(d.id))
+                ORDER BY d.created_at DESC,d.id COLLATE "C" LIMIT 1
+                """,(r,i)->List.of(r.getString(1),r.getString(2)),p.memberId(),round);
+            if(imported.isEmpty())return json.createObjectNode().put("status","not_published").put("roundId",round);
+            return delivery(p.memberId(),round,true,imported.getFirst().get(1)).filter(d->d.path("id").asString().equals(imported.getFirst().getFirst()))
+                .map(x->response(x,requestId)).orElseThrow(()->new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
+        }
         return delivery(p.memberId(),round,demo,null).map(x->response(x,requestId)).orElseGet(()->json.createObjectNode().put("status","not_published").put("roundId",round));
     }
     private ObjectNode response(ObjectNode row,String requestId){
@@ -127,6 +142,39 @@ public class PersonalBriefingPreferences {
         for(var item:selection.path("presentation").path("items")){
             var c=pools.getFirst().path("candidates").valueStream().filter(x->x.path("issueId").equals(item.path("eventId"))).findFirst().orElseThrow(()->new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
             if(!access.readableForRound(c,r,requestId))throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
+        // New relative-priority cards have their own sources; empty legacy items never bypass read authority.
+        for (String view : List.of("presentation", "verifiedPresentation")) {
+            var presentation = selection.path(view);
+            if (!presentation.has("personalPriority")) continue;
+            try {
+                var priority = presentation.get("personalPriority");
+                var allowedCompanies = com.zoop.briefing.query.BriefingPriorityRules.strings(selection.path("choice"), "companyIds");
+                Set<String> evidence = new HashSet<>();
+                for (var candidate : pools.getFirst().path("candidates"))
+                    for (var source : candidate.path("sources")) evidence.add(source.path("evidenceId").asString());
+                com.zoop.briefing.query.BriefingPriorityRules.validate(priority, roundId, r.windowTo(), true, allowedCompanies, evidence);
+                if (!roundId.equals(presentation.path("id").asString()) || !r.windowTo().equals(Instant.parse(presentation.path("dataAsOf").asString())))
+                    throw new IllegalArgumentException("personal presentation binding");
+                for (var item : priority.path("items")) {
+                    var candidate = pools.getFirst().path("candidates").valueStream()
+                        .filter(c -> c.path("issueId").equals(item.path("issueId"))).findFirst().orElseThrow();
+                    if (!candidate.path("verified").asBoolean() || !access.readableForRound(candidate, r, requestId))
+                        throw new IllegalArgumentException("unreadable personal priority candidate");
+                    for (var source : item.path("sources")) {
+                        var original = candidate.path("sources").valueStream().filter(c -> c.path("evidenceId").equals(source.path("evidenceId"))).findFirst().orElseThrow();
+                        for (String key : List.of("quote", "url", "publishedAt"))
+                            if (!original.path(key).equals(source.path(key))) throw new IllegalArgumentException("personal priority source mismatch");
+                    }
+                    for (var connection : item.path("connections"))
+                        if (candidate.path("companies").valueStream().noneMatch(c -> c.path("companyId").equals(connection.path("companyId"))))
+                            throw new IllegalArgumentException("personal priority company mismatch");
+                }
+                if (!com.zoop.briefing.query.BriefingPriorityRules.storedSourcesMatch(priority, jdbc))
+                    throw new IllegalArgumentException("personal priority evidence mismatch");
+            } catch (IllegalArgumentException | NoSuchElementException invalid) {
+                throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            }
         }
         for(var tracked:selection.path("tracking")){
             String prior=tracked.path("previousRoundId").asString();var pr=rounds.findById(prior).orElseThrow(()->new CustomException(ErrorCode.SOURCE_UNAVAILABLE));

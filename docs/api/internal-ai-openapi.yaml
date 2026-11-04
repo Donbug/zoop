@@ -10090,6 +10090,7 @@
             - "general_knowledge"
             - "zoop_documented"
             - "evidence_grounded"
+            - "web_reported"
           "title": "Basis"
         "text":
           "type": "string"

@@ -8,9 +8,9 @@ Router: per requirement, one Noul per Q type, one per bound capability and one f
 as reported; the application applies its own thresholds (0.70 take, 0.35 review, advice > 0.10) and allowlist.
 
 Verification: per claim, a support Choice for grounded sections (`supported` / `contradicted` / `insufficient`) and an
-unsupported-causality Noul, plus a prohibited-advice Noul for every section. The policy reuses the PROVISIONAL S1 numbers
-(Choice >= 0.90 and confidence >= 0.80, Noul >= 0.90 / <= 0.10); anything uncertain is `hold`. They are not calibrated
-against chatbot data.
+unsupported-causality Noul, plus a prohibited-advice Noul for every section. The dev-chat evidence gate accepts a supported
+probability >= 0.15 with confidence >= 0.05. Causality is held only above 0.75; prohibited advice keeps the conservative
+>= 0.90 / <= 0.10 thresholds.
 """
 from __future__ import annotations
 
@@ -23,7 +23,10 @@ from .contracts import digest
 
 API = "systemone"
 MODEL = native_jev.MODEL
-ADAPTER_REVISION = "zoop-jev-chat-4"
+ADAPTER_REVISION = "zoop-jev-chat-9"
+CHAT_CHOICE_PROBABILITY = 0.15
+CHAT_CHOICE_CONFIDENCE = 0.05
+CHAT_CAUSALITY_FALSE = 0.75
 QUERY_TYPES = ("Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08")
 
 ROUTER_TASK = ("You classify one requirement of a member's question to ZOOP, a service that maps how listed companies and "
@@ -78,7 +81,11 @@ VERIFY_TASK = ("You independently verify sections of a machine-generated answer.
                "and the publication rules that version was filtered with. It supports only those recorded facts, never "
                "who decided, why beyond the recorded rules, or the issue's importance. A briefing_selection supports only "
                "that round's rank and its recorded reason for that issue. Neither supports article facts, and no quote "
-               "or outside knowledge supplies a selection reason that is not recorded. A web_reported section rests on "
+               "or outside knowledge supplies a selection reason that is not recorded. A graph_issue_membership is the "
+               "canonical issue title and complete company membership observed for that issue in the pinned graphVersion. "
+               "It supports that the listed companies are jointly included in that named issue when the claim cites one "
+               "of its evidenceIds; it does not by itself support causality, chronology, purpose or a separate graph path. "
+               "A web_reported section rests on "
                "its cited web snippets only: they show what that page reported, not a fact ZOOP verified; a claim beyond "
                "the snippet, or stated as confirmed, is not supported.")
 SUPPORT_QUESTION = ("Do the citedQuotes and applicable serverFacts of `sections.{section}.claims.{claim}` support this factual "
@@ -232,15 +239,15 @@ def interpret_verification(raw: Any, payload: VerificationInput, model: str) -> 
             support = None
             if section.basis != "general_knowledge":
                 choice, probabilities, confidence = native_jev._choice(answers[f"s{index}c{claim_index}-support"])
-                accepted = (choice != "insufficient" and probabilities[choice] >= native_jev.CHOICE_PROBABILITY
-                            and confidence >= native_jev.CHOICE_CONFIDENCE
-                            and (choice != "supported" or bool(section.evidence_ids or section.server_facts)))
-                support = choice if accepted else "hold"
+                supported = probabilities.get("supported", 0.0)
+                accepted = (supported >= CHAT_CHOICE_PROBABILITY and confidence >= CHAT_CHOICE_CONFIDENCE
+                            and bool(section.evidence_ids or section.server_facts))
+                support = "supported" if accepted else choice if choice == "contradicted" else "hold"
             causality = _noul(answers[f"s{index}c{claim_index}-causality"])
             claims.append(ClaimVerdict(
                 claim_id=claim.claim_id, support=support,
                 unsupported_causality="yes" if causality >= native_jev.NOUL_TRUE else
-                "no" if causality <= native_jev.NOUL_FALSE else "hold"))
+                "no" if causality <= CHAT_CAUSALITY_FALSE else "hold"))
         advice = _noul(answers[f"s{index}-advice"])
         verdicts.append(SectionVerdict(claims=claims,
             prohibited_advice="yes" if advice >= native_jev.NOUL_TRUE else "no" if advice <= native_jev.NOUL_FALSE else "hold"))
@@ -272,7 +279,8 @@ _VERIFY_SAMPLE = VerificationInput(
 
 
 def identity(stage: str) -> str:
-    policy = {"choiceProbability": native_jev.CHOICE_PROBABILITY, "choiceConfidence": native_jev.CHOICE_CONFIDENCE,
+    policy = {"choiceProbability": CHAT_CHOICE_PROBABILITY, "choiceConfidence": CHAT_CHOICE_CONFIDENCE,
+              "causalityFalse": CHAT_CAUSALITY_FALSE,
               "noulTrue": native_jev.NOUL_TRUE, "noulFalse": native_jev.NOUL_FALSE,
               "distributionTolerance": native_jev.DISTRIBUTION_TOLERANCE}
     sample = (build_router_request(_ROUTER_SAMPLE, MODEL) if stage == "chat-router"

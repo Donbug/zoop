@@ -154,7 +154,7 @@
         "tools": ["company.read", "issue.read"],
         "outcome": "answered",
         "citationKinds": ["article", "company_profile"],
-        "appliedIssues": ["iss-fixture-hbm-equip", "iss-fixture-hbm-supply"]
+        "appliedIssues": ["iss-fixture-hbm-equip"]
       }
     },
     {
@@ -412,7 +412,7 @@
         "tools": ["company.read", "issue.read", "portfolio.scope.read"],
         "planned": ["r1-s:tools", "r1:tools"],
         "outcome": "answered",
-        "appliedCompanies": ["KRX:000660", "KRX:005930", "NASDAQ:NVDA"],
+        "appliedCompanies": ["KRX:000660"],
         "limitations": []
       }
     },
@@ -497,7 +497,7 @@
       },
       "expect": {
         "outcome": "answered",
-        "appliedCompanies": ["KRX:000660", "KRX:005930", "NASDAQ:NVDA", "NYSE:TSM"],
+        "appliedCompanies": ["KRX:000660"],
         "answerStatus": "partial",
         "limitations": [{"kind": "results_truncated", "label": "내 종목 관련 사건 알려줘", "cause": "scope_cut"}]
       }

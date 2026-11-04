@@ -82,7 +82,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      * comes outside that deadline: up to 1 s waiting for a free slot before it starts, and the reply's transport and decoding.
      * A limit equal to the service's would discard answers the service delivered in time, with their cost spent.
      * The values remain per-stage ceilings, not time reservations. Direct stages shrink to the time left after the minimum
-     * answer, verification and terminal-write reservations below, so every route remains inside the 45 s job deadline.
+     * answer, verification and terminal-write reservations below, so every direct route remains inside the 60 s job deadline.
      */
     record StageLimits(Duration router, Duration tools, Duration generate, Duration verify, Duration server) {
         /** The AI service's slot wait (1 s) and 1 s for transport and decoding, beyond its own stage deadline. */
@@ -236,7 +236,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             // checked below against exactly the results of the calls that ran, each requirement against its own.
             control.phase("retrieving");
             if (control.toolCallsLeft() < 1) throw new Stop(TOOL_BUDGET_SPENT);
-            // Idempotently keep the agent path on the same 45 s deadline as every other route.
+            // The direct path now has a 60 s ceiling; keep the agent path on its separate 45 s external contract.
             control.shortenDeadline(run.deadline().minus(ChatJobExecutor.MAX_DEADLINE.minus(AGENT_JOB)));
             Duration after = MIN_VERIFY.plus(limits.server());
             // Luna has min(35 s, what is left of it before verification and saving): never 35 s on top.
@@ -340,14 +340,17 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
 
         Map<String, ChatWebResult> hits = new LinkedHashMap<>();
         branches.forEach(b -> b.results().forEach(r -> r.webResults().forEach(h -> hits.putIfAbsent(h.id(), h))));
+        // Re-open every selected citation under the current authority before verification. Article reads may each touch
+        // the operator-owned grant/source registries, so start the independent reads together: serial reads can consume
+        // the verification reservation even when every one succeeds. The original section/evidence order still decides
+        // the response order below, and every read remains fresh for this run.
+        Map<String, Optional<Citation>> readableCitations = readCitations(run, passed.sections(), hits);
         Map<String, Citation> cited = new LinkedHashMap<>();
         for (var section : passed.sections()) {
             for (String id : section.evidenceIds()) {
                 Citation citation = cited.get(id);
                 if (citation == null) {
-                    // A web hit is cited as the search returned it: there is no evidence record to read again.
-                    Optional<Citation> read = hits.containsKey(id) ? Optional.of(webCitation(hits.get(id)))
-                            : citations.cite(id, run.graphVersionId(), run.context().asOf(), run.jobId());
+                    Optional<Citation> read = readableCitations.getOrDefault(id, Optional.empty());
                     // Readable when the tool passed it on and not now: the answer cannot stand on it.
                     if (read.isEmpty()) return validationFailed();
                     citation = read.get();
@@ -457,6 +460,35 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     }
 
     /**
+     * Reads the answer's distinct citations concurrently, each through the same current-authority check as before. Web hits
+     * need no second store read and are rebound directly. A failed read keeps the existing fail-closed behavior.
+     */
+    private Map<String, Optional<Citation>> readCitations(ChatRun run,
+            List<ChatGeneratedAnswer.Section> sections, Map<String, ChatWebResult> hits) {
+        Map<String, Future<Optional<Citation>>> pending = new LinkedHashMap<>();
+        for (var section : sections) {
+            for (String id : section.evidenceIds()) {
+                if (pending.containsKey(id)) continue;
+                pending.put(id, models.submit(() -> hits.containsKey(id) ? Optional.of(webCitation(hits.get(id)))
+                        : citations.cite(id, run.graphVersionId(), run.context().asOf(), run.jobId())));
+            }
+        }
+        Map<String, Optional<Citation>> read = new LinkedHashMap<>();
+        try {
+            for (var entry : pending.entrySet()) read.put(entry.getKey(), entry.getValue().get());
+        } catch (InterruptedException interrupted) {
+            pending.values().forEach(future -> future.cancel(true));
+            Thread.currentThread().interrupt();
+            throw new ChatToolUnavailable("interrupted while reopening answer citations", interrupted);
+        } catch (ExecutionException failed) {
+            pending.values().forEach(future -> future.cancel(true));
+            if (failed.getCause() instanceof RuntimeException runtime) throw runtime;
+            throw new IllegalStateException("citation read failed", failed.getCause());
+        }
+        return Map.copyOf(read);
+    }
+
+    /**
      * Nothing could be answered: the reason says why and what to try, and {@code applied} shows what the reads looked at
      * (every requirement's, since none was answered).
      */
@@ -533,6 +565,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             var section = sections.get(i);
             var verdict = verdicts.sections().get(i);
             boolean general = "general_knowledge".equals(section.basis());
+            boolean webReported = "web_reported".equals(section.basis());
             List<ChatClaims.Claim> claims = ChatClaims.split(i, section.text());
             boolean scriptedSectionVerdict = verdict.claims().size() == 1 && verdict.claims().getFirst().claimId() == null;
             if (!ADVICE.contains(verdict.prohibitedAdvice())
@@ -552,7 +585,13 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 }
                 boolean safe = "no".equals(verdict.prohibitedAdvice())
                         && (general || "supported".equals(decision.support()))
-                        && "no".equals(decision.unsupportedCausality());
+                        // A concept definition has no evidence claim to bind. The deterministic general-section check
+                        // already rejects current facts, figures and advice, so an uncertain ("hold") causality score
+                        // must not erase an otherwise valid definition. A definite "yes" remains blocked.
+                        // Search snippets establish only what a page reported. An uncertain causal reading must not erase
+                        // that attributed report; a definite unsupported causal assertion remains blocked.
+                        && ((general || webReported) ? !"yes".equals(decision.unsupportedCausality())
+                                : "no".equals(decision.unsupportedCausality()));
                 if (safe) kept.add(claim);
                 else dropped.add(claim.id());
             }

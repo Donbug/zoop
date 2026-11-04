@@ -85,25 +85,10 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     vi.mocked(setWatchlistCompany).mockReset();
   });
 
-  it('D-GRP-03 aliases가 있으면 기업명 아래에서 다른 이름을 펼쳐 볼 수 있다', async () => {
-    const view = renderPanel();
-    const summary = screen.getByText('기업명 더 보기');
-    const details = summary.closest('details')!;
-    expect(details.open).toBe(false);
-    await userEvent.click(summary);
-    expect(details.open).toBe(true);
-    expect(details.textContent).toContain(company.aliases.join(' · '));
-    const header = view.container.querySelector('.company-panel-header')!;
-    expect(header.contains(details)).toBe(true);
-    expect(
-      header.querySelector('h2')!.compareDocumentPosition(details) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      details.compareDocumentPosition(
-        header.querySelector('.company-price-row')!,
-      ) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+  it('D-GRP-03 does not show the removed company-alias disclosure', () => {
+    renderPanel();
+    expect(screen.queryByText('기업명 더 보기')).toBeNull();
+    expect(document.querySelector('.company-aliases')).toBeNull();
   });
 
   it('D-GRP-03 aliases가 없으면 기업명 더 보기를 표시하지 않는다', () => {
@@ -743,7 +728,7 @@ describe('D-GRP-03 prototype company panel gaps (M1-M7, M9)', () => {
     ).toBe(`/companies/${company.id}?asOf=x&tab=documents`);
   });
 
-  it('M9 hides the company focus button when the company is already the focus or has no edges', () => {
+  it('M9 toggles back to the full map when the company is already focused', () => {
     const focusButton = () =>
       screen.queryByRole('button', { name: '기업 중심 그래프' });
     const connected = {
@@ -755,6 +740,7 @@ describe('D-GRP-03 prototype company panel gaps (M1-M7, M9)', () => {
     view.unmount();
     const focused = renderWith({ graph: connected, focusId: company.id });
     expect(focusButton()).toBeNull();
+    expect(screen.getByRole('button', { name: '전체 지도 보기' })).toBeTruthy();
     focused.unmount();
     renderWith({ graph: { nodes: [], edges: [] } });
     expect(focusButton()).toBeNull();

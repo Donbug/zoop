@@ -58,7 +58,7 @@ class ChatJobExecutorTest {
         store.add(queued("job-00001", null, null, 0, "run"));
         var engine = new ScriptedChatEngine((run, control) -> {
             assertTrue(control.owned());
-            assertEquals(Duration.ofSeconds(45), control.remaining());
+            assertEquals(ChatJobExecutor.MAX_DEADLINE, control.remaining());
             control.beforeModelCall();
             control.phase("writing");
             control.beforeModelCall();
@@ -316,8 +316,8 @@ class ChatJobExecutorTest {
         store.add(queued("job-00002", null, null, 0, "run"));
         var engine = new ScriptedChatEngine((run, control) -> {
             if (run.jobId().equals("job-00001")) control.beforeModelCall();
-            // Past the 45 s deadline, still inside the 15 s lease grace: the write would be accepted by the fence.
-            clock.advance(Duration.ofSeconds(50));
+            // Past the 60 s deadline, still inside the 15 s lease grace: the write would be accepted by the fence.
+            clock.advance(Duration.ofSeconds(65));
             return ScriptedChatEngine.generalAnswer("늦은 답");
         });
         var executor = executor(engine);

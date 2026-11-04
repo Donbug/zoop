@@ -68,7 +68,8 @@ class GraphTargetToolTest {
                 null));
         var out = company().read(SCOPE, new ChatToolRequest("company.read", List.of(HYNIX), 20));
         assertEquals(profile, out.items().getFirst().evidenceIds().getFirst());
-        assertEquals(Set.of(profile, SUPPLY_HYNIX, EQUIP_HYNIX), Set.copyOf(out.evidenceIds()));
+        assertEquals(Set.of(profile, SUPPLY_HYNIX), Set.copyOf(out.evidenceIds()));
+        assertTrue(out.truncated(), "the unchecked relation evidence is reported as truncated");
 
         denied.add(profile);
         var refused = company().read(SCOPE, new ChatToolRequest("company.read", List.of(HYNIX), 20));
@@ -124,13 +125,15 @@ class GraphTargetToolTest {
     @Test
     void issueReadOfACompanyReadsItsIssuesNewestFirstAndEachIssueOnce() {
         var out = issue().read(SCOPE, new ChatToolRequest("issue.read", List.of(HYNIX), 20));
-        assertEquals(List.of("iss-fixture-hbm-equip", HBM_SUPPLY), out.items().stream().map(i -> i.id()).toList(),
-                "involved in one, structurally related to the other; newest event first");
+        assertEquals(List.of("iss-fixture-hbm-equip"), out.items().stream().map(i -> i.id()).toList(),
+                "the newest event spends the evidence-check budget, so later labels are not sent");
+        assertTrue(out.truncated());
         assertTrue(out.items().stream().allMatch(i -> "issue".equals(i.kind())));
 
         var both = issue().read(SCOPE, new ChatToolRequest("issue.read", List.of(HBM_SUPPLY, HYNIX), 20));
-        assertEquals(List.of(HBM_SUPPLY, "iss-fixture-hbm-equip"), both.items().stream().map(i -> i.id()).toList(),
-                "an issue asked for and read again through its company is reported once, where it was first asked");
+        assertEquals(List.of(HBM_SUPPLY), both.items().stream().map(i -> i.id()).toList(),
+                "later labels are not sent after the first issue spends the evidence-check budget");
+        assertTrue(both.truncated());
         assertTrue(issue().read(SCOPE, new ChatToolRequest("issue.read", List.of("KRX:999999"), 20)).items().isEmpty());
     }
 
@@ -179,11 +182,74 @@ class GraphTargetToolTest {
     @Test
     void theLimitIsSharedByAllTargetsInTargetOrder() {
         var out = issue().read(SCOPE, new ChatToolRequest("issue.read", List.of(HBM_SUPPLY, "iss-fixture-hbm-equip"), 2));
-        assertEquals(2, out.items().size());
+        assertEquals(1, out.items().size());
         assertEquals(out.items().getFirst().evidenceIds(), out.evidenceIds(), "the first issue used the whole limit");
-        assertEquals(List.of(), out.items().get(1).evidenceIds());
         assertTrue(out.truncated());
         assertEquals(2, checks.size(), "evidence past the limit is not read");
+    }
+
+    @Test
+    void currentAuthorityChecksAreBoundedAndUncheckedEvidenceIsReportedAsTruncated() {
+        List<String> evidence = java.util.stream.IntStream.range(0, GraphTargetTool.MAX_EVIDENCE_CHECKS + 4)
+                .mapToObj(i -> "ev-many-" + i).toList();
+        denied.addAll(evidence);
+        GraphTargetTool bounded = new GraphTargetTool(reader(), access()) {
+            @Override
+            public ChatCapability capability() {
+                return ChatCapability.ISSUE_READ;
+            }
+
+            @Override
+            Optional<GraphContextLookup.Target> find(GraphContextLookup lookup, String id) {
+                return Optional.empty();
+            }
+
+            @Override
+            List<GraphContextLookup.Target> targets(GraphContextLookup lookup, String id) {
+                return List.of(new GraphContextLookup.Target("iss-many-evidence", "issue", "근거가 많은 사건",
+                        List.of(HYNIX), evidence));
+            }
+        };
+
+        var out = bounded.read(SCOPE, new ChatToolRequest("issue.read", List.of(HYNIX), 20));
+
+        assertEquals(1, out.items().size(), "the public issue remains visible even when evidence checks are capped");
+        assertTrue(out.items().getFirst().evidenceIds().isEmpty());
+        assertEquals(GraphTargetTool.MAX_EVIDENCE_CHECKS, checks.size());
+        assertTrue(out.truncated(), "unchecked evidence is never reported as absent");
+    }
+
+    @Test
+    void targetsPastTheAuthorityCheckBudgetAreNotSentAsUnsupportedLabels() {
+        GraphTargetTool bounded = new GraphTargetTool(reader(), access()) {
+            @Override
+            public ChatCapability capability() {
+                return ChatCapability.ISSUE_READ;
+            }
+
+            @Override
+            Optional<GraphContextLookup.Target> find(GraphContextLookup lookup, String id) {
+                return Optional.empty();
+            }
+
+            @Override
+            List<GraphContextLookup.Target> targets(GraphContextLookup lookup, String id) {
+                List<String> checkedEvidence = java.util.stream.IntStream.range(0, GraphTargetTool.MAX_EVIDENCE_CHECKS)
+                        .mapToObj(i -> "ev-checked-" + i).toList();
+                return List.of(
+                        new GraphContextLookup.Target("iss-checked", "issue", "근거가 확인된 사건", List.of(HYNIX),
+                                checkedEvidence),
+                        new GraphContextLookup.Target("iss-unchecked", "issue", "근거를 확인하지 않은 사건",
+                                List.of(HYNIX), List.of("ev-unchecked")));
+            }
+        };
+
+        var out = bounded.read(SCOPE, new ChatToolRequest("issue.read", List.of(HYNIX), 20));
+
+        assertEquals(List.of("iss-checked"), out.items().stream().map(ChatToolItem::id).toList());
+        assertEquals(GraphTargetTool.MAX_EVIDENCE_CHECKS, out.evidenceIds().size());
+        assertEquals(GraphTargetTool.MAX_EVIDENCE_CHECKS, checks.size());
+        assertTrue(out.truncated(), "later targets are represented by truncation, not unsupported labels");
     }
 
     @Test

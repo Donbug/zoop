@@ -21,6 +21,7 @@ import com.zoop.chat.dto.ChatJob;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.dto.GraphTarget;
+import com.zoop.chat.tool.NaverApiHubWebSearchProvider;
 import com.zoop.chat.tool.SyntheticWebSearchProvider;
 import org.springframework.stereotype.Component;
 
@@ -50,6 +51,9 @@ public class ChatResponseGuard {
             + "접근 권한을 확인하지 못했어요. 필요하면 새 질문으로 다시 물어봐 주세요.";
     public static final String WITHHELD_EVIDENCE_LABEL = "표시할 수 없는 근거";
     private static final Set<String> CHECKABLE = Set.of("article", "company_profile", "zoop_doc");
+    /** Providers whose bounded title, URL and snippet may be shown again from a stored chat result. */
+    private static final Set<String> REDISPLAYABLE_WEB_PROVIDERS = Set.of(SyntheticWebSearchProvider.ID,
+            NaverApiHubWebSearchProvider.ID);
 
     private final ChatEvidenceAccess access;
     private final ChatTargetAccess targets;
@@ -108,10 +112,10 @@ public class ChatResponseGuard {
         Set<String> documents = new LinkedHashSet<>();
         for (Citation citation : nullSafe(result.citations())) {
             // A catalog profile or ZOOP document quote is checked like an article: readable while its source still holds it.
-            // A web hit has no record to read again: only the synthetic provider's may be shown again, until a real
-            // provider's redisplay rights are decided (web search design 7). Any other web citation withholds the answer.
+            // A web hit has no record to read again. Only providers with an explicit operator redisplay decision may be
+            // shown; an unknown provider still withholds the complete answer.
             if ("web_result".equals(citation.sourceKind())) {
-                if (!SyntheticWebSearchProvider.ID.equals(citation.docId())) return false;
+                if (!REDISPLAYABLE_WEB_PROVIDERS.contains(citation.docId())) return false;
                 continue;
             }
             boolean checkable = CHECKABLE.contains(citation.sourceKind());

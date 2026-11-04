@@ -22,7 +22,7 @@ ZOOP_CHAT_WEB_ENABLED=true ZOOP_CHAT_WEB_PROVIDER=synthetic
 ```
 
 - 기본은 꺼짐이다. 켜고 공급자가 `synthetic`이나 `naver-api-hub-webkr`이 아니면 기동을 거절한다.
-- `naver-api-hub-webkr`은 운영 후보 adapter다. 실제 외부 호출을 하므로 [운영 readiness gate](../../docs/development/chat-operations-readiness.md)의 웹 공급자·권리·보관·개인정보·처리 지역·비용 승인을 같은 후보 commit의 실제 공급자 preflight와 묶기 전에는 켜지 않는다. `ZOOP_CHAT_WEB_NAVER_API_HUB_CLIENT_ID`·`_CLIENT_SECRET`이 없으면 기동을 거절한다. 고정 엔드포인트 `https://naverapihub.apigw.ntruss.com/search/v1/webkr`에 검사된 검색어만 보내고 redirect·프록시를 쓰지 않으며 결과 페이지를 열지 않는다. 이 API 응답에는 게시 시각이 없어 hit의 `publishedAt`이 비므로 기간 요구의 coverage를 채우지 못한다. 켜려면 `web-search:naver-api-hub-webkr` grant 등록과 `ChatResponseGuard`의 재열람 허용 결정도 필요하다.
+- `naver-api-hub-webkr`은 운영 후보 adapter다. 실제 외부 호출을 하므로 [운영 readiness gate](../../docs/development/chat-operations-readiness.md)의 웹 공급자·권리·보관·개인정보·처리 지역·비용 승인과 실제 공급자 preflight를 같은 후보 배포에 묶는다. `ZOOP_CHAT_WEB_NAVER_API_HUB_CLIENT_ID`·`_CLIENT_SECRET`이 없으면 기동을 거절한다. 고정 엔드포인트 `https://naverapihub.apigw.ntruss.com/search/v1/webkr`에 검사된 검색어만 보내고 redirect·프록시를 쓰지 않으며 결과 페이지를 열지 않는다. 이 API 응답에는 게시 시각이 없어 hit의 `publishedAt`이 비므로 기간 요구의 coverage를 채우지 못한다. `web-search:naver-api-hub-webkr` grant가 있어야 모델 전송이 가능하며, NAVER의 제한된 제목·URL·snippet은 승인된 운영 결과로 재표시할 수 있다.
 - 실제 공급자 preflight는 `scripts/chat_web_provider_preflight.py`가 승인 플래그와 환경 credential을 요구해 고정 공개 검색을 정확히 1회 보낸다. 출력에는 검색어·결과·endpoint·credential 없이 후보 commit과 제한된 응답 계약 관측값만 남는다.
 - 합성 공급자는 `api/src/main/resources/chat-web-fixtures/synthetic-v1.json`의 고정 결과만 돌려준다. 모든 주소는 예약 도메인(`example.com`·`example.org`·`example.net`) 아래여야 하고, 아니면 기동을 거절한다. 외부로 나가는 호출은 없다.
 - fixture에서 `unavailable`에 적힌 검색어는 공급자 장애(`tool_unavailable`)처럼 동작하고, 없는 검색어는 0건이다.

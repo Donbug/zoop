@@ -55,14 +55,34 @@ export default function ChatHistoryList({
   }
 
   return (
-    <div className={ui.scroll}>
-      <div className="px-4 pt-3">
-        <button type="button" className={ui.button} onClick={onBack}>
-          ← 대화로 돌아가기
+    <div className={`${ui.scroll} flex flex-col`}>
+      <div className="absolute top-3 left-4 z-30">
+        <button
+          type="button"
+          className="grid size-9 place-items-center rounded-full text-panel-secondary transition-colors hover:bg-panel-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-panel-ink"
+          aria-label="대화로 돌아가기"
+          onClick={onBack}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="size-5"
+            fill="none"
+          >
+            <path
+              d="M19 12H5m0 0 6-6m-6 6 6 6"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+            />
+          </svg>
         </button>
       </div>
-      <section className={ui.section} aria-labelledby="ai-chat-history">
-        <h3 id="ai-chat-history">대화 기록</h3>
+      <section
+        className={`${ui.section} flex flex-1 flex-col !border-b-0`}
+        aria-label="대화 기록 목록"
+      >
         {history.status === 'loading' && (
           <LoadingIndicator
             label="대화 기록을 불러오고 있어요."
@@ -82,8 +102,8 @@ export default function ChatHistoryList({
           </div>
         )}
         {history.status === 'success' && history.items.length === 0 && (
-          <p className={ui.muted}>
-            아직 질문한 대화가 없어요. 질문을 보내면 여기에 대화가 쌓여요.
+          <p className={`${ui.muted} m-auto text-center`}>
+            아직 질문한 대화가 없어요.
           </p>
         )}
         {history.items.length > 0 && (
@@ -180,11 +200,6 @@ export default function ChatHistoryList({
         {message && (
           <p className={`${ui.muted} mt-2`} role="status">
             {message}
-          </p>
-        )}
-        {history.status === 'success' && !deleteEnabled && (
-          <p className={`${ui.muted} mt-3`}>
-            대화 기록은 회원 탈퇴 시 모두 삭제돼요.
           </p>
         )}
       </section>

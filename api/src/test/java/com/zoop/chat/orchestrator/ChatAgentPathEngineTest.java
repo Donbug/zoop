@@ -386,6 +386,28 @@ class ChatAgentPathEngineTest {
         assertEquals(List.of("web_result"), result.citations().stream().map(Citation::sourceKind).toList());
     }
 
+    @Test
+    void aWebReportSurvivesUncertainCausalityButNotDefiniteUnsupportedCausality() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
+        var agent = new Agent(Set.of(ChatCapability.WEB_SEARCH));
+        agent.answer = new ChatGeneratedAnswer(List.of(new Section("web_reported",
+                "검색 결과는 SK하이닉스의 HBM 공급 확대를 보도했어요.", List.of("r1"), List.of(HIT))),
+                List.of(), List.of());
+        agent.results = List.of(webResult());
+
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("no",
+                List.of(new ChatSemanticVerdicts.ClaimVerdict(null, "supported", "hold")))));
+        ChatResult kept = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertEquals("web_reported", kept.answerBasis());
+
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("no",
+                List.of(new ChatSemanticVerdicts.ClaimVerdict(null, "supported", "yes")))));
+        ChatResult blocked = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertEquals("insufficient_evidence", blocked.outcome());
+    }
+
     /** A plan the agent cannot read: its dependent reads stay direct, so the web comes after them. */
     private static final Map<ChatQueryType, Double> Q03 = Map.of(ChatQueryType.Q03, 0.9);
 
@@ -483,7 +505,7 @@ class ChatAgentPathEngineTest {
         decision = ChatPlannerTest.decision(req("r1", Q03, Map.of("company.read", 0.9), List.of(HYNIX)));
         var agent = new Agent(Set.of(ChatCapability.WEB_SEARCH));
         directAnswer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
-        readTakes = Duration.ofSeconds(17);
+        readTakes = Duration.ofSeconds(32);
         verdicts = new ChatSemanticVerdicts(List.of());
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
