@@ -1512,6 +1512,7 @@ export default function GraphCanvas({
     };
     let pointerStart: {
       pointerId: number;
+      pointerType: string;
       x: number;
       y: number;
       graphX: number;
@@ -1524,12 +1525,14 @@ export default function GraphCanvas({
     let dragged = false;
     const pointerDown = (event: PointerEvent) => {
       if (!graph || event.button !== 0) return;
-      // 끌던 손가락이 있는데 다른 손가락이 더 닿으면 그 손가락은 무시해 첫 손가락의 끌기를 유지한다.
-      // 새 주 포인터(isPrimary)가 내려오면 이전 포인터는 pointerup을 놓친 것이므로 이전 끌기를 여기서 끝낸다.
+      // 끌던 포인터가 있으면 다른 포인터는 무시해 끌기를 유지한다: 두 번째 손가락, 마우스 끌기 중의 터치 등.
+      // isPrimary는 입력 종류마다 따로 정해지므로, 같은 종류의 새 주 포인터만 이전 포인터가 pointerup을
+      // 놓친 것으로 보고 이어받는다. 터치는 암묵적 캡처로 pointerup·pointercancel이 늘 오고, 마우스는
+      // 버튼 없이 돌아온 움직임(pointerMove)에서 정리되므로 다른 종류가 이어받을 필요가 없다.
       if (
         pointerStart &&
         event.pointerId !== pointerStart.pointerId &&
-        !event.isPrimary
+        (event.pointerType !== pointerStart.pointerType || !event.isPrimary)
       )
         return;
       endPan();
@@ -1539,6 +1542,7 @@ export default function GraphCanvas({
       dragged = false;
       pointerStart = {
         pointerId: event.pointerId,
+        pointerType: event.pointerType,
         x: event.clientX,
         y: event.clientY,
         graphX: position[0],

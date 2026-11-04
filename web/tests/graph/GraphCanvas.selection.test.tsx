@@ -1832,6 +1832,78 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     );
   });
 
+  it('D-GRP-01 마우스로 끌던 중 화면을 터치해도(다른 종류의 주 포인터) 마우스 끌기를 유지한다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const onSelect = vi.fn();
+    render(<GraphCanvas data={data} onSelect={onSelect} />);
+    await waitFor(() =>
+      expect(canvas.handlers.has('node:pointerenter')).toBe(true),
+    );
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const surface = screen.getByRole('img', { name: /관계 지도:/ });
+
+    fireEvent.pointerDown(surface, {
+      button: 0,
+      pointerId: 1,
+      pointerType: 'mouse',
+      isPrimary: true,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 1,
+      clientX: 140,
+      clientY: 125,
+    });
+    await act(async () =>
+      canvas.handlers.get('node:pointerenter')!({
+        target: { id: 'NASDAQ:NVDA' },
+      }),
+    );
+    // 첫 터치는 터치 종류의 주 포인터(isPrimary)지만 마우스 끌기를 끝내지 않는다.
+    await act(async () => {
+      fireEvent.pointerDown(surface, {
+        button: 0,
+        pointerId: 2,
+        pointerType: 'touch',
+        isPrimary: true,
+        clientX: 300,
+        clientY: 300,
+      });
+      fireEvent.pointerMove(surface, {
+        pointerId: 2,
+        pointerType: 'touch',
+        buttons: 1,
+        clientX: 310,
+        clientY: 305,
+      });
+      fireEvent.pointerUp(window, { button: 0, pointerId: 2 });
+    });
+    expect(canvas.setElementState).not.toHaveBeenCalled();
+
+    // 마우스는 계속 추적된다: 버튼을 든 채 움직이면 그대로 끌기이고, 떼면 그때 반영한다.
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 1,
+      clientX: 160,
+      clientY: 140,
+    });
+    expect(canvas.setElementState).not.toHaveBeenCalled();
+    await act(async () =>
+      fireEvent.pointerUp(window, { button: 0, pointerId: 1 }),
+    );
+    await waitFor(() =>
+      expect(appliedStates()).toMatchObject({ 'NASDAQ:NVDA': ['hovered'] }),
+    );
+    act(() =>
+      canvas.handlers.get('node:click')!({ target: { id: 'NASDAQ:NVDA' } }),
+    );
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it('D-GRP-01 끌던 중 두 번째 손가락이 닿아도 첫 손가락의 끌기를 유지하고, 첫 손가락을 뗄 때 반영한다', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const onSelect = vi.fn();
