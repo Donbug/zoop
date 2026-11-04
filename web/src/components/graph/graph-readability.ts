@@ -12,6 +12,8 @@ export type ReadingContext = {
   edge: string | null;
   focus: string | null;
   path: ReadonlySet<string>;
+  /** Elements kept bright while a selection dims the rest of the map (null: nothing dimmed). */
+  bright?: ReadonlySet<string> | null;
 };
 export type LabelCandidate = {
   id: string;
@@ -100,6 +102,10 @@ export function readingStyles(
         Number(node.style?.labelFontSize ?? 13),
         screenLabelSize(node) / zoom,
       );
+      // D-GRP-01 (2026-11-04 review): zoomed out, an issue is only a diamond that says
+      // "there is an issue here"; its title and count come back on zoom, hover or selection.
+      const overview =
+        source?.kind === 'issue' && zoom < OVERVIEW_ZOOM && !emphasized;
       return {
         ...node,
         style: {
@@ -107,7 +113,9 @@ export function readingStyles(
           labelText: source?.label ?? node.style?.labelText,
           // D-GRP-01: 기업·사건 이름은 배율로 숨기지 않고 같은 겹침 처리 기준을 사용해요.
           labelVisibility:
-            node.style?.visibility !== 'hidden' ? 'visible' : 'hidden',
+            node.style?.visibility !== 'hidden' && !overview
+              ? 'visible'
+              : 'hidden',
           labelFontSize: size,
           // D-GRP-01: G keeps a fixed 16px line height; it must grow with the zoom-corrected font
           // or wrapped lines overlap and the culling below measures a box shorter than the text.
@@ -125,6 +133,7 @@ export function readingStyles(
           badges:
             source?.kind === 'issue' &&
             source.evidenceCount !== null &&
+            !overview &&
             (zoom >= 0.55 || emphasized)
               ? [
                   {
@@ -138,7 +147,23 @@ export function readingStyles(
                     padding: [2 / zoom, 4 / zoom],
                   },
                 ]
-              : node.style?.badges,
+              : Number(node.data?.folded) > 0
+                ? [
+                    ...(node.style?.badges ?? []),
+                    // D-GRP-01: issues folded into the company until it is selected.
+                    {
+                      text: `+${Number(node.data?.folded)}`,
+                      placement: 'right-top',
+                      offsetX: 4 / zoom,
+                      offsetY: -2 / zoom,
+                      fontSize: 13 / zoom,
+                      fontWeight: 700,
+                      fill: node.style?.labelBackgroundFill,
+                      backgroundFill: node.style?.labelFill,
+                      padding: [2 / zoom, 5 / zoom],
+                    },
+                  ]
+                : node.style?.badges,
         },
       };
     }),
@@ -354,9 +379,23 @@ export async function applyGraphReading(
   const byId = new Map(data.nodes.map((n) => [n.id, n]));
   const related = new Set<string>();
   const degrees = new Map<string, number>();
+  // Companies each issue touches on this map: shared issues always keep their diamond and lines.
+  const companies = new Map<string, Set<string>>();
   for (const edge of base.edges ?? []) {
     for (const id of [String(edge.source), String(edge.target)])
       degrees.set(id, (degrees.get(id) ?? 0) + 1);
+    const [a, b] = [
+      byId.get(String(edge.source)),
+      byId.get(String(edge.target)),
+    ];
+    const issue = a?.kind === 'issue' ? a : b?.kind === 'issue' ? b : null;
+    const company =
+      a?.kind === 'company' ? a : b?.kind === 'company' ? b : null;
+    if (issue && company)
+      companies.set(
+        issue.id,
+        (companies.get(issue.id) ?? new Set()).add(company.id),
+      );
     if (edge.source === context.anchor || edge.target === context.anchor) {
       related.add(String(edge.source));
       related.add(String(edge.target));
@@ -382,7 +421,11 @@ export async function applyGraphReading(
     const body =
       source?.kind !== 'issue' ? screenBox(shape?.getShape('key')) : null;
     if (body) bodies.push({ id, box: body });
-    if (node.style?.labelVisibility === 'hidden') {
+    // D-GRP-01 (2026-11-04 review): behind a selection, unrelated issues stay faint
+    // diamonds without a title or count, so only the selection's titles compete for room.
+    const faded =
+      source?.kind === 'issue' && context.bright && !context.bright.has(id);
+    if (node.style?.labelVisibility === 'hidden' || faded) {
       showLabel(shape?.getShape('label'), false);
       continue;
     }
@@ -392,6 +435,8 @@ export async function applyGraphReading(
     const box = screenBox(label);
     if (!label || !box) continue;
     const emphasis = related.has(id) || context.path.has(id);
+    const shared =
+      source?.kind === 'issue' && (companies.get(id)?.size ?? 0) > 1;
     const priority =
       id === context.anchor || id === context.focus
         ? 0
@@ -403,9 +448,13 @@ export async function applyGraphReading(
               : 3
           : id === '__isolated__'
             ? 4
-            : emphasis
-              ? 5
-              : 6;
+            : // Shared issue titles win over single-company ones but still yield to
+              // each other, or several titles print on top of one another when zoomed out.
+              shared
+              ? 4.5
+              : emphasis
+                ? 5
+                : 6;
     candidates.push({
       id,
       box,
@@ -440,6 +489,43 @@ export async function applyGraphReading(
     });
     labels.set(id, label);
   }
-  for (const id of culledLabels(candidates, bodies))
-    showLabel(labels.get(id), false);
+  const culled = culledLabels(candidates, bodies);
+  for (const id of culled) showLabel(labels.get(id), false);
+  // D-GRP-01 (2026-11-04 review): a single-company issue whose title does not fit is
+  // folded with its line too, so no line ends at an untitled diamond. Shared issues and the
+  // selected company's issues keep their diamond and lines (only overlapping titles wait for zoom).
+  // Follow-up chains are never folded by data either (foldedIssues): keep both ends.
+  const follows = new Set(
+    data.edges
+      .filter((e) => e.relationType === 'FOLLOWS')
+      .flatMap((e) => [e.source, e.target]),
+  );
+  const folded = new Set(
+    [...culled].filter(
+      (id) =>
+        byId.get(id)?.kind === 'issue' &&
+        (companies.get(id)?.size ?? 0) <= 1 &&
+        !follows.has(id) &&
+        !related.has(id) &&
+        !context.path.has(id),
+    ),
+  );
+  for (const node of styles.nodes ?? []) {
+    if (node.style?.visibility === 'hidden') continue;
+    const id = String(node.id);
+    if (byId.get(id)?.kind !== 'issue') continue;
+    showLabel(element(id)?.getShape('key'), !folded.has(id));
+    // The evidence count belongs to the title: a culled title takes its badge along.
+    showLabel(
+      element(id)?.getShape('badge-0'),
+      !culled.has(id) && !(context.bright && !context.bright.has(id)),
+    );
+  }
+  for (const edge of styles.edges ?? []) {
+    if (edge.style?.visibility === 'hidden') continue;
+    showLabel(
+      element(String(edge.id))?.getShape('key'),
+      !folded.has(String(edge.source)) && !folded.has(String(edge.target)),
+    );
+  }
 }
