@@ -82,7 +82,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      * comes outside that deadline: up to 1 s waiting for a free slot before it starts, and the reply's transport and decoding.
      * A limit equal to the service's would discard answers the service delivered in time, with their cost spent.
      * The values remain per-stage ceilings, not time reservations. Direct stages shrink to the time left after the minimum
-     * answer, verification and terminal-write reservations below, so every route remains inside the 45 s job deadline.
+     * answer, verification and terminal-write reservations below, so every direct route remains inside the 60 s job deadline.
      */
     record StageLimits(Duration router, Duration tools, Duration generate, Duration verify, Duration server) {
         /** The AI service's slot wait (1 s) and 1 s for transport and decoding, beyond its own stage deadline. */
@@ -236,7 +236,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             // checked below against exactly the results of the calls that ran, each requirement against its own.
             control.phase("retrieving");
             if (control.toolCallsLeft() < 1) throw new Stop(TOOL_BUDGET_SPENT);
-            // Idempotently keep the agent path on the same 45 s deadline as every other route.
+            // The direct path now has a 60 s ceiling; keep the agent path on its separate 45 s external contract.
             control.shortenDeadline(run.deadline().minus(ChatJobExecutor.MAX_DEADLINE.minus(AGENT_JOB)));
             Duration after = MIN_VERIFY.plus(limits.server());
             // Luna has min(35 s, what is left of it before verification and saving): never 35 s on top.

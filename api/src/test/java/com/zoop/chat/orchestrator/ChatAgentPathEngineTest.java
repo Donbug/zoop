@@ -483,7 +483,7 @@ class ChatAgentPathEngineTest {
         decision = ChatPlannerTest.decision(req("r1", Q03, Map.of("company.read", 0.9), List.of(HYNIX)));
         var agent = new Agent(Set.of(ChatCapability.WEB_SEARCH));
         directAnswer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
-        readTakes = Duration.ofSeconds(17);
+        readTakes = Duration.ofSeconds(32);
         verdicts = new ChatSemanticVerdicts(List.of());
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,

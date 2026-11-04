@@ -65,8 +65,8 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @Component
 public class ChatJobExecutor {
-    /** Running to terminal-state commit is bounded to 45 s on both the direct and agent paths. */
-    public static final Duration MAX_DEADLINE = Duration.ofSeconds(45);
+    /** Direct runs get 60 s through terminal-state commit; agent paths keep their own shorter policy. */
+    public static final Duration MAX_DEADLINE = Duration.ofSeconds(60);
     static final Duration LEASE_GRACE = Duration.ofSeconds(15);
     static final String RESULT_SCHEMA_VERSION = "chat-result/v1";
     static final String ROUTE_SCHEMA_VERSION = "chat-route/v1";
