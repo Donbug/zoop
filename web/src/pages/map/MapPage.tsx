@@ -3,6 +3,7 @@ import LoadingIndicator from '@/components/common/LoadingIndicator';
 import {
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -264,7 +265,27 @@ function MapWorkspace({
     id: string;
     owner: string;
   } | null>(null);
+  // 닫을 때는 왼쪽으로 밀려 나가는 애니메이션이 끝난 뒤 패널을 뺀다.
+  const [sidebarClosing, setSidebarClosing] = useState(false);
+  const sidebarSlot = useRef<HTMLDivElement>(null);
+  const sidebarShown = sidebarOpen || sidebarClosing;
+  useLayoutEffect(() => {
+    const slot = sidebarSlot.current;
+    if (!slot) return;
+    // 패널 너비와 지도 사이 간격만큼 밀어야 지도도 같은 속도로 따라 움직인다.
+    slot.style.setProperty('--holdings-shift', `${slot.offsetWidth + 12}px`);
+  }, [sidebarShown]);
+  useEffect(() => {
+    if (!sidebarClosing) return;
+    // animationend가 오지 않는 환경(동작 줄이기 설정 등)에서도 패널을 뺀다.
+    const timer = window.setTimeout(() => setSidebarClosing(false), 400);
+    return () => window.clearTimeout(timer);
+  }, [sidebarClosing]);
   function changeSidebar(open: boolean) {
+    const reduced =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    setSidebarClosing(!open && sidebarOpen && !reduced);
     setSidebarPreference(open);
     try {
       localStorage.setItem(SIDEBAR_KEY, open ? '1' : '0');
@@ -1205,11 +1226,20 @@ function MapWorkspace({
             </div>
           </div>
           <div
-            className={`relationship-body${selectedPanel ? ` has-company-panel ${pathIsCollapsed ? '' : 'max-md:pb-[48dvh]!'}` : ''}${tutorialOpen || sidebarOpen ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
+            className={`relationship-body${selectedPanel ? ` has-company-panel ${pathIsCollapsed ? '' : 'max-md:pb-[48dvh]!'}` : ''}${tutorialOpen || sidebarShown ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
             aria-busy={loading}
           >
-            {sidebarOpen && (
-              <div id="holdings-sidebar" className="flex min-h-0 max-sm:w-full">
+            {sidebarShown && (
+              <div
+                id="holdings-sidebar"
+                ref={sidebarSlot}
+                inert={!sidebarOpen}
+                onAnimationEnd={(event) => {
+                  if (event.target === event.currentTarget && !sidebarOpen)
+                    setSidebarClosing(false);
+                }}
+                className={`holdings-slot flex min-h-0 max-sm:w-full${sidebarOpen ? '' : ' is-closing'}`}
+              >
                 <HoldingsSidebar
                   key={memoryOwner}
                   member={Boolean(token)}
