@@ -55,6 +55,7 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
   default: ({
     data,
     selectedId,
+    selectedEdgeId,
     onSelect,
     onSelectEdge,
     flow,
@@ -63,13 +64,14 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
   }: {
     data: GraphResponse;
     selectedId: string | null;
+    selectedEdgeId?: string | null;
     onSelect: (id: string) => void;
     onSelectEdge: (id: string) => void;
     flow?: boolean;
     onFlowChange?: (flow: boolean) => void;
     focusLayout?: boolean;
   }) => (
-    <div data-testid="graph-canvas">
+    <div data-testid="graph-canvas" data-selected-edge={selectedEdgeId}>
       {onFlowChange && (
         <button
           aria-pressed={flow}
@@ -138,6 +140,37 @@ function setup(url = '/?mode=all&scope=watchlist') {
 }
 
 describe('D-GRP-02 · map selection and downstream context', () => {
+  it.each(['merged-edge', 'kept-edge'])(
+    'D-GRP-01 maps a grouped edge selection to the canvas while preserving its original address: %s',
+    async (selectedEdge) => {
+      const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      const company = graph.nodes.find((node) => node.kind === 'company')!;
+      const issue = graph.nodes.find((node) => node.kind === 'issue')!;
+      vi.mocked(getGraph).mockResolvedValue({
+        ...graph,
+        nodes: [
+          company,
+          { ...issue, id: 'issue-a' },
+          { ...issue, id: 'issue-b' },
+        ],
+        edges: ['kept-edge', 'merged-edge'].map((id, index) => ({
+          ...graph.edges[0],
+          id,
+          source: index ? 'issue-b' : 'issue-a',
+          target: company.id,
+          relationType: 'INVOLVES',
+        })),
+      });
+      const router = setup(
+        `/?mode=all&select=${encodeURIComponent(`edge:${selectedEdge}`)}`,
+      );
+      const canvas = await screen.findByTestId('graph-canvas');
+      expect(canvas.getAttribute('data-selected-edge')).toBe('kept-edge');
+      expect(
+        new URLSearchParams(router.state.location.search).get('select'),
+      ).toBe(`edge:${selectedEdge}`);
+    },
+  );
   it.each([
     '/?mode=all&select=node%3Amock-issue-1&focus=mock-issue-1&hops=1',
     '/?mode=all&select=node%3Amock-issue-1',

@@ -1285,7 +1285,13 @@ function MapWorkspace({
                     ? (displayedPath?.edgeIds ?? [])
                     : impactEdges(data!, impact.data ?? historicalImpact.data)
                 ).map((id) => grouping?.edgeOf.get(id) ?? id)}
-                selectedEdgeId={activeEvidence ? null : edgeId}
+                selectedEdgeId={
+                  activeEvidence
+                    ? null
+                    : edgeId
+                      ? (grouping?.edgeOf.get(edgeId) ?? edgeId)
+                      : null
+                }
                 isolateSelection={Boolean(activeEvidence && evidenceFallback)}
                 evidenceMode={Boolean(activeEvidence)}
                 onSelectEdge={selectEdge}
