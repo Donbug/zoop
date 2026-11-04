@@ -45,7 +45,7 @@
 
 ## 일정 변경과 일회성 시험
 
-`ZOOP_BRIEFING_MORNING_TIME`, `ZOOP_BRIEFING_EVENING_TIME`, `ZOOP_BRIEFING_SCHEDULE_EFFECTIVE_FROM`으로 prospective KST 일정을 API와 전용 worker에 동일하게 설정한다. 예: `08:30`, `17:30`, `2026-11-05`. API 설정 응답·다음 설정 적용 시각·자격 관측과 worker 수집 구간이 같은 정책을 사용한다. 기본값은 기존 09:20/17:30을 유지한다. 과거 발행본과 preference revision은 수정하지 않는다.
+`ZOOP_BRIEFING_MORNING_TIME`, `ZOOP_BRIEFING_EVENING_TIME`, `ZOOP_BRIEFING_SCHEDULE_EFFECTIVE_FROM`으로 prospective KST 일정을 API와 전용 worker에 동일하게 설정한다. 예: `08:30`, `17:30`, `2026-11-05`. API 설정 응답·다음 설정 적용 시각·자격 관측과 worker 수집 구간이 같은 정책을 사용한다. 기본값은 기존 09:20/17:30을 유지한다. `BRIEFING_AUTO_START_AT`보다 앞선 슬롯은 새 실패 작업도 만들지 않아 활성화 전 회차를 소급하지 않는다. 과거 발행본과 preference revision은 수정하지 않는다.
 
 `ZOOP_BRIEFING_TEST_EVENING_AT`은 명시한 KST 날짜의 퇴근 슬롯에만 적용하는 일회성 시각이다. 다음 날 반복되지 않고 실제 마감·생성·발행 시각이 남는다. 다음 출근의 비교 구간은 이 실제 시험 회차 마감부터 시작한다. 30초 polling으로 해당 실제 마감의 자격을 관측한다. 준비를 마감 10분 전까지 시작하지 못하면 시간을 소급하지 않고 실패로 기록한다.
 

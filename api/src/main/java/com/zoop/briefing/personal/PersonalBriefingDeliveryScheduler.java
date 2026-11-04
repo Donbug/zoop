@@ -25,6 +25,7 @@ public class PersonalBriefingDeliveryScheduler {
  public void capture(String edition){
   if(audience.memberIds().isEmpty())return;
   var slot=schedule.today(clock.instant(),edition);
+  if(clock.instant().isBefore(slot)||!clock.instant().isBefore(slot.plusSeconds(120)))return;
   for(String member:jdbc.query("SELECT id FROM members WHERE status='active' AND id IN ("+cohort()+") ORDER BY id",(r,i)->r.getString(1),audience.memberIds().toArray()))
    if(audience.automatic(member))
    try{service.captureEligibility(new MemberPrincipal(member,"scheduled"),slot);}catch(RuntimeException e){LoggerFactory.getLogger(getClass()).warn("Personal briefing slot unobserved: {}",e.getClass().getSimpleName());}

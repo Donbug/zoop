@@ -37,6 +37,13 @@ class ChainTests(unittest.TestCase):
             now=lambda:datetime.fromisoformat('2026-11-05T08:12:00+09:00')
             self.assertTrue(chain.work_once(cfg,now=now,connect=lambda:conn,run=run))
             self.assertEqual('morning',run.call_args.args[1])
+    def test_activation_does_not_create_historical_missed_jobs(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg={**self.cfg(d),'notBefore':'2026-11-04T22:00:00+09:00','schedule':{'testEveningAt':'2026-11-04T22:00:00+09:00'}}
+            conn=Mock();conn.__enter__=Mock(return_value=conn);conn.__exit__=Mock(return_value=False);run=Mock()
+            now=lambda:datetime.fromisoformat('2026-11-04T21:29:59+09:00')
+            self.assertFalse(chain.work_once(cfg,now=now,connect=lambda:conn,run=run))
+            conn.execute.assert_not_called();run.assert_not_called()
     def test_test_clock_requires_explicit_kst_offset(self):
         import briefing_schedule
         with self.assertRaises(ValueError):briefing_schedule.slot(datetime.fromisoformat('2026-11-04').date(),'evening',{'schedule':{'testEveningAt':'2026-11-04T22:00:00'}})

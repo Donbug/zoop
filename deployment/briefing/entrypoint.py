@@ -52,6 +52,7 @@ def main():
             briefing_auto_chain.config_check(cfg);briefing_native_intake.initialize_authority(cfg)
             print('briefing-source-authority-initialized');return
         os.environ.update({'ZOOP_DOCUMENT_READ_INGESTION_SOURCES':str(authority/'serving-delegates.json'),'ZOOP_DOCUMENT_READ_GRANTS':str(authority/'serving-grants.json'),'BRIEFING_SERVER_SOURCE_SCOPE':str(authority/'model-scope.json')})
+        if os.environ.get('BRIEFING_AUTO_START_AT'):cfg['notBefore']=os.environ['BRIEFING_AUTO_START_AT']
         cfg['schedule']={'morning':os.environ.get('ZOOP_BRIEFING_MORNING_TIME','09:20'),'evening':os.environ.get('ZOOP_BRIEFING_EVENING_TIME','17:30'),'effectiveFrom':os.environ.get('ZOOP_BRIEFING_SCHEDULE_EFFECTIVE_FROM','9999-12-31')}
         if os.environ.get('ZOOP_BRIEFING_TEST_EVENING_AT'):cfg['schedule']['testEveningAt']=os.environ['ZOOP_BRIEFING_TEST_EVENING_AT']
         cfg['personalMemberIds']=sorted(v.strip() for v in os.environ.get('ZOOP_BRIEFING_PERSONAL_SCHEDULER_MEMBER_IDS','').split(',') if v.strip())
