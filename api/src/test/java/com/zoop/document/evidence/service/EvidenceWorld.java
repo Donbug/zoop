@@ -301,15 +301,9 @@ final class EvidenceWorld {
 
     EvidenceService service(Path grantsPath, Path sourcesPath, ArtifactFileStore artifactStore,
             com.zoop.document.evidence.graph.GraphEvidenceReader graph) {
-        return service(grantsPath, sourcesPath, artifactStore, graph, publications(artifactStore));
-    }
-
-    /** With the publication reader the public graph reader also uses, as the application wires one bean into both. */
-    EvidenceService service(Path grantsPath, Path sourcesPath, ArtifactFileStore artifactStore,
-            com.zoop.document.evidence.graph.GraphEvidenceReader graph, GraphPublicationReader publications) {
         return new EvidenceService(read, registry, new DocumentReadGrants(grantsPath), new DocumentReadSources(sourcesPath), graph,
                 new EvidenceArtifactReader(artifactStore), Clock.fixed(NOW, ZoneOffset.UTC),
-                TransactionOperations.withoutTransaction(), publications);
+                TransactionOperations.withoutTransaction(), publications(artifactStore));
     }
 
     static byte[] bytes(String text) {

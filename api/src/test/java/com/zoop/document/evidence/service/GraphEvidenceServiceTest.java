@@ -79,8 +79,6 @@ class GraphEvidenceServiceTest {
     private RuntimeException graphFailure;
     /** When set, the REAL pinned reader answers instead of the stub {@link #found}. */
     private GraphEvidenceReader realPort;
-    /** The one publication reader the real public reader and the evidence service share, as the application wires it. */
-    private com.zoop.graph.publication.GraphPublicationReader sharedPublications;
 
     @Test
     void legacyReceiptRequiresPinnedV2ManifestAndBundle() {
@@ -135,8 +133,7 @@ class GraphEvidenceServiceTest {
     }
 
     private EvidenceService service() {
-        return sharedPublications == null ? world.service(null, sources, world.store, port())
-                : world.service(null, sources, world.store, port(), sharedPublications);
+        return world.service(null, sources, world.store, port());
     }
 
     private EvidenceResponse get() {
@@ -996,9 +993,8 @@ class GraphEvidenceServiceTest {
 
     private PublicGraphReader publicReader(GraphVersionSelector selector,
             java.util.function.Supplier<DisclosureExclusions> exclusions) {
-        sharedPublications = world.publications(world.store);
         return new PublicGraphReader(selector, new ArtifactGraphSnapshotStore(world.store, world.registry, null),
-                pinned -> exclusions.get(), sharedPublications,
+                pinned -> exclusions.get(), world.publications(world.store),
                 new GraphPublicationAuthority(world.registry, new DocumentReadSources(sources), pinned -> exclusions.get(),
                         java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)));
     }
@@ -1027,49 +1023,6 @@ class GraphEvidenceServiceTest {
                 "the selected version pinned explicitly, at its first publication");
         assertNull(outcome(DIRECT_ID, GRAPH_VERSION, null));
         assertEquals(ErrorCode.VERSION_UNAVAILABLE, outcome(EVIDENCE_ID, "gv-" + "0".repeat(64), null), "a version that was never active");
-    }
-
-    @Test
-    void oneReadScopeVerifiesTheVersionOnceAndEveryReadAppliesTheCurrentOverlay() throws Exception {
-        int[] overlayReads = {0};
-        DisclosureExclusions[] current = {DisclosureExclusions.NONE};
-        realReader(() -> {
-            overlayReads[0]++;
-            return current[0];
-        });
-        // Each publication rebuild reads the version's rules exactly once.
-        assertNull(outcome(EVIDENCE_ID, null, null));
-        int rebuildsPerRead = org.mockito.Mockito.mockingDetails(world.graphRepository).getInvocations().stream()
-                .filter(call -> call.getMethod().getName().equals("versionRules")).toList().size();
-        assertTrue(rebuildsPerRead >= 2, "without a scope the reader and the citation check each rebuild the publication");
-        org.mockito.Mockito.clearInvocations(world.graphRepository);
-        overlayReads[0] = 0;
-        int perRead;
-        try (com.zoop.common.request.ReadScope ignored = com.zoop.common.request.ReadScope.open()) {
-            assertNull(outcome(EVIDENCE_ID, null, null));
-            perRead = overlayReads[0];
-            current[0] = new DisclosureExclusions(1, java.util.Set.of(), java.util.Set.of(), java.util.Set.of(EVIDENCE_ID));
-            assertNull(outcome(DIRECT_ID, null, null));
-            assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "a later read in the same request applies the current overlay");
-            // The company documents page re-checks each citation at the version it already pinned.
-            assertEquals(List.of("iss-1"), service().readPinned(DIRECT_ID, GRAPH_VERSION, null, null, "r-pinned").eventIds());
-            assertTrue(overlayReads[0] > perRead, "the overlay is current on every read, only the version is verified once");
-            org.mockito.Mockito.verify(world.graphRepository, org.mockito.Mockito.times(1)).versionRules(GRAPH_VERSION);
-            world.publications(world.store).read(GRAPH_VERSION);
-            org.mockito.Mockito.verify(world.graphRepository, org.mockito.Mockito.times(2)).versionRules(GRAPH_VERSION);
-        }
-        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "the next request reads the current overlay");
-    }
-
-    @Test
-    void aSourceRevokedDuringOneRequestDropsItsReferencesFromTheNextGraphRead() throws Exception {
-        realReader(() -> DisclosureExclusions.NONE);
-        try (com.zoop.common.request.ReadScope ignored = com.zoop.common.request.ReadScope.open()) {
-            assertNotNull(realPort.read(null, null, DIRECT_ID).span());
-            writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, false, "known", List.of("read", "store", "quote-display"), "authored", null));
-            assertNull(realPort.read(null, null, DIRECT_ID).span(), "the graph drops the revoked source's references, not only its quote");
-            assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(DIRECT_ID, null, null));
-        }
     }
 
     @Test

@@ -1,9 +1,7 @@
 package com.zoop.graph.read;
 
-import com.zoop.common.request.ReadScope;
 import com.zoop.graph.snapshot.GraphSnapshotStore;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
-import com.zoop.graph.version.GraphVersionRecord;
 import com.zoop.graph.version.GraphVersionSelector;
 import com.zoop.graph.version.SelectedGraphVersion;
 import com.zoop.graph.publication.GraphPublicationReader;
@@ -21,9 +19,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class PublicGraphReader {
-    private static final java.util.concurrent.atomic.AtomicLong INSTANCES = new java.util.concurrent.atomic.AtomicLong();
-    /** Readers over different stores never share a request's kept snapshot. */
-    private final String scopeKey = "public-graph:" + INSTANCES.incrementAndGet() + ":";
     private final GraphVersionSelector selector;
     private final GraphSnapshotStore store;
     private final DisclosureExclusionReader exclusions;
@@ -59,27 +54,19 @@ public class PublicGraphReader {
         return read(selector.pinned(versionId, asOf, asOfRequested), null);
     }
 
-    /**
-     * The verified snapshot and its publication, read once per version in one read-only request. Both are immutable for a
-     * version id; the current authority (exclusions, article access, source grants, expiry) is not, so it is never kept.
-     */
-    private record Verified(PublicGraphSnapshot snapshot, GraphPublicationReader.Publication publication) { }
-
-    private Verified verify(GraphVersionRecord version) {
-        PublicGraphSnapshot snapshot = store.load(version);
-        if (!"snapshot".equals(version.kind())) return new Verified(snapshot, null);
-        try {
-            return new Verified(snapshot, publications.read(version.id(), snapshot));
-        } catch (PublicationException invalid) {
-            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
-        }
-    }
-
     private Pinned read(SelectedGraphVersion selected, String requestId) {
-        Verified verified = ReadScope.memo(scopeKey + selected.version().id(), () -> verify(selected.version()));
-        PublicGraphSnapshot snapshot = verified.snapshot();
-        DisclosureExclusions currentExclusions = verified.publication() == null ? exclusions.current(selected.version().id())
-                : authority.current(verified.publication(), requestId);
+        PublicGraphSnapshot snapshot = store.load(selected.version());
+        DisclosureExclusions currentExclusions;
+        if ("snapshot".equals(selected.version().kind())) {
+            try {
+                var publication = publications.read(selected.version().id(), snapshot);
+                currentExclusions = authority.current(publication, requestId);
+            } catch (PublicationException invalid) {
+                throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
+            }
+        } else {
+            currentExclusions = exclusions.current(selected.version().id());
+        }
         PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot,
                 selected.asOfRequested() ? selected.asOf() : null, currentExclusions,
                 selected.briefing() != null && selected.briefing().reconstruction() != null);
