@@ -64,6 +64,7 @@ tasks.register('companyIntegrationTest', Test) {
 	classpath = sourceSets.test.runtimeClasspath
 	useJUnitPlatform {
 		includeTags 'company-postgres', 'graph-postgres'
+        excludeTags 'briefing-auto-postgres'
 	}
 	outputs.upToDateWhen { false }
 	testLogging {
@@ -196,4 +197,14 @@ tasks.register('planAdmissionProof', JavaExec) {
 	dependsOn tasks.named('testClasses')
 	classpath = sourceSets.test.runtimeClasspath
 	mainClass = 'com.zoop.ai.PlanAdmissionProof'
+}
+
+// Full fresh-source chain: a test-owned HTTP source and synthetic provider peers only.
+tasks.register('briefingAutoIntegrationTest', Test) {
+    group='verification'
+    testClassesDirs=sourceSets.test.output.classesDirs
+    classpath=sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'briefing-auto-postgres' }
+    outputs.upToDateWhen { false }
+    testLogging { events 'passed','failed'; exceptionFormat 'full' }
 }

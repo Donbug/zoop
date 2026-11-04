@@ -208,6 +208,32 @@ public class AdminGraphVersionService {
     }
 
     /**
+     * Dedicated briefing writer opt-in: only a strict addition to the exact current native publication.
+     * Existing issue/evidence/relation/article values must survive unchanged. This does not approve a HOLD,
+     * choose conflicting fields, or enable the general graph scheduler's manual publication queue.
+     */
+    @Transactional
+    public Activation activateBriefingAddition(String versionId, String expectedActive, String authorizationRef, String requestId) {
+        if (authorizationRef == null || authorizationRef.isBlank() || authorizationRef.length() > 200)
+            throw new IllegalArgumentException("briefing_operator_authorization_required");
+        var before = versions.find(expectedActive).orElseThrow();
+        var after = versions.find(versionId).orElseThrow();
+        if (!IMPORTED.equals(before.kind()) || !IMPORTED.equals(after.kind()))
+            throw new IllegalArgumentException("native_publication_required");
+        var previous = snapshots.load(before);
+        var candidate = snapshots.load(after);
+        var publication = publications.read(versionId);
+        if (!publication.composed()) throw new IllegalArgumentException("additive_composition_required");
+        if (!candidate.issues().containsAll(previous.issues()) || !candidate.companies().containsAll(previous.companies())
+                || !candidate.relations().containsAll(previous.relations())
+                || !candidate.evidence().containsAll(previous.evidence()) || !candidate.articles().containsAll(previous.articles()))
+            throw new IllegalArgumentException("existing_publication_would_change");
+        return versions.activateByAdmin(versionId, expectedActive, null, "system",
+                "briefing additive intake: " + authorizationRef, "forward",
+                () -> publishableNow(after, candidate, "system", requestId));
+    }
+
+    /**
      * A synthetic fixture is publishable only where the snapshot source itself is the local/dev fixture source: an artifact
      * deployment can still read old fixture rows, and "[합성]" data must never become its public graph. The source is fixed
      * configuration, so checking it once before the snapshot read is the same answer the lock would give.

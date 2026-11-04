@@ -64,6 +64,58 @@ class SelectedGenerationTests(unittest.TestCase):
             for key,value in [('maxNewCalls',9),('maxAggregateCalls',255),('maxUsd','3.01'),('task','different'),('dsn','postgresql://user:local@remote:5432/test_briefing_replay'),('dsn','postgresql://127.0.0.1:5432/production'),('dsn','postgresql://127.0.0.1:5432/test_briefing_replay?host=remote')]:
                 config.write_text(json.dumps({**cfg,key:value}))
                 with self.assertRaises(ValueError):g.load_config(config)
+    def test_priority_snapshot_uses_priority_issue_ids_and_versioned_inputs(self):
+        import briefing_priority_generation as priority
+        s=snapshot();s['priorityContract']=priority.VERSION
+        s['selection']['presentation']['items']=[]
+        s['selection']['presentation']['personalPriority']={'items':[{'issueId':'i0'}]}
+        s['inputs']=[priority.priority_input(f) for f in s['inputs']]
+        g.validate_snapshot(s)
+        bad=copy.deepcopy(s);bad['inputs'][0].pop('priorityContract');bad['inputs'][0]=m.seal(bad['inputs'][0])
+        with self.assertRaisesRegex(ValueError,'priority_contract'):g.validate_snapshot(bad)
+
+    def test_server_worker_requires_exact_dsn_and_shared_budget_approval(self):
+        import briefing_priority_generation as priority
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);auth=root/'approval.json';config=root/'config.json'
+            dsn='postgresql://synthetic:local@approved.invalid:5432/briefing'
+            approval={'task':'test','model':b.MODEL,'maximumNewCalls':8,'maximumAggregateCalls':16,'maximumAggregateUsd':'1',
+                'scope':'priority-selected-server-v1','databaseDsnSha256':b.digest(dsn.encode()),'serverBudgetWork':str(root/'shared-budget'),'allowedMemberIds':['synthetic-owner']}
+            cfg={'task':'test','authorizationFile':str(auth),'maxNewCalls':8,'maxAggregateCalls':16,'maxUsd':'1','dsn':dsn,
+                'priorityContract':priority.VERSION,'serverLedgerCommand':['synthetic-java'],'serverBudgetWork':approval['serverBudgetWork'],'allowedMemberIds':['synthetic-owner']}
+            auth.write_text(json.dumps(approval));auth.chmod(0o600);config.write_text(json.dumps(cfg));config.chmod(0o600)
+            self.assertEqual(cfg,g.load_config(config))
+            for key,value in [('dsn',dsn+'2'),('serverBudgetWork',str(root/'other')),('priorityContract','legacy'),('maxNewCalls',1),('maxAggregateCalls',8),('maxUsd','0.01'),('allowedMemberIds',['unapproved'])]:
+                config.write_text(json.dumps({**cfg,key:value}))
+                with self.assertRaises(ValueError):g.load_config(config)
+
+    def test_empty_server_cohort_never_opens_database_or_claims_a_job(self):
+        with patch('psycopg.connect') as connect:
+            self.assertFalse(g.work_once({'serverLedgerCommand':['synthetic'],'allowedMemberIds':[]}))
+            connect.assert_not_called()
+
+    def test_server_cohort_rejects_wildcards_and_unscoped_configs(self):
+        for value in [None,['*'],['a','a'],['a,b'],['']]:
+            with self.assertRaisesRegex(ValueError,'selected_member_allowlist_required'):
+                g.allowed_members({'serverLedgerCommand':['synthetic'],'allowedMemberIds':value})
+
+    def test_each_send_rechecks_job_owner_before_sources_or_transport(self):
+        conn=Mock();conn.execute.return_value.fetchone.return_value=('active','demo-account')
+        with self.assertRaisesRegex(ValueError,'selected_member_not_allowed'):
+            g.current_authority(conn,{'serverLedgerCommand':['synthetic'],'allowedMemberIds':['allowed-account']},{},'job')
+        self.assertEqual(1,conn.execute.call_count)
+
+    def test_claim_filters_cohort_in_database_before_ordering_and_limit(self):
+        from unittest.mock import MagicMock
+        conn=MagicMock();conn.execute.return_value.fetchone.return_value=None
+        connection=MagicMock();connection.__enter__.return_value=conn
+        with patch('psycopg.connect',return_value=connection):
+            self.assertFalse(g.work_once({'dsn':'synthetic','serverLedgerCommand':['synthetic'],'allowedMemberIds':['allowed-account']}))
+        sql,params=conn.execute.call_args.args
+        self.assertIn('j.member_id=ANY(%s)',sql)
+        self.assertLess(sql.index('j.member_id=ANY(%s)'),sql.index('LIMIT 1'))
+        self.assertEqual((['allowed-account'],),params)
+
     def test_worker_rejects_readable_secrets_before_start(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);auth=root/'approval.json';config=root/'config.json'

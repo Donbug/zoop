@@ -1,0 +1,12 @@
+# Explicit deployment profile only. The dedicated worker owns early collection/common queue admission.
+zoop:
+  briefing:
+    common-scheduler-enabled: false
+    personal-scheduler-enabled: true
+    personal-scheduler-member-ids: ${ZOOP_BRIEFING_PERSONAL_SCHEDULER_MEMBER_IDS:}
+    personal-generation-allowlist-required: true
+    selected-generation-enabled: ${ZOOP_BRIEFING_SELECTED_GENERATION_ENABLED:false}
+    morning-time: ${ZOOP_BRIEFING_MORNING_TIME:09:20}
+    evening-time: ${ZOOP_BRIEFING_EVENING_TIME:17:30}
+    schedule-effective-from: ${ZOOP_BRIEFING_SCHEDULE_EFFECTIVE_FROM:9999-12-31}
+    test-evening-at: ${ZOOP_BRIEFING_TEST_EVENING_AT:}

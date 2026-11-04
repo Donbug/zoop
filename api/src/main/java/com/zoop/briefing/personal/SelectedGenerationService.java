@@ -15,26 +15,37 @@ public class SelectedGenerationService {
     private final PersonalBriefingRepository pools;
     private final SelectedGenerationRepository jobs;
     private final boolean enabled;
+    private final PersonalBriefingAudience audience;
     private final JsonMapper json=JsonMapper.builder().build();
     public SelectedGenerationService(ExplicitBriefingService selections,PersonalBriefingRepository pools,SelectedGenerationRepository jobs,
-            @Value("${zoop.briefing.selected-generation-enabled:false}")boolean enabled){this.selections=selections;this.pools=pools;this.jobs=jobs;this.enabled=enabled;}
+            boolean enabled){this(selections,pools,jobs,enabled,new PersonalBriefingAudience("",false));}
+    @org.springframework.beans.factory.annotation.Autowired
+    public SelectedGenerationService(ExplicitBriefingService selections,PersonalBriefingRepository pools,SelectedGenerationRepository jobs,
+            @Value("${zoop.briefing.selected-generation-enabled:false}")boolean enabled,PersonalBriefingAudience audience){this.selections=selections;this.pools=pools;this.jobs=jobs;this.enabled=enabled;this.audience=audience;}
     @Transactional(timeout=10)
     public ObjectNode create(String roundId,MemberPrincipal member,Request request,String requestId){
         if(member==null)throw new CustomException(ErrorCode.AUTH_REQUIRED);
         if(request==null||request.selectionVersion()==null)throw new CustomException(ErrorCode.INVALID_REQUEST);
         var selection=selections.select(roundId,member,request.choice(),requestId);
         if(!request.selectionVersion().equals(selection.path("selectionVersion").asString()))throw new CustomException(ErrorCode.REVISION_CONFLICT);
+        if(selection.path("pendingAnalysisCount").asInt()>0 && !audience.additionalGeneration(member.memberId()))throw new CustomException(ErrorCode.ACCESS_DENIED);
         if(!enabled && selection.path("pendingAnalysisCount").asInt()>0)throw new CustomException(ErrorCode.MODEL_UNAVAILABLE);
         var pool=pools.pool(roundId).orElseThrow(()->new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
         if(!pool.path("inputSha256").equals(selection.path("poolVersion")))throw new CustomException(ErrorCode.REVISION_CONFLICT);
         var snapshot=json.createObjectNode().put("roundId",roundId).put("cutoff",selection.path("dataAsOf").asString()).put("poolVersion",pool.path("inputSha256").asString())
             .put("selectionVersion",request.selectionVersion());
         snapshot.set("selection",selection.deepCopy());var ids=snapshot.putArray("selectedIssueIds");var inputs=snapshot.putArray("inputs");
-        for(var selected:selection.path("presentation").path("items")){
-            String id=selected.path("eventId").asString();ids.add(id);
+        boolean priority=PriorityPersonalAssembler.enabled(pool);
+        if(priority)snapshot.put("priorityContract",PriorityPersonalAssembler.VERSION);
+        var selectedItems=selection.path("presentation").path(priority?"personalPriority":"items");
+        if(priority)selectedItems=selectedItems.path("items");
+        for(var selected:selectedItems){
+            String id=selected.path(priority?"issueId":"eventId").asString();ids.add(id);
             var candidate=pool.path("candidates").valueStream().filter(c->id.equals(c.path("issueId").asString())).findFirst().orElseThrow(()->new CustomException(ErrorCode.REVISION_CONFLICT));
-            var input=candidate.path("analysisInput");
-            if(candidate.path("sharedView").isObject() || jobs.analysis(roundId,id,input.path("inputSha256").asString()).isPresent())continue;
+            var input=candidate.path(priority?"priorityAnalysisInput":"analysisInput");
+            var shared=candidate.path("sharedView");var cached=jobs.analysis(roundId,id,input.path("inputSha256").asString());
+            if(priority ? shared.path("priorityPersonal").isObject() || cached.filter(v->v.path("priorityPersonal").isObject()).isPresent()
+                    : shared.isObject() || cached.isPresent())continue;
             if(!input.isObject() || !input.path("roundId").asString().equals(roundId) || !input.path("issueId").asString().equals(id))throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
             inputs.add(input.deepCopy());
         }
@@ -44,7 +55,7 @@ public class SelectedGenerationService {
     @Transactional(timeout=10)
     public ObjectNode retry(String roundId,String previousId,MemberPrincipal member,String requestId){
         var previous=get(roundId,previousId,member,requestId);
-        if(!enabled || "stale".equals(previous.path("status").asString()))throw new CustomException(ErrorCode.JOB_NOT_RETRYABLE);
+        if(!enabled || !audience.additionalGeneration(member.memberId()) || "stale".equals(previous.path("status").asString()))throw new CustomException(ErrorCode.JOB_NOT_RETRYABLE);
         return get(roundId,jobs.retry(member.memberId(),roundId,previousId),member,requestId);
     }
     public ObjectNode get(String roundId,String id,MemberPrincipal member,String requestId){

@@ -41,7 +41,9 @@ class SavedPreferenceUpgradePostgresTest {
             var tables=List.of("members","briefing_rounds","briefing_personal_deliveries","briefing_feedback");
             var before=tables.stream().map(t->rows(jdbc,t,false)).toList();String pref=rows(jdbc,"briefing_personal_preferences",false);
             var upgrade=Flyway.configure().dataSource(source).schemas(schema).defaultSchema(schema).outOfOrder(false).load();
-            assertEquals(1,upgrade.migrate().migrationsExecuted);upgrade.validate();
+            int pending=upgrade.info().pending().length;
+            assertTrue(pending>=1,"The demo-scope upgrade must be pending; dependent migrations may also be present");
+            assertEquals(pending,upgrade.migrate().migrationsExecuted);upgrade.validate();
             String addedVersion=jdbc.queryForObject("SELECT version FROM flyway_schema_history WHERE script LIKE '%isolate_imported_briefing_demo_preferences.sql' AND success",String.class);
             assertTrue(addedVersion.compareTo("20261104150000")<0,"Keep this parent PR before the dependent #557 migration");
             assertEquals(before,tables.stream().map(t->rows(jdbc,t,false)).toList());assertEquals(pref,rows(jdbc,"briefing_personal_preferences",true));

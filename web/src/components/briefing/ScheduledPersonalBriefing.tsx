@@ -19,6 +19,7 @@ type Choice = Result['choice'];
 type Company = { id: string; name: string; logoUrl?: string | null };
 type Settings = {
   demoEnabled: boolean;
+  schedule?: string[];
   initializationStatus?: string;
   nextScheduledAt: string;
   preference: null | {
@@ -289,8 +290,8 @@ function MemberScheduledPersonalBriefing({
           <div>
             <h2 className="text-lg font-bold">나의 브리핑 설정</h2>
             <p className={NOTE}>
-              매일 09:20 · 17:30 기준으로 자동 제공해요. 보유·관심 종목이 없으면
-              새 브리핑을 만들지 않아요.
+              매일 {settings?.schedule?.join(' · ') ?? '정해진 시각'} 기준으로
+              제공해요. 보유·관심 종목이 없으면 새 브리핑을 만들지 않아요.
             </p>
           </div>
           {settings && (

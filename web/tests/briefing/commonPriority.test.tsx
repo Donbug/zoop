@@ -63,6 +63,24 @@ function response(v: CommonPriority) {
   } as unknown as BriefingResponse;
 }
 
+test('day-only source keeps its date, actual collection time and attribution', async () => {
+  const data = value();
+  Object.assign(data.items[0].sources[0], {
+    publishedAt: null,
+    publishedDate: '2026-10-29',
+    availableAt: '2026-10-29T18:00:00+09:00',
+    eligibilityBasis: 'first_observed',
+    publisher: '합성 발행기관',
+  });
+  expect(commonPriorityOf(response(data))).not.toBeNull();
+  render(<CommonPriorityIssues value={data} />);
+  await userEvent.setup().click(screen.getByText('합성 이슈 a'));
+  expect(screen.getByText(/게시일 2026-10-29 · 최초 수집/)).not.toBeNull();
+  expect(screen.getByText(/합성 발행기관/)).not.toBeNull();
+  data.items[0].sources[0].availableAt = '2026-11-01T00:00:00Z';
+  expect(commonPriorityOf(response(data))).toBeNull();
+});
+
 test('D-BRF-01 renders two verified relative common issues even if the old publication was empty', () => {
   render(
     <MemoryRouter>

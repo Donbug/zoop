@@ -12596,6 +12596,26 @@ components:
         publishedAt:
           type: string
           format: date-time
+          nullable: true
+          description: 실제 게시 시각. 일자만 확인된 자료는 null이며 최초 수집 시각으로 대체하지 않는다.
+        publishedDate:
+          type: string
+          format: date
+          nullable: true
+        availableAt:
+          type: string
+          format: date-time
+          nullable: true
+        eligibilityBasis:
+          type: string
+          nullable: true
+          description: publishedAt이 null이면 first_observed이며 publishedDate와 availableAt을 함께 제공한다.
+        title:
+          type: string
+          nullable: true
+        publisher:
+          type: string
+          nullable: true
     PriorityCompany:
       type: object
       properties:
