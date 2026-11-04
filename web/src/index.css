@@ -144,6 +144,30 @@
   --color-gray-950: #fafafa;
 }
 
+/* 모바일(767px 이하)에서는 메뉴·본문·제목을 한 단계씩 줄인다. caption 12px는 최저 크기라 그대로 둔다.
+   토큰을 아직 쓰지 않는 Tailwind 기본 크기(text-sm·text-base·text-lg)도 같은 비율로 줄인다.
+   지도 화면 본체(.relationship-main: 툴바·지도·기업 패널)는 PC와 같은 크기를 유지한다. */
+@media (max-width: 767px) {
+  :root {
+    --text-body: 13px;
+    --text-lead: 15px;
+    --text-title-sm: 16px;
+    --text-title: 19px;
+    --text-display: 24px;
+    --text-sm: 13px;
+    --text-base: 15px;
+    --text-lg: 16px;
+  }
+
+  .relationship-main {
+    --text-body: 14px;
+    --text-lead: 16px;
+    --text-title-sm: 18px;
+    --text-title: 22px;
+    --text-display: 28px;
+  }
+}
+
 /* 기본 규칙은 base 레이어에 둔다. 레이어 밖에 두면 Tailwind 유틸리티(text-xs 등)보다
    항상 우선해서 버튼·입력의 글자 크기 클래스가 무시된다. */
 @layer base {
