@@ -1,0 +1,35 @@
+{
+  "result": "passed",
+  "sheets": [
+    {
+      "sheet": "표지·변경이력",
+      "csv": "docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv",
+      "rows": 37,
+      "columns": 7,
+      "cells": 259,
+      "sha256": "38a83e4b4811796a4bec8e6602b614a70f25376238a0dde55f72012dac7c1861",
+      "result": "passed"
+    },
+    {
+      "sheet": "프로젝트 WBS",
+      "csv": "docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv",
+      "rows": 1021,
+      "columns": 100,
+      "cells": 102100,
+      "sha256": "89f7ebb102e2a3aebb76fd17d7e838068d1f96eddc6e3ee9e5a8baa009b81b77",
+      "result": "passed"
+    },
+    {
+      "sheet": "개발 일정 요약",
+      "csv": "docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv",
+      "rows": 32,
+      "columns": 6,
+      "cells": 192,
+      "sha256": "4942dbb6f8b0303cc5b6a2b2dbaa80d294f6ca3b9f9c5ada6dd1524ebf329725",
+      "result": "passed"
+    }
+  ],
+  "cells": 102551,
+  "baseline_files_unchanged": true,
+  "pipeline": "docs/evidence/raw/refresh_2026-10-12/_capture_workbooks.py"
+}

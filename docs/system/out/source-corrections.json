@@ -1270,7 +1270,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 93,
           "rowUnit": "xlsx-row"
         },
@@ -1339,7 +1339,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 94,
           "rowUnit": "xlsx-row"
         },
@@ -1431,7 +1431,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 95,
           "rowUnit": "xlsx-row"
         },
@@ -1500,7 +1500,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 96,
           "rowUnit": "xlsx-row"
         },
@@ -1569,7 +1569,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 97,
           "rowUnit": "xlsx-row"
         },
@@ -1684,7 +1684,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 98,
           "rowUnit": "xlsx-row"
         },
@@ -1753,7 +1753,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 99,
           "rowUnit": "xlsx-row"
         },
@@ -1868,7 +1868,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 100,
           "rowUnit": "xlsx-row"
         },
@@ -2146,7 +2146,7 @@
       "target": "6.5.5 / 6.6.19 / 6.6.20",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 76,
           "rowUnit": "xlsx-row"
         },
@@ -2154,7 +2154,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 99,
           "rowUnit": "xlsx-row"
         },
@@ -2165,34 +2165,11 @@
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     },
     {
-      "code": "WBS_DATE_ORDER_INVALID",
-      "target": "6.9.15",
-      "originalA": {
-        "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
-          "row": 153,
-          "rowUnit": "xlsx-row"
-        },
-        "text": "6.9.15: AI 챗봇 통합 테스트 / P1 / 2026-10-28~2026-10-24 / 가중치 0.002 / raw "
-      },
-      "originalB": {
-        "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
-          "row": 153,
-          "rowUnit": "xlsx-row"
-        },
-        "text": "같은 행의 종료일이 시작일보다 앞선다."
-      },
-      "workerDecision": "날짜를 추정하거나 고치지 않고 일정 정정 대상으로 표시한다.",
-      "ownerCorrectionRequest": "WBS 일정 담당자가 시작일·종료일을 정정해 주세요.",
-      "status": "원문 담당자 정정 요청(원문 변경 없음)"
-    },
-    {
       "code": "WBS_RAW_ID_REVIEW",
       "target": "FS057 / 6.5.3",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 74,
           "rowUnit": "xlsx-row"
         },
@@ -2208,52 +2185,6 @@
       },
       "workerDecision": "기존 FS057→FS035 통합 선언에 따라 저장 업무를 FS035로 편집 연결하고 raw FS057은 보존한다.",
       "ownerCorrectionRequest": "WBS 담당자가 산출물 FS057을 현재 통합 ID와 일치시키고 기존 저장 업무와 중복 산정하지 않도록 정정해 주세요.",
-      "status": "원문 담당자 정정 요청(원문 변경 없음)"
-    },
-    {
-      "code": "WBS_COVER_BODY_CONFLICT",
-      "target": "FS074~FS081 / 6.6.13~20",
-      "originalA": {
-        "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/00-표지-변경이력.csv",
-          "row": 19,
-          "rowUnit": "xlsx-row"
-        },
-        "text": ", v0.2 추가, 2026-10-06 00:00:00, 요청 반영, FS074~FS081 / WBS 6.5.13~6.5.20 추가. AI·백엔드 B 역할과 기존 6.4 연계 명시. 기존 일정·담당 유지, 신규 일정·가중치 미산정. 메인 그래프 집계 범위 확장 및 영향 조회/분석 경계 명시., , "
-      },
-      "originalB": {
-        "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
-          "row": 93,
-          "rowUnit": "xlsx-row"
-        },
-        "text": "6.6.13: (BE) 뉴스·공시 수집 및 수집 회차 관리 / P1 / 2026-09-21~2026-10-15 / 가중치 0.0045 / raw FS074, FS058, FS063"
-      },
-      "workerDecision": "본문 6.6.13~20을 현재 역할 연결에 사용한다. 일정 기준은 WBS이며 내부 충돌은 정정 요청으로 남긴다.",
-      "ownerCorrectionRequest": "WBS 담당자가 표지/요약/본문의 번호·역할·기간·가중치를 일치시켜 주세요. 원문 제안 8개를 제외하지 마세요.",
-      "status": "원문 담당자 정정 요청(원문 변경 없음)"
-    },
-    {
-      "code": "WBS_COVER_BODY_CONFLICT",
-      "target": "FS074~FS081 / 6.6.13~20",
-      "originalA": {
-        "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/02-개발-일정-요약.csv",
-          "row": 29,
-          "rowUnit": "xlsx-row"
-        },
-        "text": "6, 파이프라인 추가, FS074~FS081을 6.5.13~6.5.20에 추가. AI는 수집·정제·추출·동일성·관계·영향 검증, 백엔드 B는 GraphDB 적재·갱신·복구 및 조회 연계 담당. 기존 6.4 수행인력은 유지한다., , , "
-      },
-      "originalB": {
-        "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
-          "row": 93,
-          "rowUnit": "xlsx-row"
-        },
-        "text": "6.6.13: (BE) 뉴스·공시 수집 및 수집 회차 관리 / P1 / 2026-09-21~2026-10-15 / 가중치 0.0045 / raw FS074, FS058, FS063"
-      },
-      "workerDecision": "본문 6.6.13~20을 현재 역할 연결에 사용한다. 일정 기준은 WBS이며 내부 충돌은 정정 요청으로 남긴다.",
-      "ownerCorrectionRequest": "WBS 담당자가 표지/요약/본문의 번호·역할·기간·가중치를 일치시켜 주세요. 원문 제안 8개를 제외하지 마세요.",
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     }
   ]

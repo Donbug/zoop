@@ -1,0 +1,23 @@
+[
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "I4",
+    "before": "=SUM(I11,I16,I20,I27,I30,I34)",
+    "after": "=IFERROR(SUMPRODUCT(--($D$11:$D$500<>\"\"),--($H$11:$H$500<=TODAY()),$I$11:$I$500)/SUMPRODUCT(--($D$11:$D$500<>\"\"),$I$11:$I$500),0)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "개발 일정 요약",
+    "cell": "C8",
+    "before": "='프로젝트 WBS'!G80",
+    "after": ""
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "개발 일정 요약",
+    "cell": "D8",
+    "before": "='프로젝트 WBS'!H80",
+    "after": ""
+  }
+]

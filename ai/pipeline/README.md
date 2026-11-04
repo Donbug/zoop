@@ -280,7 +280,7 @@ CLI는 handoff writer를 열기 전에 이 선택과 현재 전달 권한 검사
 
 *손실 없이 건너뛸 수 있는 조건.* 더 새 slot이 먼저 import된 뒤 옛 slot의 번들을 건너뛰어도 최종 공개 상태를 잃지 않는 것은 **세 조건이 모두 성립할 때만**입니다. **C1** 선택은 매 freeze마다 위 규칙으로 원장·master registry·현재 전달 권한을 다시 확인합니다(직전 번들에서 잇지 않음: 이어 받으면 새 slot이 먼저 얼 때 옛 job이 영영 빠집니다). **C2** 앱이 slot마다, 계획할 단위가 없는 slot에도 freeze를 요청합니다(늦게 끝난 job과 매핑·결정 변경이 한 slot 안에 반영되도록). **C3** 아직 어떤 `ready` handoff에도 들어가지 못한 job이 있는 가장 오래된 회차부터 지금까지의 **slot이 있고 매핑·현재 전달 권한을 충족하는 job이 20개 이하**입니다. 넘으면 가장 오래된 job이 공개된 적 없이 밀려나며 `out_of_window`+`neverFrozen`으로 **보고**됩니다(조용한 손실 없음). slot이 없거나 현재 전달이 withheld인 job은 각 사유가 해소된 뒤의 freeze에서 다시 선택 대상이 됩니다. 세 조건 밖에서는 중간 버전을 건너뛴 결과가 최종 공개 상태에서 달라질 수 있습니다.
 
-이 명령은 HTTP `round-handoffs` 조정(#387: 앱이 roundId·planId만 넘기고, 자기 회차 gate·설치 순서·권한 allowlist를 서버가 수행)을 구현하지 않고 그 아래의 라이브러리·CLI 계층입니다. 모델·provider·네트워크 호출은 없습니다. 검증은 `tests/test_handoff_round.py`(실제 ingestion→S2→S3 authored-replay 원장).
+이 명령은 회차 handoff의 라이브러리·CLI 계층입니다. HTTP `round-handoffs` 조정은 [AI 서비스의 회차 실행 설정](../service/README.md)에서 제공하며, 서버가 회차·선택적 계획·bindings를 받아 자기 회차 gate·설치 순서·권한 allowlist를 적용합니다. CLI 자체는 모델·provider·네트워크 호출을 하지 않습니다. 검증은 `tests/test_handoff_round.py`(실제 ingestion→S2→S3 authored-replay 원장)와 AI 서비스의 실제 CLI 연동 시험을 따릅니다.
 
 **의존성.** 전체 패키지(`zoop-ai-pipeline`)는 공개 패키지(pydantic 2.13.5·httpx 0.28.1·lxml 6.1.3·pypdf 6.19.0·neo4j 6.3.1)만 쓰며 collect·ingest·extract·relation·dependents·graph·issue-summary·handoff 명령 모두 **private PoC·git 인증·토큰 없이** 설치·실행됩니다. 원본 PoC(`investmate`)는 이 프로젝트의 어떤 소스·스크립트·시험에서도 import하지 않고 manifest·lock에도 없습니다(옛 `poc` extra, `poc_guard`, `pinned_poc_unavailable` 코드 제거). `prototype/bff`만 별도로 private PoC를 고정해 쓰며, CI에서 그 token을 쓰는 job은 `bff` 하나뿐입니다.
 
