@@ -2,6 +2,7 @@
 // 응답은 래퍼 없는 본문이다. AI 원천에 없는 값은 0이나 빈 문자열이 아니라 null로 온다.
 
 import type { PastRun } from './briefings';
+import type { GraphRoundsSection } from './graphRounds';
 
 /** Overview.projection.status: 활성 버전에 기록된 그래프 상태. 앱이 GraphDB를 직접 읽지 않는다. */
 export type ProjectionStatus =
@@ -71,6 +72,8 @@ export type PipelineOverview = {
     } | null;
   };
   runs: PastRun[];
+  /** 그래프 정기 회차(#55) 실행기 상태와 최근 회차. 계약상 선택 항목이다. */
+  rounds?: GraphRoundsSection;
 };
 
 export type CandidateStatus = 'ALLOW' | 'HOLD' | 'REJECT';
