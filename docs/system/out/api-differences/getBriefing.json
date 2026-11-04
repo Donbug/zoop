@@ -584,6 +584,15 @@
     "response:200:application/json.commonPriority.items[].sources[]": {
       "type": "object"
     },
+    "response:200:application/json.commonPriority.items[].sources[].availableAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.commonPriority.items[].sources[].availableAt:required": false,
+    "response:200:application/json.commonPriority.items[].sources[].eligibilityBasis": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].sources[].eligibilityBasis:required": false,
     "response:200:application/json.commonPriority.items[].sources[].evidenceId": {
       "type": "string"
     },
@@ -593,6 +602,11 @@
       "format": "date-time"
     },
     "response:200:application/json.commonPriority.items[].sources[].publishedAt:required": false,
+    "response:200:application/json.commonPriority.items[].sources[].publishedDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.commonPriority.items[].sources[].publishedDate:required": false,
     "response:200:application/json.commonPriority.items[].sources[].quote": {
       "type": "string"
     },
@@ -5288,6 +5302,15 @@
     "response:200:application/json.personalPriority.items[].sources[]": {
       "type": "object"
     },
+    "response:200:application/json.personalPriority.items[].sources[].availableAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.personalPriority.items[].sources[].availableAt:required": false,
+    "response:200:application/json.personalPriority.items[].sources[].eligibilityBasis": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].sources[].eligibilityBasis:required": false,
     "response:200:application/json.personalPriority.items[].sources[].evidenceId": {
       "type": "string"
     },
@@ -5297,6 +5320,11 @@
       "format": "date-time"
     },
     "response:200:application/json.personalPriority.items[].sources[].publishedAt:required": false,
+    "response:200:application/json.personalPriority.items[].sources[].publishedDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.personalPriority.items[].sources[].publishedDate:required": false,
     "response:200:application/json.personalPriority.items[].sources[].quote": {
       "type": "string"
     },

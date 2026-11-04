@@ -118,6 +118,7 @@ export default function CommonPriorityIssues({
                         rel="noopener noreferrer"
                         className={`text-caption underline ${FOCUS_RING}`}
                       >
+                        {s.publisher ? `${s.publisher} · ` : ''}
                         {prioritySourceTime(s)} · 원문 보기 ↗
                       </a>
                     </div>

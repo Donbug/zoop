@@ -37,7 +37,7 @@ jobs:
       - name: Validate public configuration, contracts, generated documents and secrets
         run: |
           make public-check
-          uv run --no-project --with pyyaml --with httpx==0.28.1 --with pydantic==2.13.5 --with lxml==6.1.3 make tooling-test
+          uv run --no-project --with-requirements deployment/briefing/requirements.txt --with pyyaml make tooling-test
       - name: Validate PR title
         if: github.event_name == 'pull_request'
         env:
@@ -253,6 +253,12 @@ jobs:
         env:
           ZOOP_COMPANY_TEST_DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.company-postgres.ports['5432'] }}/zoop_company_test_19
         run: ./api/gradlew -p api companyIntegrationTest --console=plain
+      - name: Fresh briefing collection through publication (loopback source and authored provider peers only)
+        env:
+          ZOOP_COMPANY_TEST_DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.company-postgres.ports['5432'] }}/zoop_company_test_19
+        run: |
+          uv pip install --system --requirement deployment/briefing/requirements.txt freezegun==1.5.5
+          ./api/gradlew -p api briefingAutoIntegrationTest --console=plain
       - name: Authentication PostgreSQL integration tests
         env:
           DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.company-postgres.ports['5432'] }}/zoop_company_test_19

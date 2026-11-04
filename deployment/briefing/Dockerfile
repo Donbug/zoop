@@ -22,6 +22,7 @@ RUN printf '%s\n' '#!/usr/local/bin/python3' 'import sys' 'sys.path.insert(0,"/o
 COPY ai/service/src/zoop_ai_service/grants.py ./ai/service/src/zoop_ai_service/grants.py
 COPY ai/service/src/zoop_ai_service/__init__.py ./ai/service/src/zoop_ai_service/__init__.py
 COPY api/src/main/resources/briefing/prompts ./api/src/main/resources/briefing/prompts
+COPY docs/prompts/priority-business-producer-v1 ./docs/prompts/priority-business-producer-v1
 COPY deployment/briefing/entrypoint.py ./entrypoint.py
 RUN chown 100:101 /tmp && chmod 0700 /tmp
 VOLUME ["/tmp"]

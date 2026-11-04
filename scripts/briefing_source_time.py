@@ -21,4 +21,5 @@ def projection(source):
     available(source)
     fields=('evidenceId','quote','url','publishedAt')
     if source.get('publishedAt') is None:fields+=('publishedDate','availableAt','eligibilityBasis')
+    fields+=tuple(k for k in ('title','publisher') if isinstance(source.get(k),str) and source[k].strip())
     return {k:source[k] for k in fields}

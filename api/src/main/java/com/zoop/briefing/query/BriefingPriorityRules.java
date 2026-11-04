@@ -43,7 +43,7 @@ public final class BriefingPriorityRules {
             }
             check(!companies.isEmpty()); Set<String> sources = new HashSet<>();
             for (var source : array(item, "sources")) {
-                keys(source, "evidenceId quote url publishedAt publishedDate availableAt eligibilityBasis"); String id = text(source, "evidenceId");
+                keys(source, "evidenceId quote url publishedAt publishedDate availableAt eligibilityBasis title publisher"); String id = text(source, "evidenceId");
                 check(sources.add(id) && allowedEvidence.contains(id)); text(source, "quote");
                 check(text(source, "url").matches("https?://[^\\s]+"));
                 Instant published = sourceAvailable(source); check(!published.isAfter(cutoff));
@@ -122,6 +122,11 @@ public final class BriefingPriorityRules {
                 AND e.input_kind='body' AND e.offset_unit='unicode_code_point'
                 """, Integer.class, text(source,"evidenceId"), text(source,"quote"), text(source,"url"), source.path("publishedAt").isNull()?null:text(source,"publishedAt"));
             if (count == null || count != 1) return false;
+            for(String key:List.of("title","publisher"))if(source.has(key)){
+                if(!source.get(key).isString() || source.get(key).asString().isBlank())return false;
+                String sql=key.equals("title")?"SELECT count(*) FROM evidence e JOIN article_versions v ON v.article_id=e.article_id AND v.version=e.article_version WHERE e.id=? AND v.title=?":"SELECT count(*) FROM evidence e JOIN article_versions v ON v.article_id=e.article_id AND v.version=e.article_version WHERE e.id=? AND v.publisher=?";
+                if(!Integer.valueOf(1).equals(jdbc.queryForObject(sql,Integer.class,text(source,"evidenceId"),text(source,key))))return false;
+            }
             if(source.path("publishedAt").isNull()){
                 Integer clocks=jdbc.queryForObject("SELECT count(*) FROM evidence e JOIN article_versions v ON v.article_id=e.article_id AND v.version=e.article_version WHERE e.id=? AND v.publication_precision='day' AND v.published_date=?::date AND v.collected_at=?::timestamptz",Integer.class,text(source,"evidenceId"),text(source,"publishedDate"),text(source,"availableAt"));
                 if(clocks==null || clocks!=1)return false;
@@ -131,11 +136,18 @@ public final class BriefingPriorityRules {
     }
 
     public static Instant sourceAvailable(JsonNode source) {
-        if(!field(source,"publishedAt").isNull())return time(source,"publishedAt");
-        same(text(source,"eligibilityBasis"),"first_observed");
-        var day=java.time.LocalDate.parse(text(source,"publishedDate"));var observed=time(source,"availableAt");
-        check(!day.isAfter(observed.atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate()));
-        return observed;
+        try {
+            if(!field(source,"publishedAt").isNull()) {
+                var published=time(source,"publishedAt");
+                if(source.hasNonNull("eligibilityBasis"))same(text(source,"eligibilityBasis"),"publication_instant");
+                if(source.hasNonNull("availableAt"))same(time(source,"availableAt"),published);
+                check(!source.hasNonNull("publishedDate"));return published;
+            }
+            same(text(source,"eligibilityBasis"),"first_observed");
+            var day=java.time.LocalDate.parse(text(source,"publishedDate"));var observed=time(source,"availableAt");
+            check(!day.isAfter(observed.atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate()));
+            return observed;
+        }catch(java.time.DateTimeException invalid){throw new IllegalArgumentException("Invalid source clock");}
     }
 
     private static void price(JsonNode p, Instant cutoff) {

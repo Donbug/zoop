@@ -12573,6 +12573,12 @@ components:
           type: string
           nullable: true
           description: publishedAt이 null이면 first_observed이며 publishedDate와 availableAt을 함께 제공한다.
+        title:
+          type: string
+          nullable: true
+        publisher:
+          type: string
+          nullable: true
     PriorityCompany:
       type: object
       properties:

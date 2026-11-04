@@ -32,7 +32,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** Private CLI: existing native import/composition/activation services with CAS and current-source checks. No Spring startup. */
 public final class BriefingNativeCommand {
-    private final Clock clock=Clock.systemUTC();
+    private final Clock clock;
     private final NamedParameterJdbcTemplate jdbc;
     private final TransactionTemplate tx;
     private final JdbcDocumentRegistryRepository registry;
@@ -45,11 +45,14 @@ public final class BriefingNativeCommand {
     private final GraphPublicationReader reader;
     private final GraphPublicationAuthority authority;
     private final Path work;
-    private final Path grantPath,authorityRoot;
+    private final Path grantPath,authorityRoot,ingestExecutable,handoffExecutable;
     private final boolean additiveAllowed;
     private final String authorizationRef;
 
-    public BriefingNativeCommand(Map<String,String> env) {
+    public BriefingNativeCommand(Map<String,String> env) { this(env,Clock.systemUTC()); }
+    // Clock injection for deterministic local integration tests; CLI always uses the system clock.
+    public BriefingNativeCommand(Map<String,String> env,Clock clock) {
+        this.clock=java.util.Objects.requireNonNull(clock);
         var db=new DriverManagerDataSource(required(env,"DB_URL"),required(env,"DB_USERNAME"),required(env,"DB_PASSWORD"));
         jdbc=new NamedParameterJdbcTemplate(db);tx=new TransactionTemplate(new DataSourceTransactionManager(db));tx.setTimeout(120);
         registry=new JdbcDocumentRegistryRepository(jdbc);graph=new JdbcGraphHandoffRepository(jdbc,new JdbcDocumentAnalysisRepository(jdbc));
@@ -61,6 +64,9 @@ public final class BriefingNativeCommand {
         work=Path.of(required(env,"BRIEFING_SERVER_WORK_ROOT")).toAbsolutePath().normalize();
         grantPath=Path.of(required(env,"ZOOP_DOCUMENT_READ_GRANTS"));
         authorityRoot=Path.of(required(env,"BRIEFING_SERVER_AUTHORITY_ROOT"));
+        ingestExecutable=Path.of(env.getOrDefault("ZOOP_INGESTION_EXECUTABLE","/usr/local/bin/zoop-ai-ingest"));
+        handoffExecutable=Path.of(env.getOrDefault("ZOOP_GRAPH_HANDOFF_EXECUTABLE","/usr/local/bin/zoop-ai-handoff"));
+        if(!ingestExecutable.isAbsolute()||!handoffExecutable.isAbsolute())throw new IllegalArgumentException("absolute_native_executable");
         additiveAllowed="true".equals(env.get("BRIEFING_SERVER_ADDITIVE_GRAPH_ALLOWED"));authorizationRef=env.get("BRIEFING_SERVER_AUTHORIZATION_REF");
     }
 
@@ -71,7 +77,7 @@ public final class BriefingNativeCommand {
             var request=StrictJson.parseObject(Files.readAllBytes(path));
             var result=switch(args[0]) {case "state"->command.state();case "import"->command.importNative(request);case "activate"->command.activate(request);default->throw new IllegalArgumentException();};
             System.out.println("BRIEFING_SERVER_RESULT="+new String(StrictJson.write(result),java.nio.charset.StandardCharsets.UTF_8));
-        } catch(Exception failure) {System.err.println("BRIEFING_NATIVE_FAILED="+failure.getClass().getSimpleName());System.exit(1);}
+        } catch(Exception failure) {String code=failure.getMessage();if(code==null||!code.matches("[a-zA-Z0-9_]{1,150}"))code="unavailable";System.err.println("BRIEFING_NATIVE_FAILED="+failure.getClass().getSimpleName()+":"+code);System.exit(1);}
     }
 
     private Path owned(Path path) throws java.io.IOException {
@@ -91,8 +97,8 @@ public final class BriefingNativeCommand {
         Path root=owned(Path.of(request.string("root")).resolve("ready.json")).getParent();
         Path ingestion=Path.of(request.string("ingestionState"));Path source=Path.of(request.string("sourceFile")).toRealPath();
         if(!source.startsWith(authorityRoot.toRealPath())||Files.isSymbolicLink(source)||Files.size(source)>2_000_000)throw new IllegalArgumentException("authority_namespace");
-        if(!ingestion.toRealPath().startsWith(root.toRealPath()))throw new IllegalArgumentException("native_namespace");
-        var exporter=ProcessIngestionExporter.forPaths(Path.of("/usr/local/bin/zoop-ai-ingest"),ingestion,source);
+        if(!ingestion.toRealPath().startsWith(work.toRealPath()) || !StrictJson.parseObject(Files.readAllBytes(root.resolve("ready.json"))).node().equals(request.node()))throw new IllegalArgumentException("native_namespace");
+        var exporter=ProcessIngestionExporter.forPaths(ingestExecutable,ingestion,source);
         var parser=new IngestionExportParser();
         var observation=request.object("observation");
         var selector=new Observation(observation.string("roundId"),observation.string("sourceId"),observation.count("page"),observation.count("ordinal"),
@@ -102,7 +108,7 @@ public final class BriefingNativeCommand {
         };
         var imported=new DocumentImporter(exporter,parser,files,service).run(new ImportRequest(List.of(new ImportItem(ArticleKind.NEWS,selector,PointerPolicy.keep()))));
         if(!imported.succeeded())throw new IllegalStateException("native_document_"+imported.firstFailure());
-        var argv=List.of("/usr/local/bin/zoop-ai-handoff","export","--state-dir",root.resolve("handoff").toString(),
+        var argv=List.of(handoffExecutable.toString(),"export","--state-dir",root.resolve("handoff").toString(),
                 "--relation-state-dir",root.resolve("s3").toString(),"--extraction-state-dir",root.resolve("s2").toString(),
                 "--ingestion-state-dir",ingestion.toString(),"--sources",source.toString(),"--canonical",root.resolve("canonical.json").toString(),
                 "--decisions",root.resolve("decisions.json").toString(),"--bindings",root.resolve("bindings.json").toString());

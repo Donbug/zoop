@@ -125,7 +125,7 @@ class NativeTransport(httpx.BaseTransport):
         model=value.get('model');require(model==('gpt-6-luna' if provider=='openai' else 'jev-1.14.0'),'native_model')
         require(value.get('store') is not True and (provider!='openai' or value.get('service_tier')=='default'),'native_request_policy')
         rows=list((Path(self.budget.cfg['work'])/'budget').glob('*.json'))
-        require(sum(json.loads(p.read_bytes()).get('roundId')==self.budget.round_id and json.loads(p.read_bytes()).get('phase')=='native' for p in rows)<12,'native_phase_call_limit')
+        require(sum(json.loads(p.read_bytes()).get('roundId')==self.budget.round_id and json.loads(p.read_bytes()).get('phase')=='native' for p in rows)<self.budget.cfg.get('nativeCallLimit',12),'native_phase_call_limit')
         reservation=self.budget.reserve_physical(raw,value.get('max_completion_tokens',0),provider,model,phase='native',input_multiplier=max(1,len(value.get('questions',[]))))
         key=reservation[0]
         stage=value.get('response_format',{}).get('json_schema',{}).get('name','native_verification')
@@ -245,7 +245,8 @@ def source_qualification(root,s3,session):
     session.stage='source_qualification';session.outcome='withheld'
     return result
 
-def prepare(cfg,round):
+def prepare(cfg,round,observer=None):
+    observer=observer or (lambda *args:None)
     from zoop_ai_pipeline import extraction,relation
     from zoop_ai_pipeline.extraction_contracts import Submit
     from zoop_ai_pipeline.relation_contracts import Submit as RelationSubmit
@@ -254,7 +255,10 @@ def prepare(cfg,round):
     root=collection_root/(round['id']+'-native-v2');root.mkdir(mode=0o700,parents=True,exist_ok=True)
     if (root/'ready.json').exists():return json.loads((root/'ready.json').read_bytes())
     require(not (root/'native.started.json').exists(),'native_interrupted_requires_recovery')
+    observer('collection','started')
     chosen,exported,companies,selected_collection=collect(cfg,round,collection_root)
+    observer('collection','completed')
+    observer('native','started')
     runtime_type=configure_runtime(cfg,root,round['windowTo']);pure=runtime_type.from_env()
     original=selected_collection/'collection/items'/chosen['candidate']['newsId']
     sources=Path(cfg['authorityRoot'])/('source-'+root.name+'.json');sources.parent.mkdir(mode=0o700,parents=True,exist_ok=True);current=json.loads((original/'sources.json').read_bytes())
@@ -309,7 +313,7 @@ def prepare(cfg,round):
                 'observation':selector,'manifest':manifest,'handoffReceipt':envelope.get('receipt'),
                 'sourceId':'korea-portal','documentId':exported['document']['documentId'],'documentVersion':exported['document']['documentVersion'],
                 'bodySha256':b.digest(exported['document']['text'].encode()),'readyAt':b.now()}
-            write_once(root/'ready.json',result);return result
+            write_once(root/'ready.json',result);observer('native','completed');return result
     finally:
         if transport:transport.shutdown()
         os.environ.pop('ZOOP_AI_API_KEY',None);os.environ.pop('TYPESAFE_API_KEY',None)
@@ -327,6 +331,8 @@ def initialize_authority(cfg):
         'purposes':['briefing-outlook','semantic-verification'],'evidence':['https://www.korea.kr/guide/copyRight.do',
             'Article-level KOGL1 text badge and exact native source/body scope required before every model send. '+cfg['authorizationRef']],
         'expiresAt':None}]})
+    if cfg.get('originalReadGrants'):
+        write_once(root/'serving-grants.json',{'schemaVersion':'zoop-grant-authority-delegates-1','delegates':[cfg['originalReadGrants'],str(root/'grants.json')]})
     if not (root/'model-scope.json').exists():
         write_once(root/'model-scope.json',{'schemaVersion':'briefing-model-scope-v1','authorizationRef':cfg['authorizationRef'],'sources':[]})
 
@@ -351,11 +357,15 @@ def register_authority(cfg,ready):
 def native_command(cfg,operation,request,path):
     return server.java({**cfg,'serverCommand':cfg['nativeCommand']},operation,request,path)
 
-def run_slot(cfg,edition,cutoff=None,recover_unpaid=False):
+def run_slot(cfg,edition,cutoff=None,recover_unpaid=False,*,producer=None,observer=None,now=None,sleep=None):
     """One finite ECS task per slot. Collection starts before cutoff; publication starts at cutoff."""
     import time,psycopg
     from psycopg.rows import dict_row
-    now=datetime.now(server.KST)
+    notify=observer or (lambda *args:None);last_stage=['collection']
+    def observer(stage,status,detail=None):
+        last_stage[0]=stage;notify(stage,status,detail)
+    clock=now or (lambda:datetime.now(server.KST));sleep=sleep or time.sleep
+    now=clock()
     hour,minute=(9,20) if edition=='morning' else (17,30)
     slot=datetime.fromisoformat(cutoff).astimezone(server.KST) if cutoff else now.replace(hour=hour,minute=minute,second=0,microsecond=0)
     require(slot.date()==now.date() and slot>now+timedelta(minutes=4 if recover_unpaid else 10),'slot_preparation_window')
@@ -391,22 +401,40 @@ def run_slot(cfg,edition,cutoff=None,recover_unpaid=False):
         try:
             baseline=native_command(cfg,'state',{},root/'baseline.request.json');write_once(root/'baseline.json',baseline)
             print(json.dumps({'roundId':round['id'],'stage':'bounded_source_collection','cutoff':slot.isoformat()}),flush=True)
-            ready=prepare(cfg,round)
+            ready=prepare(cfg,round,observer=observer)
             if ready.get('status')=='withheld':
                 print(json.dumps({'roundId':round['id'],'status':'requires_recovery','reason':ready['reason']}),flush=True)
                 require(False,'source_quality_withheld')
-            register_authority(cfg,ready)
+            observer('authority','started');register_authority(cfg,ready);observer('authority','completed')
+            observer('import','started')
             incoming=native_command(cfg,'import',ready,root/'import.request.json');write_once(root/'imported.json',incoming)
-            require(datetime.now(server.KST)<slot-timedelta(seconds=10),'native_after_cutoff')
+            observer('import','completed')
+            require(clock()<slot-timedelta(seconds=10),'native_after_cutoff')
+            observer('activation','started')
             activated=native_command(cfg,'activate',{'baseline':baseline,'incoming':incoming},root/'activate.request.json')
             write_once(root/'activated.json',activated)
+            observer('activation','completed',{'graphVersion':activated['graphVersion']})
             print(json.dumps({'roundId':round['id'],'stage':'native_source_ready','graphVersion':activated['graphVersion']}),flush=True)
-            while (remaining:=(slot-datetime.now(server.KST)).total_seconds())>0:time.sleep(min(30,remaining))
+            observer('cutoff','started',{'cutoff':slot.isoformat()})
+            while (remaining:=(slot-clock()).total_seconds())>0:sleep(min(30,remaining))
+            observer('cutoff','completed')
             conn.execute("UPDATE briefing_common_schedule_jobs SET status='running' WHERE id=%s AND status='queued'",(round['id'],))
             job=conn.execute('SELECT * FROM briefing_common_schedule_jobs WHERE id=%s',(round['id'],)).fetchone()
-            server.produce(cfg,job);require(server.published(conn,job),'live_publication_proof')
+            observer('generation','started')
+            (producer or server.produce)({**cfg,'expectedGraphVersion':activated['graphVersion']},job)
+            observer('generation','completed');require(server.published(conn,job),'live_publication_proof')
+            observer('publication','completed')
             conn.execute("UPDATE briefing_common_schedule_jobs SET status='completed',finished_at=now() WHERE id=%s AND status='running'",(round['id'],))
             print(json.dumps({'roundId':round['id'],'status':'published','cutoff':slot.isoformat()}),flush=True)
         except BaseException:
+            proof_job={'id':round['id'],'round_date':slot.date(),'edition':edition,'scheduled_at':slot,'window_from':start}
+            if server.published(conn,proof_job):
+                conn.execute("UPDATE briefing_common_schedule_jobs SET status='completed',finished_at=now() WHERE id=%s AND status IN ('queued','running')",(round['id'],))
+                observer('publication','completed',{'reason':'committed_publication_recovered'})
+                return {'roundId':round['id'],'status':'published','recoveredFromStorage':True}
+            latest=conn.execute('SELECT status FROM briefing_attempts WHERE round_id=%s ORDER BY attempt_no DESC LIMIT 1',(round['id'],)).fetchone()
+            if latest is None or latest['status']=='completed':
+                (root/'failure').mkdir(mode=0o700,exist_ok=True)
+                server.record_input_failure(cfg,round,root/'failure',stage=last_stage[0],reason='automatic_chain_failed')
             conn.execute("UPDATE briefing_common_schedule_jobs SET status='requires_recovery',finished_at=now() WHERE id=%s AND status IN ('queued','running')",(round['id'],))
             raise

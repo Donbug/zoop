@@ -209,7 +209,7 @@ def produce(cfg,job):
             return result
     finally:pipe.close()
 
-def record_input_failure(cfg,round,work):
+def record_input_failure(cfg,round,work,stage='prepare',reason='approved_current_window_input_unavailable'):
     """A failed input admission is still a generation attempt, with zero model executions."""
     digest=b.digest(b.canonical(round))
     claim={'round':round,'requestKey':'server-input-'+digest,'purpose':'generation','trigger':'scheduler','adminId':None,
@@ -223,7 +223,7 @@ def record_input_failure(cfg,round,work):
         require(owner['status'] in ('running','failed'),'input_attempt_state')
         if owner['status']=='running':
             pipe.send({'op':'finish','attemptId':owner['attemptId'],'ownerToken':owner['ownerToken'],
-                'outcome':'failed','failureStage':'prepare','failureReason':'approved_current_window_input_unavailable'})
+                'outcome':'failed','failureStage':stage,'failureReason':reason})
         return owner['attemptId']
     finally:pipe.close()
 

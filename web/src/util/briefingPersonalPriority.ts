@@ -78,6 +78,8 @@ export type PersonalPriority = {
       publishedDate?: string | null;
       availableAt?: string | null;
       eligibilityBasis?: string | null;
+      title?: string;
+      publisher?: string;
     }[];
     priorAnalysis: {
       companyName: string;

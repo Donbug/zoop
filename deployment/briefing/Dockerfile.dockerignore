@@ -23,5 +23,9 @@
 !ai/pipeline/src/**
 !api/src/main/resources/company/
 !api/src/main/resources/company/demo-companies.json
+!docs/
+!docs/prompts/
+!docs/prompts/priority-business-producer-v1/
+!docs/prompts/priority-business-producer-v1/*.md
 **/__pycache__
 **/*.pyc

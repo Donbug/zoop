@@ -295,6 +295,7 @@ export default function PersonalPriorityIssues({
                         target="_blank"
                         rel="noopener noreferrer"
                       >
+                        {s.publisher ? `${s.publisher} · ` : ''}
                         {prioritySourceTime(s)} · 원문 보기 ↗
                       </a>
                     </div>

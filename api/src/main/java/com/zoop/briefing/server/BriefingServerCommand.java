@@ -83,7 +83,7 @@ public final class BriefingServerCommand {
         if(graphPublished.isAfter(cutoff)) throw new IllegalStateException("graph_after_cutoff");
         var publication=reader.read(version); var excluded=authority.current(publication,"briefing-server");
         var visible=GraphSnapshotFilter.apply(publication.snapshot(),null,excluded);
-        byte[] grantBytes=readGrants();var grantRoot=StrictJson.parseObject(grantBytes); var current=GrantRegistry.parse(grantBytes);
+        var current=GrantRegistry.read(grantsPath);
         var result=StrictJson.newObject(); result.set("round",round.node().deepCopy()); result.put("graphVersion",version);
         result.put("graphSnapshotSha256",publication.snapshotArtifact().sha256());
         result.put("reviewRevision",((Number)graphRows.getFirst().get("review_revision")).longValue());
@@ -99,21 +99,21 @@ public final class BriefingServerCommand {
                 if(!issue.evidenceIds().contains(e.evidenceId())) continue;
                 var article=visible.articles().stream().filter(a -> a.articleId().equals(e.articleId()) && a.version().equals(e.articleVersion())).findFirst().orElseThrow();
                 var rows=jdbc.queryForList("SELECT a.provider,a.kind,v.title,v.publisher,v.published_at,v.published_date,v.publication_precision,v.collected_at,t.storage_uri,t.sha256,t.bytes FROM articles a JOIN article_versions v ON v.article_id=a.id JOIN artifacts t ON t.id=v.text_artifact_id WHERE a.id=? AND v.version=? AND a.access_status='available'",e.articleId(),e.articleVersion());
-                if(rows.size()!=1) reject(); var row=rows.getFirst(); var grant=findGrant(grantRoot,current,row.get("provider").toString());
+                if(rows.size()!=1) reject(); var row=rows.getFirst(); var grant=findGrant(current,row.get("provider").toString());
                 if(grant==null || !inScope(row.get("provider").toString(),e.articleId(),e.articleVersion(),row.get("sha256").toString())) {denied++;continue;}
                 BriefingSourceClock sourceClock;
                 try { sourceClock=BriefingSourceClock.read(row); } catch(IllegalArgumentException unknown) {outside++;continue;}
                 Instant at=sourceClock.availableAt(); if(!at.isAfter(from)||at.isAfter(cutoff)) {outside++;continue;}
                 String docKey=e.articleId()+"\n"+e.articleVersion();
-                if(bound.add(docKey)) bindings.addObject().put("documentId",e.articleId()).put("documentVersion",e.articleVersion()).put("grantId",grant.string("grantId"))
-                    .put("grantRevision",grant.string("revision")).putArray("recipients").add("openai");
+                if(bound.add(docKey)) bindings.addObject().put("documentId",e.articleId()).put("documentVersion",e.articleVersion()).put("grantId",grant.grantId())
+                    .put("grantRevision",grant.revision()).putArray("recipients").add("openai");
                 byte[] body=files.readVerified(row.get("storage_uri").toString(),row.get("sha256").toString(),((Number)row.get("bytes")).longValue());
                 String text=new String(body,java.nio.charset.StandardCharsets.UTF_8);
                 int points=text.codePointCount(0,text.length()); if(e.start()<0||e.end()>points||e.start()>=e.end()) reject();
                 String quote=text.substring(text.offsetByCodePoints(0,e.start()),text.offsetByCodePoints(0,e.end()));
                 var s=sources.putObject(e.evidenceId()).put("evidenceId",e.evidenceId()).put("documentId",e.articleId()).put("documentVersion",e.articleVersion())
                     .put("bodySha256",row.get("sha256").toString()).put("title",(String)row.get("title")).put("publisher",(String)row.get("publisher")).put("sourceKind",(String)row.get("kind")).put("quote",quote).put("url",article.url())
-                    .put("grantId",grant.string("grantId")).put("grantRevision",grant.string("revision"));
+                    .put("grantId",grant.grantId()).put("grantRevision",grant.revision());
                 sourceClock.put(s);
                 s.putArray("recipients").add("openai"); evidenceIds.add(e.evidenceId());
             }
@@ -151,14 +151,13 @@ public final class BriefingServerCommand {
         result.put("inputSha256",Canonical.sha256(Canonical.appBytes(result))); return result;
     }
 
-    private StrictJson.Obj findGrant(StrictJson.Obj root,GrantRegistry registry,String provider) {
-        for(JsonNode node:root.array("grants")) {
-            var grant=StrictJson.Obj.of(node);
-            if(provider.equals(grant.string("sourceId")) && GrantRegistry.evaluate(registry.current(grant.string("grantId")).orElse(null),provider,grant.string("revision"),
-                List.of("briefing-outlook","semantic-verification"),List.of("openai"),true,Instant.now())==null) return grant;
-        }
+    private com.zoop.document.analysis.FlatGrant findGrant(GrantRegistry registry,String provider) {
+        for(var grant:registry.currentGrants())
+            if(provider.equals(grant.sourceId()) && GrantRegistry.evaluate(grant,provider,grant.revision(),
+                List.of("briefing-outlook","semantic-verification"),List.of("openai"),true,Instant.now())==null)return grant;
         return null;
     }
+
     private boolean inScope(String provider,String document,String version,String sha) {
         try {
             if(Files.size(scopePath)>1_000_000)reject();
@@ -171,7 +170,6 @@ public final class BriefingServerCommand {
             return false;
         } catch(java.io.IOException e){throw new IllegalStateException("source_scope_unavailable");}
     }
-    private byte[] readGrants() {try{return Files.readAllBytes(grantsPath);}catch(Exception e){throw new IllegalStateException("grants_unavailable");}}
 
     public void check(StrictJson.Obj prepared) {
         ObjectNode copy=(ObjectNode)prepared.node().deepCopy();String digest=prepared.string("inputSha256");copy.remove("inputSha256");
@@ -180,7 +178,7 @@ public final class BriefingServerCommand {
         if(!publication.snapshotArtifact().sha256().equals(prepared.string("graphSnapshotSha256")))reject();
         var exclusions=authority.current(publication,"briefing-server");if(exclusions.revision()!=prepared.raw("exclusionRevision").asLong(-1))reject();
         var visible=GraphSnapshotFilter.apply(publication.snapshot(),null,exclusions);
-        var registry=GrantRegistry.parse(readGrants());
+        var registry=GrantRegistry.read(grantsPath);
         Set<String> bound=new HashSet<>();
         for(JsonNode binding:prepared.array("sourceBindings")) {
             var pin=StrictJson.Obj.of(binding);if(!bound.add(pin.string("documentId")+"\n"+pin.string("documentVersion")))reject();

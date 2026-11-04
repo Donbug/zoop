@@ -199,6 +199,94 @@ class BriefingServerPostgresTest {
         assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM briefing_personal_pools WHERE (snapshot->>'complete')::boolean",Integer.class));
     }
 
+    @Test @Tag("briefing-auto-postgres")
+    void actualCollectionNativeRegistrationPriorityPublicationAndReplayProtection() throws Exception {
+        String previous=publish(importNative(HandoffFixtures.Spec.standard()));server();
+        int previousIssues=reader().read(previous).snapshot().issues().size();
+        jdbc.update("INSERT INTO companies(id,name,name_key,search_text) VALUES('SYNTH-1','합성기업','','')");
+        Path script=Path.of("../scripts/tests/fixtures/briefing_auto_chain_smoke.py").toAbsolutePath().normalize();
+        var process=new ProcessBuilder(System.getenv().getOrDefault("BRIEFING_AUTO_TEST_PYTHON","python3"),script.toString(),temp.toString(),System.getProperty("zoop.briefing.usage.classpath"));
+        var e=process.environment();e.put("DB_URL",url);e.put("DB_USERNAME","company_test");e.put("DB_PASSWORD",password());
+        e.put("BRIEFING_USAGE_ARTIFACT_ROOT",temp.toRealPath().resolve("producer").toString());
+        e.put("ZOOP_DOCUMENT_READ_GRANTS",grant.toString());e.put("ZOOP_DOCUMENT_READ_INGESTION_SOURCES",authority.toString());
+        e.put("JAVA",Path.of(System.getProperty("java.home"),"bin/java").toString());
+        Path log=temp.resolve("auto-smoke.log");process.redirectErrorStream(true).redirectOutput(log.toFile());var child=process.start();
+        assertTrue(child.waitFor(180,java.util.concurrent.TimeUnit.SECONDS));assertEquals(0,child.exitValue(),Files.readString(log));
+        var round=new com.zoop.briefing.storage.BriefingRoundRepository(jdbc).findById("brf-2026-11-04-morning").orElseThrow();
+        com.zoop.briefing.query.BriefingSnapshotValidator.validate(round);assertEquals("published",round.status());
+        assertTrue(round.publicSnapshot().at("/commonPriority/items/0/sources/0/publishedAt").isNull());
+        assertEquals("2026-11-04",round.publicSnapshot().at("/commonPriority/items/0/sources/0/publishedDate").asString());
+        assertEquals("completed",jdbc.queryForObject("SELECT status FROM briefing_common_schedule_jobs",String.class));
+        assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM briefing_attempts WHERE status='completed'",Integer.class));
+        assertTrue(jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class)<=16);
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ai_executions WHERE actual_cost IS NOT NULL OR input_tokens IS NULL",Integer.class));
+        String active=versions.active().orElseThrow().id();assertNotEquals(previous,active);
+        assertTrue(reader().read(active).snapshot().issues().size()>previousIssues);
+        assertEquals(previousIssues,reader().read(previous).snapshot().issues().size());
+        var grants=temp.toRealPath().resolve("auto-authority/serving-grants.json");var sources=temp.toRealPath().resolve("auto-authority/serving-delegates.json");
+        try(var app=new org.springframework.boot.builder.SpringApplicationBuilder(com.zoop.ZoopApplication.class).run(
+            "--server.port=0","--spring.datasource.url="+url,"--spring.datasource.username=company_test","--spring.datasource.password="+password(),
+            "--spring.flyway.enabled=false","--spring.jpa.properties.hibernate.default_schema="+schema,
+            "--zoop.document-read.grants="+grants,"--zoop.document-read.artifact-root="+temp.toRealPath().resolve("producer"),
+            "--zoop.document-read.ingestion-sources="+sources,"--zoop.graph.snapshot.source=artifact","--zoop.graph.snapshot.artifact-root="+temp.toRealPath().resolve("producer"),
+            "--ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=test","--ZOOP_AUTH_CSRF_KEYS=test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")){
+            assertTrue(com.zoop.briefing.query.BriefingPriorityRules.storedSourcesMatch(round.publicSnapshot().get("commonPriority"),jdbc),"source metadata changed after publication");
+            assertTrue(app.getBean(com.zoop.briefing.query.BriefingContentAccess.class).mayRead(round,"auto-gate"),"API authority disagrees with publisher");
+            int port=((org.springframework.boot.web.server.context.WebServerApplicationContext)app).getWebServer().getPort();
+            var response=java.net.http.HttpClient.newHttpClient().send(java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+port+"/api/v1/briefings?date=2026-11-04&edition=morning")).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,response.statusCode(),response.body());assertEquals(1,com.zoop.common.json.StrictJson.parseObject(response.body()).node().path("commonPriority").path("items").size());
+            assertFalse(response.body().contains("generationRequestDigest"));
+            // Exercise prospective settings and the actual dispatcher, rather than inserting a finished delivery.
+            String member="auto-member",other="auto-other";
+            for(String id:List.of(member,other))jdbc.update("""
+                INSERT INTO members(id,analytics_key,email,email_key,display_name,signup_method,status,created_at,
+                    mode,completed,tutorial_completed,settings_version,updated_at)
+                VALUES(?,?,?,?,?,'google','active',now(),'watchlist',true,true,1,now())
+                """,id,id,id+"@example.invalid",id+"@example.invalid","합성 자동화 시험");
+            jdbc.update("INSERT INTO member_watchlist(member_id,company_id,position) VALUES(?,?,0)",member,"SYNTH-1");
+            var principal=new com.zoop.auth.service.MemberSessionService.MemberPrincipal(member,"auto-test");
+            var before=autoPreferences(app,Clock.fixed(Instant.parse("2026-11-04T00:01:00Z"),ZoneOffset.UTC));
+            transaction.executeWithoutResult(s->before.initialize(principal));
+            var atSlot=Clock.fixed(Instant.parse("2026-11-04T00:20:30Z"),ZoneOffset.UTC);
+            var personal=autoPreferences(app,atSlot);
+            var scheduler=new com.zoop.briefing.personal.PersonalBriefingDeliveryScheduler(jdbc,personal,atSlot);
+            transaction.executeWithoutResult(s->scheduler.captureMorning());
+            int calls=jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class);
+            transaction.executeWithoutResult(s->scheduler.tick());
+            var delivery=personal.get(round.id(),principal,false,"auto-delivery");
+            assertEquals("ready",delivery.path("status").asString());
+            assertEquals(1,delivery.at("/selection/presentation/personalPriority/items").size());
+            assertTrue(delivery.at("/selection/presentation/personalPriority/items/0/sources/0/publishedAt").isNull());
+            transaction.executeWithoutResult(s->scheduler.tick());
+            assertEquals(delivery,personal.get(round.id(),principal,false,"auto-repeat"));
+            assertEquals(calls,jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class));
+            assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM briefing_selected_generation_jobs",Integer.class));
+            var sessions=app.getBean(com.zoop.auth.service.MemberSessionService.class);
+            var http=java.net.http.HttpClient.newHttpClient();
+            var uri=java.net.URI.create("http://127.0.0.1:"+port+"/api/v1/briefings/"+round.id()+"/personalized/delivery");
+            String token=sessions.issue(member,null,"auto-http").token();
+            var mine=http.send(java.net.http.HttpRequest.newBuilder(uri).header("Cookie","zoop_session="+token).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,mine.statusCode(),mine.body());assertEquals("no-store",mine.headers().firstValue("Cache-Control").orElseThrow());
+            assertEquals("ready",com.zoop.common.json.StrictJson.parseObject(mine.body()).string("status"));
+            String otherToken=sessions.issue(other,null,"auto-other").token();
+            var notMine=http.send(java.net.http.HttpRequest.newBuilder(uri).header("Cookie","zoop_session="+otherToken).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,notMine.statusCode());assertEquals("not_published",com.zoop.common.json.StrictJson.parseObject(notMine.body()).string("status"));
+            Path leaf=temp.toRealPath().resolve("auto-authority/grants.json");byte[] approved=Files.readAllBytes(leaf);
+            try {
+                Files.writeString(leaf,new String(approved,StandardCharsets.UTF_8).replace("\"enabled\":true","\"enabled\":false"));
+                var revoked=http.send(java.net.http.HttpRequest.newBuilder(uri).header("Cookie","zoop_session="+token).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
+                assertEquals(503,revoked.statusCode());
+            } finally {Files.write(leaf,approved);}
+        }
+    }
+
+    private com.zoop.briefing.personal.PersonalBriefingPreferences autoPreferences(org.springframework.context.ConfigurableApplicationContext app,Clock clock){
+        return new com.zoop.briefing.personal.PersonalBriefingPreferences(jdbc,clock,
+            app.getBean(com.zoop.briefing.personal.ExplicitBriefingService.class),app.getBean(com.zoop.briefing.personal.SelectedGenerationService.class),
+            app.getBean(com.zoop.briefing.storage.BriefingRoundRepository.class),app.getBean(com.zoop.briefing.personal.PersonalCandidateAccess.class),
+            app.getBean(com.zoop.graph.read.PersonalCompanies.class),false);
+    }
+
     private void runProducer(String edition,String mode) throws Exception {
         Path script=Path.of("../scripts/tests/fixtures/briefing_server_smoke.py").toAbsolutePath().normalize();
         var process=new ProcessBuilder("python3",script.toString(),temp.toString(),System.getProperty("zoop.briefing.usage.classpath"),edition,mode);

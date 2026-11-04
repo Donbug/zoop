@@ -1,0 +1,6 @@
+# Explicit deployment profile only. The dedicated worker owns early collection/common queue admission.
+zoop:
+  briefing:
+    common-scheduler-enabled: false
+    personal-scheduler-enabled: true
+    selected-generation-enabled: true

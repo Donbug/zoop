@@ -63,6 +63,22 @@ function response(value: PersonalPriority) {
 }
 afterEach(() => vi.unstubAllEnvs());
 
+test('personal source preserves day precision and rejects an observation after cutoff', async () => {
+  const value = priority();
+  Object.assign(value.items[0].sources[0], {
+    publishedAt: null,
+    publishedDate: '2026-11-02',
+    availableAt: '2026-11-02T11:00:00+09:00',
+    eligibilityBasis: 'first_observed',
+  });
+  expect(personalPriorityOf(response(value))).not.toBeNull();
+  render(<PersonalPriorityIssues value={value} />);
+  await userEvent.setup().click(screen.getByText('합성 제품 내부 시험 소식'));
+  expect(screen.getByText(/게시일 2026-11-02 · 최초 수집/)).not.toBeNull();
+  value.items[0].sources[0].availableAt = '2026-11-03T00:00:00Z';
+  expect(personalPriorityOf(response(value))).toBeNull();
+});
+
 test('D-BRF-02 renders a personal issue even when common-grade selection had no items', () => {
   vi.stubEnv('VITE_BRIEFING_LOCAL_REVIEW', '0');
   render(

@@ -37,6 +37,8 @@ export type CommonPriority = {
       publishedDate?: string | null;
       availableAt?: string | null;
       eligibilityBasis?: string | null;
+      title?: string;
+      publisher?: string;
     }[];
     prices: {
       companyName: string;

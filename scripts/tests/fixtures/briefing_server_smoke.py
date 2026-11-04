@@ -12,7 +12,13 @@ mode=sys.argv[4] if len(sys.argv)>4 else "normal"
 def transport(raw):
     request = json.loads(raw); data = json.loads(request['input']); stage = request['text']['format']['name']
     calls.append(stage)
-    if stage == 'selection': answer = assess(data['frozen'])
+    if stage == 'selection':
+        answer = assess(data['frozen'])
+        for candidate in data['frozen']['candidates']:
+            if candidate['freshnessReview']['decision']!='DISTINCT_EVENT':
+                a=answer['assessments'][candidate['issueId']];a['informationChange']='material_update'
+                a['whyNow']['evidenceIds']=candidate['freshnessReview']['deltaEvidenceIds'][:1]
+
     elif stage == 'selection-verification': answer = checks(data['frozen'])
     elif stage == 'analysis-verification': answer = {'checks': {f['issueId']: {'supported': mode!='withheld', 'reason': '합성 검증'} for f in data['issues']}}
     else:
