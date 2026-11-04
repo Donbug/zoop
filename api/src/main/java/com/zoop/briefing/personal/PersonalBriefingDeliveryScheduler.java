@@ -27,14 +27,14 @@ public class PersonalBriefingDeliveryScheduler {
   // Initialize ahead of the cutoff, even if the member never opens the briefing page.
   var members=jdbc.query("""
    SELECT m.id FROM members m WHERE m.status='active' AND m.id COLLATE "C">? COLLATE "C"
-   AND NOT EXISTS(SELECT 1 FROM briefing_personal_preferences p WHERE p.member_id=m.id)
+   AND NOT EXISTS(SELECT 1 FROM briefing_personal_preferences p WHERE p.member_id=m.id AND p.scope='scheduled')
    ORDER BY m.id COLLATE "C" LIMIT 100
    """,(r,i)->r.getString(1),afterMember);
   for(String member:members)try{service.initialize(new MemberPrincipal(member,"scheduled"));}catch(RuntimeException e){LoggerFactory.getLogger(getClass()).warn("Personal briefing defaults deferred: {}",e.getClass().getSimpleName());}
   afterMember=members.size()<100?"":members.getLast();
   var due=jdbc.query("""
    SELECT DISTINCT p.member_id,r.id,r.scheduled_at FROM briefing_rounds r
-   JOIN briefing_personal_preferences p ON p.effective_from<=r.scheduled_at AND p.created_at<r.scheduled_at
+   JOIN briefing_personal_preferences p ON p.scope='scheduled' AND p.effective_from<=r.scheduled_at AND p.created_at<r.scheduled_at
    JOIN members m ON m.id=p.member_id AND m.status='active'
    JOIN briefing_personal_slot_eligibility e ON e.member_id=p.member_id AND e.scheduled_at=r.scheduled_at AND e.has_companies IS TRUE
    WHERE r.status='published' AND r.scheduled_at<=? AND EXISTS(SELECT 1 FROM briefing_personal_pools pool WHERE pool.round_id=r.id)

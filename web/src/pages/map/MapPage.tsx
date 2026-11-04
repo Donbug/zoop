@@ -3,6 +3,7 @@ import LoadingIndicator from '@/components/common/LoadingIndicator';
 import {
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -264,7 +265,37 @@ function MapWorkspace({
     id: string;
     owner: string;
   } | null>(null);
+  // 닫을 때는 왼쪽으로 밀려 나가는 애니메이션이 끝난 뒤 패널을 뺀다.
+  const [sidebarClosing, setSidebarClosing] = useState(false);
+  const sidebarSlot = useRef<HTMLDivElement>(null);
+  const sidebarShown = sidebarOpen || sidebarClosing;
+  // 패널 크기와 지도 사이 간격만큼 밀어야 지도도 같은 속도로 따라 움직인다.
+  // 가로 배치는 너비, 모바일 세로 배치는 높이를 쓴다.
+  function measureSidebarSlot() {
+    const slot = sidebarSlot.current;
+    if (!slot) return;
+    slot.style.setProperty('--holdings-shift', `${slot.offsetWidth + 12}px`);
+    slot.style.setProperty('--holdings-drop', `${slot.offsetHeight + 12}px`);
+  }
+  useLayoutEffect(measureSidebarSlot, [sidebarShown]);
+  useEffect(() => {
+    if (!sidebarClosing) return;
+    // animationend가 오지 않는 환경(동작 줄이기 설정 등)에서도 패널을 뺀다.
+    const timer = window.setTimeout(() => setSidebarClosing(false), 400);
+    return () => window.clearTimeout(timer);
+  }, [sidebarClosing]);
   function changeSidebar(open: boolean) {
+    const reduced =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // 열린 뒤 내용이 바뀌어 크기가 달라졌을 수 있으니 닫기 직전에 다시 잰다.
+    // 닫는 동안 목록 응답이 와도 패널이 커지지 않게 잰 높이로 고정한다.
+    const slot = sidebarSlot.current;
+    if (!open) {
+      measureSidebarSlot();
+      if (slot) slot.style.height = `${slot.offsetHeight}px`;
+    } else slot?.style.removeProperty('height');
+    setSidebarClosing(!open && sidebarOpen && !reduced);
     setSidebarPreference(open);
     try {
       localStorage.setItem(SIDEBAR_KEY, open ? '1' : '0');
@@ -594,6 +625,35 @@ function MapWorkspace({
     }
     previousEvent.current = selectedPanel;
   }, [selectedPanel]);
+  // D-GRP-03 (2026-11-04 결정): 관련 기업을 누르면 두 기업과 공유 사건만 지도에 밝게 남긴다.
+  // 다른 노드를 고르면 풀린다. 사건 공유 선은 지도에 그리지 않으므로 선을 선택하지 않는다.
+  const [spotlightPair, setSpotlightPair] = useState<{
+    company: string;
+    other: string;
+  } | null>(null);
+  const activePair =
+    spotlightPair && spotlightPair.company === companyNode?.id
+      ? spotlightPair
+      : null;
+  const pairCompany = activePair?.company ?? null;
+  const pairOther = activePair?.other ?? null;
+  const spotlight = useMemo(() => {
+    if (!pairCompany || !pairOther || !data) return [];
+    const shared = data.edges.find(
+      (edge) =>
+        edge.relationType === 'SHARES_ISSUE' &&
+        [edge.source, edge.target].includes(pairCompany) &&
+        [edge.source, edge.target].includes(pairOther),
+    );
+    // D-GRP-01: same-title issues are one node on the map; light that node.
+    return [
+      pairCompany,
+      pairOther,
+      ...new Set(
+        (shared?.via ?? []).map((id) => grouping?.groupOf.get(id) ?? id),
+      ),
+    ];
+  }, [pairCompany, pairOther, data, grouping]);
   const relatedCompanies = useMemo(() => {
     if (!data || !companyNode) return [];
     const counts = new Map<string, number>();
@@ -1176,11 +1236,20 @@ function MapWorkspace({
             </div>
           </div>
           <div
-            className={`relationship-body${selectedPanel ? ` has-company-panel ${pathIsCollapsed ? '' : 'max-md:pb-[48dvh]!'}` : ''}${tutorialOpen || sidebarOpen ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
+            className={`relationship-body${selectedPanel ? ` has-company-panel ${pathIsCollapsed ? '' : 'max-md:pb-[48dvh]!'}` : ''}${tutorialOpen || sidebarShown ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
             aria-busy={loading}
           >
-            {sidebarOpen && (
-              <div id="holdings-sidebar" className="flex min-h-0 max-sm:w-full">
+            {sidebarShown && (
+              <div
+                id="holdings-sidebar"
+                ref={sidebarSlot}
+                inert={!sidebarOpen}
+                onAnimationEnd={(event) => {
+                  if (event.target === event.currentTarget && !sidebarOpen)
+                    setSidebarClosing(false);
+                }}
+                className={`holdings-slot flex min-h-0 max-sm:w-full${sidebarOpen ? '' : ' is-closing'}`}
+              >
                 <HoldingsSidebar
                   key={memoryOwner}
                   member={Boolean(token)}
@@ -1286,6 +1355,7 @@ function MapWorkspace({
                     : (pathFrom ?? selectedId ?? detailEventId ?? companyId),
                 )}
                 connectionPath={Boolean(pathFrom) && !activeEvidence}
+                spotlight={spotlight}
                 highlightedEdgeIds={(activeEvidence
                   ? evidenceEdges
                   : pathFrom
@@ -1557,17 +1627,15 @@ function MapWorkspace({
                   onFocus={() =>
                     updateQuery({ focus: companyNode.id, hops: '1' })
                   }
-                  onSelectRelation={(companyId) => {
-                    const edge = data?.edges.find(
-                      (item) =>
-                        item.relationType === 'SHARES_ISSUE' &&
-                        ((item.source === companyNode.id &&
-                          item.target === companyId) ||
-                          (item.target === companyNode.id &&
-                            item.source === companyId)),
-                    );
-                    if (edge) selectEdge(edge.id);
-                  }}
+                  activeRelatedId={pairOther}
+                  onSelectRelation={(companyId) =>
+                    setSpotlightPair((pair) =>
+                      pair?.company === companyNode.id &&
+                      pair.other === companyId
+                        ? null
+                        : { company: companyNode.id, other: companyId },
+                    )
+                  }
                   onAskAi={() =>
                     tutorialOpen && tutorialStep === 5
                       ? void closeTutorial()

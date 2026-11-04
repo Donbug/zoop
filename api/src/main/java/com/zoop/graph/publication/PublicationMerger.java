@@ -30,7 +30,14 @@ import tools.jackson.databind.node.ObjectNode;
 /** Exact union of admitted projections, with explicit field ownership for every headline. */
 public final class PublicationMerger {
     public static final String DECISIONS_SCHEMA = "zoop-graph-publication-decisions-1";
+    /** {@link #DECISIONS_SCHEMA} plus {@code labelCorrections}: a person's display name for a public issue, which no source value supplies. */
+    public static final String DECISIONS_SCHEMA_2 = "zoop-graph-publication-decisions-2";
+    public static final String LABEL_CORRECTIONS = "labelCorrections";
+    /** Longest corrected name, in Unicode code points (not UTF-16 units); a longer one is refused, never cut or normalized. */
+    public static final int MAX_LABEL_LENGTH = 120;
     public static final List<String> FIELDS = List.of("label", "action", "target", "assertionStatus", "eventTime", "period", "geography");
+    private static final List<String> SELECTIONS = List.of("issueMappings", "fieldSelections", "relationSelections");
+    private static final List<String> COLLECTIONS = List.of("issueMappings", "fieldSelections", "relationSelections", LABEL_CORRECTIONS);
     private static final Comparator<IssueRef> ISSUE_ORDER = Comparator.comparing(IssueRef::sourceVersionId).thenComparing(IssueRef::issueId);
     private static final Comparator<RelationRef> RELATION_ORDER = Comparator.comparing(RelationRef::sourceVersionId).thenComparing(RelationRef::relationId);
 
@@ -52,23 +59,41 @@ public final class PublicationMerger {
         return Obj.of(root);
     }
 
+    /**
+     * {@code previous} with {@code incoming} applied: a later decision with the same key replaces the earlier one. The result is a
+     * {@link #DECISIONS_SCHEMA} document unless a label correction remains, which only {@link #DECISIONS_SCHEMA_2} can carry.
+     */
     public static Obj combine(Obj previous, Obj incoming) {
         validateRoot(previous); validateRoot(incoming);
-        ObjectNode root = StrictJson.newObject(); root.put("schemaVersion", DECISIONS_SCHEMA);
-        for (String collection : List.of("issueMappings", "fieldSelections", "relationSelections")) {
+        Map<String, List<JsonNode>> combined = new java.util.LinkedHashMap<>();
+        for (String collection : COLLECTIONS) {
             Map<String, JsonNode> items = new TreeMap<>();
-            for (Obj item : previous.objects(collection)) items.put(decisionKey(collection, item), item.node());
+            for (Obj item : items(previous, collection)) items.put(decisionKey(collection, item), item.node());
             Set<String> supplied = new HashSet<>();
-            for (Obj item : incoming.objects(collection)) {
+            for (Obj item : items(incoming, collection)) {
                 String key = decisionKey(collection, item);
                 if (!supplied.add(key)) throw failure("request_invalid");
                 if ("issueMappings".equals(collection) && items.containsKey(key) && !items.get(key).equals(item.node()))
                     throw failure("identity_conflict");
                 items.put(key, item.node());
             }
-            var array = root.putArray(collection); items.values().forEach(array::add);
+            combined.put(collection, List.copyOf(items.values()));
         }
+        boolean corrected = !combined.get(LABEL_CORRECTIONS).isEmpty();
+        ObjectNode root = StrictJson.newObject(); root.put("schemaVersion", corrected ? DECISIONS_SCHEMA_2 : DECISIONS_SCHEMA);
+        combined.forEach((collection, items) -> {
+            if (corrected || !LABEL_CORRECTIONS.equals(collection)) { var array = root.putArray(collection); items.forEach(array::add); }
+        });
         return Obj.of(root);
+    }
+
+    /** The items of a collection, empty for one the document's schema does not carry (a validated root only). */
+    private static List<Obj> items(Obj root, String collection) {
+        return root.has(collection) ? root.objects(collection) : List.of();
+    }
+    /** The label corrections of a decisions document {@link #combine} or {@link #merge} accepted, none for a {@link #DECISIONS_SCHEMA} one. */
+    public static List<Obj> labelCorrections(Obj decisions) {
+        return items(decisions, LABEL_CORRECTIONS);
     }
 
     private static String decisionKey(String collection, Obj item) {
@@ -76,6 +101,7 @@ public final class PublicationMerger {
             case "issueMappings" -> Canonical.write(item.raw("from"));
             case "fieldSelections" -> item.string("issueId") + "\n" + item.string("field");
             case "relationSelections" -> item.string("relationId");
+            case LABEL_CORRECTIONS -> item.string("issueId");
             default -> throw new IllegalArgumentException(collection);
         };
     }
@@ -118,7 +144,8 @@ public final class PublicationMerger {
         publicIds.forEach((ref, id) -> groups.computeIfAbsent(id, ignored -> new ArrayList<>()).add(ref));
         groups.values().forEach(list -> list.sort(ISSUE_ORDER));
         Map<String, Obj> fields = indexed(decisions.objects("fieldSelections"), o -> o.string("issueId") + "\n" + o.string("field"));
-        Set<String> usedFields = new HashSet<>();
+        Map<String, Obj> corrections = indexed(items(decisions, LABEL_CORRECTIONS), o -> o.string("issueId"));
+        Set<String> usedFields = new HashSet<>(); Set<String> usedCorrections = new HashSet<>();
         Map<String, IssueOwners> issueOwners = new TreeMap<>();
         List<Issue> issues = new ArrayList<>();
         for (var group : groups.entrySet()) {
@@ -157,6 +184,12 @@ public final class PublicationMerger {
                 owners.put(field, owner);
             }
             Issue headline = originals.get(owners.get("label"));
+            String label = headline.label();
+            Obj correction = corrections.get(publicId);
+            if (correction != null) {
+                usedCorrections.add(publicId);
+                label = correctedLabel(correction, owners.get("label"), originals, sources);
+            }
             Issue time = originals.get(owners.get("eventTime")); Issue geo = originals.get(owners.get("geography"));
             TreeSet<String> articleIds = new TreeSet<>(); TreeSet<String> evidenceIds = new TreeSet<>();
             Map<String, PublicGraphSnapshot.MentionRef> mentions = new TreeMap<>();
@@ -167,13 +200,13 @@ public final class PublicationMerger {
                 times.add(issue.latestPublishedAt());
             }
             String latest = com.zoop.graph.importer.HandoffSnapshotWriter.latestPublished(times);
-            issues.add(new Issue(publicId, headline.label(), time.eventTime(), time.timePrecision(), originals.get(owners.get("period")).period(),
+            issues.add(new Issue(publicId, label, time.eventTime(), time.timePrecision(), originals.get(owners.get("period")).period(),
                     originals.get(owners.get("assertionStatus")).assertionStatus(), originals.get(owners.get("action")).action(),
                     originals.get(owners.get("target")).target(), geo.geography(), geo.geographyPolicyVersion(), geo.geographyEvidenceIds(),
                     List.copyOf(articleIds), List.copyOf(evidenceIds), List.copyOf(mentions.values()), headline.representativeMentionId(), latest));
             issueOwners.put(publicId, new IssueOwners(publicId, members, owners));
         }
-        if (!usedFields.equals(fields.keySet())) throw failure("mapping_unproven");
+        if (!usedFields.equals(fields.keySet()) || !usedCorrections.equals(corrections.keySet())) throw failure("mapping_unproven");
         Map<String, List<RelationRef>> relationGroups = new TreeMap<>();
         originalRelations.keySet().forEach(r -> relationGroups.computeIfAbsent(r.relationId(), ignored -> new ArrayList<>()).add(r));
         Map<String, Obj> selections = indexed(decisions.objects("relationSelections"), o -> o.string("relationId"));
@@ -268,10 +301,52 @@ public final class PublicationMerger {
     }
 
     public static boolean claimsAutomaticReviewer(Obj decisions) {
-        for (String collection : List.of("issueMappings", "fieldSelections", "relationSelections"))
-            for (Obj item : decisions.objects(collection))
+        for (String collection : COLLECTIONS)
+            for (Obj item : items(decisions, collection))
                 if (item.has("reviewer") && AUTO_REVIEWER.equals(item.string("reviewer"))) return true;
         return false;
+    }
+
+    /**
+     * A person's display name for a public issue. It replaces only {@code label}: the headline owner, its proof, the representative
+     * mention and every other field stay as the sources and selections decided them. The correction names the source value it
+     * corrects ({@code expectedLabelDigest}, the digest of the owner's {@code label} as {@link #field} reads it), so a later source
+     * that changes that value stops the merge instead of carrying the old name forward. Its evidence is the label owner's own, because
+     * the correction replaces that owner's value and inherits its provenance: the owner is the issue's atomic proof (losing any of its
+     * evidence or articles hides the whole issue), so the corrected name never outlives the facts behind the value it replaces.
+     * When a selection moves the label owner, the carried correction must be restated with the new owner's evidence in the same
+     * decisions file; a correction grounded elsewhere is {@code mapping_unproven}, like any other evidence outside its owner.
+     * A correction back to the source value withdraws the display change and keeps the record of both decisions.
+     * Only people correct names: the automatic reviewer is refused here as well as by the operator compose.
+     */
+    private static String correctedLabel(Obj correction, IssueRef owner, Map<IssueRef, Issue> originals, Map<String, Contribution> sources) {
+        correction.exactly(Set.of("issueId", "expectedLabelDigest", "label", "evidenceRefs", "reviewer", "decisionRef", "decisionVersion"));
+        audit(correction);
+        if (automatic(correction)) throw failure("request_invalid");
+        String expected = correction.string("expectedLabelDigest");
+        if (!StrictJson.SHA256.matcher(expected).matches()) throw failure("request_invalid");
+        if (!expected.equals(Canonical.digest(field(originals.get(owner), "label")))) throw failure("identity_conflict");
+        String label = correction.string("label");
+        // Blank or padded in any Unicode sense: String.isBlank/strip ignore no-break spaces (U+00A0, U+202F), which are space characters.
+        if (label.isEmpty() || label.codePoints().allMatch(PublicationMerger::space) || space(label.codePointAt(0))
+                || space(label.codePointBefore(label.length())) || label.codePointCount(0, label.length()) > MAX_LABEL_LENGTH
+                || !label.codePoints().allMatch(PublicationMerger::visible)) throw failure("request_invalid");
+        if (!evidenceRefs(correction, originals, sources).equals(Set.of(owner))) throw failure("mapping_unproven");
+        return label;
+    }
+
+    /** Whitespace by either Java definition: {@code isWhitespace} (ASCII, line/paragraph separators) or {@code isSpaceChar} (every Zs, including no-break spaces). */
+    private static boolean space(int codePoint) {
+        return Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint);
+    }
+
+    /** A code point a display name may carry: no control, format (zero-width, bidi override), separator, surrogate, private or unassigned. */
+    private static boolean visible(int codePoint) {
+        return switch (Character.getType(codePoint)) {
+            case Character.CONTROL, Character.FORMAT, Character.LINE_SEPARATOR, Character.PARAGRAPH_SEPARATOR,
+                    Character.SURROGATE, Character.PRIVATE_USE, Character.UNASSIGNED -> false;
+            default -> true;
+        };
     }
 
     /**
@@ -323,6 +398,7 @@ public final class PublicationMerger {
                     changes.add(new Change("issue", publicId, field, values)); changed = true;
                 }
             }
+            // A corrected name sits on top of the owner's value, so the same-headline selection below applies to that issue as to any other.
             if (changed || members.stream().anyMatch(r -> mappings.containsKey(r) || mappings.containsValue(r))
                     || members.stream().anyMatch(r -> !"native".equals(index.sources().get(r.sourceVersionId()).sourceKind()))
                     || FIELDS.stream().anyMatch(f -> fields.containsKey(publicId + "\n" + f))) continue;
@@ -451,9 +527,13 @@ public final class PublicationMerger {
     public static RelationRef relationRef(Obj value) {
         value.exactly(Set.of("sourceVersionId", "relationId")); return new RelationRef(value.string("sourceVersionId"), value.string("relationId"));
     }
+    /** A closed decisions document: {@link #DECISIONS_SCHEMA} with the three selections, or {@link #DECISIONS_SCHEMA_2} with label corrections too. */
     private static void validateRoot(Obj root) {
-        root.exactly(Set.of("schemaVersion", "issueMappings", "fieldSelections", "relationSelections"));
-        if (!DECISIONS_SCHEMA.equals(root.string("schemaVersion"))) throw failure("request_invalid");
+        Set<String> keys = new HashSet<>(SELECTIONS); keys.add("schemaVersion");
+        String schema = root.has("schemaVersion") ? root.string("schemaVersion") : "";
+        if (DECISIONS_SCHEMA_2.equals(schema)) keys.add(LABEL_CORRECTIONS);
+        else if (!DECISIONS_SCHEMA.equals(schema)) throw failure("request_invalid");
+        root.exactly(keys);
     }
     private static void audit(Obj item) {
         for (String key : List.of("reviewer", "decisionRef", "decisionVersion")) {

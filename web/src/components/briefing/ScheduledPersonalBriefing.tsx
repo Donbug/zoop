@@ -319,7 +319,9 @@ function MemberScheduledPersonalBriefing({
         )}
         {settings && !settings.preference && !editing && (
           <p className={NOTE}>
-            보유·관심 종목이 없어 개인화 브리핑을 제공하지 않습니다.{' '}
+            {preview?.selection
+              ? '다음 회차에 적용할 개인화 설정이 없습니다. 저장된 데모는 아래에서 별도로 볼 수 있습니다.'
+              : '보유·관심 종목이 없어 개인화 브리핑을 제공하지 않습니다.'}{' '}
             <Link to="/my" className="underline">
               내 종목 설정
             </Link>
@@ -490,8 +492,9 @@ function MemberScheduledPersonalBriefing({
             데모 미리보기
           </summary>
           <p className={`${NOTE} mt-3`}>
-            현재 저장한 설정으로 이 과거 회차를 시험합니다. 정식 자동 발행본과
-            별도로 보존하며, 운영 화면에는 이 실행 버튼이 없습니다.
+            저장된 데모는 당시 시험한 종목으로 보존합니다. 현재 보유·관심 종목과
+            정기 설정을 변경하지 않습니다. 아래 버튼은 현재 설정으로 별도 데모를
+            만들며, 운영 화면에는 이 실행 버튼이 없습니다.
           </p>
           <button
             type="button"
@@ -506,6 +509,12 @@ function MemberScheduledPersonalBriefing({
           {preview?.selection && (
             <div className="mt-4 space-y-3">
               <p className={NOTE}>별도 데모 기록 · 이 회차에서 시험한 종목</p>
+              {preview.preferenceRevision !==
+                settings.preference?.revisionId && (
+                <p className={NOTE}>
+                  보존된 데모 설정 · 현재 정기 설정과 별개입니다.
+                </p>
+              )}
               {chips(preview.selection.choice.companyIds)}
               <PersonalResult result={preview.selection} compact={compact} />
             </div>

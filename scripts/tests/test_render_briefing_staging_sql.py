@@ -41,10 +41,16 @@ class StagingPlanTest(unittest.TestCase):
     def test_member_mapping_is_a_sql_value_not_executable_input(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);self.bundle(root)
-            sql=S.render(root,"member'; SELECT 1; --",1,'artifact-root:artifacts')
+            sql=S.render(root,"member'; SELECT 1; --",1,'artifact-root:artifacts','2026-11-04T08:00:00Z')
             self.assertIn("id='member''; SELECT 1; --'",sql)
             self.assertIn('BEGIN;',sql);self.assertIn('COMMIT;',sql)
             self.assertNotIn('UPDATE ',sql);self.assertNotIn('DELETE ',sql)
+
+    def test_import_time_is_required_and_never_inferred_from_old_test_settings(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);self.bundle(root)
+            with self.assertRaisesRegex(ValueError,'imported-at'):S.render(root,'member',1,'artifact-root:artifacts')
+            with self.assertRaisesRegex(ValueError,'timezone'):S.render(root,'member',1,'artifact-root:artifacts','2026-11-04T08:00:00')
 
 
 if __name__=='__main__':unittest.main()

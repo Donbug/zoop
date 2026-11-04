@@ -10,6 +10,7 @@ import copy
 import hashlib
 import json
 import re
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -50,18 +51,26 @@ def verify_bundle(bundle):
     return manifest
 
 
-def render(bundle, member_id, preference_revision, artifact_uri_base):
+def render(bundle, member_id, preference_revision, artifact_uri_base, imported_at=None):
     if not member_id.strip() or preference_revision < 1:
         raise ValueError('explicit target member and unused positive preference revision required')
     if not re.fullmatch(r'artifact-root:[a-z][a-z0-9_]{0,63}', artifact_uri_base):
         raise ValueError('server ArtifactFileStore directory URI required')
     manifest = verify_bundle(bundle)
+    imported_at=imported_at or manifest.get('finalization',{}).get('importedAt')
+    if not imported_at:raise ValueError('explicit imported-at is required; never backdate target settings')
+    imported=datetime.fromisoformat(imported_at.replace('Z','+00:00'))
+    if imported.tzinfo is None:raise ValueError('timezone required for imported-at')
+    if 'finalization' in manifest:
+        f=manifest['finalization']
+        if member_id!=f['memberId'] or preference_revision!=f['preferenceRevision'] or imported!=datetime.fromisoformat(f['importedAt'].replace('Z','+00:00')) or artifact_uri_base!='artifact-root:artifacts':
+            raise ValueError('finalized member, revision, time and artifact mapping must remain pinned')
     plan = ['-- Private data. Review the target, member mapping and artifact storage before any execution.',
             '-- INSERT only; never publishes, creates grants, activates graphs or changes existing records.',
             'BEGIN;', "SET LOCAL lock_timeout='5s';", "SET LOCAL standard_conforming_strings=on;",
             'DO $check$ BEGIN IF NOT EXISTS (SELECT 1 FROM members WHERE id='+literal(member_id)+
             " AND status='active') THEN RAISE EXCEPTION 'target member is missing or inactive'; END IF; END $check$;"]
-    pref_id = 'prep-pref-'+hashlib.sha256((manifest['memberBindingRef']+'\n'+member_id+'\n'+str(preference_revision)).encode()).hexdigest()[:24]
+    pref_id = 'prep-pref-'+hashlib.sha256((manifest['memberBindingRef']+'\n'+member_id+'\ndemo\n'+str(preference_revision)).encode()).hexdigest()[:24]
     for table, keys in TABLES.items():
         records = [json.loads(s) for s in (bundle/'tables'/f'{table}.jsonl').read_text().splitlines()]
         for original in records:
@@ -74,7 +83,8 @@ def render(bundle, member_id, preference_revision, artifact_uri_base):
             if table in ('briefing_personal_preferences', 'briefing_personal_deliveries'):
                 row['member_id'] = member_id
                 if table.endswith('preferences'):
-                    row.update(id=pref_id, revision=preference_revision)
+                    row.update(id=pref_id, revision=preference_revision,scope='demo',created_at=imported.isoformat(),
+                               effective_from=(imported+timedelta(microseconds=1)).isoformat())
                 else:
                     row['preference_id'] = pref_id
                     row['id'] = 'prep-delivery-'+hashlib.sha256((original['id']+'\n'+pref_id).encode()).hexdigest()[:24]
@@ -103,9 +113,10 @@ def main():
     p.add_argument('--member-id',required=True)
     p.add_argument('--preference-revision',type=int,required=True)
     p.add_argument('--artifact-uri-base',required=True)
+    p.add_argument('--imported-at',required=True,help='Pinned import time with timezone, used for demo metadata only')
     p.add_argument('--output',type=Path,required=True)
     a=p.parse_args()
-    sql=render(a.bundle,a.member_id,a.preference_revision,a.artifact_uri_base)
+    sql=render(a.bundle,a.member_id,a.preference_revision,a.artifact_uri_base,a.imported_at)
     with a.output.open('x') as f:
         a.output.chmod(0o600); f.write(sql)
     print('Private staging SQL prepared; no database connection or publication performed.')

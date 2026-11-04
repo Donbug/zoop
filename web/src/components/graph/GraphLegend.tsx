@@ -24,26 +24,30 @@ export default function GraphLegend({
         const count = kind
           ? data.nodes.filter((node) => node.kind === key).length
           : data.edges.filter((edge) => edge.relationType === key).length;
-        const disabled =
-          kind &&
-          !hidden.includes(key) &&
-          hidden.includes(key === 'company' ? 'issue' : 'company');
+        // D-GRP-01 (2026-11-04 결정): 기업·사건은 끌 수 없는 개수 표시다.
+        if (kind)
+          return (
+            <span
+              key={key}
+              title={help}
+              aria-description={help}
+              className="relationship-count shrink-0! gap-1.5! border border-zoop-line font-semibold text-zoop-ink"
+            >
+              <GraphIcon name={key} size={12} />
+              {label} <span>{count}</span>
+            </span>
+          );
         return (
           <button
             key={key}
             type="button"
             aria-pressed={!hidden.includes(key)}
-            disabled={disabled}
             title={help}
             aria-description={help}
             onClick={() => onToggle(key)}
-            className="relationship-count shrink-0! gap-1.5! border border-transparent text-zoop-muted aria-pressed:border-zoop-line aria-pressed:text-zoop-ink aria-pressed:font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink disabled:cursor-not-allowed disabled:opacity-60 [&[aria-pressed=false]]:bg-transparent! [&[aria-pressed=false]]:opacity-50"
+            className="relationship-count shrink-0! gap-1.5! border border-transparent text-zoop-muted aria-pressed:border-zoop-line aria-pressed:text-zoop-ink aria-pressed:font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink [&[aria-pressed=false]]:bg-transparent! [&[aria-pressed=false]]:opacity-50"
           >
-            {kind ? (
-              <GraphIcon name={key} size={12} />
-            ) : (
-              <b aria-hidden="true" className={edgeSwatchClass(key)} />
-            )}
+            <b aria-hidden="true" className={edgeSwatchClass(key)} />
             {label} <span>{count}</span>
           </button>
         );

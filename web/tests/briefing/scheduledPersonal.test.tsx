@@ -258,3 +258,40 @@ it('no holdings and no watchlist means no default profile and no automatic brief
     ),
   ).toHaveLength(0);
 });
+
+it('D-BRF-01/02 restores an imported demo without making its frozen profile the live setting', async () => {
+  member();
+  api.mockImplementation(async (path) => {
+    if (path.startsWith(settingsPath))
+      return { ...saved, demoEnabled: true, preference: null };
+    if (path.includes('/options')) return options;
+    if (path.includes('demo=true'))
+      return {
+        ...delivered,
+        mode: 'demo',
+        preferenceRevision: 'imported-demo',
+      };
+    return { status: 'not_published', roundId: 'r' };
+  });
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByText(/저장된 데모는 아래/);
+  await user.click(screen.getByText('데모 미리보기'));
+  expect(screen.getByText('already published result')).toBeTruthy();
+  expect(
+    screen.getByText(/보존된 데모 설정 · 현재 정기 설정과 별개/),
+  ).toBeTruthy();
+  expect(
+    (
+      screen.getByRole('button', {
+        name: '현재 설정으로 데모 보기',
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(true);
+  expect(
+    api.mock.calls.filter(
+      (c) =>
+        c[1] === 'PUT' || (c[1] === 'POST' && !c[0].endsWith('/initialize')),
+    ),
+  ).toHaveLength(0);
+});

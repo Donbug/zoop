@@ -186,11 +186,44 @@ async function open(
   );
   await waitFor(() =>
     expect(document.activeElement).toBe(
-      screen.getByRole('heading', { name: 'AI에게 묻기' }),
+      screen.getByRole('heading', { name: '채팅' }),
     ),
   );
   return { user, onViewOnMap };
 }
+
+describe('D-AI-01 drawer controls', () => {
+  it('hides linked-target controls when opened from the main header', async () => {
+    server.on('GET', CURRENT, () => json(conversation([])));
+    useAiChatStore.getState().open(null, 'header');
+    render(
+      <MemoryRouter>
+        <AiChatDrawer />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: '채팅' })).toBeTruthy();
+    expect(
+      screen.queryByRole('region', { name: '질문에 연결할 대상' }),
+    ).toBeNull();
+  });
+
+  it('opens the history actions from the header toggle and resizes by keyboard', async () => {
+    const { user } = await open();
+    const menuToggle = screen.getByRole('button', { name: '대화 메뉴' });
+    await user.click(menuToggle);
+    expect(screen.getByRole('menu')).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: '대화 기록' })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: '새 대화' })).toBeTruthy();
+
+    const resize = screen.getByRole('separator', {
+      name: '챗봇 패널 너비 조절',
+    });
+    resize.focus();
+    await user.keyboard('{ArrowLeft}');
+    expect(resize.getAttribute('aria-valuenow')).toBe('464');
+  });
+});
 
 describe('D-AI-01 · asking with a linked target', () => {
   it('sends one job with the selected context and the jobId as Idempotency-Key, then polls it to its result', async () => {
@@ -227,8 +260,9 @@ describe('D-AI-01 · asking with a linked target', () => {
     );
 
     const { user } = await open();
-    await screen.findByText(/궁금한 점을 입력해 보세요/);
-    expect(screen.getByText('질문 대상: 삼성전자')).toBeTruthy();
+    await screen.findByRole('region', { name: '추천 질문' });
+    expect(screen.queryByText('질문 대상: 삼성전자')).toBeNull();
+    expect(screen.queryByText(/그래프 gv-1/)).toBeNull();
     await user.type(screen.getByLabelText('질문'), '삼성전자 최근 이슈는?');
     // Enter submits only once the last render enabled sending (see `send`).
     await waitFor(() =>
@@ -241,7 +275,7 @@ describe('D-AI-01 · asking with a linked target', () => {
     const card = await screen.findByRole('article', {
       name: '삼성전자 최근 이슈는?',
     });
-    expect(within(card).getByText('자료 확인')).toBeTruthy();
+    expect(within(card).getByText('자료 확인 중이에요.')).toBeTruthy();
     expect(
       screen.getByRole('button', { name: '보내기' }).hasAttribute('disabled'),
     ).toBe(true);
@@ -274,10 +308,10 @@ describe('D-AI-01 · asking with a linked target', () => {
       json(job({ id: (request.body as { jobId: string }).jobId })),
     );
     const { user } = await open();
-    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await screen.findByRole('region', { name: '추천 질문' });
     await user.click(screen.getByRole('checkbox'));
-    expect(screen.getByText('질문 대상: 없음')).toBeTruthy();
-    expect(screen.getByText(/연결한 대상이 없어요/)).toBeTruthy();
+    expect(screen.queryByText('질문 대상: 없음')).toBeNull();
+    expect(screen.queryByText(/연결한 대상이 없어요/)).toBeNull();
 
     await user.type(screen.getByLabelText('질문'), '   ');
     expect(
@@ -319,7 +353,7 @@ describe('D-AI-01 · asking with a linked target', () => {
       );
     });
     const { user } = await open(null);
-    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await screen.findByRole('region', { name: '추천 질문' });
     await send(user, 'HBM?');
     expect((await screen.findByRole('alert')).textContent).toContain(
       '답변 기능을 일시적으로 사용할 수 없습니다.',
@@ -350,7 +384,7 @@ describe('D-AI-01 · asking with a linked target', () => {
       return accepted.promise;
     });
     const { user } = await open(null);
-    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await screen.findByRole('region', { name: '추천 질문' });
     await send(user, 'HBM?');
     await waitFor(() => expect(server.calls('POST', JOBS)).toHaveLength(1));
     expect(screen.queryByText(/접수됐는지 확인하지 못했어요/)).toBeNull();
@@ -370,7 +404,7 @@ describe('D-AI-01 · asking with a linked target', () => {
         }),
     );
     const { user } = await open(null);
-    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await screen.findByRole('region', { name: '추천 질문' });
     await send(user, 'HBM?');
     await screen.findByText(/질문이 접수됐는지 확인하지 못했어요/);
     expect(
@@ -386,7 +420,7 @@ describe('D-AI-01 · asking with a linked target', () => {
       throw new Error('connection reset');
     });
     const { user } = await open(null);
-    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await screen.findByRole('region', { name: '추천 질문' });
     await send(user, '첫 질문');
     await screen.findByText(/질문이 접수됐는지 확인하지 못했어요/);
 
@@ -398,8 +432,11 @@ describe('D-AI-01 · asking with a linked target', () => {
     ).toBe(true);
     expect(server.calls('POST', JOBS)).toHaveLength(1);
     // Nor can a new conversation start: the unconfirmed question is resent or discarded first.
+    await user.click(screen.getByRole('button', { name: '대화 메뉴' }));
     expect(
-      screen.getByRole('button', { name: '새 대화' }).hasAttribute('disabled'),
+      screen
+        .getByRole('menuitem', { name: '새 대화' })
+        .hasAttribute('disabled'),
     ).toBe(true);
 
     await user.click(
@@ -443,7 +480,7 @@ describe('D-AI-01 · asking with a linked target', () => {
       ),
     );
     const { user } = await open(null);
-    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await screen.findByRole('region', { name: '추천 질문' });
     await send(user, '질문');
     await user.click(
       await screen.findByRole('button', { name: '같은 질문 다시 보내기' }),
@@ -465,8 +502,9 @@ describe('D-AI-01 · asking with a linked target', () => {
     );
     const { user } = await open(null);
     await waitFor(() => expect(server.calls('GET', CURRENT)).toHaveLength(1));
-    await user.click(screen.getByRole('button', { name: '새 대화' }));
-    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await user.click(screen.getByRole('button', { name: '대화 메뉴' }));
+    await user.click(screen.getByRole('menuitem', { name: '새 대화' }));
+    await screen.findByRole('region', { name: '추천 질문' });
     late.resolve(json(conversation([job({ question: '이전 대화의 질문' })])));
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(screen.queryByText('이전 대화의 질문')).toBeNull();
@@ -1059,7 +1097,7 @@ describe('D-AI-02 · job states and stored results', () => {
     await user.click(
       within(failed).getByRole('button', { name: '질문 다시 처리' }),
     );
-    await within(failed).findByText('질문을 접수했어요.');
+    await within(failed).findByText('질문을 처리할 차례를 기다리고 있어요.');
     expect(
       server.calls('POST', RETRY)[0].headers.get('Idempotency-Key'),
     ).toBeTruthy();
@@ -1076,7 +1114,13 @@ describe('D-AI-02 · job states and stored results', () => {
     server.on('GET', CURRENT, () => json(conversation([running])));
     server.on('GET', JOB, () => json(running));
     await open();
-    await screen.findByRole('article', { name: 'HBM이 뭐야?' });
+    const message = await screen.findByRole('article', { name: 'HBM이 뭐야?' });
+    expect(within(message).getByRole('status').textContent).toContain(
+      '답변 작성 중이에요.',
+    );
+    expect(within(message).queryByText('질문 이해')).toBeNull();
+    expect(within(message).queryByText('자료 확인')).toBeNull();
+    expect(within(message).queryByText('검증')).toBeNull();
     const live = document.querySelector('[aria-live="polite"]');
     expect(live?.textContent).toContain('답변 작성');
   });
@@ -1112,10 +1156,11 @@ describe('D-AI-02 · job states and stored results', () => {
       within(card).getByRole('button', { name: '질문 다시 처리' }),
     );
     // The retry may be accepted: switching now would drop its answer, so the switch waits.
+    await user.click(screen.getByRole('button', { name: '대화 메뉴' }));
     await waitFor(() =>
       expect(
         screen
-          .getByRole('button', { name: '새 대화' })
+          .getByRole('menuitem', { name: '새 대화' })
           .hasAttribute('disabled'),
       ).toBe(true),
     );
@@ -1126,12 +1171,12 @@ describe('D-AI-02 · job states and stored results', () => {
     await waitFor(() =>
       expect(
         screen
-          .getByRole('button', { name: '새 대화' })
+          .getByRole('menuitem', { name: '새 대화' })
           .hasAttribute('disabled'),
       ).toBe(false),
     );
-    await user.click(screen.getByRole('button', { name: '새 대화' }));
-    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await user.click(screen.getByRole('menuitem', { name: '새 대화' }));
+    await screen.findByRole('region', { name: '추천 질문' });
     expect(screen.queryByText('이전 대화의 실패')).toBeNull();
   });
 
@@ -1259,11 +1304,20 @@ describe('D-AI-01 · D-AI-02 prototype chat gaps (C1, C5-C9)', () => {
     const suggestions = await screen.findByRole('region', {
       name: '추천 질문',
     });
+    const questionInput = screen.getByRole('textbox', { name: '질문' });
+    expect(
+      Boolean(
+        suggestions.compareDocumentPosition(questionInput) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
+    expect(screen.queryByText(/궁금한 점을 입력해 보세요/)).toBeNull();
+    expect(screen.queryByText(/투자 권유/)).toBeNull();
     for (const button of within(suggestions).getAllByRole('button'))
       expect(button.hasAttribute('disabled')).toBe(true);
     expect(
-      within(suggestions).getByText(/대상을 고른 뒤 보낼 수 있어요/),
-    ).toBeTruthy();
+      within(suggestions).queryByText(/대상을 고른 뒤 보낼 수 있어요/),
+    ).toBeNull();
   });
 
   it('C5 scrolls to the end of the conversation when its jobs arrive', async () => {
@@ -1460,7 +1514,7 @@ describe('focus', () => {
     );
     await waitFor(() =>
       expect(document.activeElement).toBe(
-        screen.getByRole('heading', { name: 'AI에게 묻기' }),
+        screen.getByRole('heading', { name: '채팅' }),
       ),
     );
     await user.keyboard('{Escape}');
@@ -1492,7 +1546,7 @@ describe('membership', () => {
       useAuthStore.getState().setSession(member('mem-2'));
       useAiChatStore.getState().open(null);
     });
-    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await screen.findByRole('region', { name: '추천 질문' });
     late.resolve(json(conversation([job({ question: '이전 회원의 질문' })])));
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(screen.queryByText('이전 회원의 질문')).toBeNull();
@@ -1510,10 +1564,10 @@ describe('D-AI-01 C2 · several question targets', () => {
   it('replaces the target while nothing was asked yet', async () => {
     server.on('GET', CURRENT, () => json(conversation([])));
     await open();
-    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await screen.findByRole('region', { name: '추천 질문' });
     act(() => useAiChatStore.getState().open(HYNIX));
     expect(screen.getAllByRole('checkbox')).toHaveLength(1);
-    expect(screen.getByText('질문 대상: SK하이닉스')).toBeTruthy();
+    expect(screen.queryByText('질문 대상: SK하이닉스')).toBeNull();
   });
 
   it('adds a new target unchecked after a question and sends every checked target', async () => {
@@ -1526,13 +1580,13 @@ describe('D-AI-01 C2 · several question targets', () => {
     act(() => useAiChatStore.getState().open(HYNIX));
     const added = screen.getByRole('checkbox', { name: /SK하이닉스/ });
     expect((added as HTMLInputElement).checked).toBe(false);
-    expect(screen.getByText('질문 대상: 삼성전자')).toBeTruthy();
+    expect(screen.queryByText('질문 대상: 삼성전자')).toBeNull();
     // 같은 대상을 다시 전달해도 후보가 늘지 않는다.
     act(() => useAiChatStore.getState().open({ ...HYNIX }));
     expect(screen.getAllByRole('checkbox')).toHaveLength(2);
 
     await user.click(added);
-    expect(screen.getByText('질문 대상: 삼성전자, SK하이닉스')).toBeTruthy();
+    expect(screen.queryByText('질문 대상: 삼성전자, SK하이닉스')).toBeNull();
     await user.type(screen.getByLabelText('질문'), '두 회사 관계는?');
     await user.click(screen.getByRole('button', { name: '보내기' }));
     await waitFor(() => expect(server.calls('POST', JOBS)).toHaveLength(1));

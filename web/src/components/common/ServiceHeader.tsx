@@ -28,7 +28,7 @@ export default function ServiceHeader({
   /** D-AI-01: the AI drawer lives on the map. Elsewhere, go to the map first; the selected target is kept as it is. */
   function openAiChat() {
     if (pathname !== '/') navigate('/');
-    useAiChatStore.getState().open(undefined);
+    useAiChatStore.getState().open(null, 'header');
   }
 
   return (

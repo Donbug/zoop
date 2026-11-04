@@ -188,6 +188,82 @@ class GraphPublicationPreparePostgresTest {
         assertEquals(List.of(candidate), strings(next, "pendingCandidates"));
     }
 
+    @Test void aLabelCorrectionWithoutNewSourcesIsStagedOnTheBaseAndReadBackAndInherited() {
+        String published = publish(importNative(HandoffFixtures.Spec.standard()));
+        var base = reader().read(published);
+        var source = base.contributions().getFirst();
+        var issue = base.snapshot().issues().getFirst();
+        ObjectNode decisions = (ObjectNode) PublicationMerger.emptyDecisions().node().deepCopy();
+        decisions.put("schemaVersion", PublicationMerger.DECISIONS_SCHEMA_2);
+        var correction = decisions.putArray(PublicationMerger.LABEL_CORRECTIONS).addObject();
+        correction.put("issueId", issue.issueId()); correction.put("expectedLabelDigest", Canonical.digest(PublicationMerger.field(issue, "label")));
+        correction.put("label", "교정한 사건명");
+        var evidence = correction.putArray("evidenceRefs").addObject();
+        evidence.put("sourceVersionId", source.sourceVersionId()); evidence.put("issueId", issue.issueId()); evidence.put("evidenceId", issue.evidenceIds().getFirst());
+        correction.put("reviewer", "operator"); correction.put("decisionRef", "label-review"); correction.put("decisionVersion", "2026-11-04");
+        byte[] bytes = Canonical.bytes(decisions);
+        var state = graph.publicationState();
+        String basePin = registry.findArtifact("artifact-receipt-" + published).orElseThrow().sha256();
+        var request = new PublicationComposeRequest(published, List.of(), published, basePin, java.util.Map.of(), state.ruleRevision(),
+                state.reviewRevision(), Canonical.sha256(bytes), "synthetic");
+        assertEquals(request, PublicationComposeRequest.parse(Canonical.bytes(request.wire())));
+
+        var composed = GraphPublicationPreparer.operatorCompose(reader(), publications, composer(), request, bytes);
+        assertEquals("succeeded", composed.get("status").asString(), composed.toString());
+        assertEquals("staged", composed.get("outcome").asString());
+        assertEquals(List.of(), strings(composed, "incomingVersionIds"));
+        assertEquals(1, composed.get("counts").get("labelCorrections").asInt());
+        assertEquals(base.snapshot().issues().size(), composed.get("counts").get("issues").asInt());
+        String candidate = composed.get("graphVersionId").asString();
+        assertNotEquals(published, candidate);
+        // The reader re-merges the stored decisions and owners: only the name differs from the base.
+        var publication = reader().read(candidate);
+        assertEquals(published, publication.baseVersionId());
+        assertEquals(base.contributions().size(), publication.contributions().size());
+        assertEquals(base.issueSources(), publication.issueSources());
+        assertEquals(base.snapshot().relations(), publication.snapshot().relations());
+        ObjectNode expected = (ObjectNode) GraphPublicationReader.json(issue); expected.put("label", "교정한 사건명");
+        assertEquals(expected, GraphPublicationReader.json(publication.snapshot().issues().getFirst()));
+        assertEquals(PublicationMerger.DECISIONS_SCHEMA_2, publication.effectiveDecisions().string("schemaVersion"));
+        assertFalse(versions.everActivated(candidate));
+        assertEquals(published, versions.active().orElseThrow().id());
+        var again = GraphPublicationPreparer.operatorCompose(reader(), publications, composer(), request, bytes);
+        assertEquals("unchanged", again.get("outcome").asString(), again.toString());
+        assertEquals(candidate, again.get("graphVersionId").asString());
+
+        // Without new sources the request must change the base's decisions, and the reserved operator never takes this path.
+        byte[] none = Canonical.bytes(PublicationMerger.emptyDecisions().node());
+        var undecided = new PublicationComposeRequest(published, List.of(), published, basePin, java.util.Map.of(), state.ruleRevision(),
+                state.reviewRevision(), Canonical.sha256(none), "synthetic");
+        assertEquals("request_invalid", composer().run(undecided, none).get("code").asString());
+        assertFalse(GraphPublicationPreparer.proposes(reader(), publications, request, bytes));
+        assertEquals("nothing_to_prepare", preparer().run().get("outcome").asString());
+
+        // Once the correction is public, a later import is prepared on it: the same-headline selection keeps the owner and the name is inherited.
+        activate(candidate);
+        String candidatePin = registry.findArtifact("artifact-receipt-" + candidate).orElseThrow().sha256();
+        var repeated = new PublicationComposeRequest(candidate, List.of(), candidate, candidatePin, java.util.Map.of(), state.ruleRevision(),
+                state.reviewRevision(), Canonical.sha256(bytes), "synthetic");
+        assertEquals("request_invalid", composer().run(repeated, bytes).get("code").asString());
+        String incoming = importNative(HandoffFixtures.Spec.standard());
+        var next = preparer().run();
+        assertEquals("staged", next.get("outcome").asString(), next.toString());
+        assertEquals(List.of(incoming), strings(next, "incomingVersionIds"));
+        assertEquals(0, next.get("changes").size());
+        var inherited = reader().read(next.get("graphVersionId").asString());
+        assertEquals(candidate, inherited.baseVersionId());
+        assertEquals("교정한 사건명", inherited.snapshot().issues().getFirst().label());
+        assertEquals(1, PublicationMerger.labelCorrections(inherited.effectiveDecisions()).size());
+        // The fixture's second import repeats the issue record exactly, so no same-headline selection is needed (PublicationMergerTest
+        // covers the record that only adds evidence); any selection the preparation did write names the owner's source value.
+        for (var selection : inherited.effectiveDecisions().objects("fieldSelections")) {
+            assertEquals(PublicationMerger.AUTO_REVIEWER, selection.string("reviewer"));
+            assertEquals(Canonical.digest(PublicationMerger.field(source.projection().issues().getFirst(), "label")), selection.string("expectedValueDigest"));
+        }
+        assertEquals(source.issueRef(issue.issueId()), inherited.issueSources().get(issue.issueId()).headlineSources().get("label"));
+        assertEquals(2, inherited.contributions().size());
+    }
+
     @Test void nothingToPrepareWithoutNewImportsAndASourceLeftOutOfAnOperatorComposeStaysOut() {
         // Imported before the operator composed the published version: the operator chose not to include it.
         importNative(HandoffFixtures.Spec.standard().withEvent("2026-10-01", "day"));

@@ -149,8 +149,12 @@ class AiRound:
         credentials.tokens["operator"] = "t" + secrets.token_urlsafe(36)
         credentials.scopes["operator"] = ["plan.policy"]
         commands = {}
-        for module, log in (("extraction_cli", "s2"), ("relation_cli", "s3"), ("ingestion_cli", "ingestion"), ("handoff_cli", "handoff")):
-            path = root / (module + ".py")
+        # The S2/S3 wrapper file names must match the argv patterns terminate_extraction/terminate_relation pgrep for
+        # (extract-wrapper.py, relation-wrapper.py, the names the support modules' own write_wrapper use); otherwise an
+        # interrupted run leaves their children behind. The support modules hard-code the names, so they are repeated here.
+        for module, filename, log in (("extraction_cli", "extract-wrapper.py", "s2"), ("relation_cli", "relation-wrapper.py", "s3"),
+                                      ("ingestion_cli", "ingestion_cli.py", "ingestion"), ("handoff_cli", "handoff_cli.py", "handoff")):
+            path = root / filename
             script = WRAPPER.replace("__PYTHON__", str(PIPELINE_PYTHON)).replace("__GUARD_DIR__", repr(str(guard)))
             script = script.replace("__ROOT__", repr(str(root))).replace("__COMMAND_LOG__", repr(log + "-commands"))
             script = script.replace("__MODULE__", repr("zoop_ai_pipeline." + module))
@@ -236,8 +240,11 @@ class AiRound:
     def close(self):
         for service in self.services:
             service.close()
-        terminate_extraction(self.workspace)
-        terminate_relation(self.workspace)
+        # Both helpers run even when the first reports survivors, so an S2 failure never leaves S3 children behind.
+        try:
+            terminate_extraction(self.workspace)
+        finally:
+            terminate_relation(self.workspace)
 
 
 class App:

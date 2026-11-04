@@ -37,7 +37,7 @@ public class PersonalBriefingPreferences {
     }
     private Optional<ObjectNode> preference(String member,String where,Object...extra){
         var args=new ArrayList<Object>();args.add(member);args.addAll(Arrays.asList(extra));
-        return jdbc.query("SELECT id,revision,choice,created_at,effective_from FROM briefing_personal_preferences WHERE member_id=? "+where+" ORDER BY revision DESC LIMIT 1",(r,i)->{
+        return jdbc.query("SELECT id,revision,choice,created_at,effective_from FROM briefing_personal_preferences WHERE member_id=? AND scope='scheduled' "+where+" ORDER BY revision DESC LIMIT 1",(r,i)->{
             var o=json.createObjectNode().put("revisionId",r.getString(1)).put("revision",r.getInt(2));o.set("choice",StrictJson.parseObject(r.getString(3)).node());
             o.put("savedAt",r.getTimestamp(4).toInstant().toString()).put("effectiveFrom",r.getTimestamp(5).toInstant().toString());return o;},args.toArray()).stream().findFirst();
     }
