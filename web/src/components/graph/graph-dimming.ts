@@ -3,12 +3,13 @@ import type { Graph } from '@antv/g6';
 // D-GRP-01: dimming every other element through G6 states re-renders each one
 // (labels included), which takes seconds with hundreds of nodes. Instead one
 // translucent cover in the map colour sits above the elements, and only the
-// elements that stay bright are raised above it. Paper at 65% over an element
-// looks the same as that element at opacity 0.35.
+// elements that stay bright are raised above it. Paper at 85% over an element
+// looks the same as that element at opacity 0.15 (2026-11-04 review: the
+// selection should stand out the way a focused network view does).
 const COVER_Z = 1000;
 const EDGE_Z = 1001;
 const NODE_Z = 1002;
-const COVER_OPACITY = 0.65;
+const COVER_OPACITY = 0.85;
 
 type Shape = {
   id?: string;

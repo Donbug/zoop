@@ -4,6 +4,7 @@ import { mockMember } from '@/mocks/graph/fixture';
 import {
   companyNodeSize,
   ISSUES_PER_COMPANY,
+  ISSUE_NODE_SIZE,
   graphSummary,
   toG6Data,
 } from '@/components/graph/graph-model';
@@ -179,6 +180,19 @@ describe('WBS 6.6.21 · D-GRP-01/01b mock/API contract', () => {
         'issue-busy-0',
       ),
     ).toBe(true);
+  });
+  it('D-GRP-01 shades issues by evidence in one monotone ink', () => {
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const [weak, strong] = graph.nodes.filter((node) => node.kind === 'issue');
+    weak.evidenceCount = 1;
+    strong.evidenceCount = 8;
+    const rendered = toG6Data(graph, 1245, 705, null, [weak.id, strong.id]);
+    const style = (id: string) =>
+      rendered.nodes?.find((node) => node.id === id)?.style;
+    expect(style(strong.id)?.size).toBe(ISSUE_NODE_SIZE);
+    expect(style(strong.id)?.fill).toBe(style(weak.id)?.fill);
+    expect(Number(style(strong.id)?.fillOpacity)).toBe(1);
+    expect(Number(style(weak.id)?.fillOpacity)).toBeLessThan(0.6);
   });
   it('keeps a single-company issue and its relation visible before selection', () => {
     const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });

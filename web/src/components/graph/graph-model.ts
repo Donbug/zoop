@@ -116,6 +116,24 @@ export function foldedIssues(
   return { hidden, counts };
 }
 
+/** D-GRP-01 (2026-11-04 review): issue diamonds were 7px and hard to spot. */
+export const ISSUE_NODE_SIZE = 30;
+
+/**
+ * D-GRP-01: 0..1 evidence strength per issue on a log scale against the busiest
+ * issue on this map, so one heavily sourced issue does not flatten the rest.
+ */
+export function evidenceStrength(data: GraphResponse) {
+  const issues = data.nodes.filter((n) => n.kind === 'issue');
+  const max = Math.max(1, ...issues.map((n) => n.evidenceCount ?? 0));
+  return new Map(
+    issues.map((n) => [
+      n.id,
+      Math.log1p(Math.max(0, n.evidenceCount ?? 0)) / Math.log1p(max),
+    ]),
+  );
+}
+
 // Review calibration for D-GRP-01/01b fixture distribution (0–6 issues).
 // The value represents graph activity only, never importance or causality.
 export function companyNodeSize(issueCount: number, scale = 1) {
@@ -174,6 +192,7 @@ export function toG6Data(
   const fold = foldedIssues(data, expandedId, forcedNodes);
   const visible = data.nodes.filter((n) => !fold.hidden.has(n.id));
   const nodeIds = new Set(visible.map((n) => n.id));
+  const strength = evidenceStrength(data);
   const result: GraphData = {
     nodes: visible.map((n) => {
       const company = n.kind === 'company';
@@ -182,7 +201,8 @@ export function toG6Data(
       const chosen = company && n.id === expandedId;
       const size = company
         ? companyNodeSize(summary.companyIssueCounts.get(n.id) ?? 0, scale)
-        : 7 * scale;
+        : ISSUE_NODE_SIZE * scale;
+      const tone = company ? 1 : (strength.get(n.id) ?? 0);
       const badges = [
         ...(n.holding || n.watch
           ? [
@@ -216,6 +236,8 @@ export function toG6Data(
               ? logoBackground(logo)
               : themeColor('paper')
             : themeColor('ink'),
+          // D-GRP-01: monotone shade by evidence; weak issues read as a light outline.
+          fillOpacity: company ? 1 : 0.15 + 0.85 * tone,
           stroke: themeColor('ink'),
           lineWidth: n.isFocus ? 1.4 : 0.667,
           halo: n.isFocus,
@@ -262,6 +284,7 @@ export function toG6Data(
         const dimmed =
           emphasizedNodes.size > 0 &&
           (!emphasizedNodes.has(e.source) || !emphasizedNodes.has(e.target));
+        const issueTone = strength.get(e.source) ?? strength.get(e.target);
         return {
           id: e.id,
           source: e.source,
@@ -271,15 +294,18 @@ export function toG6Data(
             labelText: '',
             labelVisibility: 'hidden',
             stroke:
-              e.relationType === 'FOLLOWS'
+              e.relationType === 'FOLLOWS' || issueTone !== undefined
                 ? themeColor('ink')
                 : themeColor('faint'),
             lineWidth: 1.3,
+            // D-GRP-01: an issue's line follows its evidence shade (monotone).
             strokeOpacity: dimmed
               ? 0.08
               : e.relationType === 'SHARES_ISSUE'
                 ? 0.5
-                : 0.75,
+                : issueTone !== undefined && e.relationType !== 'FOLLOWS'
+                  ? 0.15 + 0.5 * issueTone
+                  : 0.75,
             lineDash: e.relationType === 'SHARES_ISSUE' ? [2, 4] : undefined,
             endArrow: e.relationType === 'FOLLOWS',
             endArrowSize: 6,

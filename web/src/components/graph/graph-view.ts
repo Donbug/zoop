@@ -13,8 +13,9 @@ export type LegendKey =
  * 7: 단일 기업 사건과 관계선을 기본 지도에 모두 표시한다.
  * 8: 기업 노드 25% 확대, 단일 기업 사건을 둘레에 맞춰 고리마다 나눠 놓는다(2026-11-04).
  * 9: 기업마다 근거 많은 단독 사건 5개만 표시하고, 그 5개를 안쪽 고리에 놓는다.
+ * 10: 사건 노드를 7px에서 30px로 키워 겹침 회피 위치가 달라진다. 기업 간격은 55%에 다시 50%, 사건 고리 간격은 20% 넓힌다.
  */
-export const MAP_LAYOUT_REVISION = 9;
+export const MAP_LAYOUT_REVISION = 10;
 export type GraphView = {
   hidden: LegendKey[];
   /**
