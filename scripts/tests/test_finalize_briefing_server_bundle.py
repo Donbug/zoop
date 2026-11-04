@@ -119,5 +119,35 @@ class FinalizationTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'output exists'):F.finalize(bundle,request,registry,out)
             self.assertEqual(out.read_text(),'retained')
 
+    def test_retained_registration_is_exact_and_does_not_claim_native_or_new_verification(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);bundle,request,registry,tables=fixture(root)
+            value=json.loads(request.read_text());value['schemaVersion']='briefing-finalization-request-v2'
+            value['rounds']=[dict(roundId='r1',graphVersion=None,snapshotSha256=None,basisMode='retained-results')]
+            request.write_bytes(F.canonical(value));old=(bundle/'tables/briefing_rounds.jsonl').read_bytes()
+            out=root/'retained';result=F.finalize(bundle,request,registry,out)
+            self.assertTrue(result['bound'])
+            manifest=json.loads((out/'manifest.json').read_text())
+            self.assertEqual(manifest['finalization']['schemaVersion'],'briefing-finalization-v2')
+            row=json.loads((out/'tables/briefing_rounds.jsonl').read_text());pin=row['public_snapshot'].pop('retainedBasis')
+            self.assertIsNone(row['graph_version_id']);self.assertIsNone(row['published_payload']['graphVersion'])
+            proof=json.loads((out/'artifacts'/f"{pin['sha256']}.json").read_text())
+            self.assertEqual(proof['snapshot'],row['public_snapshot']);self.assertEqual(proof['payload'],row['published_payload'])
+            self.assertEqual(proof['provenance'],dict(origin='retained-generated-results',
+                nativeGraphRegistration='not-performed',newSemanticVerification='not-performed'))
+            self.assertEqual(pin,manifest['finalization']['rounds'][0]['retainedBasis'])
+            self.assertEqual(old,(bundle/'tables/briefing_rounds.jsonl').read_bytes())
+
+    def test_retained_registration_never_waives_current_document_rights_or_legacy_graph_gate(self):
+        for version in (1,2):
+            with self.subTest(version=version),tempfile.TemporaryDirectory() as d:
+                root=Path(d);bundle,request,registry,_=fixture(root)
+                value=json.loads(request.read_text());value['schemaVersion']=f'briefing-finalization-request-v{version}'
+                value['rounds']=[dict(roundId='r1',graphVersion=None,snapshotSha256=None,basisMode='retained-results')]
+                request.write_bytes(F.canonical(value));current=json.loads(registry.read_text());current['grants'][0]['rights']='unknown'
+                registry.write_bytes(F.canonical(current));result=F.finalize(bundle,request,registry,root/'pending')
+                self.assertEqual(sum(x['kind']=='document' for x in result['blockers']),2)
+                self.assertEqual(sum(x['kind']=='round' for x in result['blockers']),1 if version==1 else 0)
+
 
 if __name__=='__main__':unittest.main()
