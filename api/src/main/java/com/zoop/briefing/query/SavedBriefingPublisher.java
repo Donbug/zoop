@@ -36,22 +36,26 @@ public class SavedBriefingPublisher {
     private final PersonalBriefingPreferences personal;
     private final DocumentReadProperties properties;
     private final Clock clock;
+    private final SavedBriefingBasisAuthority retained;
 
     public SavedBriefingPublisher(JdbcTemplate jdbc, PlatformTransactionManager manager, BriefingRoundRepository rounds,
             DocumentBriefingContentAccess access, PersonalCandidateAccess candidates, PersonalBriefingPreferences personal,
             DocumentReadProperties properties, Clock clock) {
         this.jdbc=jdbc;this.rounds=rounds;this.access=access;this.candidates=candidates;this.personal=personal;
         this.properties=properties;this.clock=clock;this.tx=new TransactionTemplate(manager);
+        this.retained=new SavedBriefingBasisAuthority(jdbc,properties.artifactRootPath());
         tx.setIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);tx.setTimeout(60);
     }
 
     public ObjectNode publish(JsonNode manifest, String manifestSha, Map<String,List<JsonNode>> tables) {
         var finalization=StrictJson.Obj.of(manifest).object("finalization");
-        require("briefing-finalization-v1".equals(finalization.string("schemaVersion")),"finalization_required");
+        String mode=finalization.string("schemaVersion");
+        require(Set.of("briefing-finalization-v1","briefing-finalization-v2").contains(mode),"finalization_required");
         String member=finalization.string("memberId"), request=finalization.string("requestSha256");
         require(StrictJson.SHA256.matcher(request).matches()&&StrictJson.SHA256.matcher(manifestSha).matches(),"invalid_digest");
         Instant imported=Instant.parse(finalization.string("importedAt"));require(!imported.isAfter(clock.instant()),"future_import");
         return tx.execute(status -> {
+            try(var readScope=com.zoop.common.request.ReadScope.open()) {
             jdbc.query("SELECT pg_advisory_xact_lock(hashtext(?))",rs->{},"saved-briefing:"+request);
             require(Integer.valueOf(1).equals(jdbc.queryForObject("SELECT count(*) FROM members WHERE id=? AND status='active' AND created_at<=?",Integer.class,member,Timestamp.from(imported))),"member_unavailable_or_import_backdated");
             var prior=jdbc.queryForList("SELECT manifest_sha256,member_id FROM briefing_result_imports WHERE request_sha256=?",request);
@@ -77,7 +81,16 @@ public class SavedBriefingPublisher {
                     """,Integer.class,id,source.path("published_payload").toString(),source.path("public_snapshot").toString(),
                         source.path("comparison_snapshot").isNull()?null:source.path("comparison_snapshot").toString())),"staged_round_changed");
                 var g=finalization.objects("rounds").stream().filter(x->id.equals(x.string("roundId"))).toList();
-                require(g.size()==1,"graph_binding_missing");String graph=g.getFirst().string("graphVersion");
+                require(g.size()==1,"graph_binding_missing");
+                if(g.getFirst().isNull("graphVersion")) {
+                    require("briefing-finalization-v2".equals(mode)&&source.path("graph_version_id").isNull()
+                            &&g.getFirst().isNull("snapshotSha256"),"retained_basis_mode_required");
+                    retained.require(source.path("published_payload"),source.path("public_snapshot"),
+                            g.getFirst().raw("retainedBasis"),finalization.string("sourceManifestSha256"));
+                    continue;
+                }
+                require(!source.path("public_snapshot").has("retainedBasis"),"native_graph_cannot_use_retained_basis");
+                String graph=g.getFirst().string("graphVersion");
                 require(graph.matches("gv-[0-9a-f]{64}"),"registered_graph_required");
                 require(Integer.valueOf(1).equals(jdbc.queryForObject("""
                     SELECT count(*) FROM graph_versions v JOIN artifacts a ON a.id=v.snapshot_artifact_id
@@ -140,6 +153,7 @@ public class SavedBriefingPublisher {
             }
             currentGrantFile(finalization.string("grantsSha256"));
             return StrictJson.newObject().put("publishedRounds",seen.size()).put("demoDeliveries",seen.size()).put("reused",repeated).put("newAiCalls",0);
+            }
         });
     }
 

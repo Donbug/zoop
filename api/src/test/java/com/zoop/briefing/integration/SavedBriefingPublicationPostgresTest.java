@@ -162,6 +162,66 @@ class SavedBriefingPublicationPostgresTest {
   assertEquals("not_published",preferences.get(ROUND,new MemberPrincipal(MEMBER,"test"),true,"unpublished-import").path("status").asString());
   assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class));
  }
+ @Test void retainedBasisPublishesWithoutPretendingToHaveANativeGraphAndPreservesRightsChecks()throws Exception {
+  retained();
+  // This source is not a native graph contribution. A disabled native source
+  // must neither be relabelled PASS nor silently reused as this basis.
+  Path sources=ROOT.resolve("sources.json");Files.writeString(sources,Files.readString(sources).replace("\"enabled\":true","\"enabled\":false"));
+  var result=publisher.publish(manifest,"e".repeat(64),tables);assertEquals(1,result.path("publishedRounds").asInt());
+  assertNull(jdbc.queryForObject("SELECT graph_version_id FROM briefing_rounds WHERE id=?",String.class,ROUND));
+  assertEquals(200,get("/api/v1/briefings?date=2026-10-15&edition=evening",null).statusCode());
+  var delivery=get("/api/v1/briefings/"+ROUND+"/personalized/delivery?demo=true",sessions.issue(MEMBER,null,"test").token());
+  assertEquals(200,delivery.statusCode());assertEquals("ready",JSON.readTree(delivery.body()).path("status").asString());
+  assertEquals(beforeSettings,preferences.settings(new MemberPrincipal(MEMBER,"test")).path("preference").toString());
+  assertEquals(beforeFeedback,jdbc.queryForObject("SELECT to_jsonb(f)::text FROM briefing_feedback f WHERE id='preserved-feedback'",String.class));
+  assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class));
+  assertTrue(publisher.publish(manifest,"e".repeat(64),tables).path("reused").asBoolean());
+  Files.writeString(GRANTS,Files.readString(GRANTS).replace("\"known\"","\"unknown\""));
+  assertEquals(503,get("/api/v1/briefings?date=2026-10-15&edition=evening",null).statusCode());
+ }
+ @Test void changedRetainedBasisRollsBackAndLaterTamperingDeniesReads()throws Exception {
+  Path file=retained();String original=Files.readString(file);Files.writeString(file,"changed");
+  assertThrows(RuntimeException.class,()->publisher.publish(manifest,"e".repeat(64),tables));
+  assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM briefing_result_imports",Integer.class));
+  assertEquals("scheduled",jdbc.queryForObject("SELECT status FROM briefing_rounds WHERE id=?",String.class,ROUND));
+  Files.writeString(file,original);publisher.publish(manifest,"e".repeat(64),tables);
+  Files.writeString(file,"changed again");
+  assertEquals(503,get("/api/v1/briefings?date=2026-10-15&edition=evening",null).statusCode());
+ }
+ @Test void retainedBasisRejectsForeignCandidateAndCannotBeUsedUnderOldFinalization()throws Exception {
+  retained();var round=tables.get("briefing_rounds").getFirst();
+  var guard=new com.zoop.briefing.query.SavedBriefingBasisAuthority(jdbc,ROOT);
+  var candidate=(ObjectNode)tables.get("briefing_personal_pools").getFirst().path("snapshot").path("candidates").get(0).deepCopy();
+  assertTrue(guard.allowsCandidate(round.path("published_payload"),round.path("public_snapshot"),candidate));
+  candidate.put("issueId","foreign-independent-issue");
+  assertFalse(guard.allowsCandidate(round.path("published_payload"),round.path("public_snapshot"),candidate));
+  ((ObjectNode)manifest.path("finalization")).put("schemaVersion","briefing-finalization-v1");
+  assertThrows(RuntimeException.class,()->publisher.publish(manifest,"e".repeat(64),tables));
+ }
+ Path retained()throws Exception {
+  ObjectNode round=(ObjectNode)tables.get("briefing_rounds").getFirst();
+  var payload=(ObjectNode)round.path("published_payload").deepCopy();payload.putNull("graphVersion");
+  ((ObjectNode)payload.path("metadata")).putNull("graphVersion");
+  var snapshot=(ObjectNode)round.path("public_snapshot").deepCopy();
+  var pool=tables.get("briefing_personal_pools").getFirst();
+  var proof=JSON.createObjectNode().put("schemaVersion","briefing-retained-result-basis-v1")
+   .put("sourceManifestSha256","a".repeat(64)).put("roundId",ROUND)
+   .put("cutoff",payload.path("dataWindow").path("end").asString()).put("poolId",pool.path("id").asString());
+  proof.set("payload",payload.deepCopy());proof.set("snapshot",snapshot.deepCopy());proof.set("pool",pool.path("snapshot").deepCopy());
+  proof.putObject("provenance").put("origin","retained-generated-results")
+   .put("nativeGraphRegistration","not-performed").put("newSemanticVerification","not-performed");
+  ArtifactFileStore.StoredFile file;
+  try(var store=ArtifactFileStore.at(ROOT).open()){file=store.put("briefing_input","retained-result.json",JSON.writeValueAsBytes(proof));}
+  String id="retained-basis-"+file.sha256();
+  jdbc.update("INSERT INTO artifacts(id,kind,storage_uri,sha256,bytes,media_type,created_at) VALUES(?,'briefing_input',?,?,?,'application/json',now())",id,file.uri(),file.sha256(),file.bytes());
+  var artifacts=new ArrayList<>(tables.get("artifacts"));artifacts.add(jdbc.queryForObject("SELECT to_jsonb(a)::text FROM artifacts a WHERE id=?",(r,i)->JSON.readTree(r.getString(1)),id));tables.put("artifacts",artifacts);
+  var pin=snapshot.putObject("retainedBasis").put("artifactId",id).put("sha256",file.sha256());
+  round.putNull("graph_version_id");round.set("published_payload",payload);round.set("public_snapshot",snapshot);
+  jdbc.update("UPDATE briefing_rounds SET graph_version_id=NULL,published_payload=?::jsonb,public_snapshot=?::jsonb,payload_sha256=encode(sha256(convert_to((?::jsonb)::text,'UTF8')),'hex') WHERE id=?",payload.toString(),snapshot.toString(),payload.toString(),ROUND);
+  var f=(ObjectNode)manifest.path("finalization");f.put("schemaVersion","briefing-finalization-v2").put("sourceManifestSha256","a".repeat(64));
+  var g=(ObjectNode)f.path("rounds").get(0);g.putNull("graphVersion").putNull("snapshotSha256");g.set("retainedBasis",pin.deepCopy());
+  return ROOT.resolve(file.uri().substring("artifact-root:".length()));
+ }
  @Test void declaredGraphCannotReplaceMissingRealRegistrationAndAllWritesRollback(){
   ((ObjectNode)manifest.path("finalization").path("rounds").get(0)).put("snapshotSha256","f".repeat(64));
   assertThrows(RuntimeException.class,()->publisher.publish(manifest,"e".repeat(64),tables));

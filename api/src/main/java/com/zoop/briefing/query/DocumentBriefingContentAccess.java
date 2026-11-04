@@ -35,6 +35,7 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
     private final BriefingReplayReadPolicy replay;
     private final BriefingGraphContentAuthority graph;
     private final java.nio.file.Path artifactRoot;
+    private final SavedBriefingBasisAuthority retained;
 
     @Autowired
     public DocumentBriefingContentAccess(JdbcTemplate jdbc, DocumentReadProperties properties, Clock clock,
@@ -45,6 +46,7 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
         this.replay = replay;
         this.graph = graph;
         this.artifactRoot = properties.artifactRootPath();
+        this.retained = new SavedBriefingBasisAuthority(jdbc, this.artifactRoot);
     }
 
     @Override
@@ -149,6 +151,7 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
 
     private boolean sources(JsonNode publishedPayload, JsonNode publicSnapshot, GrantRegistry current, Instant now, String requestId) {
         try {
+            if (!retained.allows(publishedPayload, publicSnapshot)) return false;
             List<StrictJson.Obj> bindings = StrictJson.Obj.of(publicSnapshot).objects("sourceBindings");
             // Even an honestly empty selected issue set must retain the real sources used to decide it was empty.
             if (bindings.isEmpty()) return false;
