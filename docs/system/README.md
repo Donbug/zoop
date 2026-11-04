@@ -54,8 +54,8 @@ flowchart LR
 
 ### 1. 고정본을 새 날짜 폴더에 저장한다
 
-현재 조합은 **명세 `functional-spec_2026-10-18`, WBS `wbs_2026-11-04`, 요구사항 `requirements-sheet_2026-10-06`**이다. 원본에서 삭제된 이력 탭 두 개(`03-메인-그래프.csv`·`07-AI-챗봇.csv`)는 탭이 마지막으로 남아 있던 `functional-spec_2026-10-12` 고정본에서 읽는다([10-18 원문 갱신 기록](../evidence/doc-delta-2026-10-18.md)). WBS는 공유 원본의 최신 상태를 새 날짜 폴더에 수집하며 XLSX·CSV·수집 시각·SHA-256은 해당 `_collection-manifest.json`에 보존한다. 본문 173개 업무의 A:J 열 계약은 유지한다. 이전 고정본과 [10-12 기록](../evidence/doc-delta-2026-10-12.md) 등 과거 갱신 기록은 이력으로 보존한다.
-이번 WBS 고정본은 표지 버전 `v0.3`·최종 수정일 `2026-11-04`를 2026-11-04 19:46(KST)에 수집했다. [수집 manifest](../evidence/raw/wbs_2026-11-04/_collection-manifest.json)에 공개 XLSX 응답 해시와 세 시트의 CSV 매핑을 기록했다. `6.9.15` 일정은 10/24~10/28이며, 표지의 옛 `6.5.13~20` 표기는 현재 `6.6.13~20` 번호와 당시 미산정 상태를 설명하는 이력으로 정정됐다. 생성기는 이 명시적 이력 설명과 현재 미해소 충돌을 구분한다.
+현재 조합은 **명세 `functional-spec_2026-10-18`, WBS `wbs_2026-11-04-r2`, 요구사항 `requirements-sheet_2026-10-06`**이다. 원본에서 삭제된 이력 탭 두 개(`03-메인-그래프.csv`·`07-AI-챗봇.csv`)는 탭이 마지막으로 남아 있던 `functional-spec_2026-10-12` 고정본에서 읽는다([10-18 원문 갱신 기록](../evidence/doc-delta-2026-10-18.md)). WBS는 공유 원본의 최신 상태를 새 날짜 폴더에 수집하며 XLSX·CSV·수집 시각·SHA-256은 해당 `_collection-manifest.json`에 보존한다. 본문 173개 업무의 A:J 열 계약은 유지한다. 이전 고정본과 [10-12 기록](../evidence/doc-delta-2026-10-12.md) 등 과거 갱신 기록은 이력으로 보존한다.
+이번 WBS 고정본은 표지 버전 `v0.3`·최종 수정일 `2026-11-04`를 2026-11-04 20:11(KST)에 재수집했다. [수집 manifest](../evidence/raw/wbs_2026-11-04-r2/_collection-manifest.json)에 공개 XLSX 응답 해시와 세 시트의 CSV 매핑을 기록했다. 같은 날의 [첫 고정본](../evidence/raw/wbs_2026-11-04/_collection-manifest.json)은 보존하며, 후속본에는 검사기 게시와 연속 회차 검증 상태를 보완한 E75·E178 및 표지 B24:E24의 6셀만 변경됐다. J178은 90%를 유지한다. `6.9.15` 일정은 10/24~10/28이며, 표지의 옛 `6.5.13~20` 표기는 현재 `6.6.13~20` 번호와 당시 미산정 상태를 설명하는 이력으로 정정됐다. 생성기는 이 명시적 이력 설명과 현재 미해소 충돌을 구분한다.
 
 ### 2. 기계 추출 원본을 가져온다
 
@@ -64,7 +64,7 @@ uv run --with pyyaml python docs/system/import_sources.py \
   --spec-dir docs/evidence/raw/functional-spec_2026-10-18 \
   --historical-spec-file docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv \
   --historical-spec-file docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv \
-  --wbs-dir docs/evidence/raw/wbs_2026-11-04 \
+  --wbs-dir docs/evidence/raw/wbs_2026-11-04-r2 \
   --requirements-dir docs/evidence/raw/requirements-sheet_2026-10-06
 ```
 

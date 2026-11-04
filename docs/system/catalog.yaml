@@ -1,7 +1,7 @@
 schemaVersion: 1
 sources:
   specDir: docs/evidence/raw/functional-spec_2026-10-18
-  wbsDir: docs/evidence/raw/wbs_2026-11-04
+  wbsDir: docs/evidence/raw/wbs_2026-11-04-r2
   requirementsDir: docs/evidence/raw/requirements-sheet_2026-10-06
   screens: docs/screen-plan/captures/slide-index.json
   gap: docs/evidence/spec-v1.2-gap.md
@@ -31,11 +31,11 @@ fingerprints:
   docs/evidence/raw/requirements-sheet_2026-10-06/3-정책-결정.csv: 3df186b4ea59017eff0adba5901f7a7a8099b3c445bf646c85dccb467b477466
   docs/evidence/raw/requirements-sheet_2026-10-06/_collection-manifest.json: c2f62cdc931ebcbc4fe674847864eb30a9003b1a3350768037156c5078448e90
   docs/evidence/raw/requirements-sheet_2026-10-06/zoop-requirements_2026-10-06.xlsx: cc91b251b5b930cfc005c0aa533b5fe873ac29f6ad85e086f29a9a5293c26d18
-  docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv: 29f66f1adbeb31f46ce748f761030c1e59b49d07f211c0d60117f9887567758b
-  docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv: 47e02f160337849d0b45dbf8133ff7c6b7d4756607106581524798bc8e216306
-  docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv: cbbd26e782be23ec5bf8ed81fbeb863d92927acbb1b639fd0e2c4e419ff83811
-  docs/evidence/raw/wbs_2026-11-04/_collection-manifest.json: 8ea9ea669c64f805d4d1b2089cb41cf3ca30d46b7fa33e58160d84d5b0794952
-  docs/evidence/raw/wbs_2026-11-04/zoop-wbs_2026-11-04.xlsx: 5e7d34eacd1d3a0f712f8a40f383f3a279965736240aa48deda0ac18ea1e377c
+  docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv: 237b57414b9b0bc901f47f694c053cf2b5356f8062ebcde93ab8925c5f38cb39
+  docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv: ede4ae8e2c417d0999d21d7195dd741fc04e26578a172516146debb1f3091a6e
+  docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv: cbbd26e782be23ec5bf8ed81fbeb863d92927acbb1b639fd0e2c4e419ff83811
+  docs/evidence/raw/wbs_2026-11-04-r2/_collection-manifest.json: 747772a771c73ccb381dbb1210806df4b0b72772ef97a9fb5babe9d75e1a8c6f
+  docs/evidence/raw/wbs_2026-11-04-r2/zoop-wbs_2026-11-04-r2.xlsx: ac0b9df78fb13e78675cc0ad96e4cd3e6fc65a0d1272a7679acd6a86e90d7ead
   docs/evidence/spec-v1.2-gap.md: 8e9e87b7dca6169d7c0bd8e42ede6652c85be46909dc91f2f28a366867d125ab
   docs/screen-plan/captures/slide-index.json: b41f5b5eda36d478eed80164415db923d0ae4338d848d5aa82603c64a9391d10
 specs:
@@ -8908,7 +8908,7 @@ wbs:
   progress: '1'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 11
     rowUnit: xlsx-row
 - id: '1.1'
@@ -8923,7 +8923,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 12
     rowUnit: xlsx-row
 - id: '1.2'
@@ -8938,7 +8938,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 13
     rowUnit: xlsx-row
 - id: '1.3'
@@ -8953,7 +8953,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 14
     rowUnit: xlsx-row
 - id: '1.4'
@@ -8968,7 +8968,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 15
     rowUnit: xlsx-row
 - id: '2'
@@ -8983,7 +8983,7 @@ wbs:
   progress: '1'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 16
     rowUnit: xlsx-row
 - id: '2.1'
@@ -8998,7 +8998,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 17
     rowUnit: xlsx-row
 - id: '2.2'
@@ -9013,7 +9013,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 18
     rowUnit: xlsx-row
 - id: '2.3'
@@ -9028,7 +9028,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 19
     rowUnit: xlsx-row
 - id: '3'
@@ -9043,7 +9043,7 @@ wbs:
   progress: '1'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 20
     rowUnit: xlsx-row
 - id: '3.1'
@@ -9058,7 +9058,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 21
     rowUnit: xlsx-row
 - id: '3.2'
@@ -9073,7 +9073,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 22
     rowUnit: xlsx-row
 - id: '3.3'
@@ -9088,7 +9088,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 23
     rowUnit: xlsx-row
 - id: '3.4'
@@ -9103,7 +9103,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 24
     rowUnit: xlsx-row
 - id: '3.5'
@@ -9118,7 +9118,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 25
     rowUnit: xlsx-row
 - id: '3.6'
@@ -9133,7 +9133,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 26
     rowUnit: xlsx-row
 - id: '4'
@@ -9148,7 +9148,7 @@ wbs:
   progress: '1'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 27
     rowUnit: xlsx-row
 - id: '4.1'
@@ -9163,7 +9163,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 28
     rowUnit: xlsx-row
 - id: '4.2'
@@ -9178,7 +9178,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 29
     rowUnit: xlsx-row
 - id: '5'
@@ -9193,7 +9193,7 @@ wbs:
   progress: '1'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 30
     rowUnit: xlsx-row
 - id: '5.1'
@@ -9208,7 +9208,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 31
     rowUnit: xlsx-row
 - id: '5.2'
@@ -9223,7 +9223,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 32
     rowUnit: xlsx-row
 - id: '5.3'
@@ -9238,7 +9238,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 33
     rowUnit: xlsx-row
 - id: '6'
@@ -9253,7 +9253,7 @@ wbs:
   progress: '0.90257'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 34
     rowUnit: xlsx-row
 - id: '6.1'
@@ -9268,7 +9268,7 @@ wbs:
   progress: '1'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 35
     rowUnit: xlsx-row
 - id: 6.1.1
@@ -9283,7 +9283,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 36
     rowUnit: xlsx-row
 - id: 6.1.2
@@ -9298,7 +9298,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 37
     rowUnit: xlsx-row
 - id: 6.1.3
@@ -9313,7 +9313,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 38
     rowUnit: xlsx-row
 - id: 6.1.4
@@ -9334,7 +9334,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 39
     rowUnit: xlsx-row
 - id: 6.1.5
@@ -9349,7 +9349,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 40
     rowUnit: xlsx-row
 - id: '6.2'
@@ -9364,7 +9364,7 @@ wbs:
   progress: '1'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 41
     rowUnit: xlsx-row
 - id: 6.2.1
@@ -9381,7 +9381,7 @@ wbs:
   - FS002
   - FS003
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 42
     rowUnit: xlsx-row
 - id: 6.2.2
@@ -9398,7 +9398,7 @@ wbs:
   - FS004
   - FS061
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 43
     rowUnit: xlsx-row
 - id: 6.2.3
@@ -9415,7 +9415,7 @@ wbs:
   - FS005
   - NFS001
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 44
     rowUnit: xlsx-row
 - id: 6.2.4
@@ -9432,7 +9432,7 @@ wbs:
   - FS001
   - FS006
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 45
     rowUnit: xlsx-row
 - id: 6.2.5
@@ -9448,7 +9448,7 @@ wbs:
   rawSpecIds:
   - FS007
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 46
     rowUnit: xlsx-row
 - id: 6.2.6
@@ -9467,7 +9467,7 @@ wbs:
   - FS005
   - FS006
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 47
     rowUnit: xlsx-row
 - id: 6.2.7
@@ -9484,7 +9484,7 @@ wbs:
   - FS003
   - FS006
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 48
     rowUnit: xlsx-row
 - id: 6.2.8
@@ -9499,7 +9499,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 49
     rowUnit: xlsx-row
 - id: '6.3'
@@ -9514,7 +9514,7 @@ wbs:
   progress: '0.94'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 50
     rowUnit: xlsx-row
 - id: 6.3.1
@@ -9531,7 +9531,7 @@ wbs:
   - FS008
   - FS013
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 51
     rowUnit: xlsx-row
 - id: 6.3.2
@@ -9549,7 +9549,7 @@ wbs:
   - FS010
   - FS062
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 52
     rowUnit: xlsx-row
 - id: 6.3.3
@@ -9565,7 +9565,7 @@ wbs:
   rawSpecIds:
   - FS011-01
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 53
     rowUnit: xlsx-row
 - id: 6.3.4
@@ -9581,7 +9581,7 @@ wbs:
   rawSpecIds:
   - FS012
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 54
     rowUnit: xlsx-row
 - id: 6.3.5
@@ -9597,7 +9597,7 @@ wbs:
   rawSpecIds:
   - FS013
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 55
     rowUnit: xlsx-row
 - id: 6.3.6
@@ -9618,7 +9618,7 @@ wbs:
   rawSpecIds:
   - FS014
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 56
     rowUnit: xlsx-row
 - id: 6.3.7
@@ -9635,7 +9635,7 @@ wbs:
   - FS015
   - FS016
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 57
     rowUnit: xlsx-row
 - id: 6.3.8
@@ -9651,7 +9651,7 @@ wbs:
   rawSpecIds:
   - FS008
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 58
     rowUnit: xlsx-row
 - id: 6.3.9
@@ -9669,7 +9669,7 @@ wbs:
   - FS010
   - FS062
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 59
     rowUnit: xlsx-row
 - id: 6.3.10
@@ -9686,7 +9686,7 @@ wbs:
   - FS015
   - FS016
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 60
     rowUnit: xlsx-row
 - id: 6.3.11
@@ -9706,7 +9706,7 @@ wbs:
   progress: '0.5'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 61
     rowUnit: xlsx-row
 - id: '6.4'
@@ -9721,7 +9721,7 @@ wbs:
   progress: '1'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 62
     rowUnit: xlsx-row
 - id: 6.4.1
@@ -9738,7 +9738,7 @@ wbs:
   - FS054
   - FS027
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 63
     rowUnit: xlsx-row
 - id: 6.4.2
@@ -9754,7 +9754,7 @@ wbs:
   rawSpecIds:
   - FS027
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 64
     rowUnit: xlsx-row
 - id: 6.4.3
@@ -9771,7 +9771,7 @@ wbs:
   - FS039
   - FS054
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 65
     rowUnit: xlsx-row
 - id: 6.4.4
@@ -9788,7 +9788,7 @@ wbs:
   - FS009
   - FS062
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 66
     rowUnit: xlsx-row
 - id: 6.4.5
@@ -9804,7 +9804,7 @@ wbs:
   rawSpecIds:
   - FS012
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 67
     rowUnit: xlsx-row
 - id: 6.4.6
@@ -9822,7 +9822,7 @@ wbs:
   - FS054
   - FS062
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 68
     rowUnit: xlsx-row
 - id: 6.4.7
@@ -9839,7 +9839,7 @@ wbs:
   - FS037
   - FS027
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 69
     rowUnit: xlsx-row
 - id: 6.4.8
@@ -9854,7 +9854,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 70
     rowUnit: xlsx-row
 - id: '6.5'
@@ -9869,7 +9869,7 @@ wbs:
   progress: '0.8730769231'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 71
     rowUnit: xlsx-row
 - id: 6.5.1
@@ -9892,7 +9892,7 @@ wbs:
   - FS078
   - FS080
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 72
     rowUnit: xlsx-row
 - id: 6.5.2
@@ -9915,7 +9915,7 @@ wbs:
   - FS075
   - FS077
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 73
     rowUnit: xlsx-row
 - id: 6.5.3
@@ -9937,7 +9937,7 @@ wbs:
   rawSpecIds:
   - FS057
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 74
     rowUnit: xlsx-row
 - id: 6.5.4
@@ -9948,8 +9948,9 @@ wbs:
     운영 보완으로 09~18 운영 구간 정기 수집, 야간 마지막 성공 커서와 검증된 겹침 범위, 문서·회차 멱등 재개를 검증합니다. 현황: #55는
     실제 공급원 연결·writer 운영·전체 수용이 남아 진행 중입니다. 하위 #387의 내부 회차 HTTP는 #431·#487로 수용 기준을
     충족했습니다. #532·#534의 영업일·운영 계약과 #537·#567의 실제 서비스·앱·PG 합성 두 회차 검증도 반영됐습니다. #407은
-    동일 합성 3회차 연속 수입의 안정 ID·대표값·sourceSupport·철회 통합 확인이 남아 OPEN을 유지합니다. 내부 API 완료와
-    AWS 무인 운영·공개 활성화를 구분합니다.'
+    합성 3회차 freeze·비활성 수입에서 안정 ID·대표값·sourceSupport와 결정 철회 반영을 확인했습니다. 다만 두 번째 원본의
+    공개 전환은 현행 누적 compose 계약에 따라 거절돼, 연속 공개·철회 전파 계약을 확정하기 전까지 OPEN을 유지합니다. 내부 API
+    완료와 AWS 무인 운영·공개 활성화를 구분합니다.'
   owners: 윤서진
   start: '2026-10-07'
   end: '2026-10-21'
@@ -9961,7 +9962,7 @@ wbs:
   - FS079
   - FS081
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 75
     rowUnit: xlsx-row
 - id: 6.5.5
@@ -9984,7 +9985,7 @@ wbs:
   - FS080
   - FS081
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 76
     rowUnit: xlsx-row
 - id: 6.5.6
@@ -10005,7 +10006,7 @@ wbs:
   - FS063
   - FS074
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 77
     rowUnit: xlsx-row
 - id: 6.5.7
@@ -10027,7 +10028,7 @@ wbs:
   - FS076
   - FS079
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 78
     rowUnit: xlsx-row
 - id: 6.5.8
@@ -10046,7 +10047,7 @@ wbs:
   progress: '0.8'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 79
     rowUnit: xlsx-row
 - id: '6.6'
@@ -10061,7 +10062,7 @@ wbs:
   progress: '0.93828125'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 80
     rowUnit: xlsx-row
 - id: 6.6.1
@@ -10082,7 +10083,7 @@ wbs:
   rawSpecIds:
   - FS017
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 81
     rowUnit: xlsx-row
 - id: 6.6.2
@@ -10102,7 +10103,7 @@ wbs:
   rawSpecIds:
   - FS018
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 82
     rowUnit: xlsx-row
 - id: 6.6.3
@@ -10122,7 +10123,7 @@ wbs:
   rawSpecIds:
   - FS019
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 83
     rowUnit: xlsx-row
 - id: 6.6.4
@@ -10142,7 +10143,7 @@ wbs:
   rawSpecIds:
   - FS020
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 84
     rowUnit: xlsx-row
 - id: 6.6.5
@@ -10163,7 +10164,7 @@ wbs:
   rawSpecIds:
   - FS021
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 85
     rowUnit: xlsx-row
 - id: 6.6.6
@@ -10188,7 +10189,7 @@ wbs:
   - FS022
   - FS079
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 86
     rowUnit: xlsx-row
 - id: 6.6.7
@@ -10210,7 +10211,7 @@ wbs:
   rawSpecIds:
   - FS022
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 87
     rowUnit: xlsx-row
 - id: 6.6.8
@@ -10231,7 +10232,7 @@ wbs:
   rawSpecIds:
   - FS023
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 88
     rowUnit: xlsx-row
 - id: 6.6.9
@@ -10255,7 +10256,7 @@ wbs:
   rawSpecIds:
   - FS024
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 89
     rowUnit: xlsx-row
 - id: 6.6.10
@@ -10278,7 +10279,7 @@ wbs:
   rawSpecIds:
   - FS025
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 90
     rowUnit: xlsx-row
 - id: 6.6.11
@@ -10294,7 +10295,7 @@ wbs:
   rawSpecIds:
   - FS026
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 91
     rowUnit: xlsx-row
 - id: 6.6.12
@@ -10310,7 +10311,7 @@ wbs:
   rawSpecIds:
   - FS027
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 92
     rowUnit: xlsx-row
 - id: 6.6.13
@@ -10333,7 +10334,7 @@ wbs:
   - FS058
   - FS063
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 93
     rowUnit: xlsx-row
 - id: 6.6.14
@@ -10357,7 +10358,7 @@ wbs:
   - FS056
   - FS058
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 94
     rowUnit: xlsx-row
 - id: 6.6.15
@@ -10381,7 +10382,7 @@ wbs:
   - FS058
   - FS064
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 95
     rowUnit: xlsx-row
 - id: 6.6.16
@@ -10405,7 +10406,7 @@ wbs:
   - FS056
   - FS058
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 96
     rowUnit: xlsx-row
 - id: 6.6.17
@@ -10429,7 +10430,7 @@ wbs:
   - FS055
   - FS058
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 97
     rowUnit: xlsx-row
 - id: 6.6.18
@@ -10452,7 +10453,7 @@ wbs:
   - FS078
   - FS022
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 98
     rowUnit: xlsx-row
 - id: 6.6.19
@@ -10476,7 +10477,7 @@ wbs:
   - FS055
   - FS059
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 99
     rowUnit: xlsx-row
 - id: 6.6.20
@@ -10500,7 +10501,7 @@ wbs:
   - FS059
   - FS067-03
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 100
     rowUnit: xlsx-row
 - id: 6.6.21
@@ -10523,7 +10524,7 @@ wbs:
   - FS019
   - FS026
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 101
     rowUnit: xlsx-row
 - id: 6.6.22
@@ -10544,7 +10545,7 @@ wbs:
   - FS021
   - FS024
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 102
     rowUnit: xlsx-row
 - id: 6.6.23
@@ -10566,7 +10567,7 @@ wbs:
   - FS026
   - FS027
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 103
     rowUnit: xlsx-row
 - id: 6.6.24
@@ -10587,7 +10588,7 @@ wbs:
   - FS023
   - FS024
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 104
     rowUnit: xlsx-row
 - id: 6.6.25
@@ -10607,7 +10608,7 @@ wbs:
   rawSpecIds:
   - FS024
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 105
     rowUnit: xlsx-row
 - id: 6.6.26
@@ -10629,7 +10630,7 @@ wbs:
   - FS022
   - FS024
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 106
     rowUnit: xlsx-row
 - id: 6.6.27
@@ -10649,7 +10650,7 @@ wbs:
   - FS017
   - FS027
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 107
     rowUnit: xlsx-row
 - id: '6.7'
@@ -10664,7 +10665,7 @@ wbs:
   progress: '0.9271428571'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 108
     rowUnit: xlsx-row
 - id: 6.7.1
@@ -10680,7 +10681,7 @@ wbs:
   rawSpecIds:
   - FS037
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 109
     rowUnit: xlsx-row
 - id: 6.7.2
@@ -10701,7 +10702,7 @@ wbs:
   rawSpecIds:
   - FS038
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 110
     rowUnit: xlsx-row
 - id: 6.7.3
@@ -10717,7 +10718,7 @@ wbs:
   rawSpecIds:
   - FS040
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 111
     rowUnit: xlsx-row
 - id: 6.7.4
@@ -10737,7 +10738,7 @@ wbs:
   rawSpecIds:
   - FS041
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 112
     rowUnit: xlsx-row
 - id: 6.7.5
@@ -10758,7 +10759,7 @@ wbs:
   rawSpecIds:
   - FS042
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 113
     rowUnit: xlsx-row
 - id: 6.7.6
@@ -10774,7 +10775,7 @@ wbs:
   rawSpecIds:
   - FS043
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 114
     rowUnit: xlsx-row
 - id: 6.7.7
@@ -10795,7 +10796,7 @@ wbs:
   rawSpecIds:
   - FS044
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 115
     rowUnit: xlsx-row
 - id: 6.7.8
@@ -10815,7 +10816,7 @@ wbs:
   - FS041
   - FS044
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 116
     rowUnit: xlsx-row
 - id: 6.7.9
@@ -10833,7 +10834,7 @@ wbs:
   - FS041
   - FS043
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 117
     rowUnit: xlsx-row
 - id: 6.7.10
@@ -10850,7 +10851,7 @@ wbs:
   - FS038
   - FS044
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 118
     rowUnit: xlsx-row
 - id: 6.7.11
@@ -10868,7 +10869,7 @@ wbs:
   - FS040
   - FS044
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 119
     rowUnit: xlsx-row
 - id: 6.7.12
@@ -10886,7 +10887,7 @@ wbs:
   - FS041
   - FS044
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 120
     rowUnit: xlsx-row
 - id: 6.7.13
@@ -10906,7 +10907,7 @@ wbs:
   progress: '0.5'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 121
     rowUnit: xlsx-row
 - id: '6.8'
@@ -10921,7 +10922,7 @@ wbs:
   progress: '0.788'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 122
     rowUnit: xlsx-row
 - id: 6.8.1
@@ -10944,7 +10945,7 @@ wbs:
   rawSpecIds:
   - FS028
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 123
     rowUnit: xlsx-row
 - id: 6.8.2
@@ -10967,7 +10968,7 @@ wbs:
   rawSpecIds:
   - FS029
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 124
     rowUnit: xlsx-row
 - id: 6.8.3
@@ -10988,7 +10989,7 @@ wbs:
   rawSpecIds:
   - FS030
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 125
     rowUnit: xlsx-row
 - id: 6.8.4
@@ -11007,7 +11008,7 @@ wbs:
   rawSpecIds:
   - FS031
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 126
     rowUnit: xlsx-row
 - id: 6.8.5
@@ -11028,7 +11029,7 @@ wbs:
   rawSpecIds:
   - FS032
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 127
     rowUnit: xlsx-row
 - id: 6.8.6
@@ -11048,7 +11049,7 @@ wbs:
   rawSpecIds:
   - FS033
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 128
     rowUnit: xlsx-row
 - id: 6.8.7
@@ -11069,7 +11070,7 @@ wbs:
   rawSpecIds:
   - FS034
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 129
     rowUnit: xlsx-row
 - id: 6.8.8
@@ -11089,7 +11090,7 @@ wbs:
   rawSpecIds:
   - FS035
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 130
     rowUnit: xlsx-row
 - id: 6.8.9
@@ -11110,7 +11111,7 @@ wbs:
   rawSpecIds:
   - FS036
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 131
     rowUnit: xlsx-row
 - id: 6.8.10
@@ -11131,7 +11132,7 @@ wbs:
   rawSpecIds:
   - FS066-01
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 132
     rowUnit: xlsx-row
 - id: 6.8.11
@@ -11153,7 +11154,7 @@ wbs:
   - FS033
   - FS035
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 133
     rowUnit: xlsx-row
 - id: 6.8.12
@@ -11175,7 +11176,7 @@ wbs:
   - FS033
   - FS035
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 134
     rowUnit: xlsx-row
 - id: 6.8.13
@@ -11192,7 +11193,7 @@ wbs:
   - FS032
   - FS035
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 135
     rowUnit: xlsx-row
 - id: 6.8.14
@@ -11210,7 +11211,7 @@ wbs:
   - FS036
   - FS066-01
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 136
     rowUnit: xlsx-row
 - id: 6.8.15
@@ -11232,7 +11233,7 @@ wbs:
   progress: '0.3'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 137
     rowUnit: xlsx-row
 - id: '6.9'
@@ -11247,7 +11248,7 @@ wbs:
   progress: '0.996'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 138
     rowUnit: xlsx-row
 - id: 6.9.1
@@ -11264,7 +11265,7 @@ wbs:
   - FS025
   - FS045
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 139
     rowUnit: xlsx-row
 - id: 6.9.2
@@ -11284,7 +11285,7 @@ wbs:
   rawSpecIds:
   - FS046
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 140
     rowUnit: xlsx-row
 - id: 6.9.3
@@ -11305,7 +11306,7 @@ wbs:
   rawSpecIds:
   - FS047
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 141
     rowUnit: xlsx-row
 - id: 6.9.4
@@ -11325,7 +11326,7 @@ wbs:
   rawSpecIds:
   - FS048
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 142
     rowUnit: xlsx-row
 - id: 6.9.5
@@ -11345,7 +11346,7 @@ wbs:
   rawSpecIds:
   - FS049
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 143
     rowUnit: xlsx-row
 - id: 6.9.6
@@ -11365,7 +11366,7 @@ wbs:
   rawSpecIds:
   - FS050
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 144
     rowUnit: xlsx-row
 - id: 6.9.7
@@ -11385,7 +11386,7 @@ wbs:
   rawSpecIds:
   - FS051
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 145
     rowUnit: xlsx-row
 - id: 6.9.8
@@ -11405,7 +11406,7 @@ wbs:
   rawSpecIds:
   - FS051
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 146
     rowUnit: xlsx-row
 - id: 6.9.9
@@ -11425,7 +11426,7 @@ wbs:
   rawSpecIds:
   - FS051
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 147
     rowUnit: xlsx-row
 - id: 6.9.10
@@ -11446,7 +11447,7 @@ wbs:
   rawSpecIds:
   - FS060
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 148
     rowUnit: xlsx-row
 - id: 6.9.11
@@ -11470,7 +11471,7 @@ wbs:
   - FS047
   - FS048
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 149
     rowUnit: xlsx-row
 - id: 6.9.12
@@ -11490,7 +11491,7 @@ wbs:
   rawSpecIds:
   - FS047
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 150
     rowUnit: xlsx-row
 - id: 6.9.13
@@ -11515,7 +11516,7 @@ wbs:
   - FS053
   - NFS003
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 151
     rowUnit: xlsx-row
 - id: 6.9.14
@@ -11536,7 +11537,7 @@ wbs:
   - FS053
   - NFS003
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 152
     rowUnit: xlsx-row
 - id: 6.9.15
@@ -11556,7 +11557,7 @@ wbs:
   progress: '0.9'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 153
     rowUnit: xlsx-row
 - id: '6.10'
@@ -11571,7 +11572,7 @@ wbs:
   progress: '0.9391428571'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 154
     rowUnit: xlsx-row
 - id: 6.10.1
@@ -11588,7 +11589,7 @@ wbs:
   - FS073
   - NFS001
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 155
     rowUnit: xlsx-row
 - id: 6.10.2
@@ -11609,7 +11610,7 @@ wbs:
   rawSpecIds:
   - FS072
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 156
     rowUnit: xlsx-row
 - id: 6.10.3
@@ -11626,7 +11627,7 @@ wbs:
   - FS069-01
   - FS069-02
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 157
     rowUnit: xlsx-row
 - id: 6.10.4
@@ -11642,7 +11643,7 @@ wbs:
   rawSpecIds:
   - FS065
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 158
     rowUnit: xlsx-row
 - id: 6.10.5
@@ -11664,7 +11665,7 @@ wbs:
   - FS066-01
   - FS066-02
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 159
     rowUnit: xlsx-row
 - id: 6.10.6
@@ -11685,7 +11686,7 @@ wbs:
   rawSpecIds:
   - FS067-01
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 160
     rowUnit: xlsx-row
 - id: 6.10.7
@@ -11707,7 +11708,7 @@ wbs:
   - FS067-02
   - FS067-03
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 161
     rowUnit: xlsx-row
 - id: 6.10.8
@@ -11728,7 +11729,7 @@ wbs:
   rawSpecIds:
   - FS068
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 162
     rowUnit: xlsx-row
 - id: 6.10.9
@@ -11752,7 +11753,7 @@ wbs:
   - FS070-01
   - FS070-02
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 163
     rowUnit: xlsx-row
 - id: 6.10.10
@@ -11774,7 +11775,7 @@ wbs:
   - FS071-01
   - FS071-02
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 164
     rowUnit: xlsx-row
 - id: 6.10.11
@@ -11795,7 +11796,7 @@ wbs:
   rawSpecIds:
   - FS066-03
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 165
     rowUnit: xlsx-row
 - id: 6.10.12
@@ -11817,7 +11818,7 @@ wbs:
   - FS072
   - NFS008
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 166
     rowUnit: xlsx-row
 - id: 6.10.13
@@ -11834,7 +11835,7 @@ wbs:
   - FS073
   - NFS001
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 167
     rowUnit: xlsx-row
 - id: 6.10.14
@@ -11850,7 +11851,7 @@ wbs:
   rawSpecIds:
   - FS072
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 168
     rowUnit: xlsx-row
 - id: 6.10.15
@@ -11868,7 +11869,7 @@ wbs:
   - FS066-02
   - FS066-03
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 169
     rowUnit: xlsx-row
 - id: 6.10.16
@@ -11890,7 +11891,7 @@ wbs:
   - FS067-02
   - FS067-03
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 170
     rowUnit: xlsx-row
 - id: 6.10.17
@@ -11917,7 +11918,7 @@ wbs:
   - FS071-02
   - FS068
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 171
     rowUnit: xlsx-row
 - id: 6.10.18
@@ -11941,7 +11942,7 @@ wbs:
   - FS073
   - NFS008
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 172
     rowUnit: xlsx-row
 - id: 6.10.19
@@ -11959,7 +11960,7 @@ wbs:
   progress: '0.7'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 173
     rowUnit: xlsx-row
 - id: '6.11'
@@ -11974,7 +11975,7 @@ wbs:
   progress: '0.55375'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 174
     rowUnit: xlsx-row
 - id: 6.11.1
@@ -11994,7 +11995,7 @@ wbs:
   rawSpecIds:
   - FS067-02
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 175
     rowUnit: xlsx-row
 - id: 6.11.2
@@ -12018,7 +12019,7 @@ wbs:
   progress: '0.9'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 176
     rowUnit: xlsx-row
 - id: 6.11.3
@@ -12038,7 +12039,7 @@ wbs:
   progress: '0.6'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 177
     rowUnit: xlsx-row
 - id: 6.11.4
@@ -12048,9 +12049,9 @@ wbs:
   deliverable: '그래프·근거·버전·기업/사건 연결을 검증합니다. 현황: #213·#266·#269·#338·#364·#493·#511·#524·#527의
     기반 기능·근거·버전 무결성 보강에 이어 동일 입력 producer CLI→Neo4j→앱 receipt·snapshot·evidence→공개
     HTTP 검사기와 기존 안내 문서를 현행 main 기준으로 로컬 통합·실행했습니다. 핀·관계·인용 좌표, 멱등 재생·권리 철회 3사례와 오매핑·변조
-    거절을 확인했습니다. 활성화 검증은 새 로컬 DB에 한정하며 팀 공개·PR·병합이 남아 #149는 OPEN을 유지합니다. 제품 HTTP 로컬
-    7,000회 응답은 일치했으나 DB 엔진 우열은 미확정입니다. RAG는 39건 완료·4건 검증 거절·1건 응답 미확정·196건 미실행으로 중단됐고
-    품질 비교는 미실행입니다. #556 클라우드 교정 후보는 미활성화, 69건 확장본은 로컬 범위입니다.'
+    거절을 확인했습니다. 활성화 검증은 새 로컬 DB에 한정하며 검사기와 실행 안내는 PR #574로 게시했으며, CI·검토·병합이 남아 #149는
+    OPEN을 유지합니다. 제품 HTTP 로컬 7,000회 응답은 일치했으나 DB 엔진 우열은 미확정입니다. RAG는 39건 완료·4건 검증 거절·1건
+    응답 미확정·196건 미실행으로 중단됐고 품질 비교는 미실행입니다. #556 클라우드 교정 후보는 미활성화, 69건 확장본은 로컬 범위입니다.'
   owners: 윤서진
   start: '2026-10-12'
   end: '2026-10-27'
@@ -12058,7 +12059,7 @@ wbs:
   progress: '0.9'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 178
     rowUnit: xlsx-row
 - id: 6.11.5
@@ -12080,7 +12081,7 @@ wbs:
   progress: '0.3'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 179
     rowUnit: xlsx-row
 - id: 6.11.6
@@ -12102,7 +12103,7 @@ wbs:
   progress: '0.4'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 180
     rowUnit: xlsx-row
 - id: 6.11.7
@@ -12121,7 +12122,7 @@ wbs:
   progress: '0.3'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 181
     rowUnit: xlsx-row
 - id: 6.11.8
@@ -12145,7 +12146,7 @@ wbs:
   progress: '0.6'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 182
     rowUnit: xlsx-row
 - id: 6.11.9
@@ -12163,13 +12164,13 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
     row: 183
     rowUnit: xlsx-row
 wbsSources:
   bodyHeader:
     source:
-      path: docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv
+      path: docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv
       row: 10
       rowUnit: xlsx-row
     columns:
@@ -12184,9 +12185,9 @@ wbsSources:
       가중치: 8
       진행률: 9
   ancillaryRows:
-    docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv:
+    docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv:
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 4
         rowUnit: xlsx-row
       cells:
@@ -12198,7 +12199,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 6
         rowUnit: xlsx-row
       cells:
@@ -12210,7 +12211,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 7
         rowUnit: xlsx-row
       cells:
@@ -12222,7 +12223,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 8
         rowUnit: xlsx-row
       cells:
@@ -12234,7 +12235,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 9
         rowUnit: xlsx-row
       cells:
@@ -12246,7 +12247,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 10
         rowUnit: xlsx-row
       cells:
@@ -12258,7 +12259,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 11
         rowUnit: xlsx-row
       cells:
@@ -12270,7 +12271,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 12
         rowUnit: xlsx-row
       cells:
@@ -12282,7 +12283,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 13
         rowUnit: xlsx-row
       cells:
@@ -12294,7 +12295,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 15
         rowUnit: xlsx-row
       cells:
@@ -12306,7 +12307,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 16
         rowUnit: xlsx-row
       cells:
@@ -12318,7 +12319,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 17
         rowUnit: xlsx-row
       cells:
@@ -12330,7 +12331,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 18
         rowUnit: xlsx-row
       cells:
@@ -12342,7 +12343,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 19
         rowUnit: xlsx-row
       cells:
@@ -12356,7 +12357,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 20
         rowUnit: xlsx-row
       cells:
@@ -12373,7 +12374,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 21
         rowUnit: xlsx-row
       cells:
@@ -12387,7 +12388,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 22
         rowUnit: xlsx-row
       cells:
@@ -12405,7 +12406,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 23
         rowUnit: xlsx-row
       cells:
@@ -12423,7 +12424,21 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
+        row: 24
+        rowUnit: xlsx-row
+      cells:
+      - ''
+      - v0.3 게시·검증 상태 갱신
+      - '2026-11-04'
+      - AI 담당(윤서진)
+      - 'AI 정합성 검사기와 실행 안내는 PR #574로 게시했고 CI·검토·병합을 기다린다. WBS 고정본·추적표 갱신은 PR #573으로
+        게시했다. #407의 합성 3회차 freeze·비활성 수입 검증은 통과했으나 연속 공개 전환은 현행 compose 계약과의 조정이 필요해
+        OPEN을 유지한다. E75·E178의 현재 상태만 보완했으며 담당·일정·가중치·진행률은 그대로다.'
+      - ''
+      - ''
+    - source:
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 32
         rowUnit: xlsx-row
       cells:
@@ -12435,7 +12450,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 33
         rowUnit: xlsx-row
       cells:
@@ -12447,7 +12462,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 34
         rowUnit: xlsx-row
       cells:
@@ -12459,7 +12474,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 35
         rowUnit: xlsx-row
       cells:
@@ -12471,7 +12486,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 36
         rowUnit: xlsx-row
       cells:
@@ -12483,7 +12498,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv
         row: 37
         rowUnit: xlsx-row
       cells:
@@ -12494,9 +12509,9 @@ wbsSources:
       - ''
       - ''
       - ''
-    docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv:
+    docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv:
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 1
         rowUnit: xlsx-row
       cells:
@@ -12507,7 +12522,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 2
         rowUnit: xlsx-row
       cells:
@@ -12518,7 +12533,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 4
         rowUnit: xlsx-row
       cells:
@@ -12529,7 +12544,7 @@ wbsSources:
       - 핵심 선행조건
       - 일정 배치 원칙
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 5
         rowUnit: xlsx-row
       cells:
@@ -12540,7 +12555,7 @@ wbsSources:
       - 공통 API·인증 구조
       - 선행 API 완료와 동시에 병렬 착수
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 6
         rowUnit: xlsx-row
       cells:
@@ -12551,7 +12566,7 @@ wbsSources:
       - 회원 상태·가상계좌·관심종목 API
       - 선행 API 완료와 동시에 병렬 착수
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 7
         rowUnit: xlsx-row
       cells:
@@ -12562,7 +12577,7 @@ wbsSources:
       - 스키마·수집 정책·AI 분석 계약
       - 선행 API 완료와 동시에 병렬 착수
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 8
         rowUnit: xlsx-row
       cells:
@@ -12573,7 +12588,7 @@ wbsSources:
       - FS074~FS081 분석·검증·GraphDB 반영, 기존 조회 API
       - 기존 조회 11개와 파이프라인 상세 8개로 구성한다.
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 9
         rowUnit: xlsx-row
       cells:
@@ -12584,7 +12599,7 @@ wbsSources:
       - 기업·시장·근거 조회 API
       - 선행 API 완료와 동시에 병렬 착수
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 10
         rowUnit: xlsx-row
       cells:
@@ -12595,7 +12610,7 @@ wbsSources:
       - 이슈 선정·시장 데이터·관계 그래프
       - P1 우선 구현 후 P2·우선순위 미정 3건 후반 배치
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 11
         rowUnit: xlsx-row
       cells:
@@ -12606,7 +12621,7 @@ wbsSources:
       - 질의 분기 거버넌스·그래프/근거 조회
       - 선행 API 완료와 동시에 병렬 착수
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 12
         rowUnit: xlsx-row
       cells:
@@ -12617,7 +12632,7 @@ wbsSources:
       - 운영 데이터·권한·검토 워크플로
       - P1 우선 구현 후 P2·우선순위 미정 3건 후반 배치
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 16
         rowUnit: xlsx-row
       cells:
@@ -12628,7 +12643,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 17
         rowUnit: xlsx-row
       cells:
@@ -12639,7 +12654,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 18
         rowUnit: xlsx-row
       cells:
@@ -12650,7 +12665,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 19
         rowUnit: xlsx-row
       cells:
@@ -12661,7 +12676,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 20
         rowUnit: xlsx-row
       cells:
@@ -12672,7 +12687,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 21
         rowUnit: xlsx-row
       cells:
@@ -12683,7 +12698,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 23
         rowUnit: xlsx-row
       cells:
@@ -12694,7 +12709,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 24
         rowUnit: xlsx-row
       cells:
@@ -12705,7 +12720,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 25
         rowUnit: xlsx-row
       cells:
@@ -12716,7 +12731,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 26
         rowUnit: xlsx-row
       cells:
@@ -12727,7 +12742,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 27
         rowUnit: xlsx-row
       cells:
@@ -12738,7 +12753,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 28
         rowUnit: xlsx-row
       cells:
@@ -12749,7 +12764,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 29
         rowUnit: xlsx-row
       cells:
@@ -12760,7 +12775,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 30
         rowUnit: xlsx-row
       cells:
@@ -12772,7 +12787,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 31
         rowUnit: xlsx-row
       cells:
@@ -12783,7 +12798,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-11-04/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv
         row: 32
         rowUnit: xlsx-row
       cells:

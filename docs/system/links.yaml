@@ -243,7 +243,7 @@ wbsNotes:
     ownerRequest: "WBS 담당자가 6.5.5와 6.6.19~20의 GraphDB 쓰기/공개 반영/조회 책임 인터페이스와 담당을 일치시켜 주세요."
 wbsMigration:
   previousWbsSource: "docs/evidence/raw/wbs_2026-10-03/01-프로젝트-WBS.csv"
-  currentWbsSource: "docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv"
+  currentWbsSource: "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv"
   headerComparison: "10-12와 11-04 고정본의 본문 xlsx10행 A:J = 구분/WBS/업무/유형/산출물/수행인력/시작일/종료일/가중치/진행률. 열 계약과 업무173개를 유지한다. 6.5.2는 이슈·근거 문서 구분 관리, 6.6.4는 기업 기본 정보·시세·주요 지표 조회와 미제공 구분이라는 기존 의미를 유지하며 최신 원문 제목에 맞췄다. 담당·일정·산출물·진행률은 새 고정본 원문으로 가져오며 번호만으로 다른 업무에 연결하지 않는다."
   previousTaskCount: 117
   currentTaskCount: 173

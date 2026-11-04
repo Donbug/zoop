@@ -1,0 +1,38 @@
+{
+  "result": "passed",
+  "sheets": [
+    {
+      "sheet": "표지·변경이력",
+      "csv": "docs/evidence/raw/wbs_2026-11-04-r2/00-표지-변경이력.csv",
+      "rows": 37,
+      "columns": 7,
+      "cells": 259,
+      "sha256": "21efca6f6c6ce3893b2321ce307e30706b7e887f43e063bd3c0f5a59d2816fee",
+      "result": "passed"
+    },
+    {
+      "sheet": "프로젝트 WBS",
+      "csv": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
+      "rows": 1021,
+      "columns": 100,
+      "cells": 102100,
+      "sha256": "e556eb3a81003c1ece4df9cd25f1140b4a22fe44e682589098050f03b6ad6de2",
+      "result": "passed"
+    },
+    {
+      "sheet": "개발 일정 요약",
+      "csv": "docs/evidence/raw/wbs_2026-11-04-r2/02-개발-일정-요약.csv",
+      "rows": 32,
+      "columns": 6,
+      "cells": 192,
+      "sha256": "4942dbb6f8b0303cc5b6a2b2dbaa80d294f6ca3b9f9c5ada6dd1524ebf329725",
+      "result": "passed"
+    }
+  ],
+  "cells": 102551,
+  "baseline_files_unchanged": true,
+  "baseline_files_checked": 11,
+  "saved_followup_cells_matched": 6,
+  "unchanged_J178": 0.9,
+  "pipeline": "docs/evidence/raw/refresh_2026-10-12/_capture_workbooks.py"
+}

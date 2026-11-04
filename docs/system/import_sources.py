@@ -234,7 +234,7 @@ def main() -> None:
     parser.add_argument("--spec-dir", type=Path, default=ROOT / "docs/evidence/raw/functional-spec_2026-10-18")
     parser.add_argument("--historical-spec-file", type=Path, action="append", dest="historical_spec_files",
                         help="현재 원본에서 삭제된 이력 탭의 이전 고정본 CSV. 반복 지정한다.")
-    parser.add_argument("--wbs-dir", type=Path, default=ROOT / "docs/evidence/raw/wbs_2026-11-04")
+    parser.add_argument("--wbs-dir", type=Path, default=ROOT / "docs/evidence/raw/wbs_2026-11-04-r2")
     parser.add_argument("--requirements-dir", type=Path, default=ROOT / "docs/evidence/raw/requirements-sheet_2026-10-06")
     parser.add_argument("--screens", type=Path, default=ROOT / "docs/screen-plan/captures/slide-index.json")
     parser.add_argument("--gap", type=Path, default=ROOT / "docs/evidence/spec-v1.2-gap.md")

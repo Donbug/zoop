@@ -1270,7 +1270,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 93,
           "rowUnit": "xlsx-row"
         },
@@ -1339,7 +1339,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 94,
           "rowUnit": "xlsx-row"
         },
@@ -1431,7 +1431,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 95,
           "rowUnit": "xlsx-row"
         },
@@ -1500,7 +1500,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 96,
           "rowUnit": "xlsx-row"
         },
@@ -1569,7 +1569,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 97,
           "rowUnit": "xlsx-row"
         },
@@ -1684,7 +1684,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 98,
           "rowUnit": "xlsx-row"
         },
@@ -1753,7 +1753,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 99,
           "rowUnit": "xlsx-row"
         },
@@ -1868,7 +1868,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 100,
           "rowUnit": "xlsx-row"
         },
@@ -2146,7 +2146,7 @@
       "target": "6.5.5 / 6.6.19 / 6.6.20",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 76,
           "rowUnit": "xlsx-row"
         },
@@ -2154,7 +2154,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 99,
           "rowUnit": "xlsx-row"
         },
@@ -2169,7 +2169,7 @@
       "target": "FS057 / 6.5.3",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-11-04/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-11-04-r2/01-프로젝트-WBS.csv",
           "row": 74,
           "rowUnit": "xlsx-row"
         },
