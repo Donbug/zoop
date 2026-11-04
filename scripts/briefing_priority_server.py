@@ -106,7 +106,7 @@ def produce(cfg, job):
             calls = priority.verified_calls(work / 'model')
             core_ids = {i['issueId'] for i in core['selected']}
             payload, snapshot, pool = runtime.make_publication(prepared, frozen, core,
-                [r for r in records if r['issueId'] in core_ids], calls, assessed, checked, b.now())
+                [r for r in records if r['issueId'] in core_ids], calls, assessed, checked, b.now(),cfg=cfg)
             if targets:
                 attach(payload, snapshot, pool, common, personal, summary, records, calls)
             else:

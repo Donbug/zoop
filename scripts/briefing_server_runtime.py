@@ -110,10 +110,18 @@ def frozen_input(prepared):
         'marketReference':{'status':'unavailable','reason':'no_validated_market_input_at_cutoff'},
         'baselineResponseSha256':prepared['inputSha256']})
 
-def make_publication(prepared,frozen,selection,passed,calls,assessed,checked,now):
+def publication_schedule(round_,cfg=None):
+    from datetime import date
+    from briefing_schedule import slot
+    day=date.fromisoformat(round_['date'])
+    result={edition:slot(day,edition,cfg).strftime('%H:%M') for edition in ('morning','evening')}
+    result[round_['edition']]=datetime.fromisoformat(round_['scheduledAt']).astimezone(KST).strftime('%H:%M')
+    return {**result,'confirmed':True}
+
+def make_publication(prepared,frozen,selection,passed,calls,assessed,checked,now,cfg=None):
     r=prepared['round']; metadata={'source':'published-graph-briefing-server','asOf':r['windowTo'],
         'graphVersion':prepared['graphVersion'],'partial':True,'requestId':'server:'+r['id'],
-        'schedule':{'morning':datetime.fromisoformat(r['scheduledAt'] if r['edition']=='morning' else r['windowFrom']).astimezone(KST).strftime('%H:%M'),'evening':datetime.fromisoformat(r['scheduledAt']).astimezone(KST).strftime('%H:%M') if r['edition']=='evening' else datetime.fromisoformat(r['windowFrom']).astimezone(KST).strftime('%H:%M'),'confirmed':True},
+        'schedule':publication_schedule(r,cfg),
         'selection':{'basis':'market','reason':'현재 공개 그래프에 보존된 자료 범위에서 검증한 사업 중요도와 신규 정보입니다.'},
         'failures':[{'section':'collection','code':'limited_source_coverage','message':'전체 뉴스·시장 지표를 수집한 결과가 아닙니다.','retryable':False,'asOf':r['windowTo']}]}
     regular_times=('09:20','08:30') if r['edition']=='morning' else ('17:30',)
@@ -198,7 +206,7 @@ def produce(cfg,job):
             # A rejected selected issue is a held generation, never a false "no new issue" publication.
             require(passed or not targets,'selected_issue_withheld')
             calls=view.verified_calls(work/'model')
-            payload,snapshot,pool=make_publication(prepared,frozen,selection,passed,calls,assessed,checked,b.now())
+            payload,snapshot,pool=make_publication(prepared,frozen,selection,passed,calls,assessed,checked,b.now(),cfg=cfg)
             write_once(work/'result.json',{'payload':payload,'snapshot':snapshot,'pool':pool})
             session.send('heartbeat');session.stop.set()
             if session.thread:session.thread.join(timeout=10)
