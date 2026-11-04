@@ -143,6 +143,7 @@
   animation: holdings-slide-in 220ms ease-out;
 }
 .holdings-slot.is-closing {
+  overflow: hidden;
   animation: holdings-slide-out 200ms ease-in forwards;
 }
 @keyframes holdings-slide-in {

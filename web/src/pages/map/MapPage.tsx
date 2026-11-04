@@ -289,7 +289,12 @@ function MapWorkspace({
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     // 열린 뒤 내용이 바뀌어 크기가 달라졌을 수 있으니 닫기 직전에 다시 잰다.
-    if (!open) measureSidebarSlot();
+    // 닫는 동안 목록 응답이 와도 패널이 커지지 않게 잰 높이로 고정한다.
+    const slot = sidebarSlot.current;
+    if (!open) {
+      measureSidebarSlot();
+      if (slot) slot.style.height = `${slot.offsetHeight}px`;
+    } else slot?.style.removeProperty('height');
     setSidebarClosing(!open && sidebarOpen && !reduced);
     setSidebarPreference(open);
     try {
