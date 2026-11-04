@@ -935,6 +935,15 @@ export default function IssueCentricBriefing({
               >
                 기존 발행 이슈의 전체 분석·시세·근거
               </summary>
+              {(commonPriority?.legacyAnalysisScopeWarning ||
+                personalPriority?.items.some(
+                  (item) => item.analysisOmittedReason,
+                )) && (
+                <p className={`${NOTE} mt-3`}>
+                  아래 원본 분석에는 별개 사건이 섞여 있어 위의 새 이슈 카드에는
+                  사용하지 않았습니다. 비교용으로 보존한 내용입니다.
+                </p>
+              )}
               <ol className="mt-3 space-y-3">
                 {groups.map((group, index) => (
                   <IssueCard
@@ -955,6 +964,24 @@ export default function IssueCentricBriefing({
             </details>
           )}
       </section>
+      {personalPriority &&
+        result.marketSummary &&
+        'text' in result.marketSummary && (
+          <details open={!compact} className={SECTION}>
+            <summary
+              className={`cursor-pointer text-body font-semibold ${FOCUS_RING}`}
+            >
+              기존 기준의 회차 요약·전망 (보존)
+            </summary>
+            <p className={`${NOTE} mt-3`}>
+              개인 종목 기준으로 다시 선정하기 전에 작성한 요약입니다. 위 핵심
+              이슈 목록과 구분해 보존합니다.
+            </p>
+            <p className={`${BODY} mt-3 whitespace-pre-line`}>
+              {result.marketSummary.text}
+            </p>
+          </details>
+        )}
       <PriorIssueFollowUps key={result.id} result={result} />
     </div>
   );

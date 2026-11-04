@@ -307,3 +307,34 @@ test('v3 comparison cannot substitute another event or cutoff, or use the curren
   analysis.comparison = { status: 'newly_selected', baseline: null };
   expect(personalPriorityOf(response(value))).not.toBeNull();
 });
+
+test('preserves the pre-selection summary separately from personal issue judgments', () => {
+  const result = response(priority());
+  result.marketSummary = {
+    text: '합성 보관 요약: 개인 종목 재선정 이전의 범위입니다.',
+    resultVersion: 'preserved-summary',
+    evidenceIds: ['e'],
+    generatedAt: result.dataAsOf!,
+  };
+  const view = render(
+    <MemoryRouter>
+      <IssueCentricBriefing result={result} compact selectionDetails={{}} />
+    </MemoryRouter>,
+  );
+  const details = screen
+    .getByText('기존 기준의 회차 요약·전망 (보존)')
+    .closest('details')!;
+  expect(details.open).toBe(false);
+  expect(screen.getByText(result.marketSummary.text)).toBeTruthy();
+  expect(screen.getByText('합성 제품 내부 시험 소식')).toBeTruthy();
+  view.rerender(
+    <MemoryRouter>
+      <IssueCentricBriefing
+        result={result}
+        compact={false}
+        selectionDetails={{}}
+      />
+    </MemoryRouter>,
+  );
+  expect(details.open).toBe(true);
+});
