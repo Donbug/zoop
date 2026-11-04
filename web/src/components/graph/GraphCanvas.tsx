@@ -248,6 +248,8 @@ export default function GraphCanvas({
   });
   const lastArrangement = useRef('map');
   const [renderError, setRenderError] = useState(false);
+  // D-GRP-01 (2026-11-04 요청): 확대·축소 버튼과 맞춤 버튼 사이에 지금 배율을 퍼센트로 보인다.
+  const [zoomPercent, setZoomPercent] = useState<number | null>(null);
   const reading = useEffectEvent(() => {
     const graph = instance.current;
     const base = renderedData.current;
@@ -1700,6 +1702,7 @@ export default function GraphCanvas({
         if (!graph || disposed) return;
         try {
           const nextZoom = graph.getZoom();
+          setZoomPercent(Math.round(nextZoom * 100));
           // 이름표 크기와 겹침은 배율에만 달려 있어서, 끌어서 옮기기만 하면 다시 재지 않는다.
           if (Math.abs(nextZoom - previousZoom) > 0.0001) scheduleReading();
           if (
@@ -2043,6 +2046,14 @@ export default function GraphCanvas({
             축소
           </span>
         </button>
+        {zoomPercent !== null && (
+          <output
+            aria-label={`현재 배율 ${zoomPercent}%`}
+            className="grid self-stretch min-w-14 place-items-center border-r-[0.667px] border-zoop-line px-2! text-body! font-semibold text-zoop-ink tabular-nums max-md:hidden"
+          >
+            {zoomPercent}%
+          </output>
+        )}
         <button
           // 지도 움직이기 단계에서도 확대·축소와 같이 쓸 수 있다.
           data-tutorial-action="zoom"

@@ -1803,6 +1803,43 @@ describe('D-GRP-02 · canvas selection bridge', () => {
   });
 });
 
+describe('D-GRP-01 지도 배율 표시', () => {
+  it('확대·축소와 맞춤 버튼 사이에 지금 배율을 퍼센트로 보이고, 배율이 바뀌면 따라 바뀐다', async () => {
+    render(
+      <GraphCanvas
+        data={createMockGraph({ mode: 'all', personalFilter: 'all' })}
+      />,
+    );
+    await waitFor(() =>
+      expect(canvas.handlers.has('aftertransform')).toBe(true),
+    );
+    canvas.getZoom.mockReturnValue(0.534);
+    act(() => canvas.handlers.get('aftertransform')!({ target: { id: '' } }));
+    const zoom = await screen.findByRole('status', { name: '현재 배율 53%' });
+    expect(zoom.textContent).toBe('53%');
+    const controls = within(screen.getByLabelText('지도 확대 조절'));
+    const order = [
+      controls.getByRole('button', { name: '축소' }),
+      zoom,
+      controls.getByRole('button', { name: '전체 그래프 맞춤' }),
+    ];
+    expect(
+      order[0].compareDocumentPosition(order[1]) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      order[1].compareDocumentPosition(order[2]) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    canvas.getZoom.mockReturnValue(1.2);
+    act(() => canvas.handlers.get('aftertransform')!({ target: { id: '' } }));
+    expect(
+      screen.getByRole('status', { name: '현재 배율 120%' }).textContent,
+    ).toBe('120%');
+  });
+});
+
 describe('D-GRP-01 지도 카메라 움직임', () => {
   function stubMotion(reduce: boolean) {
     vi.stubGlobal('matchMedia', (query: string) => ({
