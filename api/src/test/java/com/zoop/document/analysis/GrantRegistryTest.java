@@ -15,8 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The flat S1 registry reader and decision rule, at parity with {@code ai/service/.../grants.py}: the same strict shape, the
- * same order of denials, and never looser (a duplicate key or a date Java cannot read fails closed).
+ * Strict S1 parsing and model admission remain at parity with {@code ai/service/.../grants.py}. Stored briefing reads use
+ * display operations without granting model admission. Invalid authority still fails closed in both paths.
  */
 class GrantRegistryTest {
     private static final Instant NOW = Instant.parse("2026-10-14T05:00:00Z");
@@ -135,6 +135,52 @@ class GrantRegistryTest {
             assertEquals("naver_search_ai_prohibited",
                     GrantRegistry.evaluate(grant, source, "r1", PURPOSES, List.of("authored-replay"), true, NOW), source);
         }
+    }
+
+    @Test
+    void storedBriefingReadDoesNotRequireNewStorageModelSendOrVerification() {
+        String readJson = grant("g", "r1", "").replace("\"store\",\"model-send\",", "")
+                .replace("\"document-summary\",\"document-sentiment\",\"semantic-verification\"", "\"briefing-outlook\"");
+        FlatGrant readOnly = current(readJson);
+        List<String> recipients = List.of("authored-replay");
+        assertNull(GrantRegistry.evaluateBriefingRead(readOnly, "src", "r1", recipients, NOW));
+        assertEquals("source_operation_denied", GrantRegistry.evaluate(readOnly, "src", "r1",
+                List.of("briefing-outlook", "semantic-verification"), recipients, true, NOW));
+        FlatGrant noVerifier = current(readJson.replace("[\"read\",\"quote-display\"]",
+                "[\"read\",\"store\",\"model-send\",\"quote-display\"]"));
+        assertEquals("source_purpose_or_recipient_denied", GrantRegistry.evaluate(noVerifier, "src", "r1",
+                List.of("briefing-outlook", "semantic-verification"), recipients, true, NOW));
+    }
+
+    @Test
+    void storedBriefingStillNeedsCurrentExplicitReadAndQuoteAuthority() {
+        String readJson = grant("g", "r1", "").replace("\"document-summary\"", "\"briefing-outlook\"");
+        List<String> recipients = List.of("authored-replay");
+        for (String operation : List.of("read", "quote-display")) {
+            String reduced = readJson.replace("\"" + operation + "\",", "").replace(",\"" + operation + "\"", "");
+            assertEquals("source_operation_denied", GrantRegistry.evaluateBriefingRead(current(reduced), "src", "r1", recipients, NOW));
+        }
+        for (String rights : List.of("unknown", "denied")) {
+            assertEquals("source_rights_unknown_or_denied", GrantRegistry.evaluateBriefingRead(
+                    current(readJson.replace("\"known\"", "\"" + rights + "\"")), "src", "r1", recipients, NOW));
+        }
+        assertEquals("source_rights_unknown_or_denied", GrantRegistry.evaluateBriefingRead(null, "src", "r1", recipients, NOW));
+        assertEquals("source_rights_unknown_or_denied", GrantRegistry.evaluateBriefingRead(
+                current(readJson.replace("\"enabled\":true", "\"enabled\":false")), "src", "r1", recipients, NOW));
+        assertEquals("source_rights_unknown_or_denied", GrantRegistry.evaluateBriefingRead(
+                current(readJson.replace("[\"authored\"]", "[]")), "src", "r1", recipients, NOW));
+        assertEquals("grant_revision_or_source_changed", GrantRegistry.evaluateBriefingRead(current(readJson), "src", "other", recipients, NOW));
+        assertEquals("grant_revision_or_source_changed", GrantRegistry.evaluateBriefingRead(current(readJson), "other", "r1", recipients, NOW));
+        assertEquals("source_purpose_or_recipient_denied", GrantRegistry.evaluateBriefingRead(current(readJson), "src", "r1", List.of(), NOW));
+        assertEquals("source_purpose_or_recipient_denied", GrantRegistry.evaluateBriefingRead(current(readJson), "src", "r1", List.of("ungranted"), NOW));
+        assertEquals("source_purpose_or_recipient_denied", GrantRegistry.evaluateBriefingRead(
+                current(readJson.replace("\"briefing-outlook\"", "\"document-summary\"")), "src", "r1", recipients, NOW));
+        assertEquals("source_grant_expired", GrantRegistry.evaluateBriefingRead(
+                current(readJson.replace("\"expiresAt\":null", "\"expiresAt\":\"2026-10-14T05:00:00Z\"")), "src", "r1", recipients, NOW));
+        assertEquals("source_grant_expiry_invalid", GrantRegistry.evaluateBriefingRead(
+                current(readJson.replace("\"expiresAt\":null", "\"expiresAt\":\"tomorrow\"")), "src", "r1", recipients, NOW));
+        assertEquals("naver_search_ai_prohibited", GrantRegistry.evaluateBriefingRead(
+                current(readJson.replace("\"sourceId\":\"src\"", "\"sourceId\":\"naver-search\"")), "naver-search", "r1", recipients, NOW));
     }
 
     @Test

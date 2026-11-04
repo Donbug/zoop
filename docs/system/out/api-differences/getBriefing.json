@@ -277,6 +277,373 @@
     },
     "response:200:application/json.aiPriceOutlooks.verificationRequestDigest:required": false,
     "response:200:application/json.aiPriceOutlooks:required": false,
+    "response:200:application/json.commonPriority": {
+      "type": "object"
+    },
+    "response:200:application/json.commonPriority.candidateCount": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "response:200:application/json.commonPriority.candidateCount:required": false,
+    "response:200:application/json.commonPriority.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.commonPriority.cutoff:required": false,
+    "response:200:application/json.commonPriority.generationVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.generationVersion:required": false,
+    "response:200:application/json.commonPriority.items": {
+      "type": "array"
+    },
+    "response:200:application/json.commonPriority.items:required": false,
+    "response:200:application/json.commonPriority.items[]": {
+      "type": "object"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses": {
+      "type": "array"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[]": {
+      "type": "object"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].businessImpact": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].businessImpact:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].companyConnection": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].companyConnection:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].companyId": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].companyId:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].companyName": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].companyName:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison": {
+      "type": "object"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline:required": true,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.businessImpact": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.businessImpact:required": true,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.companyId": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.companyId:required": true,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.cutoff:required": true,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.direction": {
+      "type": "string",
+      "enum": [
+        "positive",
+        "negative",
+        "mixed",
+        "watch"
+      ]
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.direction:required": true,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.issueId": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.issueId:required": true,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.outlook": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.outlook:required": true,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.resultVersion:required": true,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.roundId:required": true,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.baseline<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.status": {
+      "type": "string",
+      "enum": [
+        "newly_selected",
+        "same_issue_company"
+      ]
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison.status:required": true,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].comparison:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].confirmedFact": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].confirmedFact:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].cutoff:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].direction": {
+      "type": "string",
+      "enum": [
+        "positive",
+        "negative",
+        "mixed",
+        "watch"
+      ]
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].direction:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].evidenceIds": {
+      "type": "array"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].evidenceIds:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].forMyStocks": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].forMyStocks:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].judgmentBasis": {
+      "type": "object"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].judgmentBasis.confidence": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].judgmentBasis.confidence:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].judgmentBasis.directionReason": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].judgmentBasis.directionReason:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].judgmentBasis.effectSizeStatus": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].judgmentBasis.effectSizeStatus:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].judgmentBasis.promptVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].judgmentBasis.promptVersion:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].judgmentBasis:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].keyPoint": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].keyPoint:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].negative": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].negative:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].nextCheck": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].nextCheck:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].outlook": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].outlook:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].positive": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].positive:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].previousChange": {
+      "type": "object"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].previousChange.status": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].previousChange.status:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].previousChange.text": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].previousChange.text:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].previousChange:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].priceObservation": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].priceObservation:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].resultVersion:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].roundId:required": false,
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].verificationMode": {
+      "type": "string",
+      "enum": [
+        "separate_request_same_model"
+      ]
+    },
+    "response:200:application/json.commonPriority.items[].aiAnalyses[].verificationMode:required": false,
+    "response:200:application/json.commonPriority.items[].analysisResultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].analysisResultVersion:required": false,
+    "response:200:application/json.commonPriority.items[].analysisWithheldReason": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].analysisWithheldReason:required": false,
+    "response:200:application/json.commonPriority.items[].companies": {
+      "type": "array"
+    },
+    "response:200:application/json.commonPriority.items[].companies:required": false,
+    "response:200:application/json.commonPriority.items[].companies[]": {
+      "type": "object"
+    },
+    "response:200:application/json.commonPriority.items[].companies[].companyId": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].companies[].companyId:required": false,
+    "response:200:application/json.commonPriority.items[].companies[].name": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].companies[].name:required": false,
+    "response:200:application/json.commonPriority.items[].companies[].reason": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].companies[].reason:required": false,
+    "response:200:application/json.commonPriority.items[].importance": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "response:200:application/json.commonPriority.items[].importance:required": false,
+    "response:200:application/json.commonPriority.items[].issueId": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].issueId:required": false,
+    "response:200:application/json.commonPriority.items[].kind": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].kind:required": false,
+    "response:200:application/json.commonPriority.items[].originCutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.commonPriority.items[].originCutoff:required": false,
+    "response:200:application/json.commonPriority.items[].originRoundId": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].originRoundId:required": false,
+    "response:200:application/json.commonPriority.items[].prices": {
+      "type": "array"
+    },
+    "response:200:application/json.commonPriority.items[].prices:required": false,
+    "response:200:application/json.commonPriority.items[].prices[]": {
+      "type": "object"
+    },
+    "response:200:application/json.commonPriority.items[].prices[].baseline": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].prices[].baseline:required": false,
+    "response:200:application/json.commonPriority.items[].prices[].changeRate": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].prices[].changeRate:required": false,
+    "response:200:application/json.commonPriority.items[].prices[].companyName": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].prices[].companyName:required": false,
+    "response:200:application/json.commonPriority.items[].prices[].currency": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].prices[].currency:required": false,
+    "response:200:application/json.commonPriority.items[].prices[].latest": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].prices[].latest:required": false,
+    "response:200:application/json.commonPriority.items[].prices[].observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.commonPriority.items[].prices[].observedAt:required": false,
+    "response:200:application/json.commonPriority.items[].reason": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].reason:required": false,
+    "response:200:application/json.commonPriority.items[].sources": {
+      "type": "array"
+    },
+    "response:200:application/json.commonPriority.items[].sources:required": false,
+    "response:200:application/json.commonPriority.items[].sources[]": {
+      "type": "object"
+    },
+    "response:200:application/json.commonPriority.items[].sources[].evidenceId": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].sources[].evidenceId:required": false,
+    "response:200:application/json.commonPriority.items[].sources[].publishedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.commonPriority.items[].sources[].publishedAt:required": false,
+    "response:200:application/json.commonPriority.items[].sources[].quote": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].sources[].quote:required": false,
+    "response:200:application/json.commonPriority.items[].sources[].url": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].sources[].url:required": false,
+    "response:200:application/json.commonPriority.items[].title": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].title:required": false,
+    "response:200:application/json.commonPriority.items[].topicTag": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].topicTag:required": false,
+    "response:200:application/json.commonPriority.items[].whyNow": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].whyNow:required": false,
+    "response:200:application/json.commonPriority.legacyAnalysisScopeWarning": {
+      "type": "boolean"
+    },
+    "response:200:application/json.commonPriority.legacyAnalysisScopeWarning:required": false,
+    "response:200:application/json.commonPriority.minimumIssues": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "response:200:application/json.commonPriority.minimumIssues:required": false,
+    "response:200:application/json.commonPriority.minimumShortfall": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "response:200:application/json.commonPriority.minimumShortfall:required": false,
+    "response:200:application/json.commonPriority.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.resultVersion:required": false,
+    "response:200:application/json.commonPriority.roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.roundId:required": false,
+    "response:200:application/json.commonPriority.schemaVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.schemaVersion:required": false,
+    "response:200:application/json.commonPriority.status": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.status:required": false,
+    "response:200:application/json.commonPriority:required": false,
     "response:200:application/json.companyOutlooks": {
       "type": "object"
     },
@@ -4593,6 +4960,381 @@
       "type": "string"
     },
     "response:200:application/json.metadata.requestId:required": true,
+    "response:200:application/json.personalPriority": {
+      "type": "object"
+    },
+    "response:200:application/json.personalPriority.candidateCount": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "response:200:application/json.personalPriority.candidateCount:required": false,
+    "response:200:application/json.personalPriority.companyIds": {
+      "type": "array"
+    },
+    "response:200:application/json.personalPriority.companyIds:required": false,
+    "response:200:application/json.personalPriority.companyIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.personalPriority.cutoff:required": false,
+    "response:200:application/json.personalPriority.items": {
+      "type": "array"
+    },
+    "response:200:application/json.personalPriority.items:required": false,
+    "response:200:application/json.personalPriority.items[]": {
+      "type": "object"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses": {
+      "type": "array"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[]": {
+      "type": "object"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].businessImpact": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].businessImpact:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].companyConnection": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].companyConnection:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].companyId": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].companyId:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].companyName": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].companyName:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison": {
+      "type": "object"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline:required": true,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.businessImpact": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.businessImpact:required": true,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.companyId": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.companyId:required": true,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.cutoff:required": true,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.direction": {
+      "type": "string",
+      "enum": [
+        "positive",
+        "negative",
+        "mixed",
+        "watch"
+      ]
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.direction:required": true,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.issueId": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.issueId:required": true,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.outlook": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.outlook:required": true,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.resultVersion:required": true,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:0>.roundId:required": true,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.baseline<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.status": {
+      "type": "string",
+      "enum": [
+        "newly_selected",
+        "same_issue_company"
+      ]
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison.status:required": true,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].comparison:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].confirmedFact": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].confirmedFact:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].cutoff:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].direction": {
+      "type": "string",
+      "enum": [
+        "positive",
+        "negative",
+        "mixed",
+        "watch"
+      ]
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].direction:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].evidenceIds": {
+      "type": "array"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].evidenceIds:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].forMyStocks": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].forMyStocks:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].judgmentBasis": {
+      "type": "object"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].judgmentBasis.confidence": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].judgmentBasis.confidence:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].judgmentBasis.directionReason": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].judgmentBasis.directionReason:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].judgmentBasis.effectSizeStatus": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].judgmentBasis.effectSizeStatus:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].judgmentBasis.promptVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].judgmentBasis.promptVersion:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].judgmentBasis:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].keyPoint": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].keyPoint:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].negative": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].negative:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].nextCheck": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].nextCheck:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].outlook": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].outlook:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].positive": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].positive:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].previousChange": {
+      "type": "object"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].previousChange.status": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].previousChange.status:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].previousChange.text": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].previousChange.text:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].previousChange:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].priceObservation": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].priceObservation:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].resultVersion:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].roundId:required": false,
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].verificationMode": {
+      "type": "string",
+      "enum": [
+        "separate_request_same_model"
+      ]
+    },
+    "response:200:application/json.personalPriority.items[].aiAnalyses[].verificationMode:required": false,
+    "response:200:application/json.personalPriority.items[].analysisOmittedReason": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].analysisOmittedReason:required": false,
+    "response:200:application/json.personalPriority.items[].connections": {
+      "type": "array"
+    },
+    "response:200:application/json.personalPriority.items[].connections:required": false,
+    "response:200:application/json.personalPriority.items[].connections[]": {
+      "type": "object"
+    },
+    "response:200:application/json.personalPriority.items[].connections[].companyId": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].connections[].companyId:required": false,
+    "response:200:application/json.personalPriority.items[].connections[].name": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].connections[].name:required": false,
+    "response:200:application/json.personalPriority.items[].connections[].reason": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].connections[].reason:required": false,
+    "response:200:application/json.personalPriority.items[].issueId": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].issueId:required": false,
+    "response:200:application/json.personalPriority.items[].kind": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].kind:required": false,
+    "response:200:application/json.personalPriority.items[].originCutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.personalPriority.items[].originCutoff:required": false,
+    "response:200:application/json.personalPriority.items[].originRoundId": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].originRoundId:required": false,
+    "response:200:application/json.personalPriority.items[].price": {
+      "type": "object"
+    },
+    "response:200:application/json.personalPriority.items[].price.baseline": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].price.baseline:required": false,
+    "response:200:application/json.personalPriority.items[].price.changeRate": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].price.changeRate:required": false,
+    "response:200:application/json.personalPriority.items[].price.companyName": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].price.companyName:required": false,
+    "response:200:application/json.personalPriority.items[].price.currency": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].price.currency:required": false,
+    "response:200:application/json.personalPriority.items[].price.latest": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].price.latest:required": false,
+    "response:200:application/json.personalPriority.items[].price.observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.personalPriority.items[].price.observedAt:required": false,
+    "response:200:application/json.personalPriority.items[].price:required": false,
+    "response:200:application/json.personalPriority.items[].priorAnalysis": {
+      "type": "array"
+    },
+    "response:200:application/json.personalPriority.items[].priorAnalysis:required": false,
+    "response:200:application/json.personalPriority.items[].priorAnalysis[]": {
+      "type": "object"
+    },
+    "response:200:application/json.personalPriority.items[].priorAnalysis[].companyName": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].priorAnalysis[].companyName:required": true,
+    "response:200:application/json.personalPriority.items[].priorAnalysis[].conditions": {
+      "type": "array"
+    },
+    "response:200:application/json.personalPriority.items[].priorAnalysis[].conditions:required": true,
+    "response:200:application/json.personalPriority.items[].priorAnalysis[].conditions[]": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].priorAnalysis[].negative": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].priorAnalysis[].negative:required": true,
+    "response:200:application/json.personalPriority.items[].priorAnalysis[].positive": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].priorAnalysis[].positive:required": true,
+    "response:200:application/json.personalPriority.items[].priorAnalysis[].takeaway": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].priorAnalysis[].takeaway:required": true,
+    "response:200:application/json.personalPriority.items[].reason": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].reason:required": false,
+    "response:200:application/json.personalPriority.items[].sources": {
+      "type": "array"
+    },
+    "response:200:application/json.personalPriority.items[].sources:required": false,
+    "response:200:application/json.personalPriority.items[].sources[]": {
+      "type": "object"
+    },
+    "response:200:application/json.personalPriority.items[].sources[].evidenceId": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].sources[].evidenceId:required": false,
+    "response:200:application/json.personalPriority.items[].sources[].publishedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.personalPriority.items[].sources[].publishedAt:required": false,
+    "response:200:application/json.personalPriority.items[].sources[].quote": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].sources[].quote:required": false,
+    "response:200:application/json.personalPriority.items[].sources[].url": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].sources[].url:required": false,
+    "response:200:application/json.personalPriority.items[].title": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].title:required": false,
+    "response:200:application/json.personalPriority.items[].topicTag": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].topicTag:required": false,
+    "response:200:application/json.personalPriority.minimumIssues": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "response:200:application/json.personalPriority.minimumIssues:required": false,
+    "response:200:application/json.personalPriority.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.resultVersion:required": false,
+    "response:200:application/json.personalPriority.roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.roundId:required": false,
+    "response:200:application/json.personalPriority.schemaVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.schemaVersion:required": false,
+    "response:200:application/json.personalPriority.status": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.status:required": false,
+    "response:200:application/json.personalPriority:required": false,
     "response:200:application/json.previousComparison:required": true,
     "response:200:application/json.previousComparison<anyOf:0>": {
       "type": "object"
@@ -4750,6 +5492,38 @@
     "response:200:application/json.previousComparison<anyOf:2>": {
       "type": "null"
     },
+    "response:200:application/json.prioritySummary": {
+      "type": "object"
+    },
+    "response:200:application/json.prioritySummary.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.prioritySummary.cutoff:required": false,
+    "response:200:application/json.prioritySummary.evidenceIds": {
+      "type": "array"
+    },
+    "response:200:application/json.prioritySummary.evidenceIds:required": false,
+    "response:200:application/json.prioritySummary.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.prioritySummary.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.prioritySummary.resultVersion:required": false,
+    "response:200:application/json.prioritySummary.roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.prioritySummary.roundId:required": false,
+    "response:200:application/json.prioritySummary.schemaVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.prioritySummary.schemaVersion:required": false,
+    "response:200:application/json.prioritySummary.text": {
+      "type": "string"
+    },
+    "response:200:application/json.prioritySummary.text:required": false,
+    "response:200:application/json.prioritySummary:required": false,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
