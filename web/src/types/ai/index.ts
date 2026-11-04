@@ -1,14 +1,16 @@
 import type { GraphTarget } from '@/types/map';
 
 export type RecoveryStatus = 'idle' | 'loading' | 'ready' | 'error';
+export type AiChatOpenSource = 'header' | 'target' | 'none';
 
 export type AiChatState = {
   isOpen: boolean;
   context: GraphTarget | null;
+  contextSource: AiChatOpenSource;
   conversationId: string | null;
   draft: string;
   recoveryStatus: RecoveryStatus;
-  open: (context?: GraphTarget | null) => void;
+  open: (context?: GraphTarget | null, source?: AiChatOpenSource) => void;
   close: () => void;
   setDraft: (draft: string) => void;
   setConversationId: (conversationId: string | null) => void;

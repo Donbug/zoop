@@ -356,12 +356,6 @@ export default function EventDetailPanel({
               nodeIds={nodeIds}
               onSelectNode={onSelectNode}
             />
-            <footer className={ui.footer}>
-              <p>{data.metadata.source}</p>
-              <p>
-                조회 기준 · {formatPublishedAt(data.metadata.asOf) ?? '미제공'}
-              </p>
-            </footer>
           </>
         )}
       </div>

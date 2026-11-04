@@ -53,6 +53,29 @@ def legacy_history_matches(before, after):
     return True
 
 
+def peer_state(connection, wait=0.0):
+    """What the peer socket shows within `wait` seconds: "open" (nothing, or pipelined data), "eof" or "reset".
+
+    The request body has been consumed, so readable data is EOF, a reset or a pipelined request. EOF alone does not mean the
+    answer is lost: a client that only shut down its sending side still reads. A reset does. After a FIN, recv keeps
+    returning EOF even once the peer answered our write with a reset, so the reset is read from the socket's pending error
+    (SO_ERROR, EPIPE in CLOSE_WAIT), polled until the wait expires."""
+    deadline = time.monotonic() + wait
+    seen = "open"
+    while True:
+        try:
+            if connection.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR):
+                return "reset"
+            readable, _, _ = select.select([connection], [], [], 0)
+            if readable:
+                seen = "eof" if connection.recv(1, socket.MSG_PEEK) == b"" else "open"
+        except OSError:
+            return "reset"
+        if time.monotonic() >= deadline:
+            return seen
+        time.sleep(0.01)
+
+
 def wait_for(predicate, timeout=90, what="condition"):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -124,6 +147,17 @@ class HttpProxy:
                 pass
 
             def forward(self):
+                response = None
+
+                def lost(detected_by):
+                    # The upstream answered (its status is already an event) but the app never received it: a delivery loss the
+                    # smoke must see, so it is recorded as a non-integer status like an upstream transport loss.
+                    with outer.lock:
+                        outer.events.append({"method": self.command, "path": self.path.split("?", 1)[0], "status": "downstream_lost",
+                                             "upstreamStatus": response.status_code, "detectedBy": detected_by,
+                                             "requestSha256": hashlib.sha256(raw).hexdigest(), "at": time.time()})
+                    self.close_connection = True
+
                 try:
                     length = int(self.headers.get("Content-Length", "0"))
                     check(0 <= length <= 16 * 1024 * 1024, "test proxy framing exceeds bound")
@@ -161,6 +195,14 @@ class HttpProxy:
                         return
                     if rule:
                         payload = rule.transform_payload(response.status_code, payload)
+                    # The app may have given up (timeout, close or reset) while the answer was held. A reset seen before writing
+                    # is a certain loss. EOF is not: a client that shut down only its sending side still reads, and a client
+                    # that closed fully still accepts the write into its kernel buffer and answers it with a reset. So the
+                    # answer is always written, and after an EOF the socket is watched briefly for that reset.
+                    before = peer_state(self.connection)
+                    if before == "reset":
+                        lost("peer_reset_before_write")
+                        return
                     self.send_response(response.status_code)
                     for key in ("Content-Type", "X-Request-ID", "ETag", "Retry-After"):
                         if key in response.headers:
@@ -168,7 +210,15 @@ class HttpProxy:
                     self.send_header("Content-Length", str(len(payload)))
                     self.end_headers()
                     self.wfile.write(payload)
-                except (BrokenPipeError, ConnectionResetError):
+                    if peer_state(self.connection, wait=0.2 if before == "eof" else 0.0) == "reset":
+                        lost("reset_after_write")
+                except (BrokenPipeError, ConnectionResetError) as error:
+                    if response is None:
+                        # The app reset the request before the upstream was called: a harness fault, as before.
+                        with outer.lock:
+                            outer.errors.append({"method": self.command, "path": self.path.split("?", 1)[0], "exceptionType": type(error).__name__})
+                    else:
+                        lost("write_failed")
                     self.close_connection = True
                 except httpx.TransportError:
                     with outer.lock:

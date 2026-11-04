@@ -330,10 +330,6 @@ export default function RelationDetailPanel({
                 ) : null}
               </section>
             )}
-            <footer className={ui.footer}>
-              <p>{data.metadata.source}</p>
-              <p>조회 기준 · {formatPublishedAt(data.metadata.asOf)}</p>
-            </footer>
           </>
         )}
       </div>

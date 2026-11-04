@@ -912,6 +912,13 @@ export default function GraphCanvas({
         if (!current.destroyed) setRenderError(true);
       });
   });
+  // D-GRP-01 (2026-11-04): 기억한 카메라 없이 주소의 select로 노드를 고른 채 열면, 전체 맞춤(넓은 지도에서는
+  // 배율 0.07 안팎)에 머물러 고른 노드가 10px 남짓으로 보이고 연결 사건 제목만 겹쳐 보였다.
+  // 이때는 첫 그리기 뒤 더블클릭처럼 고른 노드와 연결 이웃에 맞춘다.
+  const openOnSelection = useEffectEvent(() => {
+    if (selected && data.nodes.some((node) => node.id === selected))
+      pendingNeighborhood.current = selected;
+  });
   /** 키보드 Shift+Enter. 지금 그려지지 않은(접힌) 노드면 먼저 골라 펼치고, 다음 그리기 뒤에 맞춘다. */
   function requestNeighborhood(id: string) {
     const drawn = renderedData.current?.nodes?.some(
@@ -1512,6 +1519,7 @@ export default function GraphCanvas({
     };
     let pointerStart: {
       pointerId: number;
+      pointerType: string;
       x: number;
       y: number;
       graphX: number;
@@ -1524,7 +1532,16 @@ export default function GraphCanvas({
     let dragged = false;
     const pointerDown = (event: PointerEvent) => {
       if (!graph || event.button !== 0) return;
-      // pointerup을 놓친 채(예: 창 밖에서 뗌) 다시 누르면 이전 끌기를 여기서 끝낸다.
+      // 끌던 포인터가 있으면 다른 포인터는 무시해 끌기를 유지한다: 두 번째 손가락, 마우스 끌기 중의 터치 등.
+      // isPrimary는 입력 종류마다 따로 정해지므로, 같은 종류의 새 주 포인터만 이전 포인터가 pointerup을
+      // 놓친 것으로 보고 이어받는다. 터치는 암묵적 캡처로 pointerup·pointercancel이 늘 오고, 마우스는
+      // 버튼 없이 돌아온 움직임(pointerMove)에서 정리되므로 다른 종류가 이어받을 필요가 없다.
+      if (
+        pointerStart &&
+        event.pointerId !== pointerStart.pointerId &&
+        (event.pointerType !== pointerStart.pointerType || !event.isPrimary)
+      )
+        return;
       endPan();
       const bounds = host.getBoundingClientRect();
       const position = graph.getPosition();
@@ -1532,6 +1549,7 @@ export default function GraphCanvas({
       dragged = false;
       pointerStart = {
         pointerId: event.pointerId,
+        pointerType: event.pointerType,
         x: event.clientX,
         y: event.clientY,
         graphX: position[0],
@@ -1545,8 +1563,18 @@ export default function GraphCanvas({
       };
     };
     const pointerMove = (event: PointerEvent) => {
+      if (!pointerStart || event.pointerId !== pointerStart.pointerId) return;
+      // 브라우저 밖에서 버튼을 놓아 pointerup을 놓쳤으면, 버튼 없이 돌아온 첫 움직임에서 끌기를 끝낸다.
+      // 터치는 닿지 않은 채 움직이지 않으므로 마우스·펜만 본다.
       if (
-        pointerStart &&
+        (event.pointerType === 'mouse' || event.pointerType === 'pen') &&
+        event.buttons === 0
+      ) {
+        pointerStart = null;
+        endPan();
+        return;
+      }
+      if (
         Math.hypot(
           event.clientX - pointerStart.x,
           event.clientY - pointerStart.y,
@@ -1591,6 +1619,11 @@ export default function GraphCanvas({
       pointerStart = null;
       endPan();
     };
+    // 끌던 중 창이 포커스를 잃으면(다른 창으로 전환) pointerup이 오지 않으므로 여기서 끝낸다.
+    const windowBlur = () => {
+      pointerStart = null;
+      endPan();
+    };
     const stopFollowing = (event: WheelEvent) => {
       if (event.deltaY !== 0 && currentTutorialPhase() === 'zoom')
         wheelPending = true;
@@ -1612,6 +1645,7 @@ export default function GraphCanvas({
     host.addEventListener('pointermove', pointerMove);
     window.addEventListener('pointerup', pointerUp);
     window.addEventListener('pointercancel', pointerCancel);
+    window.addEventListener('blur', windowBlur);
     host.addEventListener('wheel', stopFollowing, { passive: true });
     window.addEventListener('zoop:graph-viewport-change', viewportChanged);
     hovered.current = null;
@@ -1763,6 +1797,7 @@ export default function GraphCanvas({
           fitPending.current = false;
           defaultZoomPending.current = false;
         }
+        openOnSelection();
       }
       instance.current = graph;
       syncSelection();
@@ -1829,6 +1864,7 @@ export default function GraphCanvas({
       host.removeEventListener('pointermove', pointerMove);
       window.removeEventListener('pointerup', pointerUp);
       window.removeEventListener('pointercancel', pointerCancel);
+      window.removeEventListener('blur', windowBlur);
       host.removeEventListener('wheel', stopFollowing);
       window.removeEventListener('zoop:graph-viewport-change', viewportChanged);
       observer?.disconnect();
@@ -1919,18 +1955,6 @@ export default function GraphCanvas({
           <span className="block">연결 없는 사건</span>
         </button>
       )}
-      <div className="relationship-source [&_p]:break-keep">
-        <p>SOURCE · {data.metadata.source}</p>
-        <p>
-          AS OF{' '}
-          {new Intl.DateTimeFormat('sv-SE', {
-            timeZone: 'Asia/Seoul',
-            dateStyle: 'short',
-            timeStyle: 'short',
-          }).format(new Date(data.metadata.asOf))}{' '}
-          KST
-        </p>
-      </div>
       {tutorialPhase === 'pan' && (
         <button
           className="absolute z-20 grid size-32 -translate-x-1/2 -translate-y-1/2 touch-none place-items-center rounded-full border-2 border-dashed border-zoop-ink bg-zoop-paper/75 px-3 text-center text-caption font-bold text-zoop-ink focus-visible:outline-4"
