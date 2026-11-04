@@ -315,6 +315,48 @@ test('R1 queued reading updates preserve live drag coordinates and current edge 
   expect(liveEdge.lineWidth).toBe(7);
 });
 
+test.each([0.53, 1, 1.5])(
+  'D-GRP-01 selection redraw preserves issue pill reading styles at zoom %s',
+  async (zoom) => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const base = toG6Data(data, 1200, 700);
+    let nodes = structuredClone(base.nodes!);
+    const update = vi.fn((updates: NonNullable<GraphData['nodes']>) => {
+      nodes = nodes.map((node) => ({
+        ...node,
+        style: {
+          ...node.style,
+          ...updates.find((item) => item.id === node.id)?.style,
+        },
+      }));
+    });
+    const graph = {
+      destroyed: false,
+      getNodeData: () => nodes,
+      getEdgeData: () => [],
+      updateNodeData: update,
+      updateEdgeData: vi.fn(),
+      draw: async () => {},
+      getCanvas: () => ({ document: { getElementById: () => null } }),
+    } as unknown as Graph;
+    const reading = { ...context, zoom };
+    await applyGraphReading(graph, base, data, reading);
+    const issue = data.nodes.find((node) => node.kind === 'issue')!;
+    const expected = nodes.find((node) => node.id === issue.id)!.style!;
+    const nextBase = toG6Data(data, 1200, 700, 'KRX:005930');
+    nodes = keepAppliedStyles(graph, nextBase).nodes!;
+    await applyGraphReading(graph, nextBase, data, reading);
+    const actual = nodes.find((node) => node.id === issue.id)!.style!;
+    for (const key of [
+      'labelFontSize',
+      'labelPadding',
+      'labelBackgroundRadius',
+      'labelBackgroundLineWidth',
+    ])
+      expect(actual[key]).toEqual(expected[key]);
+  },
+);
+
 test('setData keeps applied label styles and model-only keys so unchanged elements do not redraw', () => {
   const graph = {
     getNodeData: () => [
