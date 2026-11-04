@@ -118,7 +118,9 @@ async function openHistory() {
     </MemoryRouter>,
   );
   await screen.findByText('지금 질문');
-  await user.click(screen.getByRole('button', { name: '대화 기록' }));
+  await user.click(screen.getByRole('button', { name: '대화 메뉴' }));
+  await user.click(screen.getByRole('menuitem', { name: '대화 기록' }));
+  expect(screen.getByText('대화 기록')).toBeTruthy();
   return user;
 }
 
@@ -147,8 +149,8 @@ describe('D-AI-02 · conversation history', () => {
     expect(current.textContent).toContain('2026-10-27 14:30 KST');
     expect(screen.queryByRole('button', { name: /대화 삭제/ })).toBeNull();
     expect(
-      screen.getByText('대화 기록은 회원 탈퇴 시 모두 삭제돼요.'),
-    ).toBeTruthy();
+      screen.queryByText('대화 기록은 회원 탈퇴 시 삭제됩니다.'),
+    ).toBeNull();
 
     await user.click(within(list).getByRole('button', { name: /지난 질문/ }));
     await screen.findByLabelText('질문');
@@ -188,7 +190,8 @@ describe('D-AI-02 · conversation history', () => {
     await screen.findByText('대화 기록을 불러오지 못했어요.');
     fail = false;
     await user.click(screen.getByRole('button', { name: '다시 시도' }));
-    await screen.findByText(/아직 질문한 대화가 없어요/);
+    const emptyMessage = await screen.findByText('아직 질문한 대화가 없어요.');
+    expect(emptyMessage.className).toContain('m-auto');
   });
 
   it('deletes only after a confirmation when the server allows it, and the deleted current conversation leaves the chat empty', async () => {
@@ -217,8 +220,8 @@ describe('D-AI-02 · conversation history', () => {
     await waitFor(() => expect(screen.queryByText('지금 질문')).toBeNull());
     expect(screen.getByText('지난 질문')).toBeTruthy();
 
-    await user.click(screen.getByRole('button', { name: '← 대화로 돌아가기' }));
-    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await user.click(screen.getByRole('button', { name: '대화로 돌아가기' }));
+    await screen.findByText('무엇을 함께 살펴볼까요?');
   });
 
   it('keeps a conversation with a question in progress and says why', async () => {
@@ -237,7 +240,7 @@ describe('D-AI-02 · conversation history', () => {
       ),
     );
     await screen.findByText(/처리 중인 질문이 있어 삭제할 수 없어요/);
-    await user.click(screen.getByRole('button', { name: '← 대화로 돌아가기' }));
+    await user.click(screen.getByRole('button', { name: '대화로 돌아가기' }));
     expect(await screen.findByText('지금 질문')).toBeTruthy();
   });
 });
