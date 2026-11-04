@@ -38,9 +38,7 @@ function Overview({ data }: { data: Dashboard }) {
       <Metric
         label="사용자에게 보이는 그래프"
         value={
-          <span className="break-all">
-            {graph?.activeVersionId ?? '–'}
-          </span>
+          <span className="break-all">{graph?.activeVersionId ?? '–'}</span>
         }
         detail={
           graph?.activeVersionId ? (
