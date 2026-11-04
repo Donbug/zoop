@@ -351,9 +351,11 @@ class App:
 
 
 def proxy_findings(proxy):
-    """AI calls that lost the transport or answered 5xx, and the distinct 4xx answers (the app's status-first 404s are expected)."""
+    """AI calls that lost the transport or answered 5xx, and the distinct 4xx answers (the app's status-first 404s are expected).
+
+    A 4xx without a valid error code is recorded with "" so the tuples always sort."""
     lost = [e for e in proxy.events if not isinstance(e["status"], int) or e["status"] >= 500]
-    refusals = sorted({(e["method"], e["path"], e["status"], e.get("errorCode")) for e in proxy.events
+    refusals = sorted({(e["method"], e["path"], e["status"], e.get("errorCode") or "") for e in proxy.events
                        if isinstance(e["status"], int) and e["status"] >= 400})
     return lost, refusals
 
@@ -468,16 +470,21 @@ def run(args):
         failure = error
         report = {"state": "failed", "checks": checks, "error": type(error).__name__, "message": str(error)[:2000]}
         if proxy is not None:
-            lost, refusals = proxy_findings(proxy)
-            report.update(proxyErrors=proxy.errors, aiTransportLossOr5xx=lost, aiRefusals=[list(item) for item in refusals])
-    # Release every owned process and the database before anything is written, so a failed report write cannot leave them behind.
-    cleanup_failures = []
-    for name, close in (("app", app and app.close), ("proxy", proxy and proxy.close), ("ai", ai and ai.close), ("database", db.drop)):
-        if close:
             try:
-                close()
-            except Exception as error:  # every other owned resource is still released
-                cleanup_failures.append(f"{name}: {type(error).__name__}")
+                lost, refusals = proxy_findings(proxy)
+                report.update(proxyErrors=proxy.errors, aiTransportLossOr5xx=lost, aiRefusals=[list(item) for item in refusals])
+            except Exception as diagnosis:  # the diagnosis must not replace the failure or lose the report
+                report["diagnosisError"] = type(diagnosis).__name__
+    finally:
+        # Release every owned process and the database before anything is written, so neither a failed report write nor a
+        # failing diagnosis can leave them behind.
+        cleanup_failures = []
+        for name, close in (("app", app and app.close), ("proxy", proxy and proxy.close), ("ai", ai and ai.close), ("database", db.drop)):
+            if close:
+                try:
+                    close()
+                except Exception as error:  # every other owned resource is still released
+                    cleanup_failures.append(f"{name}: {type(error).__name__}")
     if cleanup_failures:
         report.update(state="failed", cleanupFailures=cleanup_failures)
     try:
