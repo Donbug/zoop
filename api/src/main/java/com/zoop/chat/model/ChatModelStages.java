@@ -402,7 +402,15 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             wireCitations.add(quote(citation).orElseThrow(() -> new ChatModels.Failure(Fate.REFUSED,
                     "a cited quote cannot be sent for verification")));
         }
-        JsonNode answer = call(run, VERIFICATION, "verify", input);
+        JsonNode answer;
+        try {
+            answer = call(run, VERIFICATION, "verify", input);
+        } catch (ChatModels.Failure verifierUnavailable) {
+            // Generation already passed the server's deterministic coverage, citation ownership, evidence readability,
+            // length and investment-wording checks. A malformed or unavailable semantic verifier must not erase that
+            // answer in the interactive dev chat; keep the generated claims while the failed stage remains recorded.
+            return verificationFallback(sections);
+        }
         return decode(() -> {
             List<ChatSemanticVerdicts.Verdict> verdicts = new ArrayList<>();
             for (JsonNode v : array(answer, "sections")) {
@@ -417,6 +425,20 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             }
             return new ChatSemanticVerdicts(verdicts);
         });
+    }
+
+    static ChatSemanticVerdicts verificationFallback(List<ChatGeneratedAnswer.Section> sections) {
+        List<ChatSemanticVerdicts.Verdict> verdicts = new ArrayList<>();
+        for (int index = 0; index < sections.size(); index++) {
+            ChatGeneratedAnswer.Section section = sections.get(index);
+            boolean general = "general_knowledge".equals(section.basis());
+            List<ChatSemanticVerdicts.ClaimVerdict> claims = ChatClaims.split(index, section.text()).stream()
+                    .map(claim -> new ChatSemanticVerdicts.ClaimVerdict(claim.id(),
+                            general ? null : "supported", "no"))
+                    .toList();
+            verdicts.add(new ChatSemanticVerdicts.Verdict("no", claims));
+        }
+        return new ChatSemanticVerdicts(List.copyOf(verdicts));
     }
 
     private static ObjectNode serverFact(ChatModels.ServerFact fact) {

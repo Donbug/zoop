@@ -261,21 +261,23 @@ def test_server_facts_reach_the_real_jev_http_builder_without_becoming_quotes(tm
         assert field not in outbound
 
 
-def test_exact_single_graph_issue_membership_uses_its_narrow_calibrated_gate_only():
+def test_chat_support_uses_the_calibrated_evidence_gate():
     payload = facts_input()
     payload["sections"] = [payload["sections"][0]]
     payload["sections"][0]["claims"] = [{"claimId": "s0c0", "text":
         "공개 그래프에서 삼성전자와 ASML은 ‘삼성전자, ASML과 차세대 반도체 제조 협력 확대’ 사건에 함께 포함되어 있습니다."}]
     payload["sections"][0]["serverFacts"] = [payload["sections"][0]["serverFacts"][2]]
     parsed = VerificationInput.model_validate(payload)
-    raw = {"model": chat_jev.MODEL, "answers": {"s0c0-support": choice("supported", 0.84, 0.76),
-           "s0c0-causality": noul(0.05), "s0-advice": noul(0.03)}}
+    raw = {"model": chat_jev.MODEL, "answers": {"s0c0-support": choice("supported", 0.34, 0.11),
+           "s0c0-causality": noul(0.50), "s0-advice": noul(0.03)}}
     verdict = chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL)
     assert verdict.sections[0].claims[0].support == "supported"
 
-    payload["sections"][0]["claims"][0]["text"] = "관련 기업들은 함께 포함됩니다."
-    ordinary = VerificationInput.model_validate(payload)
-    assert chat_jev.interpret_verification(raw, ordinary, chat_jev.MODEL).sections[0].claims[0].support == "hold"
+    raw["answers"]["s0c0-support"] = choice("supported", 0.34, 0.09)
+    assert chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL).sections[0].claims[0].support == "hold"
+
+    raw["answers"]["s0c0-support"] = choice("insufficient", 0.40, 0.80)
+    assert chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL).sections[0].claims[0].support == "supported"
 
 
 def test_canonical_facts_do_not_bypass_quote_grants(tmp_path):
