@@ -84,6 +84,7 @@ export default function GraphCanvas({
   flow = false,
   onFlowChange,
   highlightedEdgeIds = noHighlightedEdges,
+  spotlight = noHighlightedEdges,
   selectedEdgeId = null,
   isolateSelection = false,
   evidenceMode = false,
@@ -125,6 +126,8 @@ export default function GraphCanvas({
   /** 주면 확대·축소 묶음에 [흐름 순으로 정렬] 토글을 둔다. */
   onFlowChange?: (flow: boolean) => void;
   highlightedEdgeIds?: string[];
+  /** D-GRP-03 관련 기업: 이 노드들과 그 사이 선만 밝게 두고 나머지 지도를 흐린다. */
+  spotlight?: string[];
   selectedEdgeId?: string | null;
   /** 근거에 연결선이 없을 때 사건만 강조한다. */
   isolateSelection?: boolean;
@@ -174,12 +177,6 @@ export default function GraphCanvas({
     });
   }
   function toggleKind(key: LegendKey) {
-    if (
-      (key === 'company' || key === 'issue') &&
-      !view.hidden.includes(key) &&
-      view.hidden.includes(key === 'company' ? 'issue' : 'company')
-    )
-      return;
     changeView({
       ...view,
       hidden: view.hidden.includes(key)
@@ -208,6 +205,38 @@ export default function GraphCanvas({
   const hoveredEdge = useRef<string | null>(null);
   const readingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
+  /** Map-arrangement positions; recomputed only for new data, appearance or a new graph. */
+  const mapLayout = useRef<{
+    data: GraphResponse;
+    appearance: typeof appearance;
+    size: [number, number];
+    positions: Map<string, { x: number; y: number }>;
+  } | null>(null);
+  function fixedPositions(host: HTMLDivElement) {
+    const previous = mapLayout.current;
+    if (previous?.data === data && previous.appearance === appearance)
+      return previous.positions;
+    // Keep the first drawn size: a detail rail narrowing the canvas must not shift the map.
+    const size = previous?.size ?? [host.clientWidth, host.clientHeight];
+    const all = styleGraph(
+      toG6Data(
+        data,
+        size[0],
+        size[1],
+        null,
+        data.nodes.map((node) => node.id),
+      ),
+      appearance,
+    );
+    const positions = new Map(
+      (all.nodes ?? []).map((node) => [
+        String(node.id),
+        { x: Number(node.style?.x), y: Number(node.style?.y) },
+      ]),
+    );
+    mapLayout.current = { data, appearance, size, positions };
+    return positions;
+  }
   /** Nodes left bright by the current dimming; the reading pass hides faded issue titles. */
   const brightNodes = useRef<Set<string> | null>(null);
   const appliedStates = useRef({
@@ -273,6 +302,11 @@ export default function GraphCanvas({
   const minimapShown = useRef(false);
   // D-GRP-01/03: 상세 패널을 제외한 지도 영역의 중앙에 선택 노드를 유지한다.
   const centerTarget = useRef<string | null>(null);
+  /**
+   * D-GRP-01 (2026-11-04 결정): 지도에서 누른 노드는 화면에서 가려질 때만 옮긴다.
+   * 보유·관심 사이드바나 패널 행에서 고른 노드(centerRequest)는 늘 가운데로 옮긴다.
+   */
+  const centerAlways = useRef(false);
   const previousSelected = useRef<string | null>(null);
   const preservePositions = useRef(false);
   // 화면 모드 전환처럼 색만 바뀌는 다시 그리기는 지금 노드 위치를 한 번 그대로 쓴다.
@@ -392,9 +426,8 @@ export default function GraphCanvas({
               aria-pressed={selectedEdgeId === edge.id}
               title="Shift+Enter로 연결된 이웃 맞춤 확대"
             >
-              연결선: {labels.get(edge.source)} – {labels.get(edge.target)} ·{' '}
-              {edge.relationType === 'SHARES_ISSUE' ? '사건 공유' : '후속 관계'}{' '}
-              · {edge.summary}
+              연결선: {labels.get(edge.source)} – {labels.get(edge.target)} ·
+              후속 관계 · {edge.summary}
             </button>
           ))}
       </>
@@ -441,10 +474,25 @@ export default function GraphCanvas({
         selected && nodeKinds.has(selected) ? selected : null,
       );
       const hover = usable(evidenceMode ? null : hovered.current);
-      const chosenArea = neighborhood(chosen);
+      const spotlit = new Set(spotlight.filter((id) => visibleIds.has(id)));
+      const chosenArea = spotlit.size
+        ? {
+            nodes: spotlit,
+            edges: new Set(
+              (rendered.edges ?? [])
+                .filter(
+                  (edge) =>
+                    spotlit.has(String(edge.source)) &&
+                    spotlit.has(String(edge.target)),
+                )
+                .map((edge) => String(edge.id)),
+            ),
+          }
+        : neighborhood(chosen);
       const hoverArea = neighborhood(hover);
       // 포커스 모드에서는 연결 없는 노드가 이미 숨겨지므로, 남은 1·2단계 노드·연결선을 흐리게 하지 않는다.
-      const dimRest = Boolean(chosen) && !(focusLayout && focusId);
+      const dimRest =
+        (Boolean(chosen) || spotlit.size > 0) && !(focusLayout && focusId);
       const states: Record<string, string[]> = {};
       for (const node of rendered.nodes ?? []) {
         const id = String(node.id);
@@ -630,6 +678,15 @@ export default function GraphCanvas({
     ]);
     followFit.current = false;
     fitPending.current = false;
+    const margin = 48;
+    if (
+      !centerAlways.current &&
+      point[0] >= safe.x + margin &&
+      point[0] <= safe.x + safe.width - margin &&
+      point[1] >= safe.y + margin &&
+      point[1] <= safe.y + safe.height - margin
+    )
+      return;
     await graph.translateBy(
       [safe.x + safe.width / 2 - point[0], safe.y + safe.height / 2 - point[1]],
       cameraMotion('select'),
@@ -963,6 +1020,7 @@ export default function GraphCanvas({
             selected ?? focusId,
             [
               ...(tutorialTargetId ? [tutorialTargetId] : []),
+              ...spotlight,
               ...data.edges
                 .filter((edge) => highlightedEdgeIds.includes(edge.id))
                 .flatMap((edge) => [edge.source, edge.target]),
@@ -1079,6 +1137,18 @@ export default function GraphCanvas({
           });
         }
         keepPositionsOnce.current = false;
+        // D-GRP-01 (2026-11-04 결정): 기본 지도는 처음 그린 자리에 고정한다. 상세 패널로 지도 폭이
+        // 바뀌거나 기업을 골라 접힌 사건이 펼쳐져도 다른 노드가 밀리지 않도록, 접힌 사건까지 모두 넣고
+        // 처음 크기로 겹침을 피한 좌표를 쓴다. 포커스·흐름 순 배치만 노드를 옮긴다.
+        if (arrangement === 'map') {
+          const fixed = fixedPositions(host);
+          rendered.nodes = rendered.nodes?.map((node) => {
+            const position = fixed.get(String(node.id));
+            return position
+              ? { ...node, style: { ...node.style, ...position } }
+              : node;
+          });
+        }
         const relationTypes = new Map(
           data.edges.map((edge) => [edge.id, edge.relationType]),
         );
@@ -1270,6 +1340,7 @@ export default function GraphCanvas({
     if (previousSelected.current && !selected) preservePositions.current = true;
     previousSelected.current = selected;
     centerTarget.current = selected;
+    centerAlways.current = false;
     if (selected) {
       preservePositions.current = false;
       followFit.current = false;
@@ -1282,6 +1353,7 @@ export default function GraphCanvas({
     followFit.current = false;
     fitPending.current = false;
     centerTarget.current = centerRequest.id;
+    centerAlways.current = true;
     syncSelection();
   }, [centerRequest]);
   useEffect(() => {
@@ -1299,6 +1371,7 @@ export default function GraphCanvas({
     focusLayout,
     flow,
     highlightedEdgeIds,
+    spotlight,
     connectionPath,
     view.hidden,
   ]);
@@ -1426,6 +1499,7 @@ export default function GraphCanvas({
     window.addEventListener('zoop:graph-viewport-change', viewportChanged);
     hovered.current = null;
     renderedData.current = null;
+    mapLayout.current = null;
     preservePositions.current = false;
     const graphMode = data.metadata.mode;
     const rememberCamera = () => {
@@ -1590,9 +1664,12 @@ export default function GraphCanvas({
           if (!graph || disposed || graph.destroyed) return;
           if (host.clientWidth <= 0 || host.clientHeight <= 0) return;
           const [width, height] = [host.clientWidth, host.clientHeight];
-          const origin = preservePositions.current
-            ? graph.getViewportByCanvas([0, 0])
-            : null;
+          // A node clicked on the map keeps its screen position when the detail rail opens.
+          const origin =
+            preservePositions.current ||
+            (centerTarget.current && !centerAlways.current)
+              ? graph.getViewportByCanvas([0, 0])
+              : null;
           graph.setSize(width, height);
           // Some renderers shift their projection on resize. Preserve screen
           // pixels when the detail rail closes, rather than recentering the view.

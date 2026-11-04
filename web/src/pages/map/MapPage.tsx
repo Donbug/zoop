@@ -593,6 +593,35 @@ function MapWorkspace({
     }
     previousEvent.current = selectedPanel;
   }, [selectedPanel]);
+  // D-GRP-03 (2026-11-04 결정): 관련 기업을 누르면 두 기업과 공유 사건만 지도에 밝게 남긴다.
+  // 다른 노드를 고르면 풀린다. 사건 공유 선은 지도에 그리지 않으므로 선을 선택하지 않는다.
+  const [spotlightPair, setSpotlightPair] = useState<{
+    company: string;
+    other: string;
+  } | null>(null);
+  const activePair =
+    spotlightPair && spotlightPair.company === companyNode?.id
+      ? spotlightPair
+      : null;
+  const pairCompany = activePair?.company ?? null;
+  const pairOther = activePair?.other ?? null;
+  const spotlight = useMemo(() => {
+    if (!pairCompany || !pairOther || !data) return [];
+    const shared = data.edges.find(
+      (edge) =>
+        edge.relationType === 'SHARES_ISSUE' &&
+        [edge.source, edge.target].includes(pairCompany) &&
+        [edge.source, edge.target].includes(pairOther),
+    );
+    // D-GRP-01: same-title issues are one node on the map; light that node.
+    return [
+      pairCompany,
+      pairOther,
+      ...new Set(
+        (shared?.via ?? []).map((id) => grouping?.groupOf.get(id) ?? id),
+      ),
+    ];
+  }, [pairCompany, pairOther, data, grouping]);
   const relatedCompanies = useMemo(() => {
     if (!data || !companyNode) return [];
     const counts = new Map<string, number>();
@@ -1279,6 +1308,7 @@ function MapWorkspace({
                     : (pathFrom ?? selectedId ?? detailEventId ?? companyId),
                 )}
                 connectionPath={Boolean(pathFrom) && !activeEvidence}
+                spotlight={spotlight}
                 highlightedEdgeIds={(activeEvidence
                   ? evidenceEdges
                   : pathFrom
@@ -1550,17 +1580,15 @@ function MapWorkspace({
                   onFocus={() =>
                     updateQuery({ focus: companyNode.id, hops: '1' })
                   }
-                  onSelectRelation={(companyId) => {
-                    const edge = data?.edges.find(
-                      (item) =>
-                        item.relationType === 'SHARES_ISSUE' &&
-                        ((item.source === companyNode.id &&
-                          item.target === companyId) ||
-                          (item.target === companyNode.id &&
-                            item.source === companyId)),
-                    );
-                    if (edge) selectEdge(edge.id);
-                  }}
+                  activeRelatedId={pairOther}
+                  onSelectRelation={(companyId) =>
+                    setSpotlightPair((pair) =>
+                      pair?.company === companyNode.id &&
+                      pair.other === companyId
+                        ? null
+                        : { company: companyNode.id, other: companyId },
+                    )
+                  }
                   onAskAi={() =>
                     tutorialOpen && tutorialStep === 5
                       ? void closeTutorial()
