@@ -34,6 +34,20 @@ class PublicationComposeRequestTest {
         assertThrows(PublicationException.class, () -> PublicationComposeRequest.parse(duplicate.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     }
 
+    @Test
+    void aBaseMayBeComposedWithoutNewSourcesButAFirstPublicationNamesOne() {
+        ObjectNode root = request(0);
+        assertEquals("request_invalid", assertThrows(PublicationException.class,
+                () -> PublicationComposeRequest.parse(Canonical.bytes(root))).code());
+        String base = "gv-" + "c".repeat(64);
+        root.put("baseVersionId", base); root.put("expectedActiveVersionId", base); root.put("expectedBaseReceiptSha256", "d".repeat(64));
+        var parsed = PublicationComposeRequest.parse(Canonical.bytes(root));
+        assertEquals(base, parsed.baseVersionId());
+        assertEquals(java.util.List.of(), parsed.incomingVersionIds());
+        assertEquals(java.util.Map.of(), parsed.incomingReceiptPins());
+        assertEquals(parsed, PublicationComposeRequest.parse(Canonical.bytes(parsed.wire())));
+    }
+
     private static ObjectNode request(int count) {
         ObjectNode root = StrictJson.newObject(); root.put("schemaVersion", PublicationComposeRequest.SCHEMA);
         root.putNull("baseVersionId"); root.putNull("expectedActiveVersionId"); root.putNull("expectedBaseReceiptSha256");

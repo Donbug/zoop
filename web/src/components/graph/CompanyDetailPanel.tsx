@@ -9,8 +9,7 @@ import { setWatchlistCompany } from '@/apis/graph/companies';
 import { useCompanyData } from '@/hooks/useCompanyData';
 import type { GraphNode, GraphResponse } from '@/types/map/graph';
 import type { CompanyIssue } from '@/types/map/company';
-import { relationHelp } from './relation-help';
-import { edgeSwatchClass } from './edge-swatch';
+import { relatedCompaniesHelp, relationHelp } from './relation-help';
 import DocumentSentiment from './DocumentSentiment';
 import type { WatchSync } from '@/types/map';
 import IssueDocumentSentiments from './IssueDocumentSentiments';
@@ -36,6 +35,8 @@ type Props = {
   tutorialSaving?: boolean;
   onFocus: () => void;
   onSelectRelation?: (companyId: string) => void;
+  /** 지도에 함께 밝게 표시 중인 관련 기업. */
+  activeRelatedId?: string | null;
   onAskAi: () => void;
   /** 지금 지도 그래프: 직접 사건의 앞뒤 사건(FOLLOWS), 관련 기업 로고, 사건 근거, 중심 버튼 조건에 쓴다. */
   graph?: Pick<GraphResponse, 'nodes' | 'edges'> | null;
@@ -238,13 +239,15 @@ export default function CompanyDetailPanel(props: Props) {
   );
   const currency = quote?.quote.currency;
   const changePositive = (quote?.quote.change ?? 0) >= 0;
-  // D-GRP-03 · prototype node-panel.tsx:285-290: 관련 기업 줄에 로고와 사건 공유 선 견본을 둔다.
+  // D-GRP-03 · prototype node-panel.tsx:285-290: 관련 기업 줄에 로고를 둔다. 누르면 두 기업과
+  // 공유 사건만 지도에 밝게 표시한다(사건 공유 선은 2026-11-04부터 그리지 않는다).
   const relatedItem = (related: RelatedCompany) => {
     const node = props.graph?.nodes.find((item) => item.id === related.id);
     return (
       <li key={related.id}>
         <button
           className="company-related-company-select flex-row! items-center! gap-3!"
+          aria-pressed={props.activeRelatedId === related.id}
           onClick={() => props.onSelectRelation?.(related.id)}
         >
           <CompanyLogo
@@ -256,10 +259,6 @@ export default function CompanyDetailPanel(props: Props) {
             <b>{related.name}</b>
             <span>공유 사건 {related.sharedIssueCount}건</span>
           </div>
-          <b
-            aria-hidden="true"
-            className={`${edgeSwatchClass('SHARES_ISSUE')} shrink-0`}
-          />
         </button>
       </li>
     );
@@ -654,10 +653,7 @@ export default function CompanyDetailPanel(props: Props) {
             <div className="company-section-title">
               <div className="flex items-center gap-1.5">
                 <h3>관련 기업</h3>
-                <RelationHint
-                  label="사건 공유"
-                  text={relationHelp.SHARES_ISSUE}
-                />
+                <RelationHint label="관련 기업" text={relatedCompaniesHelp} />
               </div>
               <span>{props.relatedCompanies.length}</span>
             </div>

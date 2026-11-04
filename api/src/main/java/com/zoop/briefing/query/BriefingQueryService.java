@@ -283,6 +283,9 @@ public class BriefingQueryService {
         out.put("status", "published").put("publishedAt", row.publishedAt().toString());
         out.set("dataAsOf", payload.get("dataWindow").get("end").deepCopy());
         out.set("marketSummary", row.publicSnapshot().get("marketSummary").deepCopy());
+        for (String field : List.of("commonPriority", "prioritySummary")) {
+            if (row.publicSnapshot().has(field)) out.set(field, row.publicSnapshot().get(field).deepCopy());
+        }
         JsonNode editionReview = row.publicSnapshot().get("editionReview");
         if (editionReview != null) out.set("editionReview", editionReview.deepCopy());
         JsonNode aiPrice = row.publicSnapshot().get("aiPriceOutlooks");

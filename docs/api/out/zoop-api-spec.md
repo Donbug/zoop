@@ -1106,7 +1106,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getEvent · 사건 상세와 근거 참조 조회
 
-사건 상세와 근거 참조 조회. round·graphVersion·asOf로 공개 버전 하나를 고정하고(그래프 조회와 같은 규칙) 그 버전에서 현재 제외를 적용한 뒤 보이는 사건만 반환하며, 보이지 않으면 RESOURCE_NOT_FOUND/404다. relations·companies·articles·follows·evidenceIds와 사건 머리 필드는 스냅샷에서 읽는다. asOf는 그래프와 같이 사건의 기사가 하나라도 asOf 이후에 공개됐으면 사건 전체를 가리며(404), 일부 기사만 남긴 상세는 만들지 않는다. articles는 이 사건의 보이는 근거가 가리키는 정확한 (기사 ID, 기사 버전)만 담고 같은 기사의 다른 버전은 넣지 않으며, 최신 공개순이다(FS021의 관련도 우선 정렬은 관련도 원천이 없어 미구현). relations[].edgeId는 그래프 표시 간선 ID와 같다. follows는 FOLLOWS 관계(뒤 사건→앞 사건)에서 이 버전에 보이는 사건만 담는다. 수입한 버전은 그 버전의 import receipt(AI 인계 묶음)에서 mentions(원본 S2 언급, verification none)·fieldDecisions(운영자 필드 판정의 필드·결정·사유 코드만, 판정 대상 값은 싣지 않음, candidateId는 null)·sourceSupport(인계 값을 그대로 복사)를 읽고, receipt를 읽을 수 없거나, 그 사건을 담지 않거나, 인계 묶음 스키마가 현재(zoop-graph-handoff-bundle-5)가 아니면(이전 묶음은 언급·필드 판정이 없으므로 빈 목록으로 대신하지 않음) SOURCE_UNAVAILABLE/503이다. receipt 미등록·고정 바이트 손상·형식 오류는 재시도로 복구되지 않아 error.retryable=false다. receipt 저장소의 일시 읽기 장애는 error.retryable=true다. 수입한 버전은 근거마다 getEvidence와 같은 현재 공개 게이트(기사 접근 상태·현재 source grant·registry)를 지금 다시 적용해, 언급은 그 근거가 모두 보일 때만 참가자와 함께 내보내고(일부라도 가려지면 언급 전체를 뺌), 관계는 근거가 모두 보일 때만, 기사는 보이는 근거가 가리킬 때만 남긴다. 머리 필드는 운영자가 고른 대표 언급(fieldProvenance.selection=operator-representative)의 값이거나, 대표가 없으면(unanimous) 모든 언급이 같은 값이므로, 대표 언급 또는 모든 언급이 온전히 보이지 않으면 사건 전체를 RESOURCE_NOT_FOUND/404로 닫는다. follows와 FOLLOWS 관계의 상대 사건도 같은 머리 검사를 통과해야 하며, 통과하지 못하면 관계와 참조 모두에서 뺀다. 운영자가 보류·거절(HOLD·REJECT)한 언급의 eventTime(이때 timePrecision=unknown)·period는 null이며 어떤 필드로도 내보내지 않는다. 현재 권한·제외로 기사 일부가 빠지면 sourceSupport는 articleCount를 보이는 기사 수로 하고 가려진 기사에 의존하는 knownLineageCount·independentSourceCount는 null, 목록은 보이는 기사만 남긴다. 합성 fixture 버전은 receipt가 없어 mentions·fieldDecisions가 빈 배열이고 sourceSupport는 모든 기사의 출처가 알려지지 않은 것으로 표시한다(개수는 0이 아니라 null). articles[].publisher는 고정된 기사 버전의 저장된 article_versions 값이며 없으면 null, relationType은 그 기사의 보이는 언급이 모두 background면 PROVIDES_BACKGROUND, 아니면 REPORTS, 언급 정보가 없으면 null이다(앱 결정). role이 있는 companies·relations·참가자는 roleUnconfirmed=true다(인계가 확인된 역할을 생산하지 않음). summary는 아직 사건 요약 생산자가 없어 Unavailable이고 metadata.partial=true·failures에 summary를 남기며, approval은 null이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+사건 상세와 근거 참조 조회. round·graphVersion·asOf로 공개 버전 하나를 고정하고(그래프 조회와 같은 규칙) 그 버전에서 현재 제외를 적용한 뒤 보이는 사건만 반환하며, 보이지 않으면 RESOURCE_NOT_FOUND/404다. relations·companies·articles·follows·evidenceIds와 사건 머리 필드는 스냅샷에서 읽는다. asOf는 그래프와 같이 사건의 기사가 하나라도 asOf 이후에 공개됐으면 사건 전체를 가리며(404), 일부 기사만 남긴 상세는 만들지 않는다. articles는 이 사건의 보이는 근거가 가리키는 정확한 (기사 ID, 기사 버전)만 담고 같은 기사의 다른 버전은 넣지 않으며, 최신 공개순이다(FS021의 관련도 우선 정렬은 관련도 원천이 없어 미구현). relations[].edgeId는 그래프 표시 간선 ID와 같다. follows는 FOLLOWS 관계(뒤 사건→앞 사건)에서 이 버전에 보이는 사건만 담는다. 수입한 버전은 그 버전의 import receipt(AI 인계 묶음)에서 mentions(원본 S2 언급, verification none)·fieldDecisions(운영자 필드 판정의 필드·결정·사유 코드만, 판정 대상 값은 싣지 않음, candidateId는 null)·sourceSupport(인계 값을 그대로 복사)를 읽고, receipt를 읽을 수 없거나, 그 사건을 담지 않거나, 인계 묶음 스키마가 앱이 읽는 형식(zoop-graph-handoff-bundle-5~9, legacy-real 패키지 zoop-legacy-real-bundle-2·3)이 아니면(이전 묶음은 언급·필드 판정이 없으므로 빈 목록으로 대신하지 않음) SOURCE_UNAVAILABLE/503이다. 묶음 5~7 receipt가 묶음 8부터만 보관하는 값(timePrecision=unresolved 언급, unsupported-format 판정, 국가가 빈 지역 근거)을 담고 있어도 503이다. receipt 미등록·고정 바이트 손상·형식 오류는 재시도로 복구되지 않아 error.retryable=false다. receipt 저장소의 일시 읽기 장애는 error.retryable=true다. 수입한 버전은 근거마다 getEvidence와 같은 현재 공개 게이트(기사 접근 상태·현재 source grant·registry)를 지금 다시 적용해, 언급은 그 근거가 모두 보일 때만 참가자와 함께 내보내고(일부라도 가려지면 언급 전체를 뺌), 관계는 근거가 모두 보일 때만, 기사는 보이는 근거가 가리킬 때만 남긴다. 머리 필드는 운영자가 고른 대표 언급(fieldProvenance.selection=operator-representative)의 값이거나, 대표가 없으면(unanimous) 모든 언급이 같은 값이므로, 대표 언급 또는 모든 언급이 온전히 보이지 않으면 사건 전체를 RESOURCE_NOT_FOUND/404로 닫는다. follows와 FOLLOWS 관계의 상대 사건도 같은 머리 검사를 통과해야 하며, 통과하지 못하면 관계와 참조 모두에서 뺀다. 운영자가 보류·거절(HOLD·REJECT)한 언급의 eventTime(이때 timePrecision=unknown)·period는 null이며 어떤 필드로도 내보내지 않는다. 현재 권한·제외로 기사 일부가 빠지면 sourceSupport는 articleCount를 보이는 기사 수로 하고 가려진 기사에 의존하는 knownLineageCount·independentSourceCount는 null, 목록은 보이는 기사만 남긴다. 합성 fixture 버전은 receipt가 없어 mentions·fieldDecisions가 빈 배열이고 sourceSupport는 모든 기사의 출처가 알려지지 않은 것으로 표시한다(개수는 0이 아니라 null). articles[].publisher는 고정된 기사 버전의 저장된 article_versions 값이며 없으면 null, relationType은 그 기사의 보이는 언급이 모두 background면 PROVIDES_BACKGROUND, 아니면 REPORTS, 언급 정보가 없으면 null이다(앱 결정). role이 있는 companies·relations·참가자는 roleUnconfirmed=true다(인계가 확인된 역할을 생산하지 않음). summary는 수입한 버전의 import receipt에서 공개 제목을 공급하는 원천 이슈의 issues[].summary(인계 묶음 7판 이상, 운영자가 고정한 검증된 이슈 요약)를 읽는다. available이면 생산자 객체의 text·evidenceIds·generatedAt·resultVersion을 그대로 복사해 AnalysisSummary로 내보내되, 그 이슈의 mentions[].evidenceIds 전체(인용된 근거만이 아님)가 현재 공개 게이트를 통과할 때만이다. 하나라도 가려지면 Unavailable이고 이때만 metadata.partial=true·failures에 summary(SUMMARY_EVIDENCE_UNAVAILABLE)를 남긴다. 생산자가 요약을 만들지 않은 경우(receipt에 summary가 없는 이전 묶음·legacy·합성 fixture, not-requested, 시각 검토 대기, 입력 초과, 검증 미통과)는 자료 없음이므로 summary만 Unavailable(사유 문구)이고 partial=false·failures는 비며 실패로 표시하지 않는다. 검증기가 허용하지 않는 요약 모양은 SOURCE_UNAVAILABLE/503이다. approval은 수입한 버전에서 이 읽기에 보이는 이 사건의 INVOLVES 관계(asOf·제외·현재 근거 권리로 걸러진 뒤)가 receipt의 운영자 최종 승인(relations[].provenance.s3SemanticValidation=manual-operator-final-approval)에 기대면 {source: admin-review, label: 관리자 승인, scope: relation, ruleId: null}, legacy-real 원천은 보이는 언급의 approvalBasis가 review-rule:R1@2일 때 {source: review-rule, label: 자동 검수 규칙, scope: issue, ruleId: R1@2}, 그 밖에는 null이다. 원천마다 승인 출처가 다르면 null이고, 합성 fixture 버전은 receipt가 없어 항상 null이다. receipt에 relations가 없으면 SOURCE_UNAVAILABLE/503이며, 누가·언제 승인했는지는 싣지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -3300,7 +3300,7 @@ expectedRevision을 검증한다. 저장 이후 첫09:20/17:30부터 적용하�
 
 ## getPersonalBriefingDelivery · 회차별 고정 개인 브리핑 조회
 
-당시 설정과 선정·검증 결과를 그대로 제공한다. 설정 변경·새로고침으로 재생성하지 않는다. demo=true는 명시 활성화된 데모에서만 별도 결과를 조회한다. 현재 원문 권리/정정/제공 상태는 재확인한다.
+당시 설정과 선정·검증 결과를 그대로 제공한다. 설정 변경·새로고침으로 재생성하지 않는다. demo=true는 명시 활성화된 데모 또는 최종 반입 영수증에 등록된 회원 본인의 보존 데모를 조회한다. 보존 데모 조회는 수동 생성 권한을 활성화하지 않는다. 현재 원문 권리/정정/제공 상태는 재확인한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -4892,6 +4892,241 @@ The immutable published original of a round (what users saw before any correctio
 | forecast.status | 필수 | string {unavailable, not_updated} |  |
 | forecast.message | 필수 | string |  |
 
+<a id="schema-prioritysource"></a>
+
+### PrioritySource
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| evidenceId | 선택 | string |  |
+| quote | 선택 | string |  |
+| url | 선택 | string |  |
+| publishedAt | 선택 | string (date-time) |  |
+
+<a id="schema-prioritycompany"></a>
+
+### PriorityCompany
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 선택 | string |  |
+| name | 선택 | string |  |
+| reason | 선택 | string |  |
+
+<a id="schema-priorityprice"></a>
+
+### PriorityPrice
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyName | 선택 | string |  |
+| baseline | 선택 | string |  |
+| latest | 선택 | string |  |
+| changeRate | 선택 | string |  |
+| currency | 선택 | string |  |
+| observedAt | 선택 | string (date-time) |  |
+
+<a id="schema-prioritypreviouschange"></a>
+
+### PriorityPreviousChange
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 선택 | string |  |
+| text | 선택 | string |  |
+
+<a id="schema-priorityjudgmentbasis"></a>
+
+### PriorityJudgmentBasis
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| promptVersion | 선택 | string |  |
+| directionReason | 선택 | string |  |
+| confidence | 선택 | string |  |
+| effectSizeStatus | 선택 | string |  |
+
+<a id="schema-priorityanalysis"></a>
+
+### PriorityAnalysis
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 선택 | string |  |
+| companyName | 선택 | string |  |
+| roundId | 선택 | string |  |
+| cutoff | 선택 | string (date-time) |  |
+| resultVersion | 선택 | string |  |
+| verificationMode | 선택 | string {separate_request_same_model} |  |
+| direction | 선택 | string {positive, negative, mixed, watch} |  |
+| keyPoint | 선택 | string |  |
+| confirmedFact | 선택 | string |  |
+| businessImpact | 선택 | string |  |
+| companyConnection | 선택 | string |  |
+| forMyStocks | 선택 | string |  |
+| outlook | 선택 | string |  |
+| nextCheck | 선택 | string |  |
+| positive | 선택 | string, null |  |
+| negative | 선택 | string, null |  |
+| priceObservation | 선택 | string, null |  |
+| previousChange | 선택 | [PriorityPreviousChange](#schema-prioritypreviouschange) |  |
+| evidenceIds | 선택 | string[] |  |
+| judgmentBasis | 선택 | [PriorityJudgmentBasis](#schema-priorityjudgmentbasis) |  |
+| comparison | 선택 | [PriorityComparison](#schema-prioritycomparison) |  |
+
+<a id="schema-commonpriorityitem"></a>
+
+### CommonPriorityItem
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| issueId | 선택 | string |  |
+| kind | 선택 | string |  |
+| importance | 선택 | integer (int32) |  |
+| title | 선택 | string |  |
+| topicTag | 선택 | string |  |
+| reason | 선택 | string |  |
+| whyNow | 선택 | string |  |
+| originRoundId | 선택 | string |  |
+| originCutoff | 선택 | string (date-time) |  |
+| companies | 선택 | [PriorityCompany](#schema-prioritycompany)[] |  |
+| sources | 선택 | [PrioritySource](#schema-prioritysource)[] |  |
+| prices | 선택 | [PriorityPrice](#schema-priorityprice)[] |  |
+| analysisResultVersion | 선택 | string |  |
+| aiAnalyses | 선택 | [PriorityAnalysis](#schema-priorityanalysis)[] |  |
+| analysisWithheldReason | 선택 | string |  |
+
+<a id="schema-commonpriorityview"></a>
+
+### CommonPriorityView
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 선택 | string |  |
+| roundId | 선택 | string |  |
+| cutoff | 선택 | string (date-time) |  |
+| resultVersion | 선택 | string |  |
+| generationVersion | 선택 | string |  |
+| candidateCount | 선택 | integer (int32) |  |
+| minimumIssues | 선택 | integer (int32) |  |
+| minimumShortfall | 선택 | integer (int32) |  |
+| status | 선택 | string |  |
+| legacyAnalysisScopeWarning | 선택 | boolean |  |
+| items | 선택 | [CommonPriorityItem](#schema-commonpriorityitem)[] |  |
+
+<a id="schema-personalpriorityitem"></a>
+
+### PersonalPriorityItem
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| issueId | 선택 | string |  |
+| kind | 선택 | string |  |
+| title | 선택 | string |  |
+| topicTag | 선택 | string |  |
+| reason | 선택 | string |  |
+| originRoundId | 선택 | string |  |
+| originCutoff | 선택 | string (date-time) |  |
+| connections | 선택 | [PriorityCompany](#schema-prioritycompany)[] |  |
+| sources | 선택 | [PrioritySource](#schema-prioritysource)[] |  |
+| priorAnalysis | 선택 | [PriorityPriorAnalysis](#schema-priorityprioranalysis)[] |  |
+| price | 선택 | [PriorityPrice](#schema-priorityprice) |  |
+| aiAnalyses | 선택 | [PriorityAnalysis](#schema-priorityanalysis)[] |  |
+| analysisOmittedReason | 선택 | string |  |
+
+<a id="schema-personalpriorityview"></a>
+
+### PersonalPriorityView
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 선택 | string |  |
+| roundId | 선택 | string |  |
+| cutoff | 선택 | string (date-time) |  |
+| resultVersion | 선택 | string |  |
+| companyIds | 선택 | string[] |  |
+| candidateCount | 선택 | integer (int32) |  |
+| minimumIssues | 선택 | integer (int32) |  |
+| status | 선택 | string |  |
+| items | 선택 | [PersonalPriorityItem](#schema-personalpriorityitem)[] |  |
+
+<a id="schema-prioritysummary"></a>
+
+### PrioritySummary
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 선택 | string |  |
+| roundId | 선택 | string |  |
+| cutoff | 선택 | string (date-time) |  |
+| resultVersion | 선택 | string |  |
+| text | 선택 | string |  |
+| evidenceIds | 선택 | string[] |  |
+
+<a id="schema-prioritycomparisonbaseline"></a>
+
+### PriorityComparisonBaseline
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| issueId | 필수 | string |  |
+| companyId | 필수 | string |  |
+| roundId | 필수 | string |  |
+| cutoff | 필수 | string (date-time) |  |
+| resultVersion | 필수 | string |  |
+| direction | 필수 | string {positive, negative, mixed, watch} |  |
+| businessImpact | 필수 | string |  |
+| outlook | 필수 | string |  |
+
+<a id="schema-prioritycomparison"></a>
+
+### PriorityComparison
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {newly_selected, same_issue_company} |  |
+| baseline | 필수 | [PriorityComparisonBaseline](#schema-prioritycomparisonbaseline) / null |  |
+
+<a id="schema-priorityprioranalysis"></a>
+
+### PriorityPriorAnalysis
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyName | 필수 | string |  |
+| takeaway | 필수 | string |  |
+| positive | 필수 | string |  |
+| negative | 필수 | string |  |
+| conditions | 필수 | string[] |  |
+
 <a id="schema-briefingresponse"></a>
 
 ### BriefingResponse
@@ -4900,6 +5135,9 @@ The immutable published original of a round (what users saw before any correctio
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| commonPriority | 선택 | [CommonPriorityView](#schema-commonpriorityview) |  |
+| personalPriority | 선택 | [PersonalPriorityView](#schema-personalpriorityview) | 회원의 회차 고정 delivery에서만 제공되는 개인화 표시입니다. 공통 공개 응답에는 포함하지 않습니다. |
+| prioritySummary | 선택 | [PrioritySummary](#schema-prioritysummary) |  |
 | id | 필수 | string |  |
 | date | 필수 | string (date) |  |
 | edition | 필수 | string {morning, evening} |  |

@@ -557,19 +557,22 @@ describe('D-GRP-03 prototype company panel gaps (M1-M7, M9)', () => {
       screen.getByLabelText('간접 관련 설명').closest('details')!.textContent,
     ).toContain('후속 사건');
     expect(
-      screen.getByLabelText('사건 공유 설명').closest('details')!.textContent,
+      screen.getByLabelText('관련 기업 설명').closest('details')!.textContent,
     ).toContain('같은 사건에');
   });
 
-  it('M6 shows a logo and the shared-issue line swatch on related companies', () => {
+  it('M6 shows a logo on related companies and marks the one lit on the map', () => {
+    // 2026-11-04: the shared-issue line is no longer drawn, so its swatch is gone too.
     renderWith({
       relatedCompanies: [
         { id: 'NASDAQ:NVDA', name: 'NVIDIA', sharedIssueCount: 1 },
       ],
+      activeRelatedId: 'NASDAQ:NVDA',
     });
     const row = screen.getByRole('button', { name: /NVIDIA/ });
-    expect(row.querySelector('.legend-line.dashed')).toBeTruthy();
+    expect(row.querySelector('.legend-line.dashed')).toBeNull();
     expect(row.querySelector('[aria-hidden="true"].rounded-full')).toBeTruthy();
+    expect(row.getAttribute('aria-pressed')).toBe('true');
   });
 
   it('M7 lists three documents with their judgement and links the rest to the company documents tab', () => {

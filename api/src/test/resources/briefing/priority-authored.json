@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "common-relative-priority-view-v1",
+  "roundId": "brf-test-2026-10-15-evening",
+  "cutoff": "2026-10-15T08:30:00Z",
+  "resultVersion": "authored-priority-v1",
+  "minimumIssues": 2,
+  "minimumShortfall": 1,
+  "candidateCount": 4,
+  "status": "available",
+  "items": [
+    {
+      "issueId": "brf-test-event",
+      "kind": "relative_issue",
+      "importance": 1,
+      "title": "[합성시험] 사업 기회와 확인 조건",
+      "reason": "[합성시험] 후보 내 우선 확인",
+      "whyNow": "[합성시험] 확정된 변경을 확인",
+      "originRoundId": "brf-test-2026-10-15-evening",
+      "originCutoff": "2026-10-15T08:30:00Z",
+      "companies": [
+        {
+          "companyId": "brf-test-company",
+          "name": "[합성시험] 기업",
+          "reason": "[합성시험] 계약 당사자"
+        }
+      ],
+      "sources": [
+        {
+          "evidenceId": "brf-test-evidence",
+          "quote": "합성시험",
+          "url": "https://example.invalid/synthetic-document",
+          "publishedAt": "2026-10-13T00:00:00Z"
+        }
+      ],
+      "prices": [],
+      "analysisResultVersion": "authored-analysis-v1",
+      "aiAnalyses": [
+        {
+          "companyId": "brf-test-company",
+          "companyName": "[합성시험] 기업",
+          "roundId": "brf-test-2026-10-15-evening",
+          "cutoff": "2026-10-15T08:30:00Z",
+          "resultVersion": "authored-analysis-v1",
+          "verificationMode": "separate_request_same_model",
+          "direction": "watch",
+          "keyPoint": "[합성시험] 공급 능력을 확인합니다.",
+          "confirmedFact": "[합성시험] 계약 변경 사실",
+          "businessImpact": "[합성시험] 주문 확대가 공급 능력에 영향을 줄 수 있습니다.",
+          "companyConnection": "[합성시험] 계약 당사자로 연결됩니다.",
+          "outlook": "[합성시험] 실제 주문이 확인되면 판단을 강화합니다.",
+          "nextCheck": "[합성시험] 주문 규모와 가동 시점",
+          "positive": null,
+          "negative": "[합성시험] 주문 규모는 미확인",
+          "priceObservation": null,
+          "previousChange": {
+            "status": "unavailable",
+            "text": "[합성시험] 대응하는 이전 판단이 없습니다."
+          },
+          "evidenceIds": [
+            "brf-test-evidence"
+          ],
+          "judgmentBasis": {
+            "promptVersion": "common-impact-relative-v1",
+            "directionReason": "[합성시험] 사업 효과의 수치 근거가 부족합니다.",
+            "confidence": "limited",
+            "effectSizeStatus": "unquantified"
+          }
+        }
+      ]
+    }
+  ]
+}

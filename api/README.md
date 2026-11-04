@@ -1,5 +1,7 @@
 # Zoop API 실행 환경
 
+저장된 공통·개인화 결과를 새 AI 호출 없이 반입·발행하는 절차는 [브리핑 서버 반입 안내](../docs/development/briefing-server-staging.md)를 따른다. 확정 준비 도구와 별도 비웹 발행 명령을 구분하며, 일반 API 기동이나 PR 반영으로 데이터를 자동 공개하지 않는다. 반입 데모 설정은 실제 회원 설정·정기 생성과 분리한다.
+
 Spring Boot 실행 기반, 공통 오류 처리, 내부 AI 분석 transport 클라이언트와 ERD v6에 맞춘 인증 DB 스키마가 있습니다. 공개 약관 조회·이메일 회원가입·로그인·회원/비회원 세션 발급 및 조회가 구현됐습니다. 문서 저장(`artifacts`·`articles`·`article_versions`)과 operator 전용 비웹 import([문서 import](docs/DOCUMENT_IMPORT.md)), S1 문서 분석([문서 분석](docs/DOCUMENT_ANALYSIS.md))도 지원합니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
 
 ## 도구
@@ -601,7 +603,7 @@ JVM은 보존 응답의 SHA·기업·통화·해상도·요청 마감·완료 �
 
 요청 형식은 `zoop-graph-publication-compose-1`입니다. `baseVersionId`, `expectedActiveVersionId`, `expectedBaseReceiptSha256`은 필요한 null을 명시하고, 정렬한 `incomingVersionIds`와 같은 집합의 `incomingReceiptPins[{versionId,sha256}]`, 현재 `expectedRuleRevision`·`expectedReviewRevision`, 결정 파일 바이트의 `decisionsSha256`, `operator`를 모두 넣습니다. 첫 구성은 실제 활성 포인터가 null 또는 fixture일 때만 null base를 사용하며, fixture ID가 활성 상태이면 그 ID를 그대로 고정합니다.
 
-새 입력은 명령당 1–20개입니다. 누적 원본 수에는 20개 제한을 적용하지 않습니다. 전체 보존 참조는 artifact당 16 MiB와 실제 전송 closure의 1,003개 파일·256 MiB 경계를 따릅니다. 기존 원본의 규칙 적용 전 projection을 합친 뒤 현재 공개 규칙을 한 번 적용하며, 입력에서 빠진 기존 이슈도 보존합니다. 충돌은 명시적 근거·필드 선택으로 해결하거나 후보 전체를 거절합니다.
+새 입력은 명령당 0–20개입니다. 0개는 `baseVersionId`가 있고 합친 결정이 base의 결정과 다를 때만 받으며, base의 원본만으로 다시 구성합니다(예: `zoop-graph-publication-decisions-2`의 `labelCorrections`로 사건 표시명만 바꾸는 후보). 첫 구성은 1개 이상이어야 합니다. 누적 원본 수에는 20개 제한을 적용하지 않습니다. 전체 보존 참조는 artifact당 16 MiB와 실제 전송 closure의 1,003개 파일·256 MiB 경계를 따릅니다. 기존 원본의 규칙 적용 전 projection을 합친 뒤 현재 공개 규칙을 한 번 적용하며, 입력에서 빠진 기존 이슈도 보존합니다. 충돌은 명시적 근거·필드 선택으로 해결하거나 후보 전체를 거절합니다.
 
 `staged` 또는 `unchanged` 결과의 `graphVersionId`와 `receiptSha256`을 다음 전송·수동 활성화 단계에 사용합니다. 실패 코드가 `outcome_unknown`이면 같은 요청과 새 결과 경로로 상태를 대조합니다. 자세한 결정 파일·원본별 제외·권한 계약은 [누적 발행](docs/GRAPH_READ_HANDOFF.md#누적-발행과-원본별-현재-권한)을 따릅니다.
 
@@ -619,3 +621,8 @@ JVM은 보존 응답의 SHA·기업·통화·해상도·요청 마감·완료 �
 ### 브리핑 회원 평가·관리자 선호도
 
 `/api/v1/feedback`의 회원별 회차/이슈 도움 됨·안 됨·사유를 PostgreSQL에 저장하며, `/api/v1/admin/feedback/summary`와 `/dislikes`가 관리자 화면에 집계·사유를 제공합니다. 세션·CSRF·현재 발행 버전과 읽기 권한을 검증하고 취소도 보존합니다. 기존 익명 미리보기 SQLite와 구분합니다. [저장·집계·보존 및 검증](../docs/development/briefing-member-feedback.md)을 참고하세요.
+
+
+### 저장 결과 발행의 그래프 없는 보존 등록
+
+정식 그래프를 생성하지 않은 저장 결과는 briefing-finalization-request-v2의 retained-results 모드로 등록할 수 있습니다. 현재 read/quote-display·briefing-outlook 권한을 확인하고 회차·전체 후보 pool·원문/인용·보존 파일과 실제 DB를 대조합니다. graphVersion은 null로 유지하며 native/S3 등록이나 새 의미 검증을 수행했다고 표시하지 않습니다. 원 AI 문안·archive·실제 회원 설정·평가는 보존합니다. 같은 SavedBriefingPublisher 명령을 사용하며 실제 회원·delivery ID에 결속한 영수증이 있어야 개인화 보존본을 조회합니다. 파일 변조·권한 철회·범위 밖 후보는 거부하며 새 AI 전송 권한은 부여하지 않습니다. 세부 입력과 검증은 docs/development/briefing-server-staging.md를 참고하세요.

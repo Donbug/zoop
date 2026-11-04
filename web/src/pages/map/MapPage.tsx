@@ -3,6 +3,7 @@ import LoadingIndicator from '@/components/common/LoadingIndicator';
 import {
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -60,6 +61,11 @@ import {
   restoreTargets,
 } from '@/components/graph/graph-view';
 import IsolatedIssuesPanel from '@/components/graph/IsolatedIssuesPanel';
+import {
+  GROUP_PREFIX,
+  groupIssues,
+  viewRequest,
+} from '@/components/graph/issue-groups';
 import MapDetailSheet from '@/components/graph/MapDetailSheet';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useCompanyResource } from '@/hooks/useCompanyResource';
@@ -259,7 +265,37 @@ function MapWorkspace({
     id: string;
     owner: string;
   } | null>(null);
+  // 닫을 때는 왼쪽으로 밀려 나가는 애니메이션이 끝난 뒤 패널을 뺀다.
+  const [sidebarClosing, setSidebarClosing] = useState(false);
+  const sidebarSlot = useRef<HTMLDivElement>(null);
+  const sidebarShown = sidebarOpen || sidebarClosing;
+  // 패널 크기와 지도 사이 간격만큼 밀어야 지도도 같은 속도로 따라 움직인다.
+  // 가로 배치는 너비, 모바일 세로 배치는 높이를 쓴다.
+  function measureSidebarSlot() {
+    const slot = sidebarSlot.current;
+    if (!slot) return;
+    slot.style.setProperty('--holdings-shift', `${slot.offsetWidth + 12}px`);
+    slot.style.setProperty('--holdings-drop', `${slot.offsetHeight + 12}px`);
+  }
+  useLayoutEffect(measureSidebarSlot, [sidebarShown]);
+  useEffect(() => {
+    if (!sidebarClosing) return;
+    // animationend가 오지 않는 환경(동작 줄이기 설정 등)에서도 패널을 뺀다.
+    const timer = window.setTimeout(() => setSidebarClosing(false), 400);
+    return () => window.clearTimeout(timer);
+  }, [sidebarClosing]);
   function changeSidebar(open: boolean) {
+    const reduced =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // 열린 뒤 내용이 바뀌어 크기가 달라졌을 수 있으니 닫기 직전에 다시 잰다.
+    // 닫는 동안 목록 응답이 와도 패널이 커지지 않게 잰 높이로 고정한다.
+    const slot = sidebarSlot.current;
+    if (!open) {
+      measureSidebarSlot();
+      if (slot) slot.style.height = `${slot.offsetHeight}px`;
+    } else slot?.style.removeProperty('height');
+    setSidebarClosing(!open && sidebarOpen && !reduced);
     setSidebarPreference(open);
     try {
       localStorage.setItem(SIDEBAR_KEY, open ? '1' : '0');
@@ -381,6 +417,18 @@ function MapWorkspace({
     retry,
     prefetch,
   );
+  // D-GRP-01: 같은 제목의 사건은 지도에 노드 하나로 그린다. 상세·근거·영향은 원래 사건 data로 찾는다.
+  // 회차·튜토리얼은 핵심 사건·안내 대상을 원래 ID로 가리키므로 묶지 않는다.
+  // 묶음 그래프는 응답마다 한 번만 만든다. 렌더마다 새로 만들면 지도가 매번 다시 그려진다.
+  const groupable = !round && !tutorialOpen;
+  const grouping = useMemo(
+    () => (data && groupable ? groupIssues(data) : null),
+    [data, groupable],
+  );
+  const mapData = grouping?.graph ?? data;
+  const toView = (id: string | null | undefined) =>
+    id ? (grouping?.groupOf.get(id) ?? id) : (id ?? null);
+  const viewCenterRequest = viewRequest(centerRequest, grouping);
   // 저장본을 일시적으로 읽지 못한 경우만 다시 확인할 수 있다. 미기록·중단·
   // 미발행·대상 비공개는 같은 요청을 반복해도 달라지지 않는 회차 상태다.
   const graphErrorRetryable =
@@ -479,8 +527,12 @@ function MapWorkspace({
   const selectedNode =
     data?.nodes.find((node) => node.id === selectedId) ?? null;
   const companyNode = selectedNode?.kind === 'company' ? selectedNode : null;
+  const groupMembers = selectedId
+    ? (grouping?.members.get(selectedId) ?? null)
+    : null;
   const eventId =
     selectedId &&
+    !selectedId.startsWith(GROUP_PREFIX) &&
     (data || (!round && !loading)) &&
     selectedNode?.kind !== 'company'
       ? selectedId
@@ -492,6 +544,7 @@ function MapWorkspace({
     (isolatedOpen ? '__isolated__' : null) ??
     pathFrom ??
     impactIssueId ??
+    (groupMembers ? selectedId : null) ??
     eventId ??
     edgeId ??
     companyNode?.id ??
@@ -572,6 +625,35 @@ function MapWorkspace({
     }
     previousEvent.current = selectedPanel;
   }, [selectedPanel]);
+  // D-GRP-03 (2026-11-04 결정): 관련 기업을 누르면 두 기업과 공유 사건만 지도에 밝게 남긴다.
+  // 다른 노드를 고르면 풀린다. 사건 공유 선은 지도에 그리지 않으므로 선을 선택하지 않는다.
+  const [spotlightPair, setSpotlightPair] = useState<{
+    company: string;
+    other: string;
+  } | null>(null);
+  const activePair =
+    spotlightPair && spotlightPair.company === companyNode?.id
+      ? spotlightPair
+      : null;
+  const pairCompany = activePair?.company ?? null;
+  const pairOther = activePair?.other ?? null;
+  const spotlight = useMemo(() => {
+    if (!pairCompany || !pairOther || !data) return [];
+    const shared = data.edges.find(
+      (edge) =>
+        edge.relationType === 'SHARES_ISSUE' &&
+        [edge.source, edge.target].includes(pairCompany) &&
+        [edge.source, edge.target].includes(pairOther),
+    );
+    // D-GRP-01: same-title issues are one node on the map; light that node.
+    return [
+      pairCompany,
+      pairOther,
+      ...new Set(
+        (shared?.via ?? []).map((id) => grouping?.groupOf.get(id) ?? id),
+      ),
+    ];
+  }, [pairCompany, pairOther, data, grouping]);
   const relatedCompanies = useMemo(() => {
     if (!data || !companyNode) return [];
     const counts = new Map<string, number>();
@@ -904,7 +986,16 @@ function MapWorkspace({
         sessionRevision !== useAuthStore.getState().sessionRevision
       )
         return;
-      const restored = restoreTargets(saved, nextGraph);
+      // 묶음 노드 선택(node:group:…)도 되살린다. 원래 사건 ID는 그대로 유효하다.
+      const restored = restoreTargets(saved, {
+        ...nextGraph,
+        nodes: [
+          ...nextGraph.nodes,
+          ...groupIssues(nextGraph).graph.nodes.filter((node) =>
+            node.id.startsWith(GROUP_PREFIX),
+          ),
+        ],
+      });
       const targetFound =
         targetCompany &&
         nextGraph.nodes.some(
@@ -1145,11 +1236,20 @@ function MapWorkspace({
             </div>
           </div>
           <div
-            className={`relationship-body${selectedPanel ? ` has-company-panel ${pathIsCollapsed ? '' : 'max-md:pb-[48dvh]!'}` : ''}${tutorialOpen || sidebarOpen ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
+            className={`relationship-body${selectedPanel ? ` has-company-panel ${pathIsCollapsed ? '' : 'max-md:pb-[48dvh]!'}` : ''}${tutorialOpen || sidebarShown ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
             aria-busy={loading}
           >
-            {sidebarOpen && (
-              <div id="holdings-sidebar" className="flex min-h-0 max-sm:w-full">
+            {sidebarShown && (
+              <div
+                id="holdings-sidebar"
+                ref={sidebarSlot}
+                inert={!sidebarOpen}
+                onAnimationEnd={(event) => {
+                  if (event.target === event.currentTarget && !sidebarOpen)
+                    setSidebarClosing(false);
+                }}
+                className={`holdings-slot flex min-h-0 max-sm:w-full${sidebarOpen ? '' : ' is-closing'}`}
+              >
                 <HoldingsSidebar
                   key={memoryOwner}
                   member={Boolean(token)}
@@ -1199,9 +1299,9 @@ function MapWorkspace({
                 />
               </div>
             )}
-            {data ? (
+            {mapData ? (
               <GraphCanvas
-                data={data}
+                data={mapData}
                 onPersonalFilter={changeFilter}
                 onMarket={() => void changeMode('all')}
                 filterHost={filterHost}
@@ -1210,7 +1310,7 @@ function MapWorkspace({
                 )}
                 tutorialCameraEnabled={tutorialOpen && tutorialStep === 2}
                 tutorialShowNeighborhood={tutorialOpen && tutorialStep === 3}
-                centerRequest={centerRequest}
+                centerRequest={viewCenterRequest}
                 tutorialCenterId={tutorialOpen ? target?.company.id : undefined}
                 memoryOwner={
                   tutorialOpen
@@ -1249,30 +1349,36 @@ function MapWorkspace({
                     path: null,
                   });
                 }}
-                selectedId={
+                selectedId={toView(
                   activeEvidence
                     ? evidenceFallback
-                    : (pathFrom ?? selectedId ?? detailEventId ?? companyId)
-                }
+                    : (pathFrom ?? selectedId ?? detailEventId ?? companyId),
+                )}
                 connectionPath={Boolean(pathFrom) && !activeEvidence}
-                highlightedEdgeIds={
+                spotlight={spotlight}
+                highlightedEdgeIds={(activeEvidence
+                  ? evidenceEdges
+                  : pathFrom
+                    ? (displayedPath?.edgeIds ?? [])
+                    : impactEdges(data!, impact.data ?? historicalImpact.data)
+                ).map((id) => grouping?.edgeOf.get(id) ?? id)}
+                selectedEdgeId={
                   activeEvidence
-                    ? evidenceEdges
-                    : pathFrom
-                      ? (displayedPath?.edgeIds ?? [])
-                      : impactEdges(data, impact.data ?? historicalImpact.data)
+                    ? null
+                    : edgeId
+                      ? (grouping?.edgeOf.get(edgeId) ?? edgeId)
+                      : null
                 }
-                selectedEdgeId={activeEvidence ? null : edgeId}
                 isolateSelection={Boolean(activeEvidence && evidenceFallback)}
                 evidenceMode={Boolean(activeEvidence)}
                 onSelectEdge={selectEdge}
                 onSelect={selectNode}
-                focusId={
+                focusId={toView(
                   pathFrom || evidenceOutsideFocus
                     ? null
                     : (focusId ??
-                      (historical ? (detailEventId ?? companyId) : null))
-                }
+                        (historical ? (detailEventId ?? companyId) : null)),
+                )}
                 focusHops={focusHops}
                 focusLayout={
                   !pathFrom && !evidenceOutsideFocus && Boolean(focusId)
@@ -1474,6 +1580,24 @@ function MapWorkspace({
                   }}
                 />
               )}
+              {groupMembers && !impactIssueId && !pathFrom && (
+                <IsolatedIssuesPanel
+                  key={`${selectedId}:${JSON.stringify(eventContext)}`}
+                  issues={groupMembers}
+                  context={eventContext}
+                  title={groupMembers[0].label}
+                  description={`같은 제목으로 묶인 사건 ${groupMembers.length}건이에요. 사건을 누르면 상세를 볼 수 있어요.`}
+                  closeLabel="묶인 사건 닫기"
+                  searchable={false}
+                  rowLabel={(issue) =>
+                    [issue.target, issue.action].filter(Boolean).join(' · ') ||
+                    issue.label
+                  }
+                  onEvidence={(event) => eventAction('evidence', event)}
+                  onClose={() => selectNode(null)}
+                  onSelect={selectPanelNode}
+                />
+              )}
               {companyNode && !impactIssueId && !pathFrom && (
                 <CompanyDetailPanel
                   key={companyNode.id}
@@ -1515,17 +1639,15 @@ function MapWorkspace({
                         : { focus: companyNode.id, hops: '1' },
                     )
                   }
-                  onSelectRelation={(companyId) => {
-                    const edge = data?.edges.find(
-                      (item) =>
-                        item.relationType === 'SHARES_ISSUE' &&
-                        ((item.source === companyNode.id &&
-                          item.target === companyId) ||
-                          (item.target === companyNode.id &&
-                            item.source === companyId)),
-                    );
-                    if (edge) selectEdge(edge.id);
-                  }}
+                  activeRelatedId={pairOther}
+                  onSelectRelation={(companyId) =>
+                    setSpotlightPair((pair) =>
+                      pair?.company === companyNode.id &&
+                      pair.other === companyId
+                        ? null
+                        : { company: companyNode.id, other: companyId },
+                    )
+                  }
                   onAskAi={() =>
                     tutorialOpen && tutorialStep === 5
                       ? void closeTutorial()

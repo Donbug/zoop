@@ -132,8 +132,8 @@ test('D-GRP-01: sparse links get more room than a densely connected neighborhood
   const previousDenseMean = 191.91688130435122;
   expect(denseMean).toBeGreaterThanOrEqual(previousDenseMean * 1.3);
   expect(length(sparseEdge)).toBeGreaterThan(denseMean * 1.5);
-  // 2026-11-04 리뷰: 묶음 사이 여백을 180에서 418로 넓혔어요(55%, 다시 50%). 멀리 흩어지지는 않아요.
-  expect(isolatedNearest).toBeGreaterThanOrEqual(180 * 1.55 * 1.5 - 1e-9);
+  // 2026-11-04 리뷰: 넓혔던 묶음 사이 여백(418)을 다시 180으로 되돌렸어요. 멀리 흩어지지는 않아요.
+  expect(isolatedNearest).toBeGreaterThanOrEqual(180 - 1e-9);
   expect(isolatedNearest).toBeLessThanOrEqual(1200);
 });
 
@@ -162,10 +162,92 @@ test('D-GRP-01: a busy company spreads its single-company issues around fuller r
   const nearest = Math.min(
     ...leaves.flatMap((a, i) => leaves.slice(i + 1).map((b) => distance(a, b))),
   );
-  // 고리마다 6개씩 황금각으로 놓던 이전 배치는 가장 가까운 두 사건이 약 227까지 붙었어요.
-  expect(nearest).toBeGreaterThanOrEqual(250);
+  // 2026-11-04 리뷰로 사건을 기업 쪽으로 15% 당겼어요(고리 반지름·간격 × 0.85).
+  expect(nearest).toBeGreaterThanOrEqual(250 * 0.85);
   for (const leaf of leaves)
     expect(distance(leaf, points.get(company.id)!)).toBeGreaterThanOrEqual(
-      270 * 1.5 - 1e-9,
+      270 * 0.85 * 1.5 - 1e-9,
     );
+});
+
+test('D-GRP-01 issues keep a minimum distance from their companies and no nodes overlap', () => {
+  // 2026-11-04 리뷰: 사건은 연결된 기업에서 최소 450(가장 큰 기업 노드의 3배) 떨어지고,
+  // 노드끼리는 반지름에 여백을 더한 거리만큼 떨어져요.
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const points = relationshipPositions(data);
+  const kind = new Map(data.nodes.map((n) => [n.id, n.kind]));
+  const ids = [...points.keys()];
+  for (const edge of data.edges) {
+    if (edge.relationType === 'SHARES_ISSUE') continue;
+    const kinds = [kind.get(edge.source), kind.get(edge.target)];
+    if (!kinds.includes('company') || !kinds.includes('issue')) continue;
+    expect(
+      distance(points.get(edge.source)!, points.get(edge.target)!),
+    ).toBeGreaterThanOrEqual(449);
+  }
+  for (let i = 0; i < ids.length; i++)
+    for (let j = i + 1; j < ids.length; j++) {
+      const companies = [ids[i], ids[j]].filter(
+        (id) => kind.get(id) === 'company',
+      ).length;
+      expect(
+        distance(points.get(ids[i])!, points.get(ids[j])!),
+      ).toBeGreaterThanOrEqual(companies === 2 ? 374 : companies ? 134 : 179);
+    }
+});
+
+test('D-GRP-01 a company fans its own issues into empty space on the outer side', () => {
+  // 2026-11-04 리뷰: 기업에만 연결된 사건은 고른 간격으로 놓되, 빈 바깥쪽으로 펼쳐요.
+  // 기업이 이미 그린 선(공유 사건·연결 기업) 쪽으로는 뻗지 않아요.
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const points = relationshipPositions(data);
+  const kind = new Map(data.nodes.map((n) => [n.id, n.kind]));
+  const links = new Map<string, string[]>();
+  for (const edge of data.edges)
+    if (edge.relationType !== 'SHARES_ISSUE')
+      for (const [a, b] of [
+        [edge.source, edge.target],
+        [edge.target, edge.source],
+      ])
+        links.set(a, [...(links.get(a) ?? []), b]);
+  const linked = data.nodes.filter(
+    (n) => n.kind === 'company' && (links.get(n.id)?.length ?? 0) > 0,
+  );
+  const middle = {
+    x: linked.reduce((s, n) => s + points.get(n.id)!.x, 0) / linked.length,
+    y: linked.reduce((s, n) => s + points.get(n.id)!.y, 0) / linked.length,
+  };
+  let checked = 0;
+  for (const company of linked) {
+    const own = links
+      .get(company.id)!
+      .filter((id) => kind.get(id) === 'issue' && links.get(id)!.length === 1);
+    if (own.length === 0 || own.length > 3) continue;
+    const c = points.get(company.id)!;
+    const out = { x: c.x - middle.x, y: c.y - middle.y };
+    if (Math.hypot(out.x, out.y) < 400) continue;
+    const average = own.reduce(
+      (s, id) => ({
+        x: s.x + points.get(id)!.x - c.x,
+        y: s.y + points.get(id)!.y - c.y,
+      }),
+      { x: 0, y: 0 },
+    );
+    // Within 120 degrees of the outward direction: the emptiest side wins over pure outward.
+    expect(average.x * out.x + average.y * out.y).toBeGreaterThan(
+      -0.5 * Math.hypot(average.x, average.y) * Math.hypot(out.x, out.y),
+    );
+    const turn = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      Math.abs(Math.atan2(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y));
+    for (const line of links.get(company.id)!.filter((id) => !own.includes(id)))
+      for (const id of own)
+        expect(
+          turn(
+            { x: points.get(id)!.x - c.x, y: points.get(id)!.y - c.y },
+            { x: points.get(line)!.x - c.x, y: points.get(line)!.y - c.y },
+          ),
+        ).toBeGreaterThan(Math.PI / 9);
+    checked += 1;
+  }
+  expect(checked).toBeGreaterThan(0);
 });

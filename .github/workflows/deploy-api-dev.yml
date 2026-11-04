@@ -1,6 +1,12 @@
 name: Deploy API to Dev
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - 'scripts/require_ci.py'
+      - '.github/workflows/deploy-api-dev.yml'
   workflow_dispatch:
     inputs:
       operation:
@@ -22,6 +28,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  DEPLOY_OPERATION: ${{ github.event_name == 'push' && 'deploy' || inputs.operation }}
   AWS_REGION: ${{ vars.AWS_REGION }}
   ECR_REPOSITORY: ${{ vars.API_ECR_REPOSITORY }}
   ECS_CLUSTER: ${{ vars.API_ECS_CLUSTER }}
@@ -33,7 +40,7 @@ jobs:
   deploy:
     name: Build, stage, or deploy API
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     environment: dev
 
     steps:
@@ -52,6 +59,36 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Wait for CI on the pushed main commit
+        if: ${{ github.event_name == 'push' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 90); do
+            state="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&event=push&per_page=1" \
+              --jq '.workflow_runs[0] | [(.status // ""), (.conclusion // "")] | @tsv')"
+            status="${state%%$'\t'*}"
+            conclusion="${state#*$'\t'}"
+
+            if [ "$status" = completed ]; then
+              if [ "$conclusion" != success ]; then
+                echo "::error::CI completed with conclusion '$conclusion'."
+                exit 1
+              fi
+              exit 0
+            fi
+
+            echo "Waiting for CI on $GITHUB_SHA ($attempt/90, status=${status:-not-found})"
+            sleep 20
+          done
+
+          echo '::error::Timed out waiting for CI.'
+          exit 1
+
       - name: Require successful CI and every required job on this exact commit
         id: ci
         env:
@@ -61,7 +98,6 @@ jobs:
       - name: Validate deployment variables
         shell: bash
         env:
-          DEPLOY_OPERATION: ${{ inputs.operation }}
           IMAGE_STAGE_ROLE_ARN: ${{ vars.AWS_IMAGE_STAGE_ROLE_ARN }}
           DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
         run: |
@@ -101,7 +137,7 @@ jobs:
           done
 
       - name: Configure AWS credentials for image staging
-        if: ${{ inputs.operation == 'stage-image' }}
+        if: ${{ env.DEPLOY_OPERATION == 'stage-image' }}
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
         with:
           role-to-assume: ${{ vars.AWS_IMAGE_STAGE_ROLE_ARN }}
@@ -109,7 +145,7 @@ jobs:
           role-session-name: zoop-api-stage-${{ github.run_id }}
 
       - name: Configure AWS credentials for ECS deployment
-        if: ${{ inputs.operation == 'deploy' }}
+        if: ${{ env.DEPLOY_OPERATION == 'deploy' }}
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
@@ -117,7 +153,7 @@ jobs:
           role-session-name: zoop-api-deploy-${{ github.run_id }}
 
       - name: Require an active ECS service for deployment
-        if: ${{ inputs.operation == 'deploy' }}
+        if: ${{ env.DEPLOY_OPERATION == 'deploy' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -238,7 +274,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Download current task definition
-        if: ${{ inputs.operation == 'deploy' }}
+        if: ${{ env.DEPLOY_OPERATION == 'deploy' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -249,7 +285,7 @@ jobs:
             > task-definition.json
 
       - name: Render API task definition
-        if: ${{ inputs.operation == 'deploy' }}
+        if: ${{ env.DEPLOY_OPERATION == 'deploy' }}
         id: render-task-definition
         uses: aws-actions/amazon-ecs-render-task-definition@138c24f321fdbdf7edee4a685519d253cae2cdea
         with:
@@ -258,7 +294,7 @@ jobs:
           image: ${{ steps.build-image.outputs.image }}
 
       - name: Deploy API to Amazon ECS
-        if: ${{ inputs.operation == 'deploy' }}
+        if: ${{ env.DEPLOY_OPERATION == 'deploy' }}
         uses: aws-actions/amazon-ecs-deploy-task-definition@c465972ecbd160473f22e683363b422a5412a3de
         with:
           task-definition: ${{ steps.render-task-definition.outputs.task-definition }}
@@ -269,7 +305,6 @@ jobs:
       - name: Write workflow summary
         shell: bash
         env:
-          DEPLOY_OPERATION: ${{ inputs.operation }}
           RESOLVED_IMAGE: ${{ steps.build-image.outputs.image }}
           IMAGE_COMMIT: ${{ steps.build-image.outputs.commit }}
           TAGGED_IMAGE: ${{ steps.build-image.outputs.tagged-image }}

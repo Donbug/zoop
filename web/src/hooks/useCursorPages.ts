@@ -171,6 +171,8 @@ export function useCursorPages<P extends Page>(
     items: pages.flatMap((page) => page.items) as P['items'],
     hasMore: nextCursor !== null,
     loadingMore: settled?.loadingMore ?? false,
+    /** 조용한 다시 읽기가 진행 중인지. 이때 다시 부르는 조용한 reload는 무시된다. */
+    refreshing: settled !== null && settled.attempt !== attempt,
     moreError: settled?.moreError ?? null,
     loadMore,
     reload,

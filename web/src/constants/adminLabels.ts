@@ -5,6 +5,7 @@ import type {
   DashboardJobStatus,
   DashboardRoundStatus,
 } from '@/types/admin/dashboard';
+import type { GraphRoundStage } from '@/types/admin/graphRounds';
 
 // 관리자 화면의 상태 이름. 프로토타입 관리자 화면(labels.ts)과 같은 이름을 쓴다.
 
@@ -121,3 +122,27 @@ export const auditActionLabel: Record<string, string> = {
   'member.block': '회원 차단',
   'member.unblock': '회원 차단 해제',
 };
+
+/** 그래프 정기 회차(#55) 단계. 수입 완료는 비활성 버전 등록이며 공개가 아니다. */
+export const graphRoundStageLabel: Record<GraphRoundStage, string> = {
+  scheduled: '예정',
+  run_requested: '계획 요청됨',
+  plan_ready: '계획 준비됨',
+  analysis_queued: '분석 대기열',
+  analysis_done: '분석 완료',
+  freeze_requested: '묶음 요청됨',
+  handoff_ready: '묶음 준비됨',
+  imported: '수입 완료',
+  skipped: '건너뜀',
+  failed: '실패',
+};
+
+/** 재시도해도 결과가 바뀌지 않거나 운영 절차상 재시도하지 않는 실패 코드의 안내 */
+export function retryCaution(failureCode: string | null) {
+  if (!failureCode) return null;
+  if (failureCode.includes('quota_exhausted'))
+    return '분석 비용 한도를 다 써서 실패한 회차예요. 운영 절차상 재시도하지 않아요. 재시도하면 같은 계획을 다시 접수해요.';
+  if (failureCode.startsWith('run_failed'))
+    return 'AI가 실패로 답한 회차예요. 같은 회차 ID로 재시도하면 AI가 저장된 같은 결과를 돌려줘요. 다음 회차가 이어받는 것이 복구 경로예요.';
+  return null;
+}

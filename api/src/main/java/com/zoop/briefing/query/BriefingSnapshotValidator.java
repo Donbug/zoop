@@ -21,11 +21,22 @@ final class BriefingSnapshotValidator {
     }
 
     static void validate(BriefingRound row, boolean localReplay) {
+        boolean retained = row.graphVersion() == null && row.publicSnapshot() != null
+                && row.publicSnapshot().has("retainedBasis");
+        if (retained) {
+            var pin = com.zoop.common.json.StrictJson.Obj.of(row.publicSnapshot().get("retainedBasis"))
+                    .exactly(Set.of("artifactId", "sha256"));
+            check(com.zoop.common.json.StrictJson.SHA256.matcher(pin.string("sha256")).matches()
+                    && pin.string("artifactId").equals("retained-basis-" + pin.string("sha256")));
+        }
+        // This is structural validation only. The retained file/DB registration
+        // and current document grants are enforced by the read/publication gates.
+        boolean nullableGraph = localReplay || retained;
         JsonNode p = object(row.payload());
         same(text(p, "id"), row.id()); same(text(p, "date"), row.date().toString());
         same(text(p, "edition"), row.edition());
         same(timestamp(p, "scheduledAt"), row.scheduledAt()); same(timestamp(p, "generatedAt"), row.generatedAt());
-        same(localReplay ? nullableText(p, "graphVersion") : text(p, "graphVersion"), row.graphVersion());
+        same(nullableGraph ? nullableText(p, "graphVersion") : text(p, "graphVersion"), row.graphVersion());
         check(row.publishedAt() != null && row.generatedAt() != null && !row.publishedAt().isBefore(row.generatedAt()));
         nonNegativeRevision(p, "reviewRevision", false); nonNegativeRevision(p, "ruleRevision", true);
         int selectedFrom = integer(p, "selectedFrom", false);
@@ -65,7 +76,7 @@ final class BriefingSnapshotValidator {
         }
         String emptyReason = nullableText(p, "emptyReason");
         check(items.isEmpty() ? "no_issues_in_window".equals(emptyReason) : emptyReason == null);
-        metadata(object(field(p, "metadata")), row.graphVersion(), localReplay);
+        metadata(object(field(p, "metadata")), row.graphVersion(), nullableGraph, localReplay);
         JsonNode outlook = field(p, "outlook");
         if (!outlook.isNull()) {
             object(outlook); choice(outlook, "label", LABELS); text(outlook, "rationale");
@@ -73,6 +84,15 @@ final class BriefingSnapshotValidator {
             timestamp(outlook, "judgedAt"); text(outlook, "model"); text(outlook, "promptVersion");
         }
         JsonNode snapshot = object(row.publicSnapshot());
+        if (snapshot.has("commonPriority")) {
+            BriefingPriorityRules.validate(snapshot.get("commonPriority"), row.id(), row.windowTo(), false, companies, evidence);
+            for (var item : snapshot.path("commonPriority").path("items")) check(events.contains(text(item, "issueId")));
+        }
+        if (snapshot.has("prioritySummary")) {
+            check(snapshot.has("commonPriority"));
+            BriefingPriorityRules.summary(snapshot.get("prioritySummary"), row.id(), row.windowTo(), evidence);
+        }
+
         summary(field(snapshot, "marketSummary"), evidence);
         marketAnalysis(field(snapshot, "marketSummary"), row);
         if (snapshot.has("editionReview")) {
@@ -179,9 +199,9 @@ final class BriefingSnapshotValidator {
         if (!"available".equals(comparison)) check(field(price, "change").isNull() && field(price, "changeRate").isNull());
     }
 
-    private static void metadata(JsonNode value, String graphVersion, boolean localReplay) {
+    private static void metadata(JsonNode value, String graphVersion, boolean nullableGraph, boolean localReplay) {
         text(value, "source"); timestamp(value, "asOf");
-        same(localReplay ? nullableText(value, "graphVersion") : text(value, "graphVersion"), graphVersion);
+        same(nullableGraph ? nullableText(value, "graphVersion") : text(value, "graphVersion"), graphVersion);
         if (localReplay) check(Set.of("zoop-briefing-development-replay", "zoop-briefing-publication-clock-simulation", "zoop-briefing-local-collection-validation")
                 .contains(text(value, "source")));
         text(value, "requestId"); bool(value, "partial");
