@@ -5,9 +5,10 @@ import PipelineOverview from '@/components/admin/pipeline/PipelineOverview';
 import PublicationRules from '@/components/admin/pipeline/PublicationRules';
 import AnalysisJobs from '@/components/admin/pipeline/AnalysisJobs';
 import GraphVersions from '@/components/admin/pipeline/GraphVersions';
+import GraphRounds from '@/components/admin/pipeline/GraphRounds';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 
-type PipelineTab = 'candidates' | 'versions' | 'jobs';
+type PipelineTab = 'candidates' | 'versions' | 'rounds' | 'jobs';
 
 function TabIcon({ children }: { children: ReactNode }) {
   return (
@@ -26,7 +27,7 @@ function TabIcon({ children }: { children: ReactNode }) {
   );
 }
 
-// 와이어프레임 탭 아이콘: 후보(체크 목록)·그래프 버전(갈래)·작업(연결된 노드)
+// 와이어프레임 탭 아이콘: 후보(체크 목록)·그래프 버전(갈래)·작업(연결된 노드). 회차(시계)는 #55에서 더했다.
 const TABS: { value: PipelineTab; label: string; icon: ReactNode }[] = [
   {
     value: 'candidates',
@@ -50,6 +51,16 @@ const TABS: { value: PipelineTab; label: string; icon: ReactNode }[] = [
     ),
   },
   {
+    value: 'rounds',
+    label: '회차',
+    icon: (
+      <TabIcon>
+        <circle cx="8" cy="8" r="6" />
+        <path d="M8 4.5V8l2.5 1.5" />
+      </TabIcon>
+    ),
+  },
+  {
     value: 'jobs',
     label: '작업',
     icon: (
@@ -62,8 +73,8 @@ const TABS: { value: PipelineTab; label: string; icon: ReactNode }[] = [
   },
 ];
 
-// A-ADM-03 그래프 관제·검수 (/admin/pipeline). 와이어프레임대로 개요·자동 검수 규칙 아래에 [후보 | 그래프 버전 | 작업] 탭.
-// - 그래프 버전(listGraphVersions·activateGraphVersion)과 작업(listAnalysisJobs 등, #292) API를 연결한다.
+// A-ADM-03 그래프 관제·검수 (/admin/pipeline). 와이어프레임대로 개요·자동 검수 규칙 아래에 [후보 | 그래프 버전 | 회차 | 작업] 탭.
+// - 그래프 버전(listGraphVersions·activateGraphVersion), 회차(listGraphRounds 등, #55), 작업(listAnalysisJobs 등, #292) API를 연결한다.
 // - 탭 위에 이슈 관제 개요(getPipelineOverview)를, 후보 탭에 후보 목록·상세(listAnalysisCandidates·getAnalysisCandidate)를 연결한다.
 // - 고른 탭은 주소(?tab=)에 남는다. 기본은 와이어프레임처럼 후보 탭이다.
 // - 자동 검수 규칙은 탭이 아니라 개요 아래에 늘 보인다. 예전 ?tab=rules 주소는 후보 탭으로 연다.
@@ -71,7 +82,9 @@ export default function PipelineReview() {
   const { params, updateQuery } = useRouteQuery();
   const requested = params.get('tab');
   const tab: PipelineTab =
-    requested === 'versions' || requested === 'jobs' ? requested : 'candidates';
+    requested === 'versions' || requested === 'rounds' || requested === 'jobs'
+      ? requested
+      : 'candidates';
   // 그래프 버전 탭도 처음 열 때 읽고 그 뒤로는 숨기기만 해서 진행 중인 버전 전환과 그 결과를 잃지 않게 한다.
   const [versionsOpened, setVersionsOpened] = useState(tab === 'versions');
   if (tab === 'versions' && !versionsOpened) setVersionsOpened(true);
@@ -80,11 +93,19 @@ export default function PipelineReview() {
   const [graphRevision, setGraphRevision] = useState(0);
   const [jobsOpened, setJobsOpened] = useState(tab === 'jobs');
   if (tab === 'jobs' && !jobsOpened) setJobsOpened(true);
+  // 회차 탭도 처음 열 때 읽고, 그 뒤로는 숨기기만 해서 진행 중인 재시도·시작을 잃지 않게 한다.
+  const [roundsOpened, setRoundsOpened] = useState(tab === 'rounds');
+  if (tab === 'rounds' && !roundsOpened) setRoundsOpened(true);
+  // 회차 상세에서 수입된 버전으로 갈 때마다 버전 목록을 다시 읽게 한다.
+  const [versionsRefresh, setVersionsRefresh] = useState(0);
 
   return (
     <div className="flex flex-col gap-5 py-8 text-zoop-ink">
       <PageHeader title="이슈 관제" />
-      <PipelineOverview onOpenJobs={() => updateQuery({ tab: 'jobs' })} />
+      <PipelineOverview
+        onOpenJobs={() => updateQuery({ tab: 'jobs' })}
+        onOpenRounds={() => updateQuery({ tab: 'rounds' })}
+      />
       <PublicationRules />
       <Tabs
         label="그래프 관제 보기"
@@ -103,6 +124,19 @@ export default function PipelineReview() {
         <div hidden={tab !== 'versions'}>
           <GraphVersions
             onActivated={() => setGraphRevision((value) => value + 1)}
+            refreshKey={versionsRefresh}
+          />
+        </div>
+      )}
+      {roundsOpened && (
+        <div hidden={tab !== 'rounds'}>
+          <GraphRounds
+            active={tab === 'rounds'}
+            onOpenJob={(jobId) => updateQuery({ tab: 'jobs', job: jobId })}
+            onOpenVersions={() => {
+              setVersionsRefresh((value) => value + 1);
+              updateQuery({ tab: 'versions' });
+            }}
           />
         </div>
       )}

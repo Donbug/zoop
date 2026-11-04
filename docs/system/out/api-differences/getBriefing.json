@@ -607,10 +607,18 @@
       "format": "date"
     },
     "response:200:application/json.commonPriority.items[].sources[].publishedDate:required": false,
+    "response:200:application/json.commonPriority.items[].sources[].publisher": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].sources[].publisher:required": false,
     "response:200:application/json.commonPriority.items[].sources[].quote": {
       "type": "string"
     },
     "response:200:application/json.commonPriority.items[].sources[].quote:required": false,
+    "response:200:application/json.commonPriority.items[].sources[].title": {
+      "type": "string"
+    },
+    "response:200:application/json.commonPriority.items[].sources[].title:required": false,
     "response:200:application/json.commonPriority.items[].sources[].url": {
       "type": "string"
     },
@@ -5325,10 +5333,18 @@
       "format": "date"
     },
     "response:200:application/json.personalPriority.items[].sources[].publishedDate:required": false,
+    "response:200:application/json.personalPriority.items[].sources[].publisher": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].sources[].publisher:required": false,
     "response:200:application/json.personalPriority.items[].sources[].quote": {
       "type": "string"
     },
     "response:200:application/json.personalPriority.items[].sources[].quote:required": false,
+    "response:200:application/json.personalPriority.items[].sources[].title": {
+      "type": "string"
+    },
+    "response:200:application/json.personalPriority.items[].sources[].title:required": false,
     "response:200:application/json.personalPriority.items[].sources[].url": {
       "type": "string"
     },

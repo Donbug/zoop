@@ -216,6 +216,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [blockMember](#blockmember) | POST | /api/v1/admin/members/{member_id}/block | 관리자(작업별 권한) | P2 |
 | [unblockMember](#unblockmember) | POST | /api/v1/admin/members/{member_id}/unblock | 관리자(작업별 권한) | P2 |
 | [getCompanyFinancials](#getcompanyfinancials) | GET | /api/v1/companies/{id}/financials | 공개 | P1 |
+| [getCompanyIssueImpactAssessment](#getcompanyissueimpactassessment) | GET | /api/v1/companies/{id}/issues/{issueId}/impact/assessment | 공개 | P1 |
 | [getCompanyIssueImpact](#getcompanyissueimpact) | GET | /api/v1/companies/{id}/issues/{issueId}/impact | 공개 | P1 |
 | [getPersonalizedBriefingIssues](#getpersonalizedbriefingissues) | GET | /api/v1/briefings/{id}/personalized/issues | 회원(본인) | P2 |
 | [getPersonalizedBriefing](#getpersonalizedbriefing) | GET | /api/v1/briefings/{id}/personalized | 회원(본인) | P2 |
@@ -1105,7 +1106,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getEvent · 사건 상세와 근거 참조 조회
 
-사건 상세와 근거 참조 조회. round·graphVersion·asOf로 공개 버전 하나를 고정하고(그래프 조회와 같은 규칙) 그 버전에서 현재 제외를 적용한 뒤 보이는 사건만 반환하며, 보이지 않으면 RESOURCE_NOT_FOUND/404다. relations·companies·articles·follows·evidenceIds와 사건 머리 필드는 스냅샷에서 읽는다. asOf는 그래프와 같이 사건의 기사가 하나라도 asOf 이후에 공개됐으면 사건 전체를 가리며(404), 일부 기사만 남긴 상세는 만들지 않는다. articles는 이 사건의 보이는 근거가 가리키는 정확한 (기사 ID, 기사 버전)만 담고 같은 기사의 다른 버전은 넣지 않으며, 최신 공개순이다(FS021의 관련도 우선 정렬은 관련도 원천이 없어 미구현). relations[].edgeId는 그래프 표시 간선 ID와 같다. follows는 FOLLOWS 관계(뒤 사건→앞 사건)에서 이 버전에 보이는 사건만 담는다. 수입한 버전은 그 버전의 import receipt(AI 인계 묶음)에서 mentions(원본 S2 언급, verification none)·fieldDecisions(운영자 필드 판정의 필드·결정·사유 코드만, 판정 대상 값은 싣지 않음, candidateId는 null)·sourceSupport(인계 값을 그대로 복사)를 읽고, receipt를 읽을 수 없거나, 그 사건을 담지 않거나, 인계 묶음 스키마가 현재(zoop-graph-handoff-bundle-5)가 아니면(이전 묶음은 언급·필드 판정이 없으므로 빈 목록으로 대신하지 않음) SOURCE_UNAVAILABLE/503이다. receipt 미등록·고정 바이트 손상·형식 오류는 재시도로 복구되지 않아 error.retryable=false다. receipt 저장소의 일시 읽기 장애는 error.retryable=true다. 수입한 버전은 근거마다 getEvidence와 같은 현재 공개 게이트(기사 접근 상태·현재 source grant·registry)를 지금 다시 적용해, 언급은 그 근거가 모두 보일 때만 참가자와 함께 내보내고(일부라도 가려지면 언급 전체를 뺌), 관계는 근거가 모두 보일 때만, 기사는 보이는 근거가 가리킬 때만 남긴다. 머리 필드는 운영자가 고른 대표 언급(fieldProvenance.selection=operator-representative)의 값이거나, 대표가 없으면(unanimous) 모든 언급이 같은 값이므로, 대표 언급 또는 모든 언급이 온전히 보이지 않으면 사건 전체를 RESOURCE_NOT_FOUND/404로 닫는다. follows와 FOLLOWS 관계의 상대 사건도 같은 머리 검사를 통과해야 하며, 통과하지 못하면 관계와 참조 모두에서 뺀다. 운영자가 보류·거절(HOLD·REJECT)한 언급의 eventTime(이때 timePrecision=unknown)·period는 null이며 어떤 필드로도 내보내지 않는다. 현재 권한·제외로 기사 일부가 빠지면 sourceSupport는 articleCount를 보이는 기사 수로 하고 가려진 기사에 의존하는 knownLineageCount·independentSourceCount는 null, 목록은 보이는 기사만 남긴다. 합성 fixture 버전은 receipt가 없어 mentions·fieldDecisions가 빈 배열이고 sourceSupport는 모든 기사의 출처가 알려지지 않은 것으로 표시한다(개수는 0이 아니라 null). articles[].publisher는 고정된 기사 버전의 저장된 article_versions 값이며 없으면 null, relationType은 그 기사의 보이는 언급이 모두 background면 PROVIDES_BACKGROUND, 아니면 REPORTS, 언급 정보가 없으면 null이다(앱 결정). role이 있는 companies·relations·참가자는 roleUnconfirmed=true다(인계가 확인된 역할을 생산하지 않음). summary는 아직 사건 요약 생산자가 없어 Unavailable이고 metadata.partial=true·failures에 summary를 남기며, approval은 null이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+사건 상세와 근거 참조 조회. round·graphVersion·asOf로 공개 버전 하나를 고정하고(그래프 조회와 같은 규칙) 그 버전에서 현재 제외를 적용한 뒤 보이는 사건만 반환하며, 보이지 않으면 RESOURCE_NOT_FOUND/404다. relations·companies·articles·follows·evidenceIds와 사건 머리 필드는 스냅샷에서 읽는다. asOf는 그래프와 같이 사건의 기사가 하나라도 asOf 이후에 공개됐으면 사건 전체를 가리며(404), 일부 기사만 남긴 상세는 만들지 않는다. articles는 이 사건의 보이는 근거가 가리키는 정확한 (기사 ID, 기사 버전)만 담고 같은 기사의 다른 버전은 넣지 않으며, 최신 공개순이다(FS021의 관련도 우선 정렬은 관련도 원천이 없어 미구현). relations[].edgeId는 그래프 표시 간선 ID와 같다. follows는 FOLLOWS 관계(뒤 사건→앞 사건)에서 이 버전에 보이는 사건만 담는다. 수입한 버전은 그 버전의 import receipt(AI 인계 묶음)에서 mentions(원본 S2 언급, verification none)·fieldDecisions(운영자 필드 판정의 필드·결정·사유 코드만, 판정 대상 값은 싣지 않음, candidateId는 null)·sourceSupport(인계 값을 그대로 복사)를 읽고, receipt를 읽을 수 없거나, 그 사건을 담지 않거나, 인계 묶음 스키마가 앱이 읽는 형식(zoop-graph-handoff-bundle-5~9, legacy-real 패키지 zoop-legacy-real-bundle-2·3)이 아니면(이전 묶음은 언급·필드 판정이 없으므로 빈 목록으로 대신하지 않음) SOURCE_UNAVAILABLE/503이다. 묶음 5~7 receipt가 묶음 8부터만 보관하는 값(timePrecision=unresolved 언급, unsupported-format 판정, 국가가 빈 지역 근거)을 담고 있어도 503이다. receipt 미등록·고정 바이트 손상·형식 오류는 재시도로 복구되지 않아 error.retryable=false다. receipt 저장소의 일시 읽기 장애는 error.retryable=true다. 수입한 버전은 근거마다 getEvidence와 같은 현재 공개 게이트(기사 접근 상태·현재 source grant·registry)를 지금 다시 적용해, 언급은 그 근거가 모두 보일 때만 참가자와 함께 내보내고(일부라도 가려지면 언급 전체를 뺌), 관계는 근거가 모두 보일 때만, 기사는 보이는 근거가 가리킬 때만 남긴다. 머리 필드는 운영자가 고른 대표 언급(fieldProvenance.selection=operator-representative)의 값이거나, 대표가 없으면(unanimous) 모든 언급이 같은 값이므로, 대표 언급 또는 모든 언급이 온전히 보이지 않으면 사건 전체를 RESOURCE_NOT_FOUND/404로 닫는다. follows와 FOLLOWS 관계의 상대 사건도 같은 머리 검사를 통과해야 하며, 통과하지 못하면 관계와 참조 모두에서 뺀다. 운영자가 보류·거절(HOLD·REJECT)한 언급의 eventTime(이때 timePrecision=unknown)·period는 null이며 어떤 필드로도 내보내지 않는다. 현재 권한·제외로 기사 일부가 빠지면 sourceSupport는 articleCount를 보이는 기사 수로 하고 가려진 기사에 의존하는 knownLineageCount·independentSourceCount는 null, 목록은 보이는 기사만 남긴다. 합성 fixture 버전은 receipt가 없어 mentions·fieldDecisions가 빈 배열이고 sourceSupport는 모든 기사의 출처가 알려지지 않은 것으로 표시한다(개수는 0이 아니라 null). articles[].publisher는 고정된 기사 버전의 저장된 article_versions 값이며 없으면 null, relationType은 그 기사의 보이는 언급이 모두 background면 PROVIDES_BACKGROUND, 아니면 REPORTS, 언급 정보가 없으면 null이다(앱 결정). role이 있는 companies·relations·참가자는 roleUnconfirmed=true다(인계가 확인된 역할을 생산하지 않음). summary는 수입한 버전의 import receipt에서 공개 제목을 공급하는 원천 이슈의 issues[].summary(인계 묶음 7판 이상, 운영자가 고정한 검증된 이슈 요약)를 읽는다. available이면 생산자 객체의 text·evidenceIds·generatedAt·resultVersion을 그대로 복사해 AnalysisSummary로 내보내되, 그 이슈의 mentions[].evidenceIds 전체(인용된 근거만이 아님)가 현재 공개 게이트를 통과할 때만이다. 하나라도 가려지면 Unavailable이고 이때만 metadata.partial=true·failures에 summary(SUMMARY_EVIDENCE_UNAVAILABLE)를 남긴다. 생산자가 요약을 만들지 않은 경우(receipt에 summary가 없는 이전 묶음·legacy·합성 fixture, not-requested, 시각 검토 대기, 입력 초과, 검증 미통과)는 자료 없음이므로 summary만 Unavailable(사유 문구)이고 partial=false·failures는 비며 실패로 표시하지 않는다. 검증기가 허용하지 않는 요약 모양은 SOURCE_UNAVAILABLE/503이다. approval은 수입한 버전에서 이 읽기에 보이는 이 사건의 INVOLVES 관계(asOf·제외·현재 근거 권리로 걸러진 뒤)가 receipt의 운영자 최종 승인(relations[].provenance.s3SemanticValidation=manual-operator-final-approval)에 기대면 {source: admin-review, label: 관리자 승인, scope: relation, ruleId: null}, legacy-real 원천은 보이는 언급의 approvalBasis가 review-rule:R1@2일 때 {source: review-rule, label: 자동 검수 규칙, scope: issue, ruleId: R1@2}, 그 밖에는 null이다. 원천마다 승인 출처가 다르면 null이고, 합성 fixture 버전은 receipt가 없어 항상 null이다. receipt에 relations가 없으면 SOURCE_UNAVAILABLE/503이며, 누가·언제 승인했는지는 싣지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2920,6 +2921,37 @@ DB에 저장된 회차만 예정 시각·ID 내림차순으로 조회한다. 날
 | id | path | 필수 | string |  |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | period | query | 필수 | string | 회계 기간. 허용 기간·항목·회계 기준·공급자를 팀이 확정해야 한다. 차트 기간과 독립이다. |
+
+<a id="getcompanyissueimpactassessment"></a>
+
+## getCompanyIssueImpactAssessment · 기업·이슈의 검증된 S3 영향 판정 조회
+
+고정된 공개 스냅샷의 직접 INVOLVES 관계 receipt에서 검증된 인용 효과만 반환한다. source relation별 행을 합산하지 않는다. 판정 근거 권한이 하나라도 확인되지 않으면 결과 전체를 evidence_unavailable로 반환한다. 제안 문구, 가격 예측, 구조 관계 영향은 제공하지 않는다. round·graphVersion·asOf는 getGraph와 같은 버전 선택 규칙을 따른다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/companies/{id}/issues/{issueId}/impact/assessment` |
+| 권한·우선순위 | 공개 · P1 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [CompanyIssueImpactAssessment](#schema-companyissueimpactassessment), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| FS/NFS | [FS022](../../system/out/feature-FS022.md) · [FS024](../../system/out/feature-FS024.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-GRP-06](../../system/out/screen-D-GRP-06.md) |
+| WBS | 6.1.2, 6.11.1, 6.6.6, 6.6.7, 6.6.9, 6.6.22, 6.6.24, 6.6.25, 6.6.26, 6.5.1 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 기존 영향 경로 조회와 별개의 목표 API다. 공개 receipt에서 검증된 S3 영향 판정만 제공한다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| id | path | 필수 | string |  |
+| issueId | path | 필수 | string |  |
+| round | query | 선택 | string |  |
+| graphVersion | query | 선택 | string |  |
+| asOf | query | 선택 | string (date-time) |  |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
 <a id="getcompanyissueimpact"></a>
 
@@ -4875,6 +4907,8 @@ The immutable published original of a round (what users saw before any correctio
 | publishedDate | 선택 | string (date) |  |
 | availableAt | 선택 | string (date-time) |  |
 | eligibilityBasis | 선택 | string | publishedAt이 null이면 first_observed이며 publishedDate와 availableAt을 함께 제공한다. |
+| title | 선택 | string |  |
+| publisher | 선택 | string |  |
 
 <a id="schema-prioritycompany"></a>
 
@@ -9081,9 +9115,12 @@ snapshot 버전의 영수증 손상·선택 버전 불일치는 503이다. fixtu
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| companyId | 필수 | string |  |
+| issueId | 필수 | string |  |
 | status | 필수 | string {available, unavailable} |  |
 | reason | 필수 | string, null {no_public_path, not_recorded, not_verified, evidence_unavailable, issue_impact_not_produced, None} | available에서는 null이다. none 경로는 no_public_path, 구조적 이슈 영향 생산 전은 issue_impact_not_produced, impacts[]가 없는 구버전은 not_recorded다. 선택 버전 영수증 손상·불일치는 503으로 처리한다. |
 | results | 필수 | [CompanyIssueImpactResult](#schema-companyissueimpactresult)[] | available일 때 하나 이상, unavailable일 때 빈 배열. 공개 간선의 원천 판정별로 유지하고 합산하지 않는다. 검증 행 하나라도 필수 근거를 열 수 없으면 전체를 evidence_unavailable로 둔다. |
+| metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-companyissueimpactresult"></a>
 
@@ -9098,6 +9135,10 @@ snapshot 버전의 영수증 손상·선택 버전 불일치는 503이다. fixtu
 | label | 필수 | string {positive, negative, mixed, undetermined} | 선택 이슈의 선택 기업에 대한 검증 결과. 구조 관계 자체의 영향 판정을 복사하지 않는다. 주가·확률 예측이 아니다. |
 | evidenceIds | 필수 | string[] | effects 네 목록의 중복 없는 합집합. 모두 현재 getEvidence에서 읽을 수 있어야 한다. |
 | effects | 필수 | [CompanyIssueImpactEffects](#schema-companyissueimpacteffects) |  |
+| provenance | 필수 | object |  |
+| provenance.sourceKind | 필수 | string {collected, synthetic} |  |
+| provenance.executionMode | 필수 | string {live, replay} |  |
+| provenance.recordingKind | 필수 | string {provider, authored-test} |  |
 
 <a id="schema-companyissueimpacteffects"></a>
 
