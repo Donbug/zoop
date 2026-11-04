@@ -126,9 +126,9 @@ export const issuePillRadius = (fontSize: number) =>
   (fontSize * 1.3 + fontSize * 0.5) / 2;
 
 /** D-GRP-01 (2026-11-04 reviews): issue nodes were 7px diamonds, then 30/36/40/48/65 diamonds.
- * Now circles of 32, matching the reference network: about 1/3 of a regular company node
- * (70–101) and 1/5 of the busiest one (171). */
-export const ISSUE_NODE_SIZE = 32;
+ * Now circles of 64 (the user picked 2x of a 32 circle after comparing 32/64/80): smaller than
+ * a regular company (83–119) and about 1/3 of the busiest one (188). */
+export const ISSUE_NODE_SIZE = 64;
 
 /**
  * D-GRP-01: 0..1 evidence strength per issue on a log scale against the busiest
@@ -160,8 +160,9 @@ export function companyNodeSize(issueCount: number, scale = 1) {
             : 4;
   // D-GRP-01: 2026-11-04 reviews enlarged every level by 25% (was 36/44/52/68/88), then
   // by another 35% (was 45/55/65/85/110) when node spacing went back to the earlier map,
-  // then by another 15% (was 61/74/88/115/149).
-  return [70, 85, 101, 132, 171][level] * scale;
+  // then by another 15% (was 61/74/88/115/149), then levels 1-3 by 18% and 4-5 by 10%
+  // (was 70/85/101/132/171) so small companies read better without the hubs taking over.
+  return [83, 100, 119, 145, 188][level] * scale;
 }
 
 export function focusNeighborhood(
