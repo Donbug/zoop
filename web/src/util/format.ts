@@ -45,3 +45,16 @@ export function formatKst(iso: string | null) {
     KST_PARTS.formatToParts(date).find((item) => item.type === type)?.value;
   return `${part('year')}-${part('month')}-${part('day')} ${part('hour')}:${part('minute')} KST`;
 }
+
+/**
+ * datetime-local 값(KST로 본 분)을 서버의 분 단위 ISO-8601(UTC)로 바꾼다. 형식 밖이거나 없는 날짜·시각(2월 31일, 24:00 등)이면 null.
+ * Date는 없는 날짜를 다음 날로 넘기므로, 바꾼 값을 다시 KST로 읽어 입력과 같은지 확인한다.
+ */
+export function kstMinuteToIso(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  const at = new Date(`${value}:00+09:00`);
+  if (Number.isNaN(at.getTime())) return null;
+  const kst = new Date(at.getTime() + 9 * 60 * 60 * 1000).toISOString();
+  if (kst.slice(0, 16) !== value) return null;
+  return at.toISOString().replace('.000Z', 'Z');
+}
