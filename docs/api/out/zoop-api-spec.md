@@ -4860,6 +4860,241 @@ The immutable published original of a round (what users saw before any correctio
 | forecast.status | 필수 | string {unavailable, not_updated} |  |
 | forecast.message | 필수 | string |  |
 
+<a id="schema-prioritysource"></a>
+
+### PrioritySource
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| evidenceId | 선택 | string |  |
+| quote | 선택 | string |  |
+| url | 선택 | string |  |
+| publishedAt | 선택 | string (date-time) |  |
+
+<a id="schema-prioritycompany"></a>
+
+### PriorityCompany
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 선택 | string |  |
+| name | 선택 | string |  |
+| reason | 선택 | string |  |
+
+<a id="schema-priorityprice"></a>
+
+### PriorityPrice
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyName | 선택 | string |  |
+| baseline | 선택 | string |  |
+| latest | 선택 | string |  |
+| changeRate | 선택 | string |  |
+| currency | 선택 | string |  |
+| observedAt | 선택 | string (date-time) |  |
+
+<a id="schema-prioritypreviouschange"></a>
+
+### PriorityPreviousChange
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 선택 | string |  |
+| text | 선택 | string |  |
+
+<a id="schema-priorityjudgmentbasis"></a>
+
+### PriorityJudgmentBasis
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| promptVersion | 선택 | string |  |
+| directionReason | 선택 | string |  |
+| confidence | 선택 | string |  |
+| effectSizeStatus | 선택 | string |  |
+
+<a id="schema-priorityanalysis"></a>
+
+### PriorityAnalysis
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 선택 | string |  |
+| companyName | 선택 | string |  |
+| roundId | 선택 | string |  |
+| cutoff | 선택 | string (date-time) |  |
+| resultVersion | 선택 | string |  |
+| verificationMode | 선택 | string {separate_request_same_model} |  |
+| direction | 선택 | string {positive, negative, mixed, watch} |  |
+| keyPoint | 선택 | string |  |
+| confirmedFact | 선택 | string |  |
+| businessImpact | 선택 | string |  |
+| companyConnection | 선택 | string |  |
+| forMyStocks | 선택 | string |  |
+| outlook | 선택 | string |  |
+| nextCheck | 선택 | string |  |
+| positive | 선택 | string, null |  |
+| negative | 선택 | string, null |  |
+| priceObservation | 선택 | string, null |  |
+| previousChange | 선택 | [PriorityPreviousChange](#schema-prioritypreviouschange) |  |
+| evidenceIds | 선택 | string[] |  |
+| judgmentBasis | 선택 | [PriorityJudgmentBasis](#schema-priorityjudgmentbasis) |  |
+| comparison | 선택 | [PriorityComparison](#schema-prioritycomparison) |  |
+
+<a id="schema-commonpriorityitem"></a>
+
+### CommonPriorityItem
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| issueId | 선택 | string |  |
+| kind | 선택 | string |  |
+| importance | 선택 | integer (int32) |  |
+| title | 선택 | string |  |
+| topicTag | 선택 | string |  |
+| reason | 선택 | string |  |
+| whyNow | 선택 | string |  |
+| originRoundId | 선택 | string |  |
+| originCutoff | 선택 | string (date-time) |  |
+| companies | 선택 | [PriorityCompany](#schema-prioritycompany)[] |  |
+| sources | 선택 | [PrioritySource](#schema-prioritysource)[] |  |
+| prices | 선택 | [PriorityPrice](#schema-priorityprice)[] |  |
+| analysisResultVersion | 선택 | string |  |
+| aiAnalyses | 선택 | [PriorityAnalysis](#schema-priorityanalysis)[] |  |
+| analysisWithheldReason | 선택 | string |  |
+
+<a id="schema-commonpriorityview"></a>
+
+### CommonPriorityView
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 선택 | string |  |
+| roundId | 선택 | string |  |
+| cutoff | 선택 | string (date-time) |  |
+| resultVersion | 선택 | string |  |
+| generationVersion | 선택 | string |  |
+| candidateCount | 선택 | integer (int32) |  |
+| minimumIssues | 선택 | integer (int32) |  |
+| minimumShortfall | 선택 | integer (int32) |  |
+| status | 선택 | string |  |
+| legacyAnalysisScopeWarning | 선택 | boolean |  |
+| items | 선택 | [CommonPriorityItem](#schema-commonpriorityitem)[] |  |
+
+<a id="schema-personalpriorityitem"></a>
+
+### PersonalPriorityItem
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| issueId | 선택 | string |  |
+| kind | 선택 | string |  |
+| title | 선택 | string |  |
+| topicTag | 선택 | string |  |
+| reason | 선택 | string |  |
+| originRoundId | 선택 | string |  |
+| originCutoff | 선택 | string (date-time) |  |
+| connections | 선택 | [PriorityCompany](#schema-prioritycompany)[] |  |
+| sources | 선택 | [PrioritySource](#schema-prioritysource)[] |  |
+| priorAnalysis | 선택 | [PriorityPriorAnalysis](#schema-priorityprioranalysis)[] |  |
+| price | 선택 | [PriorityPrice](#schema-priorityprice) |  |
+| aiAnalyses | 선택 | [PriorityAnalysis](#schema-priorityanalysis)[] |  |
+| analysisOmittedReason | 선택 | string |  |
+
+<a id="schema-personalpriorityview"></a>
+
+### PersonalPriorityView
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 선택 | string |  |
+| roundId | 선택 | string |  |
+| cutoff | 선택 | string (date-time) |  |
+| resultVersion | 선택 | string |  |
+| companyIds | 선택 | string[] |  |
+| candidateCount | 선택 | integer (int32) |  |
+| minimumIssues | 선택 | integer (int32) |  |
+| status | 선택 | string |  |
+| items | 선택 | [PersonalPriorityItem](#schema-personalpriorityitem)[] |  |
+
+<a id="schema-prioritysummary"></a>
+
+### PrioritySummary
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 선택 | string |  |
+| roundId | 선택 | string |  |
+| cutoff | 선택 | string (date-time) |  |
+| resultVersion | 선택 | string |  |
+| text | 선택 | string |  |
+| evidenceIds | 선택 | string[] |  |
+
+<a id="schema-prioritycomparisonbaseline"></a>
+
+### PriorityComparisonBaseline
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| issueId | 필수 | string |  |
+| companyId | 필수 | string |  |
+| roundId | 필수 | string |  |
+| cutoff | 필수 | string (date-time) |  |
+| resultVersion | 필수 | string |  |
+| direction | 필수 | string {positive, negative, mixed, watch} |  |
+| businessImpact | 필수 | string |  |
+| outlook | 필수 | string |  |
+
+<a id="schema-prioritycomparison"></a>
+
+### PriorityComparison
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {newly_selected, same_issue_company} |  |
+| baseline | 필수 | [PriorityComparisonBaseline](#schema-prioritycomparisonbaseline) / null |  |
+
+<a id="schema-priorityprioranalysis"></a>
+
+### PriorityPriorAnalysis
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyName | 필수 | string |  |
+| takeaway | 필수 | string |  |
+| positive | 필수 | string |  |
+| negative | 필수 | string |  |
+| conditions | 필수 | string[] |  |
+
 <a id="schema-briefingresponse"></a>
 
 ### BriefingResponse
@@ -4868,6 +5103,9 @@ The immutable published original of a round (what users saw before any correctio
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| commonPriority | 선택 | [CommonPriorityView](#schema-commonpriorityview) |  |
+| personalPriority | 선택 | [PersonalPriorityView](#schema-personalpriorityview) | 회원의 회차 고정 delivery에서만 제공되는 개인화 표시입니다. 공통 공개 응답에는 포함하지 않습니다. |
+| prioritySummary | 선택 | [PrioritySummary](#schema-prioritysummary) |  |
 | id | 필수 | string |  |
 | date | 필수 | string (date) |  |
 | edition | 필수 | string {morning, evening} |  |

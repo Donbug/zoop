@@ -73,7 +73,7 @@ public class ExplicitBriefingService {
         out.put("selectionVersion",com.zoop.common.json.Canonical.sha256(com.zoop.common.json.Canonical.bytes(out)));
         var presentation=(ObjectNode)common.deepCopy();
         if(presentation.has("editionReview"))presentation.set("companyPriceBasis",presentation.path("editionReview").deepCopy());
-        presentation.remove(List.of("continuity","editionReview","issueReading","judgmentUpdate","companyOutlooks","aiPriceOutlooks","preservedPublication","issueIntelligence","outlook"));
+        presentation.remove(List.of("commonPriority","prioritySummary","personalPriority","continuity","editionReview","issueReading","judgmentUpdate","companyOutlooks","aiPriceOutlooks","preservedPublication","issueIntelligence","outlook"));
         presentation.putNull("graphVersion");((ObjectNode)presentation.path("metadata")).putNull("graphVersion");
         presentation.putNull("sinceMorning");presentation.putNull("previousComparison");
         var items=presentation.putArray("items");var details=out.putObject("details");var aiIssues=json.createArrayNode();

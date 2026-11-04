@@ -128,6 +128,39 @@ public class PersonalBriefingPreferences {
             var c=pools.getFirst().path("candidates").valueStream().filter(x->x.path("issueId").equals(item.path("eventId"))).findFirst().orElseThrow(()->new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
             if(!access.readableForRound(c,r,requestId))throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         }
+        // New relative-priority cards have their own sources; empty legacy items never bypass read authority.
+        for (String view : List.of("presentation", "verifiedPresentation")) {
+            var presentation = selection.path(view);
+            if (!presentation.has("personalPriority")) continue;
+            try {
+                var priority = presentation.get("personalPriority");
+                var allowedCompanies = com.zoop.briefing.query.BriefingPriorityRules.strings(selection.path("choice"), "companyIds");
+                Set<String> evidence = new HashSet<>();
+                for (var candidate : pools.getFirst().path("candidates"))
+                    for (var source : candidate.path("sources")) evidence.add(source.path("evidenceId").asString());
+                com.zoop.briefing.query.BriefingPriorityRules.validate(priority, roundId, r.windowTo(), true, allowedCompanies, evidence);
+                if (!roundId.equals(presentation.path("id").asString()) || !r.windowTo().equals(Instant.parse(presentation.path("dataAsOf").asString())))
+                    throw new IllegalArgumentException("personal presentation binding");
+                for (var item : priority.path("items")) {
+                    var candidate = pools.getFirst().path("candidates").valueStream()
+                        .filter(c -> c.path("issueId").equals(item.path("issueId"))).findFirst().orElseThrow();
+                    if (!candidate.path("verified").asBoolean() || !access.readableForRound(candidate, r, requestId))
+                        throw new IllegalArgumentException("unreadable personal priority candidate");
+                    for (var source : item.path("sources")) {
+                        var original = candidate.path("sources").valueStream().filter(c -> c.path("evidenceId").equals(source.path("evidenceId"))).findFirst().orElseThrow();
+                        for (String key : List.of("quote", "url", "publishedAt"))
+                            if (!original.path(key).equals(source.path(key))) throw new IllegalArgumentException("personal priority source mismatch");
+                    }
+                    for (var connection : item.path("connections"))
+                        if (candidate.path("companies").valueStream().noneMatch(c -> c.path("companyId").equals(connection.path("companyId"))))
+                            throw new IllegalArgumentException("personal priority company mismatch");
+                }
+                if (!com.zoop.briefing.query.BriefingPriorityRules.storedSourcesMatch(priority, jdbc))
+                    throw new IllegalArgumentException("personal priority evidence mismatch");
+            } catch (IllegalArgumentException | NoSuchElementException invalid) {
+                throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            }
+        }
         for(var tracked:selection.path("tracking")){
             String prior=tracked.path("previousRoundId").asString();var pr=rounds.findById(prior).orElseThrow(()->new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
             if(!"published".equals(pr.status())||rounds.changes(prior).stream().anyMatch(c->"correction".equals(c.kind())))throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);

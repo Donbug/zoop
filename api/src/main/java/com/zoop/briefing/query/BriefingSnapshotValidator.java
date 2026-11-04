@@ -73,6 +73,15 @@ final class BriefingSnapshotValidator {
             timestamp(outlook, "judgedAt"); text(outlook, "model"); text(outlook, "promptVersion");
         }
         JsonNode snapshot = object(row.publicSnapshot());
+        if (snapshot.has("commonPriority")) {
+            BriefingPriorityRules.validate(snapshot.get("commonPriority"), row.id(), row.windowTo(), false, companies, evidence);
+            for (var item : snapshot.path("commonPriority").path("items")) check(events.contains(text(item, "issueId")));
+        }
+        if (snapshot.has("prioritySummary")) {
+            check(snapshot.has("commonPriority"));
+            BriefingPriorityRules.summary(snapshot.get("prioritySummary"), row.id(), row.windowTo(), evidence);
+        }
+
         summary(field(snapshot, "marketSummary"), evidence);
         marketAnalysis(field(snapshot, "marketSummary"), row);
         if (snapshot.has("editionReview")) {

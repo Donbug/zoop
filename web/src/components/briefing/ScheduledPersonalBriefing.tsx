@@ -53,7 +53,21 @@ const kst = (value: string) =>
   }).format(new Date(value));
 
 /** D-BRF-01/02. Settings writes never generate or replace an existing round. */
-export default function ScheduledPersonalBriefing({
+export default function ScheduledPersonalBriefing(props: {
+  round: BriefingResponse;
+  compact: boolean;
+}) {
+  const member = useAuthStore(selectMemberId);
+  const revision = useAuthStore((s) => s.sessionRevision);
+  return (
+    <MemberScheduledPersonalBriefing
+      key={`${member}:${revision}:${props.round.id}`}
+      {...props}
+    />
+  );
+}
+
+function MemberScheduledPersonalBriefing({
   round,
   compact,
 }: {

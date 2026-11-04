@@ -84,7 +84,7 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
                 if (prior.size() != 1 || !sources(prior.get(0).payload(), prior.get(0).snapshot(), current, now, requestId)) return false;
             }
             return true;
-        } catch (StrictJson.Malformed malformed) {
+        } catch (StrictJson.Malformed | IllegalArgumentException malformed) {
             return false;
         }
     }
@@ -145,9 +145,10 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
                         """, (rs, index) -> new DocumentVersion(rs.getString("article_id"), rs.getString("article_version")), id);
                 if (source.size() != 1 || !authorized.containsKey(source.get(0))) return false;
             }
+            if (publicSnapshot.has("commonPriority") && !BriefingPriorityRules.storedSourcesMatch(publicSnapshot.get("commonPriority"), jdbc)) return false;
             return graph.context(payload.raw("graphVersion").isNull() ? null : payload.string("graphVersion"), requestId)
                     .allowsRound(publishedPayload, disclosedEvidence);
-        } catch (StrictJson.Malformed malformed) {
+        } catch (StrictJson.Malformed | IllegalArgumentException malformed) {
             return false;
         }
     }

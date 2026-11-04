@@ -12547,8 +12547,360 @@ components:
           properties:
             status: {type: string, enum: [unavailable, not_updated]}
             message: {type: string}
+    PrioritySource:
+      type: object
+      properties:
+        evidenceId:
+          type: string
+        quote:
+          type: string
+        url:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+    PriorityCompany:
+      type: object
+      properties:
+        companyId:
+          type: string
+        name:
+          type: string
+        reason:
+          type: string
+    PriorityPrice:
+      type: object
+      properties:
+        companyName:
+          type: string
+        baseline:
+          type: string
+        latest:
+          type: string
+        changeRate:
+          type: string
+        currency:
+          type: string
+        observedAt:
+          type: string
+          format: date-time
+    PriorityPreviousChange:
+      type: object
+      properties:
+        status:
+          type: string
+        text:
+          type: string
+    PriorityJudgmentBasis:
+      type: object
+      properties:
+        promptVersion:
+          type: string
+        directionReason:
+          type: string
+        confidence:
+          type: string
+        effectSizeStatus:
+          type: string
+    PriorityAnalysis:
+      type: object
+      properties:
+        companyId:
+          type: string
+        companyName:
+          type: string
+        roundId:
+          type: string
+        cutoff:
+          type: string
+          format: date-time
+        resultVersion:
+          type: string
+        verificationMode:
+          type: string
+          enum:
+          - separate_request_same_model
+        direction:
+          type: string
+          enum:
+          - positive
+          - negative
+          - mixed
+          - watch
+        keyPoint:
+          type: string
+        confirmedFact:
+          type: string
+        businessImpact:
+          type: string
+        companyConnection:
+          type: string
+        forMyStocks:
+          type: string
+        outlook:
+          type: string
+        nextCheck:
+          type: string
+        positive:
+          type:
+          - string
+          - 'null'
+        negative:
+          type:
+          - string
+          - 'null'
+        priceObservation:
+          type:
+          - string
+          - 'null'
+        previousChange:
+          $ref: '#/components/schemas/PriorityPreviousChange'
+        evidenceIds:
+          type: array
+          items:
+            type: string
+        judgmentBasis:
+          $ref: '#/components/schemas/PriorityJudgmentBasis'
+        comparison:
+          $ref: '#/components/schemas/PriorityComparison'
+    CommonPriorityItem:
+      type: object
+      properties:
+        issueId:
+          type: string
+        kind:
+          type: string
+        importance:
+          type: integer
+          format: int32
+        title:
+          type: string
+        topicTag:
+          type: string
+        reason:
+          type: string
+        whyNow:
+          type: string
+        originRoundId:
+          type: string
+        originCutoff:
+          type: string
+          format: date-time
+        companies:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriorityCompany'
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/PrioritySource'
+        prices:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriorityPrice'
+        analysisResultVersion:
+          type: string
+        aiAnalyses:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriorityAnalysis'
+        analysisWithheldReason:
+          type: string
+    CommonPriorityView:
+      type: object
+      properties:
+        schemaVersion:
+          type: string
+        roundId:
+          type: string
+        cutoff:
+          type: string
+          format: date-time
+        resultVersion:
+          type: string
+        generationVersion:
+          type: string
+        candidateCount:
+          type: integer
+          format: int32
+        minimumIssues:
+          type: integer
+          format: int32
+        minimumShortfall:
+          type: integer
+          format: int32
+        status:
+          type: string
+        legacyAnalysisScopeWarning:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonPriorityItem'
+    PersonalPriorityItem:
+      type: object
+      properties:
+        issueId:
+          type: string
+        kind:
+          type: string
+        title:
+          type: string
+        topicTag:
+          type: string
+        reason:
+          type: string
+        originRoundId:
+          type: string
+        originCutoff:
+          type: string
+          format: date-time
+        connections:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriorityCompany'
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/PrioritySource'
+        priorAnalysis:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriorityPriorAnalysis'
+        price:
+          type: 'null'
+          $ref: '#/components/schemas/PriorityPrice'
+        aiAnalyses:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriorityAnalysis'
+        analysisOmittedReason:
+          type: string
+    PersonalPriorityView:
+      type: object
+      properties:
+        schemaVersion:
+          type: string
+        roundId:
+          type: string
+        cutoff:
+          type: string
+          format: date-time
+        resultVersion:
+          type: string
+        companyIds:
+          type: array
+          items:
+            type: string
+        candidateCount:
+          type: integer
+          format: int32
+        minimumIssues:
+          type: integer
+          format: int32
+        status:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PersonalPriorityItem'
+    PrioritySummary:
+      type: object
+      properties:
+        schemaVersion:
+          type: string
+        roundId:
+          type: string
+        cutoff:
+          type: string
+          format: date-time
+        resultVersion:
+          type: string
+        text:
+          type: string
+        evidenceIds:
+          type: array
+          items:
+            type: string
+    PriorityComparisonBaseline:
+      type: object
+      properties:
+        issueId:
+          type: string
+        companyId:
+          type: string
+        roundId:
+          type: string
+        cutoff:
+          type: string
+          format: date-time
+        resultVersion:
+          type: string
+        direction:
+          type: string
+          enum:
+          - positive
+          - negative
+          - mixed
+          - watch
+        businessImpact:
+          type: string
+        outlook:
+          type: string
+      required:
+      - issueId
+      - companyId
+      - roundId
+      - cutoff
+      - resultVersion
+      - direction
+      - businessImpact
+      - outlook
+    PriorityComparison:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - newly_selected
+          - same_issue_company
+        baseline:
+          anyOf:
+          - $ref: '#/components/schemas/PriorityComparisonBaseline'
+          - type: 'null'
+      required:
+      - status
+      - baseline
+    PriorityPriorAnalysis:
+      type: object
+      properties:
+        companyName:
+          type: string
+        takeaway:
+          type: string
+        positive:
+          type: string
+        negative:
+          type: string
+        conditions:
+          type: array
+          items:
+            type: string
+      required:
+      - companyName
+      - takeaway
+      - positive
+      - negative
+      - conditions
     BriefingResponse:
       properties:
+        commonPriority:
+          $ref: '#/components/schemas/CommonPriorityView'
+        personalPriority:
+          description: 회원의 회차 고정 delivery에서만 제공되는 개인화 표시입니다. 공통 공개 응답에는 포함하지 않습니다.
+          $ref: '#/components/schemas/PersonalPriorityView'
+        prioritySummary:
+          $ref: '#/components/schemas/PrioritySummary'
         id:
           type: "string"
         date:
