@@ -31,7 +31,7 @@
 | `BRIEFING_SELECTED_WORKER_CONFIG` | 0600 config. #557 exact-server 승인, 같은 DB/schema·`serverBudgetWork`·`serving-grants.json` 요구 |
 | `OPENAI_API_KEY`, `TYPESAFE_API_KEY` | Secret 주입 후 임시 0600 파일로 이동. 이미지·EFS에 키 기록 금지 |
 
-설정 검토 후 `--initialize-authority`는 **새 소유 폴더만** 초기화한다. API의 `ZOOP_DOCUMENT_READ_INGESTION_SOURCES`는 그 폴더의 `serving-delegates.json`, `ZOOP_DOCUMENT_READ_GRANTS`는 `serving-grants.json`, artifact root는 기존 shared artifact root를 가리킨다. `zoop-grant-authority-delegates-1`은 기존 원본과 새 `grants.json`에 위임한다. 철회는 즉시 반영되고 중복 소유·중첩 delegate·읽기 실패는 차단된다. API/worker에는 이 reader가 포함된 동일 검토 버전이 필요하다.
+설정 검토 후 `--initialize-authority`는 **새 소유 폴더만** 초기화한다. 새 read grant ID는 `briefing-kogl1-auto-v1`로 분리해 종전 `briefing-kogl1-live`도 원래 권한과 함께 보존한다. API의 `ZOOP_DOCUMENT_READ_INGESTION_SOURCES`는 그 폴더의 `serving-delegates.json`, `ZOOP_DOCUMENT_READ_GRANTS`는 `serving-grants.json`, artifact root는 기존 shared artifact root를 가리킨다. `zoop-grant-authority-delegates-1`은 기존 원본과 새 `grants.json`에 위임한다. 철회는 즉시 반영되고 중복 소유·중첩 delegate·읽기 실패는 차단된다. API/worker에는 이 reader가 포함된 동일 검토 버전이 필요하다.
 
 새 migration은 추가하지 않으며 선행 PR과 최신 main의 migration이 필요하다. API/Web과 전용 worker는 다른 배포 대상이다. main의 자동 API 배포와 전용 worker·권한·스케줄러 활성화를 구분한다. 이 작업은 실제 배포나 활성화를 수행하지 않는다.
 

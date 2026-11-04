@@ -321,12 +321,14 @@ def prepare(cfg,round,observer=None):
 
 def initialize_authority(cfg):
     root=Path(cfg['authorityRoot']);root.mkdir(mode=0o700,parents=True,exist_ok=True)
+    auto=cfg.get('autoChain')=='briefing-auto-chain-v1'
     write_once(root/'serving-delegates.json',{'schemaVersion':'zoop-source-authority-delegates-1',
         'delegates':[cfg['originalSourceAuthority'],str(root/'new-authorities.json')]})
     if not (root/'new-authorities.json').exists():
         write_once(root/'new-authorities.json',{'schemaVersion':'zoop-ingestion-s2-1','revision':'empty-before-first-live-input','sources':[]})
     write_once(root/'grants.json',{'schemaVersion':'zoop-ai-s1-1','grants':[{
-        'grantId':'briefing-kogl1-live','revision':'prospective-20261103-v1','sourceId':'korea-portal','enabled':True,'rights':'known',
+        'grantId':'briefing-kogl1-auto-v1' if auto else 'briefing-kogl1-live',
+        'revision':'prospective-20261104-auto-v1' if auto else 'prospective-20261103-v1','sourceId':'korea-portal','enabled':True,'rights':'known',
         'allowedOperations':['read','store','quote-display','model-send'],'recipients':['openai'],
         'purposes':['briefing-outlook','semantic-verification'],'evidence':['https://www.korea.kr/guide/copyRight.do',
             'Article-level KOGL1 text badge and exact native source/body scope required before every model send. '+cfg['authorizationRef']],

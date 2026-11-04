@@ -100,8 +100,13 @@ def work_once(cfg,*,now=None,connect=None,run=None):
                     if not active:
                         complete=server.published(conn,existing)
                         state='completed' if complete else 'requires_recovery'
+                        journal=Journal(cfg,r['id'])
+                        if not complete:
+                            latest=conn.execute('SELECT status FROM briefing_attempts WHERE round_id=%s ORDER BY attempt_no DESC LIMIT 1',(r['id'],)).fetchone()
+                            if latest is None or latest['status']=='completed':
+                                server.record_input_failure(cfg,r,journal.root,stage='collection' if latest is None else 'generation',reason='interrupted_slot_not_resent')
                         conn.execute("UPDATE briefing_common_schedule_jobs SET status=%s,finished_at=now() WHERE id=%s AND status IN ('queued','running')",(state,r['id']))
-                        Journal(cfg,r['id'])('slot','completed' if complete else 'requires_recovery',{'reason':'saved_publication' if complete else 'interrupted_slot_not_resent'})
+                        journal('slot','completed' if complete else 'requires_recovery',{'reason':'saved_publication' if complete else 'interrupted_slot_not_resent'})
                 finally:conn.execute("SELECT pg_advisory_unlock(hashtext('zoop-briefing-server-v1'))")
                 continue
             if left<=10*60:

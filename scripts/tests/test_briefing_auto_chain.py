@@ -57,6 +57,28 @@ class ChainTests(unittest.TestCase):
             self.assertEqual('source_rights_unknown_or_denied',grants.evaluate(grants.load(index).current('one'),**args))
             b.write_bytes(a.read_bytes())
             with self.assertRaisesRegex(grants.GrantRegistryError,'grant_authority_conflict'):grants.load(index)
+    def test_new_auto_authority_keeps_the_old_runtime_grant_and_revocation(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);old={**self.cfg(d),'authorityRoot':str(root/'old'),'originalSourceAuthority':'/synthetic/original'}
+            chain.native.initialize_authority({k:v for k,v in old.items() if k!='autoChain'})
+            original=root/'old/grants.json';before=original.read_bytes()
+            new={**old,'authorityRoot':str(root/'new'),'originalReadGrants':str(original)}
+            chain.native.initialize_authority(new)
+            both=grants.load(root/'new/serving-grants.json')
+            self.assertEqual({'briefing-kogl1-live','briefing-kogl1-auto-v1'},set(both.grants))
+            self.assertEqual(before,original.read_bytes())
+            original.write_text(original.read_text().replace('"enabled":true','"enabled":false'))
+            self.assertFalse(grants.load(root/'new/serving-grants.json').current('briefing-kogl1-live')['enabled'])
+    def test_interrupted_collection_has_a_failed_attempt_and_never_dispatches(self):
+        with tempfile.TemporaryDirectory() as d:
+            conn=Mock();conn.__enter__=Mock(return_value=conn);conn.__exit__=Mock(return_value=False);run=Mock()
+            conn.execute.return_value.fetchone.side_effect=[{'status':'queued'},{'owned':True},None,None]
+            now=lambda:datetime.fromisoformat('2026-11-04T09:21:00+09:00')
+            with patch.object(chain.server,'published',return_value=False),patch.object(chain.server,'record_input_failure') as failure:
+                self.assertFalse(chain.work_once(self.cfg(d),now=now,connect=lambda:conn,run=run))
+                run.assert_not_called();failure.assert_called_once()
+                self.assertEqual('collection',failure.call_args.kwargs['stage'])
+                self.assertEqual('interrupted_slot_not_resent',failure.call_args.kwargs['reason'])
     def test_worker_does_not_start_before_collection_window(self):
         with tempfile.TemporaryDirectory() as d:
             conn=Mock();conn.__enter__=Mock(return_value=conn);conn.__exit__=Mock(return_value=False);run=Mock()
