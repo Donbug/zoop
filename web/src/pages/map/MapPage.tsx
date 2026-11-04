@@ -269,12 +269,15 @@ function MapWorkspace({
   const [sidebarClosing, setSidebarClosing] = useState(false);
   const sidebarSlot = useRef<HTMLDivElement>(null);
   const sidebarShown = sidebarOpen || sidebarClosing;
-  useLayoutEffect(() => {
+  // 패널 크기와 지도 사이 간격만큼 밀어야 지도도 같은 속도로 따라 움직인다.
+  // 가로 배치는 너비, 모바일 세로 배치는 높이를 쓴다.
+  function measureSidebarSlot() {
     const slot = sidebarSlot.current;
     if (!slot) return;
-    // 패널 너비와 지도 사이 간격만큼 밀어야 지도도 같은 속도로 따라 움직인다.
     slot.style.setProperty('--holdings-shift', `${slot.offsetWidth + 12}px`);
-  }, [sidebarShown]);
+    slot.style.setProperty('--holdings-drop', `${slot.offsetHeight + 12}px`);
+  }
+  useLayoutEffect(measureSidebarSlot, [sidebarShown]);
   useEffect(() => {
     if (!sidebarClosing) return;
     // animationend가 오지 않는 환경(동작 줄이기 설정 등)에서도 패널을 뺀다.
@@ -285,6 +288,13 @@ function MapWorkspace({
     const reduced =
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // 열린 뒤 내용이 바뀌어 크기가 달라졌을 수 있으니 닫기 직전에 다시 잰다.
+    // 닫는 동안 목록 응답이 와도 패널이 커지지 않게 잰 높이로 고정한다.
+    const slot = sidebarSlot.current;
+    if (!open) {
+      measureSidebarSlot();
+      if (slot) slot.style.height = `${slot.offsetHeight}px`;
+    } else slot?.style.removeProperty('height');
     setSidebarClosing(!open && sidebarOpen && !reduced);
     setSidebarPreference(open);
     try {
