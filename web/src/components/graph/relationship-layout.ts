@@ -11,6 +11,16 @@ const LEAF_ARC = 260;
 const ringCapacity = (radius: number) =>
   Math.max(4, Math.floor((2 * Math.PI * radius) / LEAF_ARC));
 
+type RankedNode = GraphResponse['nodes'][number];
+/** D-GRP-01: more evidence first, then the latest event; ties keep a stable id order. */
+export function leafRank(a: RankedNode, b: RankedNode) {
+  return (
+    (b.evidenceCount ?? 0) - (a.evidenceCount ?? 0) ||
+    (b.eventTime ?? '').localeCompare(a.eventTime ?? '') ||
+    a.id.localeCompare(b.id)
+  );
+}
+
 // D-GRP-01/01b: translate whole disconnected groups, never scale their interior.
 // Bounds include folded issues so expanding one does not move neighboring groups.
 export function compactRelationshipGroups(
@@ -231,7 +241,8 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
       leafCounts.set(parentId, (leafCounts.get(parentId) ?? 0) + 1);
     }
   const leaves = new Map<string, number>();
-  for (const node of ordered) {
+  // The issues kept on a folded map (leafRank) take the inner ring next to their company.
+  for (const node of [...ordered].sort(leafRank)) {
     if (points.has(node.id)) continue;
     const parentId = [...neighbors.get(node.id)!][0];
     const parent = points.get(parentId);

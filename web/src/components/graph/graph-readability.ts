@@ -138,7 +138,23 @@ export function readingStyles(
                     padding: [2 / zoom, 4 / zoom],
                   },
                 ]
-              : node.style?.badges,
+              : Number(node.data?.folded) > 0
+                ? [
+                    ...(node.style?.badges ?? []),
+                    // D-GRP-01: issues folded into the company until it is selected.
+                    {
+                      text: `+${Number(node.data?.folded)}`,
+                      placement: 'right-top',
+                      offsetX: 4 / zoom,
+                      offsetY: -2 / zoom,
+                      fontSize: 13 / zoom,
+                      fontWeight: 700,
+                      fill: node.style?.labelBackgroundFill,
+                      backgroundFill: node.style?.labelFill,
+                      padding: [2 / zoom, 5 / zoom],
+                    },
+                  ]
+                : node.style?.badges,
         },
       };
     }),
@@ -354,9 +370,23 @@ export async function applyGraphReading(
   const byId = new Map(data.nodes.map((n) => [n.id, n]));
   const related = new Set<string>();
   const degrees = new Map<string, number>();
+  // Companies each issue touches on this map: shared issues always keep their title.
+  const companies = new Map<string, Set<string>>();
   for (const edge of base.edges ?? []) {
     for (const id of [String(edge.source), String(edge.target)])
       degrees.set(id, (degrees.get(id) ?? 0) + 1);
+    const [a, b] = [
+      byId.get(String(edge.source)),
+      byId.get(String(edge.target)),
+    ];
+    const issue = a?.kind === 'issue' ? a : b?.kind === 'issue' ? b : null;
+    const company =
+      a?.kind === 'company' ? a : b?.kind === 'company' ? b : null;
+    if (issue && company)
+      companies.set(
+        issue.id,
+        (companies.get(issue.id) ?? new Set()).add(company.id),
+      );
     if (edge.source === context.anchor || edge.target === context.anchor) {
       related.add(String(edge.source));
       related.add(String(edge.target));
@@ -392,8 +422,10 @@ export async function applyGraphReading(
     const box = screenBox(label);
     if (!label || !box) continue;
     const emphasis = related.has(id) || context.path.has(id);
+    const shared =
+      source?.kind === 'issue' && (companies.get(id)?.size ?? 0) > 1;
     const priority =
-      id === context.anchor || id === context.focus
+      id === context.anchor || id === context.focus || shared
         ? 0
         : source?.kind === 'company'
           ? emphasis
@@ -440,6 +472,31 @@ export async function applyGraphReading(
     });
     labels.set(id, label);
   }
-  for (const id of culledLabels(candidates, bodies))
-    showLabel(labels.get(id), false);
+  const culled = culledLabels(candidates, bodies);
+  for (const id of culled) showLabel(labels.get(id), false);
+  // D-GRP-01 (2026-11-04 review): a single-company issue whose title does not fit is
+  // folded with its line too, so no line ends at an untitled diamond. Shared issues have
+  // priority 0 above and are never culled; the selected company keeps all of its issues
+  // (only their overlapping titles wait for zoom).
+  const folded = new Set(
+    [...culled].filter(
+      (id) =>
+        byId.get(id)?.kind === 'issue' &&
+        !related.has(id) &&
+        !context.path.has(id),
+    ),
+  );
+  for (const node of styles.nodes ?? []) {
+    if (node.style?.visibility === 'hidden') continue;
+    const id = String(node.id);
+    if (byId.get(id)?.kind === 'issue')
+      showLabel(element(id)?.getShape('key'), !folded.has(id));
+  }
+  for (const edge of styles.edges ?? []) {
+    if (edge.style?.visibility === 'hidden') continue;
+    showLabel(
+      element(String(edge.id))?.getShape('key'),
+      !folded.has(String(edge.source)) && !folded.has(String(edge.target)),
+    );
+  }
 }

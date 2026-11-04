@@ -12,8 +12,9 @@ export type LegendKey =
  * 6: 연결 없는 묶음 사이 여백을 최종 확대 후 180으로 줄인다.
  * 7: 단일 기업 사건과 관계선을 기본 지도에 모두 표시한다.
  * 8: 기업 노드 25% 확대, 단일 기업 사건을 둘레에 맞춰 고리마다 나눠 놓는다(2026-11-04).
+ * 9: 기업마다 근거 많은 단독 사건 5개만 표시하고, 그 5개를 안쪽 고리에 놓는다.
  */
-export const MAP_LAYOUT_REVISION = 8;
+export const MAP_LAYOUT_REVISION = 9;
 export type GraphView = {
   hidden: LegendKey[];
   /**
