@@ -387,6 +387,7 @@
 | BFF_PATH_DIFFERENCE | difference | unblockMember | 목표 /api/v1/admin/members/{member_id}/unblock ↔ BFF /api/admin/members/{member_id}/unblock |  |
 | BFF_FIELD_DIFFERENCE | difference | unblockMember | 목표만 203 · BFF만 18 · 형식/필수/권한 변경 12 |  |
 | TARGET_ONLY_API | difference | getCompanyFinancials | GET /api/v1/companies/{id}/financials: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | getCompanyIssueImpactAssessment | GET /api/v1/companies/{id}/issues/{issueId}/impact/assessment: 직접 대응 BFF 없음 |  |
 | TARGET_ONLY_API | difference | getCompanyIssueImpact | GET /api/v1/companies/{id}/issues/{issueId}/impact: 직접 대응 BFF 없음 |  |
 | TARGET_ONLY_API | difference | getPersonalizedBriefingIssues | GET /api/v1/briefings/{id}/personalized/issues: 직접 대응 BFF 없음 |  |
 | TARGET_ONLY_API | difference | getPersonalizedBriefing | GET /api/v1/briefings/{id}/personalized: 직접 대응 BFF 없음 |  |

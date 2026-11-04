@@ -216,6 +216,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [blockMember](#blockmember) | POST | /api/v1/admin/members/{member_id}/block | 관리자(작업별 권한) | P2 |
 | [unblockMember](#unblockmember) | POST | /api/v1/admin/members/{member_id}/unblock | 관리자(작업별 권한) | P2 |
 | [getCompanyFinancials](#getcompanyfinancials) | GET | /api/v1/companies/{id}/financials | 공개 | P1 |
+| [getCompanyIssueImpactAssessment](#getcompanyissueimpactassessment) | GET | /api/v1/companies/{id}/issues/{issueId}/impact/assessment | 공개 | P1 |
 | [getCompanyIssueImpact](#getcompanyissueimpact) | GET | /api/v1/companies/{id}/issues/{issueId}/impact | 공개 | P1 |
 | [getPersonalizedBriefingIssues](#getpersonalizedbriefingissues) | GET | /api/v1/briefings/{id}/personalized/issues | 회원(본인) | P2 |
 | [getPersonalizedBriefing](#getpersonalizedbriefing) | GET | /api/v1/briefings/{id}/personalized | 회원(본인) | P2 |
@@ -2920,6 +2921,37 @@ DB에 저장된 회차만 예정 시각·ID 내림차순으로 조회한다. 날
 | id | path | 필수 | string |  |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | period | query | 필수 | string | 회계 기간. 허용 기간·항목·회계 기준·공급자를 팀이 확정해야 한다. 차트 기간과 독립이다. |
+
+<a id="getcompanyissueimpactassessment"></a>
+
+## getCompanyIssueImpactAssessment · 기업·이슈의 검증된 S3 영향 판정 조회
+
+고정된 공개 스냅샷의 직접 INVOLVES 관계 receipt에서 검증된 인용 효과만 반환한다. source relation별 행을 합산하지 않는다. 판정 근거 권한이 하나라도 확인되지 않으면 결과 전체를 evidence_unavailable로 반환한다. 제안 문구, 가격 예측, 구조 관계 영향은 제공하지 않는다. round·graphVersion·asOf는 getGraph와 같은 버전 선택 규칙을 따른다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/companies/{id}/issues/{issueId}/impact/assessment` |
+| 권한·우선순위 | 공개 · P1 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [CompanyIssueImpactAssessment](#schema-companyissueimpactassessment), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| FS/NFS | [FS022](../../system/out/feature-FS022.md) · [FS024](../../system/out/feature-FS024.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-GRP-06](../../system/out/screen-D-GRP-06.md) |
+| WBS | 6.1.2, 6.11.1, 6.6.6, 6.6.7, 6.6.9, 6.6.22, 6.6.24, 6.6.25, 6.6.26, 6.5.1 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 기존 영향 경로 조회와 별개의 목표 API다. 공개 receipt에서 검증된 S3 영향 판정만 제공한다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| id | path | 필수 | string |  |
+| issueId | path | 필수 | string |  |
+| round | query | 선택 | string |  |
+| graphVersion | query | 선택 | string |  |
+| asOf | query | 선택 | string (date-time) |  |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
 <a id="getcompanyissueimpact"></a>
 
@@ -8840,9 +8872,12 @@ snapshot 버전의 영수증 손상·선택 버전 불일치는 503이다. fixtu
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| companyId | 필수 | string |  |
+| issueId | 필수 | string |  |
 | status | 필수 | string {available, unavailable} |  |
 | reason | 필수 | string, null {no_public_path, not_recorded, not_verified, evidence_unavailable, issue_impact_not_produced, None} | available에서는 null이다. none 경로는 no_public_path, 구조적 이슈 영향 생산 전은 issue_impact_not_produced, impacts[]가 없는 구버전은 not_recorded다. 선택 버전 영수증 손상·불일치는 503으로 처리한다. |
 | results | 필수 | [CompanyIssueImpactResult](#schema-companyissueimpactresult)[] | available일 때 하나 이상, unavailable일 때 빈 배열. 공개 간선의 원천 판정별로 유지하고 합산하지 않는다. 검증 행 하나라도 필수 근거를 열 수 없으면 전체를 evidence_unavailable로 둔다. |
+| metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-companyissueimpactresult"></a>
 
@@ -8857,6 +8892,10 @@ snapshot 버전의 영수증 손상·선택 버전 불일치는 503이다. fixtu
 | label | 필수 | string {positive, negative, mixed, undetermined} | 선택 이슈의 선택 기업에 대한 검증 결과. 구조 관계 자체의 영향 판정을 복사하지 않는다. 주가·확률 예측이 아니다. |
 | evidenceIds | 필수 | string[] | effects 네 목록의 중복 없는 합집합. 모두 현재 getEvidence에서 읽을 수 있어야 한다. |
 | effects | 필수 | [CompanyIssueImpactEffects](#schema-companyissueimpacteffects) |  |
+| provenance | 필수 | object |  |
+| provenance.sourceKind | 필수 | string {collected, synthetic} |  |
+| provenance.executionMode | 필수 | string {live, replay} |  |
+| provenance.recordingKind | 필수 | string {provider, authored-test} |  |
 
 <a id="schema-companyissueimpacteffects"></a>
 
