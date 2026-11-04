@@ -38,6 +38,7 @@ import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
 import { applyGraphReading, keepAppliedStyles } from './graph-readability';
 import { applyMapDimming, restoreMapDimming } from './graph-dimming';
+import { configureMinimap, MINIMAP_PADDING } from './graph-minimap';
 import { graphText, loadGraphFonts } from './graph-fonts';
 import {
   cameraMotion,
@@ -639,14 +640,7 @@ export default function GraphCanvas({
    * 그 연결을 끊고, 데이터나 위치가 바뀐 뒤에만 돌려받은 함수로 다시 그린다.
    */
   function minimapOnDataChange(graph: Graph) {
-    const plugin = minimapShown.current
-      ? (graph.getPluginInstance('graph-overview') as unknown as
-          { onDraw?: () => void; onRender?: () => void } | undefined)
-      : undefined;
-    if (!plugin?.onDraw || !plugin.onRender) return null;
-    graph.off('afterdraw', plugin.onDraw);
-    graph.off('afteranimate', plugin.onRender);
-    return plugin.onRender;
+    return minimapShown.current ? configureMinimap(graph) : null;
   }
   async function fitVisibleGraph(
     graph: Graph,
@@ -1178,6 +1172,7 @@ export default function GraphCanvas({
                   type: 'minimap',
                   key: 'graph-overview',
                   size: [192, 128],
+                  padding: MINIMAP_PADDING,
                   position: 'right-bottom',
                   // G6 passes this value to classList.add: it must be one token.
                   className: 'graph-overview',
@@ -1684,7 +1679,7 @@ export default function GraphCanvas({
   }
   return (
     <div
-      className="relationship-canvas [&_.graph-overview]:rounded-panel [&_.graph-overview]:border [&_.graph-overview]:border-panel-line [&_.graph-overview]:bg-zoop-paper [&_.graph-overview]:shadow-lg [&_.graph-overview]:bottom-16! [&_.graph-overview]:top-auto!"
+      className="relationship-canvas [&_.graph-overview]:rounded-panel [&_.graph-overview]:border [&_.graph-overview]:border-panel-line! [&_.graph-overview]:bg-zoop-paper! [&_.graph-overview]:shadow-lg [&_.graph-overview]:bottom-16! [&_.graph-overview]:top-auto!"
       data-testid="graph-canvas"
       onWheel={(event) => {
         if (tutorialPhase === 'zoom' && event.deltaY !== 0)

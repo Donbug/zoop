@@ -1088,7 +1088,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     ).toEqual({ zoom: 1.8, position: [40, 60], size: [0, 0], layout: 2 });
   });
 
-  it('enables the desktop minimap only above sixty visible nodes', async () => {
+  it('D-GRP-01 enables the desktop minimap only above sixty visible nodes', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const smallIds = new Set(data.nodes.slice(0, 50).map((node) => node.id));
     const small = {
@@ -1112,9 +1112,19 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     rerender(<GraphCanvas data={data} />);
     await waitFor(() =>
       expect(canvas.setPlugins).toHaveBeenLastCalledWith([
-        expect.objectContaining({ type: 'minimap', size: [192, 128] }),
+        expect.objectContaining({
+          type: 'minimap',
+          size: [192, 128],
+          padding: 10,
+        }),
       ]),
     );
+    Object.defineProperty(host, 'clientWidth', {
+      configurable: true,
+      value: 375,
+    });
+    act(() => canvas.resizeCallbacks.at(-1)?.());
+    await waitFor(() => expect(canvas.setPlugins).toHaveBeenLastCalledWith([]));
   });
 
   it('D-GRP-01 redraws at the current container size after resize and ignores a disposed observer', async () => {
