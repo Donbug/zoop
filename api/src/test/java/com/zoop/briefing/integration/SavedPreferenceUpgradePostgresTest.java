@@ -40,6 +40,8 @@ class SavedPreferenceUpgradePostgresTest {
             var before=tables.stream().map(t->rows(jdbc,t,false)).toList();String pref=rows(jdbc,"briefing_personal_preferences",false);
             var upgrade=Flyway.configure().dataSource(source).schemas(schema).defaultSchema(schema).outOfOrder(false).load();
             assertEquals(1,upgrade.migrate().migrationsExecuted);upgrade.validate();
+            String addedVersion=jdbc.queryForObject("SELECT version FROM flyway_schema_history WHERE script LIKE '%isolate_imported_briefing_demo_preferences.sql' AND success",String.class);
+            assertTrue(addedVersion.compareTo("20261104150000")<0,"Keep this parent PR before the dependent #557 migration");
             assertEquals(before,tables.stream().map(t->rows(jdbc,t,false)).toList());assertEquals(pref,rows(jdbc,"briefing_personal_preferences",true));
             assertEquals("scheduled",jdbc.queryForObject("SELECT scope FROM briefing_personal_preferences WHERE id='old-pref'",String.class));
             jdbc.update("INSERT INTO briefing_personal_preferences(id,member_id,scope,revision,choice,created_at,effective_from) VALUES('demo-pref','upgrade-owner','demo',7,'{}',now(),now()+interval '1 minute')");
