@@ -29,12 +29,12 @@ import tools.jackson.databind.JsonNode;
 public class DocumentBriefingContentAccess implements BriefingContentAccess {
     private static final Set<String> BINDING_FIELDS = Set.of("documentId", "documentVersion", "grantId", "grantRevision",
             "recipients");
-    private static final List<String> PURPOSES = List.of("briefing-outlook", "semantic-verification");
     private final JdbcTemplate jdbc;
     private final DocumentReadGrants grants;
     private final Clock clock;
     private final BriefingReplayReadPolicy replay;
     private final BriefingGraphContentAuthority graph;
+    private final java.nio.file.Path artifactRoot;
 
     @Autowired
     public DocumentBriefingContentAccess(JdbcTemplate jdbc, DocumentReadProperties properties, Clock clock,
@@ -44,6 +44,7 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
         this.clock = clock;
         this.replay = replay;
         this.graph = graph;
+        this.artifactRoot = properties.artifactRootPath();
     }
 
     @Override
@@ -54,6 +55,7 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
         Instant now = clock.instant();
         try {
             if (!sources(round.payload(), round.publicSnapshot(), current, now, requestId)) return false;
+            if (!savedContext(round.publicSnapshot(), round.windowTo(), current, now, requestId, 0)) return false;
             JsonNode comparison = round.comparisonSnapshot();
             if (comparison != null && "available".equals(StrictJson.Obj.of(comparison).string("status"))) {
                 // Comparison can disclose morning-only issues. Authorize that stored morning original as well.
@@ -84,9 +86,65 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
                 if (prior.size() != 1 || !sources(prior.get(0).payload(), prior.get(0).snapshot(), current, now, requestId)) return false;
             }
             return true;
-        } catch (StrictJson.Malformed malformed) {
+        } catch (StrictJson.Malformed | IllegalArgumentException malformed) {
             return false;
         }
+    }
+
+    /** A reused previous summary remains tied to that exact earlier publication, including later corrections/revocation. */
+    private boolean savedContext(JsonNode snapshot, Instant cutoff, GrantRegistry current, Instant now, String requestId, int depth) {
+        if (!snapshot.has("savedResultContext")) return true;
+        if (depth >= 32) return false;
+        var context = StrictJson.Obj.of(snapshot.get("savedResultContext")).requiring(Set.of("previous"));
+        var references = new java.util.ArrayList<StrictJson.Obj>(context.objects("previous"));
+        if(context.has("archivedPrevious"))references.addAll(context.objects("archivedPrevious"));
+        for (var previous : references) {
+            boolean archived=previous.has("artifactId");
+            previous.exactly(archived?Set.of("roundId","cutoff","resultVersion","artifactId","contextSha256","evidenceIds"):
+                    Set.of("roundId", "cutoff", "resultVersion"));
+            Instant priorCutoff = Instant.parse(previous.string("cutoff"));
+            if (!priorCutoff.isBefore(cutoff)) return false;
+            var rows = jdbc.query("""
+                    SELECT published_payload, public_snapshot FROM briefing_rounds r
+                    WHERE id=? AND window_to=? AND status='published' AND published_at IS NOT NULL
+                    AND payload_sha256=encode(sha256(convert_to(published_payload::text,'UTF8')),'hex')
+                    AND NOT EXISTS(SELECT 1 FROM briefing_changes c WHERE c.round_id=r.id AND c.kind='correction')
+                    """, (rs, i) -> new Prior(StrictJson.parseObject(rs.getString(1)).node(), StrictJson.parseObject(rs.getString(2)).node()),
+                    nonBlank(previous.string("roundId")), java.sql.Timestamp.from(priorCutoff));
+            if (rows.size()!=1) return false;
+            var prior=rows.getFirst();
+            if ((archived?!archivedContext(snapshot,previous):!previous.string("resultVersion").equals(prior.snapshot().path("prioritySummary").path("resultVersion").asString()))
+                    || !sources(prior.payload(), prior.snapshot(), current, now, requestId)
+                    || !savedContext(prior.snapshot(), priorCutoff, current, now, requestId, depth+1)) return false;
+        }
+        return true;
+    }
+
+    private boolean archivedContext(JsonNode snapshot, StrictJson.Obj reference) {
+        if(artifactRoot==null)return false;
+        try {
+            var row=jdbc.queryForMap("SELECT kind,storage_uri,sha256,bytes FROM artifacts WHERE id=?",reference.string("artifactId"));
+            if(!"briefing_input".equals(row.get("kind")))return false;
+            byte[] raw=com.zoop.artifact.storage.ArtifactFileStore.at(artifactRoot).readVerified(row.get("storage_uri").toString(),
+                    row.get("sha256").toString(),((Number)row.get("bytes")).longValue());
+            var saved=StrictJson.parseObject(raw);
+            Set<String> actualEvidence=new HashSet<>();archivedEvidence(saved.object("context").node(),actualEvidence);
+            return "briefing-archived-previous-context-v1".equals(saved.string("schemaVersion"))
+                &&saved.string("sourceContextSha256").equals(reference.string("contextSha256"))
+                &&reference.string("contextSha256").equals(snapshot.path("priorityContext").path("contexts").path("context:previous").path("sha256").asString())
+                &&saved.object("context").node().equals(snapshot.path("priorityContext").path("contexts").path("context:previous").path("value"))
+                &&actualEvidence.equals(new HashSet<>(reference.strings("evidenceIds")))
+                &&reference.string("roundId").equals(saved.object("context").string("roundId"))
+                &&reference.string("resultVersion").equals(saved.object("context").string("resultVersion"))
+                &&Instant.parse(reference.string("cutoff")).equals(Instant.parse(saved.object("context").string("cutoff")));
+        } catch(RuntimeException unavailable){return false;}
+    }
+    private static void archivedEvidence(JsonNode value,Set<String> result) {
+        if(value.isObject())for(String key:value.propertyNames()) {
+            if("evidenceIds".equals(key))for(var id:value.get(key)) {String text=id.asString();if(!text.startsWith("context:"))result.add(text);}
+            else archivedEvidence(value.get(key),result);
+        }
+        else if(value.isArray())for(var child:value)archivedEvidence(child,result);
     }
 
     private boolean sources(JsonNode publishedPayload, JsonNode publicSnapshot, GrantRegistry current, Instant now, String requestId) {
@@ -108,8 +166,8 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
                         SELECT a.provider FROM articles a JOIN article_versions v ON v.article_id=a.id
                         WHERE a.id=? AND v.version=? AND a.access_status='available'
                         """, (rs, index) -> rs.getString("provider"), binding.documentId(), binding.documentVersion());
-                if (providers.size() != 1 || GrantRegistry.evaluate(current.current(binding.grantId()).orElse(null),
-                        providers.get(0), binding.grantRevision(), PURPOSES, binding.recipients(), true, now) != null) {
+                if (providers.size() != 1 || GrantRegistry.evaluateBriefingRead(current.current(binding.grantId()).orElse(null),
+                        providers.get(0), binding.grantRevision(), binding.recipients(), now) != null) {
                     return false;
                 }
             }
@@ -121,6 +179,9 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
                 if (id.isBlank() || !references.add(id)) return false;
             }
             Set<String> disclosedEvidence = new LinkedHashSet<>(references);
+            var savedContext=publicSnapshot.get("savedResultContext");
+            if(savedContext!=null)for(var prior:savedContext.path("archivedPrevious"))
+                for(var id:prior.path("evidenceIds"))disclosedEvidence.add(nonBlank(id.asString()));
             summaryEvidence(StrictJson.Obj.of(publicSnapshot).raw("marketSummary"), disclosedEvidence);
             for (StrictJson.Obj item : payload.objects("items")) {
                 List<String> evidenceIds = item.strings("evidenceIds");
@@ -145,9 +206,10 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
                         """, (rs, index) -> new DocumentVersion(rs.getString("article_id"), rs.getString("article_version")), id);
                 if (source.size() != 1 || !authorized.containsKey(source.get(0))) return false;
             }
+            if (publicSnapshot.has("commonPriority") && !BriefingPriorityRules.storedSourcesMatch(publicSnapshot.get("commonPriority"), jdbc)) return false;
             return graph.context(payload.raw("graphVersion").isNull() ? null : payload.string("graphVersion"), requestId)
                     .allowsRound(publishedPayload, disclosedEvidence);
-        } catch (StrictJson.Malformed malformed) {
+        } catch (StrictJson.Malformed | IllegalArgumentException malformed) {
             return false;
         }
     }

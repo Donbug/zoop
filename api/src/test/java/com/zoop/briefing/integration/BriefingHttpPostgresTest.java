@@ -130,6 +130,41 @@ class BriefingHttpPostgresTest {
 
     @Autowired com.zoop.auth.service.MemberSessionService personalSessions;
 
+    private tools.jackson.databind.node.ObjectNode readOnlyGrant() throws IOException {
+        var registry = (tools.jackson.databind.node.ObjectNode) JSON.readTree(resource("grants.json"));
+        var grant = (tools.jackson.databind.node.ObjectNode) registry.path("grants").get(0);
+        grant.putArray("allowedOperations").add("read").add("quote-display");
+        grant.putArray("purposes").add("briefing-outlook");
+        return registry;
+    }
+
+    @Test
+    void storedBriefingUsesDisplayAuthorityWithoutAdmittingUnknownOrRevokedSources() throws Exception {
+        String original = publishedPayload();
+        var registry = readOnlyGrant();
+        Files.writeString(GRANTS, registry.toString());
+        assertEquals(200, get(MORNING, "read-only-morning").status());
+        assertEquals(200, get(EVENING, "read-only-evening").status());
+        for (String denial : java.util.List.of("unknown", "denied", "revoked", "missing-quote", "wrong-purpose", "expired", "wrong-recipient")) {
+            var changed = registry.deepCopy();
+            var grant = (tools.jackson.databind.node.ObjectNode) changed.path("grants").get(0);
+            switch (denial) {
+                case "unknown", "denied" -> grant.put("rights", denial);
+                case "revoked" -> grant.put("enabled", false);
+                case "missing-quote" -> grant.putArray("allowedOperations").add("read");
+                case "wrong-purpose" -> grant.putArray("purposes").add("document-summary");
+                case "expired" -> grant.put("expiresAt", "2026-01-01T00:00:00Z");
+                case "wrong-recipient" -> grant.putArray("recipients").add("ungranted-recipient");
+                default -> throw new AssertionError(denial);
+            }
+            Files.writeString(GRANTS, changed.toString());
+            assertEquals(503, get(EVENING, "read-denial-" + denial).status(), denial);
+        }
+        Files.writeString(GRANTS, registry.toString());
+        assertEquals(200, get(EVENING, "read-authority-restored").status());
+        assertEquals(original, publishedPayload());
+    }
+
     @Test
     void personalSelectionUsesDbWatchlistWholePoolAndPreservesPublication() throws Exception {
         String member="personal-test-"+UUID.randomUUID();
@@ -185,6 +220,11 @@ class BriefingHttpPostgresTest {
             assertEquals(3,result.path("eligibleCount").asInt());
             assertTrue(result.path("items").valueStream().noneMatch(c->c.path("issueId").asString().equals("brf-test-event")));
             assertFalse(response.body().contains("grantId"));
+            Files.writeString(GRANTS, readOnlyGrant().toString());
+            var storedRead=http.send(HttpRequest.newBuilder(URI.create(base()+"/api/v1/briefings/"+ROUND+"/personalized/issues"))
+                .header("Cookie","zoop_session="+token).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,storedRead.statusCode(),storedRead.body());
+            assertEquals(result.path("items"),JSON.readTree(storedRead.body()).path("items"));
             String otherToken=personalSessions.issue(other,null,"personal-test").token();
             var otherResponse=http.send(HttpRequest.newBuilder(URI.create(base()+"/api/v1/briefings/"+ROUND+"/personalized/issues?memberId="+member))
                 .header("Cookie","zoop_session="+otherToken).GET().build(),HttpResponse.BodyHandlers.ofString());
@@ -196,6 +236,119 @@ class BriefingHttpPostgresTest {
             assertEquals(before,jdbc.queryForObject("SELECT payload_sha256 FROM briefing_rounds WHERE id=?",String.class,ROUND));
         } finally {
             jdbc.execute("TRUNCATE briefing_personal_pools");
+            jdbc.update("DELETE FROM members WHERE id IN (?,?)",member,other);
+        }
+    }
+
+    private String priorityFixture(java.util.function.Consumer<tools.jackson.databind.node.ObjectNode> mutate) throws IOException {
+        String fixture = resource("fixture.sql");
+        int start = fixture.indexOf("$records$") + "$records$".length();
+        int end = fixture.indexOf("$records$", start);
+        var records = JSON.readTree(fixture.substring(start, end));
+        for (var record : records) if (ROUND.equals(record.path("p").path("id").asString())) {
+            var priority = (tools.jackson.databind.node.ObjectNode) JSON.readTree(resource("priority-authored.json"));
+            mutate.accept(priority);
+            var snapshot = (tools.jackson.databind.node.ObjectNode) record.get("snapshot");
+            snapshot.set("commonPriority", priority);
+            var summary = snapshot.putObject("prioritySummary").put("schemaVersion", "briefing-priority-summary-v1")
+                .put("roundId", ROUND).put("cutoff", "2026-10-15T08:30:00Z").put("resultVersion", "authored-summary-v1")
+                .put("text", "[합성시험] 주문 확대를 확인합니다.\n\n실제 가동과 수주 규모가 다음 확인 조건입니다.");
+            summary.putArray("evidenceIds").add("brf-test-evidence");
+        }
+        return fixture.substring(0, start) + JSON.writeValueAsString(records) + fixture.substring(end);
+    }
+
+    @Test
+    void savedCommonPriorityAndSummaryAreRestoredWithoutChangingOriginalPayload() throws Exception {
+        String original = publishedPayload();
+        loadFixture(priorityFixture(v -> {}));
+        var response = get(EVENING, "priority-http");
+        assertEquals(200, response.status(), response.body());
+        assertEquals("authored-priority-v1", response.json().at("/commonPriority/resultVersion").asString());
+        assertEquals(1, response.json().at("/commonPriority/items/0/importance").asInt());
+        assertEquals("watch", response.json().at("/commonPriority/items/0/aiAnalyses/0/direction").asString());
+        assertEquals("authored-summary-v1", response.json().at("/prioritySummary/resultVersion").asString());
+        assertEquals(original, publishedPayload());
+        assertEquals("synthetic-v1", response.json().at("/marketSummary/resultVersion").asString());
+        assertFalse(response.body().contains("sourceBindings"));
+        // Revocation is effective on the next GET, including the new card.
+        jdbc.update("UPDATE articles SET access_status='private' WHERE id='brf-test-document'");
+        assertUnavailable(EVENING);
+    }
+
+    @Test
+    void priorityRejectsForeignRoundFutureSourceAlteredQuoteAndUnknownFieldsOverHttp() throws Exception {
+        var mutations = java.util.List.<java.util.function.Consumer<tools.jackson.databind.node.ObjectNode>>of(
+            v -> v.put("roundId", "different-round"),
+            v -> ((tools.jackson.databind.node.ObjectNode) v.at("/items/0/sources/0")).put("publishedAt", "2026-10-16T00:00:00Z"),
+            v -> ((tools.jackson.databind.node.ObjectNode) v.at("/items/0/sources/0")).put("quote", "altered quote"),
+            v -> v.put("providerResponse", "must never disclose")
+        );
+        for (var mutation : mutations) { loadFixture(priorityFixture(mutation)); assertUnavailable(EVENING); }
+    }
+
+    @Test
+    void personalPriorityDeliveryUsesFrozenMemberScopeAndCurrentEvidenceOverHttp() throws Exception {
+        String member = "priority-member-" + UUID.randomUUID(); String other = member + "-other";
+        try {
+            for (String id : java.util.List.of(member, other)) jdbc.update("""
+                INSERT INTO members(id,analytics_key,email,email_key,display_name,signup_method,status,created_at,
+                mode,completed,tutorial_completed,settings_version,updated_at)
+                VALUES(?,?,?,?,?,'google','active',now(),'watchlist',true,true,1,now())
+                """, id,id,id+"@example.invalid",id+"@example.invalid","[합성시험] 개인화");
+            var personal = (tools.jackson.databind.node.ObjectNode) JSON.readTree(resource("priority-authored.json"));
+            personal.remove(java.util.List.of("minimumShortfall","legacyAnalysisScopeWarning","generationVersion"));
+            personal.put("schemaVersion","personal-relative-priority-view-v1").putArray("companyIds").add("brf-test-company");
+            var item = (tools.jackson.databind.node.ObjectNode)personal.at("/items/0");
+            item.set("connections",item.remove("companies")); item.remove(java.util.List.of("importance","whyNow","prices","analysisResultVersion"));
+            item.put("kind","related_reference").putNull("price").putArray("priorAnalysis");
+            var analysis=(tools.jackson.databind.node.ObjectNode)item.at("/aiAnalyses/0");
+            analysis.set("forMyStocks",analysis.remove("companyConnection"));
+            ((tools.jackson.databind.node.ObjectNode)analysis.get("judgmentBasis")).put("promptVersion","personal-impact-relative-v3");
+            analysis.putObject("comparison").put("status","newly_selected").putNull("baseline");
+            var pool = JSON.createObjectNode().put("schemaVersion","personal-candidate-pool-v1").put("complete",true)
+                .put("roundId",ROUND).put("cutoff","2026-10-15T08:30:00Z").put("candidateCount",1).put("inputSha256","d".repeat(64));
+            var candidate=pool.putArray("candidates").addObject().put("issueId","brf-test-event").put("importance",1).put("verified",true);
+            candidate.set("companies",item.path("connections").deepCopy());
+            for(var c:candidate.path("companies"))((tools.jackson.databind.node.ObjectNode)c).putArray("evidenceIds").add("brf-test-evidence");
+            var source=candidate.putArray("sources").addObject().put("evidenceId","brf-test-evidence").put("quote","합성시험")
+                .put("url","https://example.invalid/synthetic-document").put("publishedAt","2026-10-13T00:00:00Z")
+                .put("documentId","brf-test-document").put("documentVersion","synthetic-v1").put("bodySha256","a".repeat(64))
+                .put("grantId","brf-test-grant").put("grantRevision","synthetic-v1");
+            source.putArray("recipients").add("authored-replay");
+            jdbc.update("""
+                INSERT INTO briefing_personal_pools(id,round_id,input_sha256,snapshot,snapshot_sha256)
+                VALUES(?,?,?,?::jsonb,encode(sha256(convert_to((?::jsonb)::text,'UTF8')),'hex'))
+                """,member+"-pool",ROUND,"d".repeat(64),pool.toString(),pool.toString());
+            var selection=JSON.createObjectNode().put("roundId",ROUND).put("poolVersion","d".repeat(64)).put("selectionVersion","authored-personal-selection");
+            selection.putObject("choice").putArray("companyIds").add("brf-test-company");selection.putArray("tracking");
+            var presentation=selection.putObject("presentation").put("id",ROUND).put("dataAsOf","2026-10-15T08:30:00Z");
+            presentation.putArray("items");presentation.set("personalPriority",personal);
+            jdbc.update("""
+                INSERT INTO briefing_personal_preferences(id,member_id,revision,choice,created_at,effective_from)
+                VALUES(?,?,1,?::jsonb,'2026-10-14T00:00:00Z','2026-10-15T00:20:00Z')
+                """,member+"-pref",member,selection.path("choice").toString());
+            jdbc.update("""
+                INSERT INTO briefing_personal_deliveries(id,member_id,round_id,preference_id,mode,scheduled_at,
+                selection_snapshot,selection_sha256,result_snapshot,result_sha256,status,finished_at)
+                VALUES(?,?,?,?,'scheduled','2026-10-15T08:30:00Z',?::jsonb,encode(sha256(convert_to((?::jsonb)::text,'UTF8')),'hex'),
+                ?::jsonb,encode(sha256(convert_to((?::jsonb)::text,'UTF8')),'hex'),'ready',now())
+                """,member+"-delivery",member,ROUND,member+"-pref",selection.toString(),selection.toString(),selection.toString(),selection.toString());
+            String path="/api/v1/briefings/"+ROUND+"/personalized/delivery?memberId="+member;
+            assertEquals(401,get(path,"no-personal-session").status());
+            String token=personalSessions.issue(member,null,"priority-test").token();
+            var response=http.send(HttpRequest.newBuilder(URI.create(base()+path)).header("Cookie","zoop_session="+token).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,response.statusCode(),response.body());
+            assertEquals("no-store",response.headers().firstValue("Cache-Control").orElse(null));
+            assertEquals("authored-priority-v1",JSON.readTree(response.body()).at("/selection/presentation/personalPriority/resultVersion").asString());
+            String otherToken=personalSessions.issue(other,null,"priority-test").token();
+            var notMine=http.send(HttpRequest.newBuilder(URI.create(base()+path)).header("Cookie","zoop_session="+otherToken).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,notMine.statusCode());assertEquals("not_published",JSON.readTree(notMine.body()).path("status").asString());
+            assertFalse(notMine.body().contains("authored-priority-v1"));
+            jdbc.update("UPDATE articles SET access_status='private' WHERE id='brf-test-document'");
+            var revoked=http.send(HttpRequest.newBuilder(URI.create(base()+path)).header("Cookie","zoop_session="+token).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(503,revoked.statusCode(),revoked.body());
+        } finally {
             jdbc.update("DELETE FROM members WHERE id IN (?,?)",member,other);
         }
     }

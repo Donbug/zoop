@@ -400,7 +400,7 @@ export default function PublishedBriefing({
                   {result.notice.at && ` · ${briefingTime(result.notice.at)}`}
                 </p>
               )}
-              {result.status === 'published' && (
+              {result.status === 'published' && !result.prioritySummary && (
                 <BriefingOutlook
                   outlook={result.outlook}
                   issues={result.items.map((item) => ({
@@ -453,7 +453,7 @@ export default function PublishedBriefing({
                   title="시장·지표와 전체 저장 상태 보기"
                 >
                   {(!compact || !knownLimits) && partialInfo}
-                  {result.issueIntelligence ? (
+                  {result.issueIntelligence || result.commonPriority ? (
                     <>
                       <IssueCentricBriefing
                         compact={false}
@@ -475,7 +475,9 @@ export default function PublishedBriefing({
                         compact
                         title="이전 생성 전문·시장 요약·시세 보존본"
                       >
-                        {original ? (
+                        {result.commonPriority ? (
+                          currentContext
+                        ) : original ? (
                           <BriefingPreservedContext
                             result={original}
                             compact={false}
@@ -494,6 +496,7 @@ export default function PublishedBriefing({
                   {result.items.length === 0 &&
                     result.emptyReason === 'no_issues_in_window' &&
                     !result.issueIntelligence &&
+                    !result.commonPriority &&
                     !result.continuity && (
                       <BriefingRecap
                         key={`${result.id}:${result.graphVersion}:${result.dataAsOf}`}
@@ -509,7 +512,7 @@ export default function PublishedBriefing({
                     />
                   )}
                   {feedbackReadError}
-                  {!result.issueIntelligence && (
+                  {!result.issueIntelligence && !result.commonPriority && (
                     <BriefingIssueList
                       compact={compact}
                       items={result.items}

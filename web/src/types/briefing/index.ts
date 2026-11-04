@@ -200,7 +200,24 @@ export type BriefingContinuity = {
 };
 
 /** Consumer fields of getBriefing; publication snapshots are never recalculated. */
+export type BriefingPrioritySummary = {
+  schemaVersion: 'briefing-priority-summary-v1';
+  roundId: string;
+  cutoff: string;
+  resultVersion: string;
+  text: string;
+  evidenceIds: string[];
+};
+
 export type BriefingResponse = {
+  references?: {
+    eventIds: string[];
+    evidenceIds: string[];
+    companyIds: string[];
+  };
+  commonPriority?: import('@/util/briefingCommonPriority').CommonPriority;
+  personalPriority?: import('@/util/briefingPersonalPriority').PersonalPriority;
+  prioritySummary?: BriefingPrioritySummary;
   /** Immutable feedback result version; graphVersion or publication digest when graph-less. */
   feedbackVersion?: string | null;
   id: string;

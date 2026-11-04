@@ -1,5 +1,7 @@
 # Zoop API 실행 환경
 
+저장된 공통·개인화 결과를 새 AI 호출 없이 반입·발행하는 절차는 [브리핑 서버 반입 안내](../docs/development/briefing-server-staging.md)를 따른다. 확정 준비 도구와 별도 비웹 발행 명령을 구분하며, 일반 API 기동이나 PR 반영으로 데이터를 자동 공개하지 않는다. 반입 데모 설정은 실제 회원 설정·정기 생성과 분리한다.
+
 Spring Boot 실행 기반, 공통 오류 처리, 내부 AI 분석 transport 클라이언트와 ERD v6에 맞춘 인증 DB 스키마가 있습니다. 공개 약관 조회·이메일 회원가입·로그인·회원/비회원 세션 발급 및 조회가 구현됐습니다. 문서 저장(`artifacts`·`articles`·`article_versions`)과 operator 전용 비웹 import([문서 import](docs/DOCUMENT_IMPORT.md)), S1 문서 분석([문서 분석](docs/DOCUMENT_ANALYSIS.md))도 지원합니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
 
 ## 도구
