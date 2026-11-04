@@ -20,6 +20,8 @@ vi.mock('@/apis/graph/companies', () => ({ setWatchlistCompany: vi.fn() }));
 const company = mockCompany('KRX:005930');
 const state = {
   loading: false,
+  documentsLoading: false,
+  marketLoading: false,
   errors: {},
   data: {
     company,
@@ -29,6 +31,13 @@ const state = {
     documents: mockDocuments(company.id),
     holding: null,
   },
+};
+// 그래프 응답(company·documents)이 아직 없거나 실패한 상태
+const marketOnly = {
+  quote: state.data.quote,
+  metrics: state.data.metrics,
+  prices: state.data.prices,
+  holding: state.data.holding,
 };
 const fallback = {
   id: company.id,
@@ -186,6 +195,78 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     expect(screen.getByText('뉴스·공시')).toBeTruthy();
   });
 
+  it('그래프 응답을 기다리는 동안에도 노드 기업명·시세·차트·관련 기업을 먼저 보이고 사건·뉴스 자리에만 로딩을 표시한다', () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      loading: true,
+      documentsLoading: true,
+      data: marketOnly,
+    });
+    renderPanel();
+    expect(screen.getByRole('heading', { name: '삼성전자' })).toBeTruthy();
+    expect(
+      screen.getByRole('img', { name: '최근 1개월 가격 추이' }),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: '기업 상세' })).toBeTruthy();
+    expect(screen.getByText('NVIDIA')).toBeTruthy();
+    expect(screen.getByText('관련 사건을 불러오는 중')).toBeTruthy();
+    expect(screen.getByText('뉴스·공시를 불러오는 중')).toBeTruthy();
+    expect(screen.queryByText('직접 관련 사건')).toBeNull();
+    expect(screen.queryByText('표시할 뉴스·공시가 없습니다.')).toBeNull();
+  });
+
+  it('그래프 응답이 실패하면 시세는 그대로 두고 사건 자리에서 다시 시도한다', async () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      errors: { company: 'offline', documents: 'offline' },
+      data: marketOnly,
+    });
+    renderPanel();
+    expect(
+      screen.getByRole('img', { name: '최근 1개월 가격 추이' }),
+    ).toBeTruthy();
+    const alert = screen.getByText('관련 사건을 불러오지 못했습니다.');
+    const calls = vi.mocked(useCompanyData).mock.calls.length;
+    await userEvent.click(
+      within(alert.parentElement!).getByRole('button', { name: '다시 시도' }),
+    );
+    expect(vi.mocked(useCompanyData).mock.calls.at(-1)?.[2]).toBe(1);
+    expect(vi.mocked(useCompanyData).mock.calls.length).toBeGreaterThan(calls);
+  });
+
+  it('뉴스·공시 응답을 기다리는 동안에도 관련 사건과 관심 버튼을 먼저 보인다', async () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      documentsLoading: true,
+      data: { ...marketOnly, company },
+    });
+    vi.mocked(setWatchlistCompany).mockResolvedValue({
+      watchlistIds: [company.id],
+      version: 2,
+    } as never);
+    renderPanel('member-token');
+    expect(screen.getByText('직접 관련 사건')).toBeTruthy();
+    expect(screen.queryByText('관련 사건을 불러오는 중')).toBeNull();
+    expect(screen.getByText('뉴스·공시를 불러오는 중')).toBeTruthy();
+    expect(screen.queryByText('표시할 뉴스·공시가 없습니다.')).toBeNull();
+    const watch = screen.getByRole('button', { name: '☆ 관심 추가' });
+    expect(watch.hasAttribute('disabled')).toBe(false);
+    await userEvent.click(watch);
+    expect(setWatchlistCompany).toHaveBeenCalledWith(company.id, true);
+  });
+
+  it('시세 응답을 기다리는 동안에는 시세 자리에만 로딩을 표시한다', () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      marketLoading: true,
+      data: { company, documents: mockDocuments(company.id) },
+    });
+    renderPanel();
+    expect(screen.getByText('직접 관련 사건')).toBeTruthy();
+    expect(screen.getByText('시세 정보를 불러오는 중')).toBeTruthy();
+    expect(screen.queryByText('관련 사건을 불러오는 중')).toBeNull();
+  });
+
   it('D-GRP-03 로고·종목코드·기업명·가격·등락·기준 시각을 머리에 모으고, 거래량 등 중요 정보는 회색 박스에 둔다', () => {
     const view = renderPanel();
     const header = view.container.querySelector('.company-panel-header')!;
@@ -299,6 +380,48 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     expect(screen.getByRole('button', { name: '☆ 관심 추가' })).toBeTruthy();
     rerender(panel({ ids: [company.id], seq: 2 }));
     expect(screen.getByRole('button', { name: '★ 관심 해제' })).toBeTruthy();
+  });
+
+  // #568 리뷰: 기업 응답 전에는 갱신되지 않은 지도 노드 값으로 관심을 저장하지 않는다.
+  it('FS027 기업 응답 전에 열면 이미 저장한 관심 목록으로 ★를 정하고 해제 요청을 보낸다', async () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      loading: true,
+      data: marketOnly,
+    });
+    vi.mocked(setWatchlistCompany).mockResolvedValue({
+      watchlistIds: [],
+      version: 3,
+    } as never);
+    render(
+      <MemoryRouter>
+        <CompanyDetailPanel
+          companyId={company.id}
+          fallback={{ ...fallback, watch: false }}
+          relatedCompanies={[]}
+          token="member-token"
+          watchSync={{ ids: [company.id], seq: 1 }}
+          onClose={vi.fn()}
+          onSelectIssue={vi.fn()}
+          onFocus={vi.fn()}
+          onAskAi={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: '★ 관심 해제' }));
+    expect(setWatchlistCompany).toHaveBeenCalledWith(company.id, false);
+  });
+
+  it('FS027 저장한 관심 목록도 기업 응답도 없으면 관심 버튼을 막는다', () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      loading: true,
+      data: marketOnly,
+    });
+    renderPanel('member-token');
+    const button = screen.getByRole('button', { name: '관심 확인 중…' });
+    expect(button.hasAttribute('disabled')).toBe(true);
+    expect(screen.queryByRole('button', { name: '☆ 관심 추가' })).toBeNull();
   });
 
   it('저장 실패 시 관심 상태를 되돌리고 재시도 경로를 제공한다', async () => {
