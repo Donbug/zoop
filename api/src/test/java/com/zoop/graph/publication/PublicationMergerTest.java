@@ -359,9 +359,23 @@ class PublicationMergerTest {
         assertEquals("request_invalid", code(() -> PublicationMerger.combine(PublicationMerger.emptyDecisions(), Obj.of(duplicate))));
         ObjectNode foreign = corrected(published, "Name"); correction(foreign).putArray("evidenceRefs").add(evidenceRef(other));
         assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published, other), Obj.of(foreign), Set.of())));
+        // Evidence of another member of the same issue is refused too: only the label owner's evidence, the issue's atomic proof, counts.
+        var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
+        Contribution member = sameHeadline(published, source(2, "same", "Article headline"));
+        ObjectNode nonOwner = corrected(published, "Name"); correction(nonOwner).putArray("evidenceRefs").add(evidenceRef(member));
+        Obj withSelection = PublicationMerger.combine(Obj.of(peopleLabel(published)), Obj.of(nonOwner));
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published, member), withSelection, base.issueSources().keySet(), base.issueSources())));
+        Obj ownerOnly = PublicationMerger.combine(Obj.of(peopleLabel(published)), Obj.of(corrected(published, "Name")));
+        assertEquals("Name", PublicationMerger.merge(List.of(published, member), ownerOnly, base.issueSources().keySet(), base.issueSources()).issues().getFirst().label());
+        ObjectNode mixed = corrected(published, "Name"); ((tools.jackson.databind.node.ArrayNode) correction(mixed).get("evidenceRefs")).add(evidenceRef(member));
+        Obj both = PublicationMerger.combine(Obj.of(peopleLabel(published)), Obj.of(mixed));
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published, member), both, base.issueSources().keySet(), base.issueSources())));
         ObjectNode automatic = corrected(published, "Name"); correction(automatic).put("reviewer", PublicationMerger.AUTO_REVIEWER);
         assertTrue(PublicationMerger.claimsAutomaticReviewer(Obj.of(automatic)));
         assertEquals("request_invalid", code(() -> PublicationMerger.merge(List.of(published), Obj.of(automatic), Set.of())));
+        // The length limit counts code points: a name of MAX_LABEL_LENGTH supplementary characters is 2 × MAX UTF-16 units and passes.
+        String supplementary = "😀".repeat(PublicationMerger.MAX_LABEL_LENGTH);
+        assertEquals(supplementary, PublicationMerger.merge(List.of(published), Obj.of(corrected(published, supplementary)), Set.of()).issues().getFirst().label());
         for (String bad : List.of(" ", " Name", "Na\u0007me", "n".repeat(PublicationMerger.MAX_LABEL_LENGTH + 1))) {
             ObjectNode name = corrected(published, bad);
             assertEquals("request_invalid", code(() -> PublicationMerger.merge(List.of(published), Obj.of(name), Set.of())), bad);
