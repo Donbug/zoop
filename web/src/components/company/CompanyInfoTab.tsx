@@ -159,7 +159,6 @@ export default function CompanyInfoTab({
             <time dateTime={company.metadata.asOf ?? undefined}>
               {formatKst(company.metadata.asOf)}
             </time>{' '}
-            · 공개 버전 {company.metadata.graphVersion ?? '미제공'}
           </p>
           <p>기업 기준정보의 별도 갱신 시각은 제공되지 않았습니다.</p>
         </>

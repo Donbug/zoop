@@ -150,8 +150,7 @@ function Basis({ metadata }: { metadata: Meta | undefined }) {
   return metadata ? (
     <p className="wrap-anywhere">
       출처 {metadata.source} · 공개 자료 기준{' '}
-      <ReferenceTime value={metadata.asOf} /> · 버전{' '}
-      {metadata.graphVersion ?? '미제공'}
+      <ReferenceTime value={metadata.asOf} />
       {metadata.partial ? ' · 일부 자료 미제공' : ''}
     </p>
   ) : null;
