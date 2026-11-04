@@ -148,10 +148,43 @@ DB·`zoop.document-read.grants`·`artifact-root`·`ingestion-sources`·artifact 
 
 5. 비회원 공통 조회, 대상 회원 개인화 조회, 다른 회원의 비노출, 시세·근거·전체 보기를 확인한다. 보존 데모는 반입 영수증의 회원·delivery ID 범위에서만 조회하며 정식 자동 개인화 운영 이력으로 표시하지 않는다.
 
+## 그래프를 생산하지 않은 보존 결과의 등록
+
+기존 분석이 정식 native graph를 생산하지 않았다면 graphVersion이나 native/S3
+등록 영수증을 만들어 넣지 않는다. 저장 결과 조회에는 다음 별도 입력을 사용한다.
+문서의 현재 표시 권한은 여전히 필요하다.
+
+    {
+      "schemaVersion": "briefing-finalization-request-v2",
+      "rounds": [{
+        "roundId": "<preserved round>",
+        "graphVersion": null,
+        "snapshotSha256": null,
+        "basisMode": "retained-results"
+      }]
+    }
+
+나머지 회원·문서·현재 grant·원 manifest 필드는 v1과 같다. 준비 도구가 각 회차의
+실제 payload, snapshot, 전체 후보 pool, 원 manifest 해시를 별도 briefing_input
+artifact로 보존한다. retainedBasis는 이 파일의 ID/SHA만 참조한다. 이 등록은
+native graph 등록이나 새로운 의미 검증을 수행했다는 뜻이 아니며 provenance에도
+각각 not-performed를 기록한다. 원 AI 문안과 원 archive는 유지한다.
+
+같은 INSERT·별도 발행 명령을 사용하며 발행기는 현재 DB의 회차·pool과 보존 파일을
+JSONB로 대조한다. 실제 파일과 DB가 모두 일치해야 하므로 요청에 ID를 적는 것만으로
+등록을 대체할 수 없다. 이후 공개·개인화 조회에서도 파일 SHA, 회차/pool 범위,
+현재 문서 grant를 다시 검사한다. 파일 변조·다른 회차·pool 밖 후보는 거부한다.
+graphVersion은 계속 null이며 과거 지도나 현재 활성 지도를 대신 연결하지 않는다.
+
+v1 및 graphVersion이 있는 native 발행은 기존 등록/현재 원천 권한 검사를 그대로
+사용한다. v2의 보존 등록으로 native 권한 철회나 새 생성의 model-send 검사를
+우회할 수 없다. 표시 승인 기록과 외부 출처의 라이선스 주장을 혼동하지 않으며,
+운영자는 해당 제공 범위의 실제 현재 권한을 별도로 확인·등록한다.
+
 ## 공개 전 남은 조건
 
 1. 문서 담당자가 실제 문서 버전의 현재 사용 권한·등록부를 제공한다.
-2. 해당 자료의 고정 그래프 버전과 출처 결속을 등록한다. 최신 활성 그래프로 과거 기준을 바꾸지 않는다.
+2. native 결과는 고정 그래프 버전과 출처 결속을 등록한다. 그래프를 생산하지 않은 보존 결과는 위 v2 등록을 사용한다. 최신 활성 그래프로 과거 기준을 바꾸지 않는다.
 3. 대상 회원과 비공개 실험 범위를 확정한다. 설정 변경이나 기존 평가 이관을 자동 수행하지 않는다.
 4. 시장 맥락·이전 회차 참조 연결 및 발견된 언어 품질 문제를 별도 수정 버전으로 검토한다.
 5. 명시적 적재·발행 명령과 공개 API·회원 격리·실제 화면 검증을 진행한다.

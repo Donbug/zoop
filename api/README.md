@@ -621,3 +621,8 @@ JVM은 보존 응답의 SHA·기업·통화·해상도·요청 마감·완료 �
 ### 브리핑 회원 평가·관리자 선호도
 
 `/api/v1/feedback`의 회원별 회차/이슈 도움 됨·안 됨·사유를 PostgreSQL에 저장하며, `/api/v1/admin/feedback/summary`와 `/dislikes`가 관리자 화면에 집계·사유를 제공합니다. 세션·CSRF·현재 발행 버전과 읽기 권한을 검증하고 취소도 보존합니다. 기존 익명 미리보기 SQLite와 구분합니다. [저장·집계·보존 및 검증](../docs/development/briefing-member-feedback.md)을 참고하세요.
+
+
+### 저장 결과 발행의 그래프 없는 보존 등록
+
+정식 그래프를 생성하지 않은 저장 결과는 briefing-finalization-request-v2의 retained-results 모드로 등록할 수 있습니다. 현재 read/quote-display·briefing-outlook 권한을 확인하고 회차·전체 후보 pool·원문/인용·보존 파일과 실제 DB를 대조합니다. graphVersion은 null로 유지하며 native/S3 등록이나 새 의미 검증을 수행했다고 표시하지 않습니다. 원 AI 문안·archive·실제 회원 설정·평가는 보존합니다. 같은 SavedBriefingPublisher 명령을 사용하며 실제 회원·delivery ID에 결속한 영수증이 있어야 개인화 보존본을 조회합니다. 파일 변조·권한 철회·범위 밖 후보는 거부하며 새 AI 전송 권한은 부여하지 않습니다. 세부 입력과 검증은 docs/development/briefing-server-staging.md를 참고하세요.

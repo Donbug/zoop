@@ -69,14 +69,14 @@ def read_denial(grant,provider,binding,now):
 
 def inspect(bundle,request,registry,now):
     manifest=verify_bundle(bundle);tables={t:[strict(s) for s in (bundle/'tables'/f'{t}.jsonl').read_text().splitlines()] for t in TABLES}
-    if request.get('schemaVersion')!='briefing-finalization-request-v1' or request.get('sourceManifestSha256')!=sha((bundle/'manifest.json').read_bytes()):
+    if request.get('schemaVersion') not in ('briefing-finalization-request-v1','briefing-finalization-request-v2') or request.get('sourceManifestSha256')!=sha((bundle/'manifest.json').read_bytes()):
         raise ValueError('source manifest binding mismatch')
     if not request.get('memberId','').strip() or type(request.get('preferenceRevision')) is not int or request['preferenceRevision']<1:
         raise ValueError('explicit member and demo revision required')
     imported=at(request['importedAt'])
     if imported>now:raise ValueError('future import time')
     bindings=unique(request['documents'],lambda d:(d['documentId'],d['documentVersion']))
-    graphs=unique(request['rounds'],lambda r:r['roundId']);articles=unique(tables['articles'],lambda a:a['id'])
+    graphs=copy.deepcopy(unique(request['rounds'],lambda r:r['roundId']));articles=unique(tables['articles'],lambda a:a['id'])
     versions=unique(tables['article_versions'],lambda v:(v['article_id'],v['version']));artifacts=unique(tables['artifacts'],lambda a:a['id'])
     if set(bindings)!=set(versions) or set(graphs)!={r['id'] for r in tables['briefing_rounds']}:raise ValueError('incomplete or extra binding scope')
     blockers=[]
@@ -86,6 +86,9 @@ def inspect(bundle,request,registry,now):
         denial=read_denial(registry.get(b.get('grantId')),articles[key[0]]['provider'],b,now)
         if denial:blockers.append(dict(kind='document',documentId=key[0],code=denial))
     for rid,g in graphs.items():
+        if (request['schemaVersion']=='briefing-finalization-request-v2' and g.get('basisMode')=='retained-results'
+                and g.get('graphVersion') is None and g.get('snapshotSha256') is None):
+            continue
         if not re.fullmatch(r'gv-[0-9a-f]{64}',g.get('graphVersion') or '') or not re.fullmatch(r'[0-9a-f]{64}',g.get('snapshotSha256') or ''):
             blockers.append(dict(kind='round',roundId=rid,code='registered_internal_basis_required'))
     return manifest,tables,bindings,graphs,blockers
@@ -163,6 +166,28 @@ def bind_tables(tables,bindings,graphs,context_artifacts=None,imported_at=None):
     return result
 
 
+def retained_bases(tables,graphs,source_manifest_sha,files,imported_at):
+    """Register exact saved inputs, never an invented native graph or AI verdict."""
+    pools={p['round_id']:p for p in tables['briefing_personal_pools']}
+    for row in tables['briefing_rounds']:
+        g=graphs[row['id']]
+        if g.get('basisMode')!='retained-results':continue
+        if row['graph_version_id'] is not None or row['published_payload']['graphVersion'] is not None:
+            raise ValueError('retained result cannot impersonate a graph')
+        pool=pools[row['id']]
+        raw=canonical(dict(schemaVersion='briefing-retained-result-basis-v1',
+            sourceManifestSha256=source_manifest_sha,roundId=row['id'],cutoff=row['window_to'],
+            payload=row['published_payload'],snapshot=row['public_snapshot'],poolId=pool['id'],pool=pool['snapshot'],
+            provenance=dict(origin='retained-generated-results',nativeGraphRegistration='not-performed',
+                newSemanticVerification='not-performed')))
+        digest=sha(raw);aid='retained-basis-'+digest;name='artifacts/'+digest+'.json';files[name]=raw
+        tables['artifacts'].append(dict(id=aid,kind='briefing_input',storage_uri='artifact-root:'+name,
+            sha256=digest,bytes=len(raw),media_type='application/json',created_at=imported_at))
+        pin=dict(artifactId=aid,sha256=digest)
+        row['public_snapshot']['retainedBasis']=copy.deepcopy(pin)
+        g.pop('basisMode');g['retainedBasis']=pin
+
+
 def finalize(bundle,request_file,grants_file,output,check_only=False,now=None):
     if output.exists():raise ValueError('output exists; preserve previous preparation')
     now=now or datetime.now().astimezone();request_raw=request_file.read_bytes();grant_raw=grants_file.read_bytes();request=strict(request_raw)
@@ -173,7 +198,9 @@ def finalize(bundle,request_file,grants_file,output,check_only=False,now=None):
             memberMapped=True,serverRegistrationVerified=False,newAiCalls=0,serverChangesPerformed=False)
         with output.open('xb') as f:output.chmod(0o600);f.write(canonical(report))
         return report
-    context_artifacts={};tables=bind_tables(tables,bindings,graphs,context_artifacts,request['importedAt']);output.mkdir(mode=0o700,parents=True);files={}
+    context_artifacts={};tables=bind_tables(tables,bindings,graphs,context_artifacts,request['importedAt'])
+    retained_bases(tables,graphs,protected[str(bundle/'manifest.json')],context_artifacts,request['importedAt'])
+    output.mkdir(mode=0o700,parents=True);files={}
     def write(name,raw):
         p=output/name;p.parent.mkdir(mode=0o700,parents=True,exist_ok=True);p.parent.chmod(0o700)
         with p.open('xb') as f:p.chmod(0o600);f.write(raw)
@@ -184,9 +211,9 @@ def finalize(bundle,request_file,grants_file,output,check_only=False,now=None):
     for table,rows in tables.items():write(f'tables/{table}.jsonl',b''.join(canonical(r)+b'\n' for r in rows))
     write('archive/pre-finalization-manifest.json',(bundle/'manifest.json').read_bytes())
     final=copy.deepcopy(manifest);final.update(files=files,targetMemberId=request['memberId'],
-        finalization=dict(schemaVersion='briefing-finalization-v1',sourceManifestSha256=protected[str(bundle/'manifest.json')],
+        finalization=dict(schemaVersion='briefing-finalization-v2' if request['schemaVersion'].endswith('-v2') else 'briefing-finalization-v1',sourceManifestSha256=protected[str(bundle/'manifest.json')],
             requestSha256=sha(request_raw),grantsSha256=sha(grant_raw),memberId=request['memberId'],
-            preferenceRevision=request['preferenceRevision'],importedAt=request['importedAt'],rounds=request['rounds'],
+            preferenceRevision=request['preferenceRevision'],importedAt=request['importedAt'],rounds=list(graphs.values()),
             serverRegistrationVerified=False,newModelCallsAuthorized=False))
     with (output/'manifest.json').open('xb') as f:(output/'manifest.json').chmod(0o600);f.write(canonical(final))
     if any(sha(Path(p).read_bytes())!=s for p,s in protected.items()):raise ValueError('finalization input changed')

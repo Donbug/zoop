@@ -35,4 +35,15 @@ class PersonalCandidateGraphScopeTest {
         assertThrows(CustomException.class,()->access.readableForRound(candidate,round,"request"));
         verifyNoInteractions(jdbc);
     }
+    @Test void retainedMarkerCannotSuppressAnUnavailableNativeGraph() {
+        var jdbc=mock(JdbcTemplate.class);var authority=mock(BriefingGraphContentAuthority.class);
+        var access=new PersonalCandidateAccess(jdbc,new DocumentReadProperties(null,null,null),Clock.systemUTC(),authority);
+        var round=mock(BriefingRound.class);when(round.graphVersion()).thenReturn("gv-revoked");
+        var json=JsonMapper.builder().build();var snapshot=json.createObjectNode();
+        snapshot.putObject("retainedBasis").put("artifactId","unregistered");
+        when(round.publicSnapshot()).thenReturn(snapshot);
+        when(authority.context(eq("gv-revoked"),anyString())).thenThrow(new CustomException(com.zoop.common.exception.ErrorCode.SOURCE_UNAVAILABLE));
+        assertThrows(CustomException.class,()->access.readableForRound(json.createObjectNode(),round,"request"));
+        verify(authority).context("gv-revoked","request");verifyNoInteractions(jdbc);
+    }
 }
