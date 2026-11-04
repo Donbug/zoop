@@ -119,6 +119,17 @@ class PreparedServerBundlePostgresTest {
         for(String table:new String[]{"briefing_rounds","briefing_personal_deliveries","briefing_personal_preferences","briefing_personal_pools"}){
             String before=snapshot(table);executePlan(plan);assertEquals(before,snapshot(table),table);
         }
+        String preflight=System.getenv("BRIEFING_BINDINGS_PREFLIGHT");
+        if(preflight!=null && !preflight.isBlank()) {
+            String readOnly=Files.readString(Path.of(preflight));
+            assertTrue(readOnly.contains("BEGIN READ ONLY;"));
+            assertTrue(readOnly.stripTrailing().endsWith("ROLLBACK;"));
+            String preferences=snapshot("briefing_personal_preferences");
+            String deliveries=snapshot("briefing_personal_deliveries");
+            executePlan(readOnly);
+            assertEquals(preferences,snapshot("briefing_personal_preferences"));
+            assertEquals(deliveries,snapshot("briefing_personal_deliveries"));
+        }
         assertEquals(feedback,snapshot("briefing_feedback"));
         assertEquals(existing,jdbc.queryForObject("SELECT to_jsonb(t)::text FROM briefing_rounds t WHERE id='prep258-existing'",String.class));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM briefing_rounds WHERE published_at IS NOT NULL",Integer.class));

@@ -32,6 +32,12 @@ class StagingPlanTest(unittest.TestCase):
             for member,rev,uri in [('',1,'artifact-root:artifacts'),('member',0,'artifact-root:artifacts'),('member',1,'relative/path'),('member',1,'file:///x'),('member',1,'artifact-root:../escape')]:
                 with self.assertRaises(ValueError):S.render(root,member,rev,uri)
 
+    def test_table_cannot_be_read_outside_integrity_manifest(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);self.bundle(root)
+            path=root/'manifest.json';v=json.loads(path.read_text());v['files'].pop('tables/evidence.jsonl');path.write_text(json.dumps(v))
+            with self.assertRaisesRegex(ValueError,'outside the integrity manifest'):S.verify_bundle(root)
+
     def test_member_mapping_is_a_sql_value_not_executable_input(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);self.bundle(root)

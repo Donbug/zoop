@@ -35,20 +35,27 @@ def literal(value):
     return "'" + value.replace("'", "''") + "'"
 
 
-def render(bundle, member_id, preference_revision, artifact_uri_base):
-    if not member_id.strip() or preference_revision < 1:
-        raise ValueError('explicit target member and unused positive preference revision required')
-    if not re.fullmatch(r'artifact-root:[a-z][a-z0-9_]{0,63}', artifact_uri_base):
-        raise ValueError('server ArtifactFileStore directory URI required')
+def verify_bundle(bundle):
     manifest = json.loads((bundle/'manifest.json').read_text())
     if manifest['publicationReady'] or not manifest['noAutomaticPublish']:
         raise ValueError('not an unpublished staging bundle')
+    if not {f'tables/{table}.jsonl' for table in TABLES}.issubset(manifest['files']):
+        raise ValueError('required table is outside the integrity manifest')
     for name, expected in manifest['files'].items():
         if Path(name).is_absolute() or '..' in Path(name).parts:
             raise ValueError('unsafe bundle path')
         raw = (bundle/name).read_bytes()
         if len(raw) != expected['bytes'] or hashlib.sha256(raw).hexdigest() != expected['sha256']:
             raise ValueError('bundle integrity mismatch: '+name)
+    return manifest
+
+
+def render(bundle, member_id, preference_revision, artifact_uri_base):
+    if not member_id.strip() or preference_revision < 1:
+        raise ValueError('explicit target member and unused positive preference revision required')
+    if not re.fullmatch(r'artifact-root:[a-z][a-z0-9_]{0,63}', artifact_uri_base):
+        raise ValueError('server ArtifactFileStore directory URI required')
+    manifest = verify_bundle(bundle)
     plan = ['-- Private data. Review the target, member mapping and artifact storage before any execution.',
             '-- INSERT only; never publishes, creates grants, activates graphs or changes existing records.',
             'BEGIN;', "SET LOCAL lock_timeout='5s';", "SET LOCAL standard_conforming_strings=on;",

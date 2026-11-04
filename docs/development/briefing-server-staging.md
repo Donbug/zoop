@@ -82,3 +82,31 @@ python3 scripts/render_briefing_staging_sql.py \
 5. 서버 적재·공개 API·회원 격리·실제 화면 검증 후 별도 발행 절차를 진행한다.
 
 `publicationReady=false`는 의도된 상태다. #553만 병합하거나 SQL을 적재하는 것만으로 기존 비공개 자료가 서버 사용자에게 공개되는 구조가 아니다.
+
+## 회원·권한·최소 내부 근거 연결 준비
+
+과거 지도 화면을 추가하지 않는다. 아래 도구는 기존 후보 풀과 인용을 재사용해 **조회 검증에 필요한 ID 연결 요청서**만 만든다. 새 지도 선택기나 native graph publication을 생성하지 않는다.
+
+```sh
+python3 scripts/prepare_briefing_read_bindings.py \
+  --bundle /private/output/new-bundle \
+  --profile-file /private/source/test-profile-private.json \
+  --source-registry /private/source/native/corpus-v2/registry.json \
+  --output /private/output/new-read-bindings
+```
+
+대상 서버 회원을 정했다면 `--target-member-id`를 명시한다. 생략하면 대상은 미지정이며 로컬 시험 회원을 서버 회원으로 간주하지 않는다. 지정해도 DB 확인 전에는 mappingVerified=false다.
+
+| 출력 | 역할 |
+| --- | --- |
+| member-mapping.json | 원래 회원·설정 리비전·적용 시각, 명시적인 대상 회원, demo 범위와 소급 제공 금지 |
+| document-authority-requests.json | 문서 ID·버전·본문 SHA·원래 공급자 ID와 현재 grant의 관측값, 아직 승인되지 않은 용도·수신자 연결 요청 |
+| internal-basis/ 및 index | 회차 cutoff에 맞는 후보·기업·근거 ID 연결, 등록할 내부 근거 범위의 해시. graphVersion은 미지정 |
+| server-preflight-readonly.sql | 대상 회원·설정·문서 버전·기존 회차와 그래프 메타데이터를 확인하는 SELECT/ROLLBACK. 자동 실행하지 않음 |
+| gates.json | 자료 무결성/참조 검증과 실제 회원·권한·등록 상태를 분리 |
+
+내부 근거 범위에는 회차별 전체 보존 후보를 사용해 개인화 전용 사건도 빠뜨리지 않는다. 회원 ID·보유/관심·개인 선정 표시는 이 범위 파일에 넣지 않는다. 동일 기업의 독립 사건은 유지하며, 저장된 기업 참조를 새로운 영향 검증 PASS나 긍부정으로 바꾸지 않는다.
+
+이 파일은 승인된 grant 등록부나 native 그래프가 아니다. pending 값이나 scope hash를 실제 graphVersion으로 채우면 안 된다. 현재 source authority와 문서별 권한을 확인하고 지원되는 등록 절차에서 받은 버전·publication receipt를 연결한 뒤, 서버의 기존 조회 검사로 검증해야 한다. 과거 자료는 뒤늦게 수집한 재구성본이며 당시 운영 스냅샷으로 표시하지 않는다.
+
+서버에서 보이는 시점은 대상 회원 확인·문서 권한 근거·내부 결속 검증을 완료하고, 승인된 코드 반영/데이터 반입/배포/공통·회원 조회 검증을 마친 뒤다. 기존 결과 재사용은 새 AI 생성이나 다음 09:20/17:30 회차를 기다릴 필요가 없다. 이 준비 명령만으로 공개하거나 배포하지 않는다.
