@@ -11,8 +11,12 @@ export type LegendKey =
  * 5: 기본 간격 50% 확대·저연결 노드 여유 확대. 이전 좌표의 카메라는 복원하지 않는다.
  * 6: 연결 없는 묶음 사이 여백을 최종 확대 후 180으로 줄인다.
  * 7: 단일 기업 사건과 관계선을 기본 지도에 모두 표시한다.
+ * 8: 기업 노드 25% 확대, 단일 기업 사건을 둘레에 맞춰 고리마다 나눠 놓는다(2026-11-04).
+ * 9: 기업마다 근거 많은 단독 사건 5개만 표시하고, 그 5개를 안쪽 고리에 놓는다.
+ * 10: 사건 노드를 7px에서 30px로 키워 겹침 회피 위치가 달라진다. 기업 간격은 55%에 다시 50%, 사건 고리 간격은 20% 넓힌다.
+ * 11: 접힌 사건까지 넣어 겹침을 피한 위치를 고정한다. 기업을 골라 사건이 펼쳐져도 다른 노드가 움직이지 않는다.
  */
-export const MAP_LAYOUT_REVISION = 7;
+export const MAP_LAYOUT_REVISION = 11;
 export type GraphView = {
   hidden: LegendKey[];
   /**
@@ -28,14 +32,9 @@ export type GraphView = {
 };
 export type ModeEntry = { url: string; view: GraphView };
 export const emptyView = (): GraphView => ({ hidden: [] });
-const keys: LegendKey[] = [
-  'company',
-  'issue',
-  'INVOLVES',
-  'STRUCTURALLY_RELATED_TO',
-  'FOLLOWS',
-  'SHARES_ISSUE',
-];
+// D-GRP-01 (2026-11-04 결정): 기업·사건은 끌 수 없고 사건 공유 선은 그리지 않는다.
+// 전에 저장한 숨김 값은 복원하지 않는다.
+const keys: LegendKey[] = ['INVOLVES', 'STRUCTURALLY_RELATED_TO', 'FOLLOWS'];
 export function readModeEntry(owner: string, mode: MapMode): ModeEntry | null {
   try {
     const entry = JSON.parse(

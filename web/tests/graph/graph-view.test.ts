@@ -44,7 +44,7 @@ it('D-GRP-01 drops cameras from before the current layout but keeps the address 
       JSON.stringify({
         url: '/?mode=all&select=node%3ANAVER',
         view: {
-          hidden: ['SHARES_ISSUE'],
+          hidden: ['FOLLOWS'],
           camera: {
             zoom: 1,
             position: [-940, 0],
@@ -56,9 +56,20 @@ it('D-GRP-01 drops cameras from before the current layout but keeps the address 
     );
     const entry = readModeEntry('member-a', 'all');
     expect(entry?.url).toBe('/?mode=all&select=node%3ANAVER');
-    expect(entry?.view.hidden).toEqual(['SHARES_ISSUE']);
+    expect(entry?.view.hidden).toEqual(['FOLLOWS']);
     expect(entry?.view.camera).toBeUndefined();
   }
+});
+it('D-GRP-01 drops saved company, issue and shared-issue filters that the legend no longer offers', () => {
+  // 2026-11-04 decision: companies and issues cannot be hidden, and shared-issue lines are not drawn.
+  sessionStorage.setItem(
+    'zoop.graph.view:member-a:all',
+    JSON.stringify({
+      url: '/?mode=all',
+      view: { hidden: ['company', 'issue', 'SHARES_ISSUE', 'FOLLOWS'] },
+    }),
+  );
+  expect(readModeEntry('member-a', 'all')?.view.hidden).toEqual(['FOLLOWS']);
 });
 it('restores real selection, focus and path only, and reports removed targets', () => {
   const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });

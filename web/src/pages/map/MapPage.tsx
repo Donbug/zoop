@@ -60,10 +60,16 @@ import {
   restoreTargets,
 } from '@/components/graph/graph-view';
 import IsolatedIssuesPanel from '@/components/graph/IsolatedIssuesPanel';
+import {
+  GROUP_PREFIX,
+  groupIssues,
+  viewRequest,
+} from '@/components/graph/issue-groups';
 import MapDetailSheet from '@/components/graph/MapDetailSheet';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useCompanyResource } from '@/hooks/useCompanyResource';
 import { useImpactPath } from '@/hooks/useImpactPath';
+import { useImpactAssessment } from '@/hooks/useImpactAssessment';
 import { companyUrl } from '@/apis/company/company';
 import { setTutorialCompleted } from '@/apis/graph/tutorial';
 import { impactEdges, exactTime } from '@/components/company/detail-model';
@@ -380,6 +386,18 @@ function MapWorkspace({
     retry,
     prefetch,
   );
+  // D-GRP-01: 같은 제목의 사건은 지도에 노드 하나로 그린다. 상세·근거·영향은 원래 사건 data로 찾는다.
+  // 회차·튜토리얼은 핵심 사건·안내 대상을 원래 ID로 가리키므로 묶지 않는다.
+  // 묶음 그래프는 응답마다 한 번만 만든다. 렌더마다 새로 만들면 지도가 매번 다시 그려진다.
+  const groupable = !round && !tutorialOpen;
+  const grouping = useMemo(
+    () => (data && groupable ? groupIssues(data) : null),
+    [data, groupable],
+  );
+  const mapData = grouping?.graph ?? data;
+  const toView = (id: string | null | undefined) =>
+    id ? (grouping?.groupOf.get(id) ?? id) : (id ?? null);
+  const viewCenterRequest = viewRequest(centerRequest, grouping);
   // 저장본을 일시적으로 읽지 못한 경우만 다시 확인할 수 있다. 미기록·중단·
   // 미발행·대상 비공개는 같은 요청을 반복해도 달라지지 않는 회차 상태다.
   const graphErrorRetryable =
@@ -478,8 +496,12 @@ function MapWorkspace({
   const selectedNode =
     data?.nodes.find((node) => node.id === selectedId) ?? null;
   const companyNode = selectedNode?.kind === 'company' ? selectedNode : null;
+  const groupMembers = selectedId
+    ? (grouping?.members.get(selectedId) ?? null)
+    : null;
   const eventId =
     selectedId &&
+    !selectedId.startsWith(GROUP_PREFIX) &&
     (data || (!round && !loading)) &&
     selectedNode?.kind !== 'company'
       ? selectedId
@@ -491,6 +513,7 @@ function MapWorkspace({
     (isolatedOpen ? '__isolated__' : null) ??
     pathFrom ??
     impactIssueId ??
+    (groupMembers ? selectedId : null) ??
     eventId ??
     edgeId ??
     companyNode?.id ??
@@ -571,6 +594,35 @@ function MapWorkspace({
     }
     previousEvent.current = selectedPanel;
   }, [selectedPanel]);
+  // D-GRP-03 (2026-11-04 결정): 관련 기업을 누르면 두 기업과 공유 사건만 지도에 밝게 남긴다.
+  // 다른 노드를 고르면 풀린다. 사건 공유 선은 지도에 그리지 않으므로 선을 선택하지 않는다.
+  const [spotlightPair, setSpotlightPair] = useState<{
+    company: string;
+    other: string;
+  } | null>(null);
+  const activePair =
+    spotlightPair && spotlightPair.company === companyNode?.id
+      ? spotlightPair
+      : null;
+  const pairCompany = activePair?.company ?? null;
+  const pairOther = activePair?.other ?? null;
+  const spotlight = useMemo(() => {
+    if (!pairCompany || !pairOther || !data) return [];
+    const shared = data.edges.find(
+      (edge) =>
+        edge.relationType === 'SHARES_ISSUE' &&
+        [edge.source, edge.target].includes(pairCompany) &&
+        [edge.source, edge.target].includes(pairOther),
+    );
+    // D-GRP-01: same-title issues are one node on the map; light that node.
+    return [
+      pairCompany,
+      pairOther,
+      ...new Set(
+        (shared?.via ?? []).map((id) => grouping?.groupOf.get(id) ?? id),
+      ),
+    ];
+  }, [pairCompany, pairOther, data, grouping]);
   const relatedCompanies = useMemo(() => {
     if (!data || !companyNode) return [];
     const counts = new Map<string, number>();
@@ -673,6 +725,12 @@ function MapWorkspace({
       target?.issue.id === impactIssueId
       ? target.edge.id
       : undefined,
+  );
+  const impactAssessment = useImpactAssessment(
+    data && !loading && !error ? impactCompanyId : null,
+    data && !loading && !error ? impactIssueId : null,
+    impact.data?.pathStatus === 'direct_available',
+    eventContext,
   );
   function selectEdge(id: string) {
     if (
@@ -897,7 +955,16 @@ function MapWorkspace({
         sessionRevision !== useAuthStore.getState().sessionRevision
       )
         return;
-      const restored = restoreTargets(saved, nextGraph);
+      // 묶음 노드 선택(node:group:…)도 되살린다. 원래 사건 ID는 그대로 유효하다.
+      const restored = restoreTargets(saved, {
+        ...nextGraph,
+        nodes: [
+          ...nextGraph.nodes,
+          ...groupIssues(nextGraph).graph.nodes.filter((node) =>
+            node.id.startsWith(GROUP_PREFIX),
+          ),
+        ],
+      });
       const targetFound =
         targetCompany &&
         nextGraph.nodes.some(
@@ -1192,9 +1259,9 @@ function MapWorkspace({
                 />
               </div>
             )}
-            {data ? (
+            {mapData ? (
               <GraphCanvas
-                data={data}
+                data={mapData}
                 onPersonalFilter={changeFilter}
                 onMarket={() => void changeMode('all')}
                 filterHost={filterHost}
@@ -1203,7 +1270,7 @@ function MapWorkspace({
                 )}
                 tutorialCameraEnabled={tutorialOpen && tutorialStep === 2}
                 tutorialShowNeighborhood={tutorialOpen && tutorialStep === 3}
-                centerRequest={centerRequest}
+                centerRequest={viewCenterRequest}
                 tutorialCenterId={tutorialOpen ? target?.company.id : undefined}
                 memoryOwner={
                   tutorialOpen
@@ -1242,30 +1309,36 @@ function MapWorkspace({
                     path: null,
                   });
                 }}
-                selectedId={
+                selectedId={toView(
                   activeEvidence
                     ? evidenceFallback
-                    : (pathFrom ?? selectedId ?? detailEventId ?? companyId)
-                }
+                    : (pathFrom ?? selectedId ?? detailEventId ?? companyId),
+                )}
                 connectionPath={Boolean(pathFrom) && !activeEvidence}
-                highlightedEdgeIds={
+                spotlight={spotlight}
+                highlightedEdgeIds={(activeEvidence
+                  ? evidenceEdges
+                  : pathFrom
+                    ? (displayedPath?.edgeIds ?? [])
+                    : impactEdges(data!, impact.data ?? historicalImpact.data)
+                ).map((id) => grouping?.edgeOf.get(id) ?? id)}
+                selectedEdgeId={
                   activeEvidence
-                    ? evidenceEdges
-                    : pathFrom
-                      ? (displayedPath?.edgeIds ?? [])
-                      : impactEdges(data, impact.data ?? historicalImpact.data)
+                    ? null
+                    : edgeId
+                      ? (grouping?.edgeOf.get(edgeId) ?? edgeId)
+                      : null
                 }
-                selectedEdgeId={activeEvidence ? null : edgeId}
                 isolateSelection={Boolean(activeEvidence && evidenceFallback)}
                 evidenceMode={Boolean(activeEvidence)}
                 onSelectEdge={selectEdge}
                 onSelect={selectNode}
-                focusId={
+                focusId={toView(
                   pathFrom || evidenceOutsideFocus
                     ? null
                     : (focusId ??
-                      (historical ? (detailEventId ?? companyId) : null))
-                }
+                        (historical ? (detailEventId ?? companyId) : null)),
+                )}
                 focusHops={focusHops}
                 focusLayout={
                   !pathFrom && !evidenceOutsideFocus && Boolean(focusId)
@@ -1459,6 +1532,24 @@ function MapWorkspace({
                   }}
                 />
               )}
+              {groupMembers && !impactIssueId && !pathFrom && (
+                <IsolatedIssuesPanel
+                  key={`${selectedId}:${JSON.stringify(eventContext)}`}
+                  issues={groupMembers}
+                  context={eventContext}
+                  title={groupMembers[0].label}
+                  description={`같은 제목으로 묶인 사건 ${groupMembers.length}건이에요. 사건을 누르면 상세를 볼 수 있어요.`}
+                  closeLabel="묶인 사건 닫기"
+                  searchable={false}
+                  rowLabel={(issue) =>
+                    [issue.target, issue.action].filter(Boolean).join(' · ') ||
+                    issue.label
+                  }
+                  onEvidence={(event) => eventAction('evidence', event)}
+                  onClose={() => selectNode(null)}
+                  onSelect={selectPanelNode}
+                />
+              )}
               {companyNode && !impactIssueId && !pathFrom && (
                 <CompanyDetailPanel
                   key={companyNode.id}
@@ -1496,17 +1587,15 @@ function MapWorkspace({
                   onFocus={() =>
                     updateQuery({ focus: companyNode.id, hops: '1' })
                   }
-                  onSelectRelation={(companyId) => {
-                    const edge = data?.edges.find(
-                      (item) =>
-                        item.relationType === 'SHARES_ISSUE' &&
-                        ((item.source === companyNode.id &&
-                          item.target === companyId) ||
-                          (item.target === companyNode.id &&
-                            item.source === companyId)),
-                    );
-                    if (edge) selectEdge(edge.id);
-                  }}
+                  activeRelatedId={pairOther}
+                  onSelectRelation={(companyId) =>
+                    setSpotlightPair((pair) =>
+                      pair?.company === companyNode.id &&
+                      pair.other === companyId
+                        ? null
+                        : { company: companyNode.id, other: companyId },
+                    )
+                  }
                   onAskAi={() =>
                     tutorialOpen && tutorialStep === 5
                       ? void closeTutorial()
@@ -1573,6 +1662,11 @@ function MapWorkspace({
                   context={eventContext}
                   graph={data}
                   impact={impact.data}
+                  assessment={impactAssessment.data}
+                  assessmentLoading={impactAssessment.loading}
+                  assessmentError={impactAssessment.error}
+                  assessmentRetryable={impactAssessment.retryable}
+                  onAssessmentRetry={impactAssessment.retry}
                   onSelectNode={selectPanelNode}
                   loading={impact.loading}
                   error={impact.error}

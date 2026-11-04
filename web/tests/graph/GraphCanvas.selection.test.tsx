@@ -898,14 +898,97 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       );
       expect(canvas.created).toHaveBeenCalledOnce();
 
-      // An explicit fit can still use the full, newly expanded graph surface.
+      // An explicit fit can still use the full, newly expanded graph surface. Since
+      // 2026-11-04 it moves only the camera: the map keeps its first-drawn node positions.
       await userEvent.click(
         screen.getByRole('button', { name: '전체 그래프 맞춤' }),
       );
       await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
-      expect(positions()).not.toEqual(before);
+      expect(positions()).toEqual(before);
     },
   );
+  it('D-GRP-01 keeps every drawn node in place when selecting a company unfolds its issues', async () => {
+    // 2026-11-04 decision: only focus and flow arrangements move nodes on the map.
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const company = graph.nodes.find((node) => node.kind === 'company')!;
+    const template = graph.nodes.find((node) => node.kind === 'issue')!;
+    const extra = Array.from({ length: 8 }, (_, index) => ({
+      ...template,
+      id: `issue-busy-${index}`,
+      isFocus: false,
+      evidenceCount: index,
+    }));
+    const data = {
+      ...graph,
+      nodes: [...graph.nodes, ...extra],
+      edges: [
+        ...graph.edges,
+        ...extra.map((issue, index) => ({
+          ...graph.edges[0],
+          id: `busy-${index}`,
+          source: issue.id,
+          target: company.id,
+          relationType: 'INVOLVES' as const,
+        })),
+      ],
+    };
+    const { rerender } = render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const positions = () =>
+      new Map(
+        (canvas.setData.mock.lastCall![0] as GraphData).nodes!.map((node) => [
+          String(node.id),
+          [node.style!.x, node.style!.y],
+        ]),
+      );
+    const before = positions();
+    expect(before.has('issue-busy-0')).toBe(false);
+    const host = screen.getByRole('img');
+    // The detail rail narrows the canvas as the company opens.
+    Object.defineProperty(host, 'clientWidth', {
+      value: 700,
+      configurable: true,
+    });
+    rerender(<GraphCanvas data={data} selectedId={company.id} />);
+    await waitFor(() => expect(positions().has('issue-busy-0')).toBe(true));
+    const after = positions();
+    for (const [id, position] of before)
+      expect([id, after.get(id)]).toEqual([id, position]);
+  });
+  it('D-GRP-03 lights only the spotlit companies, their shared issues and the lines between them', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const shared = data.edges.find(
+      (edge) => edge.relationType === 'SHARES_ISSUE',
+    )!;
+    const spotlight = [shared.source, shared.target, ...shared.via];
+    render(
+      <GraphCanvas
+        data={data}
+        selectedId={shared.source}
+        spotlight={spotlight}
+      />,
+    );
+    await waitFor(() => expect(canvas.setElementState).toHaveBeenCalled());
+    const rendered = canvas.setData.mock.lastCall![0] as GraphData;
+    await waitFor(() =>
+      expect(
+        screen
+          .getByTestId('graph-canvas')
+          .querySelector('[data-map-dimmed]')
+          ?.getAttribute('data-map-dimmed'),
+      ).toBe('true'),
+    );
+    const lit = new Set(spotlight);
+    const other = rendered.nodes!.find((node) => !lit.has(String(node.id)))!;
+    const states = appliedStates();
+    expect(states[shared.target]).toContain('related');
+    expect(states[shared.via[0]]).toContain('related');
+    expect(states[String(other.id)] ?? []).not.toContain('related');
+    const between = rendered.edges!.find(
+      (edge) => lit.has(String(edge.source)) && lit.has(String(edge.target)),
+    )!;
+    expect(states[String(between.id)]).toContain('related');
+  });
   it('keeps a user-placed view centered when a sidebar narrows the map', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     sessionStorage.setItem(
@@ -934,10 +1017,12 @@ describe('D-GRP-02 · canvas selection bridge', () => {
   it('explains each legend item in its tooltip', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     render(<GraphCanvas data={data} />);
-    const shared = await screen.findByRole('button', { name: /^사건 공유/ });
-    expect(shared.getAttribute('title')).toContain(
-      '같은 사건에 각각 직접 또는 구조적으로 연결',
+    const direct = await screen.findByRole('button', { name: /^직접 관련/ });
+    expect(direct.getAttribute('title')).toContain(
+      '기업이 사건의 당사자입니다',
     );
+    // 2026-11-04: shared-issue lines are not drawn, so the legend has no chip for them.
+    expect(screen.queryByRole('button', { name: /^사건 공유/ })).toBeNull();
     expect(
       screen.getByRole('button', { name: /^후속 사건/ }).getAttribute('title'),
     ).toContain('앞 사건 다음에');
@@ -954,7 +1039,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       expect(
         screen.getAllByRole('group', { name: '그래프 표시 필터' }),
       ).toHaveLength(1);
-      const button = screen.getByRole('button', { name: /^사건 공유 \d/ });
+      const button = screen.getByRole('button', { name: /^직접 관련 \d/ });
       expect(toolbar.contains(button)).toBe(true);
       expect(
         screen.getByTestId('graph-canvas').querySelector('aside'),
@@ -971,7 +1056,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
             ?.filter(
               (edge) =>
                 data.edges.find((item) => item.id === edge.id)?.relationType ===
-                'SHARES_ISSUE',
+                'INVOLVES',
             )
             .every((edge) => edge.style?.visibility === 'hidden'),
         ).toBe(true),
@@ -988,28 +1073,37 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       toolbar.remove();
     }
   });
-  it('ports legend filters without moving nodes and keeps at least one node kind visible', async () => {
+  it('ports legend filters without moving nodes and never hides companies or issues', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     render(<GraphCanvas data={data} />);
     await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
     const before = (canvas.setData.mock.lastCall![0] as GraphData).nodes?.find(
       (node) => node.id === 'NASDAQ:NVDA',
     )?.style;
-    await userEvent.click(screen.getByRole('button', { name: /기업 \d/ }));
+    // 2026-11-04 decision: company and issue counts are labels, not toggles.
+    const filters = screen.getByRole('group', { name: '그래프 표시 필터' });
+    expect(
+      within(filters).queryByRole('button', { name: /^기업 \d/ }),
+    ).toBeNull();
+    expect(
+      within(filters).queryByRole('button', { name: /^사건 \d/ }),
+    ).toBeNull();
+    expect(filters.textContent).toMatch(/기업 \d+/);
+    expect(filters.textContent).toMatch(/사건 \d+/);
+    await userEvent.click(
+      screen.getByRole('button', { name: /^직접 관련 \d/ }),
+    );
     await waitFor(() =>
       expect(
-        (canvas.setData.mock.lastCall![0] as GraphData).nodes?.find(
-          (node) => node.id === 'NASDAQ:NVDA',
-        )?.style?.visibility,
-      ).toBe('hidden'),
+        screen
+          .getByRole('button', { name: /^직접 관련 \d/ })
+          .getAttribute('aria-pressed'),
+      ).toBe('false'),
     );
-    expect(
-      (screen.getByRole('button', { name: /^사건 \d+$/ }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
     const after = (canvas.setData.mock.lastCall![0] as GraphData).nodes?.find(
       (node) => node.id === 'NASDAQ:NVDA',
     )?.style;
+    expect(after?.visibility).toBe('visible');
     expect([after?.x, after?.y]).toEqual([before?.x, before?.y]);
     expect(
       screen.queryByRole('button', { name: '흐름 순으로 정렬' }),
@@ -1088,7 +1182,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     ).toEqual({ zoom: 1.8, position: [40, 60], size: [0, 0], layout: 2 });
   });
 
-  it('enables the desktop minimap only above sixty visible nodes', async () => {
+  it('D-GRP-01 enables the desktop minimap only above sixty visible nodes', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const smallIds = new Set(data.nodes.slice(0, 50).map((node) => node.id));
     const small = {
@@ -1112,9 +1206,19 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     rerender(<GraphCanvas data={data} />);
     await waitFor(() =>
       expect(canvas.setPlugins).toHaveBeenLastCalledWith([
-        expect.objectContaining({ type: 'minimap', size: [192, 128] }),
+        expect.objectContaining({
+          type: 'minimap',
+          size: [192, 128],
+          padding: 10,
+        }),
       ]),
     );
+    Object.defineProperty(host, 'clientWidth', {
+      configurable: true,
+      value: 375,
+    });
+    act(() => canvas.resizeCallbacks.at(-1)?.());
+    await waitFor(() => expect(canvas.setPlugins).toHaveBeenLastCalledWith([]));
   });
 
   it('D-GRP-01 redraws at the current container size after resize and ignores a disposed observer', async () => {
@@ -1218,9 +1322,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
 
   it('D-GRP-01 moving between nodes ignores stale leave and keeps the clicked node emphasized on exit', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
-    const shared = data.edges.find(
-      (edge) => edge.relationType === 'SHARES_ISSUE',
-    )!;
+    const shared = data.edges.find((edge) => edge.relationType === 'FOLLOWS')!;
     render(
       <GraphCanvas
         data={data}
@@ -1380,6 +1482,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     const shared = data.edges.find(
       (edge) => edge.relationType === 'SHARES_ISSUE',
     )!;
+    const follows = data.edges.find((edge) => edge.relationType === 'FOLLOWS')!;
     const involves = data.edges.find(
       (edge) => edge.relationType === 'INVOLVES',
     )!;
@@ -1387,26 +1490,35 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       <GraphCanvas data={data} onSelectEdge={onSelectEdge} />,
     );
     await waitFor(() => expect(canvas.handlers.has('edge:click')).toBe(true));
-    await act(async () =>
-      canvas.handlers.get('edge:click')!({ target: { id: involves.id } }),
-    );
+    // 2026-11-04: shared-issue lines are not drawn, so they cannot be selected either.
+    for (const edge of [involves, shared])
+      await act(async () =>
+        canvas.handlers.get('edge:click')!({ target: { id: edge.id } }),
+      );
     expect(onSelectEdge).not.toHaveBeenCalled();
+    expect(
+      (canvas.setData.mock.lastCall![0] as GraphData).edges?.some(
+        (edge) => edge.id === shared.id,
+      ),
+    ).toBe(false);
+    expect(screen.queryByRole('button', { name: /사건 공유/ })).toBeNull();
     await act(async () =>
-      canvas.handlers.get('edge:click')!({ target: { id: shared.id } }),
+      canvas.handlers.get('edge:click')!({ target: { id: follows.id } }),
     );
-    expect(onSelectEdge).toHaveBeenCalledWith(shared.id);
+    expect(onSelectEdge).toHaveBeenCalledWith(follows.id);
     rerender(
       <GraphCanvas
         data={data}
         onSelectEdge={onSelectEdge}
-        selectedEdgeId={shared.id}
+        selectedEdgeId={follows.id}
       />,
     );
     await waitFor(() =>
       expect(canvas.setElementState).toHaveBeenLastCalledWith(
-        expect.objectContaining({ [shared.id]: ['selected'] }),
+        expect.objectContaining({ [follows.id]: ['selected'] }),
       ),
     );
+    onSelectEdge.mockClear();
     await userEvent.click(
       screen.getByRole('button', {
         name: /연결선: HBM3E 12단 경쟁 – HBM4 공급 계약/,
@@ -1416,7 +1528,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     rerender(<GraphCanvas data={data} onSelectEdge={onSelectEdge} />);
     await waitFor(() =>
       expect(canvas.setElementState).toHaveBeenLastCalledWith(
-        expect.objectContaining({ [shared.id]: [] }),
+        expect.objectContaining({ [follows.id]: [] }),
       ),
     );
     expect(canvas.created).toHaveBeenCalledOnce();

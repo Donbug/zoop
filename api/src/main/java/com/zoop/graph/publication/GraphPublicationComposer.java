@@ -108,14 +108,21 @@ public final class GraphPublicationComposer {
         }
         List<Contribution> contributions = byId.values().stream().sorted(java.util.Comparator.comparing(Contribution::sourceVersionId)).toList();
         Obj effective = PublicationMerger.combine(base == null ? PublicationMerger.emptyDecisions() : base.effectiveDecisions(), decisions);
+        // Without a new source the composition changes only by its decisions; ones the base already carries would republish it as is.
+        if (request.incomingVersionIds().isEmpty() && base != null && effective.node().equals(base.effectiveDecisions().node())) throw failure("request_invalid");
         if (base != null) {
             Map<String, PublicGraphSnapshot.Issue> current = new java.util.HashMap<>();
             var baseMerged = PublicationMerger.merge(base.contributions(), base.effectiveDecisions(), Set.of(), base.issueSources());
             baseMerged.issues().forEach(i -> current.put(i.issueId(), i));
+            Map<GraphPublicationReader.IssueRef, PublicGraphSnapshot.Issue> originals = new java.util.HashMap<>();
+            base.contributions().forEach(c -> c.projection().issues().forEach(i -> originals.put(c.issueRef(i.issueId()), i)));
             for (Obj choice : decisions.objects("fieldSelections")) {
-                var previous = current.get(choice.string("issueId"));
-                if (previous != null && !choice.string("expectedValueDigest").equals(Canonical.digest(PublicationMerger.field(previous, choice.string("field")))))
-                    throw failure("identity_conflict");
+                String issueId = choice.string("issueId"), field = choice.string("field");
+                var previous = current.get(issueId);
+                if (previous == null) continue;
+                // A published label may be a corrected name; a selection names the owner's source value, the digest merge accepts.
+                var published = "label".equals(field) ? originals.get(base.issueSources().get(issueId).headlineSources().get("label")) : previous;
+                if (!choice.string("expectedValueDigest").equals(Canonical.digest(PublicationMerger.field(published, field)))) throw failure("identity_conflict");
             }
             for (Obj choice : decisions.objects("relationSelections")) {
                 var previous = baseMerged.relations().stream().filter(r -> r.relationId().equals(choice.string("relationId"))).findFirst();
@@ -194,6 +201,7 @@ public final class GraphPublicationComposer {
         result.put("expectedActiveVersionId", request.expectedActiveVersionId()); result.put("compositionDigest", digest); result.put("receiptSha256", receiptRow.sha256());
         var counts = result.putObject("counts"); counts.put("sources", contributions.size()); counts.put("companies", snapshot.companies().size());
         counts.put("issues", snapshot.issues().size()); counts.put("relations", snapshot.relations().size()); counts.put("articles", snapshot.articles().size()); counts.put("evidence", snapshot.evidence().size());
+        counts.put("labelCorrections", PublicationMerger.labelCorrections(effective).size());
         result.put("activation", "not-activated"); return result;
     }
 

@@ -3,6 +3,88 @@ import type { GraphResponse } from '@/types/map/graph';
 type Point = { x: number; y: number };
 const cache = new WeakMap<GraphResponse, Map<string, Point>>();
 
+// Leaf-issue rings before the final 1.5× spread: first radius, ring gap and the arc reserved
+// per issue title (about one wrapped title wide at the default zoom).
+// D-GRP-01 (2026-11-04 review): issues sit 20% further apart (was 270/170/260).
+const LEAF_SPREAD = 1.2;
+const LEAF_RADIUS = 270 * LEAF_SPREAD;
+const LEAF_RING_GAP = 170 * LEAF_SPREAD;
+const LEAF_ARC = 260 * LEAF_SPREAD;
+// D-GRP-01 (2026-11-04 review): companies and shared issues sit 55%, then another 50%,
+// further apart so their lines stop crossing in one knot.
+const CORE_SPREAD = 1.55 * 1.5;
+const COMPANY_REPULSION = 4;
+// Issue–company links rest 50% longer, so an issue shared by several companies sits between them.
+const LINK_SLACK = 1.5;
+const ringCapacity = (radius: number) =>
+  Math.max(4, Math.floor((2 * Math.PI * radius) / LEAF_ARC));
+
+type RankedNode = GraphResponse['nodes'][number];
+/** D-GRP-01: more evidence first, then the latest event; ties keep a stable id order. */
+export function leafRank(a: RankedNode, b: RankedNode) {
+  return (
+    (b.evidenceCount ?? 0) - (a.evidenceCount ?? 0) ||
+    (b.eventTime ?? '').localeCompare(a.eventTime ?? '') ||
+    a.id.localeCompare(b.id)
+  );
+}
+
+// D-GRP-01 (2026-11-04 review): busy companies that share many issues used to pile up in
+// one knot of crossing lines. Keep every pair of companies at least this far apart (before
+// the final 1.5x), enough for both of their issue rings, then carry each shared issue
+// along with the companies it joins.
+const MIN_COMPANY_GAP = 2 * LEAF_RADIUS + 80;
+function separateCompanies(
+  core: GraphResponse['nodes'],
+  neighbors: Map<string, Set<string>>,
+  points: Map<string, Point>,
+) {
+  const companies = core.filter((n) => n.kind === 'company');
+  const before = new Map(
+    companies.map((n) => [n.id, { ...points.get(n.id)! }]),
+  );
+  for (let round = 0; round < 200; round++) {
+    let moved = false;
+    for (let i = 0; i < companies.length; i++)
+      for (let j = i + 1; j < companies.length; j++) {
+        const a = points.get(companies[i].id)!,
+          b = points.get(companies[j].id)!;
+        const dx = b.x - a.x,
+          dy = b.y - a.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance >= MIN_COMPANY_GAP) continue;
+        // Coincident companies split along a stable direction from their order.
+        const [ux, uy] =
+          distance > 0.01
+            ? [dx / distance, dy / distance]
+            : [Math.cos(i + j), Math.sin(i + j)];
+        const push = (MIN_COMPANY_GAP - distance) / 2;
+        a.x -= ux * push;
+        a.y -= uy * push;
+        b.x += ux * push;
+        b.y += uy * push;
+        moved = true;
+      }
+    if (!moved) break;
+  }
+  for (const node of core) {
+    if (node.kind === 'company') continue;
+    const joined = [...neighbors.get(node.id)!].filter((id) => before.has(id));
+    if (!joined.length) continue;
+    const point = points.get(node.id)!;
+    point.x +=
+      joined.reduce(
+        (sum, id) => sum + points.get(id)!.x - before.get(id)!.x,
+        0,
+      ) / joined.length;
+    point.y +=
+      joined.reduce(
+        (sum, id) => sum + points.get(id)!.y - before.get(id)!.y,
+        0,
+      ) / joined.length;
+  }
+}
+
 // D-GRP-01/01b: translate whole disconnected groups, never scale their interior.
 // Bounds include folded issues so expanding one does not move neighboring groups.
 export function compactRelationshipGroups(
@@ -10,15 +92,22 @@ export function compactRelationshipGroups(
   groups: string[][],
 ) {
   if (groups.length < 2) return;
-  // 최종 1.5배 확대를 적용하면 묶음 사이 여백은 180이 돼요.
-  const gap = 120;
+  // 최종 1.5배 확대를 적용하면 묶음 사이 여백은 418이 돼요(2026-11-04 리뷰로 55%, 다시 50% 넓힘).
+  const gap = 120 * CORE_SPREAD;
+  const minSide = 120 * CORE_SPREAD;
   const boxes = groups
     .map((ids) => {
       const members = ids.map((id) => points.get(id)!);
       const minX = Math.min(...members.map((p) => p.x));
       const minY = Math.min(...members.map((p) => p.y));
-      const width = Math.max(120, Math.max(...members.map((p) => p.x)) - minX);
-      const height = Math.max(120, Math.max(...members.map((p) => p.y)) - minY);
+      const width = Math.max(
+        minSide,
+        Math.max(...members.map((p) => p.x)) - minX,
+      );
+      const height = Math.max(
+        minSide,
+        Math.max(...members.map((p) => p.y)) - minY,
+      );
       return { ids, minX, minY, width, height };
     })
     .sort(
@@ -138,7 +227,12 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
         const dx = a.x - b.x,
           dy = a.y - b.y;
         const distance = Math.max(1, Math.hypot(dx, dy));
-        const strength = 180 ** 2 / distance;
+        // D-GRP-01 (2026-11-04 review): companies push each other harder than issues do,
+        // so companies sharing many issues no longer collapse into one knot of lines.
+        const companies =
+          core[i].kind === 'company' && core[j].kind === 'company';
+        const strength =
+          ((companies ? COMPANY_REPULSION : 1) * 180 ** 2) / distance;
         const fx = (dx / distance) * strength,
           fy = (dy / distance) * strength;
         forceA.x += fx;
@@ -160,7 +254,8 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
         neighbors.get(edge.target)!.size,
       );
       const spacing = degree <= 1 ? 1.75 : degree === 2 ? 1.3 : 1;
-      const strength = (distance ** 2 / (210 * spacing ** 3)) * edge.weight;
+      const strength =
+        (distance ** 2 / (210 * (spacing * LINK_SLACK) ** 3)) * edge.weight;
       const fx = (dx / distance) * strength,
         fy = (dy / distance) * strength;
       forces.get(edge.source)!.x += fx;
@@ -210,23 +305,53 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
   const extent = Math.max(1600, Math.sqrt(nodes.length) * 230);
   const fit = Math.min(1, extent / spanX, extent / 1.6 / spanY);
   for (const point of nodes) {
-    point.x *= fit * 1.45;
-    point.y *= fit;
+    point.x *= fit * 1.45 * CORE_SPREAD;
+    point.y *= fit * CORE_SPREAD;
   }
+  separateCompanies(core, neighbors, points);
+  // D-GRP-01: a company's single-company issues sit on rings around it. Each ring holds as many
+  // as its circumference allows (one issue title per LEAF_ARC), so a busy company such as
+  // 삼성전자 spreads its issues outward instead of stacking six per ring.
+  const leafCounts = new Map<string, number>();
+  for (const node of ordered)
+    if (!points.has(node.id)) {
+      const parentId = [...neighbors.get(node.id)!][0] ?? '';
+      leafCounts.set(parentId, (leafCounts.get(parentId) ?? 0) + 1);
+    }
   const leaves = new Map<string, number>();
-  for (const node of ordered) {
+  // The issues kept on a folded map (leafRank) take the inner ring next to their company.
+  for (const node of [...ordered].sort(leafRank)) {
     if (points.has(node.id)) continue;
     const parentId = [...neighbors.get(node.id)!][0];
     const parent = points.get(parentId);
     const index = leaves.get(parentId ?? '') ?? 0;
     leaves.set(parentId ?? '', index + 1);
-    const angle = index * 2.399963229728653;
-    const radius = parent
-      ? 270 + Math.floor(index / 6) * 135
-      : 400 + index * 100;
+    if (!parent) {
+      const angle = index * 2.399963229728653;
+      const radius = 400 + index * 100;
+      points.set(node.id, {
+        x: Math.cos(angle) * radius,
+        y: Math.sin(angle) * radius,
+      });
+      continue;
+    }
+    let ring = 0,
+      start = 0,
+      radius = LEAF_RADIUS,
+      capacity = ringCapacity(radius);
+    while (index >= start + capacity) {
+      start += capacity;
+      ring += 1;
+      radius = LEAF_RADIUS + ring * LEAF_RING_GAP;
+      capacity = ringCapacity(radius);
+    }
+    const onRing = Math.min(capacity, (leafCounts.get(parentId) ?? 0) - start);
+    // Offset alternate rings by half a slot so titles on neighbouring rings do not line up.
+    const angle =
+      ((index - start + (ring % 2) / 2) / onRing) * Math.PI * 2 - Math.PI / 2;
     points.set(node.id, {
-      x: (parent?.x ?? 0) + Math.cos(angle) * radius,
-      y: (parent?.y ?? 0) + Math.sin(angle) * radius,
+      x: parent.x + Math.cos(angle) * radius,
+      y: parent.y + Math.sin(angle) * radius,
     });
   }
   const groups: string[][] = [];

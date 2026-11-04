@@ -116,13 +116,13 @@ class EventDetailServiceTest {
     }
 
     @Test
-    void summaryIsUnavailableApprovalIsNullAndTheResponseSaysWhy() {
+    void summaryIsUnavailableApprovalIsNullAndNeitherIsAFailure() {
         EventDetail detail = fixtures().get(EUV, null, null, null, "r");
 
         assertEquals(new EventDetail.Unavailable("unavailable", EventDetailService.SUMMARY_UNAVAILABLE), detail.summary());
         assertNull(detail.approval());
-        assertTrue(detail.metadata().partial());
-        assertEquals("summary", detail.metadata().failures().get(0).section());
+        assertFalse(detail.metadata().partial(), "a summary nobody produced is absent data, not a failed section");
+        assertEquals(List.of(), detail.metadata().failures());
     }
 
     @Test
@@ -223,12 +223,146 @@ class EventDetailServiceTest {
             assertNull(detail.approval(), schema);
             assertEquals(new EventDetail.Unavailable("unavailable", EventDetailService.SUMMARY_UNAVAILABLE),
                     detail.summary(), schema);
-            assertEquals("SUMMARY_NOT_PRODUCED", detail.metadata().failures().get(0).code(), schema);
+            assertFalse(detail.metadata().partial(), schema);
+            assertEquals(List.of(), detail.metadata().failures(), schema);
 
             when(receipts.shownNow(eq(VISIBLE_EVIDENCE), anyString(), any(), anyString())).thenReturn(false);
             assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
                     () -> service.get(EUV, null, "gv-imported", null, "req-withdrawn")).getErrorCode(), schema);
         }
+    }
+
+    // ---- issue summary: the receipt's verified summary, gated on its whole basis ---------------------------------------
+
+    private static final String SUMMARY_TEXT = "ASML이 EUV 장비 수출을 발표했다.\n삼성전자가 장비를 받는다.";
+    private static final String RESULT_VERSION = "isr-" + "5".repeat(64);
+
+    /** The producer's available summary object as the bundle-7 receipt retains it; its claims cite both EUV quotes. */
+    private static String availableSummary() {
+        return """
+                {"status":"available","text":"%s",
+                 "claims":[{"claimId":"c1","text":"ASML이 EUV 장비 수출을 발표했다.","evidenceIds":["%s"]},
+                           {"claimId":"c2","text":"삼성전자가 장비를 받는다.","evidenceIds":["%s"]}],
+                 "evidenceIds":["%s","%s"],"generatedAt":"2026-10-22T01:02:03Z","resultVersion":"%s","language":"ko",
+                 "source":{"jobId":"summary-job-1","inputDigest":"%s","resultDigest":"%s","basisDigest":"%s"},
+                 "producer":{"kind":"provider","model":"m","reasoningEffort":"high","promptVersion":"p1",
+                             "schemaDigest":"%s","runtimeIdentity":"%s"},
+                 "verifier":{"kind":"independent-verifier","model":"v","adapterIdentity":"%s","requestDigest":"%s"}}
+                """.formatted(SUMMARY_TEXT.replace("\n", "\\n"), VISIBLE_EVIDENCE, SAMSUNG_EVIDENCE, VISIBLE_EVIDENCE,
+                SAMSUNG_EVIDENCE, RESULT_VERSION, "9".repeat(64), "8".repeat(64), "7".repeat(64), "6".repeat(64),
+                "5".repeat(64), "4".repeat(64), "3".repeat(64));
+    }
+
+    /** The EUV receipt as a bundle-7 whose issue carries {@code summary}. */
+    private static StrictJson.Obj summarized(String summaryJson) {
+        StrictJson.Obj receipt = bundle(false);
+        ((ObjectNode) receipt.node()).put("schemaVersion", "zoop-graph-handoff-bundle-7");
+        ((ObjectNode) receipt.objects("issues").get(0).node()).set("summary", StrictJson.parseObject(summaryJson).node());
+        return receipt;
+    }
+
+    @Test
+    void anAvailableReceiptSummaryIsServedAsTheProducerWroteItWhenEveryBasisQuoteIsShown() {
+        EventDetail detail = imported(summarized(availableSummary())).get(EUV, null, null, null, "r");
+
+        assertEquals(new EventDetail.SummaryOut(SUMMARY_TEXT, List.of(VISIBLE_EVIDENCE, SAMSUNG_EVIDENCE),
+                "2026-10-22T01:02:03Z", RESULT_VERSION), detail.summary());
+        assertFalse(detail.metadata().partial());
+        assertEquals(List.of(), detail.metadata().failures());
+        assertFalse(detail.toString().contains("summary-job-1"), "the job pin and digests stay in the receipt");
+    }
+
+    @Test
+    void aSummaryWhoseBasisQuoteIsHiddenNowIsWithheldWholeEvenWhenTheEventStaysReadable() {
+        EventDetailService service = imported(summarized(availableSummary()));
+        // m2's second quote is withdrawn: the head (m1, the representative) still shows, but the model read that quote.
+        when(receipts.shownNow(eq(SAMSUNG_EVIDENCE), anyString(), any(), anyString())).thenReturn(false);
+
+        EventDetail detail = service.get(EUV, null, null, null, "r");
+
+        assertEquals(List.of(M1), detail.mentions().stream().map(MentionOut::mentionId).toList());
+        assertEquals(new EventDetail.Unavailable("unavailable", EventDetailService.SUMMARY_BASIS_HIDDEN), detail.summary());
+        assertTrue(detail.metadata().partial());
+        assertEquals("SUMMARY_EVIDENCE_UNAVAILABLE", detail.metadata().failures().get(0).code());
+        assertFalse(detail.toString().contains("삼성전자가 장비를 받는다"), "no claim text leaves with a hidden basis");
+    }
+
+    @Test
+    void aSummaryIsWithheldWhenAQuoteTheModelReadIsNotInTheFilteredSnapshotEvenIfNoClaimCitesIt() {
+        // Only the first quote is cited, but m2's second quote is part of the basis and is hidden now.
+        ObjectNode oneClaim = (ObjectNode) StrictJson.parseObject(availableSummary()).node();
+        ((tools.jackson.databind.node.ArrayNode) oneClaim.get("claims")).remove(1);
+        oneClaim.putArray("evidenceIds").add(VISIBLE_EVIDENCE);
+        assertFalse(oneClaim.toString().contains(SAMSUNG_EVIDENCE));
+        EventDetailService service = imported(summarized(oneClaim.toString()));
+        when(receipts.shownNow(eq(SAMSUNG_EVIDENCE), anyString(), any(), anyString())).thenReturn(false);
+
+        EventDetail detail = service.get(EUV, null, null, null, "r");
+
+        assertEquals(new EventDetail.Unavailable("unavailable", EventDetailService.SUMMARY_BASIS_HIDDEN), detail.summary());
+        assertEquals("SUMMARY_EVIDENCE_UNAVAILABLE", detail.metadata().failures().get(0).code());
+    }
+
+    @Test
+    void anUnavailableReceiptSummaryKeepsTheProducersReasonAndIsNotAFailure() {
+        record Case(String json, String reason) { }
+        List<Case> cases = List.of(
+                new Case("{\"status\":\"unavailable\",\"code\":\"not-requested\",\"source\":null}",
+                        EventDetailService.SUMMARY_UNAVAILABLE),
+                new Case("{\"status\":\"unavailable\",\"code\":\"temporal-review-pending\",\"source\":null}",
+                        EventDetailService.SUMMARY_TEMPORAL_PENDING),
+                new Case("{\"status\":\"unavailable\",\"code\":\"input-too-large\",\"source\":null}",
+                        EventDetailService.SUMMARY_INPUT_TOO_LARGE),
+                new Case("{\"status\":\"unavailable\",\"code\":\"verifier-hold\",\"source\":{\"jobId\":\"summary-job-1\","
+                        + "\"inputDigest\":\"" + "9".repeat(64) + "\",\"resultDigest\":\"" + "8".repeat(64) + "\",\"basisDigest\":\""
+                        + "7".repeat(64) + "\"}}", EventDetailService.SUMMARY_NOT_VERIFIED));
+        for (Case c : cases) {
+            EventDetail detail = imported(summarized(c.json())).get(EUV, null, null, null, "r");
+            assertEquals(new EventDetail.Unavailable("unavailable", c.reason()), detail.summary(), c.json());
+            // The producer decided there is no summary: absent data, never a failed section of this read.
+            assertFalse(detail.metadata().partial(), c.json());
+            assertEquals(List.of(), detail.metadata().failures(), c.json());
+        }
+    }
+
+    @Test
+    void aReceiptSummaryTheVerifierWouldNotHaveAdmittedIsSourceUnavailableNotAServerError() {
+        for (String broken : List.of("{\"status\":\"unavailable\",\"source\":null}", "{\"status\":\"available\"}",
+                "{\"status\":\"unavailable\",\"code\":null,\"source\":null}")) {
+            EventDetailService service = imported(summarized(broken));
+            assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                    () -> service.get(EUV, null, null, null, "r")).getErrorCode(), broken);
+        }
+        // The key present with a non-object value is the same: only a receipt WITHOUT the key never produced a summary.
+        for (String notAnObject : List.of("null", "\"available\"", "[]", "7")) {
+            StrictJson.Obj receipt = bundle(false);
+            ((ObjectNode) receipt.node()).put("schemaVersion", "zoop-graph-handoff-bundle-8");
+            ((ObjectNode) receipt.objects("issues").get(0).node()).set("summary",
+                    StrictJson.parseObject("{\"summary\":" + notAnObject + "}").raw("summary"));
+            EventDetailService service = imported(receipt);
+            assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                    () -> service.get(EUV, null, null, null, "r")).getErrorCode(), notAnObject);
+        }
+    }
+
+    @Test
+    void aComposedEventServesTheSummaryOfTheSourceThatSuppliesItsTitle() {
+        TemporalScenario scenario = composedScenario(false);
+        // The native member's one quote is what both claims cite; the union is that one id, as the verifier requires.
+        ObjectNode summary = (ObjectNode) StrictJson.parseObject(
+                availableSummary().replace(VISIBLE_EVIDENCE, "proof-b").replace(SAMSUNG_EVIDENCE, "proof-b")).node();
+        summary.putArray("evidenceIds").add("proof-b");
+        ((ObjectNode) scenario.nativeIssue().node()).set("summary", summary);
+
+        EventDetail composed = scenario.composed().get("public-issue", null, null, null, "r");
+        assertEquals(SUMMARY_TEXT, ((EventDetail.SummaryOut) composed.summary()).text());
+        assertEquals(List.of("proof-b"), ((EventDetail.SummaryOut) composed.summary()).evidenceIds());
+        assertFalse(composed.metadata().partial());
+
+        // The native member's basis quote withdrawn: the composed event closes on its selected leaf before any summary.
+        when(receipts.shownNow(eq("proof-b"), anyString(), any(), anyString())).thenReturn(false);
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
+                () -> scenario.composed().get("public-issue", null, null, null, "r")).getErrorCode());
     }
 
     @Test
@@ -679,7 +813,8 @@ class EventDetailServiceTest {
                 "the native verdict remains; no legacy HOLD is invented");
     }
 
-    private record TemporalScenario(EventDetailService original, EventDetailService composed, StrictJson.Obj originalIssue) { }
+    private record TemporalScenario(EventDetailService original, EventDetailService composed, StrictJson.Obj originalIssue,
+            StrictJson.Obj nativeIssue) { }
 
     @Test
     void selectedLeafWithdrawalClosesComposedEventDespiteAnotherReadableLeaf() {
@@ -784,7 +919,8 @@ class EventDetailServiceTest {
                         "issue-a", "company")));
         return new TemporalScenario(detailService(originalSource.projection(), originalPublication, "source-a"),
                 detailService(snapshot, publication, "publication-version"),
-                originalSource.bundle().objects("issues").getFirst());
+                originalSource.bundle().objects("issues").getFirst(),
+                sources.getLast().bundle().objects("issues").getFirst());
     }
 
     private EventDetailService detailService(PublicGraphSnapshot snapshot, Publication publication, String versionId) {

@@ -1,7 +1,7 @@
 import type { GraphData } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import { isSelectableRelation } from '@/types/map/relation';
-import { relationshipPositions } from './relationship-layout';
+import { leafRank, relationshipPositions } from './relationship-layout';
 import { companyLogo, logoScale, logoBackground } from '@/util/company-logo';
 import { themeColor } from '@/util/theme-color';
 import { separateNodes, shortTitle } from './graph-geometry';
@@ -70,6 +70,70 @@ export function graphSummary(data: GraphResponse) {
   };
 }
 
+/** D-GRP-01: single-company issues each company shows before it is selected. */
+export const ISSUES_PER_COMPANY = 5;
+
+/**
+ * D-GRP-01 (2026-11-04 review): a company shows at most ISSUES_PER_COMPANY of the
+ * issues that involve only it (most evidence, then latest first). The rest fold into
+ * a "+N" badge until the company is selected. Shared, focus and follow-up issues,
+ * the selected issue and any forced node always stay.
+ */
+export function foldedIssues(
+  data: GraphResponse,
+  expandedId?: string | null,
+  forcedNodes: string[] = [],
+) {
+  const summary = graphSummary(data);
+  const follows = new Set(
+    data.edges
+      .filter((e) => e.relationType === 'FOLLOWS')
+      .flatMap((e) => [e.source, e.target]),
+  );
+  const byCompany = new Map<string, GraphResponse['nodes']>();
+  for (const node of data.nodes) {
+    const companies = summary.incident.get(node.id);
+    if (
+      node.kind !== 'issue' ||
+      companies?.length !== 1 ||
+      node.isFocus ||
+      follows.has(node.id)
+    )
+      continue;
+    byCompany.set(companies[0], [...(byCompany.get(companies[0]) ?? []), node]);
+  }
+  const hidden = new Set<string>();
+  const counts = new Map<string, number>();
+  for (const [companyId, issues] of byCompany) {
+    if (companyId === expandedId) continue;
+    const folded = [...issues]
+      .sort(leafRank)
+      .slice(ISSUES_PER_COMPANY)
+      .filter((n) => n.id !== expandedId && !forcedNodes.includes(n.id));
+    folded.forEach((n) => hidden.add(n.id));
+    if (folded.length) counts.set(companyId, folded.length);
+  }
+  return { hidden, counts };
+}
+
+/** D-GRP-01 (2026-11-04 review): issue diamonds were 7px and hard to spot. */
+export const ISSUE_NODE_SIZE = 30;
+
+/**
+ * D-GRP-01: 0..1 evidence strength per issue on a log scale against the busiest
+ * issue on this map, so one heavily sourced issue does not flatten the rest.
+ */
+export function evidenceStrength(data: GraphResponse) {
+  const issues = data.nodes.filter((n) => n.kind === 'issue');
+  const max = Math.max(1, ...issues.map((n) => n.evidenceCount ?? 0));
+  return new Map(
+    issues.map((n) => [
+      n.id,
+      Math.log1p(Math.max(0, n.evidenceCount ?? 0)) / Math.log1p(max),
+    ]),
+  );
+}
+
 // Review calibration for D-GRP-01/01b fixture distribution (0–6 issues).
 // The value represents graph activity only, never importance or causality.
 export function companyNodeSize(issueCount: number, scale = 1) {
@@ -83,7 +147,8 @@ export function companyNodeSize(issueCount: number, scale = 1) {
           : issueCount <= 4
             ? 3
             : 4;
-  return [36, 44, 52, 68, 88][level] * scale;
+  // D-GRP-01: 2026-11-04 review enlarged every level by 25% (was 36/44/52/68/88).
+  return [45, 55, 65, 85, 110][level] * scale;
 }
 
 export function focusNeighborhood(
@@ -122,11 +187,13 @@ export function toG6Data(
   const personal = data.metadata.mode === 'personal';
   const scale = personal ? 0.69 : 1;
   const positions = relationshipPositions(data);
-  // D-GRP-01: every public issue stays on the canvas. Folding single-company
-  // issues hid both the issue and its only INVOLVES edge, making related
-  // companies look disconnected even though the API returned the relation.
-  const visible = data.nodes;
+  // D-GRP-01: every company keeps up to ISSUES_PER_COMPANY of its own issues and
+  // their INVOLVES edges, so related companies never look disconnected (#543);
+  // the rest fold into a "+N" badge until the company is selected.
+  const fold = foldedIssues(data, expandedId, forcedNodes);
+  const visible = data.nodes.filter((n) => !fold.hidden.has(n.id));
   const nodeIds = new Set(visible.map((n) => n.id));
+  const strength = evidenceStrength(data);
   const result: GraphData = {
     nodes: visible.map((n) => {
       const company = n.kind === 'company';
@@ -135,7 +202,8 @@ export function toG6Data(
       const chosen = company && n.id === expandedId;
       const size = company
         ? companyNodeSize(summary.companyIssueCounts.get(n.id) ?? 0, scale)
-        : 7 * scale;
+        : ISSUE_NODE_SIZE * scale;
+      const tone = company ? 1 : (strength.get(n.id) ?? 0);
       const badges = [
         ...(n.holding || n.watch
           ? [
@@ -158,7 +226,7 @@ export function toG6Data(
       return {
         id: n.id,
         type: company ? 'circle' : 'diamond',
-        data: { kind: n.kind, chosen },
+        data: { kind: n.kind, chosen, folded: fold.counts.get(n.id) ?? 0 },
         style: {
           // Camera and styling remain independent of relationship placement.
           x: width / 2 + position.x,
@@ -169,6 +237,8 @@ export function toG6Data(
               ? logoBackground(logo)
               : themeColor('paper')
             : themeColor('ink'),
+          // D-GRP-01: monotone shade by evidence; weak issues read as a light outline.
+          fillOpacity: company ? 1 : 0.15 + 0.85 * tone,
           stroke: themeColor('ink'),
           lineWidth: n.isFocus ? 1.4 : 0.667,
           halo: n.isFocus,
@@ -209,12 +279,20 @@ export function toG6Data(
         },
       };
     }),
+    // D-GRP-01 (2026-11-04 결정): 사건 공유 선은 공유 사건 노드의 기업–사건–기업 연결과
+    // 같은 내용이라 그리지 않는다. 관련 기업 목록(D-GRP-03)은 응답의 선을 그대로 쓴다.
     edges: data.edges
-      .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
+      .filter(
+        (e) =>
+          e.relationType !== 'SHARES_ISSUE' &&
+          nodeIds.has(e.source) &&
+          nodeIds.has(e.target),
+      )
       .map((e) => {
         const dimmed =
           emphasizedNodes.size > 0 &&
           (!emphasizedNodes.has(e.source) || !emphasizedNodes.has(e.target));
+        const issueTone = strength.get(e.source) ?? strength.get(e.target);
         return {
           id: e.id,
           source: e.source,
@@ -224,16 +302,16 @@ export function toG6Data(
             labelText: '',
             labelVisibility: 'hidden',
             stroke:
-              e.relationType === 'FOLLOWS'
+              e.relationType === 'FOLLOWS' || issueTone !== undefined
                 ? themeColor('ink')
                 : themeColor('faint'),
             lineWidth: 1.3,
+            // D-GRP-01: an issue's line follows its evidence shade (monotone).
             strokeOpacity: dimmed
               ? 0.08
-              : e.relationType === 'SHARES_ISSUE'
-                ? 0.5
+              : issueTone !== undefined && e.relationType !== 'FOLLOWS'
+                ? 0.15 + 0.5 * issueTone
                 : 0.75,
-            lineDash: e.relationType === 'SHARES_ISSUE' ? [2, 4] : undefined,
             endArrow: e.relationType === 'FOLLOWS',
             endArrowSize: 6,
             cursor: isSelectableRelation(e) ? 'pointer' : 'default',
