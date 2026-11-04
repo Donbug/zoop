@@ -89,12 +89,29 @@ def parse(data: bytes) -> Registry:
 
 
 def load(path: Path) -> Registry:
-    try:
-        with path.open("rb") as stream:
-            data = stream.read(MAX_REGISTRY_BYTES + 1)
-    except OSError:
-        raise GrantRegistryError("grant_registry_unreadable") from None
-    return parse(data)
+    def read(leaf):
+        try:
+            with leaf.open("rb") as stream: raw=stream.read(MAX_REGISTRY_BYTES+1)
+        except OSError: raise GrantRegistryError("grant_registry_unreadable") from None
+        if len(raw)>MAX_REGISTRY_BYTES:raise GrantRegistryError("grant_registry_too_large")
+        return raw
+    data=read(path)
+    try: root=json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError,ValueError):raise GrantRegistryError("grant_registry_unreadable") from None
+    if not isinstance(root,dict) or root.get("schemaVersion")!="zoop-grant-authority-delegates-1":return parse(data)
+    paths=root.get("delegates")
+    if set(root)!={"schemaVersion","delegates"} or not isinstance(paths,list) or not 1<=len(paths)<=8:raise GrantRegistryError("grant_registry_schema_invalid")
+    seen=set();owners=set();grants=[];size=len(data)
+    for item in paths:
+        if not isinstance(item,str):raise GrantRegistryError("grant_registry_schema_invalid")
+        leaf=Path(item)
+        if not leaf.is_absolute() or leaf.is_symlink() or leaf.resolve() in seen:raise GrantRegistryError("grant_registry_schema_invalid")
+        seen.add(leaf.resolve());raw=read(leaf);size+=len(raw)
+        if size>MAX_REGISTRY_BYTES:raise GrantRegistryError("grant_registry_too_large")
+        parsed=parse(raw)  # No nested delegate authority and no copied stale approval list.
+        if owners.intersection(parsed.grants):raise GrantRegistryError("grant_authority_conflict")
+        owners.update(parsed.grants);grants.extend(json.loads(raw)["grants"])
+    return parse(json.dumps({"schemaVersion":SCHEMA,"grants":grants},ensure_ascii=False,separators=(",",":")).encode())
 
 
 def evaluate(grant: dict[str, Any] | None, *, source_id: str, revision: str, purposes: list[str],

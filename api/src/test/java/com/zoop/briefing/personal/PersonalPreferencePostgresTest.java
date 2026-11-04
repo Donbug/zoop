@@ -92,14 +92,14 @@ class PersonalPreferencePostgresTest {
  }
  @Test void publicationDispatcherCreatesTheRoundWithoutAUserGenerationRequest(){
   service.save(member,new PersonalBriefingPreferences.Save(choice,null));clock.now=Instant.parse("2026-10-22T00:20:00Z");service.captureEligibility(member,clock.now);clock.now=Instant.parse("2026-10-22T01:00:00Z");
-  new PersonalBriefingDeliveryScheduler(jdbc,service,clock).tick();
+  new PersonalBriefingDeliveryScheduler(jdbc,service,clock,new PersonalBriefingAudience(member.memberId(),true)).tick();
   var automatic=service.get(round,member,false,"test");assertEquals("ready",automatic.path("status").asString());
   assertEquals(3,automatic.path("selection").path("presentation").path("items").size());
-  new PersonalBriefingDeliveryScheduler(jdbc,service,clock).tick();
+  new PersonalBriefingDeliveryScheduler(jdbc,service,clock,new PersonalBriefingAudience(member.memberId(),true)).tick();
   assertEquals(automatic,service.get(round,member,false,"test"));
  }
  @Test void backgroundInitializationNeedsNoPersonalPageVisit(){
-  new PersonalBriefingDeliveryScheduler(jdbc,service,clock).tick();
+  new PersonalBriefingDeliveryScheduler(jdbc,service,clock,new PersonalBriefingAudience(member.memberId(),true)).tick();
   assertEquals(1,service.settings(member).path("preference").path("revision").asInt());
   assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM briefing_personal_deliveries WHERE member_id=?",Integer.class,member.memberId()));
  }

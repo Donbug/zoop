@@ -1,3 +1,4 @@
+import { prioritySourceAvailable } from './briefingSourceTime';
 import { sameBriefingInstant } from './briefingTime';
 import type { BriefingResponse } from '@/types/briefing';
 import { safeArticleUrl } from '@/components/graph/event-format';
@@ -73,7 +74,12 @@ export type PersonalPriority = {
       evidenceId: string;
       quote: string;
       url: string;
-      publishedAt: string;
+      publishedAt: string | null;
+      publishedDate?: string | null;
+      availableAt?: string | null;
+      eligibilityBasis?: string | null;
+      title?: string;
+      publisher?: string;
     }[];
     priorAnalysis: {
       companyName: string;
@@ -208,10 +214,13 @@ function validatePersonalPriority(
           (s) =>
             !s ||
             !s.quote ||
+            [s.title, s.publisher].some(
+              (v) => v !== undefined && (typeof v !== 'string' || !v.trim()),
+            ) ||
             !s.evidenceId ||
             !safeArticleUrl(s.url) ||
-            !Number.isFinite(Date.parse(s.publishedAt)) ||
-            Date.parse(s.publishedAt) > cutoff,
+            !Number.isFinite(prioritySourceAvailable(s)) ||
+            prioritySourceAvailable(s) > cutoff,
         ) ||
         !Array.isArray(item.priorAnalysis) ||
         item.priorAnalysis.some(

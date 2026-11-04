@@ -28,6 +28,7 @@ const choice = {
 };
 const saved = {
   demoEnabled: false,
+  schedule: ['08:30', '17:30'],
   nextScheduledAt: '2026-10-30T08:30:00Z',
   preference: {
     revisionId: 'p1',

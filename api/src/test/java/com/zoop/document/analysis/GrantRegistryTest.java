@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -202,5 +203,17 @@ class GrantRegistryTest {
 
             assertEquals(testCase[1], decide(grant, "r1", replay), "expiresAt " + testCase[0]);
         }
+    }
+    @Test
+    void delegatedOwnersRemainFreshWithoutCopyingOrOverridingTheirGrants(@TempDir Path root) throws Exception {
+        Path original=root.resolve("original.json"),added=root.resolve("added.json"),index=root.resolve("index.json");
+        String originalValue="{\"schemaVersion\":\"zoop-ai-s1-1\",\"grants\":["+grant("g","r1","")+"]}";
+        Files.writeString(original,originalValue);Files.writeString(added,originalValue.replace("\"g\"","\"other\""));
+        var pointer=com.zoop.common.json.StrictJson.newObject().put("schemaVersion","zoop-grant-authority-delegates-1");pointer.putArray("delegates").add(original.toString()).add(added.toString());Files.write(index,com.zoop.common.json.Canonical.bytes(pointer));
+        assertTrue(GrantRegistry.read(index).current("g").orElseThrow().enabled());
+        Files.writeString(original,originalValue.replace("\"enabled\":true","\"enabled\":false"));
+        assertFalse(GrantRegistry.read(index).current("g").orElseThrow().enabled());
+        Files.writeString(added,originalValue);
+        assertEquals("grant_authority_conflict",registryCode(()->GrantRegistry.read(index)));
     }
 }

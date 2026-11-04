@@ -24,6 +24,20 @@ class PersonalPoolTests(unittest.TestCase):
         with self.assertRaises(ValueError):personal.compile_pool(self.f,self.row,self.calls[:1],{})
         changed=copy.deepcopy(self.row);changed['assessments']['assessments']['i0']['businessImportance']=3
         with self.assertRaises(ValueError):personal.compile_pool(self.f,changed,self.calls,{})
+    def test_document_binding_cannot_overwrite_an_individual_evidence_passage(self):
+        registry={}
+        for candidate in self.f['candidates']:
+            for source in candidate['sources'].values():
+                registry[(source['documentId'],'sha256-'+source['bodySha256'])]={**source,
+                    'documentVersion':'sha256-'+source['bodySha256'],'grantId':'grant','grantRevision':'1','recipients':['openai'],
+                    'evidenceId':'different-passage','quote':'다른 인용'}
+        pool=personal.compile_pool(self.f,self.row,self.calls,registry)
+        for candidate in pool['candidates']:
+            source=candidate['sources'][0];original=self.f['candidates'][int(candidate['issueId'][1:])]['sources']
+            self.assertIn(source['evidenceId'],original)
+            self.assertEqual(original[source['evidenceId']]['quote'],source['quote'])
+            self.assertEqual('grant',source['grantId'])
+
     def test_sql_never_updates_publication_or_feedback_and_binds_original_sha(self):
         value=personal.sql(personal.compile_pool(self.f,self.row,self.calls,{}))
         self.assertIn('publicationPayloadSha256',value)

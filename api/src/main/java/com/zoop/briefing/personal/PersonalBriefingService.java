@@ -116,14 +116,17 @@ public class PersonalBriefingService {
     }
 
     static List<JsonNode> eligible(JsonNode pool,BriefingRound round) {
+        return eligible(pool,round,2);
+    }
+    static List<JsonNode> eligible(JsonNode pool,BriefingRound round,int minimumImportance) {
         var list=new ArrayList<JsonNode>();
         for(var c:pool.path("candidates")) {
-            if (!c.path("verified").asBoolean() || c.path("importance").asInt()<2
+            if (!c.path("verified").asBoolean() || c.path("importance").asInt()<minimumImportance
                     || !List.of("new_event","material_update").contains(c.path("informationChange").asString())) continue;
             if (c.path("eventKey").asString().isBlank() || c.path("sources").isEmpty()) continue;
             boolean valid=true;
             for(var s:c.path("sources")) {
-                Instant at=Instant.parse(s.path("publishedAt").asString());
+                Instant at=com.zoop.briefing.server.BriefingSourceClock.available(s);
                 if(at.isAfter(round.windowTo()) || (round.windowFrom()!=null && !at.isAfter(round.windowFrom()))
                         || s.path("quote").asString().isBlank() || !s.path("quoteVerified").asBoolean()) valid=false;
             }

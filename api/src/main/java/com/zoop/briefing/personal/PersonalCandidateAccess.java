@@ -34,17 +34,18 @@ public class PersonalCandidateAccess {
         var current=grants.registry(requestId);
         if (!candidate.path("sources").isArray() || candidate.path("sources").isEmpty()) return false;
         for (var source : candidate.path("sources")) {
-            var bindings=jdbc.query("""
-                SELECT a.provider,t.sha256,v.published_at FROM articles a JOIN article_versions v ON v.article_id=a.id
+            var bindings=jdbc.queryForList("""
+                SELECT a.provider,t.sha256,v.published_at,v.published_date,v.publication_precision,v.collected_at FROM articles a JOIN article_versions v ON v.article_id=a.id
                 JOIN artifacts t ON t.id=v.text_artifact_id
                 WHERE a.id=? AND v.version=? AND a.access_status='available'
-                """, (r,i)->List.of(r.getString(1),r.getString(2),r.getTimestamp(3).toInstant().toString()),
+                """,
                 source.path("documentId").asString(),source.path("documentVersion").asString());
-            if (bindings.size()!=1 || !bindings.getFirst().get(1).equals(source.path("bodySha256").asString())) return false;
-            if (!java.time.Instant.parse(bindings.getFirst().get(2)).equals(java.time.Instant.parse(source.path("publishedAt").asString()))) return false;
+            if (bindings.size()!=1 || !bindings.getFirst().get("sha256").equals(source.path("bodySha256").asString())) return false;
+            try { if(!com.zoop.briefing.server.BriefingSourceClock.read(bindings.getFirst()).matches(com.zoop.common.json.StrictJson.Obj.of(source)))return false; }
+            catch(IllegalArgumentException invalidClock){return false;}
             var recipients=source.path("recipients").valueStream().map(JsonNode::asString).toList();
             if (recipients.isEmpty() || GrantRegistry.evaluateBriefingRead(current.current(source.path("grantId").asString()).orElse(null),
-                    bindings.getFirst().getFirst(),source.path("grantRevision").asString(),
+                    bindings.getFirst().get("provider").toString(),source.path("grantRevision").asString(),
                     recipients,clock.instant())!=null) return false;
         }
         return true;

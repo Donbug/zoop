@@ -50,18 +50,45 @@ public final class GrantRegistry {
     }
 
     /** The grant now in force for {@code grantId}: in a file listing several revisions, the last one listed. */
+    public List<FlatGrant> currentGrants() { return current.values().stream().sorted(java.util.Comparator.comparing(FlatGrant::grantId)).toList(); }
+
     public Optional<FlatGrant> current(String grantId) {
         return Optional.ofNullable(current.get(grantId));
     }
 
     public static GrantRegistry read(Path path) {
-        byte[] data;
-        try (InputStream stream = Files.newInputStream(path)) {
-            data = stream.readNBytes(MAX_BYTES + 1);
-        } catch (IOException | RuntimeException error) {
-            throw unavailable("grant_registry_unreadable");
-        }
-        return parse(data);
+        byte[] data=readBytes(path);
+        StrictJson.Obj root;
+        try { root=StrictJson.parseObject(data); }
+        catch(RuntimeException invalid){throw unavailable("grant_registry_unreadable");}
+        if(!"zoop-grant-authority-delegates-1".equals(root.node().path("schemaVersion").asString()))return parse(data);
+        try {
+            root.requiring(Set.of("schemaVersion","delegates"));
+            var leaves=root.array("delegates").values();
+            if(leaves.isEmpty()||leaves.size()>8)throw unavailable("grant_registry_schema_invalid");
+            var combined=StrictJson.newObject().put("schemaVersion",SCHEMA);var grants=combined.putArray("grants");
+            Set<Path> paths=new java.util.HashSet<>();Set<String> owners=new java.util.HashSet<>();int size=data.length;
+            for(var value:leaves){
+                if(!value.isString())throw unavailable("grant_registry_schema_invalid");
+                var leaf=Path.of(value.asString());
+                if(!leaf.isAbsolute()||Files.isSymbolicLink(leaf)||!paths.add(leaf.toRealPath()))throw unavailable("grant_registry_schema_invalid");
+                byte[] raw=readBytes(leaf);size+=raw.length;if(size>MAX_BYTES)throw unavailable("grant_registry_too_large");
+                var parsed=parse(raw); // Deliberately refuses nested delegates.
+                for(String id:parsed.current.keySet())if(!owners.add(id))throw unavailable("grant_authority_conflict");
+                for(var grant:StrictJson.parseObject(raw).array("grants").values())grants.add(grant.deepCopy());
+            }
+            return parse(com.zoop.common.json.Canonical.bytes(combined));
+        }catch(AnalysisException error){throw error;}
+        catch(Exception invalid){throw unavailable("grant_registry_schema_invalid");}
+    }
+
+    private static byte[] readBytes(Path path){
+        try(InputStream stream=Files.newInputStream(path)){
+            byte[] data=stream.readNBytes(MAX_BYTES+1);
+            if(data.length>MAX_BYTES)throw unavailable("grant_registry_too_large");
+            return data;
+        }catch(AnalysisException error){throw error;}
+        catch(IOException|RuntimeException error){throw unavailable("grant_registry_unreadable");}
     }
 
     public static GrantRegistry parse(byte[] data) {

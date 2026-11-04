@@ -1,3 +1,4 @@
+import { prioritySourceAvailable } from './briefingSourceTime';
 import { sameBriefingInstant } from './briefingTime';
 import type { BriefingResponse } from '@/types/briefing';
 import { safeArticleUrl } from '@/components/graph/event-format';
@@ -32,7 +33,12 @@ export type CommonPriority = {
       evidenceId: string;
       quote: string;
       url: string;
-      publishedAt: string;
+      publishedAt: string | null;
+      publishedDate?: string | null;
+      availableAt?: string | null;
+      eligibilityBasis?: string | null;
+      title?: string;
+      publisher?: string;
     }[];
     prices: {
       companyName: string;
@@ -109,11 +115,14 @@ function validateCommonPriority(
         (s) =>
           !s.evidenceId ||
           !s.quote ||
+          [s.title, s.publisher].some(
+            (v) => v !== undefined && (typeof v !== 'string' || !v.trim()),
+          ) ||
           !safeArticleUrl(s.url) ||
-          !Number.isFinite(Date.parse(s.publishedAt)) ||
-          Date.parse(s.publishedAt) > cutoff ||
+          !Number.isFinite(prioritySourceAvailable(s)) ||
+          prioritySourceAvailable(s) > cutoff ||
           (item.kind === 'previous_issue' &&
-            Date.parse(s.publishedAt) > Date.parse(item.originCutoff)),
+            prioritySourceAvailable(s) > Date.parse(item.originCutoff)),
       ) ||
       !Array.isArray(item.prices) ||
       item.prices.some(

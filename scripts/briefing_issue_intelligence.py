@@ -212,7 +212,13 @@ def validate_assessments(answer, frozen):
             delta = set(c['freshnessReview'].get('deltaEvidenceIds', []))
             require(bool(delta & set(a['whyNow']['evidenceIds'])), 'material_delta_missing')
         if a['informationChange'] == 'new_event':
-            require(c['freshnessReview']['decision'] == 'DISTINCT_EVENT', 'update_relabelled_new')
+            distinct=c['freshnessReview']['decision']=='DISTINCT_EVENT'
+            # Native server snapshots already bind stable, verified canonical issue IDs. Their assessment is
+            # still independently verified before selection; the producer must not manufacture DISTINCT_EVENT.
+            reviewed_native=(frozen.get('freshnessPolicy')=='native-canonical-and-independent-review-v1'
+                and c['freshnessReview']['decision']=='REQUIRES_REVIEW'
+                and c['issueId'] not in {p['issueId'] for p in frozen.get('previousSelected',[])})
+            require(distinct or reviewed_native, 'update_relabelled_new')
 
 
 def verification_schema(ids):
@@ -243,7 +249,8 @@ def price_signal(candidate):
             'basis': list(next(iter(bases))), 'keys': [list(k) for k in unique]}
 
 
-def select(frozen, assessed, verified, previous_selected=()):
+def select(frozen, assessed, verified, previous_selected=(), *, minimum_importance=2):
+    require(minimum_importance in (1, 2), 'importance_threshold')
     validate_assessments(assessed, frozen)
     base.validate_schema(verified, verification_schema([c['issueId'] for c in frozen['candidates']]))
     eligible, rejected = [], []
@@ -251,7 +258,7 @@ def select(frozen, assessed, verified, previous_selected=()):
     for c in frozen['candidates']:
         iid = c['issueId']; a = assessed['assessments'][iid]
         reason = ('assessment_not_supported' if not verified['checks'][iid]['supported'] else
-                  'importance_below_core_threshold' if a['businessImportance'] < 2 else
+                  'importance_below_core_threshold' if a['businessImportance'] < minimum_importance else
                   'repeat_or_uncertain' if a['informationChange'] in ('repeat', 'uncertain') else None)
         if iid in previous:
             old = previous[iid]

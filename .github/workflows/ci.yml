@@ -37,7 +37,7 @@ jobs:
       - name: Validate public configuration, contracts, generated documents and secrets
         run: |
           make public-check
-          uv run --no-project --with pyyaml make tooling-test
+          uv run --no-project --with-requirements deployment/briefing/requirements.txt --with pyyaml make tooling-test
       - name: Validate PR title
         if: github.event_name == 'pull_request'
         env:
@@ -190,6 +190,11 @@ jobs:
             --file api/Dockerfile \
             --tag "zoop-api:ci-${GITHUB_SHA}" \
             api
+      - name: Build and check dedicated briefing runtime without credentials or model calls
+        run: |
+          docker build --file deployment/briefing/Dockerfile --build-arg "API_IMAGE=zoop-api:ci-${GITHUB_SHA}" --tag "zoop-briefing:ci-${GITHUB_SHA}" .
+          docker run --rm "zoop-briefing:ci-${GITHUB_SHA}" --check
+
   ai-container:
     name: ai-container
     runs-on: ubuntu-24.04
@@ -248,6 +253,12 @@ jobs:
         env:
           ZOOP_COMPANY_TEST_DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.company-postgres.ports['5432'] }}/zoop_company_test_19
         run: ./api/gradlew -p api companyIntegrationTest --console=plain
+      - name: Fresh briefing collection through publication (loopback source and authored provider peers only)
+        env:
+          ZOOP_COMPANY_TEST_DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.company-postgres.ports['5432'] }}/zoop_company_test_19
+        run: |
+          uv pip install --system --requirement deployment/briefing/requirements.txt freezegun==1.5.5
+          ./api/gradlew -p api briefingAutoIntegrationTest --console=plain
       - name: Authentication PostgreSQL integration tests
         env:
           DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.company-postgres.ports['5432'] }}/zoop_company_test_19

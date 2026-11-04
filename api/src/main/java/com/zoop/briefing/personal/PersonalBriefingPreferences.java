@@ -24,10 +24,16 @@ public class PersonalBriefingPreferences {
     private final BriefingRoundRepository rounds; private final PersonalCandidateAccess access;
     private final com.zoop.graph.read.PersonalCompanies personal;
     private final JsonMapper json=JsonMapper.builder().build();
+    private final com.zoop.briefing.scheduling.BriefingSchedule schedule;
     public PersonalBriefingPreferences(JdbcTemplate jdbc,Clock clock,ExplicitBriefingService selections,
         SelectedGenerationService generation,BriefingRoundRepository rounds,PersonalCandidateAccess access,com.zoop.graph.read.PersonalCompanies personal,
-        @Value("${zoop.briefing.personal-demo-enabled:false}")boolean demoEnabled){
-        this.jdbc=jdbc;this.clock=clock;this.selections=selections;this.generation=generation;this.rounds=rounds;this.access=access;this.demoEnabled=demoEnabled;this.personal=personal;
+        boolean demoEnabled){this(jdbc,clock,selections,generation,rounds,access,personal,demoEnabled,com.zoop.briefing.scheduling.BriefingSchedule.legacy());
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public PersonalBriefingPreferences(JdbcTemplate jdbc,Clock clock,ExplicitBriefingService selections,
+        SelectedGenerationService generation,BriefingRoundRepository rounds,PersonalCandidateAccess access,com.zoop.graph.read.PersonalCompanies personal,
+        @Value("${zoop.briefing.personal-demo-enabled:false}")boolean demoEnabled,com.zoop.briefing.scheduling.BriefingSchedule schedule){
+        this.jdbc=jdbc;this.clock=clock;this.selections=selections;this.generation=generation;this.rounds=rounds;this.access=access;this.demoEnabled=demoEnabled;this.personal=personal;this.schedule=schedule;
     }
     static void member(MemberPrincipal p){if(p==null)throw new CustomException(ErrorCode.AUTH_REQUIRED);}
     public static Instant nextSlot(Instant now){
@@ -42,8 +48,8 @@ public class PersonalBriefingPreferences {
             o.put("savedAt",r.getTimestamp(4).toInstant().toString()).put("effectiveFrom",r.getTimestamp(5).toInstant().toString());return o;},args.toArray()).stream().findFirst();
     }
     public ObjectNode settings(MemberPrincipal p){
-        member(p);var o=json.createObjectNode().put("demoEnabled",demoEnabled).put("timezone","Asia/Seoul").put("nextScheduledAt",nextSlot(clock.instant()).toString());
-        o.putArray("schedule").add("09:20").add("17:30");o.set("preference",preference(p.memberId(),"").<JsonNode>map(x->x).orElse(json.nullNode()));return o;
+        member(p);var o=json.createObjectNode().put("demoEnabled",demoEnabled).put("timezone","Asia/Seoul").put("nextScheduledAt",schedule.next(clock.instant()).toString());
+        var times=o.putArray("schedule");schedule.times(clock.instant()).forEach(times::add);o.set("preference",preference(p.memberId(),"").<JsonNode>map(x->x).orElse(json.nullNode()));return o;
     }
     public boolean hasCurrentCompanies(MemberPrincipal p){
         member(p);var ids=personal.of(p);return !ids.holdings().isEmpty()||!ids.watchlist().isEmpty();
@@ -75,7 +81,7 @@ public class PersonalBriefingPreferences {
         var normalized=new ExplicitBriefingService.Choice(List.copyOf(ids),3,0,3);
         if(latest.isPresent()&&latest.get().path("choice").equals(json.valueToTree(normalized)))return settings(p);
         var now=clock.instant();jdbc.update("INSERT INTO briefing_personal_preferences(id,member_id,revision,choice,created_at,effective_from) VALUES (?,?,?,?::jsonb,?,?)",
-            "pref-"+UUID.randomUUID(),p.memberId(),latest.map(x->x.path("revision").asInt()+1).orElse(1),json.valueToTree(normalized).toString(),Timestamp.from(now),Timestamp.from(nextSlot(now)));
+            "pref-"+UUID.randomUUID(),p.memberId(),latest.map(x->x.path("revision").asInt()+1).orElse(1),json.valueToTree(normalized).toString(),Timestamp.from(now),Timestamp.from(schedule.next(now)));
         return settings(p);
     }
     private void lock(String key){jdbc.query("SELECT pg_advisory_xact_lock(hashtext(?))",r->{},"personal-briefing:"+key);}
@@ -83,7 +89,7 @@ public class PersonalBriefingPreferences {
     public ObjectNode prepare(String roundId,MemberPrincipal p,boolean demo,String expectedRevision,String requestId){
         member(p);if(demo&&!demoEnabled)throw new CustomException(ErrorCode.ACCESS_DENIED);
         var round=rounds.findById(roundId).orElseThrow(()->new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-        if(!"published".equals(round.status()) || round.scheduledAt().isAfter(clock.instant()) || (!demo && !List.of(LocalTime.of(9,20),LocalTime.of(17,30)).contains(round.scheduledAt().atZone(ZoneId.of("Asia/Seoul")).toLocalTime())))throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        if(!"published".equals(round.status()) || round.scheduledAt().isAfter(clock.instant()) || (!demo && !schedule.matches(round.scheduledAt(),round.edition())))throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         if(!demo){
             var eligible=jdbc.query("SELECT has_companies FROM briefing_personal_slot_eligibility WHERE member_id=? AND scheduled_at=?",(r,i)->r.getBoolean(1),p.memberId(),Timestamp.from(round.scheduledAt()));
             if(eligible.isEmpty()||!eligible.getFirst())return json.createObjectNode().put("status",eligible.isEmpty()?"not_scheduled":"no_companies").put("roundId",roundId);
@@ -165,6 +171,9 @@ public class PersonalBriefingPreferences {
                         var original = candidate.path("sources").valueStream().filter(c -> c.path("evidenceId").equals(source.path("evidenceId"))).findFirst().orElseThrow();
                         for (String key : List.of("quote", "url", "publishedAt"))
                             if (!original.path(key).equals(source.path(key))) throw new IllegalArgumentException("personal priority source mismatch");
+                        for(String key:List.of("title","publisher"))if(source.has(key)&&!original.path(key).equals(source.path(key)))throw new IllegalArgumentException("personal priority attribution mismatch");
+                        if(source.path("publishedAt").isNull())for(String key:List.of("publishedDate","availableAt","eligibilityBasis"))
+                            if(!original.path(key).equals(source.path(key)))throw new IllegalArgumentException("personal priority source clock mismatch");
                     }
                     for (var connection : item.path("connections"))
                         if (candidate.path("companies").valueStream().noneMatch(c -> c.path("companyId").equals(connection.path("companyId"))))

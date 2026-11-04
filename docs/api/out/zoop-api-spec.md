@@ -4903,7 +4903,12 @@ The immutable published original of a round (what users saw before any correctio
 | evidenceId | 선택 | string |  |
 | quote | 선택 | string |  |
 | url | 선택 | string |  |
-| publishedAt | 선택 | string (date-time) |  |
+| publishedAt | 선택 | string (date-time) | 실제 게시 시각. 일자만 확인된 자료는 null이며 최초 수집 시각으로 대체하지 않는다. |
+| publishedDate | 선택 | string (date) |  |
+| availableAt | 선택 | string (date-time) |  |
+| eligibilityBasis | 선택 | string | publishedAt이 null이면 first_observed이며 publishedDate와 availableAt을 함께 제공한다. |
+| title | 선택 | string |  |
+| publisher | 선택 | string |  |
 
 <a id="schema-prioritycompany"></a>
 
