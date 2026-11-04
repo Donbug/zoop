@@ -110,3 +110,27 @@ python3 scripts/prepare_briefing_read_bindings.py \
 이 파일은 승인된 grant 등록부나 native 그래프가 아니다. pending 값이나 scope hash를 실제 graphVersion으로 채우면 안 된다. 현재 source authority와 문서별 권한을 확인하고 지원되는 등록 절차에서 받은 버전·publication receipt를 연결한 뒤, 서버의 기존 조회 검사로 검증해야 한다. 과거 자료는 뒤늦게 수집한 재구성본이며 당시 운영 스냅샷으로 표시하지 않는다.
 
 서버에서 보이는 시점은 대상 회원 확인·문서 권한 근거·내부 결속 검증을 완료하고, 승인된 코드 반영/데이터 반입/배포/공통·회원 조회 검증을 마친 뒤다. 기존 결과 재사용은 새 AI 생성이나 다음 09:20/17:30 회차를 기다릴 필요가 없다. 이 준비 명령만으로 공개하거나 배포하지 않는다.
+
+## 로컬 수집 기본값과 실제 사용 권한 구분
+
+`private_intake.py`의 `USE`는 모든 비공개 시험 수집 기록에 `rights=unconfirmed`, `publicUse=false`, `modelSend=false`를 일괄 기록한다. `private_retained.describe_record`도 별도의 비공개 처리 경로를 위해 비활성·unknown grant를 만든다. 이 값은 **수집기 기본값이며 출처의 명시적 이용 금지 결정이 아니다**. 반대로 공개 표시 허가를 증명하는 값도 아니다. robots 조회 성공이나 사용자 시험 승인을 출처의 서비스 표시 허가로 간주하지 않는다.
+
+해당 준비본이 이 경로에서 나왔는지 다음 명령으로 확인할 수 있다.
+
+```sh
+python3 scripts/audit_briefing_retained_rights.py \
+  --bundle /private/output/new-bundle \
+  --units-file /private/source/native/corpus-v2/units.json \
+  --output /private/output/new-rights-audit.json
+```
+
+도구는 manifest에 고정된 수집 기록·문서 버전·본문 SHA와 원래 PLAN 해시를 대조하고, 현재 수집기의 기본값 선언 위치·해시를 남긴다. 기본값과 다르거나 출처·본문·해시가 바뀐 자료는 정상 기본값으로 처리하지 않는다. 출력은 0600이며 기존 감사 파일을 덮어쓰지 않는다. 원문·grant·DB를 변경하거나 승인본을 생성하지 않는다. 기록에 없는 출처의 이용 조건은 `not_recorded`로 구분해 확인해야 한다.
+
+저장된 브리핑 조회와 새 AI 실행은 다음처럼 분리한다.
+
+| 용도 | 필요한 operation | 필요한 purpose |
+| --- | --- | --- |
+| 기존 공통·개인화 브리핑 및 후보 조회 | read, quote-display | briefing-outlook |
+| 새 AI 생성·독립 검증 | read, store, model-send, quote-display | briefing-outlook, semantic-verification |
+
+조회에서 새 저장·모델 전송·검증 권한을 추가로 요구하지 않는다. 다만 현재 grant의 `known`·활성 상태·권한 근거·source/revision·수신자·만료 검사와 기사 공개 상태, 정확 인용·고정 그래프 검사는 유지한다. unknown/denied/비활성 grant는 조회용으로 자동 승격하지 않으며, 수집 기록의 false를 true로 바꾸지 않는다. 기존 승인 범위에 읽기·인용 표시만 있더라도 새 모델 호출은 계속 거부된다. 문서 분석·모델 worker의 기존 전체 권한 검사는 변경하지 않는다.

@@ -38,9 +38,9 @@ public class PersonalCandidateAccess {
             if (bindings.size()!=1 || !bindings.getFirst().get(1).equals(source.path("bodySha256").asString())) return false;
             if (!java.time.Instant.parse(bindings.getFirst().get(2)).equals(java.time.Instant.parse(source.path("publishedAt").asString()))) return false;
             var recipients=source.path("recipients").valueStream().map(JsonNode::asString).toList();
-            if (recipients.isEmpty() || GrantRegistry.evaluate(current.current(source.path("grantId").asString()).orElse(null),
+            if (recipients.isEmpty() || GrantRegistry.evaluateBriefingRead(current.current(source.path("grantId").asString()).orElse(null),
                     bindings.getFirst().getFirst(),source.path("grantRevision").asString(),
-                    List.of("briefing-outlook","semantic-verification"),recipients,true,clock.instant())!=null) return false;
+                    recipients,clock.instant())!=null) return false;
         }
         return true;
     }

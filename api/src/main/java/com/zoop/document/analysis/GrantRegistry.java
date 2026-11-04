@@ -19,11 +19,11 @@ import com.zoop.common.json.StrictJson;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Current-authority reader for the operator-owned flat S1 grant registry, ported rule for rule from
- * {@code ai/service/.../grants.py} ({@code parse} and {@code evaluate}, no Python import). The file is read fresh for every
- * decision; nothing is cached and nothing is written back.
+ * Current-authority reader for the operator-owned flat S1 grant registry. Parsing and model admission via {@code evaluate}
+ * follow {@code ai/service/.../grants.py} (no Python import); {@code evaluateBriefingRead} checks the narrower stored-display
+ * use. The file is read fresh for every decision; nothing is cached and nothing is written back.
  *
- * <p>It is at parity with the Python reader or stricter, never looser: JSON with duplicate keys is refused (Python keeps the
+ * <p>Registry parsing is at parity with the Python reader or stricter: JSON with duplicate keys is refused (Python keeps the
  * last), and an {@code expiresAt} that {@link OffsetDateTime#parse} cannot read denies that grant (Python's
  * {@code fromisoformat} reads more forms), so a doubtful date fails closed. The failure code is one of
  * {@code grant_registry_too_large}, {@code grant_registry_unreadable}, {@code grant_registry_schema_invalid} and
@@ -33,6 +33,7 @@ public final class GrantRegistry {
     public static final String SCHEMA = "zoop-ai-s1-1";
     public static final int MAX_BYTES = 1_000_000;
     public static final Set<String> OPERATIONS = Set.of("read", "store", "model-send", "quote-display");
+    private static final Set<String> BRIEFING_READ_OPERATIONS = Set.of("read", "quote-display");
     public static final String REPLAY_RECIPIENT = "authored-replay";
 
     private static final Set<String> KINDS = Set.of("document-summary", "document-sentiment", "semantic-verification",
@@ -127,6 +128,22 @@ public final class GrantRegistry {
      */
     public static String evaluate(FlatGrant grant, String sourceId, String revision, List<String> purposes,
             List<String> recipients, boolean requireRecipients, Instant now) {
+        return evaluateUse(grant, sourceId, revision, purposes, recipients, requireRecipients, OPERATIONS, now);
+    }
+
+    /**
+     * Viewing an already stored briefing does not store new source text, send it to a model or run a verifier. Require
+     * current read/quote authority for the briefing purpose, while retaining identity, recipient, expiry and revocation
+     * checks. This is not admission for generation: model workers must continue to use {@link #evaluate}.
+     */
+    public static String evaluateBriefingRead(FlatGrant grant, String sourceId, String revision,
+            List<String> recipients, Instant now) {
+        return evaluateUse(grant, sourceId, revision, List.of("briefing-outlook"), recipients, true,
+                BRIEFING_READ_OPERATIONS, now);
+    }
+
+    private static String evaluateUse(FlatGrant grant, String sourceId, String revision, List<String> purposes,
+            List<String> recipients, boolean requireRecipients, Set<String> requiredOperations, Instant now) {
         if (grant == null || !"known".equals(grant.rights()) || !grant.enabled() || grant.evidence().isEmpty()) {
             return "source_rights_unknown_or_denied";
         }
@@ -147,7 +164,7 @@ public final class GrantRegistry {
                 return "source_grant_expired";
             }
         }
-        if (!grant.allowedOperations().containsAll(OPERATIONS)) {
+        if (!grant.allowedOperations().containsAll(requiredOperations)) {
             return "source_operation_denied";
         }
         boolean recipientsGranted = !requireRecipients || (!recipients.isEmpty() && grant.recipients().containsAll(recipients));

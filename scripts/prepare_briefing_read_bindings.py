@@ -68,8 +68,10 @@ def plan(tables,profile,registry,target_member_id=None):
             evidenceIds=sorted(e['id'] for e in evidence.values() if (e['article_id'],e['article_version'])==key),
             observedGrant=dict(grantId=grant['grantId'],revision=grant['revision'],enabled=grant['enabled'],rights=grant['rights'],
                 allowedOperations=grant['allowedOperations'],purposes=grant['purposes'],recipients=grant['recipients']),
-            requiredByCurrentReader=dict(operations=['read','store','model-send','quote-display'],
-                purposes=['briefing-outlook','semantic-verification'],requiresCurrentEvidence=True),
+            requiredByCurrentReader=dict(operations=['read','quote-display'],
+                purposes=['briefing-outlook'],requiresCurrentEvidence=True),
+            requiredForNewModelCalls=dict(operations=['read','store','model-send','quote-display'],
+                purposes=['briefing-outlook','semantic-verification'],requiresSeparateAuthorization=True),
             proposedGrantId=None,proposedRevision=None,proposedRecipients=[],authorizationEvidence=[],
             approvalStatus='pending',newModelCallsAuthorized=False))
     basis=[]

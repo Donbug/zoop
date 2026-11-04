@@ -29,7 +29,6 @@ import tools.jackson.databind.JsonNode;
 public class DocumentBriefingContentAccess implements BriefingContentAccess {
     private static final Set<String> BINDING_FIELDS = Set.of("documentId", "documentVersion", "grantId", "grantRevision",
             "recipients");
-    private static final List<String> PURPOSES = List.of("briefing-outlook", "semantic-verification");
     private final JdbcTemplate jdbc;
     private final DocumentReadGrants grants;
     private final Clock clock;
@@ -108,8 +107,8 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
                         SELECT a.provider FROM articles a JOIN article_versions v ON v.article_id=a.id
                         WHERE a.id=? AND v.version=? AND a.access_status='available'
                         """, (rs, index) -> rs.getString("provider"), binding.documentId(), binding.documentVersion());
-                if (providers.size() != 1 || GrantRegistry.evaluate(current.current(binding.grantId()).orElse(null),
-                        providers.get(0), binding.grantRevision(), PURPOSES, binding.recipients(), true, now) != null) {
+                if (providers.size() != 1 || GrantRegistry.evaluateBriefingRead(current.current(binding.grantId()).orElse(null),
+                        providers.get(0), binding.grantRevision(), binding.recipients(), now) != null) {
                     return false;
                 }
             }

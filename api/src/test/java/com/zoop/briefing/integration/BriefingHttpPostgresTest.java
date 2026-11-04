@@ -130,6 +130,41 @@ class BriefingHttpPostgresTest {
 
     @Autowired com.zoop.auth.service.MemberSessionService personalSessions;
 
+    private tools.jackson.databind.node.ObjectNode readOnlyGrant() throws IOException {
+        var registry = (tools.jackson.databind.node.ObjectNode) JSON.readTree(resource("grants.json"));
+        var grant = (tools.jackson.databind.node.ObjectNode) registry.path("grants").get(0);
+        grant.putArray("allowedOperations").add("read").add("quote-display");
+        grant.putArray("purposes").add("briefing-outlook");
+        return registry;
+    }
+
+    @Test
+    void storedBriefingUsesDisplayAuthorityWithoutAdmittingUnknownOrRevokedSources() throws Exception {
+        String original = publishedPayload();
+        var registry = readOnlyGrant();
+        Files.writeString(GRANTS, registry.toString());
+        assertEquals(200, get(MORNING, "read-only-morning").status());
+        assertEquals(200, get(EVENING, "read-only-evening").status());
+        for (String denial : java.util.List.of("unknown", "denied", "revoked", "missing-quote", "wrong-purpose", "expired", "wrong-recipient")) {
+            var changed = registry.deepCopy();
+            var grant = (tools.jackson.databind.node.ObjectNode) changed.path("grants").get(0);
+            switch (denial) {
+                case "unknown", "denied" -> grant.put("rights", denial);
+                case "revoked" -> grant.put("enabled", false);
+                case "missing-quote" -> grant.putArray("allowedOperations").add("read");
+                case "wrong-purpose" -> grant.putArray("purposes").add("document-summary");
+                case "expired" -> grant.put("expiresAt", "2026-01-01T00:00:00Z");
+                case "wrong-recipient" -> grant.putArray("recipients").add("ungranted-recipient");
+                default -> throw new AssertionError(denial);
+            }
+            Files.writeString(GRANTS, changed.toString());
+            assertEquals(503, get(EVENING, "read-denial-" + denial).status(), denial);
+        }
+        Files.writeString(GRANTS, registry.toString());
+        assertEquals(200, get(EVENING, "read-authority-restored").status());
+        assertEquals(original, publishedPayload());
+    }
+
     @Test
     void personalSelectionUsesDbWatchlistWholePoolAndPreservesPublication() throws Exception {
         String member="personal-test-"+UUID.randomUUID();
@@ -185,6 +220,11 @@ class BriefingHttpPostgresTest {
             assertEquals(3,result.path("eligibleCount").asInt());
             assertTrue(result.path("items").valueStream().noneMatch(c->c.path("issueId").asString().equals("brf-test-event")));
             assertFalse(response.body().contains("grantId"));
+            Files.writeString(GRANTS, readOnlyGrant().toString());
+            var storedRead=http.send(HttpRequest.newBuilder(URI.create(base()+"/api/v1/briefings/"+ROUND+"/personalized/issues"))
+                .header("Cookie","zoop_session="+token).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,storedRead.statusCode(),storedRead.body());
+            assertEquals(result.path("items"),JSON.readTree(storedRead.body()).path("items"));
             String otherToken=personalSessions.issue(other,null,"personal-test").token();
             var otherResponse=http.send(HttpRequest.newBuilder(URI.create(base()+"/api/v1/briefings/"+ROUND+"/personalized/issues?memberId="+member))
                 .header("Cookie","zoop_session="+otherToken).GET().build(),HttpResponse.BodyHandlers.ofString());

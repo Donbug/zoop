@@ -54,6 +54,10 @@ class BindingPreparationTest(unittest.TestCase):
             self.assertEqual(request['approvalStatus'],'pending')
             self.assertIsNone(request['proposedGrantId'])
             self.assertFalse(request['newModelCallsAuthorized'])
+            self.assertEqual(request['requiredByCurrentReader']['operations'],['read','quote-display'])
+            self.assertEqual(request['requiredByCurrentReader']['purposes'],['briefing-outlook'])
+            self.assertIn('model-send',request['requiredForNewModelCalls']['operations'])
+            self.assertIn('semantic-verification',request['requiredForNewModelCalls']['purposes'])
 
     def test_forged_pool_seal_is_rejected(self):
         t,p,r=fixture();t['briefing_personal_pools'][0]['snapshot']['candidates'][0]['issueId']='changed'
