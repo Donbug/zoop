@@ -83,7 +83,8 @@ export function companyNodeSize(issueCount: number, scale = 1) {
           : issueCount <= 4
             ? 3
             : 4;
-  return [36, 44, 52, 68, 88][level] * scale;
+  // D-GRP-01: 2026-11-04 review enlarged every level by 25% (was 36/44/52/68/88).
+  return [45, 55, 65, 85, 110][level] * scale;
 }
 
 export function focusNeighborhood(

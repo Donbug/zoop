@@ -3,6 +3,14 @@ import type { GraphResponse } from '@/types/map/graph';
 type Point = { x: number; y: number };
 const cache = new WeakMap<GraphResponse, Map<string, Point>>();
 
+// Leaf-issue rings before the final 1.5× spread: first radius, ring gap and the arc reserved
+// per issue title (about one wrapped title wide at the default zoom).
+const LEAF_RADIUS = 270;
+const LEAF_RING_GAP = 170;
+const LEAF_ARC = 260;
+const ringCapacity = (radius: number) =>
+  Math.max(4, Math.floor((2 * Math.PI * radius) / LEAF_ARC));
+
 // D-GRP-01/01b: translate whole disconnected groups, never scale their interior.
 // Bounds include folded issues so expanding one does not move neighboring groups.
 export function compactRelationshipGroups(
@@ -213,6 +221,15 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
     point.x *= fit * 1.45;
     point.y *= fit;
   }
+  // D-GRP-01: a company's single-company issues sit on rings around it. Each ring holds as many
+  // as its circumference allows (one issue title per LEAF_ARC), so a busy company such as
+  // 삼성전자 spreads its issues outward instead of stacking six per ring.
+  const leafCounts = new Map<string, number>();
+  for (const node of ordered)
+    if (!points.has(node.id)) {
+      const parentId = [...neighbors.get(node.id)!][0] ?? '';
+      leafCounts.set(parentId, (leafCounts.get(parentId) ?? 0) + 1);
+    }
   const leaves = new Map<string, number>();
   for (const node of ordered) {
     if (points.has(node.id)) continue;
@@ -220,13 +237,32 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
     const parent = points.get(parentId);
     const index = leaves.get(parentId ?? '') ?? 0;
     leaves.set(parentId ?? '', index + 1);
-    const angle = index * 2.399963229728653;
-    const radius = parent
-      ? 270 + Math.floor(index / 6) * 135
-      : 400 + index * 100;
+    if (!parent) {
+      const angle = index * 2.399963229728653;
+      const radius = 400 + index * 100;
+      points.set(node.id, {
+        x: Math.cos(angle) * radius,
+        y: Math.sin(angle) * radius,
+      });
+      continue;
+    }
+    let ring = 0,
+      start = 0,
+      radius = LEAF_RADIUS,
+      capacity = ringCapacity(radius);
+    while (index >= start + capacity) {
+      start += capacity;
+      ring += 1;
+      radius = LEAF_RADIUS + ring * LEAF_RING_GAP;
+      capacity = ringCapacity(radius);
+    }
+    const onRing = Math.min(capacity, (leafCounts.get(parentId) ?? 0) - start);
+    // Offset alternate rings by half a slot so titles on neighbouring rings do not line up.
+    const angle =
+      ((index - start + (ring % 2) / 2) / onRing) * Math.PI * 2 - Math.PI / 2;
     points.set(node.id, {
-      x: (parent?.x ?? 0) + Math.cos(angle) * radius,
-      y: (parent?.y ?? 0) + Math.sin(angle) * radius,
+      x: parent.x + Math.cos(angle) * radius,
+      y: parent.y + Math.sin(angle) * radius,
     });
   }
   const groups: string[][] = [];

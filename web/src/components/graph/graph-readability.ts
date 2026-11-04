@@ -3,6 +3,9 @@ import type { GraphResponse } from '@/types/map/graph';
 import { intersects, screenLabelSize, type Rect } from './graph-geometry';
 import { MIN_GRAPH_ZOOM } from './graph-zoom-range';
 
+/** Below this zoom issue titles are clipped to two lines (D-GRP-01 overview). */
+export const OVERVIEW_ZOOM = 0.45;
+
 export type ReadingContext = {
   zoom: number;
   anchor: string | null;
@@ -106,10 +109,19 @@ export function readingStyles(
           labelVisibility:
             node.style?.visibility !== 'hidden' ? 'visible' : 'hidden',
           labelFontSize: size,
+          // D-GRP-01: G keeps a fixed 16px line height; it must grow with the zoom-corrected font
+          // or wrapped lines overlap and the culling below measures a box shorter than the text.
+          labelLineHeight: size * 1.3,
           labelWordWrap: true,
           labelWordWrapWidth: 170 / zoom,
+          labelTextOverflow: 'ellipsis',
           labelMaxWidth: 170 / zoom,
-          labelMaxLines: Math.max(1, (source?.label ?? '').length),
+          // D-GRP-01: the zoomed-out overview shows two lines of each issue title; zooming in,
+          // hovering or selecting brings back the whole title.
+          labelMaxLines:
+            source?.kind === 'issue' && zoom < OVERVIEW_ZOOM && !emphasized
+              ? 2
+              : Math.max(1, (source?.label ?? '').length),
           badges:
             source?.kind === 'issue' &&
             source.evidenceCount !== null &&
@@ -157,6 +169,7 @@ const READING_KEYS = new Set([
   'labelWordWrapWidth',
   'labelMaxWidth',
   'labelMaxLines',
+  'labelLineHeight',
   'badges',
 ]);
 
@@ -302,6 +315,7 @@ export async function applyGraphReading(
       fontSize: style.labelFontSize,
       wordWrapWidth: style.labelWordWrapWidth,
       maxLines: style.labelMaxLines,
+      lineHeight: style.labelLineHeight,
     });
   };
   type ElementShape = { getShape: (name: string) => Shape | undefined };
