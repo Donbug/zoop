@@ -512,7 +512,8 @@ class OrchestratedChatEngineTest {
         // A timeout is the same passing fault.
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> {
             try {
-                Thread.sleep(10_000);
+                // Core graph/evidence reads have a 25 s per-call limit; stay past it so this remains a timeout fixture.
+                Thread.sleep(26_000);
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
             }

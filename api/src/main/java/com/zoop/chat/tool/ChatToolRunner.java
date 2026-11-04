@@ -47,8 +47,10 @@ import tools.jackson.databind.node.ObjectNode;
  * <li>Every capability must be bound in {@link ChatToolRegistry} before anything is reserved; an unbound one refuses the
  * whole stage. The stage's calls are reserved first ({@code reserved}, at most 12 per attempt) and each is marked
  * {@code running} just before it starts.</li>
- * <li>At most four calls of a stage run at once. A call has 3 seconds, a graph computation ({@code zoop-graph-read}:
- * paths, version comparison) 5 seconds, a web search 7 seconds, and the stage 10 seconds, never past the run's deadline; a call that runs out ends {@code failed}/{@link #TIMEOUT} and its read is interrupted. A call that could not
+ * <li>At most four calls of a stage run at once. A lightweight call has 3 seconds, a core graph/evidence read
+ * ({@code zoop-core-read}) 25 seconds, a graph computation ({@code zoop-graph-read}: paths, version comparison) 5 seconds,
+ * a web search 7 seconds, and the stage 30 seconds, never past the run's deadline; a call that runs out ends
+ * {@code failed}/{@link #TIMEOUT} and its read is interrupted. A call that could not
  * start within the stage stays reserved and is closed as {@code cancelled} with the job, and a call whose start was
  * recorded only after the stage ran out is not run at all.</li>
  * <li>Reads that have not ended, timed-out ones included, hold a runner-wide slot ({@link #MAX_IN_FLIGHT}) until their
@@ -67,8 +69,9 @@ public class ChatToolRunner implements AutoCloseable {
     public static final String TIMEOUT = "tool_timeout";
     public static final String UNAVAILABLE = "tool_unavailable";
     public static final String FAILED = "tool_failed";
-    static final Duration STAGE_LIMIT = Duration.ofSeconds(10);
+    static final Duration STAGE_LIMIT = Duration.ofSeconds(30);
     static final Duration CALL_LIMIT = Duration.ofSeconds(3);
+    static final Duration CORE_READ_LIMIT = Duration.ofSeconds(25);
     static final Duration GRAPH_CALL_LIMIT = Duration.ofSeconds(5);
     static final Duration WEB_CALL_LIMIT = Duration.ofSeconds(7);
     static final Duration RECORD_GRACE = Duration.ofSeconds(2);
@@ -84,6 +87,7 @@ public class ChatToolRunner implements AutoCloseable {
     private final ChatToolRegistry registry;
     private final Duration stageLimit;
     private final Duration callLimit;
+    private final Duration coreReadLimit;
     private final Duration graphCallLimit;
     private final Duration recordGrace;
     private final Semaphore inFlight;
@@ -97,14 +101,20 @@ public class ChatToolRunner implements AutoCloseable {
 
     @Autowired
     public ChatToolRunner(ChatToolRegistry registry) {
-        this(registry, STAGE_LIMIT, CALL_LIMIT, GRAPH_CALL_LIMIT, RECORD_GRACE, MAX_IN_FLIGHT);
+        this(registry, STAGE_LIMIT, CALL_LIMIT, CORE_READ_LIMIT, GRAPH_CALL_LIMIT, RECORD_GRACE, MAX_IN_FLIGHT);
     }
 
     ChatToolRunner(ChatToolRegistry registry, Duration stageLimit, Duration callLimit, Duration graphCallLimit,
             Duration recordGrace, int maxInFlight) {
+        this(registry, stageLimit, callLimit, callLimit, graphCallLimit, recordGrace, maxInFlight);
+    }
+
+    private ChatToolRunner(ChatToolRegistry registry, Duration stageLimit, Duration callLimit, Duration coreReadLimit,
+            Duration graphCallLimit, Duration recordGrace, int maxInFlight) {
         this.registry = registry;
         this.stageLimit = stageLimit;
         this.callLimit = callLimit;
+        this.coreReadLimit = coreReadLimit;
         this.graphCallLimit = graphCallLimit;
         this.recordGrace = recordGrace;
         this.inFlight = new Semaphore(maxInFlight);
@@ -384,6 +394,7 @@ public class ChatToolRunner implements AutoCloseable {
     /** The time one call of {@code capability} has, before the stage and the run's deadline shorten it. */
     private Duration limit(ChatCapability capability) {
         if (capability.web()) return WEB_CALL_LIMIT;
+        if ("zoop-core-read".equals(capability.group())) return coreReadLimit;
         return "zoop-graph-read".equals(capability.group()) ? graphCallLimit : callLimit;
     }
 

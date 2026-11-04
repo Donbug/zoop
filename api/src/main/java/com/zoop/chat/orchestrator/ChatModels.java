@@ -45,7 +45,8 @@ public final class ChatModels {
     }
 
     /** Canonical facts are server observations, not article evidence and never a model's assertions. */
-    public sealed interface ServerFact permits PortfolioFact, ComparisonFact, PublicationFact, BriefingSelectionFact {
+    public sealed interface ServerFact permits PortfolioFact, ComparisonFact, PublicationFact, BriefingSelectionFact,
+            GraphIssueFact {
         String requirementId();
     }
 
@@ -74,6 +75,10 @@ public final class ChatModels {
     public record ComparisonFact(String requirementId, String fromVersion, String toVersion, Instant asOf,
             Instant since, String queryScope, List<String> targetIds, int evidenceLimit, int changeLimit,
             boolean evidenceRestricted, List<GraphChange> changes, boolean truncated) implements ServerFact { }
+
+    /** An issue and its companies as read from the run's pinned public graph, bound to the evidence the section cites. */
+    public record GraphIssueFact(String requirementId, String issueId, String issueTitle, List<String> companyIds,
+            List<String> evidenceIds, String graphVersion) implements ServerFact { }
 
     /**
      * A short-lived, non-deserializable envelope captured from current branches, consumed with the exact run and checked
@@ -112,7 +117,8 @@ public final class ChatModels {
                         boolean portfolio = ChatCapability.PORTFOLIO_SCOPE_READ.id().equals(result.capabilityId());
                         boolean comparison = ChatCapability.GRAPH_VERSION_DIFF.id().equals(result.capabilityId());
                         boolean selection = ChatCapability.SELECTION_RULE_READ.id().equals(result.capabilityId());
-                        if (!portfolio && !comparison && !selection) continue;
+                        boolean issueRead = ChatCapability.ISSUE_READ.id().equals(result.capabilityId());
+                        if (!portfolio && !comparison && !selection && !issueRead) continue;
                         if (!result.succeeded() || result.provenance() == null
                                 || !result.provenance().belongsTo(run)) throw invalidFacts();
                         ChatToolRequest query = result.provenance().request();
@@ -120,6 +126,12 @@ public final class ChatModels {
                                 || !seen.add(result.toolCallId())) throw invalidFacts();
                         if (selection) {
                             for (ServerFact fact : selections(run, branch.requirementId(), result)) {
+                                if (!facts.contains(fact)) facts.add(fact);
+                            }
+                            continue;
+                        }
+                        if (issueRead) {
+                            for (ServerFact fact : graphIssues(run, branch.requirementId(), section, result)) {
                                 if (!facts.contains(fact)) facts.add(fact);
                             }
                             continue;
@@ -198,6 +210,23 @@ public final class ChatModels {
             return new ComparisonFact(requirement, earlier, run.graphVersionId(), run.context().asOf(), query.since(),
                     whole ? "whole_graph" : "targets", whole ? List.of() : targets, query.limit(), 40,
                     query.evidenceScope() != null, List.copyOf(changes), result.truncated());
+        }
+
+        private static List<ServerFact> graphIssues(ChatRun run, String requirement,
+                ChatGeneratedAnswer.Section section, ChatToolResult result) {
+            if (!Objects.equals(run.graphVersionId(), result.dataVersion()) || result.items().size() > 50) {
+                throw invalidFacts();
+            }
+            List<ServerFact> facts = new ArrayList<>();
+            for (ChatToolItem item : result.items()) {
+                if (!"issue".equals(item.kind()) || item.companyIds().size() > ChatToolRequest.MAX_TARGETS
+                        || item.companyIds().stream().anyMatch(id -> !companyId(id))) throw invalidFacts();
+                List<String> evidence = item.evidenceIds().stream().filter(section.evidenceIds()::contains).toList();
+                if (evidence.isEmpty()) continue;
+                facts.add(new GraphIssueFact(requirement, item.id(), bounded(item.label()), item.companyIds(), evidence,
+                        run.graphVersionId()));
+            }
+            return List.copyOf(facts);
         }
 
         private static boolean companyId(String id) {

@@ -460,7 +460,27 @@ class BriefingSelectionFact(Wire):
     reason: str = Field(min_length=1, max_length=1000)
 
 
-ServerFact = Annotated[PortfolioFact | ComparisonFact | PublicationFact | BriefingSelectionFact,
+class GraphIssueFact(Wire):
+    """An issue and its member companies from the request's pinned public graph."""
+    kind: Literal["graph_issue_membership"]
+    requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
+    issue_id: str = Field(min_length=1, max_length=200)
+    issue_title: str = Field(min_length=1, max_length=300)
+    company_ids: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(min_length=1, max_length=5)
+    evidence_ids: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(min_length=1, max_length=MAX_CITATIONS)
+    graph_version: str = Field(min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def bounded_membership(self):
+        if len(set(self.company_ids)) != len(self.company_ids) or any(
+                ":" not in company_id or company_id.startswith("member:") for company_id in self.company_ids):
+            raise ValueError("distinct company ids required")
+        if len(set(self.evidence_ids)) != len(self.evidence_ids):
+            raise ValueError("evidence ids must be distinct")
+        return self
+
+
+ServerFact = Annotated[PortfolioFact | ComparisonFact | PublicationFact | BriefingSelectionFact | GraphIssueFact,
                        Field(discriminator="kind")]
 
 
@@ -507,6 +527,11 @@ class VerificationInput(Wire):
                     raise ValueError("comparison belongs to another version or asOf")
                 if isinstance(fact, PublicationFact) and fact.graph_version != self.request_binding.graph_version_id:
                     raise ValueError("publication record belongs to another version")
+                if isinstance(fact, GraphIssueFact):
+                    if fact.graph_version != self.request_binding.graph_version_id:
+                        raise ValueError("graph issue belongs to another version")
+                    if not set(fact.evidence_ids) <= set(section.evidence_ids):
+                        raise ValueError("graph issue cites evidence outside its section")
         for section in self.sections:
             if section.basis == "general_knowledge" and section.evidence_ids:
                 raise ValueError("a general section cites nothing")

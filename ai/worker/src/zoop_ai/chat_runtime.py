@@ -11,7 +11,7 @@ Rules (ZOOP-AIG-001 6.3.2-6.3.3, design summary 5.1):
   stage as purpose and the exact recipient (`authored-replay`, or `<provider>:<revision>` live). Otherwise nothing is sent.
 - Each stage has its own client timeout (router 4 s, answer 25 s, verification 6 s, agent step 30 s); a timeout after sending
   is `unknown`.
-- The models are pinned like the pipeline's: Luna `gpt-6-luna` at reasoning effort `high` for `chat-answer` and `medium` for
+- The models are pinned: Luna `gpt-6-luna` at reasoning effort `medium` for both `chat-answer` and
   `chat-agent`, Jev `jev-1.14.0`. The model that answered must be the pinned one (a Luna answer may name a `gpt-6-luna-...`
   snapshot) and is what the receipt records.
 - An agent step (`chat-agent`) is one Responses request, so the same ledger rules hold per step: the application gives every

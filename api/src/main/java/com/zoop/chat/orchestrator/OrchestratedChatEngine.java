@@ -340,14 +340,17 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
 
         Map<String, ChatWebResult> hits = new LinkedHashMap<>();
         branches.forEach(b -> b.results().forEach(r -> r.webResults().forEach(h -> hits.putIfAbsent(h.id(), h))));
+        // Re-open every selected citation under the current authority before verification. Article reads may each touch
+        // the operator-owned grant/source registries, so start the independent reads together: serial reads can consume
+        // the verification reservation even when every one succeeds. The original section/evidence order still decides
+        // the response order below, and every read remains fresh for this run.
+        Map<String, Optional<Citation>> readableCitations = readCitations(run, passed.sections(), hits);
         Map<String, Citation> cited = new LinkedHashMap<>();
         for (var section : passed.sections()) {
             for (String id : section.evidenceIds()) {
                 Citation citation = cited.get(id);
                 if (citation == null) {
-                    // A web hit is cited as the search returned it: there is no evidence record to read again.
-                    Optional<Citation> read = hits.containsKey(id) ? Optional.of(webCitation(hits.get(id)))
-                            : citations.cite(id, run.graphVersionId(), run.context().asOf(), run.jobId());
+                    Optional<Citation> read = readableCitations.getOrDefault(id, Optional.empty());
                     // Readable when the tool passed it on and not now: the answer cannot stand on it.
                     if (read.isEmpty()) return validationFailed();
                     citation = read.get();
@@ -454,6 +457,35 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                         run.graphVersionId(), run.context().asOf()), clock.instant());
         route.put("outcome", "answered").set("coverage", coverage.json());
         return new ChatEngineOutcome.Completed(result, route);
+    }
+
+    /**
+     * Reads the answer's distinct citations concurrently, each through the same current-authority check as before. Web hits
+     * need no second store read and are rebound directly. A failed read keeps the existing fail-closed behavior.
+     */
+    private Map<String, Optional<Citation>> readCitations(ChatRun run,
+            List<ChatGeneratedAnswer.Section> sections, Map<String, ChatWebResult> hits) {
+        Map<String, Future<Optional<Citation>>> pending = new LinkedHashMap<>();
+        for (var section : sections) {
+            for (String id : section.evidenceIds()) {
+                if (pending.containsKey(id)) continue;
+                pending.put(id, models.submit(() -> hits.containsKey(id) ? Optional.of(webCitation(hits.get(id)))
+                        : citations.cite(id, run.graphVersionId(), run.context().asOf(), run.jobId())));
+            }
+        }
+        Map<String, Optional<Citation>> read = new LinkedHashMap<>();
+        try {
+            for (var entry : pending.entrySet()) read.put(entry.getKey(), entry.getValue().get());
+        } catch (InterruptedException interrupted) {
+            pending.values().forEach(future -> future.cancel(true));
+            Thread.currentThread().interrupt();
+            throw new ChatToolUnavailable("interrupted while reopening answer citations", interrupted);
+        } catch (ExecutionException failed) {
+            pending.values().forEach(future -> future.cancel(true));
+            if (failed.getCause() instanceof RuntimeException runtime) throw runtime;
+            throw new IllegalStateException("citation read failed", failed.getCause());
+        }
+        return Map.copyOf(read);
     }
 
     /**

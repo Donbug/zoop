@@ -463,6 +463,12 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
                             .put("change", change.change());
                 }
             }
+            case ChatModels.GraphIssueFact issue -> {
+                wire.put("kind", "graph_issue_membership").put("issueId", issue.issueId())
+                        .put("issueTitle", issue.issueTitle()).put("graphVersion", issue.graphVersion());
+                issue.companyIds().forEach(wire.putArray("companyIds")::add);
+                issue.evidenceIds().forEach(wire.putArray("evidenceIds")::add);
+            }
         }
         return wire;
     }
