@@ -5,18 +5,29 @@ import { eventTimeText } from '@/util/event-time';
 import { getEvent } from '@/apis/graph/events';
 import type { EventContext, EventDetail } from '@/types/map/event';
 // D-GRP-01/02 M15: keep unknown event precision last; fetch basis only on request.
+// D-GRP-01 issue groups reuse this list with their own title, description and row text.
 export default function IsolatedIssuesPanel({
   issues,
   onSelect,
   onClose,
   onEvidence,
   context = {},
+  title,
+  description,
+  closeLabel = '연결 없는 사건 닫기',
+  searchable = true,
+  rowLabel = (issue) => issue.label,
 }: {
   issues: GraphNode[];
   onSelect: (id: string) => void;
   onClose: () => void;
   onEvidence?: (event: EventDetail) => void;
   context?: EventContext;
+  title?: string;
+  description?: string;
+  closeLabel?: string;
+  searchable?: boolean;
+  rowLabel?: (issue: GraphNode) => string;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [query, setQuery] = useState('');
@@ -46,7 +57,7 @@ export default function IsolatedIssuesPanel({
   }
   const filtered = issues
     .filter((issue) =>
-      issue.label.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+      rowLabel(issue).toLocaleLowerCase().includes(query.toLocaleLowerCase()),
     )
     .sort((a, b) => {
       const knownA = eventTimeText(a.eventTime, a.timePrecision)
@@ -82,12 +93,12 @@ export default function IsolatedIssuesPanel({
             tabIndex={-1}
             className={ui.title}
           >
-            연결 없는 사건 {issues.length}건
+            {title ?? `연결 없는 사건 ${issues.length}건`}
           </h2>
           <button
             className={ui.close}
             onClick={onClose}
-            aria-label="연결 없는 사건 닫기"
+            aria-label={closeLabel}
           >
             ×
           </button>
@@ -96,17 +107,19 @@ export default function IsolatedIssuesPanel({
       <div className={ui.scroll}>
         <section className={ui.section}>
           <p>
-            현재 조회한 그래프에서 연결선이 확인되지 않은 사건입니다. 전체
-            데이터에 관계가 없다는 뜻은 아닙니다.
+            {description ??
+              '현재 조회한 그래프에서 연결선이 확인되지 않은 사건입니다. 전체 데이터에 관계가 없다는 뜻은 아닙니다.'}
           </p>
-          <label className="mt-3 block">
-            사건 검색
-            <input
-              className="mt-1 w-full rounded-panel border border-panel-line p-2"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
+          {searchable && (
+            <label className="mt-3 block">
+              사건 검색
+              <input
+                className="mt-1 w-full rounded-panel border border-panel-line p-2"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+          )}
           <ul className={ui.list}>
             {filtered.map((issue) => (
               <li key={issue.id}>
@@ -114,7 +127,7 @@ export default function IsolatedIssuesPanel({
                   className="w-full text-left"
                   onClick={() => onSelect(issue.id)}
                 >
-                  {issue.label}
+                  {rowLabel(issue)}
                 </button>
                 <p className={ui.muted}>
                   {eventTimeText(issue.eventTime, issue.timePrecision) ??
@@ -126,7 +139,7 @@ export default function IsolatedIssuesPanel({
                     className={`${ui.button} mt-1`}
                     disabled={pending !== null || issue.evidenceCount === 0}
                     onClick={() => void evidence(issue.id)}
-                    aria-label={`${issue.label} 근거 보기`}
+                    aria-label={`${rowLabel(issue)} 근거 보기`}
                   >
                     {pending === issue.id
                       ? '근거 확인 중'
