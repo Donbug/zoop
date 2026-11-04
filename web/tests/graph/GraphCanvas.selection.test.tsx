@@ -1751,7 +1751,11 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       clientX: 100,
       clientY: 100,
     });
-    fireEvent.pointerMove(surface, { clientX: 140, clientY: 125 });
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      clientX: 140,
+      clientY: 125,
+    });
     await act(async () => {
       fireEvent.pointerUp(window, { button: 2, pointerId: 1 });
       fireEvent.pointerUp(window, { button: 0, pointerId: 2 });
@@ -1773,6 +1777,123 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     await waitFor(() =>
       expect(appliedStates()).toMatchObject({ 'KRX:005380': ['hovered'] }),
     );
+  });
+
+  it('D-GRP-01 브라우저 밖에서 버튼을 놓아 pointerup을 놓쳐도, 버튼 없이 돌아온 움직임에서 끌기를 끝내고 hover를 되살린다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+    await waitFor(() =>
+      expect(canvas.handlers.has('node:pointerenter')).toBe(true),
+    );
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const surface = screen.getByRole('img', { name: /관계 지도:/ });
+
+    fireEvent.pointerDown(surface, {
+      button: 0,
+      pointerId: 1,
+      pointerType: 'mouse',
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 1,
+      clientX: 140,
+      clientY: 125,
+    });
+    await act(async () =>
+      canvas.handlers.get('node:pointerenter')!({
+        target: { id: 'NASDAQ:NVDA' },
+      }),
+    );
+    expect(canvas.setElementState).not.toHaveBeenCalled();
+
+    // pointerup 없이 버튼이 떼어진 채 지도 안으로 돌아온다.
+    await act(async () =>
+      fireEvent.pointerMove(surface, {
+        pointerId: 1,
+        pointerType: 'mouse',
+        buttons: 0,
+        clientX: 150,
+        clientY: 130,
+      }),
+    );
+    await waitFor(() =>
+      expect(appliedStates()).toMatchObject({ 'NASDAQ:NVDA': ['hovered'] }),
+    );
+    await act(async () =>
+      canvas.handlers.get('node:pointerenter')!({
+        target: { id: 'KRX:005380' },
+      }),
+    );
+    await waitFor(() =>
+      expect(appliedStates()).toMatchObject({ 'KRX:005380': ['hovered'] }),
+    );
+  });
+
+  it('D-GRP-01 끌던 중 두 번째 손가락이 닿아도 첫 손가락의 끌기를 유지하고, 첫 손가락을 뗄 때 반영한다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const onSelect = vi.fn();
+    render(<GraphCanvas data={data} onSelect={onSelect} />);
+    await waitFor(() =>
+      expect(canvas.handlers.has('node:pointerenter')).toBe(true),
+    );
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const surface = screen.getByRole('img', { name: /관계 지도:/ });
+
+    fireEvent.pointerDown(surface, {
+      button: 0,
+      pointerId: 1,
+      pointerType: 'touch',
+      isPrimary: true,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      pointerType: 'touch',
+      buttons: 1,
+      clientX: 140,
+      clientY: 125,
+    });
+    await act(async () =>
+      canvas.handlers.get('node:pointerenter')!({
+        target: { id: 'NASDAQ:NVDA' },
+      }),
+    );
+    // 두 번째 손가락: 누름·움직임·뗌 모두 첫 손가락의 끌기를 건드리지 않는다.
+    await act(async () => {
+      fireEvent.pointerDown(surface, {
+        button: 0,
+        pointerId: 2,
+        pointerType: 'touch',
+        isPrimary: false,
+        clientX: 300,
+        clientY: 300,
+      });
+      fireEvent.pointerMove(surface, {
+        pointerId: 2,
+        pointerType: 'touch',
+        buttons: 1,
+        clientX: 302,
+        clientY: 301,
+      });
+      fireEvent.pointerUp(window, { button: 0, pointerId: 2 });
+    });
+    expect(canvas.setElementState).not.toHaveBeenCalled();
+
+    await act(async () =>
+      fireEvent.pointerUp(window, { button: 0, pointerId: 1 }),
+    );
+    await waitFor(() =>
+      expect(appliedStates()).toMatchObject({ 'NASDAQ:NVDA': ['hovered'] }),
+    );
+    // 첫 손가락은 끌기였으므로 뗄 때의 클릭으로 노드를 고르지 않는다.
+    act(() =>
+      canvas.handlers.get('node:click')!({ target: { id: 'NASDAQ:NVDA' } }),
+    );
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('D-GRP-03 선택 상태가 G6 기본 12px로 이름표를 줄이지 않는다', async () => {
