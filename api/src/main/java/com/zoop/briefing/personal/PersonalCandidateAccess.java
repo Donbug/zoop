@@ -24,8 +24,10 @@ public class PersonalCandidateAccess {
         this.retained=new com.zoop.briefing.query.SavedBriefingBasisAuthority(jdbc,properties.artifactRootPath());
     }
     public boolean readableForRound(JsonNode candidate, BriefingRound round, String requestId) {
-        return retained.allowsCandidate(round.payload(),round.publicSnapshot(),candidate)
-                &&readable(candidate,authority.context(round.graphVersion(),requestId),requestId);
+        var graph=authority.context(round.graphVersion(),requestId);
+        if(round.publicSnapshot()!=null&&round.publicSnapshot().has("retainedBasis")
+                &&!retained.allowsCandidate(round.payload(),round.publicSnapshot(),candidate))return false;
+        return readable(candidate,graph,requestId);
     }
     public boolean readable(JsonNode candidate, BriefingGraphContentAuthority.Context graph, String requestId) {
         if (!graph.allowsCandidate(candidate)) return false;
