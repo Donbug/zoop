@@ -374,6 +374,48 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     expect(screen.getByRole('button', { name: '★ 관심 해제' })).toBeTruthy();
   });
 
+  // #568 리뷰: 기업 응답 전에는 갱신되지 않은 지도 노드 값으로 관심을 저장하지 않는다.
+  it('FS027 기업 응답 전에 열면 이미 저장한 관심 목록으로 ★를 정하고 해제 요청을 보낸다', async () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      loading: true,
+      data: marketOnly,
+    });
+    vi.mocked(setWatchlistCompany).mockResolvedValue({
+      watchlistIds: [],
+      version: 3,
+    } as never);
+    render(
+      <MemoryRouter>
+        <CompanyDetailPanel
+          companyId={company.id}
+          fallback={{ ...fallback, watch: false }}
+          relatedCompanies={[]}
+          token="member-token"
+          watchSync={{ ids: [company.id], seq: 1 }}
+          onClose={vi.fn()}
+          onSelectIssue={vi.fn()}
+          onFocus={vi.fn()}
+          onAskAi={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: '★ 관심 해제' }));
+    expect(setWatchlistCompany).toHaveBeenCalledWith(company.id, false);
+  });
+
+  it('FS027 저장한 관심 목록도 기업 응답도 없으면 관심 버튼을 막는다', () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      loading: true,
+      data: marketOnly,
+    });
+    renderPanel('member-token');
+    const button = screen.getByRole('button', { name: '관심 확인 중…' });
+    expect(button.hasAttribute('disabled')).toBe(true);
+    expect(screen.queryByRole('button', { name: '☆ 관심 추가' })).toBeNull();
+  });
+
   it('저장 실패 시 관심 상태를 되돌리고 재시도 경로를 제공한다', async () => {
     vi.mocked(setWatchlistCompany).mockRejectedValue(new Error('실패'));
     renderPanel('member-token');

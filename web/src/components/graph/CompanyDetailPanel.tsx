@@ -196,7 +196,10 @@ export default function CompanyDetailPanel(props: Props) {
     retry,
     props.context,
   );
-  const [watchOverride, setWatchOverride] = useState<boolean | null>(null);
+  // 이 지도에서 이미 저장한 관심 목록이 있으면 처음 열 때부터 그 목록을 쓴다(지도 노드 값은 갱신되지 않는다).
+  const [watchOverride, setWatchOverride] = useState<boolean | null>(
+    props.watchSync ? props.watchSync.ids.includes(props.companyId) : null,
+  );
   const [saving, setSaving] = useState(false);
   const [watchError, setWatchError] = useState('');
   // 사이드바에서 이 기업의 관심을 바꾸면 ★도 같은 목록으로 맞춘다. 저장 중에는 내 저장 결과를 기다린다.
@@ -207,12 +210,13 @@ export default function CompanyDetailPanel(props: Props) {
       setWatchOverride(props.watchSync.ids.includes(props.companyId));
   }
   const company = data?.company;
-  // 그래프 응답 전에는 지도 노드가 가진 관심 표시로 시작한다.
-  const watch =
-    watchOverride ?? Boolean(company?.watch ?? props.fallback.watch);
+  // 저장한 목록도 기업 응답도 없으면 관심 상태를 모른다. 오래된 지도 노드 값으로 저장하지 않도록
+  // 기업 응답이 올 때까지 버튼을 막는다.
+  const knownWatch = watchOverride ?? company?.watch ?? null;
+  const watch = Boolean(knownWatch);
 
   async function toggleWatch() {
-    if (!props.token || saving) return;
+    if (!props.token || saving || knownWatch === null) return;
     const previous = watch;
     const desired = !previous;
     setWatchOverride(desired);
@@ -483,10 +487,16 @@ export default function CompanyDetailPanel(props: Props) {
           {props.token ? (
             <button
               onClick={() => void toggleWatch()}
-              disabled={saving}
-              aria-pressed={watch}
+              disabled={saving || knownWatch === null}
+              aria-pressed={knownWatch === null ? undefined : watch}
             >
-              {saving ? '저장 중…' : watch ? '★ 관심 해제' : '☆ 관심 추가'}
+              {saving
+                ? '저장 중…'
+                : knownWatch === null
+                  ? '관심 확인 중…'
+                  : watch
+                    ? '★ 관심 해제'
+                    : '☆ 관심 추가'}
             </button>
           ) : (
             <Link to="/login" state={{ from: location }}>
