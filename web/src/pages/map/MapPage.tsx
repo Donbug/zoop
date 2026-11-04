@@ -64,6 +64,7 @@ import MapDetailSheet from '@/components/graph/MapDetailSheet';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useCompanyResource } from '@/hooks/useCompanyResource';
 import { useImpactPath } from '@/hooks/useImpactPath';
+import { useImpactAssessment } from '@/hooks/useImpactAssessment';
 import { companyUrl } from '@/apis/company/company';
 import { setTutorialCompleted } from '@/apis/graph/tutorial';
 import { impactEdges, exactTime } from '@/components/company/detail-model';
@@ -673,6 +674,12 @@ function MapWorkspace({
       target?.issue.id === impactIssueId
       ? target.edge.id
       : undefined,
+  );
+  const impactAssessment = useImpactAssessment(
+    data && !loading && !error ? impactCompanyId : null,
+    data && !loading && !error ? impactIssueId : null,
+    impact.data?.pathStatus === 'direct_available',
+    eventContext,
   );
   function selectEdge(id: string) {
     if (
@@ -1573,6 +1580,11 @@ function MapWorkspace({
                   context={eventContext}
                   graph={data}
                   impact={impact.data}
+                  assessment={impactAssessment.data}
+                  assessmentLoading={impactAssessment.loading}
+                  assessmentError={impactAssessment.error}
+                  assessmentRetryable={impactAssessment.retryable}
+                  onAssessmentRetry={impactAssessment.retry}
                   onSelectNode={selectPanelNode}
                   loading={impact.loading}
                   error={impact.error}

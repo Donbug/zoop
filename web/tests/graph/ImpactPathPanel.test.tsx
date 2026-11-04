@@ -6,6 +6,7 @@ import { useRelationData } from '@/hooks/useRelationData';
 import { createMockGraph } from '@/mocks/graph/response';
 import { createMockRelation } from '@/mocks/relations/fixture';
 import type { RelationDetail } from '@/types/map/relation';
+import type { CompanyIssueImpactAssessment } from '@/types/map/impact-assessment';
 
 vi.mock('@/hooks/useRelationData');
 
@@ -61,6 +62,70 @@ it('D-GRP-06 M12 selects a connected company and opens only that relation eviden
   expect(screen.getByText('직접 관련 · 참여 기업')).toBeTruthy();
   await userEvent.click(screen.getByRole('button', { name: /^근거 1건$/ }));
   expect(evidence).toHaveBeenCalledWith(['specific-evidence']);
+});
+
+it('D-GRP-06 shows verified quote effects separately and opens their evidence', async () => {
+  const evidence = vi.fn();
+  const assessment: CompanyIssueImpactAssessment = {
+    companyId: company.id,
+    issueId: issue.id,
+    status: 'available',
+    reason: null,
+    results: [
+      {
+        impactId: 'assessment-1',
+        status: 'verified',
+        label: 'mixed',
+        evidenceIds: ['ev-positive', 'ev-negative'],
+        effects: {
+          positive: ['ev-positive'],
+          negative: ['ev-negative'],
+          neutral: [],
+          uncertain: [],
+        },
+        provenance: {
+          sourceKind: 'synthetic',
+          executionMode: 'replay',
+          recordingKind: 'authored-test',
+        },
+      },
+    ],
+    metadata: {
+      source: 's3_issue_impacts',
+      asOf: graph.metadata.asOf,
+      graphVersion: graph.metadata.graphVersion,
+    },
+  };
+  render(
+    <ImpactPathPanel
+      companyId={company.id}
+      issueId={issue.id}
+      context={context}
+      graph={graph}
+      impact={{
+        companyId: company.id,
+        issueId: issue.id,
+        pathStatus: 'direct_available',
+        steps: [],
+        metadata: graph.metadata,
+      }}
+      assessment={assessment}
+      loading={false}
+      error={null}
+      onRetry={vi.fn()}
+      onClose={vi.fn()}
+      onViewIssue={vi.fn()}
+      onEvidence={evidence}
+      onAskAi={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByText('긍정·부정 혼재')).toBeTruthy();
+  expect(screen.getByText(/합성 재생 시험 결과/)).toBeTruthy();
+  await userEvent.click(
+    screen.getByRole('button', { name: '긍정 근거 1건 보기' }),
+  );
+  expect(evidence).toHaveBeenCalledWith(['ev-positive']);
 });
 const structuralEdge = {
   ...directEdge,

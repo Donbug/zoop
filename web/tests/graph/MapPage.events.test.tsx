@@ -45,6 +45,26 @@ vi.mock('@/apis/graph/events', async (original) => ({
   getEvent: vi.fn(),
 }));
 vi.mock('@/apis/graph/graph', () => ({ getGraph: vi.fn() }));
+vi.mock('@/apis/graph/impact-assessment', () => ({
+  getCompanyIssueImpactAssessment: vi.fn(
+    async (
+      companyId: string,
+      issueId: string,
+      context: { asOf?: string; graphVersion?: string },
+    ) => ({
+      companyId,
+      issueId,
+      status: 'unavailable',
+      reason: 'not_recorded',
+      results: [],
+      metadata: {
+        source: 's3_issue_impacts',
+        asOf: context.asOf ?? '2026-10-16T00:00:00Z',
+        graphVersion: context.graphVersion ?? 'fixture-2026-10-08',
+      },
+    }),
+  ),
+}));
 vi.mock('@/apis/telemetry/telemetry', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/apis/telemetry/telemetry')>()),
   recordInteractionEvents: vi.fn(),
