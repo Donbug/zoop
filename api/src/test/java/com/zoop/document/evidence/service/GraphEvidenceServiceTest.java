@@ -1030,7 +1030,7 @@ class GraphEvidenceServiceTest {
     }
 
     @Test
-    void oneReadScopeVerifiesTheVersionOnceAndTheNextRequestReadsTheCurrentOverlay() throws Exception {
+    void oneReadScopeVerifiesTheVersionOnceAndEveryReadAppliesTheCurrentOverlay() throws Exception {
         int[] overlayReads = {0};
         DisclosureExclusions[] current = {DisclosureExclusions.NONE};
         realReader(() -> {
@@ -1050,16 +1050,26 @@ class GraphEvidenceServiceTest {
             perRead = overlayReads[0];
             current[0] = new DisclosureExclusions(1, java.util.Set.of(), java.util.Set.of(), java.util.Set.of(EVIDENCE_ID));
             assertNull(outcome(DIRECT_ID, null, null));
-            assertNull(outcome(EVIDENCE_ID, null, null), "one request keeps the overlay it read first");
+            assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "a later read in the same request applies the current overlay");
             // The company documents page re-checks each citation at the version it already pinned.
             assertEquals(List.of("iss-1"), service().readPinned(DIRECT_ID, GRAPH_VERSION, null, null, "r-pinned").eventIds());
-            assertEquals(perRead, overlayReads[0], "the version is verified once per request, not once per evidence");
+            assertTrue(overlayReads[0] > perRead, "the overlay is current on every read, only the version is verified once");
             org.mockito.Mockito.verify(world.graphRepository, org.mockito.Mockito.times(1)).versionRules(GRAPH_VERSION);
             world.publications(world.store).read(GRAPH_VERSION);
             org.mockito.Mockito.verify(world.graphRepository, org.mockito.Mockito.times(2)).versionRules(GRAPH_VERSION);
         }
         assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "the next request reads the current overlay");
-        assertEquals(2 * perRead, overlayReads[0]);
+    }
+
+    @Test
+    void aSourceRevokedDuringOneRequestDropsItsReferencesFromTheNextGraphRead() throws Exception {
+        realReader(() -> DisclosureExclusions.NONE);
+        try (com.zoop.common.request.ReadScope ignored = com.zoop.common.request.ReadScope.open()) {
+            assertNotNull(realPort.read(null, null, DIRECT_ID).span());
+            writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, false, "known", List.of("read", "store", "quote-display"), "authored", null));
+            assertNull(realPort.read(null, null, DIRECT_ID).span(), "the graph drops the revoked source's references, not only its quote");
+            assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(DIRECT_ID, null, null));
+        }
     }
 
     @Test

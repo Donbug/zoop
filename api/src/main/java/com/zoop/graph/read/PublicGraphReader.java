@@ -59,24 +59,27 @@ public class PublicGraphReader {
         return read(selector.pinned(versionId, asOf, asOfRequested), null);
     }
 
-    /** The verified snapshot and its current exclusion overlay, read once per version in one read-only request. */
-    private record Loaded(PublicGraphSnapshot snapshot, DisclosureExclusions exclusions) { }
+    /**
+     * The verified snapshot and its publication, read once per version in one read-only request. Both are immutable for a
+     * version id; the current authority (exclusions, article access, source grants, expiry) is not, so it is never kept.
+     */
+    private record Verified(PublicGraphSnapshot snapshot, GraphPublicationReader.Publication publication) { }
 
-    private Loaded load(GraphVersionRecord version, String requestId) {
+    private Verified verify(GraphVersionRecord version) {
         PublicGraphSnapshot snapshot = store.load(version);
-        if (!"snapshot".equals(version.kind())) return new Loaded(snapshot, exclusions.current(version.id()));
+        if (!"snapshot".equals(version.kind())) return new Verified(snapshot, null);
         try {
-            var publication = publications.read(version.id(), snapshot);
-            return new Loaded(snapshot, authority.current(publication, requestId));
+            return new Verified(snapshot, publications.read(version.id(), snapshot));
         } catch (PublicationException invalid) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
         }
     }
 
     private Pinned read(SelectedGraphVersion selected, String requestId) {
-        Loaded loaded = ReadScope.memo(scopeKey + selected.version().id(), () -> load(selected.version(), requestId));
-        PublicGraphSnapshot snapshot = loaded.snapshot();
-        DisclosureExclusions currentExclusions = loaded.exclusions();
+        Verified verified = ReadScope.memo(scopeKey + selected.version().id(), () -> verify(selected.version()));
+        PublicGraphSnapshot snapshot = verified.snapshot();
+        DisclosureExclusions currentExclusions = verified.publication() == null ? exclusions.current(selected.version().id())
+                : authority.current(verified.publication(), requestId);
         PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot,
                 selected.asOfRequested() ? selected.asOf() : null, currentExclusions,
                 selected.briefing() != null && selected.briefing().reconstruction() != null);
