@@ -5,15 +5,21 @@ import { MIN_GRAPH_ZOOM } from './graph-zoom-range';
 
 /** Below this zoom issue titles are clipped to two lines (D-GRP-01 overview). */
 export const OVERVIEW_ZOOM = 0.45;
+/** Zooming in this much past the whole-graph fit brings issue titles back. */
+const WHOLE_FIT_MARGIN = 1.2;
 
 export type ReadingContext = {
   zoom: number;
   anchor: string | null;
+  /** Clicked node: its connected titles stay while another node is hovered, until deselected. */
+  selected?: string | null;
   edge: string | null;
   focus: string | null;
   path: ReadonlySet<string>;
   /** Elements kept bright while a selection dims the rest of the map (null: nothing dimmed). */
   bright?: ReadonlySet<string> | null;
+  /** Zoom that fits the whole visible graph. Issue titles stay hidden up to just above it. */
+  wholeFitZoom?: number;
 };
 export type LabelCandidate = {
   id: string;
@@ -22,12 +28,33 @@ export type LabelCandidate = {
   distance: number;
   degree: number;
   evidence: number;
+  /** Never culled: titles connected to the hovered or selected node (D-GRP-01, 2026-11-04). */
+  keep?: boolean;
+  /** Other sides the title may move to when its own box overlaps, in order of preference. */
+  alternatives?: { placement: LabelPlacement; box: Rect }[];
 };
+export type LabelPlacement = 'top' | 'bottom' | 'left' | 'right';
+
+/** The hovered/selected nodes and every node one edge away from them. */
+function anchorNeighbors(base: GraphData, context: ReadingContext) {
+  const anchors = new Set(
+    [context.anchor, context.selected].filter((id): id is string => !!id),
+  );
+  const related = new Set(anchors);
+  for (const e of base.edges ?? [])
+    if (anchors.has(String(e.source)) || anchors.has(String(e.target))) {
+      related.add(String(e.source));
+      related.add(String(e.target));
+    }
+  return related;
+}
 
 // D-GRP-01/01b · R1–R3. Only labels are culled; data, badges and positions stay intact.
 export function culledLabels(
   candidates: LabelCandidate[],
   bodies: { id: string; box: Rect }[],
+  /** Filled with the side chosen for each title that has alternatives. */
+  placements?: Map<string, LabelPlacement>,
 ) {
   const cells = new Map<string, { id: string; box: Rect }[]>();
   const keys = (r: Rect) => {
@@ -59,19 +86,32 @@ export function culledLabels(
       b.evidence - a.evidence ||
       a.id.localeCompare(b.id),
   )) {
-    if (
-      item.priority > 0 &&
-      keys(item.box).some((key) =>
+    const free = (box: Rect) =>
+      !keys(box).some((key) =>
         cells
           .get(key)
           ?.some(
-            (other) =>
-              other.id !== item.id && intersects(item.box, other.box, 2),
+            (other) => other.id !== item.id && intersects(box, other.box, 2),
           ),
-      )
-    )
-      hidden.add(item.id);
-    else add(item);
+      );
+    if (item.priority === 0) {
+      add(item);
+      continue;
+    }
+    // D-GRP-01 (2026-11-04 review): an overlapping issue title first tries the other sides of
+    // its diamond, so titles shown on hover sit side by side instead of on top of each other.
+    const options = item.alternatives ?? [];
+    const fit = options.find((option) => free(option.box));
+    if (fit) {
+      placements?.set(item.id, fit.placement);
+      add({ id: item.id, box: fit.box });
+    } else {
+      // Nothing fits: the title goes back to its first side (shown anyway when kept).
+      const box = options[0]?.box ?? item.box;
+      if (options.length) placements?.set(item.id, options[0].placement);
+      if (item.keep || free(box)) add({ id: item.id, box });
+      else hidden.add(item.id);
+    }
   }
   return hidden;
 }
@@ -83,13 +123,14 @@ export function readingStyles(
   context: ReadingContext,
 ): GraphData {
   const zoom = Math.max(MIN_GRAPH_ZOOM, context.zoom);
+  // D-GRP-01 (2026-11-04 review): the whole-graph fit shows only diamonds, even when a compact
+  // map fits above OVERVIEW_ZOOM. Titles come back once the user zooms in past the fit.
+  const overviewZoom = Math.max(
+    OVERVIEW_ZOOM,
+    (context.wholeFitZoom ?? 0) * WHOLE_FIT_MARGIN,
+  );
   const byId = new Map(data.nodes.map((n) => [n.id, n]));
-  const related = new Set(context.anchor ? [context.anchor] : []);
-  for (const e of base.edges ?? [])
-    if (e.source === context.anchor || e.target === context.anchor) {
-      related.add(String(e.source));
-      related.add(String(e.target));
-    }
+  const related = anchorNeighbors(base, context);
   return {
     nodes: base.nodes?.map((node) => {
       const source = byId.get(String(node.id));
@@ -105,7 +146,7 @@ export function readingStyles(
       // D-GRP-01 (2026-11-04 review): zoomed out, an issue is only a diamond that says
       // "there is an issue here"; its title and count come back on zoom, hover or selection.
       const overview =
-        source?.kind === 'issue' && zoom < OVERVIEW_ZOOM && !emphasized;
+        source?.kind === 'issue' && zoom < overviewZoom && !emphasized;
       return {
         ...node,
         style: {
@@ -127,7 +168,7 @@ export function readingStyles(
           // D-GRP-01: the zoomed-out overview shows two lines of each issue title; zooming in,
           // hovering or selecting brings back the whole title.
           labelMaxLines:
-            source?.kind === 'issue' && zoom < OVERVIEW_ZOOM && !emphasized
+            source?.kind === 'issue' && zoom < overviewZoom && !emphasized
               ? 2
               : Math.max(1, (source?.label ?? '').length),
           badges:
@@ -179,10 +220,22 @@ export function readingStyles(
   };
 }
 
+/** G6 label style for an issue title on one side of its diamond (top is the default). */
+const placementStyle = (side: LabelPlacement) => ({
+  labelPlacement: side,
+  labelOffsetY: side === 'top' ? -5 : side === 'bottom' ? 5 : 0,
+  labelOffsetX: side === 'left' ? -5 : side === 'right' ? 5 : 0,
+});
+
 /** Label styles last pushed per graph; a new base (setData) starts over. */
 const appliedLabels = new WeakMap<
   Graph,
-  { base: GraphData; styles: Map<string, string> }
+  {
+    base: GraphData;
+    styles: Map<string, string>;
+    /** Issue titles moved off their default top side to avoid an overlap. */
+    placements: Map<string, LabelPlacement>;
+  }
 >();
 
 /** Keys readingStyles derives from zoom; other label styles (colours) still come from the new data. */
@@ -272,7 +325,7 @@ export async function applyGraphReading(
   // Hover keeps the zoom, so most label styles are unchanged: only push and redraw the changed ones.
   let applied = appliedLabels.get(graph);
   if (!applied) {
-    applied = { base, styles: new Map() };
+    applied = { base, styles: new Map(), placements: new Map() };
     appliedLabels.set(graph, applied);
   } else if (applied.base !== base) {
     // setData keeps applied label styles on elements that stay (keepAppliedStyles);
@@ -299,6 +352,11 @@ export async function applyGraphReading(
       previous.set(id, key);
       return [{ id, style }];
     });
+  const { placements } = applied;
+  for (const node of styles.nodes ?? []) {
+    const side = placements.get(String(node.id));
+    if (side) node.style = { ...node.style, ...placementStyle(side) };
+  }
   const nodeUpdates = changed(styles.nodes, true);
   const edgeUpdates = changed(styles.edges);
   if (nodeUpdates.length) graph.updateNodeData(nodeUpdates);
@@ -377,7 +435,7 @@ export async function applyGraphReading(
     };
   };
   const byId = new Map(data.nodes.map((n) => [n.id, n]));
-  const related = new Set<string>();
+  const related = anchorNeighbors(base, context);
   const degrees = new Map<string, number>();
   // Companies each issue touches on this map: shared issues always keep their diamond and lines.
   const companies = new Map<string, Set<string>>();
@@ -396,10 +454,6 @@ export async function applyGraphReading(
         issue.id,
         (companies.get(issue.id) ?? new Set()).add(company.id),
       );
-    if (edge.source === context.anchor || edge.target === context.anchor) {
-      related.add(String(edge.source));
-      related.add(String(edge.target));
-    }
   }
   const candidates: LabelCandidate[] = [],
     bodies: { id: string; box: Rect }[] = [];
@@ -407,6 +461,44 @@ export async function applyGraphReading(
   const anchor = base.nodes?.find(
     (n) => n.id === context.anchor || n.id === context.focus,
   );
+  // Screen boxes of an issue title on each side of its diamond; the side it sits on now
+  // keeps its measured box. Top first, then below, then beside (the count badge is top-right).
+  const sides = (
+    node: NonNullable<GraphData['nodes']>[number],
+    box: Rect,
+  ): { placement: LabelPlacement; box: Rect }[] => {
+    const [cx, cy] = graph.getViewportByCanvas([
+      Number(node.style?.x),
+      Number(node.style?.y),
+    ]);
+    if (!Number.isFinite(cx) || !Number.isFinite(cy)) return [];
+    const zoom = context.zoom;
+    const half = (Number(node.style?.size ?? 48) / 2) * zoom;
+    const gap = 5 * zoom;
+    const { width, height } = box;
+    const current = String(node.style?.labelPlacement ?? 'top');
+    const options: { placement: LabelPlacement; box: Rect }[] = [
+      {
+        placement: 'top',
+        box: { x: cx - width / 2, y: cy - half - gap - height, width, height },
+      },
+      {
+        placement: 'bottom',
+        box: { x: cx - width / 2, y: cy + half + gap, width, height },
+      },
+      {
+        placement: 'left',
+        box: { x: cx - half - gap - width, y: cy - height / 2, width, height },
+      },
+      {
+        placement: 'right',
+        box: { x: cx + half + gap, y: cy - height / 2, width, height },
+      },
+    ];
+    return options.map((option) =>
+      option.placement === current ? { ...option, box } : option,
+    );
+  };
   const anchorPoint = anchor
     ? graph.getViewportByCanvas([
         Number(anchor.style?.x),
@@ -464,6 +556,11 @@ export async function applyGraphReading(
         : 0,
       degree: degrees.get(id) ?? 0,
       evidence: source?.evidenceCount ?? 0,
+      // D-GRP-01 (2026-11-04 review): titles of issues connected to the hovered or clicked
+      // node stay while the pointer rests there or until the selection is cleared, even if
+      // they overlap. Unrelated titles yield to them instead.
+      keep: source?.kind === 'issue' && related.has(id),
+      alternatives: source?.kind === 'issue' ? sides(node, box) : undefined,
     });
     labels.set(id, label);
   }
@@ -489,8 +586,25 @@ export async function applyGraphReading(
     });
     labels.set(id, label);
   }
-  const culled = culledLabels(candidates, bodies);
+  const chosen = new Map<string, LabelPlacement>();
+  const culled = culledLabels(candidates, bodies, chosen);
   for (const id of culled) showLabel(labels.get(id), false);
+  // Move titles whose side changed, then hide the culled ones again (a redraw shows them).
+  const moves = candidates.flatMap((candidate) => {
+    if (!candidate.alternatives?.length) return [];
+    const side = chosen.get(candidate.id) ?? 'top';
+    if (side === (placements.get(candidate.id) ?? 'top')) return [];
+    if (side === 'top') placements.delete(candidate.id);
+    else placements.set(candidate.id, side);
+    previous.delete(candidate.id);
+    return [{ id: candidate.id, style: placementStyle(side) }];
+  });
+  if (moves.length) {
+    graph.updateNodeData(moves);
+    await graph.draw();
+    if (graph.destroyed) return;
+    for (const id of culled) showLabel(labels.get(id), false);
+  }
   // D-GRP-01 (2026-11-04 review): a single-company issue whose title does not fit is
   // folded with its line too, so no line ends at an untitled diamond. Shared issues and the
   // selected company's issues keep their diamond and lines (only overlapping titles wait for zoom).

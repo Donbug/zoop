@@ -34,7 +34,8 @@ public record PublicationComposeRequest(String baseVersionId, List<String> incom
             String basePin = optional(root.stringOrNull("expectedBaseReceiptSha256"), StrictJson.SHA256);
             if ((base == null) != (basePin == null)) throw invalid();
             List<String> incoming = root.strings("incomingVersionIds");
-            if (incoming.isEmpty() || incoming.size() > 20 || !incoming.equals(incoming.stream().sorted().distinct().toList())) throw invalid();
+            // No new source is a compose of the base's own sources under new decisions (a label correction); a first publication names one.
+            if ((incoming.isEmpty() && base == null) || incoming.size() > 20 || !incoming.equals(incoming.stream().sorted().distinct().toList())) throw invalid();
             incoming.forEach(id -> required(id, VERSION));
             Map<String, String> pins = new TreeMap<>(); String previous = null;
             for (var pin : root.objects("incomingReceiptPins")) {

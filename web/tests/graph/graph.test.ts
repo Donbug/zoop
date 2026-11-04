@@ -117,22 +117,28 @@ describe('WBS 6.6.21 · D-GRP-01/01b mock/API contract', () => {
   });
   it('uses five activity sizes based on each company unique issue count', () => {
     expect([0, 1, 2, 4, 100].map((count) => companyNodeSize(count))).toEqual([
-      45, 55, 65, 85, 110,
+      61, 74, 88, 115, 149,
     ]);
 
     const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const rendered = toG6Data(graph, 1245, 705);
     const nvidia = rendered.nodes?.find((node) => node.id === 'NASDAQ:NVDA');
     const samsung = rendered.nodes?.find((node) => node.id === 'KRX:005930');
-    expect(nvidia?.style?.size).toBe(65);
-    expect(samsung?.style?.size).toBe(110);
+    expect(nvidia?.style?.size).toBe(88);
+    expect(samsung?.style?.size).toBe(149);
   });
   it('D-GRP-01 renders every public issue and relation without dangling edges', () => {
     const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const rendered = toG6Data(graph, 1245, 705);
     const ids = new Set(rendered.nodes?.map((n) => n.id));
     expect(rendered.nodes).toHaveLength(graph.nodes.length);
-    expect(rendered.edges).toHaveLength(graph.edges.length);
+    // 2026-11-04 decision: shared-issue lines repeat the company–issue–company links and are not drawn.
+    expect(rendered.edges).toHaveLength(
+      graph.edges.filter((e) => e.relationType !== 'SHARES_ISSUE').length,
+    );
+    expect(graph.edges.some((e) => e.relationType === 'SHARES_ISSUE')).toBe(
+      true,
+    );
     expect(
       rendered.edges?.every((e) => ids.has(e.source) && ids.has(e.target)),
     ).toBe(true);

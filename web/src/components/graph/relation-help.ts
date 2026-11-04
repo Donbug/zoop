@@ -27,14 +27,16 @@ export const legendEntries: [LegendKey, string, string][] = [
     '후속 사건',
     '후속 사건: 앞 사건 다음에 이어서 일어난 사건을 잇는 선입니다. 뒤 사건이 아직 일어나지 않았으면 나타나지 않습니다.',
   ],
-  [
-    'SHARES_ISSUE',
-    '사건 공유',
-    '사건 공유: 두 기업이 같은 사건에 각각 직접 또는 구조적으로 연결되어 있을 때 그리는 선입니다. 두 기업 사이의 관계를 기사가 따로 말한 것은 아니며, 근거는 공유한 사건의 근거를 따릅니다.',
-  ],
 ];
 
 /** 범례 칩의 설명. 지도 패널 섹션 머리의 관계 안내(D-GRP-03)도 같은 문구를 쓴다. */
 export const relationHelp = Object.fromEntries(
   legendEntries.map(([key, , help]) => [key, help]),
-) as Record<LegendKey, string>;
+) as Record<Exclude<LegendKey, 'SHARES_ISSUE'>, string>;
+
+/**
+ * D-GRP-03 관련 기업 안내. 사건 공유 선은 기업–사건–기업 연결과 겹쳐 지도에 그리지 않는다
+ * (2026-11-04 결정). 관련 기업 목록은 API의 사건 공유 데이터로 계속 만든다.
+ */
+export const relatedCompaniesHelp =
+  '관련 기업: 이 기업과 같은 사건에 함께 연결된 기업입니다. 두 기업 사이의 관계를 기사가 따로 말한 것은 아니며, 누르면 두 기업과 함께 연결된 사건만 지도에 밝게 표시합니다.';

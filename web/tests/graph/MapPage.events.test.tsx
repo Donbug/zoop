@@ -45,6 +45,26 @@ vi.mock('@/apis/graph/events', async (original) => ({
   getEvent: vi.fn(),
 }));
 vi.mock('@/apis/graph/graph', () => ({ getGraph: vi.fn() }));
+vi.mock('@/apis/graph/impact-assessment', () => ({
+  getCompanyIssueImpactAssessment: vi.fn(
+    async (
+      companyId: string,
+      issueId: string,
+      context: { asOf?: string; graphVersion?: string },
+    ) => ({
+      companyId,
+      issueId,
+      status: 'unavailable',
+      reason: 'not_recorded',
+      results: [],
+      metadata: {
+        source: 's3_issue_impacts',
+        asOf: context.asOf ?? '2026-10-16T00:00:00Z',
+        graphVersion: context.graphVersion ?? 'fixture-2026-10-08',
+      },
+    }),
+  ),
+}));
 vi.mock('@/apis/telemetry/telemetry', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/apis/telemetry/telemetry')>()),
   recordInteractionEvents: vi.fn(),
@@ -376,7 +396,9 @@ describe('D-GRP-04 · map navigation and evidence handoff', () => {
     expect(screen.getByTestId('graph-canvas')).toBe(canvas);
     expect(getGraph).toHaveBeenCalledTimes(1);
   });
-  it('opens shared relations from the company related-company list', async () => {
+  it('lights the two companies and their shared issues from the related-company list', async () => {
+    // D-GRP-03 (2026-11-04 decision): the shared-issue line is not drawn, so a related
+    // company keeps the company panel open and only highlights the pair on the map.
     const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const edge = graph.edges.find(
       (item) => item.relationType === 'SHARES_ISSUE',
@@ -392,12 +414,17 @@ describe('D-GRP-04 · map navigation and evidence handoff', () => {
       name: new RegExp(`${detail.target.label}.*공유 사건`),
     });
     await userEvent.click(relatedButton);
-    await screen.findByRole('complementary', {
-      name: `${detail.source.label} – ${detail.target.label}`,
-    });
+    expect(relatedButton.getAttribute('aria-pressed')).toBe('true');
     expect(
       new URLSearchParams(router.state.location.search).get('select'),
-    ).toBe(`edge:${edge.id}`);
+    ).toBe(`node:${edge.source}`);
+    expect(
+      screen.queryByRole('complementary', {
+        name: `${detail.source.label} – ${detail.target.label}`,
+      }),
+    ).toBeNull();
+    await userEvent.click(relatedButton);
+    expect(relatedButton.getAttribute('aria-pressed')).toBe('false');
   });
 });
 

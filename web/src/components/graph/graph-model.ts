@@ -116,8 +116,9 @@ export function foldedIssues(
   return { hidden, counts };
 }
 
-/** D-GRP-01 (2026-11-04 review): issue diamonds were 7px and hard to spot. */
-export const ISSUE_NODE_SIZE = 30;
+/** D-GRP-01 (2026-11-04 reviews): issue nodes were 7px diamonds and hard to spot, then 30
+ * and 36, then 40. Now 48, so a diamond reads about 20-30% of a company node like the reference network. */
+export const ISSUE_NODE_SIZE = 48;
 
 /**
  * D-GRP-01: 0..1 evidence strength per issue on a log scale against the busiest
@@ -147,8 +148,9 @@ export function companyNodeSize(issueCount: number, scale = 1) {
           : issueCount <= 4
             ? 3
             : 4;
-  // D-GRP-01: 2026-11-04 review enlarged every level by 25% (was 36/44/52/68/88).
-  return [45, 55, 65, 85, 110][level] * scale;
+  // D-GRP-01: 2026-11-04 reviews enlarged every level by 25% (was 36/44/52/68/88), then
+  // by another 35% (was 45/55/65/85/110) when node spacing went back to the earlier map.
+  return [61, 74, 88, 115, 149][level] * scale;
 }
 
 export function focusNeighborhood(
@@ -278,8 +280,15 @@ export function toG6Data(
         },
       };
     }),
+    // D-GRP-01 (2026-11-04 결정): 사건 공유 선은 공유 사건 노드의 기업–사건–기업 연결과
+    // 같은 내용이라 그리지 않는다. 관련 기업 목록(D-GRP-03)은 응답의 선을 그대로 쓴다.
     edges: data.edges
-      .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
+      .filter(
+        (e) =>
+          e.relationType !== 'SHARES_ISSUE' &&
+          nodeIds.has(e.source) &&
+          nodeIds.has(e.target),
+      )
       .map((e) => {
         const dimmed =
           emphasizedNodes.size > 0 &&
@@ -301,12 +310,9 @@ export function toG6Data(
             // D-GRP-01: an issue's line follows its evidence shade (monotone).
             strokeOpacity: dimmed
               ? 0.08
-              : e.relationType === 'SHARES_ISSUE'
-                ? 0.5
-                : issueTone !== undefined && e.relationType !== 'FOLLOWS'
-                  ? 0.15 + 0.5 * issueTone
-                  : 0.75,
-            lineDash: e.relationType === 'SHARES_ISSUE' ? [2, 4] : undefined,
+              : issueTone !== undefined && e.relationType !== 'FOLLOWS'
+                ? 0.15 + 0.5 * issueTone
+                : 0.75,
             endArrow: e.relationType === 'FOLLOWS',
             endArrowSize: 6,
             cursor: isSelectableRelation(e) ? 'pointer' : 'default',
