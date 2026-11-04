@@ -278,8 +278,15 @@ export function toG6Data(
         },
       };
     }),
+    // D-GRP-01 (2026-11-04 결정): 사건 공유 선은 공유 사건 노드의 기업–사건–기업 연결과
+    // 같은 내용이라 그리지 않는다. 관련 기업 목록(D-GRP-03)은 응답의 선을 그대로 쓴다.
     edges: data.edges
-      .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
+      .filter(
+        (e) =>
+          e.relationType !== 'SHARES_ISSUE' &&
+          nodeIds.has(e.source) &&
+          nodeIds.has(e.target),
+      )
       .map((e) => {
         const dimmed =
           emphasizedNodes.size > 0 &&
@@ -301,12 +308,9 @@ export function toG6Data(
             // D-GRP-01: an issue's line follows its evidence shade (monotone).
             strokeOpacity: dimmed
               ? 0.08
-              : e.relationType === 'SHARES_ISSUE'
-                ? 0.5
-                : issueTone !== undefined && e.relationType !== 'FOLLOWS'
-                  ? 0.15 + 0.5 * issueTone
-                  : 0.75,
-            lineDash: e.relationType === 'SHARES_ISSUE' ? [2, 4] : undefined,
+              : issueTone !== undefined && e.relationType !== 'FOLLOWS'
+                ? 0.15 + 0.5 * issueTone
+                : 0.75,
             endArrow: e.relationType === 'FOLLOWS',
             endArrowSize: 6,
             cursor: isSelectableRelation(e) ? 'pointer' : 'default',
