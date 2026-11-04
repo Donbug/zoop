@@ -67,6 +67,11 @@ DB 연결은 기존 `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`를 사용하며 `.env
 
 최초 smoke에서는 bundle `-7`의 사건 상세가 503 `SOURCE_UNAVAILABLE`로 거절됐습니다. 이후 `EventDetailService`가 소비 필드의 의미가 같은 정확한 bundle `-5`·`-6`·`-7` receipt를 읽도록 수정했고, 당시 신규 수입은 `-7`만 허용했습니다. 당시 수정 후 새 jar의 실제 HTTP 28단계에서 활성화·graph·event·evidence 조회와 현재 권리 철회/복원을 확인했으며, 공개 제외 저장소 통합 후 기본 설정 경로의 재검증과는 별개입니다. 미지원 과거·미래 버전과 접두어 유사값은 거절하며, 요약의 미제공 상태는 바꾸지 않았습니다. 이 로컬 검증은 운영 배포나 수령자의 실행 확인을 뜻하지 않습니다.
 
+### 비공개 Neo4j와 공개 앱의 같은 입력 비교
+
+`api/scripts/graph_handoff_reconciliation_smoke.py`는 동일한 S2/S3 pin을 비공개 Neo4j projection과 bundle `-9` 앱 수입에 각각 전달하고, receipt·snapshot·PostgreSQL 근거 행·공개 HTTP까지 canonical 기업/이슈·관계 방향·문서 버전/구간을 대조합니다([명령·환경·결과](../README.md#같은-입력의-neo4j공개-앱-정합성-smoke)). 실제 잘못 매핑한 Neo4j 버전과 관측 사본 변조를 별도로 검출합니다. Neo4j projection은 비공개 분석 결과이며, 앱 공개 읽기는 수동 활성화한 artifact·DB·현재 권리에서 이루어집니다.
+
+
 ### 생산자 exposure에서 공개 제외·해제까지의 합성 검증
 
 `api/scripts/graph_handoff_exclusion_smoke.py`는 설치된 exposure CLI → 실제 비웹 운영자 제외·해제 명령 → PostgreSQL → 공개 graph·event·evidence HTTP를 연결합니다([전제·실행 명령·정리 방법](../README.md#공개-제외-왕복의-별도-합성-smoke)). 현재 bundle `-8` builder와 import helper, 관리자 HTTP 활성화, 소유 DB 정리 경로를 재사용합니다. 비교용 원본을 먼저 공개하고, 기존 publication composer로 그 원본과 검사 대상 원본을 합친 구성본을 만든 뒤 현재 포인터 CAS로 공개합니다. 보고서·제외·해제는 검사 대상 원본의 receipt·버전에 고정하며, 공개 대상 조회에는 구성본 ID를 사용합니다.
