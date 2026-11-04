@@ -4,8 +4,9 @@ import com.zoop.common.response.Metadata;
 import java.util.List;
 
 /**
- * OpenAPI {@code EventDetail} ({@code getEvent}); every key is serialized, nulls included. {@code summary} is either an
- * analysis summary or {@link Unavailable}; no producer writes an event summary yet, so it is always unavailable for now.
+ * OpenAPI {@code EventDetail} ({@code getEvent}); every key is serialized, nulls included. {@code summary} is either a
+ * {@link SummaryOut} (the verified issue summary the import receipt retains, served only while every quote it was written
+ * from is shown now) or {@link Unavailable} with the reason.
  */
 public record EventDetail(String title, String id, String eventTime, String timePrecision, String period,
         List<MentionOut> mentions, List<ArticleOut> articles, List<RelationOut> relations, List<CompanyLink> companies,
@@ -43,6 +44,17 @@ public record EventDetail(String title, String id, String eventTime, String time
     public record FollowRef(String title, String id, String eventTime, String timePrecision) { }
 
     public record Unavailable(String status, String reason) { }
+
+    /**
+     * OpenAPI {@code AnalysisSummary}: the producer's verified claims joined by a newline, the sorted union of the quotes they
+     * cite, the producer's generation time and the {@code isr-} result version, copied from the receipt and never rewritten
+     * here. {@code analysis} is omitted: an issue summary carries no market outlook.
+     */
+    public record SummaryOut(String text, List<String> evidenceIds, String generatedAt, String resultVersion) {
+        public SummaryOut {
+            evidenceIds = List.copyOf(evidenceIds);
+        }
+    }
 
     /** Retained approval provenance: native administrator review or the legacy BFF's named effective publication rule. */
     public record ApprovalOut(String source, String label, String scope, String ruleId) { }
