@@ -64,8 +64,7 @@ export interface RelationDetail {
   metadata: EventDetail['metadata'];
 }
 
+/** 지도에서 눌러 관계 상세(D-GRP-04)를 여는 선. 사건 공유 선은 2026-11-04부터 그리지 않는다. */
 export function isSelectableRelation(edge: Pick<GraphEdge, 'relationType'>) {
-  return (
-    edge.relationType === 'SHARES_ISSUE' || edge.relationType === 'FOLLOWS'
-  );
+  return edge.relationType === 'FOLLOWS';
 }

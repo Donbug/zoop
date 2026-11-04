@@ -636,7 +636,7 @@ class GraphHandoffImporterTest {
     }
 
     @Test
-    void aCurrentImportReceiptServesEventMetadataOverTheConsumerRouteWithoutExposingItsSummary() throws Exception {
+    void aCurrentImportReceiptServesEventMetadataAndItsVerifiedSummaryOverTheConsumerRoute() throws Exception {
         Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
         handoff.envelope = summarized.envelopeBytes();
         assertTrue(importer.run(summarized.request()).succeeded());
@@ -659,10 +659,16 @@ class GraphHandoffImporterTest {
                 .andExpect(jsonPath("$.sourceSupport.articleCount").value(1))
                 .andExpect(jsonPath("$.metadata.graphVersion").value(versionId))
                 .andExpect(jsonPath("$.metadata.source").value("public_graph_snapshot"))
-                .andExpect(jsonPath("$.metadata.partial").value(true))
-                .andExpect(jsonPath("$.metadata.failures[0].code").value("SUMMARY_NOT_PRODUCED"))
-                .andExpect(jsonPath("$.summary.status").value("unavailable"))
-                .andExpect(jsonPath("$.summary.text").doesNotExist())
+                .andExpect(jsonPath("$.metadata.partial").value(false))
+                .andExpect(jsonPath("$.metadata.failures").isEmpty())
+                // The receipt's verified summary is served as the producer wrote it; its job pin and digests are not.
+                .andExpect(jsonPath("$.summary.text").value(HandoffFixtures.SUMMARY_CLAIM))
+                .andExpect(jsonPath("$.summary.evidenceIds.length()").value(1))
+                .andExpect(jsonPath("$.summary.generatedAt").value("2026-10-22T01:02:03+00:00"))
+                .andExpect(jsonPath("$.summary.resultVersion").isString())
+                .andExpect(jsonPath("$.summary.status").doesNotExist())
+                .andExpect(jsonPath("$.summary.source").doesNotExist())
+                .andExpect(jsonPath("$.summary.claims").doesNotExist())
                 .andExpect(jsonPath("$.approval").isEmpty());
 
         // The same supported receipt still cannot bypass current source rights or its registry-pinned bytes.

@@ -83,6 +83,8 @@ public final class SourceRegistry {
             "[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}(?::[0-9]{2}(?:\\.[0-9]{1,9})?)?"
                     + "(?:Z|[+-][0-9]{2}:[0-9]{2}(?::[0-9]{2})?)");
 
+    public static final String DELEGATES_SCHEMA = "zoop-source-authority-delegates-1";
+    private final List<Path> delegates;
     private final Map<String, SourceGrant> grants;
     private final Map<GrantKey, Path> routes;
     private final Path routingPath;
@@ -91,6 +93,7 @@ public final class SourceRegistry {
     private record GrantKey(String sourceId, String grantId, String revision) {}
 
     private SourceRegistry(Map<String, SourceGrant> grants) {
+        this.delegates = List.of();
         this.grants = grants;
         this.routes = Map.of();
         this.routingPath = null;
@@ -98,10 +101,16 @@ public final class SourceRegistry {
     }
 
     private SourceRegistry(Map<GrantKey, Path> routes, Path path, byte[] bytes) {
+        this.delegates = List.of();
         this.grants = Map.of();
         this.routes = Map.copyOf(routes);
         this.routingPath = path;
         this.routingBytes = bytes;
+    }
+
+    private SourceRegistry(List<Path> delegates, Path path, byte[] bytes) {
+        this.delegates=List.copyOf(delegates); this.grants=Map.of(); this.routes=Map.of();
+        this.routingPath=path;this.routingBytes=bytes;
     }
 
     /**
@@ -134,6 +143,13 @@ public final class SourceRegistry {
         byte[] data = readBounded(path);
         try {
             StrictJson.Obj root = StrictJson.parseObject(data);
+            if (DELEGATES_SCHEMA.equals(root.string("schemaVersion"))) {
+                root.exactly(Set.of("schemaVersion","delegates"));wellFormed(root.node());
+                var paths=root.strings("delegates").stream().map(Path::of).toList();
+                if(paths.isEmpty()||paths.size()>8||new HashSet<>(paths).size()!=paths.size())throw invalid();
+                for(var leaf:paths)if(!leaf.isAbsolute()||!leaf.equals(leaf.normalize())||leaf.equals(path))throw invalid();
+                return new SourceRegistry(paths,path,data);
+            }
             if (!AUTHORITY_SET_SCHEMA.equals(root.string("schemaVersion"))) return parse(data);
             root.exactly(AUTHORITY_SET);
             wellFormed(root.node());
@@ -330,6 +346,19 @@ public final class SourceRegistry {
         return new Invalid("source_registry_invalid");
     }
 
+    /** Delegates remain live files, rather than a copied list of another owner's routes. No nested delegate graphs. */
+    private SourceRegistry delegateOwner(String sourceId,String grantId,String revision) {
+        SourceRegistry selected=null;
+        for(var path:delegates) {
+            if(DELEGATES_SCHEMA.equals(StrictJson.parseObject(readBounded(path)).string("schemaVersion")))throw invalid();
+            var current=read(path);var key=new GrantKey(sourceId,grantId,revision);
+            var leaf=current.grants.get(sourceId);
+            boolean owns=current.routes.containsKey(key)||(leaf!=null&&leaf.grantId().equals(grantId)&&leaf.revision().equals(revision));
+            if(owns){if(selected!=null)throw invalid();selected=current;}
+        }
+        return selected;
+    }
+
     /**
      * Whether the grant now in force for {@code sourceId} lets this app read, store and quote-display what it imported under
      * {@code (grantId, revision)}. Returns {@code null} to allow, otherwise a stable internal denial code for the log only
@@ -341,6 +370,11 @@ public final class SourceRegistry {
      * {@code source_grant_expired}, {@code source_operation_denied}.
      */
     public String denial(String sourceId, String grantId, String revision, Instant now) {
+        if(!delegates.isEmpty()) {
+            unchanged();var owner=delegateOwner(sourceId,grantId,revision);
+            var result=owner==null?"source_unknown":owner.denial(sourceId,grantId,revision,now);
+            unchanged();return result;
+        }
         if (routingPath != null) {
             unchanged();
             Path leaf = routes.get(new GrantKey(sourceId, grantId, revision));
@@ -369,6 +403,11 @@ public final class SourceRegistry {
 
     /** Explicit retained-file imports bind an article URL to the same current source's exact host allowlist. */
     public String denialForUrl(String sourceId, String grantId, String revision, String url, Instant now) {
+        if(!delegates.isEmpty()) {
+            unchanged();var owner=delegateOwner(sourceId,grantId,revision);
+            var result=owner==null?"source_unknown":owner.denialForUrl(sourceId,grantId,revision,url,now);
+            unchanged();return result;
+        }
         if (routingPath != null) {
             unchanged();
             Path leaf = routes.get(new GrantKey(sourceId, grantId, revision));

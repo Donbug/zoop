@@ -49,7 +49,9 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.mentions").isArray())
                 .andExpect(jsonPath("$.fieldDecisions").isArray())
                 .andExpect(jsonPath("$.metadata.graphVersion").value("fixture-2026-10-08"))
-                .andExpect(jsonPath("$.metadata.partial").value(true));
+                .andExpect(jsonPath("$.summary.reason").isString())
+                .andExpect(jsonPath("$.metadata.partial").value(false))
+                .andExpect(jsonPath("$.metadata.failures").isEmpty());
     }
 
     @Test

@@ -3,6 +3,7 @@
 No provider, DB or filesystem mutations. Stored older prose is never relabelled.
 """
 import copy
+import briefing_source_time as source_time
 import re
 from datetime import datetime
 import briefing_replay as b
@@ -95,7 +96,7 @@ def validate(draft, frozen, scope):
     cutoff = aware(frozen['cutoff'])
     for issue in frozen['issues']:
         for source in issue['sources'].values():
-            require(aware(source['publishedAt']) <= cutoff, 'priority_future_source')
+            require(source_time.available(source) <= cutoff, 'priority_future_source')
         for target in issue['targets']:
             company = draft['issues'][issue['issueId']]['companies'][target['companyId']]
             ids = set(target['evidenceIds']); require(ids and ids <= set(issue['sources']), 'priority_target_evidence')

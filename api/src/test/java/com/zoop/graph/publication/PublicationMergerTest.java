@@ -296,6 +296,176 @@ class PublicationMergerTest {
         assertEquals(chosen.evidenceIds(), merged.relations().getFirst().evidenceIds());
     }
 
+    @Test
+    void aLabelCorrectionReplacesOnlyTheNameAndIsReproducedOnRead() {
+        Contribution published = source(0, "same", "Article headline");
+        var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
+        Obj effective = PublicationMerger.combine(PublicationMerger.emptyDecisions(), Obj.of(corrected(published, "Corrected name")));
+        assertEquals(PublicationMerger.DECISIONS_SCHEMA_2, effective.string("schemaVersion"));
+        var merged = PublicationMerger.merge(List.of(published), effective, base.issueSources().keySet(), base.issueSources());
+        Issue before = base.issues().getFirst(); Issue after = merged.issues().getFirst();
+        assertEquals("Corrected name", after.label());
+        ObjectNode expected = (ObjectNode) GraphPublicationReader.json(before); expected.put("label", "Corrected name");
+        assertEquals(expected, GraphPublicationReader.json(after));
+        assertEquals(base.issueSources(), merged.issueSources());
+        assertEquals(base.relations(), merged.relations());
+        // The reader re-merges from the stored decisions and owners only.
+        var reread = PublicationMerger.merge(List.of(published), effective, Set.of(), merged.issueSources());
+        assertEquals(merged.issues(), reread.issues());
+        assertEquals(merged.issueSources(), reread.issueSources());
+        assertEquals(1, PublicationMerger.labelCorrections(effective).size());
+        assertEquals(0, PublicationMerger.labelCorrections(PublicationMerger.emptyDecisions()).size());
+        assertFalse(PublicationMerger.claimsAutomaticReviewer(effective));
+        // Without a correction the combined document keeps the first schema, as every stored publication wrote it.
+        var plain = PublicationMerger.combine(PublicationMerger.emptyDecisions(), Obj.of(peopleLabel(published)));
+        assertEquals(PublicationMerger.DECISIONS_SCHEMA, plain.string("schemaVersion"));
+        assertFalse(plain.has(PublicationMerger.LABEL_CORRECTIONS));
+    }
+
+    @Test
+    void aLabelCorrectionNamesTheSourceValueItCorrectsAndStopsWhenASourceChangesIt() {
+        Contribution published = source(0, "same", "Article headline");
+        var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
+        Obj effective = PublicationMerger.combine(PublicationMerger.emptyDecisions(), Obj.of(corrected(published, "Corrected name")));
+        ObjectNode wrong = corrected(published, "Corrected name");
+        correction(wrong).put("expectedLabelDigest", "0".repeat(64));
+        assertEquals("identity_conflict", code(() -> PublicationMerger.merge(List.of(published), Obj.of(wrong), Set.of())));
+        // A later source changes the headline: nothing selected it, so the merge stops instead of carrying the old name forward.
+        Contribution changed = relabel(copy(published, 1), "Changed headline");
+        assertEquals("correction_required", code(() -> PublicationMerger.merge(List.of(published, changed), effective,
+                base.issueSources().keySet(), base.issueSources())));
+        var proposal = propose(List.of(published, changed), effective, base, changed);
+        assertEquals(0, proposal.decisions().objects("fieldSelections").size());
+        assertTrue(proposal.changes().stream().anyMatch(c -> "label".equals(c.field())));
+        // A person selects the changed value: the correction names the value before it, so it is refused and must be decided again.
+        Obj selected = PublicationMerger.combine(effective, Obj.of(peopleLabel(changed)));
+        assertEquals("identity_conflict", code(() -> PublicationMerger.merge(List.of(published, changed), selected,
+                base.issueSources().keySet(), base.issueSources())));
+        // Selecting the published value keeps the correction.
+        Obj kept = PublicationMerger.combine(effective, Obj.of(peopleLabel(published)));
+        var merged = PublicationMerger.merge(List.of(published, changed), kept, base.issueSources().keySet(), base.issueSources());
+        assertEquals("Corrected name", merged.issues().getFirst().label());
+        assertEquals(published.issueRef("same"), merged.issueSources().get("same").headlineSources().get("label"));
+    }
+
+    @Test
+    void aLabelCorrectionIsRefusedWhenUnusedDuplicateUngroundedAutomaticOrNotAName() {
+        Contribution published = source(0, "same", "Article headline"); Contribution other = source(1, "other", "Other");
+        ObjectNode unknown = corrected(published, "Name"); correction(unknown).put("issueId", "missing");
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published), Obj.of(unknown), Set.of())));
+        ObjectNode duplicate = corrected(published, "Name");
+        ((tools.jackson.databind.node.ArrayNode) duplicate.get(PublicationMerger.LABEL_CORRECTIONS)).add(correction(duplicate).deepCopy());
+        assertEquals("request_invalid", code(() -> PublicationMerger.merge(List.of(published), Obj.of(duplicate), Set.of())));
+        assertEquals("request_invalid", code(() -> PublicationMerger.combine(PublicationMerger.emptyDecisions(), Obj.of(duplicate))));
+        ObjectNode foreign = corrected(published, "Name"); correction(foreign).putArray("evidenceRefs").add(evidenceRef(other));
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published, other), Obj.of(foreign), Set.of())));
+        // Evidence of another member of the same issue is refused too: only the label owner's evidence, the issue's atomic proof, counts.
+        var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
+        Contribution member = sameHeadline(published, source(2, "same", "Article headline"));
+        ObjectNode nonOwner = corrected(published, "Name"); correction(nonOwner).putArray("evidenceRefs").add(evidenceRef(member));
+        Obj withSelection = PublicationMerger.combine(Obj.of(peopleLabel(published)), Obj.of(nonOwner));
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published, member), withSelection, base.issueSources().keySet(), base.issueSources())));
+        Obj ownerOnly = PublicationMerger.combine(Obj.of(peopleLabel(published)), Obj.of(corrected(published, "Name")));
+        assertEquals("Name", PublicationMerger.merge(List.of(published, member), ownerOnly, base.issueSources().keySet(), base.issueSources()).issues().getFirst().label());
+        ObjectNode mixed = corrected(published, "Name"); ((tools.jackson.databind.node.ArrayNode) correction(mixed).get("evidenceRefs")).add(evidenceRef(member));
+        Obj both = PublicationMerger.combine(Obj.of(peopleLabel(published)), Obj.of(mixed));
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published, member), both, base.issueSources().keySet(), base.issueSources())));
+        // A selection that moves the owner to a member with the same text leaves a carried correction ungrounded until it is restated.
+        Obj moved = PublicationMerger.combine(Obj.of(corrected(published, "Name")), Obj.of(peopleLabelOf(member)));
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published, member), moved, base.issueSources().keySet(), base.issueSources())));
+        ObjectNode restated = corrected(member, "Name");
+        Obj regrounded = PublicationMerger.combine(moved, Obj.of(restated));
+        var movedMerge = PublicationMerger.merge(List.of(published, member), regrounded, base.issueSources().keySet(), base.issueSources());
+        assertEquals("Name", movedMerge.issues().getFirst().label());
+        assertEquals(member.issueRef("same"), movedMerge.issueSources().get("same").headlineSources().get("label"));
+        // Without a base the owner is the default one (the member carrying the public id first in source order): only its evidence counts.
+        Contribution twin = copy(published, 3);
+        Contribution earlier = published.sourceVersionId().compareTo(twin.sourceVersionId()) < 0 ? published : twin;
+        Contribution later = earlier == published ? twin : published;
+        assertEquals("Name", PublicationMerger.merge(List.of(published, twin), Obj.of(corrected(earlier, "Name")), Set.of()).issues().getFirst().label());
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published, twin), Obj.of(corrected(later, "Name")), Set.of())));
+        // Invisible code points are refused like control characters: zero-width space, bidi override, line separator, lone surrogate.
+        for (String bad : List.of("Name​", "삼성전자‮담합", "Na me", "Na\uD83Dme", "Name")) {
+            ObjectNode name = corrected(published, bad);
+            assertEquals("request_invalid", code(() -> PublicationMerger.merge(List.of(published), Obj.of(name), Set.of())), bad);
+        }
+        assertEquals("삼성전자·ASML, High NA EUV 도입 협력 계획 😀", PublicationMerger.merge(List.of(published),
+                Obj.of(corrected(published, "삼성전자·ASML, High NA EUV 도입 협력 계획 😀")), Set.of()).issues().getFirst().label());
+        assertEquals("High NA EUV", PublicationMerger.merge(List.of(published), Obj.of(corrected(published, "High NA EUV")), Set.of()).issues().getFirst().label());
+        ObjectNode automatic = corrected(published, "Name"); correction(automatic).put("reviewer", PublicationMerger.AUTO_REVIEWER);
+        assertTrue(PublicationMerger.claimsAutomaticReviewer(Obj.of(automatic)));
+        assertEquals("request_invalid", code(() -> PublicationMerger.merge(List.of(published), Obj.of(automatic), Set.of())));
+        // The length limit counts code points: a name of MAX_LABEL_LENGTH supplementary characters is 2 × MAX UTF-16 units and passes.
+        String supplementary = "😀".repeat(PublicationMerger.MAX_LABEL_LENGTH);
+        assertEquals(supplementary, PublicationMerger.merge(List.of(published), Obj.of(corrected(published, supplementary)), Set.of()).issues().getFirst().label());
+        // Blank or padded names include the no-break spaces String.isBlank/strip ignore (U+00A0, U+202F); an inner no-break space is text.
+        for (String bad : List.of("", " ", " Name", "Name ", " ", "  ", " Name", "Name ", "Na\u0007me",
+                "n".repeat(PublicationMerger.MAX_LABEL_LENGTH + 1))) {
+            ObjectNode name = corrected(published, bad);
+            assertEquals("request_invalid", code(() -> PublicationMerger.merge(List.of(published), Obj.of(name), Set.of())), bad);
+        }
+        String longest = "n".repeat(PublicationMerger.MAX_LABEL_LENGTH);
+        assertEquals(longest, PublicationMerger.merge(List.of(published), Obj.of(corrected(published, longest)), Set.of()).issues().getFirst().label());
+        // Correcting back to the source name withdraws the display change; the decision stays on record.
+        Obj withdrawn = PublicationMerger.combine(Obj.of(corrected(published, "Name")), Obj.of(corrected(published, "Article headline")));
+        assertEquals(1, PublicationMerger.labelCorrections(withdrawn).size());
+        assertEquals("Article headline", PublicationMerger.merge(List.of(published), withdrawn, Set.of()).issues().getFirst().label());
+        ObjectNode first = corrected(published, "Name"); first.put("schemaVersion", PublicationMerger.DECISIONS_SCHEMA);
+        assertEquals("request_invalid", code(() -> PublicationMerger.merge(List.of(published), Obj.of(first), Set.of())));
+        ObjectNode extra = corrected(published, "Name"); extra.putArray("other");
+        assertEquals("request_invalid", code(() -> PublicationMerger.merge(List.of(published), Obj.of(extra), Set.of())));
+        ObjectNode partial = corrected(published, "Name"); correction(partial).remove("evidenceRefs");
+        assertEquals("request_invalid", code(() -> PublicationMerger.merge(List.of(published), Obj.of(partial), Set.of())));
+    }
+
+    @Test
+    void aCorrectedIssueTakesTheSameHeadlineSelectionAndALaterCorrectionReplacesTheEarlierOne() {
+        Contribution published = source(0, "same", "Article headline");
+        var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
+        Obj inherited = PublicationMerger.combine(PublicationMerger.emptyDecisions(), Obj.of(corrected(published, "Corrected name")));
+        var corrected = PublicationMerger.merge(List.of(published), inherited, base.issueSources().keySet(), base.issueSources());
+        // A source that only adds evidence: the usual same-headline selection keeps the owner (its digest is the owner's source value,
+        // not the corrected name) and the corrected name is inherited on top of it.
+        Contribution incoming = sameHeadline(published, source(1, "same", "Article headline"));
+        var prepared = prepare(List.of(published, incoming), inherited, corrected, incoming);
+        var selections = prepared.proposal().decisions().objects("fieldSelections");
+        assertEquals(1, selections.size());
+        assertEquals(Canonical.digest(PublicationMerger.field(published.projection().issues().getFirst(), "label")), selections.getFirst().string("expectedValueDigest"));
+        assertEquals(1, prepared.proposal().sameHeadlines().size());
+        assertEquals(List.of(), prepared.proposal().changes());
+        assertEquals(PublicationMerger.DECISIONS_SCHEMA, prepared.proposal().decisions().string("schemaVersion"));
+        assertEquals(PublicationMerger.DECISIONS_SCHEMA_2, prepared.effective().string("schemaVersion"));
+        assertEquals("Corrected name", prepared.merged().issues().getFirst().label());
+        assertEquals(published.issueRef("same"), prepared.merged().issueSources().get("same").headlineSources().get("label"));
+        assertEquals(2, prepared.merged().issues().getFirst().evidenceIds().size());
+        // A later correction of the same issue replaces the earlier one; the digest still names the source value.
+        Obj replaced = PublicationMerger.combine(prepared.effective(), Obj.of(corrected(published, "Second name")));
+        assertEquals(1, PublicationMerger.labelCorrections(replaced).size());
+        assertEquals("Second name", PublicationMerger.merge(List.of(published, incoming), replaced, Set.of(), prepared.merged().issueSources())
+                .issues().getFirst().label());
+    }
+
+    /** The failure code a merge or combine reports: a malformed document is the composer's {@code request_invalid}. */
+    private static String code(org.junit.jupiter.api.function.Executable call) {
+        try { call.execute(); } catch (PublicationException failure) { return failure.code(); }
+        catch (StrictJson.Malformed malformed) { return "request_invalid"; }
+        catch (Throwable unexpected) { throw new AssertionError(unexpected); }
+        return fail("expected a failure");
+    }
+    private static ObjectNode correction(ObjectNode decisions) {
+        return (ObjectNode) decisions.get(PublicationMerger.LABEL_CORRECTIONS).get(0);
+    }
+    /** A second-schema decisions document that names {@code published}'s issue {@code label}, citing its own evidence. */
+    private static ObjectNode corrected(Contribution published, String label) {
+        ObjectNode root = (ObjectNode) PublicationMerger.emptyDecisions().node().deepCopy();
+        root.put("schemaVersion", PublicationMerger.DECISIONS_SCHEMA_2);
+        var issue = published.projection().issues().getFirst();
+        var item = root.putArray(PublicationMerger.LABEL_CORRECTIONS).addObject();
+        item.put("issueId", issue.issueId()); item.put("expectedLabelDigest", Canonical.digest(PublicationMerger.field(issue, "label")));
+        item.put("label", label); item.putArray("evidenceRefs").add(evidenceRef(published)); audit(item);
+        return root;
+    }
+
     private record Prepared(PublicationMerger.Proposal proposal, Obj effective, PublicationMerger.Merged merged) {}
 
     private static PublicationMerger.Proposal propose(List<Contribution> all, Obj inherited, PublicationMerger.Merged base, Contribution... incoming) {
@@ -306,10 +476,17 @@ class PublicationMergerTest {
     /** Proposes, merges like the composer and re-merges like the reader (stored decisions and owners only). */
     private static Prepared prepare(List<Contribution> all, Obj inherited, PublicationMerger.Merged base, Contribution... incoming) {
         var proposal = propose(all, inherited, base, incoming);
-        // The composer accepts a new decision only when it names the value published before (GraphPublicationComposer.compose).
+        // The composer accepts a new decision only when it names the value published before (GraphPublicationComposer.compose);
+        // for label that is the owner's source value, which a corrected name sits on top of.
         for (Obj choice : proposal.decisions().objects("fieldSelections")) {
             var previous = base.issues().stream().filter(i -> i.issueId().equals(choice.string("issueId"))).findFirst();
-            previous.ifPresent(p -> assertEquals(Canonical.digest(PublicationMerger.field(p, choice.string("field"))), choice.string("expectedValueDigest")));
+            previous.ifPresent(p -> {
+                Issue published = "label".equals(choice.string("field")) ? all.stream()
+                        .filter(c -> c.sourceVersionId().equals(base.issueSources().get(p.issueId()).headlineSources().get("label").sourceVersionId()))
+                        .flatMap(c -> c.projection().issues().stream()).filter(i -> i.issueId().equals(base.issueSources().get(p.issueId()).headlineSources().get("label").issueId()))
+                        .findFirst().orElseThrow() : p;
+                assertEquals(Canonical.digest(PublicationMerger.field(published, choice.string("field"))), choice.string("expectedValueDigest"));
+            });
         }
         Obj effective = PublicationMerger.combine(inherited, proposal.decisions());
         var merged = PublicationMerger.merge(all, effective, base.issueSources().keySet(), base.issueSources());
@@ -321,12 +498,16 @@ class PublicationMergerTest {
     }
 
     private static ObjectNode peopleLabel(Contribution published) {
+        return peopleLabelOf(published);
+    }
+    /** A person's label selection of issue {@code same} that takes {@code owner}'s value and cites its evidence. */
+    private static ObjectNode peopleLabelOf(Contribution owner) {
         ObjectNode people = (ObjectNode) PublicationMerger.emptyDecisions().node().deepCopy();
         var choice = ((tools.jackson.databind.node.ArrayNode) people.get("fieldSelections")).addObject();
         choice.put("issueId", "same"); choice.put("field", "label");
-        choice.put("expectedValueDigest", Canonical.digest(PublicationMerger.field(published.projection().issues().getFirst(), "label")));
-        choice.set("takeFrom", GraphPublicationReader.json(published.issueRef("same")));
-        choice.putArray("evidenceRefs").add(evidenceRef(published)); audit(choice);
+        choice.put("expectedValueDigest", Canonical.digest(PublicationMerger.field(owner.projection().issues().getFirst(), "label")));
+        choice.set("takeFrom", GraphPublicationReader.json(owner.issueRef("same")));
+        choice.putArray("evidenceRefs").add(evidenceRef(owner)); audit(choice);
         return people;
     }
     /** {@code other}'s source and evidence, with every headline field of {@code published}'s issue. */

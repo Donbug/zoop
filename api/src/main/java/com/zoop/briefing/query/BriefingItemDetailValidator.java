@@ -11,10 +11,10 @@ import com.zoop.common.json.StrictJson;
 import tools.jackson.databind.JsonNode;
 
 /** Reject corrupt stored details; this reader never reconstructs claims or fetches a newer source. */
-final class BriefingItemDetailValidator {
+public final class BriefingItemDetailValidator {
     private BriefingItemDetailValidator() { }
 
-    static void validate(BriefingRound round, JsonNode itemNode, JsonNode detailNode, BriefingRoundRepository repository) {
+    public static void validate(BriefingRound round, JsonNode itemNode, JsonNode detailNode, BriefingRoundRepository repository) {
         var item = StrictJson.Obj.of(itemNode);
         var detail = StrictJson.Obj.of(detailNode).exactly(Set.of("roundId", "eventId", "title", "summary",
                 "selectionReason", "claims", "companies", "evidence", "limitations", "metadata"));
@@ -42,8 +42,9 @@ final class BriefingItemDetailValidator {
             same(source.documentId(), evidence.string("documentId"));
             same(source.documentVersion(), evidence.string("documentVersion"));
             same(source.quote(), evidence.string("quote"));
-            same(source.title(), evidence.string("title"));
-            same(source.publisher(), evidence.string("publisher"));
+            same(source.title()==null?"":source.title(), evidence.string("title"));
+            // The briefing DTO requires strings; an absent owner value is displayed as an empty string, never an invented publisher.
+            same(source.publisher()==null?"":source.publisher(), evidence.string("publisher"));
             same(source.url(), evidence.string("url"));
             String published = evidence.stringOrNull("publishedAt");
             same(source.publishedAt(), published == null ? null : Instant.parse(published));

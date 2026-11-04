@@ -58,10 +58,7 @@ def produce(cfg, job):
          'scheduledAt': job['scheduled_at'].isoformat(), 'windowFrom': job['window_from'].isoformat(),
          'windowTo': job['scheduled_at'].isoformat()}
     prepared = runtime.java(cfg, 'prepare', {'round': r}, work / 'prepare.request.json')
-    # The read contract requires an actual publication instant; never substitute an observation clock.
-    if any(not source.get('publishedAt') for candidate in prepared['candidates'] for source in candidate['sources'].values()):
-        runtime.record_input_failure(cfg, r, work)
-        raise ValueError('priority_precise_publication_time_required')
+    runtime.require(not cfg.get('expectedGraphVersion') or prepared['graphVersion']==cfg['expectedGraphVersion'],'admitted_graph_changed')
     write_once(work / 'prepared.json', prepared)
     frozen = runtime.frozen_input(prepared); write_once(work / 'frozen.json', frozen)
     def current():

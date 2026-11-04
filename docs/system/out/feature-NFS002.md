@@ -39,7 +39,7 @@
 | me | 4 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | portfolio | 5 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | graph | 2 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
-| companies | 9 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
+| companies | 10 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | events | 2 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | evidence | 1 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | briefings | 17 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |

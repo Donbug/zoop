@@ -132,7 +132,13 @@ describe('WBS 6.6.21 · D-GRP-01/01b mock/API contract', () => {
     const rendered = toG6Data(graph, 1245, 705);
     const ids = new Set(rendered.nodes?.map((n) => n.id));
     expect(rendered.nodes).toHaveLength(graph.nodes.length);
-    expect(rendered.edges).toHaveLength(graph.edges.length);
+    // 2026-11-04 decision: shared-issue lines repeat the company–issue–company links and are not drawn.
+    expect(rendered.edges).toHaveLength(
+      graph.edges.filter((e) => e.relationType !== 'SHARES_ISSUE').length,
+    );
+    expect(graph.edges.some((e) => e.relationType === 'SHARES_ISSUE')).toBe(
+      true,
+    );
     expect(
       rendered.edges?.every((e) => ids.has(e.source) && ids.has(e.target)),
     ).toBe(true);

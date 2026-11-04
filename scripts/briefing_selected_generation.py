@@ -6,6 +6,7 @@ Queued/running/completed records are never automatically re-dispatched after
 an unknown network outcome or process loss.
 """
 import argparse
+import briefing_source_time as source_time
 from contextlib import contextmanager
 import copy
 from decimal import Decimal
@@ -38,7 +39,7 @@ def validate_snapshot(snapshot):
         if priority_mode:m.require(f.get('priorityContract')==snapshot['priorityContract'],'selected_priority_contract')
         m.require(f['issueId'] in expected and f['issueId'] not in seen and f['roundId']==snapshot['roundId']
             and m.aware(f['cutoff'])==m.aware(snapshot['cutoff']),'selected_input_scope');seen.add(f['issueId'])
-        for s in f['sources'].values():m.require(m.aware(s['publishedAt'])<=m.aware(snapshot['cutoff']),'selected_future_source')
+        for s in f['sources'].values():m.require(source_time.available(s)<=m.aware(snapshot['cutoff']),'selected_future_source')
         for t in f['targets']:
             price=t['observedMovement']
             if price['status']=='available':m.require(m.aware(price['latest']['observedAt'])<=m.aware(snapshot['cutoff']),'selected_future_price')
@@ -130,8 +131,10 @@ def current_authority(conn,cfg,snapshot,job_id=None):
     for iid in snapshot['selectedIssueIds']:
         candidate=next(c for c in pool[0]['candidates'] if c['issueId']==iid)
         for s in candidate['sources']:
-            source=conn.execute("SELECT a.provider,t.sha256,v.published_at FROM articles a JOIN article_versions v ON v.article_id=a.id JOIN artifacts t ON t.id=v.text_artifact_id WHERE a.id=%s AND v.version=%s AND a.access_status='available'",(s['documentId'],s['documentVersion'])).fetchone()
-            m.require(source and source[1]==s['bodySha256'] and source[2]==m.aware(s['publishedAt']),'selected_source_changed')
+            source=conn.execute("SELECT a.provider,t.sha256,v.published_at,v.published_date,v.collected_at FROM articles a JOIN article_versions v ON v.article_id=a.id JOIN artifacts t ON t.id=v.text_artifact_id WHERE a.id=%s AND v.version=%s AND a.access_status='available'",(s['documentId'],s['documentVersion'])).fetchone()
+            m.require(source and source[1]==s['bodySha256'],'selected_source_changed')
+            if s.get('publishedAt') is not None:m.require(source[2]==m.aware(s['publishedAt']),'selected_source_changed')
+            else:m.require(source[2] is None and str(source[3])==s.get('publishedDate') and source[4]==source_time.available(s),'selected_source_clock_changed')
             m.require('openai' in s['recipients'],'selected_model_recipient_denied')
             m.require(grants.evaluate(registry.current(s['grantId']),source_id=source[0],revision=s['grantRevision'],purposes=['briefing-outlook','semantic-verification'],recipients=s['recipients']) is None,'selected_rights_changed')
 

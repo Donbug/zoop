@@ -2,12 +2,14 @@ package com.zoop.graph.read;
 
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
+import com.zoop.common.json.StrictJson;
 import com.zoop.common.json.StrictJson.Obj;
 import com.zoop.common.response.Metadata;
 import com.zoop.common.response.SectionFailure;
 import com.zoop.document.evidence.service.EvidenceService;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.document.repository.VersionRow;
+import com.zoop.graph.importer.HandoffIssueSummary;
 import com.zoop.graph.importer.MentionIds;
 import com.zoop.graph.importer.LegacyRealPackage;
 import com.zoop.graph.publication.GraphPublicationReader.Contribution;
@@ -25,6 +27,7 @@ import com.zoop.graph.read.dto.EventDetail.MentionOut;
 import com.zoop.graph.read.dto.EventDetail.Participant;
 import com.zoop.graph.read.dto.EventDetail.RelationOut;
 import com.zoop.graph.read.dto.EventDetail.SourceSupportOut;
+import com.zoop.graph.read.dto.EventDetail.SummaryOut;
 import com.zoop.graph.read.dto.EventDetail.Unavailable;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Article;
@@ -50,11 +53,21 @@ import org.springframework.stereotype.Service;
  * {@code getEvent} (#64, FS021): one issue of the pinned, filtered public graph with its relations, companies, articles and
  * sequence from the snapshot. Original contribution receipts retain source-local mentions and field verdicts; exact
  * field owners supply the headline proof. Current rights apply before the detail is projected. Mixed approval provenance
- * remains nullable, and multi-source support is recomputed from declared origins and exact text hashes.
+ * remains nullable, and multi-source support is recomputed from declared origins and exact text hashes. The issue summary
+ * comes from the receipt of the source that supplies the public title (its basis is that issue's title and quotes) and is
+ * served only while every quote of that basis, not only the cited ones, is shown now; otherwise it is unavailable with the
+ * reason.
  */
 @Service
 public class EventDetailService {
     static final String SUMMARY_UNAVAILABLE = "사건 요약은 아직 제공되지 않습니다.";
+    static final String SUMMARY_TEMPORAL_PENDING = "사건 시각 검토가 끝나지 않아 요약을 제공하지 않습니다.";
+    static final String SUMMARY_INPUT_TOO_LARGE = "인용이 많아 요약을 만들지 않았습니다.";
+    static final String SUMMARY_NOT_VERIFIED = "요약 검증이 통과하지 않아 제공하지 않습니다.";
+    /** Neutral on purpose: like a dropped mention or FOLLOWS, a withheld basis quote is not announced to the reader. */
+    static final String SUMMARY_BASIS_HIDDEN = "사건 요약을 지금은 제공하지 않습니다.";
+    /** The one summary section failure: a summary exists but a quote it was written from cannot be shown now. */
+    static final String SUMMARY_EVIDENCE_UNAVAILABLE = "SUMMARY_EVIDENCE_UNAVAILABLE";
     private static final String IMPORTED = "snapshot";
     private static final Set<String> WITHHELD = Set.of("HOLD", "REJECT");
     /** INVOLVES provenance when at least one contributing S3 relation rests on an operator's final approval of a HOLD. */
@@ -114,9 +127,9 @@ public class EventDetailService {
         own.addAll(issue.geographyEvidenceIds());
         List<ArticleOut> articles = articles(snapshot,
                 own.stream().filter(shown).map(inSnapshot::get).toList(), visibleMentions);
-        Metadata metadata = new Metadata(pinned.selected().source(), pinned.selected().asOf(), versionId, requestId, true,
-                List.of(new SectionFailure("summary", "SUMMARY_NOT_PRODUCED", SUMMARY_UNAVAILABLE, false,
-                        pinned.selected().asOf())));
+        Summary summary = summary(publication, issue, sources, inSnapshot::containsKey, shown, pinned.selected().asOf());
+        Metadata metadata = new Metadata(pinned.selected().source(), pinned.selected().asOf(), versionId, requestId,
+                summary.failure() != null, summary.failure() == null ? List.of() : List.of(summary.failure()));
         Map<String, Boolean> roleFlags = legacyRelationRoleFlags(publication, relations);
         return new EventDetail(issue.label(), id, issue.eventTime(), issue.timePrecision(), issue.period(),
                 sources.stream().flatMap(s -> mentions(s.mentions(),
@@ -127,8 +140,69 @@ public class EventDetailService {
                 sourceSupport(publication, sources, snapshot, own.stream().filter(shown).map(inSnapshot::get).toList()),
                 sources.stream().flatMap(s -> fieldDecisions(s.issue(), appIds(s.mentions())).stream()).distinct().toList(),
                 issue.evidenceIds().stream().filter(shown).toList(),
-                follows(graph, id, relations), approval(publication, id, relations, sources),
-                new Unavailable("unavailable", SUMMARY_UNAVAILABLE), metadata);
+                follows(graph, id, relations), approval(publication, id, relations, sources), summary.value(), metadata);
+    }
+
+    /**
+     * The summary key and, only when this read could not serve a summary that exists, the failure that says why. A summary
+     * nobody produced is absent data, not a failure (OpenAPI {@code SectionFailure}): {@code failure} is null for it.
+     */
+    private record Summary(Object value, SectionFailure failure) { }
+
+    private static Summary absent(String reason) {
+        return new Summary(new Unavailable("unavailable", reason), null);
+    }
+
+    /**
+     * The receipt summary of the source that supplies the public title: the summary basis is that issue's title and the union
+     * of its {@code mentions[].evidenceIds}, so no other member's summary describes this event. A receipt without the key
+     * (bundle formats before 7, legacy packages, a synthetic fixture) never produced one. An {@code unavailable} summary keeps
+     * the producer's code as the reason; neither is a read failure. An {@code available} summary is copied as the exact
+     * producer object, but only while EVERY basis quote is shown now (current rights, asOf, exclusions): a hidden quote the
+     * model read hides the whole summary, even when no claim cites it, because the text may rest on it, and that is the one
+     * case reported as a section failure ({@code partial}), as the impact path reports withheld evidence. A summary the
+     * receipt cannot describe (a shape the verifier would not have admitted) is SOURCE_UNAVAILABLE like any other
+     * undescribable receipt, never a 500.
+     */
+    private static Summary summary(Publication publication, Issue issue, List<SourceIssue> sources,
+            Predicate<String> inSnapshot, Predicate<String> shown, Instant asOf) {
+        if (publication == null) return absent(SUMMARY_UNAVAILABLE);
+        var owners = publication.issueSources().get(issue.issueId());
+        IssueRef labelOwner = owners == null ? null : owners.headlineSources().get("label");
+        if (labelOwner == null) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        Obj handoff = sources.stream()
+                .filter(s -> s.source().sourceVersionId().equals(labelOwner.sourceVersionId())
+                        && s.issue().string("id").equals(labelOwner.issueId()))
+                .map(SourceIssue::issue).findFirst().orElseThrow(() -> new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
+        // No key: a format that never carried a summary (bundle 5 and 6, legacy packages). A key whose value is not an
+        // object is a receipt the verifier would not have admitted, so it is undescribable, not absent data.
+        if (!handoff.has("summary")) return absent(SUMMARY_UNAVAILABLE);
+        if (!handoff.raw("summary").isObject()) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        try {
+            return summary(handoff, handoff.object("summary"), inSnapshot, shown, asOf);
+        } catch (StrictJson.Malformed malformed) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, malformed);
+        }
+    }
+
+    private static Summary summary(Obj handoff, Obj summary, Predicate<String> inSnapshot, Predicate<String> shown,
+            Instant asOf) {
+        if (!"available".equals(summary.string("status"))) {
+            String code = summary.string("code");
+            if (HandoffIssueSummary.NOT_REQUESTED.equals(code)) return absent(SUMMARY_UNAVAILABLE);
+            if (HandoffIssueSummary.TEMPORAL_PENDING.equals(code)) return absent(SUMMARY_TEMPORAL_PENDING);
+            if (HandoffIssueSummary.INPUT_TOO_LARGE.equals(code)) return absent(SUMMARY_INPUT_TOO_LARGE);
+            return absent(SUMMARY_NOT_VERIFIED);
+        }
+        Set<String> basis = new HashSet<>();
+        for (Obj mention : handoff.objects("mentions")) basis.addAll(mention.strings("evidenceIds"));
+        // The snapshot membership check is free; only quotes the filtered snapshot still carries cost a rights read.
+        if (!basis.stream().allMatch(inSnapshot) || !basis.stream().allMatch(shown)) {
+            return new Summary(new Unavailable("unavailable", SUMMARY_BASIS_HIDDEN), new SectionFailure("summary",
+                    SUMMARY_EVIDENCE_UNAVAILABLE, SUMMARY_BASIS_HIDDEN, false, asOf));
+        }
+        return new Summary(new SummaryOut(summary.string("text"), summary.strings("evidenceIds"),
+                summary.string("generatedAt"), summary.string("resultVersion")), null);
     }
 
     /**
