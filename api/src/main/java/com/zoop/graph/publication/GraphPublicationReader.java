@@ -170,7 +170,8 @@ public final class GraphPublicationReader {
             checkRows(versionId, contributions);
             List<String> incoming = basis.strings("incomingVersionIds");
             Set<String> sourceVersions = contributions.stream().map(Contribution::sourceVersionId).collect(java.util.stream.Collectors.toSet());
-            if (incoming.isEmpty() || incoming.size() > 20 || !incoming.equals(incoming.stream().sorted().distinct().toList())
+            // A composition of the base's own sources under new decisions names no incoming source (a first publication's sources must equal them).
+            if (incoming.size() > 20 || !incoming.equals(incoming.stream().sorted().distinct().toList())
                     || !sourceVersions.containsAll(incoming)) throw failure("basis_mismatch");
             String baseVersion = basis.stringOrNull("baseVersionId");
             String expectedActive = basis.stringOrNull("expectedActiveVersionId");

@@ -165,7 +165,7 @@ public final class GraphPublicationPreparer {
      */
     public static boolean proposes(GraphPublicationReader reader, JdbcGraphPublicationRepository publications, PublicationComposeRequest request,
             byte[] decisions) {
-        if (request.baseVersionId() == null) return false;
+        if (request.baseVersionId() == null || request.incomingVersionIds().isEmpty()) return false;
         Publication base = reader.read(request.baseVersionId());
         List<Contribution> incoming = new ArrayList<>();
         for (String id : publications.importOrder(request.incomingVersionIds())) {
