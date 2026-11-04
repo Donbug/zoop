@@ -182,11 +182,11 @@ def test_verification_policy_holds_whatever_is_uncertain():
          "prohibitedAdvice": "no"},
         {"claims": [{"claimId": "s1c0", "support": None, "unsupportedCausality": "no"}],
          "prohibitedAdvice": "no"}]
-    assert verdicts(choice("supported", p=0.14, confidence=0.5), 0.02)[0]["claims"][0]["support"] == "hold"
+    assert verdicts(choice("supported", p=0.34, confidence=0.04), 0.02)[0]["claims"][0]["support"] == "hold"
     assert verdicts(choice("contradicted"), 0.02)[0]["claims"][0]["support"] == "contradicted"
     assert verdicts(choice("insufficient"), 0.02)[0]["claims"][0]["support"] == "hold"
     assert verdicts(choice("supported"), 0.02, 0.95)[0]["claims"][0]["unsupportedCausality"] == "yes"
-    assert verdicts(choice("supported"), 0.02, 0.75)[0]["claims"][0]["unsupportedCausality"] == "hold"
+    assert verdicts(choice("supported"), 0.02, 0.76)[0]["claims"][0]["unsupportedCausality"] == "hold"
     assert verdicts(choice("supported"), 0.95)[0]["prohibitedAdvice"] == "yes"
     assert verdicts(choice("supported"), 0.5)[0]["prohibitedAdvice"] == "hold"
 
@@ -765,7 +765,7 @@ def test_path_pairs_keep_their_status_and_steps_name_only_quoted_evidence():
 
 def test_the_answer_prompt_explains_paths_and_its_version_moved():
     assert "status=cut" in chat_luna.PROMPT and "evidenceIds" in chat_luna.PROMPT
-    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-11-01-1-")
+    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-11-04-4-")
     assert "web_reported" in chat_luna.PROMPT and "web-search:" in chat_luna.PROMPT
 
 
