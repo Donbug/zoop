@@ -855,13 +855,14 @@ def main() -> int:
         correction("WBS_RAW_ID_REVIEW", "FS057 / 6.5.3", task_original("6.5.3"), spec_original("FS035"),
                    "기존 FS057→FS035 통합 선언에 따라 저장 업무를 FS035로 편집 연결하고 raw FS057은 보존한다.",
                    "WBS 담당자가 산출물 FS057을 현재 통합 ID와 일치시키고 기존 저장 업무와 중복 산정하지 않도록 정정해 주세요.")
-    for records in catalog.get("wbsSources", {}).get("ancillaryRows", {}).values():
-        for record in records:
-            if any("6.5.13" in text and "6.5.20" in text for text in record["cells"]) and "6.6.13" in tasks:
-                correction("WBS_COVER_BODY_CONFLICT", "FS074~FS081 / 6.6.13~20",
-                           {"source": record["source"], "text": cell(record["cells"])}, task_original("6.6.13"),
-                           "본문 6.6.13~20을 현재 역할 연결에 사용한다. 일정 기준은 WBS이며 내부 충돌은 정정 요청으로 남긴다.",
-                           "WBS 담당자가 표지/요약/본문의 번호·역할·기간·가중치를 일치시켜 주세요. 원문 제안 8개를 제외하지 마세요.")
+    for warning in catalog.get("warnings", []):
+        if warning["code"] == "WBS_COVER_BODY_CONFLICT" and "6.6.13" in tasks:
+            records = catalog["wbsSources"]["ancillaryRows"][warning["source"]["path"]]
+            record = next(row for row in records if row["source"] == warning["source"])
+            correction("WBS_COVER_BODY_CONFLICT", "FS074~FS081 / 6.6.13~20",
+                       {"source": record["source"], "text": cell(record["cells"])}, task_original("6.6.13"),
+                       "본문 6.6.13~20을 현재 역할 연결에 사용한다. 일정 기준은 WBS이며 내부 충돌은 정정 요청으로 남긴다.",
+                       "WBS 담당자가 표지/요약/본문의 번호·역할·기간·가중치를 일치시켜 주세요. 원문 제안 8개를 제외하지 마세요.")
     correction_rows = [[r["code"], r["target"], source_label(r["originalA"]["source"]), r["originalA"]["text"],
                         source_label(r["originalB"]["source"]), r["originalB"]["text"],
                         r["workerDecision"], r["ownerCorrectionRequest"], r["status"]] for r in corrections]

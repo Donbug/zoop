@@ -8,6 +8,8 @@ import copy
 import importlib.util
 import re
 import unittest
+import csv
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -224,6 +226,33 @@ class DetailAuthorityTests(unittest.TestCase):
         api["components"]["schemas"]["PriceSeries"]["properties"]["interval"]["enum"] = ["5m", "1d"]
         _, findings = self.run_check(specs, links, api)
         self.assertTrue(any(f[1] == "chartResolution" for f in findings))
+
+
+class WbsCoverHistoryTests(unittest.TestCase):
+    def test_import_distinguishes_resolved_numbering_history_from_current_conflict(self):
+        module_spec = importlib.util.spec_from_file_location("zoop_doc_import", ROOT / "docs/system/import_sources.py")
+        importer = importlib.util.module_from_spec(module_spec)
+        module_spec.loader.exec_module(importer)
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            with (folder / "body.csv").open("w", encoding="utf-8-sig", newline="") as stream:
+                csv.writer(stream).writerows([
+                    ["구분", "WBS", "업무", "유형", "산출물", "수행인력", "시작일", "종료일", "가중치", "진행률"],
+                    ["", "6.6.13", "(BE) 뉴스·공시 수집", "P1", "FS074", "담당", "2026-10-12", "2026-10-23", "0.01", "0.8"],
+                ])
+            cases = [
+                ("FS074~FS081 / WBS 6.5.13~6.5.20 추가. 신규 일정·가중치 미산정.", True),
+                ("FS074~FS081을 WBS 6.5.13~6.5.20으로 추가했다(현재 번호 6.6.13~6.6.20). 신규 행의 일정과 가중치는 이때 산정하지 않았다.", False),
+                ("WBS 6.5.13~6.5.20 신규 일정·가중치 미산정. 다른 작업의 현재 번호 6.6.13~6.6.20.", True),
+            ]
+            for text, expected_conflict in cases:
+                with self.subTest(cover=text):
+                    with (folder / "cover.csv").open("w", encoding="utf-8-sig", newline="") as stream:
+                        csv.writer(stream).writerow([text])
+                    warnings = []
+                    tasks, _ = importer.import_wbs(folder, warnings)
+                    self.assertEqual(tasks[0]["id"], "6.6.13")
+                    self.assertEqual(any(item["code"] == "WBS_COVER_BODY_CONFLICT" for item in warnings), expected_conflict)
 
 
 class GeneratedProjectionTests(unittest.TestCase):

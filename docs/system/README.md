@@ -1,6 +1,6 @@
 # 줍 문서·목표 API 연결 체계
 
-화면계획서, 기능·비기능 명세, 요구사항, WBS, 프로토타입 판정, 목표 API를 **ID 참조**로 연결한다. 저장소에 원본을 두고 팀용 xlsx와 마크다운은 생성한다. 구글 시트는 생성한 xlsx를 가져다 보는 배포본이며 사람이 편집하는 원본을 대신하지 않는다.
+화면계획서, 기능·비기능 명세, 요구사항, WBS, 프로토타입 판정, 목표 API를 **ID 참조**로 연결한다. 공유 WBS는 일정·담당·산출물·보고 진행률의 정본이며, 저장소에는 날짜별 고정본을 보존한다. 이 입력으로 생성한 `zoop-trace.xlsx`와 마크다운은 추적용 배포본이다. 추적표를 가져온 구글 시트와 원본 공유 WBS는 구분한다.
 
 API 명세는 **정식 서버가 구현할 목표 계약**이다. BFF의 현재 OpenAPI는 차이 비교 자료이지 목표 계약의 정본이 아니다. 현재 WBS `6.1.2 API 명세 최종 검토·구현 기준 확정` 및 `6.11.1 API·스키마 계약 통합 점검`에 연결한다. API 공통 규칙은 사용자 **잠정 채택/시연 기준**이며 팀 최종 승인·구현 완료로 표시하지 않는다.
 
@@ -37,11 +37,12 @@ flowchart LR
 
 - CSV 출처의 `row`는 CSV 물리적 줄이 아니라 **xlsx 행 번호**다. 여러 줄 셀이 있어도 `csv.reader`의 레코드 번호로 원본 행을 보존한다. 구현 대조 마크다운은 텍스트 줄, 화면계획서는 슬라이드 쪽수를 쓴다.
 - 목차는 **98개 ID**다(10-10·10-12 동일). 목차 밖에 남은 상세 ID(옛 AI 5개)와 옛 `메인 그래프`(03)·`AI 챗봇`(07) 탭은 `links.yaml.detailAuthority`로 현행/이력을 구분한다. 두 탭은 10-12 XLSX에서 삭제되지 않고 숨김 상태다. 목차 밖 ID가 이력·정정 목록에 없으면 hard error이며 활성 목록으로 자동 승격하지 않는다. 이력 정의는 인수 기준 대체 증거가 아니고 번호가 같아도 의미가 다른 AI ID(FS046~051)는 `legacyAiMeaning`의 의미 이행표로만 잇는다. 옛 FS046의 서버 공통 의무는 `aiJobs`·NFS001/003에 보존한다.
-- 상세 `FS???`는 10-10에 `ㅊ`로 바뀌었고 같은 구획 제목은 `FS066-01 브리핑 리뷰`였다. 10-12 원문에서 B134가 `FS066-01`로 정정되어 `rawIdCorrections`는 비었고 해소 기록은 `resolvedRawIdCorrections`에 남는다. 생성기는 해소 기록의 원문 오류 ID가 고정본에 남아 있거나 대상 정의 행·제목 행이 다르면 hard error를 낸다. 이 정정은 B134 한 셀의 해소이며 목차 F61/G61, WBS FE 복합 산출물, 일정 역전, 표지/본문 충돌, 브리핑 메타 요구 36 등은 해소되지 않았다([10-12 기록](../evidence/doc-delta-2026-10-12.md)). FS042는 시점 기반 관계 그래프이며 요구 42의 재무·실적은 `reservedRequirements`로 요구 번호에만 연결한다. 새 FS/WBS를 만들지 않는다.
+- 상세 `FS???`는 10-10에 `ㅊ`로 바뀌었고 같은 구획 제목은 `FS066-01 브리핑 리뷰`였다. 10-12 원문에서 B134가 `FS066-01`로 정정되어 `rawIdCorrections`는 비었고 해소 기록은 `resolvedRawIdCorrections`에 남는다. 생성기는 해소 기록의 원문 오류 ID가 고정본에 남아 있거나 대상 정의 행·제목 행이 다르면 hard error를 낸다. 이 정정은 B134 한 셀의 해소이며, 당시 남아 있던 목차·WBS·브리핑 메타 요구 충돌은 [10-12 기록](../evidence/doc-delta-2026-10-12.md)에 보존한다. 현재 WBS 충돌 여부는 최신 고정본으로 검사한다. FS042는 시점 기반 관계 그래프이며 요구 42의 재무·실적은 `reservedRequirements`로 요구 번호에만 연결한다. 새 FS/WBS를 만들지 않는다.
 - 요구사항의 원본 번호 연결과 새 고정본의 제목이 다르면 확인 경고를 남긴다. 분리·통합인지 번호 이동인지 팀이 확인해야 한다. 새 정의서에서 중복이 사라졌다면 그 사실도 현재 입력에 따라 달라진다.
 - WBS의 원문 FS/선행·재사용 참조는 `rawSpecIds`로 보존한다. 현재 제목·역할·FS 의미에 맞춘 편집 연결은 `links.yaml.wbsConnections`, API별 연결 정본은 `x-zoop.wbsIds`다. 번호가 우연히 존재해도 같은 업무로 보지 않는다. 저장한 제목/BE·FE 역할과 현재 본문이 다르면 hard error다. [내용 기반 이행표](out/wbs-migration.md)가 옛 번호·새 역할 분리의 근거를 보존한다.
 - API 대응이 필요한 **P1 및 원문 제안 8개의 유효 포함 요구**는 작업 또는 `featureDecisions`의 **계약 미정 + 사유**가 필요하다. 클라이언트 품질·오프라인 파이프라인은 **API 불필요 + 사유**, 운영 연동은 별도 미정으로 구분한다. `FS074~081`의 원문 추가 제안·검토 전/우선 미정은 보존하되 현재 유효 구현 범위는 **팀합의요구/설계대상**이다. `원문 제안·유효 기준` 시트는 원문/현재 기준의 비교이며 보류 공수 목록이 아니다. 원문 WBS 충돌은 정정 요청으로 남기고 오프라인 요구를 가짜 API로 덮지 않는다.
 - 프로토타입 상태는 `spec-v1.2-gap.md` §5 기준선에 §0.1→§0.2→§0.3→§0.4의 마지막 판정을 적용한다. 번호가 재사용된 AI ID의 옛 판정은 의미 이행표가 정한 현재 ID에만 붙인다. 판정 문서·코드 위치는 **실행 검증 증거가 아니며**, 원본 최신화만으로 승인·구현 완료를 올리지 않는다.
+- WBS `progress`는 공유 원본의 보고 진행률이며 `원문 WBS` 시트에 그대로 표시한다. `기능→WBS→구현 상태`의 `문서 구현 판정`은 프로토타입 대조 문서의 판정이다. 범위 승인(`implementationScope`)·GitHub 이슈 상태·실행 검증 결과와 각각 구분하며 원본 수집만으로 완료를 올리지 않는다.
 - 프로토타입 전용 모의 IdP, 스냅샷 파일, 데모 재생·샌드박스 명령은 목표 요청·응답에 넣지 않는다. 차이 표/제외 사유로만 설명한다. 명세가 「확인 필요」로 남긴 보존 기간·제한·정량 목표는 숫자로 확정하지 않는다.
 - `DocumentSentiment`는 문서×기업, `BriefingOutlook`은 발행 회차 판정이다. `null`(아직 판정하지 않음)과 `undetermined`(판단 보류)를 구분한다. 이유·인용·판정 시각·모델·프롬프트 버전을 보존하고 확률·점수·가격 예측은 계약에 넣지 않는다.
 - 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준의 `.env` 설정 정책은 유지하며 AI 기능은 설계를 먼저 한다. live 예산·유료 실행 승인은 별개로 미정이다. 원본 충돌은 **작업자 가결정→시연→팀 최종 결정**으로 다루고 정정 요청을 보존한다. 요구 범위는 현재 사용자 결정에 따라 포함됐지만 실제 모델 호출 허가는 아니다.
@@ -53,7 +54,8 @@ flowchart LR
 
 ### 1. 고정본을 새 날짜 폴더에 저장한다
 
-현재 조합은 **명세 `functional-spec_2026-10-18`, WBS `wbs_2026-10-12`, 요구사항 `requirements-sheet_2026-10-06`**이며, 원본에서 삭제된 이력 탭 두 개(`03-메인-그래프.csv`·`07-AI-챗봇.csv`)는 탭이 마지막으로 남아 있던 `functional-spec_2026-10-12` 고정본에서 읽는다([10-18 원문 갱신 기록](../evidence/doc-delta-2026-10-18.md)). [10-12 원문 갱신 기록](../evidence/doc-delta-2026-10-12.md)에서 2026-10-12 09:45(KST) 재수집한 명세·WBS 18탭 135,892셀을 10-10 고정본과 대조해 변경 47셀(명세 26·WBS 21)을 확인했다. 38셀은 작업자가 공유 시트에 기록한 수정이고 9셀(WBS 6.8.7 신규 기재와 6.8.8 가중치)은 기록에 없는 팀 변경이다. 요구사항은 다시 받지 않고 10-06 고정본을 유지한다. 10-10 입력(`functional-spec_2026-10-10`, `wbs_2026-10-10`)과 [10-10 기록](../evidence/doc-delta-2026-10-10.md), 10-08 입력과 [10-08 delta](../evidence/doc-delta-2026-10-08.md)는 역사 기록으로 유지한다. 원본은 수정하지 않는다. WBS는 173개이며 본문 A:J 헤더는 이전 고정본과 동일하고 6.8.7 공란이 채워진 점만 제목·역할 변화다. 표지 `6.5.13~20` vs 본문 `6.6.13~20` 충돌은 별도로 남는다.
+현재 조합은 **명세 `functional-spec_2026-10-18`, WBS `wbs_2026-11-04`, 요구사항 `requirements-sheet_2026-10-06`**이다. 원본에서 삭제된 이력 탭 두 개(`03-메인-그래프.csv`·`07-AI-챗봇.csv`)는 탭이 마지막으로 남아 있던 `functional-spec_2026-10-12` 고정본에서 읽는다([10-18 원문 갱신 기록](../evidence/doc-delta-2026-10-18.md)). WBS는 공유 원본의 최신 상태를 새 날짜 폴더에 수집하며 XLSX·CSV·수집 시각·SHA-256은 해당 `_collection-manifest.json`에 보존한다. 본문 173개 업무의 A:J 열 계약은 유지한다. 이전 고정본과 [10-12 기록](../evidence/doc-delta-2026-10-12.md) 등 과거 갱신 기록은 이력으로 보존한다.
+이번 WBS 고정본은 표지 버전 `v0.3`·최종 수정일 `2026-11-04`를 2026-11-04 19:46(KST)에 수집했다. [수집 manifest](../evidence/raw/wbs_2026-11-04/_collection-manifest.json)에 공개 XLSX 응답 해시와 세 시트의 CSV 매핑을 기록했다. `6.9.15` 일정은 10/24~10/28이며, 표지의 옛 `6.5.13~20` 표기는 현재 `6.6.13~20` 번호와 당시 미산정 상태를 설명하는 이력으로 정정됐다. 생성기는 이 명시적 이력 설명과 현재 미해소 충돌을 구분한다.
 
 ### 2. 기계 추출 원본을 가져온다
 
@@ -62,7 +64,7 @@ uv run --with pyyaml python docs/system/import_sources.py \
   --spec-dir docs/evidence/raw/functional-spec_2026-10-18 \
   --historical-spec-file docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv \
   --historical-spec-file docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv \
-  --wbs-dir docs/evidence/raw/wbs_2026-10-12 \
+  --wbs-dir docs/evidence/raw/wbs_2026-11-04 \
   --requirements-dir docs/evidence/raw/requirements-sheet_2026-10-06
 ```
 
@@ -133,7 +135,7 @@ env -i PATH="$PATH" HOME="$HOME" \
 2. **[`../api/out/zoop-api-spec.md`](../api/out/zoop-api-spec.md)**: 팀용 API 명세서다. 메서드·경로·권한·요청·응답·오류·연결 FS/NFS/화면/WBS·차이·확인 사항을 작업별로 본다. 개발자는 정본 `openapi.yaml`도 함께 받는다.
 3. **[`out/index.md`](out/index.md)**와 그 옆의 `screen-*.md`, `feature-*.md`: 화면별·기능별 요약과 상호 링크다. 링크를 유지하려면 디렉터리 구조째 공유하거나 저장소에서 읽는다.
 4. **[`out/warnings.md`](out/warnings.md)** 및 **[`out/api-differences.md`](out/api-differences.md)**: 현재 원본 오류·확인 필요·프로토타입과의 차이를 함께 전달한다. xlsx의 경고 시트를 제외해서 공유하지 않는다.
-5. **[`out/wbs-migration.md`](out/wbs-migration.md)**: 117→173개 WBS의 번호·역할·의미 이행 근거다. 표지/본문·FS042 충돌과 공란 업무는 해결된 것처럼 소개하지 않는다.
+5. **[`out/wbs-migration.md`](out/wbs-migration.md)**: 117→173개 WBS의 번호·역할·의미 이행 근거다. 원문 충돌·공란 여부는 현재 고정본의 검사 결과와 함께 읽는다.
 6. **[`out/effective-authority.json`](out/effective-authority.json)** 및 **[`out/detail-authority.md`](out/detail-authority.md)**: 원문 상태·분류를 바꾸지 않고 현재 결정과 명세별 `implementationScope`, 범위 예외, 현행/이력 상세 권한을 기계 판독할 수 있다. `checks.json.scopeCounts`는 원문 기준(`rawIndexSpecs`·`rawProposals`·`rawDetailOnlyRecords`)과 유효 포함(`effectiveIncludedSpecs`·`scopeExceptionSpecs`)을 구분해 보인다. 전체 포함이라는 단일 수치로 합치지 않는다.
 7. **[`out/acceptance-matrix.md`](out/acceptance-matrix.md)** 및 **[`out/acceptance-matrix.json`](out/acceptance-matrix.json)**: 전체 103개 ID(현행 목차 98 + 이력 전용 5)의 121개 상세 정의(현행 99·이력 22)를 출처별 원문 수용 기준, 유효 범위, 의미 이행된 기존 판정 출처, 코드 위치와 연결한다. 다른 정의를 합치지 않고 과거 통과 수치를 현재 runtime pass로 올리지 않는다. `checks.json.acceptanceCoverage`에서 ID/상세 출처 전수 coverage와 기준/상세 누락을 확인한다.
 8. **[`out/source-corrections.md`](out/source-corrections.md)** 및 JSON: 현행/이력 정의, 번호가 재사용된 AI ID, 목차/상세 의미, 요구사항 제목·의미 연결, 요구 42와 FS042, FS066-01의 두 상세 정의, 미갱신 추가 제안 상태, WBS raw ID/표지·본문·날짜 순서·GraphDB 담당 경계의 두 원문과 작업자 안·담당자 수정 요청을 보존한다. 해소된 원문 ID 오류는 [`out/detail-authority.md`](out/detail-authority.md)에 해소 항목으로 남는다. 추가 WBS 일정/담당 충돌은 현재 작업 기준 문서에 별도로 연결한다.

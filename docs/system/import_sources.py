@@ -179,7 +179,10 @@ def import_wbs(folder: Path, warnings: list[dict]) -> tuple[list[dict], dict]:
                       r["id"].startswith("6.6.") and 13 <= int(r["id"].split(".")[-1]) <= 20]
     for source_path, records in ancillary.items():
         for record in records:
-            if any("6.5.13" in text and "6.5.20" in text for text in record["cells"]) and proposal_tasks:
+            conflicting = any("6.5.13" in text and "6.5.20" in text and not (
+                "현재 번호 6.6.13~6.6.20" in text and "이때 산정하지 않았다" in text)
+                for text in record["cells"])
+            if conflicting and proposal_tasks:
                 warnings.append({"code": "WBS_COVER_BODY_CONFLICT", "id": "FS074~FS081",
                                  "message": "표지/요약은 6.5.13~20·일정/가중치 미산정으로 소개하지만 본문은 6.6.13~20·P1·실명/기간/양수 가중치다. 원문 충돌은 정정 요청으로 보존하며 현재 요구 범위는 사용자 결정과 별도로 표시한다.",
                                  "source": record["source"]})
@@ -231,7 +234,7 @@ def main() -> None:
     parser.add_argument("--spec-dir", type=Path, default=ROOT / "docs/evidence/raw/functional-spec_2026-10-18")
     parser.add_argument("--historical-spec-file", type=Path, action="append", dest="historical_spec_files",
                         help="현재 원본에서 삭제된 이력 탭의 이전 고정본 CSV. 반복 지정한다.")
-    parser.add_argument("--wbs-dir", type=Path, default=ROOT / "docs/evidence/raw/wbs_2026-10-12")
+    parser.add_argument("--wbs-dir", type=Path, default=ROOT / "docs/evidence/raw/wbs_2026-11-04")
     parser.add_argument("--requirements-dir", type=Path, default=ROOT / "docs/evidence/raw/requirements-sheet_2026-10-06")
     parser.add_argument("--screens", type=Path, default=ROOT / "docs/screen-plan/captures/slide-index.json")
     parser.add_argument("--gap", type=Path, default=ROOT / "docs/evidence/spec-v1.2-gap.md")
