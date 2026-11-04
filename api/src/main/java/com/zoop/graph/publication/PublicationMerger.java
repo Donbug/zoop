@@ -327,10 +327,17 @@ public final class PublicationMerger {
         if (!StrictJson.SHA256.matcher(expected).matches()) throw failure("request_invalid");
         if (!expected.equals(Canonical.digest(field(originals.get(owner), "label")))) throw failure("identity_conflict");
         String label = correction.string("label");
-        if (label.isBlank() || !label.equals(label.strip()) || label.codePointCount(0, label.length()) > MAX_LABEL_LENGTH
+        // Blank or padded in any Unicode sense: String.isBlank/strip ignore no-break spaces (U+00A0, U+202F), which are space characters.
+        if (label.isEmpty() || label.codePoints().allMatch(PublicationMerger::space) || space(label.codePointAt(0))
+                || space(label.codePointBefore(label.length())) || label.codePointCount(0, label.length()) > MAX_LABEL_LENGTH
                 || !label.codePoints().allMatch(PublicationMerger::visible)) throw failure("request_invalid");
         if (!evidenceRefs(correction, originals, sources).equals(Set.of(owner))) throw failure("mapping_unproven");
         return label;
+    }
+
+    /** Whitespace by either Java definition: {@code isWhitespace} (ASCII, line/paragraph separators) or {@code isSpaceChar} (every Zs, including no-break spaces). */
+    private static boolean space(int codePoint) {
+        return Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint);
     }
 
     /** A code point a display name may carry: no control, format (zero-width, bidi override), separator, surrogate, private or unassigned. */

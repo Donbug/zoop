@@ -391,13 +391,16 @@ class PublicationMergerTest {
         }
         assertEquals("삼성전자·ASML, High NA EUV 도입 협력 계획 😀", PublicationMerger.merge(List.of(published),
                 Obj.of(corrected(published, "삼성전자·ASML, High NA EUV 도입 협력 계획 😀")), Set.of()).issues().getFirst().label());
+        assertEquals("High NA EUV", PublicationMerger.merge(List.of(published), Obj.of(corrected(published, "High NA EUV")), Set.of()).issues().getFirst().label());
         ObjectNode automatic = corrected(published, "Name"); correction(automatic).put("reviewer", PublicationMerger.AUTO_REVIEWER);
         assertTrue(PublicationMerger.claimsAutomaticReviewer(Obj.of(automatic)));
         assertEquals("request_invalid", code(() -> PublicationMerger.merge(List.of(published), Obj.of(automatic), Set.of())));
         // The length limit counts code points: a name of MAX_LABEL_LENGTH supplementary characters is 2 × MAX UTF-16 units and passes.
         String supplementary = "😀".repeat(PublicationMerger.MAX_LABEL_LENGTH);
         assertEquals(supplementary, PublicationMerger.merge(List.of(published), Obj.of(corrected(published, supplementary)), Set.of()).issues().getFirst().label());
-        for (String bad : List.of(" ", " Name", "Na\u0007me", "n".repeat(PublicationMerger.MAX_LABEL_LENGTH + 1))) {
+        // Blank or padded names include the no-break spaces String.isBlank/strip ignore (U+00A0, U+202F); an inner no-break space is text.
+        for (String bad : List.of("", " ", " Name", "Name ", " ", "  ", " Name", "Name ", "Na\u0007me",
+                "n".repeat(PublicationMerger.MAX_LABEL_LENGTH + 1))) {
             ObjectNode name = corrected(published, bad);
             assertEquals("request_invalid", code(() -> PublicationMerger.merge(List.of(published), Obj.of(name), Set.of())), bad);
         }
