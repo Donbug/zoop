@@ -35,6 +35,30 @@ const place = (node: Node, point: Point): Node => ({
   ...node,
   style: { ...node.style, x: point.x, y: point.y },
 });
+/** 노드 지름. size는 숫자 또는 [너비, 높이]다. */
+function diameter(node: Node) {
+  const size = node.style?.size;
+  const value = Array.isArray(size) ? Number(size[0]) : Number(size ?? 20);
+  return Number.isFinite(value) ? value : 20;
+}
+/** 포커스 모드에서 가운데 기업과 이웃 노드의 최대 지름. 사건이 많은 기업도 주변을 가리지 않는다. */
+export const FOCUS_CENTER_MAX = 120;
+export const FOCUS_NEIGHBOR_MAX = 100;
+/** 포커스 링에서 이웃 노드 사이와 링 사이의 최소 여백 */
+const RING_GAP = 40;
+/** 지름이 max보다 크면 로고·글자까지 같은 비율로 줄인다. */
+function shrink(node: Node, max: number): Node {
+  const size = diameter(node);
+  if (size <= max) return node;
+  const ratio = max / size;
+  const style = node.style ?? {};
+  const scaled = Object.fromEntries(
+    (['iconWidth', 'iconHeight', 'iconRadius', 'iconFontSize'] as const)
+      .filter((key) => typeof style[key] === 'number')
+      .map((key) => [key, Number(style[key]) * ratio]),
+  );
+  return { ...node, style: { ...style, ...scaled, size: max } };
+}
 
 /** 포커스 노드에서 각 노드까지의 단계(1 또는 2). 포커스 노드는 0 */
 export function focusRings(
@@ -61,6 +85,7 @@ export function focusRings(
 /**
  * 포커스 모드: 포커스 노드를 가운데, 1단계 이웃을 첫 링, 2단계 이웃을 둘째 링에 둔다.
  * 링 안 순서는 원래 지도에서 포커스 노드를 기준으로 한 방향을 따른다. 나머지 노드는 숨긴다.
+ * 기업 노드는 지름 상한까지 줄이고, 링 반지름은 실제 지름으로 정해 노드끼리 겹치지 않게 한다.
  */
 export function arrangeFocus(
   rendered: GraphData,
@@ -90,9 +115,34 @@ export function arrangeFocus(
       .sort((a, b) => a.angle - b.angle || a.id.localeCompare(b.id));
   const first = ringOf(1);
   const second = ringOf(2);
-  // 링 둘레가 노드 사이 최소 간격을 넘도록 반지름을 정한다.
-  const r1 = Math.max(base * 0.28, (first.length * 90) / (2 * Math.PI));
-  const r2 = Math.max(r1 + base * 0.2, (second.length * 70) / (2 * Math.PI));
+  const sized = new Map(
+    nodes.map((node) => {
+      const id = String(node.id);
+      if (!rings.has(id)) return [id, node];
+      return [
+        id,
+        shrink(node, id === focusId ? FOCUS_CENTER_MAX : FOCUS_NEIGHBOR_MAX),
+      ];
+    }),
+  );
+  const radius = (id: string) => diameter(sized.get(id)!) / 2;
+  const widest = (ring: { id: string }[]) =>
+    Math.max(0, ...ring.map((item) => radius(item.id)));
+  // 링 둘레가 이웃 노드 지름과 여백의 합을 넘도록 한다.
+  const around = (ring: { id: string }[]) =>
+    ring.reduce((sum, item) => sum + radius(item.id) * 2 + RING_GAP, 0) /
+    (2 * Math.PI);
+  // 링끼리, 가운데 노드와 첫 링도 가장 큰 노드끼리 닿지 않게 한다.
+  const r1 = Math.max(
+    base * 0.28,
+    around(first),
+    radius(focusId) + widest(first) + RING_GAP,
+  );
+  const r2 = Math.max(
+    r1 + base * 0.2,
+    around(second),
+    r1 + widest(first) + widest(second) + RING_GAP,
+  );
   const targets = new Map<string, Point>([[focusId, center]]);
   for (const [ring, radius] of [
     [first, r1],
@@ -110,7 +160,7 @@ export function arrangeFocus(
   const hidden = new Set<string>();
   const arranged = nodes.map((node) => {
     const target = targets.get(String(node.id));
-    if (target) return place(node, target);
+    if (target) return place(sized.get(String(node.id))!, target);
     hidden.add(String(node.id));
     return node;
   });

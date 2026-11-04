@@ -63,6 +63,8 @@ import {
 } from './graph-zoom-range';
 
 const noHighlightedEdges: string[] = [];
+/** D-GRP-07b: 포커스 배치를 화면에 맞출 때의 최대 확대 비율(100%). */
+const FOCUS_FIT_ZOOM = 1;
 /** D-GRP-01: how long the pointer rests on a node before its connected issue titles show. */
 export const HOVER_INTENT_MS = 300;
 
@@ -1129,6 +1131,11 @@ export default function GraphCanvas({
           arrangement !== lastArrangement.current && cameraMotion('layout')
             ? renderedData.current
             : null;
+        // 다른 배치에서 포커스로 들어오면 이웃이 가운데 노드에서 링으로 펴져 나간다.
+        // 같은 포커스에서 단계만 바꾸면 이미 보이던 노드는 지금 자리에서 옮겨 간다.
+        const sameFocus = lastArrangement.current.startsWith(
+          `focus:${focusId}:`,
+        );
         if (arrangement !== lastArrangement.current) {
           lastArrangement.current = arrangement;
           preservePositions.current = false;
@@ -1237,6 +1244,8 @@ export default function GraphCanvas({
         const previous = new Map(
           morphFrom?.nodes?.map((node) => [node.id, node.style]),
         );
+        const spreadFrom =
+          arrangeFocusNow && focusId ? previous.get(focusId) : undefined;
         graph.setData(
           keepAppliedStyles(
             graph,
@@ -1244,7 +1253,14 @@ export default function GraphCanvas({
               ? {
                   ...rendered,
                   nodes: rendered.nodes?.map((node) => {
-                    const from = previous.get(node.id);
+                    const before = previous.get(node.id);
+                    const from =
+                      spreadFrom &&
+                      node.id !== focusId &&
+                      node.style?.visibility !== 'hidden' &&
+                      (!sameFocus || !before || before.visibility === 'hidden')
+                        ? spreadFrom
+                        : before;
                     const { x, y } = node.style ?? {};
                     if (
                       !from ||
@@ -1344,7 +1360,8 @@ export default function GraphCanvas({
           await fitVisibleGraph(
             graph,
             undefined,
-            undefined,
+            // 포커스는 노드가 적어 맞춤이 크게 확대된다. 100%를 넘기지 않아 가운데 기업이 화면을 덮지 않는다.
+            arrangeFocusNow ? FOCUS_FIT_ZOOM : undefined,
             moving ? 'layout' : animate ? 'fit' : false,
           );
         }

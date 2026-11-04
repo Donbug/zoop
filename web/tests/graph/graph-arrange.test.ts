@@ -3,6 +3,8 @@ import { createMockGraph } from '@/mocks/graph/response';
 import {
   arrangeFlow,
   arrangeFocus,
+  FOCUS_CENTER_MAX,
+  FOCUS_NEIGHBOR_MAX,
   focusRings,
 } from '@/components/graph/graph-arrange';
 import { toG6Data } from '@/components/graph/graph-model';
@@ -68,6 +70,69 @@ test('포커스 2단계: 이웃의 이웃은 바깥 링에 두어 1단계보다 
   expect(radius(2).length).toBeGreaterThan(0);
   expect(Math.min(...radius(2))).toBeGreaterThan(Math.max(...radius(1)));
 });
+
+function styledFocusCase(hops: 1 | 2) {
+  const data = graph();
+  // 연결이 가장 많은 기업: 사건 수가 많아 지도에서 가장 큰 노드다.
+  const degree = (id: string) =>
+    data.edges.filter((e) => e.source === id || e.target === id).length;
+  const focusId = data.nodes
+    .filter((node) => node.kind === 'company')
+    .sort((a, b) => degree(b.id) - degree(a.id))[0].id;
+  const rings = focusRings(data, focusId, hops);
+  const rendered = styleGraph(
+    toG6Data(data, W, H, focusId, [...rings.keys()]),
+    {
+      variant: 'improved',
+      theme: 'light',
+    },
+  );
+  return {
+    focusId,
+    rings,
+    rendered,
+    ...arrangeFocus(rendered, data, focusId, hops, W, H),
+  };
+}
+const sizeOf = (
+  nodes: NonNullable<ReturnType<typeof toG6Data>['nodes']>,
+  id: string,
+) => Number(nodes.find((n) => n.id === id)!.style?.size);
+
+test('포커스: 가운데 기업과 이웃 노드를 지름 상한까지 줄이고 로고도 같은 비율로 줄인다', () => {
+  const { focusId, rings, rendered, nodes } = styledFocusCase(1);
+  const original = sizeOf(rendered.nodes ?? [], focusId);
+  expect(original).toBeGreaterThan(FOCUS_CENTER_MAX);
+  expect(sizeOf(nodes, focusId)).toBe(FOCUS_CENTER_MAX);
+  const before = rendered.nodes!.find((n) => n.id === focusId)!.style!;
+  const after = nodes.find((n) => n.id === focusId)!.style!;
+  if (typeof before.iconWidth === 'number')
+    expect(Number(after.iconWidth)).toBeCloseTo(
+      (before.iconWidth * FOCUS_CENTER_MAX) / original,
+      5,
+    );
+  for (const id of rings.keys())
+    if (id !== focusId)
+      expect(sizeOf(nodes, id)).toBeLessThanOrEqual(FOCUS_NEIGHBOR_MAX);
+});
+
+test.each([1, 2] as const)(
+  '포커스 %i단계: 보이는 노드끼리 겹치지 않는다',
+  (hops) => {
+    const { nodes, hidden } = styledFocusCase(hops);
+    const shown = nodes.filter((n) => !hidden.has(String(n.id)));
+    for (let i = 0; i < shown.length; i += 1)
+      for (let j = i + 1; j < shown.length; j += 1) {
+        const a = shown[i];
+        const b = shown[j];
+        expect(
+          distance(point(nodes, String(a.id)), point(nodes, String(b.id))),
+        ).toBeGreaterThanOrEqual(
+          (Number(a.style?.size) + Number(b.style?.size)) / 2,
+        );
+      }
+  },
+);
 
 test('흐름 순 정렬: 사건은 관련 기업보다, 선행 사건은 후속 사건보다 왼쪽에 있고 노드가 겹치지 않는다', () => {
   const data = graph();

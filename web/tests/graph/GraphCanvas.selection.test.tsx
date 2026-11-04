@@ -2092,7 +2092,7 @@ describe('D-GRP-01 지도 카메라 움직임', () => {
     view.unmount();
     vi.unstubAllGlobals();
   });
-  it('포커스에 들어가면 노드를 이전 자리에 그린 뒤 새 자리로 옮기고, 동작 줄이기면 바로 놓는다', async () => {
+  it('포커스에 들어가면 이웃을 가운데 기업의 이전 자리에 그린 뒤 링으로 펴고, 동작 줄이기면 바로 놓는다', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const focusId = data.nodes.find((node) => node.kind === 'company')!.id;
     const lastNodes = () =>
@@ -2116,12 +2116,40 @@ describe('D-GRP-01 지도 카메라 움직임', () => {
       boolean,
     ];
     expect(animated).toBe(true);
-    expect(Object.keys(targets).length).toBeGreaterThan(0);
+    expect(Object.keys(targets).length).toBeGreaterThan(1);
     const drawn = lastNodes();
+    // 가운데 기업은 제자리에서, 이웃은 모두 가운데 기업의 이전 자리에서 출발한다.
+    expect(drawn.get(focusId)).toEqual(before.get(focusId));
     for (const id of Object.keys(targets)) {
-      expect(drawn.get(id)).toEqual(before.get(id));
-      expect(targets[id]).not.toEqual(before.get(id));
+      expect(drawn.get(id)).toEqual(before.get(focusId));
+      expect(targets[id]).not.toEqual(before.get(focusId));
     }
+
+    // 같은 포커스에서 단계만 바꾸면 이미 보이던 이웃은 지금 자리에서 옮기고, 새 이웃만 가운데에서 펴진다.
+    // 1단계가 끝난 자리: 그린 자리에서 옮겨 간 목표 자리로 바뀐다.
+    const oneHop = new Map([...lastNodes(), ...Object.entries(targets)]);
+    const firstRing = Object.keys(targets).filter((id) => id !== focusId);
+    canvas.translateElementTo.mockClear();
+    canvas.setData.mockClear();
+    view.rerender(
+      <GraphCanvas data={data} focusId={focusId} focusHops={2} focusLayout />,
+    );
+    await waitFor(() => expect(canvas.translateElementTo).toHaveBeenCalled());
+    const [twoHopTargets] = canvas.translateElementTo.mock.lastCall! as [
+      Record<string, [number, number]>,
+      boolean,
+    ];
+    const twoHop = lastNodes();
+    const center = oneHop.get(focusId);
+    for (const id of Object.keys(twoHopTargets)) {
+      if (id === focusId) continue;
+      expect(twoHop.get(id)).toEqual(
+        firstRing.includes(id) ? oneHop.get(id) : center,
+      );
+    }
+    expect(
+      Object.keys(twoHopTargets).some((id) => !firstRing.includes(id)),
+    ).toBe(true);
     view.unmount();
 
     stubMotion(true);
