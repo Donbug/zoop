@@ -1439,13 +1439,73 @@ export default function GraphCanvas({
     let graph: Graph | null = null;
     let observer: ResizeObserver | null = null;
     let resizeFrame: number | null = null;
+    // 끌고 있는 동안은 지나치는 노드·연결의 hover를 그리지 않고, 포인터가 마지막으로 가리킨 것만 pending에 둔다.
+    // 손을 뗄 때(pointerup·pointercancel) 그 상태를 한 번 반영하고, 바뀐 것이 있을 때만 이름표를 다시 읽는다.
+    // 노드가 많을 때 끌기 중 hover마다 상태 변경·이름표 읽기가 이어져 화면이 끊기는 것을 막는다.
+    let pending: { node: string | null; edge: string | null } | null = null;
+    const enterEdge = (id: string) => {
+      if (pending) {
+        pending.edge = id;
+        return;
+      }
+      if (!interactionEnabled()) return;
+      hoveredEdge.current = id;
+      setHoveredIssue(null);
+      scheduleReading();
+    };
+    const leaveEdge = () => {
+      if (pending) {
+        pending.edge = null;
+        return;
+      }
+      hoveredEdge.current = null;
+      setHoveredIssue(null);
+      scheduleReading();
+    };
+    const enterNode = (id: string) => {
+      if (pending) pending.node = id;
+      else hoverNode(id);
+    };
+    const leaveNodeLater = (id: string) => {
+      if (!pending) leaveNode(id);
+      else if (pending.node === id) pending.node = null;
+    };
     const clearHover = () => {
+      if (pending) {
+        pending.node = null;
+        pending.edge = null;
+        return;
+      }
       hoveredEdge.current = null;
       setHoveredIssue(null);
       hoverNode(null);
       scheduleReading();
     };
+    const startPan = () => {
+      if (pending) return;
+      // 끌기 직전에 노드를 벗어나 해제를 기다리던 중이면 그 노드는 이미 떠난 것으로 본다.
+      const leaving = hoverClearTimer.current !== null;
+      if (leaving) {
+        clearTimeout(hoverClearTimer.current!);
+        hoverClearTimer.current = null;
+      }
+      pending = {
+        node: leaving ? null : hovered.current,
+        edge: hoveredEdge.current,
+      };
+    };
+    const endPan = () => {
+      if (!pending) return;
+      const { node, edge } = pending;
+      pending = null;
+      if (edge !== hoveredEdge.current) {
+        if (edge === null) leaveEdge();
+        else enterEdge(edge);
+      }
+      if (node !== hovered.current) hoverNode(node);
+    };
     let pointerStart: {
+      pointerId: number;
       x: number;
       y: number;
       graphX: number;
@@ -1458,11 +1518,14 @@ export default function GraphCanvas({
     let dragged = false;
     const pointerDown = (event: PointerEvent) => {
       if (!graph || event.button !== 0) return;
+      // pointerup을 놓친 채(예: 창 밖에서 뗌) 다시 누르면 이전 끌기를 여기서 끝낸다.
+      endPan();
       const bounds = host.getBoundingClientRect();
       const position = graph.getPosition();
       wheelPending = false;
       dragged = false;
       pointerStart = {
+        pointerId: event.pointerId,
         x: event.clientX,
         y: event.clientY,
         graphX: position[0],
@@ -1486,9 +1549,16 @@ export default function GraphCanvas({
         followFit.current = false;
         centerTarget.current = null;
         dragged = true;
+        startPan();
       }
     };
     const pointerUp = (event: PointerEvent) => {
+      // 끌던 포인터의 왼쪽 버튼(터치·펜은 0)만 끝낸다. 오른쪽 버튼이나 다른 손가락을 떼는 것은 무시한다.
+      if (
+        event.button !== 0 ||
+        (pointerStart && event.pointerId !== pointerStart.pointerId)
+      )
+        return;
       if (
         pointerStart?.allowed &&
         graph &&
@@ -1508,6 +1578,12 @@ export default function GraphCanvas({
           tutorialAction('pan');
       }
       pointerStart = null;
+      endPan();
+    };
+    const pointerCancel = (event: PointerEvent) => {
+      if (pointerStart && event.pointerId !== pointerStart.pointerId) return;
+      pointerStart = null;
+      endPan();
     };
     const stopFollowing = (event: WheelEvent) => {
       if (event.deltaY !== 0 && currentTutorialPhase() === 'zoom')
@@ -1529,6 +1605,7 @@ export default function GraphCanvas({
     host.addEventListener('pointerdown', pointerDown);
     host.addEventListener('pointermove', pointerMove);
     window.addEventListener('pointerup', pointerUp);
+    window.addEventListener('pointercancel', pointerCancel);
     host.addEventListener('wheel', stopFollowing, { passive: true });
     window.addEventListener('zoop:graph-viewport-change', viewportChanged);
     hovered.current = null;
@@ -1590,17 +1667,10 @@ export default function GraphCanvas({
       graph.on('edge:dblclick', (event: IElementEvent) =>
         zoomNeighborhood(event.target.id),
       );
-      graph.on('edge:pointerenter', (event: IElementEvent) => {
-        if (!interactionEnabled()) return;
-        hoveredEdge.current = event.target.id;
-        setHoveredIssue(null);
-        scheduleReading();
-      });
-      graph.on('edge:pointerleave', () => {
-        hoveredEdge.current = null;
-        setHoveredIssue(null);
-        scheduleReading();
-      });
+      graph.on('edge:pointerenter', (event: IElementEvent) =>
+        enterEdge(event.target.id),
+      );
+      graph.on('edge:pointerleave', leaveEdge);
       graph.on('node:click', (event: IElementEvent) => {
         if (!dragged) selectNode(event.target.id);
       });
@@ -1608,7 +1678,7 @@ export default function GraphCanvas({
         enterNode(event.target.id),
       );
       graph.on('node:pointerleave', (event: IElementEvent) =>
-        leaveNode(event.target.id),
+        leaveNodeLater(event.target.id),
       );
       graph.on('canvas:pointerleave', clearHover);
       graph.on('afterdraw', () => {
@@ -1752,6 +1822,7 @@ export default function GraphCanvas({
       host.removeEventListener('pointerdown', pointerDown);
       host.removeEventListener('pointermove', pointerMove);
       window.removeEventListener('pointerup', pointerUp);
+      window.removeEventListener('pointercancel', pointerCancel);
       host.removeEventListener('wheel', stopFollowing);
       window.removeEventListener('zoop:graph-viewport-change', viewportChanged);
       observer?.disconnect();
