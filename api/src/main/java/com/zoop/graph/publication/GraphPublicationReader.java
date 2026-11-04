@@ -14,6 +14,7 @@ import com.zoop.artifact.storage.ArtifactStoreException;
 import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
 import com.zoop.common.json.StrictJson.Obj;
+import com.zoop.common.request.ReadScope;
 import com.zoop.document.evidence.service.GraphReceiptGrants;
 import com.zoop.document.repository.ArtifactRow;
 import com.zoop.document.repository.DocumentRegistryRepository;
@@ -32,6 +33,9 @@ public final class GraphPublicationReader {
     public static final String BASIS_SCHEMA = "zoop-graph-publication-basis-1";
     public static final String POLICY = "zoop-cumulative-publication-policy-1";
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final java.util.concurrent.atomic.AtomicLong INSTANCES = new java.util.concurrent.atomic.AtomicLong();
+    /** Readers with different artifact sources (artifact root, delivery package) never share a request's kept publication. */
+    private final String scopeKey = "graph-publication:" + INSTANCES.incrementAndGet() + ":";
     private final GraphHandoffRepository graph;
     private final DocumentRegistryRepository registry;
     private final java.util.function.Function<ArtifactRow, byte[]> readArtifact;
@@ -112,8 +116,15 @@ public final class GraphPublicationReader {
         return read(versionId, null);
     }
 
-    /** Reuses the snapshot already verified by the configured public snapshot store. */
+    /**
+     * Reuses the snapshot already verified by the configured public snapshot store. One read-only request verifies a version
+     * once ({@link ReadScope}); the version id is content-addressed, so the kept publication is the same one a re-read builds.
+     */
     public Publication read(String versionId, PublicGraphSnapshot loadedSnapshot) {
+        return ReadScope.memo(scopeKey + versionId, () -> readNow(versionId, loadedSnapshot));
+    }
+
+    private Publication readNow(String versionId, PublicGraphSnapshot loadedSnapshot) {
         try {
             var version = graph.findVersion(versionId).orElseThrow(() -> failure("basis_unavailable"));
             if (!"snapshot".equals(version.kind())) throw failure("basis_mismatch");
