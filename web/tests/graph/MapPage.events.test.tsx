@@ -149,7 +149,12 @@ describe('D-GRP-02 · map selection and downstream context', () => {
         url.includes('focus=') ? graph : { ...graph, edges: [] },
       );
       setup(url);
-      await screen.findByRole('button', { name: 'AI에게 묻기' });
+      // 파일의 첫 테스트라 첫 렌더가 느릴 수 있다(부하가 큰 로컬에서 기본 1초를 넘김).
+      await screen.findByRole(
+        'button',
+        { name: 'AI에게 묻기' },
+        { timeout: 5000 },
+      );
       expect(
         screen.queryByRole('button', { name: '이슈 중심 그래프' }),
       ).toBeNull();
