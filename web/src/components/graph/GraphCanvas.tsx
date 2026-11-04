@@ -1512,6 +1512,7 @@ export default function GraphCanvas({
     };
     let pointerStart: {
       pointerId: number;
+      pointerType: string;
       x: number;
       y: number;
       graphX: number;
@@ -1524,7 +1525,16 @@ export default function GraphCanvas({
     let dragged = false;
     const pointerDown = (event: PointerEvent) => {
       if (!graph || event.button !== 0) return;
-      // pointerup을 놓친 채(예: 창 밖에서 뗌) 다시 누르면 이전 끌기를 여기서 끝낸다.
+      // 끌던 포인터가 있으면 다른 포인터는 무시해 끌기를 유지한다: 두 번째 손가락, 마우스 끌기 중의 터치 등.
+      // isPrimary는 입력 종류마다 따로 정해지므로, 같은 종류의 새 주 포인터만 이전 포인터가 pointerup을
+      // 놓친 것으로 보고 이어받는다. 터치는 암묵적 캡처로 pointerup·pointercancel이 늘 오고, 마우스는
+      // 버튼 없이 돌아온 움직임(pointerMove)에서 정리되므로 다른 종류가 이어받을 필요가 없다.
+      if (
+        pointerStart &&
+        event.pointerId !== pointerStart.pointerId &&
+        (event.pointerType !== pointerStart.pointerType || !event.isPrimary)
+      )
+        return;
       endPan();
       const bounds = host.getBoundingClientRect();
       const position = graph.getPosition();
@@ -1532,6 +1542,7 @@ export default function GraphCanvas({
       dragged = false;
       pointerStart = {
         pointerId: event.pointerId,
+        pointerType: event.pointerType,
         x: event.clientX,
         y: event.clientY,
         graphX: position[0],
@@ -1545,8 +1556,18 @@ export default function GraphCanvas({
       };
     };
     const pointerMove = (event: PointerEvent) => {
+      if (!pointerStart || event.pointerId !== pointerStart.pointerId) return;
+      // 브라우저 밖에서 버튼을 놓아 pointerup을 놓쳤으면, 버튼 없이 돌아온 첫 움직임에서 끌기를 끝낸다.
+      // 터치는 닿지 않은 채 움직이지 않으므로 마우스·펜만 본다.
       if (
-        pointerStart &&
+        (event.pointerType === 'mouse' || event.pointerType === 'pen') &&
+        event.buttons === 0
+      ) {
+        pointerStart = null;
+        endPan();
+        return;
+      }
+      if (
         Math.hypot(
           event.clientX - pointerStart.x,
           event.clientY - pointerStart.y,
@@ -1591,6 +1612,11 @@ export default function GraphCanvas({
       pointerStart = null;
       endPan();
     };
+    // 끌던 중 창이 포커스를 잃으면(다른 창으로 전환) pointerup이 오지 않으므로 여기서 끝낸다.
+    const windowBlur = () => {
+      pointerStart = null;
+      endPan();
+    };
     const stopFollowing = (event: WheelEvent) => {
       if (event.deltaY !== 0 && currentTutorialPhase() === 'zoom')
         wheelPending = true;
@@ -1612,6 +1638,7 @@ export default function GraphCanvas({
     host.addEventListener('pointermove', pointerMove);
     window.addEventListener('pointerup', pointerUp);
     window.addEventListener('pointercancel', pointerCancel);
+    window.addEventListener('blur', windowBlur);
     host.addEventListener('wheel', stopFollowing, { passive: true });
     window.addEventListener('zoop:graph-viewport-change', viewportChanged);
     hovered.current = null;
@@ -1829,6 +1856,7 @@ export default function GraphCanvas({
       host.removeEventListener('pointermove', pointerMove);
       window.removeEventListener('pointerup', pointerUp);
       window.removeEventListener('pointercancel', pointerCancel);
+      window.removeEventListener('blur', windowBlur);
       host.removeEventListener('wheel', stopFollowing);
       window.removeEventListener('zoop:graph-viewport-change', viewportChanged);
       observer?.disconnect();
