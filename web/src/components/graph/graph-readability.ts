@@ -2,6 +2,7 @@ import type { Graph, GraphData } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import { intersects, screenLabelSize, type Rect } from './graph-geometry';
 import { MIN_GRAPH_ZOOM } from './graph-zoom-range';
+import { issuePillPadding, issuePillRadius } from './graph-model';
 
 /** Below this zoom issue titles are clipped to two lines (D-GRP-01 overview). */
 export const OVERVIEW_ZOOM = 0.45;
@@ -99,7 +100,7 @@ export function culledLabels(
       continue;
     }
     // D-GRP-01 (2026-11-04 review): an overlapping issue title first tries the other sides of
-    // its diamond, so titles shown on hover sit side by side instead of on top of each other.
+    // its circle, so titles shown on hover sit side by side instead of on top of each other.
     const options = item.alternatives ?? [];
     const fit = options.find((option) => free(option.box));
     if (fit) {
@@ -123,7 +124,7 @@ export function readingStyles(
   context: ReadingContext,
 ): GraphData {
   const zoom = Math.max(MIN_GRAPH_ZOOM, context.zoom);
-  // D-GRP-01 (2026-11-04 review): the whole-graph fit shows only diamonds, even when a compact
+  // D-GRP-01 (2026-11-04 review): the whole-graph fit shows only issue circles, even when a compact
   // map fits above OVERVIEW_ZOOM. Titles come back once the user zooms in past the fit.
   const overviewZoom = Math.max(
     OVERVIEW_ZOOM,
@@ -143,7 +144,7 @@ export function readingStyles(
         Number(node.style?.labelFontSize ?? 13),
         screenLabelSize(node) / zoom,
       );
-      // D-GRP-01 (2026-11-04 review): zoomed out, an issue is only a diamond that says
+      // D-GRP-01 (2026-11-04 review): zoomed out, an issue is only a circle that says
       // "there is an issue here"; its title and count come back on zoom, hover or selection.
       const overview =
         source?.kind === 'issue' && zoom < overviewZoom && !emphasized;
@@ -158,6 +159,15 @@ export function readingStyles(
               ? 'visible'
               : 'hidden',
           labelFontSize: size,
+          // 배율에 맞춘 글자 크기로 알약 모양 여백과 반지름을 다시 잰다.
+          ...(source?.kind === 'issue'
+            ? {
+                labelPadding: issuePillPadding(size),
+                labelBackgroundRadius: issuePillRadius(size),
+                // 테두리도 화면 기준 0.667px로 유지해야 줄여 볼 때도 둥근 상자가 보인다.
+                labelBackgroundLineWidth: 0.667 / zoom,
+              }
+            : {}),
           // D-GRP-01: G keeps a fixed 16px line height; it must grow with the zoom-corrected font
           // or wrapped lines overlap and the culling below measures a box shorter than the text.
           labelLineHeight: size * 1.3,
@@ -220,7 +230,7 @@ export function readingStyles(
   };
 }
 
-/** G6 label style for an issue title on one side of its diamond (top is the default). */
+/** G6 label style for an issue title on one side of its circle (top is the default). */
 const placementStyle = (side: LabelPlacement) => ({
   labelPlacement: side,
   labelOffsetY: side === 'top' ? -5 : side === 'bottom' ? 5 : 0,
@@ -243,6 +253,9 @@ const READING_KEYS = new Set([
   'labelText',
   'labelVisibility',
   'labelFontSize',
+  'labelPadding',
+  'labelBackgroundRadius',
+  'labelBackgroundLineWidth',
   'labelWordWrap',
   'labelWordWrapWidth',
   'labelMaxWidth',
@@ -437,7 +450,7 @@ export async function applyGraphReading(
   const byId = new Map(data.nodes.map((n) => [n.id, n]));
   const related = anchorNeighbors(base, context);
   const degrees = new Map<string, number>();
-  // Companies each issue touches on this map: shared issues always keep their diamond and lines.
+  // Companies each issue touches on this map: shared issues always keep their circle and lines.
   const companies = new Map<string, Set<string>>();
   for (const edge of base.edges ?? []) {
     for (const id of [String(edge.source), String(edge.target)])
@@ -461,7 +474,7 @@ export async function applyGraphReading(
   const anchor = base.nodes?.find(
     (n) => n.id === context.anchor || n.id === context.focus,
   );
-  // Screen boxes of an issue title on each side of its diamond; the side it sits on now
+  // Screen boxes of an issue title on each side of its circle; the side it sits on now
   // keeps its measured box. Top first, then below, then beside (the count badge is top-right).
   const sides = (
     node: NonNullable<GraphData['nodes']>[number],
@@ -514,7 +527,7 @@ export async function applyGraphReading(
       source?.kind !== 'issue' ? screenBox(shape?.getShape('key')) : null;
     if (body) bodies.push({ id, box: body });
     // D-GRP-01 (2026-11-04 review): behind a selection, unrelated issues stay faint
-    // diamonds without a title or count, so only the selection's titles compete for room.
+    // circles without a title or count, so only the selection's titles compete for room.
     const faded =
       source?.kind === 'issue' && context.bright && !context.bright.has(id);
     if (node.style?.labelVisibility === 'hidden' || faded) {
@@ -606,8 +619,8 @@ export async function applyGraphReading(
     for (const id of culled) showLabel(labels.get(id), false);
   }
   // D-GRP-01 (2026-11-04 review): a single-company issue whose title does not fit is
-  // folded with its line too, so no line ends at an untitled diamond. Shared issues and the
-  // selected company's issues keep their diamond and lines (only overlapping titles wait for zoom).
+  // folded with its line too, so no line ends at an untitled circle. Shared issues and the
+  // selected company's issues keep their circle and lines (only overlapping titles wait for zoom).
   // Follow-up chains are never folded by data either (foldedIssues): keep both ends.
   const follows = new Set(
     data.edges

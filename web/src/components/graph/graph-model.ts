@@ -116,9 +116,19 @@ export function foldedIssues(
   return { hidden, counts };
 }
 
-/** D-GRP-01 (2026-11-04 reviews): issue nodes were 7px diamonds and hard to spot, then 30
- * and 36, then 40. Now 48, so a diamond reads about 20-30% of a company node like the reference network. */
-export const ISSUE_NODE_SIZE = 48;
+/** D-GRP-01 (2026-11-04 요청): 사건 제목 상자를 알약 모양으로 그린다. 위아래 여백은 글자의 1/4,
+ * 양옆은 둥근 끝에 글자가 닿지 않게 3/4이고, 반지름은 한 줄 상자 높이(줄 간격 1.3 + 위아래 여백)의 절반이다. */
+export const issuePillPadding = (fontSize: number): [number, number] => [
+  fontSize * 0.25,
+  fontSize * 0.75,
+];
+export const issuePillRadius = (fontSize: number) =>
+  (fontSize * 1.3 + fontSize * 0.5) / 2;
+
+/** D-GRP-01 (2026-11-04 reviews): issue nodes were 7px diamonds, then 30/36/40/48/65 diamonds.
+ * Now circles of 64 (the user picked 2x of a 32 circle after comparing 32/64/80): smaller than
+ * a regular company (83–119) and about 1/3 of the busiest one (188). */
+export const ISSUE_NODE_SIZE = 64;
 
 /**
  * D-GRP-01: 0..1 evidence strength per issue on a log scale against the busiest
@@ -149,8 +159,10 @@ export function companyNodeSize(issueCount: number, scale = 1) {
             ? 3
             : 4;
   // D-GRP-01: 2026-11-04 reviews enlarged every level by 25% (was 36/44/52/68/88), then
-  // by another 35% (was 45/55/65/85/110) when node spacing went back to the earlier map.
-  return [61, 74, 88, 115, 149][level] * scale;
+  // by another 35% (was 45/55/65/85/110) when node spacing went back to the earlier map,
+  // then by another 15% (was 61/74/88/115/149), then levels 1-3 by 18% and 4-5 by 10%
+  // (was 70/85/101/132/171) so small companies read better without the hubs taking over.
+  return [83, 100, 119, 145, 188][level] * scale;
 }
 
 export function focusNeighborhood(
@@ -226,7 +238,8 @@ export function toG6Data(
       const iconSize = logo ? size * logoScale(logo) : size;
       return {
         id: n.id,
-        type: company ? 'circle' : 'diamond',
+        // D-GRP-01 (2026-11-04 요청): 사건도 기업처럼 원으로 그린다. 크기와 진하기로 구분한다.
+        type: 'circle',
         data: { kind: n.kind, chosen, folded: fold.counts.get(n.id) ?? 0 },
         style: {
           // Camera and styling remain independent of relationship placement.
@@ -272,8 +285,9 @@ export function toG6Data(
           labelBackgroundFill: themeColor('paper'),
           labelBackgroundStroke: themeColor('ink'),
           labelBackgroundLineWidth: 0.5,
-          labelBackgroundRadius: 8,
-          labelPadding: [3, 8],
+          // D-GRP-01 (2026-11-04 요청): 사건 제목 상자는 상태 배지처럼 양끝이 둥근 알약 모양이다.
+          labelBackgroundRadius: issuePillRadius(15 * scale),
+          labelPadding: issuePillPadding(15 * scale),
           badges,
           cursor: 'pointer',
           opacity: dimmed ? 0.16 : 1,

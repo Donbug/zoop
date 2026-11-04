@@ -43,7 +43,7 @@ test.each([0.1, 0.4, 0.53, 0.8, 1.5])(
   },
 );
 
-test('D-GRP-01 zoomed out, issues keep only their diamond until hovered or selected', () => {
+test('D-GRP-01 zoomed out, issues keep only their circle until hovered or selected', () => {
   const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
   const base = toG6Data(data, 1200, 700);
   const issue = data.nodes.find((n) => n.kind === 'issue')!;
@@ -56,7 +56,7 @@ test('D-GRP-01 zoomed out, issues keep only their diamond until hovered or selec
   expect(style(issue.id).labelVisibility).toBe('visible');
 });
 
-test('D-GRP-01 the whole-graph fit shows issue diamonds only, even above the overview zoom', () => {
+test('D-GRP-01 the whole-graph fit shows issue circles only, even above the overview zoom', () => {
   // 2026-11-04 리뷰: 촘촘한 지도는 0.45보다 크게 맞춰져도 전체 맞춤에서는 사건 제목을 숨겨요.
   const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
   const base = toG6Data(data, 1200, 700);
@@ -315,6 +315,48 @@ test('R1 queued reading updates preserve live drag coordinates and current edge 
   expect(liveEdge.lineWidth).toBe(7);
 });
 
+test.each([0.53, 1, 1.5])(
+  'D-GRP-01 selection redraw preserves issue pill reading styles at zoom %s',
+  async (zoom) => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const base = toG6Data(data, 1200, 700);
+    let nodes = structuredClone(base.nodes!);
+    const update = vi.fn((updates: NonNullable<GraphData['nodes']>) => {
+      nodes = nodes.map((node) => ({
+        ...node,
+        style: {
+          ...node.style,
+          ...updates.find((item) => item.id === node.id)?.style,
+        },
+      }));
+    });
+    const graph = {
+      destroyed: false,
+      getNodeData: () => nodes,
+      getEdgeData: () => [],
+      updateNodeData: update,
+      updateEdgeData: vi.fn(),
+      draw: async () => {},
+      getCanvas: () => ({ document: { getElementById: () => null } }),
+    } as unknown as Graph;
+    const reading = { ...context, zoom };
+    await applyGraphReading(graph, base, data, reading);
+    const issue = data.nodes.find((node) => node.kind === 'issue')!;
+    const expected = nodes.find((node) => node.id === issue.id)!.style!;
+    const nextBase = toG6Data(data, 1200, 700, 'KRX:005930');
+    nodes = keepAppliedStyles(graph, nextBase).nodes!;
+    await applyGraphReading(graph, nextBase, data, reading);
+    const actual = nodes.find((node) => node.id === issue.id)!.style!;
+    for (const key of [
+      'labelFontSize',
+      'labelPadding',
+      'labelBackgroundRadius',
+      'labelBackgroundLineWidth',
+    ])
+      expect(actual[key]).toEqual(expected[key]);
+  },
+);
+
 test('setData keeps applied label styles and model-only keys so unchanged elements do not redraw', () => {
   const graph = {
     getNodeData: () => [
@@ -498,8 +540,8 @@ test('D-GRP-01 a folded issue takes its evidence badge along and both come back'
   }
 });
 
-test('D-GRP-01 an overlapping issue title moves to a free side of its diamond', () => {
-  // 2026-11-04 리뷰: 호버로 보인 사건 제목이 겹치면 마름모의 빈 쪽(아래·왼쪽·오른쪽)으로 옮겨요.
+test('D-GRP-01 an overlapping issue title moves to a free side of its circle', () => {
+  // 2026-11-04 리뷰: 호버로 보인 사건 제목이 겹치면 사건 원의 빈 쪽(아래·왼쪽·오른쪽)으로 옮겨요.
   const top = { x: 0, y: 0, width: 100, height: 20 };
   const entry = (id: string, alternatives = true) => ({
     id,
@@ -522,3 +564,22 @@ test('D-GRP-01 an overlapping issue title moves to a free side of its diamond', 
   expect(placements.get('a')).toBe('top');
   expect(placements.get('b')).toBe('bottom');
 });
+
+test.each([0.53, 1, 1.5])(
+  'D-GRP-01 issue titles sit in a pill: radius is half of a one-line box at zoom %s',
+  (zoom) => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const base = toG6Data(data, 1200, 700);
+    const issue = readingStyles(base, data, { ...context, zoom }).nodes!.find(
+      (node) => node.data?.kind === 'issue',
+    )!.style!;
+    const size = Number(issue.labelFontSize);
+    const [vertical, horizontal] = issue.labelPadding as [number, number];
+    const oneLine = Number(issue.labelLineHeight) + vertical * 2;
+    expect(Number(issue.labelBackgroundRadius)).toBeCloseTo(oneLine / 2);
+    // 둥근 끝에 글자가 닿지 않도록 양옆 여백이 위아래보다 넓다.
+    expect(horizontal).toBeGreaterThan(vertical);
+    expect(horizontal).toBeCloseTo(size * 0.75);
+    expect(Number(issue.labelBackgroundLineWidth) * zoom).toBeCloseTo(0.667);
+  },
+);
