@@ -174,6 +174,26 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
+    void uncertainCausalityDoesNotEraseAValidatedGeneralDefinition() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.95), Map.of()));
+        answer = new ChatGeneratedAnswer(List.of(general(
+                "HBM은 여러 D램을 수직으로 쌓은 고대역폭 메모리입니다. 넓은 인터페이스로 많은 데이터를 한 번에 전달합니다.",
+                "r1")), List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("no", List.of(
+                new ChatSemanticVerdicts.ClaimVerdict("s0c0", null, "no"),
+                new ChatSemanticVerdicts.ClaimVerdict("s0c1", null, "hold"),
+                new ChatSemanticVerdicts.ClaimVerdict("s0c2", null, "hold"),
+                new ChatSemanticVerdicts.ClaimVerdict("s0c3", null, "hold")))));
+
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        assertEquals("answered", result.outcome());
+        assertEquals(ChatAnswerCheck.GENERAL_NOTICE
+                + " HBM은 여러 D램을 수직으로 쌓은 고대역폭 메모리입니다. 넓은 인터페이스로 많은 데이터를 한 번에 전달합니다.",
+                result.answer());
+    }
+
+    @Test
     void everyPathReadCarriesTheFirstTargetWhenTheTargetsAreSplit() {
         List<List<String>> asked = Collections.synchronizedList(new ArrayList<>());
         tools.put(ChatCapability.GRAPH_PATH_READ, (scope, request) -> {

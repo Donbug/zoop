@@ -584,7 +584,11 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 }
                 boolean safe = "no".equals(verdict.prohibitedAdvice())
                         && (general || "supported".equals(decision.support()))
-                        && "no".equals(decision.unsupportedCausality());
+                        // A concept definition has no evidence claim to bind. The deterministic general-section check
+                        // already rejects current facts, figures and advice, so an uncertain ("hold") causality score
+                        // must not erase an otherwise valid definition. A definite "yes" remains blocked.
+                        && (general ? !"yes".equals(decision.unsupportedCausality())
+                                : "no".equals(decision.unsupportedCausality()));
                 if (safe) kept.add(claim);
                 else dropped.add(claim.id());
             }
