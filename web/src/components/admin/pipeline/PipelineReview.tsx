@@ -96,6 +96,8 @@ export default function PipelineReview() {
   // 회차 탭도 처음 열 때 읽고, 그 뒤로는 숨기기만 해서 진행 중인 재시도·시작을 잃지 않게 한다.
   const [roundsOpened, setRoundsOpened] = useState(tab === 'rounds');
   if (tab === 'rounds' && !roundsOpened) setRoundsOpened(true);
+  // 회차 상세에서 수입된 버전으로 갈 때마다 버전 목록을 다시 읽게 한다.
+  const [versionsRefresh, setVersionsRefresh] = useState(0);
 
   return (
     <div className="flex flex-col gap-5 py-8 text-zoop-ink">
@@ -122,6 +124,7 @@ export default function PipelineReview() {
         <div hidden={tab !== 'versions'}>
           <GraphVersions
             onActivated={() => setGraphRevision((value) => value + 1)}
+            refreshKey={versionsRefresh}
           />
         </div>
       )}
@@ -130,7 +133,10 @@ export default function PipelineReview() {
           <GraphRounds
             active={tab === 'rounds'}
             onOpenJob={(jobId) => updateQuery({ tab: 'jobs', job: jobId })}
-            onOpenVersions={() => updateQuery({ tab: 'versions' })}
+            onOpenVersions={() => {
+              setVersionsRefresh((value) => value + 1);
+              updateQuery({ tab: 'versions' });
+            }}
           />
         </div>
       )}

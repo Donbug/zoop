@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { listGraphVersions } from '@/apis/admin/graphVersions';
 import {
   Empty,
@@ -65,15 +65,29 @@ const activationLabel: Record<GraphVersionActivation['action'], string> = {
 // - 원장에서 새 버전 게시(publishGraphVersion)는 API가 아직 없다.
 export default function GraphVersions({
   onActivated,
+  refreshKey = 0,
 }: {
   /** 표시 버전이 바뀌면 후보의 공개 표시 상태도 다시 읽게 알린다. */
   onActivated?: () => void;
+  /** 회차 상세에서 버전 탭으로 올 때마다 바뀐다. 바뀌면 목록을 조용히 다시 읽는다(#55). */
+  refreshKey?: number;
 } = {}) {
   const versions = useCursorPages(listGraphVersions);
   const [target, setTarget] = useState<GraphVersion | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // 전환 요청이 진행 중인지. 진행 중에는 다른 버전을 고르거나 폼을 바꾸지 못하게 한다.
   const [pending, setPending] = useState(false);
+  // 처음 연 뒤로 탭이 유지되므로, 회차가 수입한 새 버전을 보려면 다시 읽어야 한다.
+  // 전환 중이면 읽지 않는다. 전환이 끝나면 목록을 다시 읽는다.
+  const refresh = useEffectEvent(() => {
+    if (!pending) versions.reload({ quiet: true });
+  });
+  const seenRefreshKey = useRef(refreshKey);
+  useEffect(() => {
+    if (seenRefreshKey.current === refreshKey) return;
+    seenRefreshKey.current = refreshKey;
+    refresh();
+  }, [refreshKey]);
   const first = versions.pages[0];
   const activeVersionId = first?.activeVersionId ?? null;
   // 커서는 표시 버전을 고정하지 않는다. 더 불러온 쪽의 표시 버전이 첫 쪽과 다르면 목록이 섞인 것이므로
@@ -204,8 +218,8 @@ export default function GraphVersions({
                   >
                     {formatKst(version.createdAt)}
                   </td>
-                  <td className={`${TD} max-w-56 break-all text-zoop-muted`}>
-                    {version.sourceLabel}
+                  <td className={`${TD} max-w-56 text-zoop-muted`}>
+                    <SourceLabel label={version.sourceLabel} />
                   </td>
                   <td className={`${TD} text-right tabular-nums`}>
                     {count(version.issueCount)}
