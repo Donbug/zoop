@@ -706,7 +706,7 @@ export default function GraphCanvas({
         : [],
     );
     if (safe.width < 40 || safe.height < 40) return;
-    // Use the circle/diamond position, rather than label/halo bounds.
+    // Use the node circle position, rather than label/halo bounds.
     const point = graph.getViewportByCanvas([
       Number(target.style?.x ?? 0),
       Number(target.style?.y ?? 0),
@@ -2049,7 +2049,7 @@ export default function GraphCanvas({
         {zoomPercent !== null && (
           <output
             aria-label={`현재 배율 ${zoomPercent}%`}
-            className="grid self-stretch min-w-14 place-items-center border-r-[0.667px] border-zoop-line px-2! text-body! font-semibold text-zoop-ink tabular-nums max-md:hidden"
+            className="grid self-stretch min-w-[50px] place-items-center border-r-[0.667px] border-zoop-line px-1.5! text-body! font-semibold text-zoop-ink tabular-nums max-md:hidden"
           >
             {zoomPercent}%
           </output>

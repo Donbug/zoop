@@ -117,15 +117,15 @@ describe('WBS 6.6.21 · D-GRP-01/01b mock/API contract', () => {
   });
   it('uses five activity sizes based on each company unique issue count', () => {
     expect([0, 1, 2, 4, 100].map((count) => companyNodeSize(count))).toEqual([
-      61, 74, 88, 115, 149,
+      70, 85, 101, 132, 171,
     ]);
 
     const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const rendered = toG6Data(graph, 1245, 705);
     const nvidia = rendered.nodes?.find((node) => node.id === 'NASDAQ:NVDA');
     const samsung = rendered.nodes?.find((node) => node.id === 'KRX:005930');
-    expect(nvidia?.style?.size).toBe(88);
-    expect(samsung?.style?.size).toBe(149);
+    expect(nvidia?.style?.size).toBe(101);
+    expect(samsung?.style?.size).toBe(171);
   });
   it('D-GRP-01 renders every public issue and relation without dangling edges', () => {
     const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });

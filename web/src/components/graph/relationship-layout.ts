@@ -47,8 +47,8 @@ const MIN_COMPANY_GAP = 250;
 // nodes by their radii (company up to 75, issue 24 world units) plus a margin.
 const ISSUE_REACH = 450 / 1.5;
 const COMPANY_CLEARANCE = (75 + 24 + 36) / 1.5;
-// Two issue diamonds (48 world units) stay at least 180 apart: about 2.7 diamonds of gap
-// (2026-11-04 review: diamonds side by side were hard to tell apart).
+// Two issue nodes stay at least 180 world units apart (set when they were 48-unit diamonds)
+// (2026-11-04 review: issues side by side were hard to tell apart).
 const ISSUE_CLEARANCE = 180 / 1.5;
 function spreadNodes(
   ids: string[],
