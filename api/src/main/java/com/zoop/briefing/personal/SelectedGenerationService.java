@@ -30,11 +30,17 @@ public class SelectedGenerationService {
         var snapshot=json.createObjectNode().put("roundId",roundId).put("cutoff",selection.path("dataAsOf").asString()).put("poolVersion",pool.path("inputSha256").asString())
             .put("selectionVersion",request.selectionVersion());
         snapshot.set("selection",selection.deepCopy());var ids=snapshot.putArray("selectedIssueIds");var inputs=snapshot.putArray("inputs");
-        for(var selected:selection.path("presentation").path("items")){
-            String id=selected.path("eventId").asString();ids.add(id);
+        boolean priority=PriorityPersonalAssembler.enabled(pool);
+        if(priority)snapshot.put("priorityContract",PriorityPersonalAssembler.VERSION);
+        var selectedItems=selection.path("presentation").path(priority?"personalPriority":"items");
+        if(priority)selectedItems=selectedItems.path("items");
+        for(var selected:selectedItems){
+            String id=selected.path(priority?"issueId":"eventId").asString();ids.add(id);
             var candidate=pool.path("candidates").valueStream().filter(c->id.equals(c.path("issueId").asString())).findFirst().orElseThrow(()->new CustomException(ErrorCode.REVISION_CONFLICT));
-            var input=candidate.path("analysisInput");
-            if(candidate.path("sharedView").isObject() || jobs.analysis(roundId,id,input.path("inputSha256").asString()).isPresent())continue;
+            var input=candidate.path(priority?"priorityAnalysisInput":"analysisInput");
+            var shared=candidate.path("sharedView");var cached=jobs.analysis(roundId,id,input.path("inputSha256").asString());
+            if(priority ? shared.path("priorityPersonal").isObject() || cached.filter(v->v.path("priorityPersonal").isObject()).isPresent()
+                    : shared.isObject() || cached.isPresent())continue;
             if(!input.isObject() || !input.path("roundId").asString().equals(roundId) || !input.path("issueId").asString().equals(id))throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
             inputs.add(input.deepCopy());
         }

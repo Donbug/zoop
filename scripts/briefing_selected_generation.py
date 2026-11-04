@@ -6,6 +6,7 @@ Queued/running/completed records are never automatically re-dispatched after
 an unknown network outcome or process loss.
 """
 import argparse
+from contextlib import contextmanager
 import copy
 from decimal import Decimal
 import fcntl
@@ -25,13 +26,16 @@ from zoop_ai_service import grants
 
 
 def validate_snapshot(snapshot):
-    selection=snapshot['selection']; expected=[r['eventId'] for r in selection['presentation']['items']]
+    selection=snapshot['selection']
+    priority_mode=snapshot.get('priorityContract')=='priority-business-producer-v1'
+    expected=[r['issueId'] for r in selection['presentation']['personalPriority']['items']] if priority_mode else [r['eventId'] for r in selection['presentation']['items']]
     m.require(snapshot['selectedIssueIds']==expected and len(set(expected))==len(expected)<=3,'selected_identity')
     m.require(snapshot['roundId']==selection['roundId'] and snapshot['cutoff']==selection['dataAsOf']
         and snapshot['poolVersion']==selection['poolVersion'] and snapshot['selectionVersion']==selection['selectionVersion'],'selected_scope')
     seen=set()
     for f in snapshot['inputs']:
         m.check_seal(f)
+        if priority_mode:m.require(f.get('priorityContract')==snapshot['priorityContract'],'selected_priority_contract')
         m.require(f['issueId'] in expected and f['issueId'] not in seen and f['roundId']==snapshot['roundId']
             and m.aware(f['cutoff'])==m.aware(snapshot['cutoff']),'selected_input_scope');seen.add(f['issueId'])
         for s in f['sources'].values():m.require(m.aware(s['publishedAt'])<=m.aware(snapshot['cutoff']),'selected_future_source')
@@ -60,7 +64,7 @@ def materialize(record,metadata,generated_at):
         if s.get('context') and s['quote'] in s['context']:
             start=s['contextStart'];q=start+s['context'].index(s['quote'])
             context={'text':s['context'],'start':start,'end':s['contextEnd'],'quoteStart':q,'quoteEnd':q+len(s['quote']),'offsetUnit':'unicode_code_point'}
-        evidence.append({**s,'id':sid,'documentVersion':'sha256-'+s['bodySha256'],'publisher':'','quoteVerified':True,'sourceKind':'news','bodyContext':context})
+        evidence.append({**s,'id':sid,'documentVersion':s.get('documentVersion','sha256-'+s['bodySha256']),'publisher':'','quoteVerified':True,'sourceKind':'news','bodyContext':context})
     detail={'roundId':f['roundId'],'eventId':iid,'title':item['title'],'summary':summary,'selectionReason':item['reason'],
         'companies':links,'claims':[{**c['newInformation'],'type':'fact'} for c in draft['companies']],
         'evidence':evidence,'limitations':[],'metadata':copy.deepcopy(metadata)}
@@ -80,8 +84,11 @@ class BudgetTransport:
         return Decimal(b.strict_load(b.regular(done))['chargedUpperUsd']) if done.exists() else Decimal(row['reservedUpperUsd'])
     def __call__(self,raw):
         self.authority();req=b.strict_load(raw);stage=req['text']['format']['name'];key=b.digest(raw)
-        m.require(req['model']==b.MODEL and req['store'] is False and stage in ['analysis','analysis-verification']
-            and req['instructions']==(m.PROMPTS/(stage+'.md')).read_text(),'selected_transport_contract')
+        allowed=stage in ['analysis','analysis-verification'] and req['instructions']==(m.PROMPTS/(stage+'.md')).read_text()
+        if self.cfg.get('priorityContract')=='priority-business-producer-v1' and stage in ('priority-personal','priority-personal-check'):
+            import briefing_priority_generation as priority
+            allowed=req['instructions']==priority.prompt_for(stage).read_text()
+        m.require(req['model']==b.MODEL and req['store'] is False and allowed,'selected_transport_contract')
         root=Path(self.cfg['budget']);reserve=(Decimal(len(raw)+4096)*Decimal('.5')+Decimal(req['max_output_tokens'])*Decimal('1.5'))/1000000
         for p in [root,root/'finished',root/'responses']:b.private_dir(p)
         with (root/'.lock').open('a+') as guard:
@@ -129,6 +136,41 @@ def current_authority(conn,cfg,snapshot,job_id=None):
             m.require(grants.evaluate(registry.current(s['grantId']),source_id=source[0],revision=s['grantRevision'],purposes=['briefing-outlook','semantic-verification'],recipients=s['recipients']) is None,'selected_rights_changed')
 
 
+
+@contextmanager
+def generation_client(conn,cfg,job_id,snapshot,out):
+    priority_mode=snapshot.get('priorityContract')=='priority-business-producer-v1'
+    if cfg.get('serverLedgerCommand') is None:
+        yield m.company.context.legacy.MarketSummaryClient(out,BudgetTransport(cfg,conn,job_id,lambda:current_authority(conn,cfg,snapshot,job_id)),6 if priority_mode else 4,prompt_root=m.PROMPTS)
+        return
+    # Only the explicitly approved priority server config may enter this path.
+    m.require(priority_mode and cfg.get('priorityContract')==snapshot['priorityContract'],'selected_server_priority_required')
+    import briefing_server_runtime as runtime
+    from briefing_usage import CommandPipe,recorded
+    row=conn.execute('SELECT id,round_date,edition,scheduled_at,window_from,window_to FROM briefing_rounds WHERE id=%s',(snapshot['roundId'],)).fetchone()
+    m.require(row is not None,'selected_round_missing')
+    round_={'id':row[0],'date':str(row[1]),'edition':row[2],'scheduledAt':row[3].isoformat(),
+            'windowFrom':row[4].isoformat() if row[4] else None,'windowTo':row[5].isoformat()}
+    claim={'round':round_,'requestKey':'priority-selected-'+job_id,'purpose':'outlook','trigger':'scheduler','adminId':None,
+           'inputArtifactId':None,'inputDigest':b.digest(b.canonical(snapshot))}
+    class Session(runtime.ServerUsageSession):
+        def invoke(self,stage,encoded,transport):
+            self.feature='briefing-outlook';self.unit=None if stage.startswith('priority-') else self.unit
+            return super().invoke(stage,encoded,transport)
+        def replay(self,stage,call):
+            self.feature='briefing-outlook';self.unit=None if stage.startswith('priority-') else self.unit
+            return super().replay(stage,call)
+    pipe=CommandPipe(cfg['serverLedgerCommand'])
+    session=Session(pipe,claim,out/'usage',estimate={'currency':'USD','priceVersion':'openai-luna-standard-20261103','inputPerMillion':0.10,'outputPerMillion':0.50})
+    budget_cfg={**cfg,'work':cfg['serverBudgetWork']}
+    session.budget=runtime.Budget(budget_cfg,snapshot['roundId'],lambda:current_authority(conn,cfg,snapshot,job_id),b.authenticated_transport(Path(cfg['keyFile'])))
+    client=runtime.RecordedClient(out,session.budget.transport,6,prompt_root=m.PROMPTS)
+    try:
+        with recorded(client,session):
+            m.require(not session.terminal,'selected_completed_result_requires_recovery')
+            yield client
+    finally:pipe.close()
+
 def process(conn,cfg,job_id):
     from psycopg.types.json import Jsonb
     row=conn.execute("SELECT request_snapshot,request_sha256,status,retry_of FROM briefing_selected_generation_jobs WHERE id=%s",(job_id,)).fetchone()
@@ -144,36 +186,57 @@ def process(conn,cfg,job_id):
             cached=conn.execute("SELECT 1 FROM briefing_shared_issue_analyses WHERE round_id=%s AND issue_id=%s AND input_sha256=%s",(f['roundId'],f['issueId'],f['inputSha256'])).fetchone()
             if not cached:targets.append(f)
         out=Path(cfg['work'])/job_id;b.private_dir(out);b.write_once(out/'request-snapshot.json',b.canonical(snapshot))
-        client=m.company.context.legacy.MarketSummaryClient(out,BudgetTransport(cfg,conn,job_id,lambda:current_authority(conn,cfg,snapshot,job_id)),4,prompt_root=m.PROMPTS)
-        initial_repair=None
-        if row[3] and targets:
-            previous=b.strict_load(b.regular(Path(cfg['work'])/row[3]/'attempts.json'));ids={f['issueId'] for f in targets}
-            prior_draft={};prior_checks={}
-            for attempt in previous:
-                prior_draft.update({i:d for i,d in attempt['draft']['issues'].items() if i in ids})
-                prior_checks.update({i:d for i,d in attempt['verification']['checks'].items() if i in ids})
-            initial_repair={'draft':{'issues':prior_draft},'verification':{'checks':prior_checks},
-                'instruction':'사실·사업 판단·전망을 보존하고 지적된 누락만 고친다. outlook에서 가격이 available이면 전일 종가 관측과, news.status=observed인 경우 그 관측도 함께 구분한다. 기사 직전 봉 시각과 기사 발행 시각을 같은 것으로 부르지 말고 before.observedAt부터 latest.observedAt까지의 정확한 기준·가격·변동률을 명시한다. 주가 변동의 원인으로 뉴스를 단정하지 않는다.',
-                'priceRequirements':[{ 'issueId':f['issueId'],'targets':[{'companyId':t['companyId'],'observedMovement':t['observedMovement']} for t in f['targets']]} for f in targets]}
-        drafted,checked,attempts=m.analyze(client,targets,initial_repair=initial_repair) if targets else ({'issues':{}},{'checks':{}},[])
-        b.write_once(out/'attempts.json',b.canonical(attempts));calls=view.verified_calls(out);passed=[];withheld=[]
-        for f in targets:
-            iid=f['issueId']
-            if not checked['checks'][iid]['supported']:
-                withheld.append({'issueId':iid,'reason':checked['checks'][iid]['reason']});continue
-            record={**{k:f[k] for k in ('roundId','date','edition','cutoff','issueId')},'status':'PASS','frozen':f,'draft':drafted['issues'][iid],'verification':checked['checks'][iid]}
-            record['resultVersion']=m.VERSION+'-'+b.digest(b.canonical(record));proof=prove(record,calls);generated=b.now()
-            rendered=materialize(record,snapshot['selection']['presentation']['metadata'],generated);receipts=[]
-            for key in [proof['generationRequestDigest'],proof['verificationRequestDigest']]:
-                request=b.regular(out/'calls'/(key+'.request.json'));response=b.regular(out/'calls'/(key+'.response.json'))
-                receipts.append({'request':request.decode(),'response':response.decode(),'requestSha256':b.digest(request),'responseSha256':b.digest(response)})
-            current_authority(conn,cfg,snapshot,job_id)
-            conn.execute("INSERT INTO briefing_shared_issue_analyses(result_version,round_id,issue_id,input_sha256,input_snapshot,result_record,view,view_sha256,provider_proof) VALUES (%s,%s,%s,%s,%s,%s,%s,encode(sha256(convert_to((%s::jsonb)::text,'UTF8')),'hex'),%s) ON CONFLICT DO NOTHING",(record['resultVersion'],f['roundId'],iid,f['inputSha256'],Jsonb(f),Jsonb(record),Jsonb(rendered),Jsonb(rendered),Jsonb(receipts)))
-            b.write_once(out/(iid+'.verified.json'),b.canonical({'record':record,'proof':proof,'view':rendered}));passed.append(iid)
-        status='ready' if not withheld else 'partial' if passed or len(snapshot['selectedIssueIds'])>len(snapshot['inputs']) else 'withheld'
-        outcome={'passedIssueIds':passed,'withheld':withheld,'newCalls':len(client.new_calls),'reusedCalls':len(client.reused_calls),'model':b.MODEL,'verificationMode':'separate_request_same_model'}
-        conn.execute("UPDATE briefing_selected_generation_jobs SET status=%s,outcome=%s,finished_at=now() WHERE id=%s AND status='running'",(status,Jsonb(outcome),job_id))
-        print(json.dumps({'jobId':job_id,'status':status,'passed':len(passed),'withheld':len(withheld),'newCalls':len(client.new_calls)}),flush=True)
+        priority_mode=snapshot.get('priorityContract')=='priority-business-producer-v1'
+        if priority_mode:
+            import briefing_priority_generation as priority
+            m.require(cfg.get('priorityContract')==snapshot['priorityContract'],'selected_priority_opt_in')
+        with generation_client(conn,cfg,job_id,snapshot,out) as client:
+            initial_repair=None
+            if row[3] and targets:
+                previous=b.strict_load(b.regular(Path(cfg['work'])/row[3]/'attempts.json'));ids={f['issueId'] for f in targets}
+                prior_draft={};prior_checks={}
+                for attempt in previous:
+                    prior_draft.update({i:d for i,d in attempt['draft']['issues'].items() if i in ids})
+                    prior_checks.update({i:d for i,d in attempt['verification']['checks'].items() if i in ids})
+                initial_repair={'draft':{'issues':prior_draft},'verification':{'checks':prior_checks},
+                    'instruction':'사실·사업 판단·전망을 보존하고 지적된 누락만 고친다. outlook에서 가격이 available이면 전일 종가 관측과, news.status=observed인 경우 그 관측도 함께 구분한다. 기사 직전 봉 시각과 기사 발행 시각을 같은 것으로 부르지 말고 before.observedAt부터 latest.observedAt까지의 정확한 기준·가격·변동률을 명시한다. 주가 변동의 원인으로 뉴스를 단정하지 않는다.',
+                    'priceRequirements':[{ 'issueId':f['issueId'],'targets':[{'companyId':t['companyId'],'observedMovement':t['observedMovement']} for t in f['targets']]} for f in targets]}
+            drafted,checked,attempts=m.analyze(client,targets,initial_repair=initial_repair) if targets else ({'issues':{}},{'checks':{}},[])
+            b.write_once(out/'attempts.json',b.canonical(attempts))
+            priority_record=None
+            if priority_mode and targets:
+                import briefing_priority_generation as priority
+                supported=[f for f in targets if checked['checks'][f['issueId']]['supported']]
+                if supported:priority_record=priority.generate(client,supported,'personal')
+            calls=priority.verified_calls(out) if priority_mode else view.verified_calls(out);passed=[];withheld=[]
+            for f in targets:
+                iid=f['issueId']
+                if not checked['checks'][iid]['supported']:
+                    withheld.append({'issueId':iid,'reason':checked['checks'][iid]['reason']});continue
+                record={**{k:f[k] for k in ('roundId','date','edition','cutoff','issueId')},'status':'PASS','frozen':f,'draft':drafted['issues'][iid],'verification':checked['checks'][iid]}
+                record['resultVersion']=m.VERSION+'-'+b.digest(b.canonical(record));proof=prove(record,calls);generated=b.now()
+                rendered=materialize(record,snapshot['selection']['presentation']['metadata'],generated);receipts=[]
+                if priority_record:
+                    priority_proof=priority.prove(priority_record,calls)
+                    rendered['priorityPersonal']=priority.item(priority_record,iid)
+                    # Private, immutable proof; presentation builder returns only the explicit DTO.
+                    rendered['priorityRecord']=priority_record
+                    rendered['priorityProof']=priority_proof
+                    rendered['priorityProviderReceipts']=[]
+                    for key in priority_proof.values():
+                        request=b.regular(out/'calls'/(key+'.request.json'));response=b.regular(out/'calls'/(key+'.response.json'))
+                        rendered['priorityProviderReceipts'].append({'request':request.decode(),'response':response.decode(),'requestSha256':b.digest(request),'responseSha256':b.digest(response)})
+                for key in [proof['generationRequestDigest'],proof['verificationRequestDigest']]:
+                    request=b.regular(out/'calls'/(key+'.request.json'));response=b.regular(out/'calls'/(key+'.response.json'))
+                    receipts.append({'request':request.decode(),'response':response.decode(),'requestSha256':b.digest(request),'responseSha256':b.digest(response)})
+                current_authority(conn,cfg,snapshot,job_id)
+                conn.execute("INSERT INTO briefing_shared_issue_analyses(result_version,round_id,issue_id,input_sha256,input_snapshot,result_record,view,view_sha256,provider_proof) VALUES (%s,%s,%s,%s,%s,%s,%s,encode(sha256(convert_to((%s::jsonb)::text,'UTF8')),'hex'),%s) ON CONFLICT DO NOTHING",(record['resultVersion'],f['roundId'],iid,f['inputSha256'],Jsonb(f),Jsonb(record),Jsonb(rendered),Jsonb(rendered),Jsonb(receipts)))
+                b.write_once(out/(iid+'.verified.json'),b.canonical({'record':record,'proof':proof,'view':rendered}));passed.append(iid)
+            if getattr(client,'usage',None) is not None:client.usage.outcome='withheld' if withheld else 'available'
+            status='ready' if not withheld else 'partial' if passed or len(snapshot['selectedIssueIds'])>len(snapshot['inputs']) else 'withheld'
+            outcome={'passedIssueIds':passed,'withheld':withheld,'newCalls':len(client.new_calls),'reusedCalls':len(client.reused_calls),'model':b.MODEL,'verificationMode':'separate_request_same_model'}
+            conn.execute("UPDATE briefing_selected_generation_jobs SET status=%s,outcome=%s,finished_at=now() WHERE id=%s AND status='running'",(status,Jsonb(outcome),job_id))
+            print(json.dumps({'jobId':job_id,'status':status,'passed':len(passed),'withheld':len(withheld),'newCalls':len(client.new_calls)}),flush=True)
     finally:
         for key in locks:conn.execute('SELECT pg_advisory_unlock(%s)',(key,))
 
@@ -203,7 +266,14 @@ def load_config(path):
         and cfg['maxAggregateCalls']<=approval['maximumAggregateCalls']
         and Decimal(cfg['maxUsd'])<=Decimal(approval['maximumAggregateUsd']),'explicit_authorization_bound')
     target=urlsplit(cfg['dsn'])
-    m.require(target.scheme=='postgresql' and target.hostname=='127.0.0.1' and not target.query and bool(re.fullmatch(r'/[a-z0-9_]*briefing_replay[a-z0-9_]*',target.path)),'local_worker_database')
+    local=target.scheme=='postgresql' and target.hostname=='127.0.0.1' and not target.query and bool(re.fullmatch(r'/[a-z0-9_]*briefing_replay[a-z0-9_]*',target.path))
+    if cfg.get('serverLedgerCommand') is not None:
+        m.require(approval.get('scope')=='priority-selected-server-v1' and cfg.get('priorityContract')=='priority-business-producer-v1'
+            and approval.get('databaseDsnSha256')==b.digest(cfg['dsn'].encode())
+            and approval.get('serverBudgetWork')==cfg.get('serverBudgetWork')
+            and isinstance(cfg['serverLedgerCommand'],list) and bool(cfg['serverLedgerCommand'])
+            and target.scheme=='postgresql' and bool(target.hostname) and bool(target.path.strip('/')),'selected_exact_server_authorization')
+    else:m.require(local,'local_worker_database')
     return cfg
 
 

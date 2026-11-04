@@ -29,14 +29,17 @@ def compile_pool(frozen, row, calls, registry, previous_id=None, baseline=None):
         iid = c['issueId']; a = assessed['assessments'][iid]
         sources = []
         for sid, s in c['sources'].items():
-            bound = registry.get((s['documentId'], 'sha256-' + s['bodySha256']))
+            bound = registry.get((s['documentId'], s.get('documentVersion', 'sha256-' + s['bodySha256'])))
             if bound is None:
                 # Retain the whole assessed pool; current access checks will exclude this source.
-                bound = {'documentId': s['documentId'], 'documentVersion': 'sha256-' + s['bodySha256'],
+                bound = {'documentId': s['documentId'], 'documentVersion': s.get('documentVersion', 'sha256-' + s['bodySha256']),
                          'bodySha256': s['bodySha256'], 'grantId': '', 'grantRevision': '', 'recipients': []}
             if bound['bodySha256'] != s['bodySha256']:
                 raise ValueError('source_version_changed:' + iid)
-            sources.append({**copy.deepcopy(s), **copy.deepcopy(bound), 'quoteVerified': True})
+            # A document binding may be reused by several distinct evidence passages.
+            # Its evidenceId/quote/url must never overwrite the individual passage.
+            binding = {k: copy.deepcopy(bound[k]) for k in ('documentId','documentVersion','bodySha256','grantId','grantRevision','recipients')}
+            sources.append({**copy.deepcopy(s), **binding, 'quoteVerified': True})
         companies = []
         for link in c['companies']:
             relation = next(r for r in a['relations'] if r['companyId'] == link['companyId'])

@@ -64,6 +64,31 @@ class SelectedGenerationTests(unittest.TestCase):
             for key,value in [('maxNewCalls',9),('maxAggregateCalls',255),('maxUsd','3.01'),('task','different'),('dsn','postgresql://user:local@remote:5432/test_briefing_replay'),('dsn','postgresql://127.0.0.1:5432/production'),('dsn','postgresql://127.0.0.1:5432/test_briefing_replay?host=remote')]:
                 config.write_text(json.dumps({**cfg,key:value}))
                 with self.assertRaises(ValueError):g.load_config(config)
+    def test_priority_snapshot_uses_priority_issue_ids_and_versioned_inputs(self):
+        import briefing_priority_generation as priority
+        s=snapshot();s['priorityContract']=priority.VERSION
+        s['selection']['presentation']['items']=[]
+        s['selection']['presentation']['personalPriority']={'items':[{'issueId':'i0'}]}
+        s['inputs']=[priority.priority_input(f) for f in s['inputs']]
+        g.validate_snapshot(s)
+        bad=copy.deepcopy(s);bad['inputs'][0].pop('priorityContract');bad['inputs'][0]=m.seal(bad['inputs'][0])
+        with self.assertRaisesRegex(ValueError,'priority_contract'):g.validate_snapshot(bad)
+
+    def test_server_worker_requires_exact_dsn_and_shared_budget_approval(self):
+        import briefing_priority_generation as priority
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);auth=root/'approval.json';config=root/'config.json'
+            dsn='postgresql://synthetic:local@approved.invalid:5432/briefing'
+            approval={'task':'test','model':b.MODEL,'maximumNewCalls':8,'maximumAggregateCalls':16,'maximumAggregateUsd':'1',
+                'scope':'priority-selected-server-v1','databaseDsnSha256':b.digest(dsn.encode()),'serverBudgetWork':str(root/'shared-budget')}
+            cfg={'task':'test','authorizationFile':str(auth),'maxNewCalls':8,'maxAggregateCalls':16,'maxUsd':'1','dsn':dsn,
+                'priorityContract':priority.VERSION,'serverLedgerCommand':['synthetic-java'],'serverBudgetWork':approval['serverBudgetWork']}
+            auth.write_text(json.dumps(approval));auth.chmod(0o600);config.write_text(json.dumps(cfg));config.chmod(0o600)
+            self.assertEqual(cfg,g.load_config(config))
+            for key,value in [('dsn',dsn+'2'),('serverBudgetWork',str(root/'other')),('priorityContract','legacy')]:
+                config.write_text(json.dumps({**cfg,key:value}))
+                with self.assertRaises(ValueError):g.load_config(config)
+
     def test_worker_rejects_readable_secrets_before_start(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);auth=root/'approval.json';config=root/'config.json'

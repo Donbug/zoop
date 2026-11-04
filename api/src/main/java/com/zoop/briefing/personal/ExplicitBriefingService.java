@@ -65,11 +65,26 @@ public class ExplicitBriefingService {
         }
         int max=choice.maxIssues()==null?3:choice.maxIssues(),min=choice.minIssues()==null?0:choice.minIssues(),per=choice.perCompanyLimit()==null?3:choice.perCompanyLimit();
         var selected=select(matches,scope,max,per);
+        boolean priority=PriorityPersonalAssembler.enabled(pool);
+        var priorityMatches=new ArrayList<JsonNode>();
+        if(priority)for(var c:PersonalBriefingService.eligible(pool,round,1))
+            if(!PersonalBriefingService.matched(c,scope).isEmpty() && access.readableForRound(c,round,requestId))priorityMatches.add(c);
+        var prioritySelected=priority?select(priorityMatches,scope,max,per):List.<JsonNode>of();
+        var priorityViews=new HashMap<String,JsonNode>();
+        if(priority)for(var c:prioritySelected){
+            String id=c.path("issueId").asString();var shared=c.path("sharedView");
+            if(!shared.path("priorityPersonal").isObject())shared=generated.analysis(roundId,id,c.path("priorityAnalysisInput").path("inputSha256").asString()).orElse(shared);
+            priorityViews.put(id,shared);
+        }
         var out=json.createObjectNode().put("roundId",roundId).put("dataAsOf",round.windowTo().toString())
                 .put("status",selected.isEmpty()?"no_matching_issues":"available").put("eligibleCount",eligible.size())
                 .put("matchingCount",matches.size()).put("excludedByCurrentAccess",excluded).put("minimumShortfall",Math.max(0,min-selected.size()))
                 .put("poolVersion",pool.path("inputSha256").asString()).put("policyVersion",pool.path("selectionPolicyVersion").asString());
         out.set("choice",json.valueToTree(new Choice(List.copyOf(scope),max,min,per)));
+        if(priority){
+            out.put("priorityContract",PriorityPersonalAssembler.VERSION);var ids=out.putArray("prioritySelectedIssueIds");
+            prioritySelected.forEach(c->ids.add(c.path("issueId").asString()));
+        }
         out.put("selectionVersion",com.zoop.common.json.Canonical.sha256(com.zoop.common.json.Canonical.bytes(out)));
         var presentation=(ObjectNode)common.deepCopy();
         if(presentation.has("editionReview"))presentation.set("companyPriceBasis",presentation.path("editionReview").deepCopy());
@@ -81,7 +96,7 @@ public class ExplicitBriefingService {
         var reasons=out.putArray("selectionReasons");
         for(var c:selected){
             reasons.addObject().put("issueId",c.path("issueId").asString()).put("whyImportant",c.path("whyImportant").asString()).put("whyNow",c.path("whyNow").asString());
-            var shared=c.path("sharedView");
+            var shared=priority?priorityViews.getOrDefault(c.path("issueId").asString(),c.path("sharedView")):c.path("sharedView");
             if(!shared.isObject() && !c.path("analysisInput").path("inputSha256").asString().isBlank())
                 shared=generated.analysis(roundId,c.path("issueId").asString(),c.path("analysisInput").path("inputSha256").asString()).orElse(shared);
             if(shared.isObject() && shared.path("item").path("eventId").equals(c.path("issueId"))){
@@ -113,8 +128,12 @@ public class ExplicitBriefingService {
                 verified.set("issueIntelligence",meta);out.set("verifiedPresentation",verified);
             }
         }
+        if(priority){
+            presentation.set("personalPriority",PriorityPersonalAssembler.project(pool,roundId,round.windowTo().toString(),scope,prioritySelected,min,priorityViews));
+            pending=(int)prioritySelected.stream().filter(c->!priorityViews.get(c.path("issueId").asString()).path("priorityPersonal").isObject()).count();
+        }
         presentation.put("emptyReason",selected.isEmpty()?"no_issues_in_window":null);
-        out.put("analysisStatus",selected.isEmpty()?"no_issues":pending==0?"ready":"needs_generation").put("pendingAnalysisCount",pending).set("presentation",presentation);
+        out.put("analysisStatus",(priority?prioritySelected:selected).isEmpty()?"no_issues":pending==0?"ready":"needs_generation").put("pendingAnalysisCount",pending).set("presentation",presentation);
         out.set("tracking",tracking(pool,round,scope,requestId));return out;
     }
     static List<JsonNode> select(List<JsonNode> candidates,Set<String> scope,int max,int per){
