@@ -63,6 +63,8 @@ import {
 } from './graph-zoom-range';
 
 const noHighlightedEdges: string[] = [];
+/** D-GRP-01: how long the pointer rests on a node before its connected issue titles show. */
+export const HOVER_INTENT_MS = 300;
 
 /** 접근성 목록에서 누른 버튼의 노드·연결선 id. 비활성 버튼은 고르지 않는다. */
 function accessibleTarget(target: EventTarget) {
@@ -267,10 +269,12 @@ export default function GraphCanvas({
         await applyGraphReading(graph, base, data, {
           zoom: graph.getZoom(),
           anchor: evidenceMode ? selected : (hovered.current ?? selected),
+          selected,
           edge: evidenceMode ? null : (hoveredEdge.current ?? selectedEdgeId),
           focus: focusId,
           path,
           bright: brightNodes.current,
+          wholeFitZoom: wholeFitZoom.current,
         });
       })
       .catch(() => {
@@ -300,6 +304,8 @@ export default function GraphCanvas({
   const defaultZoomPending = useRef(false);
   const followFit = useRef(true);
   const minimapShown = useRef(false);
+  /** D-GRP-01: zoom that fits the whole visible graph; issue titles stay hidden around it. */
+  const wholeFitZoom = useRef(0);
   // D-GRP-01/03: 상세 패널을 제외한 지도 영역의 중앙에 선택 노드를 유지한다.
   const centerTarget = useRef<string | null>(null);
   /**
@@ -582,7 +588,18 @@ export default function GraphCanvas({
   );
   const hoverSyncQueued = useRef(false);
   const hoverClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverIntentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverIntentId = useRef<string | null>(null);
+  /** Cancels the pending hover; with an id, only when that node's hover is pending. */
+  const cancelHoverIntent = (id?: string) => {
+    if (hoverIntentTimer.current === null) return;
+    if (id !== undefined && hoverIntentId.current !== id) return;
+    clearTimeout(hoverIntentTimer.current);
+    hoverIntentTimer.current = null;
+    hoverIntentId.current = null;
+  };
   const hoverNode = useEffectEvent((id: string | null) => {
+    cancelHoverIntent();
     if (hoverClearTimer.current !== null) {
       clearTimeout(hoverClearTimer.current);
       hoverClearTimer.current = null;
@@ -620,7 +637,23 @@ export default function GraphCanvas({
         if (!graph.destroyed) setRenderError(true);
       });
   });
+  // D-GRP-01 (2026-11-04 review): a pointer that only brushes past a node does not light up
+  // its connections; the hover counts once the pointer rests on the node for HOVER_INTENT_MS.
+  const intendHover = useEffectEvent((id: string) => {
+    cancelHoverIntent();
+    if (hovered.current === id) {
+      hoverNode(id);
+      return;
+    }
+    hoverIntentId.current = id;
+    hoverIntentTimer.current = setTimeout(() => {
+      hoverIntentTimer.current = null;
+      hoverIntentId.current = null;
+      hoverNode(id);
+    }, HOVER_INTENT_MS);
+  });
   const leaveNode = useEffectEvent((id: string) => {
+    cancelHoverIntent(id);
     // A late leave from the previous node must not clear the new node's hover.
     if (hovered.current !== id) return;
     setHoveredIssue(null);
@@ -781,6 +814,7 @@ export default function GraphCanvas({
     // the unobstructed viewport, with 0.53 as the floor for naturally small maps.
     // Recompute after data, layout and viewport changes.
     const wholeGraphFit = fitZoom(allFootprints, safe, MAX_GRAPH_ZOOM);
+    wholeFitZoom.current = wholeGraphFit.zoom;
     const zoomOutFloor = Math.max(
       MIN_GRAPH_ZOOM,
       Math.min(DEFAULT_GRAPH_ZOOM, wholeGraphFit.zoom),
@@ -1405,13 +1439,79 @@ export default function GraphCanvas({
     let graph: Graph | null = null;
     let observer: ResizeObserver | null = null;
     let resizeFrame: number | null = null;
+    // 끌고 있는 동안은 지나치는 노드·연결의 hover를 그리지 않고, 포인터가 마지막으로 가리킨 것만 pending에 둔다.
+    // 손을 뗄 때(pointerup·pointercancel) 그 상태를 한 번 반영하고, 바뀐 것이 있을 때만 이름표를 다시 읽는다.
+    // 노드가 많을 때 끌기 중 hover마다 상태 변경·이름표 읽기가 이어져 화면이 끊기는 것을 막는다.
+    let pending: { node: string | null; edge: string | null } | null = null;
+    const enterEdge = (id: string) => {
+      if (pending) {
+        pending.edge = id;
+        return;
+      }
+      if (!interactionEnabled()) return;
+      hoveredEdge.current = id;
+      setHoveredIssue(null);
+      scheduleReading();
+    };
+    const leaveEdge = () => {
+      if (pending) {
+        pending.edge = null;
+        return;
+      }
+      hoveredEdge.current = null;
+      setHoveredIssue(null);
+      scheduleReading();
+    };
+    const enterNode = (id: string) => {
+      if (pending) pending.node = id;
+      else intendHover(id);
+    };
+    const leaveNodeLater = (id: string) => {
+      if (!pending) leaveNode(id);
+      else if (pending.node === id) pending.node = null;
+    };
     const clearHover = () => {
+      if (pending) {
+        pending.node = null;
+        pending.edge = null;
+        return;
+      }
       hoveredEdge.current = null;
       setHoveredIssue(null);
       hoverNode(null);
       scheduleReading();
     };
+    const startPan = () => {
+      if (pending) return;
+      // 머무르기 판정(HOVER_INTENT_MS)을 기다리던 노드는 끌기로 지나친 것이므로 hover로 치지 않는다.
+      cancelHoverIntent();
+      // 끌기 직전에 노드를 벗어나 해제를 기다리던 중이면 그 노드는 이미 떠난 것으로 본다.
+      const leaving = hoverClearTimer.current !== null;
+      if (leaving) {
+        clearTimeout(hoverClearTimer.current!);
+        hoverClearTimer.current = null;
+      }
+      pending = {
+        node: leaving ? null : hovered.current,
+        edge: hoveredEdge.current,
+      };
+    };
+    const endPan = () => {
+      if (!pending) return;
+      const { node, edge } = pending;
+      pending = null;
+      if (edge !== hoveredEdge.current) {
+        if (edge === null) leaveEdge();
+        else enterEdge(edge);
+      }
+      // 손을 뗀 자리의 노드도 머무르기 판정을 거친다. 떠난 hover는 바로 푼다.
+      if (node !== hovered.current) {
+        if (node === null) hoverNode(null);
+        else intendHover(node);
+      }
+    };
     let pointerStart: {
+      pointerId: number;
       x: number;
       y: number;
       graphX: number;
@@ -1424,11 +1524,14 @@ export default function GraphCanvas({
     let dragged = false;
     const pointerDown = (event: PointerEvent) => {
       if (!graph || event.button !== 0) return;
+      // pointerup을 놓친 채(예: 창 밖에서 뗌) 다시 누르면 이전 끌기를 여기서 끝낸다.
+      endPan();
       const bounds = host.getBoundingClientRect();
       const position = graph.getPosition();
       wheelPending = false;
       dragged = false;
       pointerStart = {
+        pointerId: event.pointerId,
         x: event.clientX,
         y: event.clientY,
         graphX: position[0],
@@ -1452,9 +1555,16 @@ export default function GraphCanvas({
         followFit.current = false;
         centerTarget.current = null;
         dragged = true;
+        startPan();
       }
     };
     const pointerUp = (event: PointerEvent) => {
+      // 끌던 포인터의 왼쪽 버튼(터치·펜은 0)만 끝낸다. 오른쪽 버튼이나 다른 손가락을 떼는 것은 무시한다.
+      if (
+        event.button !== 0 ||
+        (pointerStart && event.pointerId !== pointerStart.pointerId)
+      )
+        return;
       if (
         pointerStart?.allowed &&
         graph &&
@@ -1474,6 +1584,12 @@ export default function GraphCanvas({
           tutorialAction('pan');
       }
       pointerStart = null;
+      endPan();
+    };
+    const pointerCancel = (event: PointerEvent) => {
+      if (pointerStart && event.pointerId !== pointerStart.pointerId) return;
+      pointerStart = null;
+      endPan();
     };
     const stopFollowing = (event: WheelEvent) => {
       if (event.deltaY !== 0 && currentTutorialPhase() === 'zoom')
@@ -1495,6 +1611,7 @@ export default function GraphCanvas({
     host.addEventListener('pointerdown', pointerDown);
     host.addEventListener('pointermove', pointerMove);
     window.addEventListener('pointerup', pointerUp);
+    window.addEventListener('pointercancel', pointerCancel);
     host.addEventListener('wheel', stopFollowing, { passive: true });
     window.addEventListener('zoop:graph-viewport-change', viewportChanged);
     hovered.current = null;
@@ -1556,25 +1673,18 @@ export default function GraphCanvas({
       graph.on('edge:dblclick', (event: IElementEvent) =>
         zoomNeighborhood(event.target.id),
       );
-      graph.on('edge:pointerenter', (event: IElementEvent) => {
-        if (!interactionEnabled()) return;
-        hoveredEdge.current = event.target.id;
-        setHoveredIssue(null);
-        scheduleReading();
-      });
-      graph.on('edge:pointerleave', () => {
-        hoveredEdge.current = null;
-        setHoveredIssue(null);
-        scheduleReading();
-      });
+      graph.on('edge:pointerenter', (event: IElementEvent) =>
+        enterEdge(event.target.id),
+      );
+      graph.on('edge:pointerleave', leaveEdge);
       graph.on('node:click', (event: IElementEvent) => {
         if (!dragged) selectNode(event.target.id);
       });
       graph.on('node:pointerenter', (event: IElementEvent) =>
-        hoverNode(event.target.id),
+        enterNode(event.target.id),
       );
       graph.on('node:pointerleave', (event: IElementEvent) =>
-        leaveNode(event.target.id),
+        leaveNodeLater(event.target.id),
       );
       graph.on('canvas:pointerleave', clearHover);
       graph.on('afterdraw', () => {
@@ -1708,6 +1818,7 @@ export default function GraphCanvas({
         clearTimeout(readingTimer.current);
         readingTimer.current = null;
       }
+      cancelHoverIntent();
       if (hoverClearTimer.current !== null) {
         clearTimeout(hoverClearTimer.current);
         hoverClearTimer.current = null;
@@ -1717,6 +1828,7 @@ export default function GraphCanvas({
       host.removeEventListener('pointerdown', pointerDown);
       host.removeEventListener('pointermove', pointerMove);
       window.removeEventListener('pointerup', pointerUp);
+      window.removeEventListener('pointercancel', pointerCancel);
       host.removeEventListener('wheel', stopFollowing);
       window.removeEventListener('zoop:graph-viewport-change', viewportChanged);
       observer?.disconnect();

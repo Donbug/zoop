@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import GraphCanvas from '@/components/graph/GraphCanvas';
+import GraphCanvas, { HOVER_INTENT_MS } from '@/components/graph/GraphCanvas';
 import { GraphAppearanceContext } from '@/components/graph/graph-appearance';
 import {
   EDGE_ANIMATION,
@@ -654,10 +654,22 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     await waitFor(() =>
       expect(canvas.handlers.has('node:pointerenter')).toBe(true),
     );
+    // D-GRP-01: brushing past the node (leaving before HOVER_INTENT_MS) shows nothing.
     act(() =>
       canvas.handlers.get('node:pointerenter')!({ target: { id: issue.id } }),
     );
-    expect(screen.getByRole('tooltip').textContent).toBe(issue.label);
+    act(() =>
+      canvas.handlers.get('node:pointerleave')!({ target: { id: issue.id } }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, HOVER_INTENT_MS + 50));
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    act(() =>
+      canvas.handlers.get('node:pointerenter')!({ target: { id: issue.id } }),
+    );
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByRole('tooltip').textContent).toBe(issue.label),
+    );
     act(() =>
       canvas.handlers.get('node:pointerleave')!({ target: { id: issue.id } }),
     );
@@ -1640,6 +1652,127 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       canvas.handlers.get('node:click')!({ target: { id: data.nodes[0].id } }),
     );
     expect(onSelect).toHaveBeenCalledWith(data.nodes[0].id);
+  });
+
+  it('D-GRP-01 끌고 있는 동안 지나친 hover는 그리지 않고, 손을 뗄 때 마지막으로 가리킨 노드만 한 번 반영한다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+    await waitFor(() =>
+      expect(canvas.handlers.has('node:pointerenter')).toBe(true),
+    );
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const draws = canvas.draw.mock.calls.length;
+    const surface = screen.getByRole('img', { name: /관계 지도:/ });
+    const issue = data.nodes.find((node) => node.kind === 'issue')!;
+
+    fireEvent.pointerDown(surface, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(surface, { clientX: 140, clientY: 125 });
+    await act(async () => {
+      canvas.handlers.get('node:pointerenter')!({
+        target: { id: 'NASDAQ:NVDA' },
+      });
+      canvas.handlers.get('edge:pointerenter')!({
+        target: { id: data.edges[0].id },
+      });
+      canvas.handlers.get('node:pointerleave')!({
+        target: { id: 'NASDAQ:NVDA' },
+      });
+      canvas.handlers.get('edge:pointerleave')!({ target: { id: '' } });
+      canvas.handlers.get('node:pointerenter')!({ target: { id: issue.id } });
+    });
+    expect(canvas.setElementState).not.toHaveBeenCalled();
+    expect(canvas.draw).toHaveBeenCalledTimes(draws);
+    expect(screen.queryByRole('tooltip')).toBeNull();
+
+    await act(async () =>
+      fireEvent.pointerUp(window, { clientX: 140, clientY: 125 }),
+    );
+    await waitFor(() =>
+      expect(appliedStates()).toMatchObject({ [issue.id]: ['hovered'] }),
+    );
+    expect(canvas.setElementState).toHaveBeenCalledOnce();
+    // 끌기 중 지나친 NVDA는 hover되지 않는다(사건과 연결돼 related만 붙는다).
+    expect(appliedStates()['NASDAQ:NVDA'] ?? []).not.toContain('hovered');
+    expect(screen.getByRole('tooltip').textContent).toBe(issue.label);
+  });
+
+  it('D-GRP-01 끌기 전에 올려 둔 hover는 지도 밖에서 손을 떼면 풀리고, 바뀐 것이 없으면 다시 그리지 않는다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+    await waitFor(() =>
+      expect(canvas.handlers.has('node:pointerenter')).toBe(true),
+    );
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const surface = screen.getByRole('img', { name: /관계 지도:/ });
+    const issue = data.nodes.find((node) => node.kind === 'issue')!;
+    await act(async () =>
+      canvas.handlers.get('node:pointerenter')!({ target: { id: issue.id } }),
+    );
+    await waitFor(() =>
+      expect(appliedStates()).toMatchObject({ [issue.id]: ['hovered'] }),
+    );
+    expect(screen.getByRole('tooltip').textContent).toBe(issue.label);
+
+    // 같은 노드 위에서 끌기만 하고 떼면 hover는 그대로이고 상태를 다시 보내지 않는다.
+    const sent = canvas.setElementState.mock.calls.length;
+    fireEvent.pointerDown(surface, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(surface, { clientX: 140, clientY: 125 });
+    await act(async () =>
+      fireEvent.pointerUp(window, { clientX: 140, clientY: 125 }),
+    );
+    expect(canvas.setElementState).toHaveBeenCalledTimes(sent);
+    expect(screen.getByRole('tooltip').textContent).toBe(issue.label);
+
+    // 끌다가 지도 밖으로 나가 손을 떼면 그때 hover를 푼다.
+    fireEvent.pointerDown(surface, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(surface, { clientX: 140, clientY: 125 });
+    await act(async () => fireEvent.pointerLeave(surface));
+    expect(screen.getByRole('tooltip').textContent).toBe(issue.label);
+    expect(canvas.setElementState).toHaveBeenCalledTimes(sent);
+    await act(async () =>
+      fireEvent.pointerUp(window, { clientX: 900, clientY: 900 }),
+    );
+    await waitFor(() => expect(appliedStates()[issue.id]).toEqual([]));
+    expect(screen.queryByRole('tooltip')).toBeNull();
+  });
+
+  it('D-GRP-01 다른 버튼·손가락을 떼는 것은 끌기를 끝내지 않고, pointercancel은 끝낸다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+    await waitFor(() =>
+      expect(canvas.handlers.has('node:pointerenter')).toBe(true),
+    );
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const surface = screen.getByRole('img', { name: /관계 지도:/ });
+
+    fireEvent.pointerDown(surface, {
+      button: 0,
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(surface, { clientX: 140, clientY: 125 });
+    await act(async () => {
+      fireEvent.pointerUp(window, { button: 2, pointerId: 1 });
+      fireEvent.pointerUp(window, { button: 0, pointerId: 2 });
+      canvas.handlers.get('node:pointerenter')!({
+        target: { id: 'NASDAQ:NVDA' },
+      });
+    });
+    expect(canvas.setElementState).not.toHaveBeenCalled();
+
+    await act(async () => fireEvent.pointerCancel(window, { pointerId: 1 }));
+    await waitFor(() =>
+      expect(appliedStates()).toMatchObject({ 'NASDAQ:NVDA': ['hovered'] }),
+    );
+    await act(async () =>
+      canvas.handlers.get('node:pointerenter')!({
+        target: { id: 'KRX:005380' },
+      }),
+    );
+    await waitFor(() =>
+      expect(appliedStates()).toMatchObject({ 'KRX:005380': ['hovered'] }),
+    );
   });
 
   it('D-GRP-03 선택 상태가 G6 기본 12px로 이름표를 줄이지 않는다', async () => {
