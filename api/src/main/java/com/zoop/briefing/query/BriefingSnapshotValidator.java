@@ -10,13 +10,13 @@ import com.zoop.briefing.storage.BriefingRound;
 import tools.jackson.databind.JsonNode;
 
 /** Validates the stored public DTO before disclosure. It does not repair or recalculate a publication. */
-final class BriefingSnapshotValidator {
+public final class BriefingSnapshotValidator {
     private static final Set<String> PRECISIONS = Set.of("year", "month", "day", "datetime", "unknown");
     private static final Set<String> LABELS = Set.of("positive", "negative", "mixed", "undetermined");
 
     private BriefingSnapshotValidator() { }
 
-    static void validate(BriefingRound row) {
+    public static void validate(BriefingRound row) {
         validate(row, false);
     }
 

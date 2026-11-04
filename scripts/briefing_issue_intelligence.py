@@ -212,7 +212,13 @@ def validate_assessments(answer, frozen):
             delta = set(c['freshnessReview'].get('deltaEvidenceIds', []))
             require(bool(delta & set(a['whyNow']['evidenceIds'])), 'material_delta_missing')
         if a['informationChange'] == 'new_event':
-            require(c['freshnessReview']['decision'] == 'DISTINCT_EVENT', 'update_relabelled_new')
+            distinct=c['freshnessReview']['decision']=='DISTINCT_EVENT'
+            # Native server snapshots already bind stable, verified canonical issue IDs. Their assessment is
+            # still independently verified before selection; the producer must not manufacture DISTINCT_EVENT.
+            reviewed_native=(frozen.get('freshnessPolicy')=='native-canonical-and-independent-review-v1'
+                and c['freshnessReview']['decision']=='REQUIRES_REVIEW'
+                and c['issueId'] not in {p['issueId'] for p in frozen.get('previousSelected',[])})
+            require(distinct or reviewed_native, 'update_relabelled_new')
 
 
 def verification_schema(ids):

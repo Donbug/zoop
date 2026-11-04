@@ -54,6 +54,20 @@ class IssueIntelligenceTests(unittest.TestCase):
     def pick(self, f, a=None, v=None, previous=()):
         return m.select(f, a or assess(f), v or checks(f), previous)
 
+    def test_native_pending_freshness_still_needs_independent_support(self):
+        f=frozen(1);f['freshnessPolicy']='native-canonical-and-independent-review-v1';f['previousSelected']=[]
+        f['candidates'][0]['freshnessReview']['decision']='REQUIRES_REVIEW'
+        self.assertEqual(1,len(self.pick(f)['selected']))
+        denied=checks(f);denied['checks']['i0']['supported']=False
+        self.assertFalse(self.pick(f,v=denied)['selected'])
+    def test_native_policy_never_relabels_a_previously_selected_issue_as_new(self):
+        f=frozen(1);f['freshnessPolicy']='native-canonical-and-independent-review-v1'
+        f['previousSelected']=[{'issueId':'i0'}];f['candidates'][0]['freshnessReview']['decision']='REQUIRES_REVIEW'
+        with self.assertRaisesRegex(ValueError,'update_relabelled_new'):self.pick(f)
+    def test_ordinary_pending_freshness_is_still_rejected(self):
+        f=frozen(1);f['candidates'][0]['freshnessReview']['decision']='REQUIRES_REVIEW'
+        with self.assertRaisesRegex(ValueError,'update_relabelled_new'):self.pick(f)
+
     def test_same_company_three_independent_events_survive(self):
         f = frozen(); original = copy.deepcopy(f)
         r = self.pick(f)
