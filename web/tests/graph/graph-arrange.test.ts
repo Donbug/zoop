@@ -134,6 +134,55 @@ test.each([1, 2] as const)(
   },
 );
 
+test('포커스: 크기가 다른 노드가 한 링에 섞여도 이웃한 큰 노드끼리 겹치지 않는다', () => {
+  // #576 리뷰: 짧은 화면, 한 링에 지름 100 기업 2개(서로 이웃)와 지름 14 사건 18개.
+  const width = 600;
+  const height = 300;
+  const node = (id: string, size: number, angle: number) => ({
+    id,
+    style: { x: Math.cos(angle) * 300, y: Math.sin(angle) * 300, size },
+  });
+  const neighbors = [
+    node('company-a', 100, 0),
+    node('company-b', 100, 0.05),
+    ...Array.from({ length: 18 }, (_, i) =>
+      node(`issue-${i}`, 14, 0.2 + (i * (2 * Math.PI - 0.4)) / 18),
+    ),
+  ];
+  const rendered = {
+    nodes: [{ id: 'focus', style: { x: 0, y: 0, size: 100 } }, ...neighbors],
+  };
+  const data = {
+    nodes: [],
+    edges: neighbors.map((n) => ({ source: 'focus', target: n.id })),
+  } as unknown as GraphResponse;
+  const { nodes } = arrangeFocus(rendered, data, 'focus', 1, width, height);
+  for (let i = 0; i < nodes.length; i += 1)
+    for (let j = i + 1; j < nodes.length; j += 1) {
+      const a = nodes[i];
+      const b = nodes[j];
+      expect(
+        distance(point(nodes, String(a.id)), point(nodes, String(b.id))),
+      ).toBeGreaterThanOrEqual(
+        (Number(a.style?.size) + Number(b.style?.size)) / 2,
+      );
+    }
+  // 두 기업은 원래 지도 방향대로 링에서도 이웃한다.
+  const order = [...neighbors]
+    .map((n) => ({
+      id: n.id,
+      angle: Math.atan2(
+        point(nodes, n.id).y - height / 2,
+        point(nodes, n.id).x - width / 2,
+      ),
+    }))
+    .sort((a, b) => a.angle - b.angle)
+    .map((n) => n.id);
+  const ia = order.indexOf('company-a');
+  const ib = order.indexOf('company-b');
+  expect([1, order.length - 1]).toContain(Math.abs(ia - ib));
+});
+
 test('흐름 순 정렬: 사건은 관련 기업보다, 선행 사건은 후속 사건보다 왼쪽에 있고 노드가 겹치지 않는다', () => {
   const data = graph();
   const rendered = toG6Data(data, W, H);

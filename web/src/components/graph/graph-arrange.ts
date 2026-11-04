@@ -128,19 +128,40 @@ export function arrangeFocus(
   const radius = (id: string) => diameter(sized.get(id)!) / 2;
   const widest = (ring: { id: string }[]) =>
     Math.max(0, ...ring.map((item) => radius(item.id)));
-  // 링 둘레가 이웃 노드 지름과 여백의 합을 넘도록 한다.
-  const around = (ring: { id: string }[]) =>
-    ring.reduce((sum, item) => sum + radius(item.id) * 2 + RING_GAP, 0) /
-    (2 * Math.PI);
+  // 링 위에서 노드마다 자기 지름과 여백만큼의 몫을 받는다. 큰 노드는 넓은 각도를 차지한다.
+  const share = (id: string) => radius(id) * 2 + RING_GAP;
+  /** 링 첫 노드에서 각 노드 중심까지의 각도 */
+  const anglesOf = (ring: { id: string }[]) => {
+    const total = ring.reduce((sum, item) => sum + share(item.id), 0);
+    let offset = 0;
+    return ring.map((item, index) => {
+      if (index > 0) offset += (share(ring[index - 1].id) + share(item.id)) / 2;
+      return (offset / total) * 2 * Math.PI;
+    });
+  };
+  // 이웃한 두 노드(마지막과 첫 노드 포함)의 중심 사이 직선 거리가 두 반지름의 합과 여백 이상이 되는
+  // 가장 작은 반지름. 각도 몫이 지름에 비례하므로 크기가 다른 노드가 섞여도 큰 노드끼리 닿지 않는다.
+  const spread = (ring: { id: string }[]) => {
+    if (ring.length < 2) return 0;
+    const total = ring.reduce((sum, item) => sum + share(item.id), 0);
+    return Math.max(
+      ...ring.map((item, index) => {
+        const next = ring[(index + 1) % ring.length];
+        const between = (Math.PI * (share(item.id) + share(next.id))) / total;
+        const need = radius(item.id) + radius(next.id) + NODE_GAP;
+        return need / (2 * Math.sin(Math.min(between, Math.PI) / 2));
+      }),
+    );
+  };
   // 링끼리, 가운데 노드와 첫 링도 가장 큰 노드끼리 닿지 않게 한다.
   const r1 = Math.max(
     base * 0.28,
-    around(first),
+    spread(first),
     radius(focusId) + widest(first) + RING_GAP,
   );
   const r2 = Math.max(
     r1 + base * 0.2,
-    around(second),
+    spread(second),
     r1 + widest(first) + widest(second) + RING_GAP,
   );
   const targets = new Map<string, Point>([[focusId, center]]);
@@ -149,8 +170,9 @@ export function arrangeFocus(
     [second, r2],
   ] as const) {
     const start = ring[0]?.angle ?? 0;
+    const angles = anglesOf(ring);
     ring.forEach((item, index) => {
-      const angle = start + (index * 2 * Math.PI) / ring.length;
+      const angle = start + angles[index];
       targets.set(item.id, {
         x: center.x + Math.cos(angle) * radius,
         y: center.y + Math.sin(angle) * radius,
