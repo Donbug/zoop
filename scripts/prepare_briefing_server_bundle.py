@@ -311,7 +311,9 @@ def prepare(input_sqlite, native, release, personal_release, profile_file, outpu
     for did in sorted(docs):
         unit = units[did]; raw = unit['text'].encode(); aid=artifact('extracted_text',raw,'.txt')
         s=next(s for s in sources.values() if s['documentId']==did)
-        tables['articles'].append(dict(id=did, kind='news', provider=s['publisher'], access_status='private', current_version=None, created_at=now))
+        # GrantRegistry compares articles.provider with the immutable native sourceId.
+        # A display hostname is not that identity, even when both name the same site.
+        tables['articles'].append(dict(id=did, kind='news', provider=unit['observation']['sourceId'], access_status='private', current_version=None, created_at=now))
         tables['article_versions'].append(dict(article_id=did, version=s['documentVersion'], title=unit['title'],
             publisher=s['publisher'], url=s['url'], published_at=s['publishedAt'], published_date=None,
             publication_precision='datetime', text_artifact_id=aid, raw_artifact_id=None, collected_at=observations[did]['collectedAt']))

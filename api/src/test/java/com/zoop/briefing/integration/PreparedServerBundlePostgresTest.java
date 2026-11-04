@@ -101,6 +101,8 @@ class PreparedServerBundlePostgresTest {
             var version=jdbc.queryForMap("SELECT version,collected_at FROM article_versions WHERE article_id=?",source.path("documentId").asString());
             assertEquals(source.path("originalObservation").path("documentVersion").asString(),version.get("version"));
             assertEquals(java.time.Instant.parse(source.path("collectedAt").asString()),((java.sql.Timestamp)version.get("collected_at")).toInstant());
+            assertEquals(source.path("originalObservation").path("sourceId").asString(),
+                jdbc.queryForObject("SELECT provider FROM articles WHERE id=?",String.class,source.path("documentId").asString()));
         }
         for(String line:Files.readAllLines(bundle.resolve("tables/briefing_rounds.jsonl"))) {
             var source=json.readTree(line);
