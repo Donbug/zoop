@@ -182,7 +182,7 @@ export default function GraphVersions({
                   >
                     {formatKst(version.createdAt)}
                   </td>
-                  <td className={`${TD} max-w-56 text-zoop-muted`}>
+                  <td className={`${TD} max-w-56 break-all text-zoop-muted`}>
                     {version.sourceLabel}
                   </td>
                   <td className={`${TD} text-right tabular-nums`}>
