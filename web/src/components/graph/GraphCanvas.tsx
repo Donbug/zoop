@@ -330,9 +330,12 @@ export default function GraphCanvas({
     graph: Graph;
     origin: [number, number];
     zoom: number;
+    /** Host size at the last restore; later draws restore again only after a resize. */
+    restoredSize?: [number, number];
   };
   const selectionCamera = useRef<SelectionCamera | null>(null);
-  // Keep the return target through the closing rail's resize/slide frames.
+  // Keep the return target through the closing rail's resize/slide frames,
+  // then drop it once a draw finds the camera where the restore left it.
   const cameraReturn = useRef<SelectionCamera | null>(null);
   function captureSelectionCamera() {
     const graph = instance.current;
@@ -366,6 +369,27 @@ export default function GraphCanvas({
       flow
     )
       return;
+    const host = container.current;
+    const size: [number, number] = [
+      host?.clientWidth ?? 0,
+      host?.clientHeight ?? 0,
+    ];
+    const current = graph.getViewportByCanvas([0, 0]);
+    const settled =
+      graph.getZoom() === saved.zoom &&
+      current[0] === saved.origin[0] &&
+      current[1] === saved.origin[1];
+    // Only a resize may undo the restore. Any other change after it is not ours to revert.
+    if (
+      saved.restoredSize &&
+      (settled ||
+        (saved.restoredSize[0] === size[0] &&
+          saved.restoredSize[1] === size[1]))
+    ) {
+      cameraReturn.current = null;
+      return;
+    }
+    saved.restoredSize = size;
     if (graph.getZoom() !== saved.zoom) await graph.zoomTo(saved.zoom, false);
     if (cameraReturn.current !== saved || graph.destroyed) return;
     // getPosition()/translateTo() use different bases in G6. Restore the actual
@@ -835,8 +859,12 @@ export default function GraphCanvas({
       });
     // The plugin creates its DOM asynchronously. Reserve its known geometry
     // on the first fit as well, before it has a measurable container.
+    // Mobile moves it left of the round zoom buttons (same breakpoint as max-md).
+    const mobile =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(width < 48rem)').matches;
     obstacles.push({
-      x: host.clientWidth - 192,
+      x: mobile ? 8 : host.clientWidth - 192,
       y: host.clientHeight - 64 - 128,
       width: 192,
       height: 128,
@@ -1382,13 +1410,17 @@ export default function GraphCanvas({
         renderedData.current = rendered;
         await syncVisualStates(graph, rendered);
         renderMinimap?.();
+        // A camera move made by this draw wins over the selection return below.
+        let cameraMoved = false;
         if (
           !arrangeFocusNow &&
           focusId &&
           focusId !== lastFocused.current &&
           rendered.nodes?.some((node) => node.id === focusId)
-        )
+        ) {
+          cameraMoved = true;
           await graph.focusElement(focusId, cameraMotion('select'));
+        }
         lastFocused.current = focusId;
         // Resize changes layout coordinates. Center only after the new draw,
         // never on the previous layout before the detail rail has resized it.
@@ -1403,6 +1435,7 @@ export default function GraphCanvas({
         ) {
           pendingNeighborhood.current = null;
           centerTarget.current = null;
+          cameraMoved = true;
           await fitVisibleGraph(
             graph,
             neighborhoodIds(rendered, pending),
@@ -1419,6 +1452,7 @@ export default function GraphCanvas({
           fitPending.current = false;
           const animate = fitRequested.current;
           fitRequested.current = false;
+          cameraMoved = true;
           await fitVisibleGraph(
             graph,
             undefined,
@@ -1447,11 +1481,13 @@ export default function GraphCanvas({
           tutorialCentered.current !== tutorialCenterId &&
           rendered.nodes?.some((node) => node.id === tutorialCenterId)
         ) {
+          cameraMoved = true;
           await graph.focusElement(tutorialCenterId, false);
           followFit.current = false;
         }
         tutorialCentered.current = tutorialCenterId;
-        await restoreSelectionCamera(graph);
+        if (cameraMoved) cameraReturn.current = null;
+        else await restoreSelectionCamera(graph);
         syncTutorialMarker();
         scheduleReading();
       })
@@ -2003,8 +2039,13 @@ export default function GraphCanvas({
   }
   return (
     <div
-      className="relationship-canvas [&_.graph-overview]:rounded-panel [&_.graph-overview]:border [&_.graph-overview]:border-panel-line! [&_.graph-overview]:bg-zoop-paper! [&_.graph-overview]:shadow-lg [&_.graph-overview]:right-0! [&_.graph-overview]:left-auto! [&_.graph-overview]:bottom-16! [&_.graph-overview]:top-auto!"
+      className="relationship-canvas [&_.graph-overview]:rounded-panel [&_.graph-overview]:border [&_.graph-overview]:border-panel-line! [&_.graph-overview]:bg-zoop-paper! [&_.graph-overview]:shadow-lg [&_.graph-overview]:right-0! [&_.graph-overview]:left-auto! [&_.graph-overview]:bottom-16! [&_.graph-overview]:top-auto! max-md:[&_.graph-overview]:right-auto! max-md:[&_.graph-overview]:left-2!"
       data-testid="graph-canvas"
+      onPointerDownCapture={(event) => {
+        // G6 moves the main camera itself while its minimap viewport is dragged.
+        if ((event.target as Element).closest?.('.graph-overview'))
+          abandonCameraReturn();
+      }}
       onWheel={(event) => {
         if (tutorialPhase === 'zoom' && event.deltaY !== 0)
           void control(event.deltaY < 0 ? 'in' : 'out');
@@ -2083,6 +2124,7 @@ export default function GraphCanvas({
             previous.x = event.clientX;
             previous.y = event.clientY;
             previous.moved += Math.hypot(dx, dy);
+            abandonCameraReturn();
             followFit.current = false;
             centerTarget.current = null;
             drawing.current = drawing.current.then(async () => {
@@ -2110,6 +2152,7 @@ export default function GraphCanvas({
             const graph = instance.current;
             if (direction[event.key] && graph && !graph.destroyed) {
               event.preventDefault();
+              abandonCameraReturn();
               followFit.current = false;
               void graph
                 .translateBy(direction[event.key], false)
