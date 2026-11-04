@@ -53,6 +53,22 @@ def legacy_history_matches(before, after):
     return True
 
 
+def peer_closed(connection):
+    """True when the peer has already closed (FIN read as EOF, or a reset) and nothing else is pending on the socket.
+
+    The request body has been consumed, so readable data is either EOF, a reset or a pipelined request; only the first two
+    mean the answer cannot be delivered."""
+    try:
+        readable, _, _ = select.select([connection], [], [], 0)
+        if not readable:
+            return False
+        return connection.recv(1, socket.MSG_PEEK) == b""
+    except (ConnectionResetError, BrokenPipeError):
+        return True
+    except OSError:
+        return True
+
+
 def wait_for(predicate, timeout=90, what="condition"):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -124,6 +140,17 @@ class HttpProxy:
                 pass
 
             def forward(self):
+                response = None
+
+                def lost(detected_by):
+                    # The upstream answered (its status is already an event) but the app never received it: a delivery loss the
+                    # smoke must see, so it is recorded as a non-integer status like an upstream transport loss.
+                    with outer.lock:
+                        outer.events.append({"method": self.command, "path": self.path.split("?", 1)[0], "status": "downstream_lost",
+                                             "upstreamStatus": response.status_code, "detectedBy": detected_by,
+                                             "requestSha256": hashlib.sha256(raw).hexdigest(), "at": time.time()})
+                    self.close_connection = True
+
                 try:
                     length = int(self.headers.get("Content-Length", "0"))
                     check(0 <= length <= 16 * 1024 * 1024, "test proxy framing exceeds bound")
@@ -161,6 +188,11 @@ class HttpProxy:
                         return
                     if rule:
                         payload = rule.transform_payload(response.status_code, payload)
+                    # The app may have given up (timeout, FIN or RST) while the answer was held: a write into the kernel buffer
+                    # would still succeed, so peer closure is checked positively before anything is written.
+                    if peer_closed(self.connection):
+                        lost("peer_closed_before_write")
+                        return
                     self.send_response(response.status_code)
                     for key in ("Content-Type", "X-Request-ID", "ETag", "Retry-After"):
                         if key in response.headers:
@@ -168,7 +200,13 @@ class HttpProxy:
                     self.send_header("Content-Length", str(len(payload)))
                     self.end_headers()
                     self.wfile.write(payload)
-                except (BrokenPipeError, ConnectionResetError):
+                except (BrokenPipeError, ConnectionResetError) as error:
+                    if response is None:
+                        # The app reset the request before the upstream was called: a harness fault, as before.
+                        with outer.lock:
+                            outer.errors.append({"method": self.command, "path": self.path.split("?", 1)[0], "exceptionType": type(error).__name__})
+                    else:
+                        lost("write_failed")
                     self.close_connection = True
                 except httpx.TransportError:
                     with outer.lock:

@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 import httpx
 import pytest
 
-from analyze_plan_queue_support import HttpFault, HttpProxy, PgProxy, legacy_history_matches, private_json, recv_exact
+from analyze_plan_queue_support import HttpFault, HttpProxy, PgProxy, legacy_history_matches, private_json, recv_exact, wait_for
 
 
 def frame(tag, body):
@@ -57,6 +57,45 @@ def test_drop_is_after_real_upstream_processing_and_exact_body():
             proxy.close()
             server.shutdown()
             server.server_close()
+
+
+def test_downstream_loss_after_upstream_answer_is_recorded():
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *_):
+            pass
+
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            payload = b'{"accepted":true}'
+            self.send_response(202)
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    proxy = HttpProxy(f"http://127.0.0.1:{server.server_address[1]}")
+    fault = proxy.arm("POST", "/submit")   # after-upstream barrier: the proxy holds the answer until released
+    host, port = proxy.url.replace("http://", "").split(":")
+    client = socket.create_connection((host, int(port)), timeout=10)
+    try:
+        body = b'{"fixed":"body"}'
+        client.sendall(b"POST /submit HTTP/1.1\r\nHost: proxy\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body)
+        assert fault.entered.wait(5)
+        assert proxy.events[0]["status"] == 202
+        # The app side gives up (a plain FIN close, the client-timeout path) before the proxy writes the held answer: a write
+        # would still land in the kernel buffer, so the proxy must notice the closed peer and record that the 202 was lost.
+        client.close()
+        fault.release.set()
+        lost = wait_for(lambda: [e for e in proxy.events if e["status"] == "downstream_lost"], timeout=5, what="downstream_lost event")
+        assert lost[0]["upstreamStatus"] == 202 and lost[0]["path"] == "/submit" and lost[0]["detectedBy"] == "peer_closed_before_write"
+        assert len([e for e in proxy.events if e["status"] == 202]) == 1
+        assert proxy.errors == []
+    finally:
+        fault.release.set()
+        proxy.close()
+        server.shutdown()
+        server.server_close()
 
 
 @pytest.mark.parametrize("boundary", ["before", "after"])
