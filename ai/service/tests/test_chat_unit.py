@@ -250,6 +250,17 @@ def test_an_agent_step_is_relayed_with_its_own_deadline(tmp_path, step):
     assert status == 200 and body.answer.status == step["status"] and process.calls[0][1] == STAGE_DEADLINE["chat-agent"] == 33.0
 
 
+def test_an_agent_web_report_is_relayed_instead_of_becoming_outcome_unknown(tmp_path):
+    step = {**FINAL, "answer": {"sections": [{"basis": "web_reported", "text": "웹 보도 요약",
+                                                "requirementIds": ["r1"], "evidenceIds": ["web-1"]}],
+                                "insufficientRequirementIds": [], "graphTargetIds": []}}
+    process = Scripted(lambda p: Outcome("result", result=result(p["invocationId"], stage="chat-agent", answer=step), exit_code=0))
+
+    status, body = ChatStages(config(tmp_path), process).invoke("app", "chat-agent", request("chat-agent"), Observation())
+
+    assert status == 200 and body.answer.answer.sections[0].basis == "web_reported"
+
+
 @pytest.mark.parametrize("step", [
     {**HELD, "approvalRequests": []},                                            # held without requests
     {**HELD, "answer": FINAL["answer"]},                                         # held with an answer

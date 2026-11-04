@@ -100,7 +100,7 @@ class RouterAnswer(ChatWire):
 
 
 class AnswerSection(ChatWire):
-    basis: Literal["general_knowledge", "zoop_documented", "evidence_grounded"]
+    basis: Literal["general_knowledge", "zoop_documented", "evidence_grounded", "web_reported"]
     text: str
     requirement_ids: list[str]
     evidence_ids: list[str]
