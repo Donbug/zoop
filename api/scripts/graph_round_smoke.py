@@ -26,7 +26,8 @@ Prerequisites, prepared once and never installed by this command (Linux; the AI 
     --java /path/to/java --pg-host <host> --pg-port 5432 --pg-user <superuser> --output /tmp/round-smoke-unique
 
 A new database is created on that server for each run and dropped at the end (--keep-database keeps it). The output
-directory must not exist; it keeps the report, logs and the owned working tree on failure.
+directory must not exist; it keeps the report, logs and the owned working tree on failure. Processes and the database are
+released before report.json is written; a run whose cleanup fails is reported as failed with `cleanupFailures`.
 """
 from __future__ import annotations
 
@@ -371,7 +372,7 @@ def run(args):
         checks.append(name)
 
     db = Postgres(args.pg_host, args.pg_port, args.pg_user, os.environ.get("PGPASSWORD", ""), args.keep_database).create()
-    ai, app, proxy = None, None, None
+    ai, app, proxy, failure = None, None, None, None
     try:
         ai = AiRound(out / "ai")
         ai.start()
@@ -463,24 +464,32 @@ def run(args):
                   "authoredProviderCalls": authored["providerCalls"], "providerCalls": 0, "heldSeconds": round(held, 1),
                   "aiRefusals": [list(item) for item in refusals],
                   "fixture": "authored synthetic world and calendar; replay only"}
-        return report
     except BaseException as error:
+        failure = error
         report = {"state": "failed", "checks": checks, "error": type(error).__name__, "message": str(error)[:2000]}
         if proxy is not None:
             lost, refusals = proxy_findings(proxy)
             report.update(proxyErrors=proxy.errors, aiTransportLossOr5xx=lost, aiRefusals=[list(item) for item in refusals])
-        raise
-    finally:
+    # Release every owned process and the database before anything is written, so a failed report write cannot leave them behind.
+    cleanup_failures = []
+    for name, close in (("app", app and app.close), ("proxy", proxy and proxy.close), ("ai", ai and ai.close), ("database", db.drop)):
+        if close:
+            try:
+                close()
+            except Exception as error:  # every other owned resource is still released
+                cleanup_failures.append(f"{name}: {type(error).__name__}")
+    if cleanup_failures:
+        report.update(state="failed", cleanupFailures=cleanup_failures)
+    try:
         (out / "report.json").write_text(canonical(report) + "\n")
-        cleanup_failures = []
-        for name, close in (("app", app and app.close), ("proxy", proxy and proxy.close), ("ai", ai and ai.close), ("database", db.drop)):
-            if close:
-                try:
-                    close()
-                except Exception as error:  # every owned resource is still released; the original failure stays the raised one
-                    cleanup_failures.append(f"{name}: {type(error).__name__}")
-        if cleanup_failures:
-            (out / "cleanup-failures.json").write_text(canonical(cleanup_failures) + "\n")
+    except OSError as error:
+        print(f"report.json not written: {type(error).__name__}: {error}", file=sys.stderr)
+        if failure is None:
+            failure = error
+    if failure is not None:  # the test failure stays the raised one; a lost report or failed cleanup fails an otherwise passing run
+        raise failure
+    check(not cleanup_failures, "cleanup failed: " + ", ".join(cleanup_failures))
+    return report
 
 
 def main():
