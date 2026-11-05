@@ -35,6 +35,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(OutputCaptureExtension.class)
@@ -128,6 +131,8 @@ class GraphPublicationAuthorityTest {
             "receipt, receipt, receipt_invalid",
             "json, json, json_invalid",
             "registry, registry, source_registry_invalid",
+            "registry-missing, registry, source_registry_unreadable",
+            "registry-interrupted, registry, source_registry_unreadable",
             "unknown, publication, publication_invalid"
     })
     void authorityFailureLogsOnlyClosedReasonAndCorrelationWhileHttpStaysUnavailable(
@@ -145,6 +150,17 @@ class GraphPublicationAuthorityTest {
             case "receipt" -> article.putArray("observations");
             case "json" -> article.remove("textSha256");
             case "registry" -> Files.writeString(setup.secondRegistry(), "{\"private\":\"" + canary + "\"}");
+            case "registry-missing" -> Files.delete(setup.secondRegistry());
+            case "registry-interrupted" -> {
+                var registry = spy(setup.registry());
+                doAnswer(invocation -> {
+                    var facts = invocation.callRealMethod();
+                    Thread.currentThread().interrupt();
+                    return facts;
+                }).when(registry).findArticleFacts(anySet());
+                authority = new GraphPublicationAuthority(registry, new DocumentReadSources(temp.toRealPath().resolve("authority.json")),
+                        version -> setup.exclusions().getOrDefault(version, DisclosureExclusions.NONE), Clock.fixed(NOW, ZoneOffset.UTC));
+            }
             case "unknown" -> authority = new GraphPublicationAuthority(setup.registry(), null,
                     version -> { throw new PublicationException(canary); }, Clock.fixed(NOW, ZoneOffset.UTC));
             default -> throw new AssertionError(scenario);
@@ -154,20 +170,60 @@ class GraphPublicationAuthorityTest {
         var publication = publication("synthetic-diagnostic", List.of(changed, setup.contributions().getLast()));
         var mvc = MockMvcBuilders.standaloneSetup(new AuthorityReadController(authority, publication))
                 .setControllerAdvice(new GlobalExceptionHandler()).addFilters(new RequestIdFilter()).build();
-        mvc.perform(get("/api/v1/graph").header(RequestIdFilter.HEADER, "synthetic-authority-read"))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.error.code").value("SOURCE_UNAVAILABLE"))
-                .andExpect(jsonPath("$.error.requestId").value("synthetic-authority-read"))
-                .andExpect(jsonPath("$.error.retryable").value(false))
-                .andExpect(jsonPath("$.error.reason").doesNotExist())
-                .andExpect(jsonPath("$.error.category").doesNotExist());
+        try {
+            mvc.perform(get("/api/v1/graph").header(RequestIdFilter.HEADER, "synthetic-authority-read"))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.error.code").value("SOURCE_UNAVAILABLE"))
+                    .andExpect(jsonPath("$.error.requestId").value("synthetic-authority-read"))
+                    .andExpect(jsonPath("$.error.retryable").value(false))
+                    .andExpect(jsonPath("$.error.reason").doesNotExist())
+                    .andExpect(jsonPath("$.error.category").doesNotExist());
+        } finally {
+            Thread.interrupted();
+        }
         var diagnostics = output.getAll().lines().filter(line -> line.contains("Graph publication authority unavailable")).toList();
         assertEquals(1, diagnostics.size());
+        String registryDiagnostic = switch (scenario) {
+            case "registry" -> ", failureKind=NOT_IO, interrupted=false";
+            case "registry-missing" -> ", failureKind=NOT_FOUND, interrupted=false";
+            case "registry-interrupted" -> ", failureKind=INTERRUPTED_IO, interrupted=true";
+            default -> "";
+        };
         assertTrue(diagnostics.getFirst().endsWith("(category=" + category + ", reason=" + reason
-                + ", requestFingerprint=ea8089e3a30d2588116e612473cab14bd9ae23852720bdd63d1e3dc9e8912558)"));
+                + ", requestFingerprint=ea8089e3a30d2588116e612473cab14bd9ae23852720bdd63d1e3dc9e8912558"
+                + registryDiagnostic + ")"));
         assertFalse(output.getAll().contains(canary));
         assertFalse(output.getAll().contains(temp.toString()));
         assertFalse(output.getAll().contains("at com.zoop.graph.publication"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"missing, NOT_FOUND, false", "interrupted, INTERRUPTED_IO, true"})
+    void initialRegistryFailureLogsOnlyItsKindAndCapturedInterruptState(
+            String scenario, String kind, boolean interrupted, CapturedOutput output) throws Exception {
+        String canary = "PRIVATE_CANARY_registry_path_and_content";
+        Path file = temp.toRealPath().resolve(canary + ".json");
+        Files.writeString(file, registry("grant-a", true).replace("synthetic fixture", canary));
+        var sources = new DocumentReadSources(file);
+        assertNull(sources.registry("synthetic-initial-read").denial("source", "grant-a", "r1", NOW));
+        if ("missing".equals(scenario)) Files.delete(file);
+        CustomException failure;
+        try {
+            if (interrupted) Thread.currentThread().interrupt();
+            failure = assertThrows(CustomException.class, () -> sources.registry("synthetic-initial-read"));
+            assertEquals(interrupted, Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, failure.getErrorCode());
+        var diagnostics = output.getAll().lines()
+                .filter(line -> line.contains("Document read ingestion source registry unavailable")).toList();
+        assertEquals(1, diagnostics.size());
+        assertTrue(diagnostics.getFirst().endsWith("(code=source_registry_unreadable, requestId=synthetic-initial-read"
+                + ", failureKind=" + kind + ", interrupted=" + interrupted + ")"));
+        assertFalse(output.getAll().contains(canary));
+        assertFalse(output.getAll().contains(temp.toString()));
+        assertFalse(output.getAll().contains("at com.zoop.document"));
     }
 
     @RestController

@@ -595,6 +595,31 @@ class SourceRegistryTest {
     }
 
     @Test
+    void anInterruptedRegularFileReadRetainsOnlyItsDiagnosticKindAndInterruptState(@TempDir Path temp) throws Exception {
+        Path file = registryFile(temp.toRealPath());
+        byte[] before = Files.readAllBytes(file);
+        var permissions = Files.getPosixFilePermissions(file);
+        assertNull(denial(SourceRegistry.read(file)));
+        SourceRegistry.Invalid failure;
+        try {
+            Thread.currentThread().interrupt();
+            failure = assertThrows(SourceRegistry.Invalid.class, () -> SourceRegistry.read(file));
+            assertEquals(true, Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+        assertEquals("source_registry_unreadable", failure.code());
+        assertEquals(SourceRegistry.FailureKind.INTERRUPTED_IO, failure.failureKind());
+        assertEquals(true, failure.interrupted());
+        assertNull(failure.getCause());
+        assertEquals(0, failure.getStackTrace().length);
+        assertEquals("source_registry_unreadable", failure.getMessage());
+        assertArrayEquals(before, Files.readAllBytes(file));
+        assertEquals(permissions, Files.getPosixFilePermissions(file));
+        assertNull(denial(SourceRegistry.read(file)));
+    }
+
+    @Test
     void anAtomicSameDirectoryRegularFileReplacementChangesTheNextRead(@TempDir Path temp) throws Exception {
         Path root = temp.toRealPath();
         Path file = registryFile(root);
