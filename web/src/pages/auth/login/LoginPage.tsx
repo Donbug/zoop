@@ -31,7 +31,7 @@ const SOCIAL_LABEL: Record<string, string> = {
   kakao: '카카오톡 로그인',
 };
 // D-AUT-01: 승인된 중앙 로그인 시안. 셸의 3px 모서리 규칙보다 우선한다.
-const pillInput = `h-12 w-full rounded-full! border-0 bg-zoop-soft px-5 text-body text-zoop-ink placeholder:text-zoop-muted focus:bg-zoop-paper focus:ring-1 focus:ring-zoop-ink disabled:opacity-60 ${focusRing}`;
+const pillInput = `h-12 w-full rounded-full! border border-zoop-border! bg-zoop-surface shadow-[0_1px_3px_rgb(0_0_0/0.08)] px-5 text-body text-zoop-ink placeholder:text-zoop-muted focus:bg-zoop-paper focus:ring-1 focus:ring-zoop-ink disabled:opacity-60 ${focusRing}`;
 const pillButton = `mt-2 flex h-12 w-full items-center justify-center rounded-full! bg-zoop-ink text-body font-bold text-zoop-paper disabled:cursor-progress disabled:opacity-60 ${focusRing}`;
 const textLinkBase = `rounded! bg-transparent text-zoop-muted hover:text-zoop-ink hover:underline aria-disabled:opacity-60 disabled:opacity-60 ${focusRing}`;
 const textLink = `min-h-0! ${textLinkBase}`;
