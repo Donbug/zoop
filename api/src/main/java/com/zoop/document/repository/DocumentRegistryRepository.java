@@ -1,7 +1,9 @@
 package com.zoop.document.repository;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Primitive statements of the document registry. Every method must run inside the caller's single transaction; the
@@ -27,6 +29,16 @@ public interface DocumentRegistryRepository {
     boolean insertVersionIfAbsent(VersionRow row);
 
     Optional<VersionRow> findVersion(String articleId, String version);
+
+    record ArticleVersion(String articleId, String version) {}
+    record ArticleFacts(ArticleRow article, VersionRow version, ArtifactRow text) {}
+
+    /**
+     * Joins exact article/version identities to their extracted-text artifacts in batches of at most 256 identities.
+     * Missing article, version or artifact rows are omitted; the caller must fail closed on a missing identity.
+     * Facts belong to the caller's transaction snapshot, not to an authorization or cross-request cache.
+     */
+    Map<ArticleVersion, ArticleFacts> findArticleFacts(Set<ArticleVersion> identities);
 
     /**
      * Compare-and-set of {@code current_version}: moves it to {@code target} only when it currently equals

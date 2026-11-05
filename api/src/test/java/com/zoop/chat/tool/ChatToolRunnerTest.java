@@ -20,8 +20,15 @@ import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.service.FrozenSelection;
 import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
+import com.zoop.graph.publication.GraphPublicationAuthority;
+import com.zoop.graph.publication.GraphPublicationReader.Publication;
+import com.zoop.graph.publication.PublicationException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.MDC;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -125,6 +132,29 @@ class ChatToolRunnerTest {
         assertTrue(results.stream().allMatch(r -> r.items().isEmpty() && r.truncated() == null && r.dataVersion() == null));
         assertEquals(ChatToolCallEnd.failed(ChatToolRunner.UNAVAILABLE), control.ends.get("tc-0"));
         assertEquals(ChatToolCallEnd.failed(ChatToolRunner.FAILED), control.ends.get("tc-2"));
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void documentAuthorityFailuresKeepTheJobCorrelationOnTheVirtualReadThread(CapturedOutput output) {
+        var authority = new GraphPublicationAuthority(null, null,
+                version -> { throw new PublicationException("basis_unavailable"); }, java.time.Clock.systemUTC());
+        var publication = new Publication("v1", null, null, null, null, null, null, null, List.of(), null, Map.of(), Map.of());
+        var documents = new DocumentSearchTool((company, from, version, asOf, limit, trace) -> {
+            assertTrue(Thread.currentThread().isVirtual());
+            authority.current(publication, null);
+            throw new AssertionError("authority failure must stop the document read");
+        });
+        var control = new RecordingControl(Duration.ofSeconds(60));
+        try (var caller = MDC.putCloseable("requestId", "caller-context");
+                var runner = new ChatToolRunner(new ChatToolRegistry(List.of(documents)))) {
+            var result = runner.runStage(run("v1", null), control, 1, List.of(request("document.search"))).getFirst();
+            assertEquals(ChatToolRunner.UNAVAILABLE, result.error());
+            assertEquals(ChatToolCallEnd.failed(ChatToolRunner.UNAVAILABLE), control.ends.get("tc-0"));
+            assertEquals("caller-context", MDC.get("requestId"));
+        }
+        assertTrue(output.getAll().contains("category=publication, reason=basis_unavailable, requestFingerprint="
+                + Canonical.sha256("job-1")));
     }
 
     @Test

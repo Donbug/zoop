@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -368,7 +369,7 @@ public class ChatToolRunner implements AutoCloseable {
             AtomicReference<Thread> reader = new AtomicReference<>();
             pool.execute(() -> {
                 reader.set(Thread.currentThread());
-                try {
+                try (var correlation = MDC.putCloseable("requestId", scope.traceId())) {
                     if (!read.isDone()) read.complete(passed(call, tool.read(scope, call), delivery));
                 } catch (Throwable error) {
                     read.completeExceptionally(error);

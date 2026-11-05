@@ -8,10 +8,13 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import com.zoop.common.json.StrictJson;
 import com.zoop.document.repository.ArticleRow;
 import com.zoop.document.repository.ArtifactRow;
 import com.zoop.document.repository.DocumentRegistryRepository;
+import com.zoop.document.repository.DocumentRegistryRepository.ArticleFacts;
+import com.zoop.document.repository.DocumentRegistryRepository.ArticleVersion;
 import com.zoop.document.repository.VersionRow;
 import com.zoop.graph.importer.LegacyRealPackage;
 import com.zoop.graph.publication.GraphPublicationReader;
@@ -35,10 +38,10 @@ class GraphDeliveryClosureTest {
         var registry = mock(DocumentRegistryRepository.class);
         var article = new ArticleRow(articleId, "news", "legacy-source", null, "available");
         when(registry.lockArticle(articleId)).thenReturn(Optional.of(article));
-        when(registry.findArticle(articleId)).thenReturn(Optional.of(article));
-        when(registry.findVersion(articleId, version)).thenReturn(Optional.of(new VersionRow(articleId, version,
-                "Synthetic legacy", null, "https://allowed.invalid/story", NOW, null, "datetime", null, text.id(), NOW)));
-        when(registry.findArtifact(text.id())).thenReturn(Optional.of(text));
+        var identity = new ArticleVersion(articleId, version);
+        var registeredVersion = new VersionRow(articleId, version, "Synthetic legacy", null,
+                "https://allowed.invalid/story", NOW, null, "datetime", null, text.id(), NOW);
+        when(registry.findArticleFacts(Set.of(identity))).thenReturn(Map.of(identity, new ArticleFacts(article, registeredVersion, text)));
         var bundle = StrictJson.newObject().put("schemaVersion", LegacyRealPackage.BUNDLE_SCHEMA);
         var sourceArticle = bundle.putArray("articles").addObject().put("articleId", articleId).put("articleVersion", version)
                 .put("originalArticleId", originalId).put("textSha256", hash).put("url", "https://allowed.invalid/story");

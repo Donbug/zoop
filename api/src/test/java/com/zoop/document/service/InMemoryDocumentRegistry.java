@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import com.zoop.document.repository.ArticleRow;
@@ -125,6 +126,19 @@ public final class InMemoryDocumentRegistry implements DocumentRegistryRepositor
     @Override
     public Optional<VersionRow> findVersion(String articleId, String version) {
         return Optional.ofNullable(versions.get(key(articleId, version)));
+    }
+
+    @Override
+    public Map<ArticleVersion, ArticleFacts> findArticleFacts(Set<ArticleVersion> identities) {
+        Map<ArticleVersion, ArticleFacts> found = new LinkedHashMap<>();
+        for (ArticleVersion identity : identities) {
+            var article = articles.get(identity.articleId());
+            var version = versions.get(key(identity.articleId(), identity.version()));
+            var text = version == null ? null : artifacts.get(version.textArtifactId());
+            if (article != null && version != null && text != null)
+                found.put(identity, new ArticleFacts(article, version, text));
+        }
+        return found;
     }
 
     @Override
