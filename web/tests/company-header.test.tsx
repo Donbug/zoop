@@ -318,12 +318,12 @@ test.each([409, 422, 500])(
     expect(screen.getByText(/기업 정보 조회 실패/)).toBeTruthy();
   },
 );
-test('D-COM-01 46 preserves prototype disclaimer', async () => {
+test('D-COM-01 46 omits the investment disclaimer from company details', async () => {
   open();
   await screen.findByRole('heading', { name: company.name });
   expect(
-    screen.getByText('본 정보는 참고용이며 투자 권유가 아니에요.'),
-  ).toBeTruthy();
+    screen.queryByText('본 정보는 참고용이며 투자 권유가 아니에요.'),
+  ).toBeNull();
 });
 
 test('D-COM-01 45 shares one settings request through automatic snapshot pinning', async () => {

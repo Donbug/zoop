@@ -2,6 +2,7 @@ import { useRef, useState, type PointerEvent } from 'react';
 import type { GraphResponse } from '@/types/map/graph';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import { useColorTheme } from '@/util/theme-color';
+import { companyLogo, logoBackground, logoScale } from '@/util/company-logo';
 
 /** getCompanyGraphAsOf의 emptyReason 코드를 사용자 문구로 바꾼다. 모르는 코드는 기본 문구를 쓴다. */
 const EMPTY_REASON: Record<string, string> = {
@@ -91,7 +92,7 @@ export default function CompanyGraphPreview({
         {data.nodes.filter((n) => n.kind === 'issue').length} · 연결{' '}
         {data.edges.length}
       </p>
-      <p>○ 기업 · ◆ 사건 · 점선은 파생 관계입니다.</p>
+      <p>○ 기업 · ● 사건 · 점선은 파생 관계입니다.</p>
       <svg
         viewBox={`${view.x} ${view.y} ${320 / view.scale} ${300 / view.scale}`}
         role="img"
@@ -132,9 +133,13 @@ export default function CompanyGraphPreview({
             </line>
           ) : null;
         })}
-        {data.nodes.map((node) => {
+        {data.nodes.map((node, index) => {
           const point = points.get(node.id)!;
           const selected = selectedId === node.id;
+          const logo =
+            node.kind === 'company' ? companyLogo(node.id, node.logoUrl) : null;
+          const logoSize = 38 * logoScale(logo);
+          const clipId = `company-graph-logo-${index}`;
           return (
             <g
               key={node.id}
@@ -145,23 +150,56 @@ export default function CompanyGraphPreview({
             >
               <title>{node.label}</title>
               {node.kind === 'company' ? (
+                <>
+                  <circle
+                    cx={point.x}
+                    cy={point.y}
+                    r={19}
+                    fill={
+                      logo ? logoBackground(logo) : 'var(--color-zoop-paper)'
+                    }
+                    className={
+                      selected
+                        ? 'stroke-zoop-ink stroke-[3px]'
+                        : 'stroke-zoop-muted stroke-1'
+                    }
+                  />
+                  {logo ? (
+                    <>
+                      <clipPath id={clipId}>
+                        <circle cx={point.x} cy={point.y} r={19} />
+                      </clipPath>
+                      <image
+                        href={logo}
+                        x={point.x - logoSize / 2}
+                        y={point.y - logoSize / 2}
+                        width={logoSize}
+                        height={logoSize}
+                        preserveAspectRatio="xMidYMid meet"
+                        clipPath={`url(#${clipId})`}
+                        pointerEvents="none"
+                      />
+                    </>
+                  ) : (
+                    <text
+                      x={point.x}
+                      y={point.y + 5}
+                      textAnchor="middle"
+                      className="fill-zoop-ink text-body font-bold"
+                    >
+                      {node.label.slice(0, 1)}
+                    </text>
+                  )}
+                </>
+              ) : (
                 <circle
                   cx={point.x}
                   cy={point.y}
-                  r={19}
-                  className={
-                    selected
-                      ? 'fill-white stroke-zoop-ink stroke-[3px]'
-                      : 'fill-white stroke-zoop-muted stroke-1'
-                  }
-                />
-              ) : (
-                <polygon
-                  points={`${point.x},${point.y - 9} ${point.x + 9},${point.y} ${point.x},${point.y + 9} ${point.x - 9},${point.y}`}
+                  r={selected ? 11 : 9}
                   className={
                     selected
                       ? 'fill-zoop-ink stroke-white stroke-2'
-                      : 'fill-zoop-muted'
+                      : 'fill-zoop-ink opacity-70'
                   }
                 />
               )}
@@ -209,7 +247,7 @@ export default function CompanyGraphPreview({
         목록에서 선택할 수 있어요.
       </p>
       <ul
-        className="max-h-60 overflow-auto"
+        className="my-5 max-h-60 space-y-2 overflow-auto py-2"
         aria-label="기업 관계 그래프 노드 목록"
       >
         {data.nodes.map((node) => (

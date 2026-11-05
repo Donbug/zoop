@@ -2096,8 +2096,19 @@ test('mismatched chart company/period is rejected rather than shown as selected 
   expect(screen.queryByRole('group', { name: '공급된 종가 차트' })).toBeNull();
 });
 
-test('chart bucket marker opens event cards from the info tab without altering cutoff', async () => {
+test('D-COM-01/01b/02 shows chart and timeline only on the events tab', async () => {
   open(`${pinned}&tab=info`);
+  expect(screen.queryByText(/본 정보는 참고용이며 투자 권유/)).toBeNull();
+  expect(screen.queryByRole('region', { name: '시세 차트' })).toBeNull();
+  expect(screen.queryByRole('region', { name: '사건 타임라인' })).toBeNull();
+  await userEvent.click(screen.getByRole('button', { name: '문서' }));
+  expect(screen.queryByText(/본 정보는 참고용이며 투자 권유/)).toBeNull();
+  expect(screen.queryByRole('region', { name: '시세 차트' })).toBeNull();
+  expect(screen.queryByRole('region', { name: '사건 타임라인' })).toBeNull();
+  await userEvent.click(screen.getByRole('button', { name: '사건' }));
+  expect(screen.queryByText(/본 정보는 참고용이며 투자 권유/)).toBeNull();
+  expect(screen.getByRole('region', { name: '시세 차트' })).toBeTruthy();
+  expect(screen.getByRole('region', { name: '사건 타임라인' })).toBeTruthy();
   await userEvent.click(
     await screen.findByRole('button', {
       name: '차트 사건 2026-10-05 · 사건 2건',
@@ -2108,6 +2119,65 @@ test('chart bucket marker opens event cards from the info tab without altering c
     `asOf=${encodeURIComponent(time)}`,
   );
   expect(screen.getByRole('button', { name: '합성 사건 B' })).toBeTruthy();
+});
+
+test('D-COM-05 hides snapshot source and shows company logos in timeline and event detail', async () => {
+  server.on('GET', '/api/v1/companies/:id', (request) =>
+    json({
+      ...company,
+      id: request.params.id,
+      logoUrl: '/graph-assets/samsung.svg',
+      metadata: { ...metadata, asOf: request.query.get('asOf') ?? time },
+    }),
+  );
+  open(pinned);
+  const timeline = await screen.findByRole('region', {
+    name: '사건 타임라인',
+  });
+  await userEvent.click(
+    await within(timeline).findByRole('button', {
+      name: '2026-10-05 사건 2건 펼치기',
+    }),
+  );
+  const eventButton = await within(timeline).findByRole('button', {
+    name: '합성 사건 A',
+  });
+  expect(within(timeline).queryByText(/출처 synthetic/)).toBeNull();
+  expect(
+    eventButton.parentElement?.querySelector('img')?.getAttribute('src'),
+  ).toBe('/graph-assets/samsung.svg');
+  await userEvent.click(eventButton);
+  const related = await within(timeline).findByRole('region', {
+    name: '사건 연결 기업',
+  });
+  expect(related.querySelector('img')?.getAttribute('src')).toBe(
+    '/graph-assets/samsung.svg',
+  );
+});
+
+test('D-COM-01b relationship preview uses company logos and circular issues', async () => {
+  server.on('GET', '/api/v1/companies/:id/graph', () =>
+    json({
+      ...graph,
+      nodes: graph.nodes.map((node) =>
+        node.kind === 'company'
+          ? { ...node, logoUrl: '/graph-assets/samsung.svg' }
+          : node,
+      ),
+    }),
+  );
+  open(pinned);
+  const preview = await screen.findByRole('img', {
+    name: '기준 시점 기업 관계 그래프',
+  });
+  expect(
+    preview.querySelector('image[href="/graph-assets/samsung.svg"]'),
+  ).toBeTruthy();
+  const issue = [...preview.querySelectorAll('g')].find((item) =>
+    item.querySelector('title')?.textContent?.includes('합성 사건'),
+  );
+  expect(issue?.querySelector('circle')).toBeTruthy();
+  expect(issue?.querySelector('polygon')).toBeNull();
 });
 
 test('selected graph version rejects a response that omits snapshot metadata', async () => {
@@ -2920,7 +2990,7 @@ test('D-COM-01 F7 preserves missing quote amounts instead of fabricating zero', 
   ).toBeTruthy();
   expect(region.getByText('미제공 (미제공)', { exact: true })).toBeTruthy();
   expect(region.queryByText('0원', { exact: true })).toBeNull();
-  expect(region.getByText(/공급자 관측 시각 미제공/)).toBeTruthy();
+  expect(region.queryByText(/공급자 관측/)).toBeNull();
 });
 
 test('D-COM-01 F7 keeps zero as a real amount', async () => {
@@ -2935,25 +3005,18 @@ test('D-COM-01 F7 keeps zero as a real amount', async () => {
   expect(region.getByText('0원 (+2.00%)', { exact: true })).toBeTruthy();
 });
 
-test('D-COM-01 F6 shows KST while preserving original metadata and observation times', async () => {
+test('D-COM-01 F6 hides overview and quote source captions while preserving the requested time', async () => {
   open(pinned);
   const companyRegion = await screen.findByRole('region', {
     name: '기업 개요',
   });
-  const basis = await within(companyRegion).findByText('2026-10-06 12:00 KST', {
-    exact: true,
-  });
-  expect(basis.tagName).toBe('TIME');
-  expect(basis.getAttribute('datetime')).toBe(time);
+  expect(within(companyRegion).queryByText(/출처 synthetic/)).toBeNull();
   const quoteRegion = screen.getByRole('region', { name: '최신 시세' });
-  const observed = await within(quoteRegion).findByText(
-    '2026-10-06 12:00 KST',
-    { exact: true },
-  );
-  expect(observed.getAttribute('datetime')).toBe(time);
-  expect(within(quoteRegion).getByText(/공급자 관측/).textContent).toContain(
-    '공급자 관측 2026-10-06 12:00 KST',
-  );
+  expect(within(quoteRegion).queryByText(/공급자 관측/)).toBeNull();
+  const graphRegion = screen.getByRole('complementary', {
+    name: '시점 기반 관계 그래프',
+  });
+  expect(within(graphRegion).queryByText(/출처 synthetic/)).toBeNull();
   const last = server.calls('GET', '/api/v1/companies/:id').at(-1)!;
   expect(last.query.get('asOf')).toBe(time);
   expect(last.query.get('graphVersion')).toBe('v1');

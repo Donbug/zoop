@@ -3,8 +3,6 @@ import type { Company } from '@/types/company/detail';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { useColorTheme } from '@/util/theme-color';
-import { formatKst } from '@/util/format';
-import { sourceLabel } from '@/util/sourceLabel';
 
 const fields = [
   ['legalName', '정식 법인명'],
@@ -54,6 +52,7 @@ export default function CompanyInfoTab({
       aria-busy={resource.loading}
       data-screen-id="D-COM-03"
       data-wireframe-screen-id="D-COM-01"
+      className="border-b-0!"
     >
       <h2>기업 기준정보</h2>
       {resource.loading ? (
@@ -114,9 +113,7 @@ export default function CompanyInfoTab({
                 </dd>
               </div>
             ))}
-            <div
-              className={`min-w-0 border-b py-4 ${dark ? 'border-zoop-border' : 'border-zoop-line'}`}
-            >
+            <div className="min-w-0 py-4">
               <dt className="text-zoop-muted">홈페이지</dt>
               <dd className="mt-1 wrap-anywhere">
                 {href ? (
@@ -155,14 +152,6 @@ export default function CompanyInfoTab({
               </button>
             </div>
           )}
-          <p className="mt-4 wrap-anywhere">
-            조회 출처 {sourceLabel(company.metadata.source)} · 관계·요약 자료
-            기준{' '}
-            <time dateTime={company.metadata.asOf ?? undefined}>
-              {formatKst(company.metadata.asOf)}
-            </time>{' '}
-          </p>
-          <p>기업 기준정보의 별도 갱신 시각은 제공되지 않았습니다.</p>
         </>
       ) : (
         <p role="status">기업 기준정보가 제공되지 않았습니다.</p>

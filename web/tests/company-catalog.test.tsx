@@ -76,6 +76,7 @@ it('D-COM-01 only loads the next search page on request', async () => {
   ).toBe(false);
   await userEvent.click(next);
   await screen.findByRole('region', { name: '기업 검색 결과' });
+  expect(screen.getByRole('heading', { name: '검색 결과' })).toBeTruthy();
   await within(
     screen.getByRole('region', { name: '기업 검색 결과' }),
   ).findByRole('link', { name: /삼성전자/ });
@@ -98,7 +99,7 @@ it('D-COM-01 does not present a failed or pending relation lookup as no linked c
   });
   const linked = within(screen.getByRole('region', { name: '연결된 기업' }));
   expect(linked.getByRole('status').textContent).toContain('확인 중');
-  expect(linked.queryByText('조회된 연결 기업이 없어요.')).toBeNull();
+  expect(linked.queryByText('연결된 기업이 없어요.')).toBeNull();
   unmount();
   open({
     data: graph,
@@ -114,12 +115,36 @@ it('D-COM-01 does not present a failed or pending relation lookup as no linked c
       'alert',
     ).textContent,
   ).toContain('조회 실패');
-  expect(screen.queryByText('조회된 연결 기업이 없어요.')).toBeNull();
+  expect(screen.queryByText('연결된 기업이 없어요.')).toBeNull();
+});
+it('D-COM-01 uses the shorter linked-company empty message', () => {
+  const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  open({
+    data: { ...graph, edges: [] },
+    loading: false,
+    error: null,
+    errorCode: null,
+    errorStatus: null,
+    errorRetryable: null,
+    retry() {},
+  });
+  expect(
+    within(screen.getByRole('region', { name: '연결된 기업' })).getByText(
+      '연결된 기업이 없어요.',
+    ),
+  ).toBeTruthy();
 });
 it('D-COM-01 separates personal, recent and linked groups and never reads member settings for guests', async () => {
   open();
-  for (const name of ['보유 기업', '관심 기업', '최근 본 기업', '연결된 기업'])
+  for (const name of [
+    '보유 기업',
+    '관심 기업',
+    '최근 본 기업',
+    '연결된 기업',
+  ]) {
     expect(screen.getByRole('region', { name })).toBeTruthy();
+    expect(screen.getByRole('heading', { name })).toBeTruthy();
+  }
   const recent = within(screen.getByRole('region', { name: '최근 본 기업' }));
   const link = await recent.findByRole('link', { name: /삼성전자/ });
   expect(link.getAttribute('aria-current')).toBe('page');
