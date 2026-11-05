@@ -132,7 +132,7 @@ content, data state and action semantics.
 
 | Token           | Light     | Dark      |
 | --------------- | --------- | --------- |
-| `zoop-page`     | `#f7f7f5` | `#171717` |
+| `zoop-page`     | `#f5f5f5` | `#171717` |
 | `zoop-surface`  | `#ffffff` | `#262626` |
 | `zoop-card`     | `#f5f5f4` | `#2b2b2d` |
 | `zoop-control`  | `#efefed` | `#303032` |
@@ -142,8 +142,28 @@ content, data state and action semantics.
 
 Use `rounded-xl border border-zoop-border bg-zoop-surface shadow-sm` for outer
 panels, `rounded-lg bg-zoop-card` for inner sections and `rounded-md` for controls.
-Briefing uses the `CARD`/`SECTION`/`EMPTY`/`PRIMARY_BUTTON` recipes from
-`components/briefing/briefingStyles.ts` for common, scheduled and explicit flows.
+
+Briefing exception (D-BRF-01/02, 2026-11-05, design-direction §5.7): each
+edition has one outer boundary and a flat inside. Use the recipes in
+`components/briefing/briefingStyles.ts` for common, scheduled and explicit flows:
+
+- `CARD`: the only edition boundary, `rounded-xl` surface without a shadow.
+- `SECTION` / `DISCLOSURE`: no background; every block draws only a bottom
+  divider and the last one draws none, so adjacent blocks never double a line.
+  Do not add `border-t` to a briefing block.
+- Headings: page `text-display` > edition h2 `text-title` > section h3
+  `SECTION_TITLE` (`text-title-sm`) > sub-heading h4 `SUBSECTION_TITLE` and
+  issue titles (`text-lead`). Never put `SECTION_TITLE` on an h4.
+- Issue lists: `ISSUE_LIST` rows with `ISSUE_ROW` dividers and
+  `ISSUE_SUMMARY`; an opened issue body (`ISSUE_BODY`) uses a left rule and
+  indent so it is not confused with the next row.
+- `EMPTY` keeps a `bg-zoop-card` surface for real empty, error and notice states.
+- The toolbar sits on `zoop-page`: the reading toggle track is
+  `border border-zoop-border bg-zoop-control`, the pressed option
+  `bg-zoop-surface` with an underline. Basis filters mark the pressed option
+  with ink text and an underline only; hover changes text colour, not the
+  background.
+
 The page scopes input/select treatments to briefing; it does not style other routes.
 Faint text on the darkest selected surface still reaches 4.78:1.
 Dependency assumptions and validation evidence belong in the pull request.

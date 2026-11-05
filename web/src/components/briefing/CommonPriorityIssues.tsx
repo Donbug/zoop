@@ -1,7 +1,16 @@
 import { prioritySourceTime } from '@/util/briefingSourceTime';
 import type { CommonPriority } from '@/util/briefingCommonPriority';
 import { briefingTime } from '@/util/briefingTime';
-import { BODY, EMPTY, FOCUS_RING, NOTE } from './briefingStyles';
+import {
+  BODY,
+  EMPTY,
+  FOCUS_RING,
+  ISSUE_BODY,
+  ISSUE_LIST,
+  ISSUE_ROW,
+  ISSUE_SUMMARY,
+  NOTE,
+} from './briefingStyles';
 import { BusinessImpact } from './PersonalPriorityIssues';
 
 const labels = {
@@ -36,13 +45,11 @@ export default function CommonPriorityIssues({
           확인 가능한 자료가 부족해 {value.items.length}개만 제공합니다.
         </p>
       )}
-      <ol className="space-y-3">
+      <ol className={ISSUE_LIST}>
         {value.items.map((item, index) => (
-          <li key={item.issueId}>
-            <details className="overflow-hidden rounded-xl border border-zoop-border bg-zoop-surface">
-              <summary
-                className={`cursor-pointer list-none p-5 sm:p-6 ${FOCUS_RING}`}
-              >
+          <li key={item.issueId} className={ISSUE_ROW}>
+            <details>
+              <summary className={`${ISSUE_SUMMARY} ${FOCUS_RING}`}>
                 <span className="flex flex-wrap justify-between gap-2 text-caption text-zoop-muted">
                   <span>이슈 {index + 1} · 시장 전체 기준</span>
                   <span className="rounded-full bg-zoop-card px-3 py-1">
@@ -69,7 +76,7 @@ export default function CommonPriorityIssues({
                   <span>자세히 보기 +</span>
                 </span>
               </summary>
-              <div className="space-y-5 border-t border-zoop-border p-5 sm:p-6">
+              <div className={ISSUE_BODY}>
                 {item.aiAnalyses?.map((analysis) => (
                   <BusinessImpact
                     key={analysis.companyId}

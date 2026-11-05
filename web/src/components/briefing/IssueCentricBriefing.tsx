@@ -46,6 +46,10 @@ import {
   BODY,
   EMPTY,
   FOCUS_RING,
+  ISSUE_BODY,
+  ISSUE_LIST,
+  ISSUE_ROW,
+  ISSUE_SUMMARY,
   NOTE,
   SECTION,
   SECTION_TITLE,
@@ -498,7 +502,7 @@ function IssueCard({
     (m) => m.item.documentSentiments ?? [],
   );
   return (
-    <li>
+    <li className={ISSUE_ROW}>
       {group.members.length > 1 &&
         group.members.map((m) => (
           // 회차 판단의 근거 이슈 앵커. 묶음 카드는 사건마다 같은 카드로 이어 준다.
@@ -519,13 +523,9 @@ function IssueCard({
           if (next && !open) recordOpen();
           setOpen(next);
         }}
-        className={`scroll-mt-4 overflow-hidden border border-zoop-border bg-zoop-surface ${
-          corrections.length ? 'rounded-t-xl border-b-0' : 'rounded-xl'
-        }`}
+        className="scroll-mt-4"
       >
-        <summary
-          className={`cursor-pointer list-none p-5 transition-transform duration-150 ease-out active:scale-[0.99] motion-reduce:transition-none sm:p-6 ${FOCUS_RING}`}
-        >
+        <summary className={`${ISSUE_SUMMARY} ${FOCUS_RING}`}>
           <span className="flex justify-between gap-3 text-caption text-zoop-muted">
             <span>핵심 이슈 {rank}</span>
             <span aria-hidden>{open ? '접기 −' : '자세히 +'}</span>
@@ -547,7 +547,7 @@ function IssueCard({
           </span>
         </summary>
         {open && (
-          <div className="space-y-6 border-t border-zoop-border p-5 sm:p-6">
+          <div className={ISSUE_BODY}>
             <p className={NOTE}>
               시장 관측 ·{' '}
               {newsObserved
@@ -731,8 +731,8 @@ function IssueCard({
         )}
       </details>
       {corrections.length > 0 && (
-        // 접힌 카드에서도 정정이 보이도록 카드 아래쪽 테두리 안에 붙여 둔다.
-        <div className="rounded-b-xl border border-t-0 border-zoop-border bg-zoop-surface px-5 pb-5 sm:px-6">
+        // 접힌 이슈에서도 원문과 구분된 정정 안내를 계속 보여 준다.
+        <div className="mt-4">
           <IssueCorrections corrections={corrections} />
         </div>
       )}
@@ -899,7 +899,7 @@ export default function IssueCentricBriefing({
             evening={result.edition === 'evening'}
           />
         ) : groups.length ? (
-          <ol className="space-y-3">
+          <ol className={ISSUE_LIST}>
             {groups.map((group, index) => (
               <IssueCard
                 key={group.id}
@@ -944,7 +944,7 @@ export default function IssueCentricBriefing({
                   사용하지 않았습니다. 비교용으로 보존한 내용입니다.
                 </p>
               )}
-              <ol className="mt-3 space-y-3">
+              <ol className={`mt-3 ${ISSUE_LIST}`}>
                 {groups.map((group, index) => (
                   <IssueCard
                     key={group.id}

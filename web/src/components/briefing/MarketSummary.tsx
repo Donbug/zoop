@@ -14,6 +14,7 @@ import {
   NOTE,
   SECTION,
   SECTION_TITLE,
+  SUBSECTION_TITLE,
 } from './briefingStyles';
 
 const labels = { kospi: 'KOSPI', kosdaq: 'KOSDAQ' };
@@ -173,7 +174,7 @@ export default function MarketSummary({
             );
             return claims.length > 0 ? (
               <div key={group.kind}>
-                <h4 className={SECTION_TITLE}>{group.title}</h4>
+                <h4 className={SUBSECTION_TITLE}>{group.title}</h4>
                 <ul className="flex flex-col gap-3">
                   {claims.map((claim) => (
                     <Claim
@@ -192,7 +193,7 @@ export default function MarketSummary({
             </p>
           )}
           <div>
-            <h4 className={SECTION_TITLE}>이전 전망의 관측·평가</h4>
+            <h4 className={SUBSECTION_TITLE}>이전 전망의 관측·평가</h4>
             {analysis.forecastEvaluations.length === 0 ? (
               <p className={NOTE}>
                 비교할 수 있는 구조화된 이전 전망이 없습니다.

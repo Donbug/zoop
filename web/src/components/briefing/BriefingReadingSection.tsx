@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { FOCUS_RING, SECTION } from './briefingStyles';
+import { DISCLOSURE, FOCUS_RING } from './briefingStyles';
 
 /** D-BRF-01·02: 간단히 보기에서만 접는다. 전체 보기의 원문은 그대로 유지한다. */
 export default function BriefingReadingSection({
@@ -13,9 +13,9 @@ export default function BriefingReadingSection({
 }) {
   if (!compact) return <>{children}</>;
   return (
-    <details className={SECTION}>
+    <details className={DISCLOSURE}>
       <summary
-        className={`min-h-11 cursor-pointer content-center text-body font-semibold transition-transform duration-150 ease-out active:scale-[0.99] motion-reduce:transition-none ${FOCUS_RING}`}
+        className={`min-h-11 cursor-pointer content-center text-body font-semibold ${FOCUS_RING}`}
       >
         {title}
       </summary>

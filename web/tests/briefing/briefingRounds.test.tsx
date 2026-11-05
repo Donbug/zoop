@@ -739,8 +739,13 @@ it('D-BRF-01/02 theme keeps surface roles and reading query/keyboard behavior', 
     true,
   );
   const indicators = screen.getByRole('region', { name: '주요 시장 지표' });
-  expect(indicators.classList.contains('bg-zoop-card')).toBe(true);
-  expect(indicators.classList.contains('rounded-lg')).toBe(true);
+  // D-BRF-01/02: edition h2 > section h3 > sub-heading h4.
+  expect(heading.classList.contains('text-title')).toBe(true);
+  expect(
+    within(indicators)
+      .getByRole('heading', { level: 3 })
+      .classList.contains('text-title-sm'),
+  ).toBe(true);
   expect(screen.getByLabelText('발행일').classList.contains('rounded-md')).toBe(
     true,
   );

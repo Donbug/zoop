@@ -88,7 +88,7 @@ export default function MarketIndicators({
       <ul
         className={
           compact
-            ? 'grid grid-cols-3 gap-3'
+            ? 'grid grid-cols-3 divide-x divide-zoop-border'
             : 'grid grid-cols-3 max-sm:grid-cols-1 max-sm:gap-4'
         }
       >
@@ -106,7 +106,7 @@ export default function MarketIndicators({
               key={id}
               className={
                 compact
-                  ? 'min-w-0 rounded-panel border border-zoop-border p-3'
+                  ? 'min-w-0 px-3 first:pl-0 last:pr-0'
                   : 'min-h-[86px] min-w-0 border-r border-zoop-border px-[18px] py-1 first:pl-0 last:border-r-0 last:pr-0 max-sm:border-r-0 max-sm:border-b max-sm:px-0 max-sm:pb-4 max-sm:last:border-b-0'
               }
             >

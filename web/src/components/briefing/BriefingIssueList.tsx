@@ -15,6 +15,8 @@ import {
   BODY,
   EMPTY,
   FOCUS_RING,
+  ISSUE_LIST,
+  ISSUE_ROW,
   NOTE,
   SECTION,
   SECTION_TITLE,
@@ -76,7 +78,7 @@ export default function BriefingIssueList({
           </p>
         )
       ) : (
-        <ol>
+        <ol className={ISSUE_LIST}>
           {[...items]
             .sort((a, b) => a.rank - b.rank)
             .slice(0, 3)
@@ -84,14 +86,14 @@ export default function BriefingIssueList({
               <li
                 key={item.eventId}
                 id={issueAnchor(item)}
-                className="scroll-mt-4 flex flex-col gap-1.5 border-t border-zoop-border pt-5 first:border-t-0 first:pt-0 [&+li]:mt-5"
+                className={`${ISSUE_ROW} flex scroll-mt-4 flex-col gap-1.5`}
               >
                 <BriefingReadingSection
                   compact={compact}
                   title={`${item.rank}. ${item.title} · 근거 ${item.evidenceCount}건`}
                 >
                   <p className={NOTE}>{eventTimeLabel(item)}</p>
-                  <h4 className="text-body font-bold">
+                  <h4 className="text-lead font-bold">
                     {item.rank}. {item.title}
                   </h4>
                   {(item.matchedCompanyIds ?? []).length > 0 && (
