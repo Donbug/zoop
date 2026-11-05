@@ -1,10 +1,6 @@
-/* D-STK-01 adopts D-AUT-01's quiet paper surface while retaining the service navigation. */
-.service-surface.stocks-login-surface {
-  background: var(--color-zoop-paper);
-}
-
+/* D-STK-01 keeps D-AUT-01's paper header and navigation. The page itself uses
+   the shared service wash, like D-WAT-01 (내 종목), D-GRP-01 and D-BRF-01. */
 .stocks-login-surface .relationship-header,
-.stocks-login-surface .service-page-main,
 .stocks-login-surface .service-bottom-nav {
   background-color: var(--color-zoop-paper);
 }

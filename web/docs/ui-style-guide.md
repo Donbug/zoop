@@ -109,6 +109,11 @@ Black `/graph-assets` icons with `data-icon` are inverted in dark; company logos
 
 ### Company and briefing surfaces (D-COM-01/02 · D-BRF-01/02)
 
+Light page backgrounds match `내 종목` (D-WAT-01, `zoop-wash` `#f5f5f5`):
+`zoop-page`, the improved map's `--map-page` and the stocks page all use
+`#f5f5f5` (decided 2026-11-05). Dark pages stay `#171717`. Headers, cards and
+the map canvas keep their own surfaces.
+
 Company and briefing routes share `bg-zoop-page` for the page and
 `bg-zoop-surface` for the header and bottom navigation. Exception: the light
 company detail keeps its earlier look (white `rounded-2xl` panels, divider
