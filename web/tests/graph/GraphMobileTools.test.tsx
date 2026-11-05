@@ -21,6 +21,11 @@ test('M-GRP-01 mobile menu switches arrangement, respects focus lock and closes 
     screen.getByRole('button', { name: '흐름 순으로 정렬' }).parentElement!
       .className,
   ).toContain('bottom-52');
+  // Short canvases (landscape) keep it beside the column instead of clipping its top.
+  expect(
+    screen.getByRole('button', { name: '흐름 순으로 정렬' }).parentElement!
+      .className,
+  ).toContain('[@media(max-height:560px)]:bottom-0');
   await userEvent.click(
     screen.getByRole('button', { name: '흐름 순으로 정렬' }),
   );

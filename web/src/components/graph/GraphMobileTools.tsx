@@ -52,7 +52,7 @@ export default function GraphMobileTools({
       >
         <span aria-hidden="true">···</span>
       </summary>
-      <div className="absolute right-14 bottom-52 w-56 rounded-lg border border-zoop-line bg-zoop-paper p-3 text-body text-zoop-ink shadow-lg">
+      <div className="absolute right-14 bottom-52 w-56 [@media(max-height:560px)]:bottom-0 rounded-lg border border-zoop-line bg-zoop-paper p-3 text-body text-zoop-ink shadow-lg">
         {onFlowChange && (
           <button
             type="button"

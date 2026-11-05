@@ -1369,6 +1369,86 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     });
     return camera;
   }
+  it('D-GRP-01 Shift+Enter on a collapsed node keeps its neighborhood fit after closing', async () => {
+    const base = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    // Extra single-company issues fold behind 삼성전자's "+N" badge.
+    const issue = base.nodes.find((node) => node.id === 'mock-issue-20')!;
+    const link = base.edges.find(
+      (edge) => edge.source === issue.id || edge.target === issue.id,
+    )!;
+    const extra = Array.from(
+      { length: 8 },
+      (_, index) => `fold-issue-${index}`,
+    );
+    const data = {
+      ...base,
+      nodes: [
+        ...base.nodes,
+        ...extra.map((id, index) => ({
+          ...issue,
+          id,
+          label: `접힌 사건 ${index}`,
+        })),
+      ],
+      edges: [
+        ...base.edges,
+        ...extra.map((id) => ({
+          ...link,
+          id: `edge-${id}`,
+          source: link.source === issue.id ? id : link.source,
+          target: link.target === issue.id ? id : link.target,
+        })),
+      ],
+    };
+    const onSelect = vi.fn();
+    const { rerender } = render(
+      <GraphCanvas data={data} onSelect={onSelect} />,
+    );
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+    const host = screen.getByRole('img');
+    Object.defineProperties(host, {
+      clientWidth: { configurable: true, value: 900 },
+      clientHeight: { configurable: true, value: 700 },
+    });
+    await act(async () => {});
+    const drawn = canvas.setData.mock.lastCall![0] as GraphData;
+    const visible = new Set(
+      drawn
+        .nodes!.filter((node) => node.style?.visibility !== 'hidden')
+        .map((node) => node.id),
+    );
+    const collapsed = data.nodes.find((node) => !visible.has(node.id))!;
+    expect(collapsed).toBeDefined();
+    const camera = liveCamera([40, 60], 1.2);
+    fireEvent.keyDown(
+      document.querySelector(`[data-node-id="${collapsed.id}"]`)!,
+      {
+        key: 'Enter',
+        shiftKey: true,
+      },
+    );
+    expect(onSelect).toHaveBeenCalledWith(collapsed.id);
+    canvas.zoomTo.mockClear();
+    rerender(
+      <GraphCanvas data={data} onSelect={onSelect} selectedId={collapsed.id} />,
+    );
+    await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
+    await act(async () => {});
+    // The neighborhood fit moved the camera on purpose.
+    camera.position = [300, 200];
+    camera.zoom = 1.6;
+    canvas.translateBy.mockClear();
+    canvas.zoomTo.mockClear();
+    const count = canvas.setData.mock.calls.length;
+    rerender(<GraphCanvas data={data} onSelect={onSelect} />);
+    await waitFor(() =>
+      expect(canvas.setData.mock.calls.length).toBeGreaterThan(count),
+    );
+    await act(async () => {});
+    expect(canvas.zoomTo).not.toHaveBeenCalledWith(1.2, false);
+    expect(camera.position).toEqual([300, 200]);
+  });
+
   /** Select, move the camera for the selection, then deselect: the camera returns to [40, 60] @ 1.2. */
   async function selectAndReturn(
     props: Partial<Parameters<typeof GraphCanvas>[0]> = {},

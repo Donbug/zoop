@@ -42,6 +42,7 @@ import { applyMapDimming, restoreMapDimming } from './graph-dimming';
 import {
   configureMinimap,
   MINIMAP_PADDING,
+  minimapMobile,
   minimapSize,
 } from './graph-minimap';
 import { graphText, loadGraphFonts } from './graph-fonts';
@@ -862,7 +863,7 @@ export default function GraphCanvas({
     // The plugin creates its DOM asynchronously. Reserve its known geometry
     // on the first fit as well, before it has a measurable container.
     // Mobile moves it left of the round zoom buttons (GraphMobileTools breakpoint).
-    const mobile = window.matchMedia?.('(max-width: 767px)').matches ?? false;
+    const mobile = minimapMobile();
     if (!measured.some(({ el }) => el.matches('.graph-overview'))) {
       const [width, height] = minimapSize();
       obstacles.push({
@@ -1029,7 +1030,6 @@ export default function GraphCanvas({
     if (!drawn && data.nodes.some((node) => node.id === id)) {
       pendingNeighborhood.current = id;
       handleNodeSelect(id);
-      abandonCameraReturn();
       return;
     }
     setNeighborhoodRequest({ id });
@@ -1451,6 +1451,9 @@ export default function GraphCanvas({
           pendingNeighborhood.current = null;
           centerTarget.current = null;
           cameraMoved = true;
+          // A neighborhood fit is an explicit zoom. Closing the node keeps it,
+          // including a collapsed node selected first (its capture runs later).
+          abandonCameraReturn();
           await fitVisibleGraph(
             graph,
             neighborhoodIds(rendered, pending),
