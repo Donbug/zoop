@@ -202,6 +202,29 @@ export function nodeRect(node: NodeData): Rect {
     height: radius * 2 + above + below + 12,
   };
 }
+/**
+ * D-GRP-01 (2026-11-05): the map may not be dragged into empty canvas. Some part of the
+ * graph must stay in the middle of the screen: the circles' screen box has to reach the
+ * central band that leaves `keep` of the width/height free on each side. An edge node
+ * can still be brought to the center. Returns the screen-px move that restores this.
+ */
+export const PAN_KEEP = 0.25;
+export function panCorrection(
+  box: Rect,
+  width: number,
+  height: number,
+  keep = PAN_KEEP,
+): [number, number] {
+  const axis = (start: number, size: number, screen: number) => {
+    const low = screen * keep,
+      high = screen * (1 - keep);
+    if (start + size < low) return low - (start + size);
+    if (start > high) return high - start;
+    return 0;
+  };
+  return [axis(box.x, box.width, width), axis(box.y, box.height, height)];
+}
+
 export function intersects(a: Rect, b: Rect, gap = 0) {
   return (
     a.x < b.x + b.width + gap &&

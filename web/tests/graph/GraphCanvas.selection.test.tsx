@@ -28,6 +28,11 @@ import * as geometry from '@/components/graph/graph-geometry';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import { toggleTheme, useColorTheme } from '@/util/theme-color';
+import {
+  emptyView,
+  MAP_LAYOUT_REVISION,
+  saveModeEntry,
+} from '@/components/graph/graph-view';
 
 const canvas = vi.hoisted(() => ({
   created: vi.fn(),
@@ -62,8 +67,10 @@ const canvas = vi.hoisted(() => ({
 vi.mock('@antv/g6', () => ({
   Graph: class {
     destroyed = false;
-    constructor(options?: unknown) {
+    initial: { nodes?: unknown[] } | undefined;
+    constructor(options?: { data?: { nodes?: unknown[] } }) {
       canvas.created(options);
+      this.initial = options?.data;
     }
     on(name: string, handler: (event: { target: { id: string } }) => void) {
       canvas.handlers.set(name, handler);
@@ -87,7 +94,9 @@ vi.mock('@antv/g6', () => ({
     translateElementTo = canvas.translateElementTo;
     getViewportByCanvas = canvas.getViewportByCanvas;
     getNodeData() {
-      return canvas.setData.mock.lastCall?.[0]?.nodes ?? [];
+      return (
+        canvas.setData.mock.lastCall?.[0]?.nodes ?? this.initial?.nodes ?? []
+      );
     }
     setSize = canvas.setSize;
     setNode = canvas.setNode;
@@ -2822,5 +2831,156 @@ describe('D-GRP-01 지도 카메라 움직임', () => {
     await waitFor(() => expect(canvas.translateElementTo).toHaveBeenCalled());
     view.unmount();
     vi.unstubAllGlobals();
+  });
+});
+
+describe('D-GRP-01 지도 이동 범위', () => {
+  /** jsdom has no layout; give the map host a real size for the bounds math. */
+  const sized = () => {
+    const width = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'clientWidth',
+    );
+    const height = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'clientHeight',
+    );
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 1200,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get: () => 700,
+    });
+    return () => {
+      if (width)
+        Object.defineProperty(HTMLElement.prototype, 'clientWidth', width);
+      if (height)
+        Object.defineProperty(HTMLElement.prototype, 'clientHeight', height);
+    };
+  };
+  const remember = (zoom: number) =>
+    saveModeEntry('public', 'all', {
+      url: '/?mode=all',
+      view: {
+        ...emptyView(),
+        camera: {
+          zoom,
+          position: [0, 0],
+          size: [1200, 700],
+          layout: MAP_LAYOUT_REVISION,
+        },
+      },
+    });
+
+  it('기억한 카메라에 노드가 하나도 보이지 않으면 전체 맞춤으로 연다', async () => {
+    const restore = sized();
+    try {
+      remember(0.13);
+      // Every circle lands far outside the 1200x700 map.
+      canvas.getViewportByCanvas.mockImplementation((point) => [
+        point[0] + 50000,
+        point[1] + 50000,
+      ]);
+      const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      render(<GraphCanvas data={data} />);
+      await waitFor(() =>
+        expect(canvas.handlers.has('aftertransform')).toBe(true),
+      );
+      await waitFor(() =>
+        expect(canvas.zoomTo).toHaveBeenCalledWith(0.13, false),
+      );
+      // After the empty camera, the whole fit applies its own zoom too.
+      await waitFor(() =>
+        expect(canvas.zoomTo.mock.calls.some(([zoom]) => zoom !== 0.13)).toBe(
+          true,
+        ),
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it('기억한 카메라에 노드가 보이면 그 카메라를 그대로 쓴다', async () => {
+    const restore = sized();
+    try {
+      remember(0.5);
+      canvas.getViewportByCanvas.mockImplementation((point) => [
+        point[0] * 0.001 + 600,
+        point[1] * 0.001 + 350,
+      ]);
+      const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      render(<GraphCanvas data={data} />);
+      await waitFor(() =>
+        expect(canvas.zoomTo).toHaveBeenCalledWith(0.5, false),
+      );
+      await act(async () => {});
+      // Only the remembered zoom is applied: no fallback fit.
+      expect(canvas.zoomTo.mock.calls.every(([zoom]) => zoom === 0.5)).toBe(
+        true,
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it('휴대폰 상세 시트에 가려진 부분은 이동 범위에서 뺀다', async () => {
+    const restore = sized();
+    // M-GRP-01 sheet covering the lower half of the 1200x700 map.
+    const sheet = document.createElement('div');
+    sheet.dataset.screenId = 'M-GRP-01';
+    const rect = DOMRect.fromRect({ x: 0, y: 350, width: 1200, height: 350 });
+    sheet.getBoundingClientRect = () => rect;
+    sheet.getClientRects = () =>
+      [rect] as unknown as ReturnType<HTMLElement['getClientRects']>;
+    document.body.append(sheet);
+    try {
+      const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      render(<GraphCanvas data={data} />);
+      await waitFor(() =>
+        expect(canvas.handlers.has('aftertransform')).toBe(true),
+      );
+      await act(async () => {});
+      canvas.translateBy.mockClear();
+      // The graph sits at y=510: inside the band of the whole map (175-525),
+      // but behind the sheet. The free area above it is 0-350 (band 87.5-262.5).
+      canvas.getViewportByCanvas.mockImplementation(() => [600, 510]);
+      act(() => canvas.handlers.get('aftertransform')!({ target: { id: '' } }));
+      // Without the sheet this would not move at all. freeViewport keeps a small gap.
+      expect(canvas.translateBy).toHaveBeenCalledTimes(1);
+      const [[dx, dy]] = canvas.translateBy.mock.calls[0] as [[number, number]];
+      expect(dx).toBe(0);
+      expect(dy).toBeLessThan(-240);
+      expect(dy).toBeGreaterThan(-260);
+    } finally {
+      sheet.remove();
+      restore();
+    }
+  });
+
+  it('지도를 빈 캔버스로 끌어내면 그래프가 화면 가운데 띠에 닿도록 되돌린다', async () => {
+    const restore = sized();
+    try {
+      const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      render(<GraphCanvas data={data} />);
+      await waitFor(() =>
+        expect(canvas.handlers.has('aftertransform')).toBe(true),
+      );
+      await act(async () => {});
+      canvas.translateBy.mockClear();
+      // The whole graph now sits 50000px right of and below the map.
+      canvas.getViewportByCanvas.mockImplementation((point) => [
+        point[0] + 50000,
+        point[1] + 50000,
+      ]);
+      act(() => canvas.handlers.get('aftertransform')!({ target: { id: '' } }));
+      expect(canvas.translateBy).toHaveBeenCalledTimes(1);
+      const [[dx, dy]] = canvas.translateBy.mock.calls[0] as [[number, number]];
+      expect(dx).toBeLessThan(-40000);
+      expect(dy).toBeLessThan(-40000);
+    } finally {
+      restore();
+    }
   });
 });

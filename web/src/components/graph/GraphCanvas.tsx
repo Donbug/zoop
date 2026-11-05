@@ -61,6 +61,7 @@ import {
   overviewFootprint,
   fitZoom,
   freeViewport,
+  panCorrection,
   type Rect,
 } from './graph-geometry';
 import {
@@ -70,6 +71,78 @@ import {
 } from './graph-zoom-range';
 import { createWheelZoom } from './graph-wheel-zoom';
 
+/**
+ * The map area not covered by the zoom bar, minimap, selection sheet or page overflow
+ * (host pixels). Fits and the pan bounds both measure against it.
+ */
+function mapFreeArea(host: HTMLElement): Rect {
+  const hostRect = host.getBoundingClientRect();
+  const root = host.parentElement;
+  const overlays = [
+    ...(root?.querySelectorAll<HTMLElement>(
+      '.relationship-zoom,.relationship-source,.relationship-selection,.graph-overview,[data-screen-id="D-GRP-07b"]',
+    ) ?? []),
+    ...document.querySelectorAll<HTMLElement>('[data-screen-id="M-GRP-01"]'),
+  ];
+  const measured = overlays
+    .filter((el) => el.getClientRects().length && !el.closest('.hidden'))
+    .map((el) => ({ el, rect: el.getBoundingClientRect() }))
+    .filter(({ rect }) => rect.width > 0 && rect.height > 0);
+  const obstacles: Rect[] = measured.map(({ rect: r }) => {
+    return {
+      x: r.left - hostRect.left,
+      y: r.top - hostRect.top,
+      width: r.width,
+      height: r.height,
+    };
+  });
+  // The plugin creates its DOM asynchronously. Reserve its known geometry
+  // on the first fit as well, before it has a measurable container.
+  // Mobile moves it left of the round zoom buttons (GraphMobileTools breakpoint).
+  const mobile = minimapMobile();
+  if (!measured.some(({ el }) => el.matches('.graph-overview'))) {
+    const [width, height] = minimapSize();
+    obstacles.push({
+      x: mobile ? 8 : host.clientWidth - width,
+      y: host.clientHeight - 64 - height,
+      width,
+      height,
+    });
+  }
+  // Desktop layouts can be wider than the browser. Reserve the clipped
+  // portion too, rather than fitting nodes behind horizontal page overflow.
+  const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = document.documentElement.clientHeight;
+  if (viewportWidth > 0 && hostRect.right > viewportWidth)
+    obstacles.push({
+      x: viewportWidth - hostRect.left,
+      y: 0,
+      width: hostRect.right - viewportWidth,
+      height: host.clientHeight,
+    });
+  if (viewportHeight > 0 && hostRect.bottom > viewportHeight)
+    obstacles.push({
+      x: 0,
+      y: viewportHeight - hostRect.top,
+      width: host.clientWidth,
+      height: hostRect.bottom - viewportHeight,
+    });
+  if (hostRect.left < 0)
+    obstacles.push({
+      x: 0,
+      y: 0,
+      width: -hostRect.left,
+      height: host.clientHeight,
+    });
+  if (hostRect.top < 0)
+    obstacles.push({
+      x: 0,
+      y: 0,
+      width: host.clientWidth,
+      height: -hostRect.top,
+    });
+  return freeViewport(host.clientWidth, host.clientHeight, obstacles);
+}
 const noHighlightedEdges: string[] = [];
 /** D-GRP-07b: 포커스 배치를 화면에 맞출 때의 최대 확대 비율(100%). */
 const FOCUS_FIT_ZOOM = 1;
@@ -842,72 +915,7 @@ export default function GraphCanvas({
     const host = container.current;
     if (!host || graph.destroyed || !host.clientWidth || !host.clientHeight)
       return false;
-    const hostRect = host.getBoundingClientRect();
-    const root = host.parentElement;
-    const overlays = [
-      ...(root?.querySelectorAll<HTMLElement>(
-        '.relationship-zoom,.relationship-source,.relationship-selection,.graph-overview,[data-screen-id="D-GRP-07b"]',
-      ) ?? []),
-      ...document.querySelectorAll<HTMLElement>('[data-screen-id="M-GRP-01"]'),
-    ];
-    const measured = overlays
-      .filter((el) => el.getClientRects().length && !el.closest('.hidden'))
-      .map((el) => ({ el, rect: el.getBoundingClientRect() }))
-      .filter(({ rect }) => rect.width > 0 && rect.height > 0);
-    const obstacles: Rect[] = measured.map(({ rect: r }) => {
-      return {
-        x: r.left - hostRect.left,
-        y: r.top - hostRect.top,
-        width: r.width,
-        height: r.height,
-      };
-    });
-    // The plugin creates its DOM asynchronously. Reserve its known geometry
-    // on the first fit as well, before it has a measurable container.
-    // Mobile moves it left of the round zoom buttons (GraphMobileTools breakpoint).
-    const mobile = minimapMobile();
-    if (!measured.some(({ el }) => el.matches('.graph-overview'))) {
-      const [width, height] = minimapSize();
-      obstacles.push({
-        x: mobile ? 8 : host.clientWidth - width,
-        y: host.clientHeight - 64 - height,
-        width,
-        height,
-      });
-    }
-    // Desktop layouts can be wider than the browser. Reserve the clipped
-    // portion too, rather than fitting nodes behind horizontal page overflow.
-    const viewportWidth = document.documentElement.clientWidth;
-    const viewportHeight = document.documentElement.clientHeight;
-    if (viewportWidth > 0 && hostRect.right > viewportWidth)
-      obstacles.push({
-        x: viewportWidth - hostRect.left,
-        y: 0,
-        width: hostRect.right - viewportWidth,
-        height: host.clientHeight,
-      });
-    if (viewportHeight > 0 && hostRect.bottom > viewportHeight)
-      obstacles.push({
-        x: 0,
-        y: viewportHeight - hostRect.top,
-        width: host.clientWidth,
-        height: hostRect.bottom - viewportHeight,
-      });
-    if (hostRect.left < 0)
-      obstacles.push({
-        x: 0,
-        y: 0,
-        width: -hostRect.left,
-        height: host.clientHeight,
-      });
-    if (hostRect.top < 0)
-      obstacles.push({
-        x: 0,
-        y: 0,
-        width: host.clientWidth,
-        height: -hostRect.top,
-      });
-    const safe = freeViewport(host.clientWidth, host.clientHeight, obstacles);
+    const safe = mapFreeArea(host);
     if (safe.width < 40 || safe.height < 40) return false;
     const visibleNodes = graph
       .getNodeData()
@@ -1682,6 +1690,57 @@ export default function GraphCanvas({
     } | null = null;
     let wheelPending = false;
     let previousZoom = 1;
+    // D-GRP-01: pan bounds. `clamping` marks our own correction move; `restoring`
+    // pauses the bounds while a remembered camera is checked for visible nodes.
+    let clamping = false;
+    let restoring = false;
+    /** Screen box of the visible circles, or null when there are none. */
+    const graphScreenBox = (g: Graph): Rect | null => {
+      let left = Infinity,
+        top = Infinity,
+        right = -Infinity,
+        bottom = -Infinity;
+      for (const node of g.getNodeData()) {
+        if (node.style?.visibility === 'hidden') continue;
+        const f = fitFootprint(node);
+        if (![f.x, f.y, f.radius].every(Number.isFinite)) continue;
+        left = Math.min(left, f.x - f.radius);
+        right = Math.max(right, f.x + f.radius);
+        top = Math.min(top, f.y - f.radius);
+        bottom = Math.max(bottom, f.y + f.radius);
+      }
+      if (!Number.isFinite(left)) return null;
+      const [x1, y1] = g.getViewportByCanvas([left, top]);
+      const [x2, y2] = g.getViewportByCanvas([right, bottom]);
+      if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+      return {
+        x: Math.min(x1, x2),
+        y: Math.min(y1, y2),
+        width: Math.abs(x2 - x1),
+        height: Math.abs(y2 - y1),
+      };
+    };
+    /** Moves the map back when it was dragged or zoomed into empty canvas. True if it moved. */
+    const keepGraphInView = (g: Graph) => {
+      if (clamping || restoring) return false;
+      const box = graphScreenBox(g);
+      if (!box || host.clientWidth <= 0 || host.clientHeight <= 0) return false;
+      // Measure against the uncovered area, so on a phone the graph cannot hide
+      // entirely behind the detail sheet.
+      const free = mapFreeArea(host);
+      if (free.width < 40 || free.height < 40) return false;
+      const [dx, dy] = panCorrection(
+        { ...box, x: box.x - free.x, y: box.y - free.y },
+        free.width,
+        free.height,
+      );
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return false;
+      clamping = true;
+      void g.translateBy([dx, dy], false).finally(() => {
+        clamping = false;
+      });
+      return true;
+    };
     // 누른 뒤 일정 거리 이상 움직였으면 지도 이동이다. 손을 뗄 때 생기는 클릭으로 노드·연결을 고르지 않는다.
     let dragged = false;
     const pointerDown = (event: PointerEvent) => {
@@ -1910,11 +1969,15 @@ export default function GraphCanvas({
       });
       // 끌기(drag-canvas)가 아닌 다른 카메라 이동(버튼 확대·맞춤·선택 이동)이 시작되면 휠 확대를 멈춰 서로 다투지 않게 한다.
       graph.on('beforetransform', () => {
-        if (!pointerStart && !wheelZoom.owns()) wheelZoom.interrupt();
+        // The pan-bounds correction is part of the current move, not a new one.
+        if (!pointerStart && !wheelZoom.owns() && !clamping)
+          wheelZoom.interrupt();
       });
       graph.on('aftertransform', () => {
         if (!graph || disposed) return;
         try {
+          // The correction move fires its own aftertransform, which does the rest.
+          if (keepGraphInView(graph)) return;
           const nextZoom = graph.getZoom();
           const zoomChanged = Math.abs(nextZoom - previousZoom) > 0.0001;
           if (
@@ -1959,7 +2022,9 @@ export default function GraphCanvas({
       followFit.current = !camera;
       fitPending.current = !camera;
       defaultZoomPending.current = !camera;
+      let restored = false;
       if (camera) {
+        restoring = true;
         retainFocus();
         await graph.zoomTo(camera.zoom, false);
         // D-GRP-01: G6 getPosition() is world-space, while translateBy() takes
@@ -1973,7 +2038,23 @@ export default function GraphCanvas({
           ],
           false,
         );
-      } else {
+        restoring = false;
+        // D-GRP-01: a remembered camera that shows no node at all (for example one saved
+        // before the restore fix) would open on empty canvas. Open on the whole fit instead.
+        const box = graphScreenBox(graph);
+        // No measurable node (nothing drawn yet) is not evidence of an empty view.
+        restored =
+          !box ||
+          (box.x < host.clientWidth &&
+            box.x + box.width > 0 &&
+            box.y < host.clientHeight &&
+            box.y + box.height > 0);
+        if (restored) keepGraphInView(graph);
+      }
+      if (!restored) {
+        followFit.current = true;
+        fitPending.current = true;
+        defaultZoomPending.current = true;
         // The initial graph is rendered before the data-sync effect can observe
         // the new instance. Fit that first frame here so a fresh visitor does
         // not open on an unscaled corner of the full public graph.
