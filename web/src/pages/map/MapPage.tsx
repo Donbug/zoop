@@ -1116,6 +1116,7 @@ function MapWorkspace({
         tabIndex={-1}
         className="relationship-main motion-safe:animate-service-enter"
       >
+        <h1 className="sr-only">관계 지도</h1>
         <section
           ref={mapRegion}
           tabIndex={-1}
@@ -1143,7 +1144,7 @@ function MapWorkspace({
                               : 'D-GRP-01'
           }
         >
-          <div className="relationship-toolbar h-auto! min-h-12 overflow-y-hidden! py-1! [&>*]:shrink-0">
+          <div className="relationship-toolbar h-auto! min-h-12 overflow-y-hidden! py-1! md:flex-wrap md:gap-y-1 [&>*]:shrink-0">
             <button
               className="relationship-sidebar-toggle"
               aria-expanded={sidebarOpen}
@@ -1204,22 +1205,15 @@ function MapWorkspace({
             )}
             <div ref={setFilterHost} className="contents" />
             {appliedMode === 'all' && (
-              <>
-                <div
-                  className="relationship-count"
-                  title="전체 조회에는 개인 정보가 포함되지 않습니다."
-                >
-                  <GraphIcon name="holding" size={10} />
-                  보유<span>—</span>
-                </div>
-                <div
-                  className="relationship-count"
-                  title="전체 조회에는 개인 정보가 포함되지 않습니다."
-                >
-                  <GraphIcon name="watch" size={11} />
-                  관심<span>—</span>
-                </div>
-              </>
+              // 시장 전체에는 개인 정보가 없다. 대시 대신 어디서 보이는지 글로 알린다.
+              <div
+                className="relationship-count"
+                title="전체 조회에는 개인 정보가 포함되지 않습니다."
+              >
+                <GraphIcon name="holding" size={10} />
+                <GraphIcon name="watch" size={11} />
+                보유·관심<span>내 종목에서 표시</span>
+              </div>
             )}
             <div className="relationship-toolbar-help">
               <button

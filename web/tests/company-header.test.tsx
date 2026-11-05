@@ -223,6 +223,19 @@ test('D-COM-01 42 shows latest metrics with source and basis but no snapshot que
   expect(calls).toHaveLength(1);
   expect([...calls[0].query.keys()]).toEqual([]);
 });
+test('D-COM-01 42 states a basis shared by every metric once, not per metric', async () => {
+  server.on('GET', '/api/v1/companies/:id/metrics', () =>
+    json({
+      ...metrics,
+      items: metrics.items.map((item) => ({ ...item, basis: '2026.06' })),
+    }),
+  );
+  open();
+  await screen.findByText('12.35배');
+  const section = screen.getByRole('region', { name: '주요 지표' });
+  expect(within(section).getByText(/2026\.06 기준 지표/)).toBeTruthy();
+  expect(within(section).queryByText(/\(2026\.06 기준\)/)).toBeNull();
+});
 test.each([1200000, 0, null])(
   'D-COM-01 42 marketCap preserves %s',
   async (value) => {

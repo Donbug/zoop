@@ -36,6 +36,28 @@ import LoadingIndicator, {
 </button>
 ```
 
+List rows that load as a whole (D-STK-01 종목 목록, D-MY-01 관심 종목 행) show
+static row placeholders instead of a lone spinner, so the page keeps its shape.
+Use `StockListSkeleton` from `@/components/stocks/StockList` for the stocks list.
+A row whose name is still loading must not offer destructive actions such as the
+watchlist remove button (decided 2026-11-05, Impeccable audit).
+
+## Touch targets
+
+Small controls keep their visible size but take taps over at least 44 × 44 px
+with `touchTarget` from `@/components/common/touch-target` (a centered
+`::after` hit area). Do not use it on an element with `overflow: hidden`, or
+where the hit area would cover a neighbouring control; give such elements
+padding with an equal negative margin, or `min-h-11`, instead.
+
+```tsx
+import { touchTarget } from '@/components/common/touch-target';
+
+<button className={touchTarget} aria-label="다크 모드로 바꾸기">
+  …
+</button>;
+```
+
 ```tsx
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 

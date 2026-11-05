@@ -311,7 +311,7 @@ function StocksSession() {
       className="mx-auto w-full max-w-[672px] text-zoop-ink"
       data-screen-id="D-STK-01"
     >
-      <h1 className="text-display font-[750] tracking-[-0.045em]">종목</h1>
+      <h1 className="text-display font-[750] tracking-[-0.025em]">종목</h1>
       <StockSearchForm
         draft={draft}
         onDraftChange={setDraft}

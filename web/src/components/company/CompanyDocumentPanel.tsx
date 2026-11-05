@@ -13,6 +13,7 @@ import { formatKst } from '@/util/format';
 import type { CompanyDocuments, Evidence } from '@/types/company/documents';
 import type { DocumentAnalysis } from '@/types/evidence';
 import { useColorTheme } from '@/util/theme-color';
+import { sourceLabel } from '@/util/sourceLabel';
 
 const stageLabels = {
   not_requested: '미요청',
@@ -342,8 +343,9 @@ export default function CompanyDocumentPanel() {
       {list.data && (
         <>
           <p className="wrap-anywhere">
-            출처 {list.data.metadata.source} · 기준 {list.data.metadata.asOf} ·
-            버전 {list.data.metadata.graphVersion ?? '미제공'}
+            출처 {sourceLabel(list.data.metadata.source)} · 기준{' '}
+            {list.data.metadata.asOf} · 버전{' '}
+            {list.data.metadata.graphVersion ?? '미제공'}
           </p>
           <p>
             제공된 근거 문서 {visible.length}건

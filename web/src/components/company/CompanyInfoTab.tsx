@@ -4,6 +4,7 @@ import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { useColorTheme } from '@/util/theme-color';
 import { formatKst } from '@/util/format';
+import { sourceLabel } from '@/util/sourceLabel';
 
 const fields = [
   ['legalName', '정식 법인명'],
@@ -155,7 +156,8 @@ export default function CompanyInfoTab({
             </div>
           )}
           <p className="mt-4 wrap-anywhere">
-            조회 출처 {company.metadata.source} · 관계·요약 자료 기준{' '}
+            조회 출처 {sourceLabel(company.metadata.source)} · 관계·요약 자료
+            기준{' '}
             <time dateTime={company.metadata.asOf ?? undefined}>
               {formatKst(company.metadata.asOf)}
             </time>{' '}

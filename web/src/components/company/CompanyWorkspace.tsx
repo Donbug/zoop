@@ -68,6 +68,7 @@ import { useColorTheme } from '@/util/theme-color';
 import { useCompanyMapEntry } from '@/hooks/useCompanyMapEntry';
 import { useCompanyScroll } from '@/hooks/useCompanyScroll';
 import { useCompanyShortPrices } from '@/hooks/useCompanyShortPrices';
+import { sourceLabel } from '@/util/sourceLabel';
 
 // D-COM-01 B1: 백엔드 financials 컨트롤러가 생기면 계약을 확인하고 다시 켠다.
 const COMPANY_FINANCIALS_ENABLED = false;
@@ -149,7 +150,7 @@ function ReferenceTime({
 function Basis({ metadata }: { metadata: Meta | undefined }) {
   return metadata ? (
     <p className="wrap-anywhere">
-      출처 {metadata.source} · 공개 자료 기준{' '}
+      출처 {sourceLabel(metadata.source)} · 공개 자료 기준{' '}
       <ReferenceTime value={metadata.asOf} />
       {metadata.partial ? ' · 일부 자료 미제공' : ''}
     </p>
@@ -328,6 +329,14 @@ export default function CompanyWorkspace() {
       [id, canLoadSections],
     ),
   );
+  const metricBases =
+    metrics.data?.status === 'available'
+      ? metrics.data.items.map((item) => item.basis)
+      : [];
+  const sharedBasis =
+    metricBases[0] && metricBases.every((basis) => basis === metricBases[0])
+      ? metricBases[0]
+      : null;
   // D-COM-04·06 (#358): 버전만 있는 주소는 서버가 그 버전이 처음 공개된 시각을 metadata.asOf로 준다.
   // 그 버전으로 답했고 정확한 시각이면 주소의 asOf로 채운다(처음 열 때와 같은 방식). 채운 주소를 기억해
   // "처음 공개된 시점으로 보는 중"을 알리고, 그 주소가 409·422면 예전처럼 열 수 없다고 안내한다.
@@ -986,9 +995,11 @@ export default function CompanyWorkspace() {
           )}
           {metrics.data?.status === 'available' && (
             <>
+              {/* 제목에 이미 '주요 지표'가 있으므로 출처·기준만 적고, 모든 지표의 기준 기간이 같으면 한 번만 적는다. */}
               <p>
-                주요 지표 · {metrics.data.source.name} · 기준{' '}
+                출처 {metrics.data.source.name} · 기준{' '}
                 <ReferenceTime value={metrics.data.asOf} />
+                {sharedBasis && ` · ${sharedBasis} 기준 지표`}
               </p>
               <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-caption md:grid-cols-4">
                 {metrics.data.items
@@ -1005,7 +1016,7 @@ export default function CompanyWorkspace() {
                       <dt className="text-zoop-muted">{item.label}</dt>
                       <dd className="font-semibold tabular-nums">
                         {item.value}
-                        {item.basis && (
+                        {item.basis && !sharedBasis && (
                           <span className="font-normal text-zoop-muted">
                             {' '}
                             ({item.basis} 기준)
