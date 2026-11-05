@@ -100,6 +100,62 @@ function setup(response = round(), url = '/briefing?reading=full') {
   return server;
 }
 describe('D-BRF-01 / FS028 FS030 FS031 FS033 FS035', () => {
+  it('failed compact view shows old verified reference separately and never calls it a new publication', async () => {
+    const previous = round();
+    setup(
+      round({
+        status: 'failed',
+        items: [],
+        publishedAt: null,
+        generatedAt: null,
+        dataAsOf: null,
+        marketSummary: unavailable,
+        marketVariables: unavailable,
+        continuity: {
+          schemaVersion: 'importance-continuity-v2',
+          roundId: 'fixture-round',
+          cutoff: '2026-10-15T08:30:00+09:00',
+          mode: 'validation_failed',
+          importanceFloor: null,
+          message: '이번 회차의 새 분석을 완료하지 못했습니다.',
+          coverage: {
+            status: 'limited',
+            confirmedDocuments: 0,
+            message: '시장에 새 소식이 없다는 뜻은 아닙니다.',
+          },
+          references: [],
+          recap: {
+            status: 'available',
+            previousRoundId: previous.id,
+            date: previous.date,
+            edition: previous.edition,
+            dataAsOf: previous.dataAsOf,
+            message: '이전 공통 브리핑의 저장본입니다.',
+            items: previous.items,
+          },
+          watchConditions: [],
+          forecast: {
+            status: 'not_updated',
+            message: '새 전망을 생성하지 않았습니다.',
+          },
+        },
+      }),
+      '/briefing?reading=compact',
+    );
+    await screen.findByText('이번 회차의 새 분석을 완료하지 못했습니다.');
+    expect(screen.getByText('생성 실패')).toBeTruthy();
+    expect(
+      screen.getByText('시장에 새 소식이 없다는 뜻은 아닙니다.'),
+    ).toBeTruthy();
+    expect(screen.getByText('합성 핵심 이슈')).toBeTruthy();
+    expect(
+      screen
+        .getByRole('link', { name: '이전 브리핑 전문 보기' })
+        .getAttribute('href'),
+    ).toContain('date=2026-10-14');
+    expect(screen.getByText('새 전망을 생성하지 않았습니다.')).toBeTruthy();
+    expect(screen.queryByText('합성 시장 요약')).toBeNull();
+  });
   it('labels a stored historical replay and preserves missing market data', async () => {
     const response = round();
     setup({

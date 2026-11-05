@@ -63,6 +63,13 @@ public class BriefingRoundRepository {
         return jdbc.query(ROUND + " WHERE id=?", rows, id).stream().findFirst();
     }
 
+    /** Public reference only: both the source cutoff and actual publication predate this round. */
+    public Optional<BriefingRound> previousPublished(Instant sourceBefore, Instant publishedBy) {
+        return jdbc.query(ROUND + " WHERE status='published' AND window_to<=? AND published_at<=? "
+                + "ORDER BY window_to DESC, published_at DESC, id COLLATE \"C\" DESC LIMIT 1",
+                rows, java.sql.Timestamp.from(sourceBefore), java.sql.Timestamp.from(publishedBy)).stream().findFirst();
+    }
+
     /** Exact publication evidence, independent of document-analysis summary ownership. */
     public Optional<ItemEvidence> findItemEvidence(String id) {
         return jdbc.query("""

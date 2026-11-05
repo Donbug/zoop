@@ -145,9 +145,24 @@ def collect(cfg,round,root,*,all_candidates=False):
             if matches:
                 row={**row,'inputPriority':source_priority(row['candidate']['title'],text,companies,matches)}
                 eligible.append((row,exported,matches,selected_root))
+    import briefing_news_intake as news
+    if cfg.get('recordedOnly') and cfg.get('newsSourceRegistry'):
+        require((root/'news-sources/result.json').is_file(),'recorded_news_collection_required')
+    news_entries,news_result=news.collect(cfg,round,root)
+    for row,exported,selected_root in news_entries:
+        identity=(row['documentId'],row['documentVersion'])
+        if identity in seen or identity in processed:continue
+        seen.add(identity)
+        text=exported['document']['text'];matches=source_matches(text,companies)
+        if matches:
+            row={**row,'inputPriority':source_priority(row['candidate']['title'],text,companies,matches)}
+            eligible.append((row,exported,matches,selected_root))
     eligible.sort(key=source_rank,reverse=True)
+    coverage={'complete':False,'candidateDocuments':len(eligible),'selectedDocuments':min(1,len(eligible)),
+        'collection':result['counts'],'samsungNewsroom':official_coverage,
+        'newsSources':{k:news_result[k] for k in ('status','sources','modelCalls','memberSpecificRequests')}}
+    write_once(root/'source-coverage.json',coverage)
     require(bool(eligible),'no_current_company_source')
-    coverage={'complete':False,'candidateDocuments':len(eligible),'selectedDocuments':1,'collection':result['counts'],'samsungNewsroom':official_coverage}
     if all_candidates:
         return [({**row,'coverage':coverage,'matchedCompanyIds':matched},exported,companies,selected_root) for row,exported,matched,selected_root in eligible]
     chosen,exported,matches,selected_root=eligible[0]
@@ -354,7 +369,7 @@ def prepare_candidate(cfg,round,entry,root):
     runtime_type=configure_runtime(cfg,root,round['windowTo']);pure=runtime_type.from_env()
     original=Path(chosen['nativeItemRoot']) if chosen.get('nativeItemRoot') else selected_collection/'collection/items'/chosen['candidate']['newsId']
     sources=Path(cfg['authorityRoot'])/('source-'+root.name+'.json');sources.parent.mkdir(mode=0o700,parents=True,exist_ok=True);current=json.loads((original/'sources.json').read_bytes())
-    grant=current['sources'][0]['grant'];grant.update({'grantId':root.name+'-processing','revision':'first-party-prospective-v1' if chosen.get('sourceId') else 'kogl1-prospective-v2',
+    grant=current['sources'][0]['grant'];grant.update({'grantId':root.name+'-processing','revision':('news-source-prospective-v1' if chosen['rights'].get('rightsBasis')=='explicit-current-source-authority' else 'first-party-prospective-v1') if chosen.get('sourceId') else 'kogl1-prospective-v2',
         'allowedOperations':['read','store','quote-display','model-send'],
         'purposes':[pure.purpose(stage) for stage in ('extract','compare','topic','relation','impact','verify-relation','verify-impact')],
         'recipients':sorted({pure.recipient(stage) for stage in ('extract','compare','topic','relation','impact','verify-relation','verify-impact')}),
@@ -365,6 +380,9 @@ def prepare_candidate(cfg,round,entry,root):
         require(datetime.now(timezone.utc)<datetime.fromisoformat(cfg.get('recoveryDeadline') or round['windowTo']).astimezone(timezone.utc)-timedelta(seconds=190),'native_dispatch_deadline')
         authority.check(chosen.get('sourceId','korea-portal'),chosen['candidate']['newsId'],('read','store','quote-display','model-send'))
         require(json.loads((original/'rights.json').read_bytes())==chosen['rights'],'rights_pin')
+        if chosen['rights'].get('rightsBasis')=='explicit-current-source-authority':
+            import briefing_news_intake as news
+            news.current_source(cfg,chosen['sourceId'],chosen['rights']['registrySha256'])
     # Prospective grant is read anew by native engines; no acquisition registry or old source grant is edited.
     source=extraction.Sources(ingestion,authority)
     selector={k:exported['observation'][k] for k in ['roundId','sourceId','page','ordinal','documentId','rawVersion','documentVersion']}
@@ -445,6 +463,14 @@ def initialize_authority(cfg):
             'recipients':['openai'],'purposes':['briefing-outlook','semantic-verification'],
             'evidence':[NOTICE,'In-house article text only, checked creator/byline and immutable literal evidence; no images, attachments or external authors. '+cfg.get('sourceAuthorizationRef',cfg['authorizationRef'])],
             'expiresAt':None})
+    if cfg.get('newsSourceRegistry'):
+        import briefing_news_intake as news
+        registry,_=news.load_registry(cfg)
+        for source in registry['sources']:
+            if news.authorized(source):
+                # Keep the reviewed source's exact public-serving grant. Acquisition
+                # and prospective native grants remain separate document bindings.
+                additions.append(source['grant'])
     ensure_grants(root/'grants.json',additions)
     if cfg.get('originalReadGrants'):
         write_once(root/'serving-grants.json',{'schemaVersion':'zoop-grant-authority-delegates-1','delegates':[cfg['originalReadGrants'],str(root/'grants.json')]})

@@ -6,6 +6,7 @@ import CompanyLogo from '@/components/common/CompanyLogo';
 import type { BriefingResponse } from '@/types/briefing';
 import type { Result } from './ExplicitPersonalBriefing';
 import IssueCentricBriefing from './IssueCentricBriefing';
+import BriefingContinuity from './BriefingContinuity';
 import BriefingItemDetails from './BriefingItemDetails';
 import {
   CARD,
@@ -486,6 +487,19 @@ function MemberScheduledPersonalBriefing({
                 : '이 회차에 발행된 개인화 브리핑이 없습니다. 설정 저장 이후의 회차부터 제공합니다.'}
           </p>
         )}
+        {delivery &&
+          delivery.status !== 'unavailable' &&
+          !published &&
+          round.status === 'failed' &&
+          round.continuity && (
+            <aside aria-label="개인화 미발행과 공통 참고 자료">
+              <p className={`${NOTE} mb-3`}>
+                개인화 브리핑도 아직 발행되지 않았습니다. 아래는 이전 공통
+                브리핑이며, 내 종목으로 새로 분석한 결과가 아닙니다.
+              </p>
+              <BriefingContinuity value={round.continuity} compact={compact} />
+            </aside>
+          )}
       </section>
       {(settings?.demoEnabled || preview?.selection) && (
         <details className={`${CARD} space-y-3`}>

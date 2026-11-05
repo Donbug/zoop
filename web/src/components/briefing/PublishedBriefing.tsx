@@ -419,7 +419,7 @@ export default function PublishedBriefing({
                   }))}
                 />
               )}
-              {!compact &&
+              {(!compact || result.status !== 'published') &&
                 result.continuity &&
                 result.continuity.mode !== 'core' && (
                   <BriefingContinuity

@@ -323,6 +323,60 @@ class BriefingQueryServiceTest {
         verifyNoInteractions(access);
     }
 
+    @Test void failedRoundMayReferenceOnlyAnAlreadyPublishedReadableOriginalWithoutPublishingIt() {
+        var previous = published();
+        Instant next = MORNING.plusSeconds(86400);
+        var failed = new BriefingRound("failed-next", DATE.plusDays(1), "morning", next,
+                MORNING.plusSeconds(43200), next, true, "failed", null, null, null, null, null, null);
+        when(repository.find(failed.date(), "morning")).thenReturn(Optional.of(failed));
+        when(repository.previousPublished(failed.windowFrom(), failed.windowTo())).thenReturn(Optional.of(previous));
+        var before = previous.payload().deepCopy();
+        var result = service.get(failed.date(), "morning", "request");
+        assertEquals("failed", result.path("status").asString());
+        assertTrue(result.path("publishedAt").isNull()); assertTrue(result.path("items").isEmpty());
+        assertTrue(result.path("outlook").isNull());
+        assertEquals("available", result.at("/continuity/recap/status").asString());
+        assertEquals(previous.id(), result.at("/continuity/recap/previousRoundId").asString());
+        assertEquals(before.path("items"), result.at("/continuity/recap/items"));
+        assertEquals("not_updated", result.at("/continuity/forecast/status").asString());
+        assertEquals(before, previous.payload());
+    }
+
+    @Test void failedReferenceNeverLeaksRevokedCorrectedLateOrFutureOriginals() {
+        var previous = published();
+        Instant next = MORNING.plusSeconds(86400);
+        var failed = new BriefingRound("failed-next", DATE.plusDays(1), "morning", next,
+                MORNING.plusSeconds(43200), next, true, "failed", null, null, null, null, null, null);
+        when(repository.find(failed.date(), "morning")).thenReturn(Optional.of(failed));
+        when(repository.previousPublished(any(), any())).thenReturn(Optional.of(previous));
+        when(access.mayRead(previous, "request")).thenReturn(false);
+        var denied = service.get(failed.date(), "morning", "request");
+        assertEquals("unavailable", denied.at("/continuity/recap/status").asString());
+        assertTrue(denied.at("/continuity/recap/items").isEmpty());
+        when(access.mayRead(previous, "request")).thenReturn(true);
+        when(repository.changes(previous.id())).thenReturn(List.of(new BriefingChange(1, "correction", null,
+                "old", "new", "test", next, null)));
+        assertEquals("unavailable", service.get(failed.date(), "morning", "request").at("/continuity/recap/status").asString());
+        when(repository.changes(previous.id())).thenReturn(List.of());
+        var late = new BriefingRound(previous.id(), previous.date(), previous.edition(), previous.scheduledAt(),
+                previous.windowFrom(), previous.windowTo(), true, "published", next.plusSeconds(1),
+                previous.generatedAt(), previous.graphVersion(), previous.payload(), previous.publicSnapshot(), null);
+        when(repository.previousPublished(any(), any())).thenReturn(Optional.of(late));
+        assertEquals("unavailable", service.get(failed.date(), "morning", "request").at("/continuity/recap/status").asString());
+    }
+
+    @Test void failedAndMissingSchedulesUseConfiguredTimesWhilePublishedMetadataStaysOriginal() {
+        var schedule = new com.zoop.briefing.scheduling.BriefingSchedule("08:30", "17:30", "2026-10-01", "");
+        var configured = new BriefingQueryService(repository,
+                Clock.fixed(Instant.parse("2026-10-19T00:00:00Z"), ZoneOffset.UTC), access,
+                com.zoop.briefing.replay.BriefingReplayReadPolicy.disabled(), null, schedule);
+        var empty = configured.get(DATE, "morning", "request");
+        assertEquals("08:30", empty.at("/metadata/schedule/morning").asString());
+        assertEquals("2026-10-15T23:30:00Z", empty.path("scheduledAt").asString());
+        var row = published(); when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
+        assertEquals("07:40", configured.get(DATE, "morning", "request").at("/metadata/schedule/morning").asString());
+    }
+
     @Test void currentGrantDenialCannotFallBackToPublishedSnapshot() {
         var row = published(); when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
         when(access.mayRead(row, "request")).thenReturn(false);
