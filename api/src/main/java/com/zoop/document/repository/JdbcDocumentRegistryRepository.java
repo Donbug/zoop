@@ -7,7 +7,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -54,6 +58,17 @@ public class JdbcDocumentRegistryRepository implements DocumentRegistryRepositor
             FROM article_versions
             WHERE article_id = :articleId AND version = :version
             """;
+    private static final String FIND_ARTICLE_FACTS = """
+            SELECT a.id, a.kind, a.provider, a.current_version, a.access_status,
+                   v.article_id, v.version, v.title, v.publisher, v.url, v.published_at, v.published_date,
+                   v.publication_precision, v.raw_artifact_id, v.text_artifact_id, v.collected_at,
+                   t.kind AS text_kind, t.storage_uri, t.sha256, t.bytes, t.media_type, t.created_at
+            FROM articles a
+            JOIN article_versions v ON v.article_id = a.id
+            JOIN artifacts t ON t.id = v.text_artifact_id
+            WHERE (v.article_id, v.version) IN (:identities)
+            """;
+    private static final int FACTS_BATCH_SIZE = 256;
     private static final String MOVE_POINTER = """
             UPDATE articles
             SET current_version = :target
@@ -161,6 +176,35 @@ public class JdbcDocumentRegistryRepository implements DocumentRegistryRepositor
                 result.getString("raw_artifact_id"),
                 result.getString("text_artifact_id"),
                 instant(result, "collected_at"))).stream().findFirst();
+    }
+
+    @Override
+    public Map<ArticleVersion, ArticleFacts> findArticleFacts(Set<ArticleVersion> identities) {
+        Map<ArticleVersion, ArticleFacts> found = new HashMap<>();
+        var batch = new ArrayList<Object[]>(Math.min(identities.size(), FACTS_BATCH_SIZE));
+        for (ArticleVersion identity : identities) {
+            batch.add(new Object[] {identity.articleId(), identity.version()});
+            if (batch.size() == FACTS_BATCH_SIZE) {
+                readArticleFacts(batch, found);
+                batch.clear();
+            }
+        }
+        if (!batch.isEmpty()) readArticleFacts(batch, found);
+        return found;
+    }
+
+    private void readArticleFacts(ArrayList<Object[]> batch, Map<ArticleVersion, ArticleFacts> found) {
+        jdbc.query(FIND_ARTICLE_FACTS, new MapSqlParameterSource("identities", batch), result -> {
+            var article = new ArticleRow(result.getString("id"), result.getString("kind"), result.getString("provider"),
+                    result.getString("current_version"), result.getString("access_status"));
+            var version = new VersionRow(result.getString("article_id"), result.getString("version"), result.getString("title"),
+                    result.getString("publisher"), result.getString("url"), instant(result, "published_at"),
+                    result.getObject("published_date", LocalDate.class), result.getString("publication_precision"),
+                    result.getString("raw_artifact_id"), result.getString("text_artifact_id"), instant(result, "collected_at"));
+            var text = new ArtifactRow(version.textArtifactId(), result.getString("text_kind"), result.getString("storage_uri"),
+                    result.getString("sha256"), result.getLong("bytes"), result.getString("media_type"), instant(result, "created_at"));
+            found.put(new ArticleVersion(article.id(), version.version()), new ArticleFacts(article, version, text));
+        });
     }
 
     @Override

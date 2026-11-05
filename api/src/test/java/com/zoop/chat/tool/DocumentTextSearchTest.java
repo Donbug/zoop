@@ -75,6 +75,9 @@ class DocumentTextSearchTest {
             @Override public Optional<ArtifactRow> findArtifact(String id) {
                 return artifact.id().equals(id) ? Optional.of(artifact) : Optional.empty();
             }
+            @Override public java.util.Map<ArticleVersion, ArticleFacts> findArticleFacts(java.util.Set<ArticleVersion> identities) {
+                throw new UnsupportedOperationException();
+            }
             @Override public boolean insertArticleIfAbsent(String id, String kind, String provider, Instant createdAt) {
                 throw new UnsupportedOperationException();
             }

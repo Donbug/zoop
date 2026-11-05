@@ -3,6 +3,8 @@ package com.zoop.graph.publication;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
@@ -11,6 +13,8 @@ import com.zoop.document.evidence.service.DocumentReadSources;
 import com.zoop.document.evidence.service.GraphReceiptGrants;
 import com.zoop.document.importer.SourceRegistry;
 import com.zoop.document.repository.DocumentRegistryRepository;
+import com.zoop.document.repository.DocumentRegistryRepository.ArticleFacts;
+import com.zoop.document.repository.DocumentRegistryRepository.ArticleVersion;
 import com.zoop.graph.publication.GraphPublicationReader.IssueRef;
 import com.zoop.graph.publication.GraphPublicationReader.Publication;
 import com.zoop.graph.read.DisclosureExclusionReader;
@@ -38,6 +42,7 @@ public final class GraphPublicationAuthority {
             Set<ArticleTarget> articles = new HashSet<>(own.articleTargets()); long revision = own.revision();
             SourceRegistry current = sources.registry(requestId);
             Instant at = clock.instant();
+            var facts = articleFacts(publication.contributions(), registry);
             for (var source : publication.contributions()) {
                 DisclosureExclusions excluded = source.sourceVersionId().equals(publication.versionId()) ? own : exclusions.current(source.sourceVersionId());
                 revision = Math.max(revision, excluded.revision());
@@ -50,7 +55,7 @@ public final class GraphPublicationAuthority {
                 }
                 relations.addAll(excluded.relationIds()); evidence.addAll(excluded.evidenceIds()); articles.addAll(excluded.articleTargets());
                 for (var article : source.projection().articles()) {
-                    if (!allowed(source, article, registry, current, at)) articles.add(new ArticleTarget(article.articleId(), article.version()));
+                    if (!allowed(source, article, facts, current, at)) articles.add(new ArticleTarget(article.articleId(), article.version()));
                 }
             }
             // A selected field's owner is an atomic proof: incidental surviving mentions cannot replace its headline.
@@ -85,7 +90,7 @@ public final class GraphPublicationAuthority {
         requireFullRights(publication.contributions(), registry, current, at);
     }
 
-    public void requireFullRights(java.util.List<GraphPublicationReader.Contribution> contributions, String requestId) {
+    public void requireFullRights(List<GraphPublicationReader.Contribution> contributions, String requestId) {
         try {
             requireFullRights(contributions, registry, sources.registry(requestId), clock.instant());
         } catch (SourceRegistry.Invalid | GraphReceiptGrants.Malformed | StrictJson.Malformed malformed) {
@@ -95,12 +100,13 @@ public final class GraphPublicationAuthority {
         }
     }
 
-    private static void requireFullRights(java.util.List<GraphPublicationReader.Contribution> contributions,
+    private static void requireFullRights(List<GraphPublicationReader.Contribution> contributions,
             DocumentRegistryRepository registry, SourceRegistry current, Instant at) {
         try {
             current.checkRoutingUnchanged();
+            var facts = articleFacts(contributions, registry);
             for (var source : contributions) for (var article : source.projection().articles()) {
-                if (!allowed(source, article, registry, current, at))
+                if (!allowed(source, article, facts, current, at))
                     throw new PublicationException("rights_denied");
             }
             current.checkRoutingUnchanged();
@@ -109,12 +115,20 @@ public final class GraphPublicationAuthority {
         }
     }
 
+    private static Map<ArticleVersion, ArticleFacts> articleFacts(List<GraphPublicationReader.Contribution> contributions,
+            DocumentRegistryRepository registry) {
+        Set<ArticleVersion> identities = new HashSet<>();
+        for (var source : contributions) for (var article : source.projection().articles())
+            identities.add(new ArticleVersion(article.articleId(), article.version()));
+        return registry.findArticleFacts(identities);
+    }
+
     private static boolean allowed(GraphPublicationReader.Contribution source, com.zoop.graph.snapshot.PublicGraphSnapshot.Article projected,
-            DocumentRegistryRepository registry, SourceRegistry current, Instant at) {
+            Map<ArticleVersion, ArticleFacts> registryFacts, SourceRegistry current, Instant at) {
         String articleId = projected.articleId(), articleVersion = projected.version();
-        var article = registry.findArticle(articleId).orElseThrow(() -> new PublicationException("basis_unavailable"));
-        var version = registry.findVersion(articleId, articleVersion).orElseThrow(() -> new PublicationException("basis_unavailable"));
-        var text = registry.findArtifact(version.textArtifactId()).orElseThrow(() -> new PublicationException("basis_unavailable"));
+        var registered = registryFacts.get(new ArticleVersion(articleId, articleVersion));
+        if (registered == null) throw new PublicationException("basis_unavailable");
+        var article = registered.article(); var version = registered.version(); var text = registered.text();
         var facts = source.bundle().objects("articles").stream().filter(a -> a.string("articleId").equals(articleId)
                 && a.string("articleVersion").equals(articleVersion)).toList();
         if (facts.size() != 1 || !"extracted_text".equals(text.kind()) || !text.sha256().equals(facts.getFirst().string("textSha256")))

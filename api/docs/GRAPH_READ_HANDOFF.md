@@ -46,6 +46,8 @@ client는 비-loopback 주소에 HTTPS를 요구하고 proxy·redirect·자동 �
 
 현재 권리 reader는 `collected-http` scope의 선택 필드 `textProjection`에서 `korea-kogl1-caption-boundary-1`과 `eu-commission-pdf-body-ranges-1`의 닫힌 객체 구조를 인식합니다. 생략하거나 `null`이면 기존 scope와 같은 권리 규칙을 적용하며, 알 수 없는 profile·scope 설정과 잘못된 객체 타입은 거절합니다. Java는 현재 grant의 `read`·`store`·`quote-display`를 판단하고, 부모 문서·범위·개별 권리 영수증의 의미 검증은 native preparation이 담당합니다. 원본 registry와 전체 descriptor는 그대로 보존되므로 Python `Source.configuration(scope)`의 정확한 구성 비교와 모든 member를 포함한 canonical hash가 계속 적용됩니다.
 
+공개 publication의 현재 권한 검사는 모든 원본 구성에서 정확한 `(articleId, articleVersion)` 집합을 모아, 같은 조회 트랜잭션에서 기사·버전·본문 artifact를 최대 256개 identity씩 JOIN합니다. 반복 기사의 불변 registry 사실만 공유하고, 각 구성의 receipt·해시·현재 read/store/quote-display grant·revision·만료·공개 제외는 각각 검사합니다. 누락되거나 불일치하는 registry 사실은 `503 SOURCE_UNAVAILABLE`로 닫으며, `GET /api/v1/graph`의 REPEATABLE READ·읽기 전용·5초 제한을 유지합니다.
+
 ### 합성 종단 smoke
 
 이미 설치된 pipeline·service·worker 환경, 최신 API jar와 비어 있는 전용 loopback PostgreSQL을 준비합니다. 아래 변수는 운영자가 해당 로컬 검증 환경에서 지정합니다.

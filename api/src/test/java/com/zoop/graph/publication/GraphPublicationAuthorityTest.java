@@ -87,6 +87,27 @@ class GraphPublicationAuthorityTest {
         assertEquals(Set.of("issue-0"), setup.authority().current(publication("historic", setup.contributions()), "test").issueIds());
     }
 
+    @Test
+    void missingTextAndDuplicateReceiptIdentitiesFailClosed() throws Exception {
+        var setup = setup();
+        var publication = publication("missing-text", setup.contributions());
+        setup.registry().removeArtifact("text");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> setup.authority().current(publication, "test")).getErrorCode());
+
+        var restored = setup();
+        var source = restored.contributions().getLast();
+        var duplicate = (tools.jackson.databind.node.ObjectNode) source.bundle().node().deepCopy();
+        var articles = (tools.jackson.databind.node.ArrayNode) duplicate.get("articles");
+        articles.add(articles.get(0).deepCopy());
+        var changed = new Contribution(source.sourceVersionId(), source.sourceId(), source.sourceKind(), source.receipt(),
+                source.projectionArtifact(), source.projection(), StrictJson.Obj.of(duplicate));
+        var ambiguous = publication("duplicate-identity", List.of(restored.contributions().getFirst(), changed));
+        var authority = restored.authority();
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> authority.current(ambiguous, "test")).getErrorCode());
+    }
+
     private record Setup(GraphPublicationAuthority authority, InMemoryDocumentRegistry registry, List<Contribution> contributions,
             Map<String, DisclosureExclusions> exclusions, Path secondRegistry) {}
 
@@ -111,18 +132,18 @@ class GraphPublicationAuthorityTest {
                 version -> exclusions.getOrDefault(version, DisclosureExclusions.NONE), Clock.fixed(NOW, ZoneOffset.UTC));
         return new Setup(authority, registry, List.of(a, b), exclusions, second);
     }
-    private static Contribution withBundle(Contribution source, PublicGraphSnapshot projection, String grant) {
+    static Contribution withBundle(Contribution source, PublicGraphSnapshot projection, String grant) {
         var bundle = StrictJson.newObject(); var article = projection.articles().getFirst();
         var node = bundle.putArray("articles").addObject(); node.put("articleId", article.articleId()); node.put("articleVersion", article.version()); node.put("textSha256", "f".repeat(64));
         var observation = node.putArray("observations").addObject(); observation.put("sourceId", "source"); observation.putObject("grant").put("grantId", grant).put("revision", "r1");
         return new Contribution(source.sourceVersionId(), source.sourceId(), source.sourceKind(), source.receipt(), source.projectionArtifact(), projection, StrictJson.Obj.of(bundle));
     }
-    private static Publication publication(String version, List<Contribution> sources) {
+    static Publication publication(String version, List<Contribution> sources) {
         var merged = PublicationMerger.merge(sources, PublicationMerger.emptyDecisions(), Set.of());
         return new Publication(version, "publication", "digest", null, null, sources.getFirst().receipt(), sources.getFirst().projectionArtifact(),
                 merged.snapshot(version, "publication"), sources, PublicationMerger.emptyDecisions(), merged.issueSources(), merged.relationSources());
     }
-    private static String registry(String grant, boolean enabled) {
+    static String registry(String grant, boolean enabled) {
         return """
                 {"schemaVersion":"zoop-ingestion-s2-1","revision":"registry-1","sources":[{
                   "sourceId":"source","adapter":"authored-files","inputRoot":"/synthetic","allowedHosts":["example.invalid"],
