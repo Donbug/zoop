@@ -1,6 +1,7 @@
 """Run packaging against throwaway synthetic input; never inspect a real .env."""
 from __future__ import annotations
 
+import copy
 import hashlib
 import io
 import json
@@ -428,6 +429,92 @@ class EvaluationVerificationGateTests(unittest.TestCase):
                     repo_checks.evaluation_verification()
             run.assert_called_once()
             self.assertEqual(run.call_args.args[0][-1], "smoke")
+
+
+class ChatResourceContractFixtureTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.fixture_path = SCRIPTS.parent / "docs/api/fixtures/chat-internal-contracts.json"
+        cls.fixtures = json.loads(cls.fixture_path.read_text(encoding="utf-8"))
+        cls.internal_spec = json.loads((SCRIPTS.parent / "docs/api/internal-ai-openapi.json")
+                                       .read_text(encoding="utf-8"))
+
+    def test_current_fixtures_pass_public_contract_validation(self):
+        with redirect_stdout(io.StringIO()) as output:
+            repo_checks.contracts()
+        self.assertIn("chat portable fixture records with format checks", output.getvalue())
+
+    def test_public_contract_validation_rejects_extra_or_missing_fixture_groups(self):
+        read_text = Path.read_text
+        for group, replacement in (("unexpected", []), ("resourceContracts", None)):
+            fixtures = copy.deepcopy(self.fixtures)
+            if replacement is None:
+                del fixtures[group]
+            else:
+                fixtures[group] = replacement
+            def fixture_text(path, *args, **kwargs):
+                return json.dumps(fixtures) if path == self.fixture_path else read_text(path, *args, **kwargs)
+            with self.subTest(group=group), patch.object(Path, "read_text", fixture_text):
+                with self.assertRaisesRegex(ValueError, "fixture groups differ"):
+                    repo_checks.contracts()
+
+    def test_malformed_resource_fixtures_are_rejected(self):
+        from jsonschema import ValidationError
+
+        allocation = ("allocations", "chat-answer:replay")
+        cases = (
+            (("unexpected",), {}, False),
+            (("policy", "unexpected"), True, False),
+            (("policy", "maxInputTokens"), 0, False),
+            (("policyDigest",), "0" * 64, False),
+            (("capabilities", "schemaVersion"), "zoop-ai-chat-5", False),
+            (("capabilities", "runtime", "unexpected"), True, False),
+            (("capabilities", "runtime", "timeModel", "workerProcessMarginMs"), 1, True),
+            (("capabilities", "runtime", "stages", "unexpected"), {}, True),
+            (("capabilities", "configurationErrors", "unexpected"), None, False),
+            (("capabilities", "runtime", "supportedReasoningEfforts"), ["high"], True),
+            (("capabilities", "runtime", "stages", "chat-answer", "api"), "systemone", True),
+            (("capabilities", "runtime", "stages", "chat-router", "fixedInputOverheadBytes"), 1, True),
+            (("capabilities", "runtimeFingerprint"), "0" * 64, False),
+            (("allocations", "unexpected:replay"), {}, False),
+            ((*allocation, "unexpected"), {}, False),
+            ((*allocation, "preimage", "stage"), "chat-agent", False),
+            ((*allocation, "resources", "unexpected"), {}, False),
+            ((*allocation, "resources", "luna", "maxOutputTokens"), 128001, False),
+            ((*allocation, "resources", "allocationDigest"), "0" * 64, False),
+            ((*allocation, "binding", "schemaVersion"), "zoop-chat-resource-binding-2", False),
+            ((*allocation, "binding", "allocationDigest"), "0" * 64, False),
+        )
+        for path, replacement, reseal_runtime in cases:
+            value = copy.deepcopy(self.fixtures["resourceContracts"])
+            target = value
+            for key in path[:-1]:
+                target = target[key]
+            target[path[-1]] = replacement
+            if reseal_runtime:
+                capabilities = value["capabilities"]
+                capabilities["runtimeFingerprint"] = hashlib.sha256(json.dumps(
+                    capabilities["runtime"], ensure_ascii=False, sort_keys=True,
+                    separators=(",", ":")).encode("utf-8")).hexdigest()
+            with self.subTest(path=path), self.assertRaises((ValidationError, ValueError)):
+                repo_checks.chat_resource_fixtures(value, self.internal_spec)
+
+    def test_rehashed_allocation_cannot_change_its_policy_or_runtime(self):
+        from jsonschema import ValidationError
+
+        for field, replacement in (("providerTimeoutMs", 1), ("policyDigest", "0" * 64),
+                                   ("runtimeFingerprint", "0" * 64), ("luna", None), ("finalizing", False)):
+            value = copy.deepcopy(self.fixtures["resourceContracts"])
+            entry = value["allocations"]["chat-answer:replay"]
+            entry["resources"][field] = replacement
+            entry["preimage"]["resources"][field] = replacement
+            digest = hashlib.sha256(json.dumps(entry["preimage"], ensure_ascii=False, sort_keys=True,
+                                              separators=(",", ":")).encode("utf-8")).hexdigest()
+            entry["resources"]["allocationDigest"] = digest
+            entry["binding"].update({key: entry["resources"][key]
+                                     for key in ("policyDigest", "runtimeFingerprint", "allocationDigest")})
+            with self.subTest(field=field), self.assertRaises((ValidationError, ValueError)):
+                repo_checks.chat_resource_fixtures(value, self.internal_spec)
 
 
 class SecretAndCredentialTests(unittest.TestCase):

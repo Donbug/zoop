@@ -267,7 +267,7 @@
     },
     "response:200:application/json.result<anyOf:0>.sections[].text": {
       "type": "string",
-      "maxLength": 12000
+      "maxLength": 96000
     },
     "response:200:application/json.result<anyOf:0>.sections[].text:required": true,
     "response:200:application/json.result<anyOf:0>.uiActions": {
@@ -918,7 +918,7 @@
     "response:200:application/json.result<anyOf:0>.answer": {
       "target": {
         "type": "string",
-        "maxLength": 12000
+        "maxLength": 96000
       },
       "bff": {
         "type": "string"

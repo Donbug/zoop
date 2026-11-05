@@ -1514,7 +1514,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.6.10, 6.9.1, 6.9.2, 6.9.3, 6.9.4, 6.9.5, 6.9.6, 6.9.10, 6.9.11, 6.9.12, 6.9.13, 6.9.14, 6.5.7 |
 | 프로토타입 대응 | /api/chat/sessions/{id}/jobs |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, 도구 호출 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.9를 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다. |
+| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., 서버 자원 정책은 작업별로 고정한다. 로컬 기본 상한은 현재 문맥 입력 512000토큰, reasoning 포함 출력 64000토큰·표시 출력 16000토큰, 합계 본문 48000 code point, 작업 1200초다. 시간 값은 오프라인 검증 상한이며 운영 지연·비용 승인과 실제 모델 품질 검증은 출시 조건이다. 내부 6회·웹 2회·동시 4회·승인 3라운드와 재실행 3회 상한을 유지한다. |
 
 ### 요청 필드
 
@@ -5687,7 +5687,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | --- | --- | --- | --- |
 | outcome | 필수 | string {answered, clarification, guidance, insufficient_evidence} |  |
 | messageId | 필수 | string |  |
-| answer | 필수 | string | 표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 이어 붙인 전체가 12000자를 넘으면 검증 실패다. 돌려줄 때 인용 근거를 지금 읽을 수 없으면 저장 결과와 달리 고정 안내 문장만 담고 sections·citations는 빈 배열이다(getQuestionJob). |
+| answer | 필수 | string | 표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 안내 문장과 구분자까지 Unicode code point로 합산한다. 작업에 고정된 기본 상한은 48000이고 설정 가능한 계약 최대치는 96000이다. 돌려줄 때 인용 근거를 지금 읽을 수 없으면 고정 안내 문장만 담고 sections·citations는 빈 배열이다(getQuestionJob). |
 | sections | 필수 | [ChatAnswerSection](#schema-chatanswersection)[] | answered 본문을 근거 수준별로 나눈 구간. answered가 아니면 빈 배열이다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다. |
 | answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, web_reported, mixed, none} | 사용자 표시용 답변 근거 수준. 서버가 sections에서 계산한다: 구간 basis가 한 종류면 그 값(Q02 일반 개념 general_knowledge, 승인된 ZOOP 도움말·정책 zoop_documented, 공개 근거 기반 사실 evidence_grounded, 보조 웹 검색이 보도한 내용 web_reported), 두 종류 이상이면 mixed, 구간이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가로 정하지 않는다. |
 | reason | 필수 | string / null |  |
