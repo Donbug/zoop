@@ -35,13 +35,6 @@
   text-decoration: none;
 }
 
-.relationship-logo strong {
-  font-size: var(--text-lead);
-  font-weight: 800;
-  line-height: 24px;
-  letter-spacing: -0.4px;
-}
-
 .relationship-logo span {
   color: var(--zoop-muted);
   font-size: var(--text-caption);

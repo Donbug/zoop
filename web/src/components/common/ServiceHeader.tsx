@@ -3,6 +3,7 @@ import { useColorTheme, useThemeToggle } from '@/util/theme-color';
 import GraphIcon from '@/components/graph/GraphIcon';
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import AccountMenu from './AccountMenu';
+import ZoopWordmark from './ZoopWordmark';
 import ThemeSunIcon from './ThemeSunIcon';
 import './service-shell.css';
 import { touchTarget } from '@/components/common/touch-target';
@@ -35,8 +36,8 @@ export default function ServiceHeader({
   return (
     <header className="relationship-header">
       <NavLink to="/" className="relationship-logo">
-        {/* 로고는 영문 ZOOP 한 단어로, 메뉴 타이틀과 같은 색·크기로 둔다. */}
-        <strong className="font-heading">ZOOP</strong>
+        {/* 로고는 ZOOP 워드마크로, 메뉴 타이틀과 같은 색에 예전 ZOOP 글자 높이로 둔다. */}
+        <ZoopWordmark className="text-lead" />
       </NavLink>
       <nav aria-label={navLabel}>
         {menus.map((menu) => (
