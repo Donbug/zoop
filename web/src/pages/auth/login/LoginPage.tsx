@@ -228,7 +228,7 @@ export default function LoginPage() {
     <LoginFrame>
       <section className="mx-auto flex w-full max-w-[340px] flex-col gap-6 text-zoop-ink">
         <header className="mb-5 text-center">
-          <p className="text-display leading-none font-[750] tracking-[-0.045em] font-heading">
+          <p className="text-[length:calc(var(--text-display)*1.2)] leading-none font-[750] tracking-[-0.045em] font-heading">
             ZOOP
           </p>
           <p className="mt-4 text-body leading-6 text-zoop-muted">
