@@ -2925,6 +2925,40 @@ describe('D-GRP-01 지도 이동 범위', () => {
     }
   });
 
+  it('휴대폰 상세 시트에 가려진 부분은 이동 범위에서 뺀다', async () => {
+    const restore = sized();
+    // M-GRP-01 sheet covering the lower half of the 1200x700 map.
+    const sheet = document.createElement('div');
+    sheet.dataset.screenId = 'M-GRP-01';
+    const rect = DOMRect.fromRect({ x: 0, y: 350, width: 1200, height: 350 });
+    sheet.getBoundingClientRect = () => rect;
+    sheet.getClientRects = () =>
+      [rect] as unknown as ReturnType<HTMLElement['getClientRects']>;
+    document.body.append(sheet);
+    try {
+      const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      render(<GraphCanvas data={data} />);
+      await waitFor(() =>
+        expect(canvas.handlers.has('aftertransform')).toBe(true),
+      );
+      await act(async () => {});
+      canvas.translateBy.mockClear();
+      // The graph sits at y=510: inside the band of the whole map (175-525),
+      // but behind the sheet. The free area above it is 0-350 (band 87.5-262.5).
+      canvas.getViewportByCanvas.mockImplementation(() => [600, 510]);
+      act(() => canvas.handlers.get('aftertransform')!({ target: { id: '' } }));
+      // Without the sheet this would not move at all. freeViewport keeps a small gap.
+      expect(canvas.translateBy).toHaveBeenCalledTimes(1);
+      const [[dx, dy]] = canvas.translateBy.mock.calls[0] as [[number, number]];
+      expect(dx).toBe(0);
+      expect(dy).toBeLessThan(-240);
+      expect(dy).toBeGreaterThan(-260);
+    } finally {
+      sheet.remove();
+      restore();
+    }
+  });
+
   it('지도를 빈 캔버스로 끌어내면 그래프가 화면 가운데 띠에 닿도록 되돌린다', async () => {
     const restore = sized();
     try {
