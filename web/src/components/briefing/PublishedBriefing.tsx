@@ -400,6 +400,13 @@ export default function PublishedBriefing({
                   {result.notice.at && ` · ${briefingTime(result.notice.at)}`}
                 </p>
               )}
+              {result.status === 'failed' && (
+                // 실패 화면이 막다른 길이 되지 않도록 다음 행동을 알려 준다.
+                <p className={`${NOTE} mt-2`}>
+                  다시 시도해도 같다면 위의 회차 선택에서 다른 날짜나 회차를
+                  골라 볼 수 있어요.
+                </p>
+              )}
               {result.status === 'published' && !result.prioritySummary && (
                 <BriefingOutlook
                   outlook={result.outlook}

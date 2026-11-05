@@ -267,6 +267,16 @@ describe('D-BRF-01 이전 퇴근 브리핑 대비', () => {
     expect(within(section).getByRole('link')).toBeTruthy();
   });
 
+  it('생성에 실패한 회차는 다른 날짜·회차를 고를 수 있다고 안내한다', async () => {
+    setup(briefing({ status: 'failed' }));
+    expect(await screen.findByText('생성 실패')).toBeTruthy();
+    expect(
+      screen.getByText(
+        '다시 시도해도 같다면 위의 회차 선택에서 다른 날짜나 회차를 골라 볼 수 있어요.',
+      ),
+    ).toBeTruthy();
+  });
+
   it('아직 발행하지 않은 회차의 이전 비교를 노출하지 않는다', async () => {
     setup(briefing({ status: 'not_ready' }));
     expect(

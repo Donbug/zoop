@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { touchTarget } from '@/components/common/touch-target';
 
 /** D-GRP-02/03/05: native replacement for prototype Radix explanations. */
 export default function PanelDisclosure({
@@ -50,7 +51,7 @@ export default function PanelDisclosure({
       <summary
         aria-label={label}
         title={label}
-        className="cursor-pointer list-none text-zoop-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink [&::-webkit-details-marker]:hidden"
+        className={`${touchTarget} cursor-pointer list-none text-zoop-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink [&::-webkit-details-marker]:hidden`}
       >
         {trigger ?? label}
       </summary>

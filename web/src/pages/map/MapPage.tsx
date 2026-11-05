@@ -92,6 +92,7 @@ import type {
 import '@/components/graph/relationship-map.css';
 import { useColorTheme } from '@/util/theme-color';
 import { readSocialLinkResult } from '@/components/common/socialLinkResult';
+import { touchTarget } from '@/components/common/touch-target';
 
 // Same-session preference only. useAuthStore clears it when the member changes
 // and keeps it when the same member's session is restored after a reload.
@@ -1156,6 +1157,7 @@ function MapWorkspace({
             </button>
             <div className="relationship-mode" aria-label="그래프 모드">
               <button
+                className={touchTarget}
                 aria-pressed={appliedMode === 'all'}
                 onClick={() => void changeMode('all')}
               >
@@ -1163,6 +1165,7 @@ function MapWorkspace({
                 시장 전체
               </button>
               <button
+                className={touchTarget}
                 aria-pressed={appliedMode === 'personal'}
                 onClick={() => void changeMode('personal')}
               >

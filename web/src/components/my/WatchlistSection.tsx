@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import ErrorNotice from '@/components/common/ErrorNotice';
 import LoadingIndicator from '@/components/common/LoadingIndicator';
-import { LoadingSpinner } from '@/components/common/LoadingIndicator';
 import StockRow from '@/components/my/StockRow';
 import CompanySearch from '@/components/stocks/CompanySearch';
 import HeldBadge from '@/components/stocks/HeldBadge';
@@ -167,18 +166,30 @@ export default function WatchlistSection({
               if (!brief) {
                 return (
                   <li key={id} className="flex items-center gap-2 py-3">
-                    <p className="flex flex-1 items-center gap-2 text-body text-zoop-ink">
-                      {entry?.status === 'error' ? (
-                        '종목 정보를 불러오지 못했어요.'
-                      ) : (
-                        <>
-                          <LoadingSpinner size="sm" />
-                          <span className="sr-only">
-                            종목 정보를 불러오고 있어요
-                          </span>
-                        </>
-                      )}
-                    </p>
+                    {entry?.status === 'error' ? (
+                      <p className="flex flex-1 items-center gap-2 text-body text-zoop-ink">
+                        종목 정보를 불러오지 못했어요.
+                      </p>
+                    ) : (
+                      <p
+                        role="status"
+                        aria-busy="true"
+                        className="flex min-h-9 flex-1 items-center gap-3"
+                      >
+                        {/* 이름을 알기 전에는 무엇을 지우는지 알 수 없으므로 빼기 버튼을 두지 않는다. */}
+                        <span
+                          aria-hidden="true"
+                          className="size-8 shrink-0 rounded-full bg-zoop-line/60"
+                        />
+                        <span
+                          aria-hidden="true"
+                          className="h-4 w-28 rounded-sm bg-zoop-line/60"
+                        />
+                        <span className="sr-only">
+                          종목 정보를 불러오고 있어요
+                        </span>
+                      </p>
+                    )}
                     {entry?.status === 'error' && (
                       <button
                         type="button"
@@ -189,7 +200,7 @@ export default function WatchlistSection({
                         다시 시도
                       </button>
                     )}
-                    {removeButton}
+                    {entry?.status === 'error' && removeButton}
                   </li>
                 );
               }

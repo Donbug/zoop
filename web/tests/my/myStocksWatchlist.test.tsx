@@ -249,6 +249,26 @@ describe('D-MY-01 / 01b 내 종목: 관심 종목', () => {
     expect(await within(section).findByText('NVIDIA')).toBeTruthy();
   });
 
+  test('관심 행의 기업 이름을 불러오는 동안에는 빼기 버튼을 두지 않는다', async () => {
+    const server = createFakeServer();
+    myMember(server, { watchlistIds: ['cmp-nvidia'] });
+    const company = deferred<Response>();
+    server.on('GET', '/api/v1/companies/:id', () => company.promise);
+    openMy();
+
+    const list = await screen.findByRole('list', { name: '관심 종목 목록' });
+    expect(within(list).getByRole('status').textContent).toContain(
+      '종목 정보를 불러오고 있어요',
+    );
+    expect(within(list).queryAllByRole('button')).toEqual([]);
+
+    company.resolve(apiError(503, 'SOURCE_UNAVAILABLE'));
+    expect(
+      await screen.findByText('종목 정보를 불러오지 못했어요.'),
+    ).toBeTruthy();
+    expect(watchNames()).toEqual(['종목 관심 종목에서 빼기']);
+  });
+
   test('관심 행의 기업 정보를 불러오지 못하면 그 행에서 다시 시도한다', async () => {
     const server = createFakeServer();
     myMember(server, { watchlistIds: ['cmp-nvidia'] });

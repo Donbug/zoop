@@ -5,6 +5,7 @@ import { useAiChatStore } from '@/stores/useAiChatStore';
 import AccountMenu from './AccountMenu';
 import ThemeSunIcon from './ThemeSunIcon';
 import './service-shell.css';
+import { touchTarget } from '@/components/common/touch-target';
 
 const menus = [
   { to: '/', label: '지도' },
@@ -52,7 +53,7 @@ export default function ServiceHeader({
           type="button"
           aria-label={themeLabel}
           title={themeLabel}
-          className="max-md:grid max-md:size-10 max-md:place-items-center"
+          className={`${touchTarget} max-md:grid max-md:size-10 max-md:place-items-center`}
           onClick={toggleTheme}
         >
           {/* D-GRP-01 G1/G2: the next theme action remains available on mobile. */}

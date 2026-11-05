@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import ErrorNotice from '@/components/common/ErrorNotice';
-import LoadingIndicator, {
-  LoadingSpinner,
-} from '@/components/common/LoadingIndicator';
-import StockList from '@/components/stocks/StockList';
+import { LoadingSpinner } from '@/components/common/LoadingIndicator';
+import StockList, { StockListSkeleton } from '@/components/stocks/StockList';
 import StockSearchForm from '@/components/stocks/StockSearchForm';
 import { getCompanyBrief, searchCompanies } from '@/apis/companies/companies';
 import { getPortfolio } from '@/apis/portfolio/portfolio';
@@ -427,10 +425,7 @@ function StocksSession() {
           </Link>
         </p>
       ) : listLoading ? (
-        <LoadingIndicator
-          label="종목을 불러오고 있어요"
-          className="mt-5 flex min-h-10 w-full"
-        />
+        <StockListSkeleton label="종목을 불러오고 있어요" />
       ) : scope === 'all' && first.status === 'error' ? (
         <div className="mt-5 text-caption text-zoop-muted">
           <ErrorNotice

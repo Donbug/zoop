@@ -11,7 +11,7 @@ const LIGHT: Record<Token, string> = {
   line: '#d6d6d2',
   paper: '#ffffff',
   soft: '#f2f2f0',
-  up: '#d23c3c',
+  up: '#c53030',
 };
 
 /** 캔버스에 쓸 zoop 토큰 색. 현재 테마(:root[data-theme])의 값을 읽는다. */
