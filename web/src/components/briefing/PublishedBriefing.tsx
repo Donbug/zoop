@@ -344,7 +344,7 @@ export default function PublishedBriefing({
     <BriefingTelemetry roundId={published?.id ?? null}>
       <article
         data-reading={compact ? 'compact' : 'full'}
-        className={personal && result ? 'mt-[18px]' : CARD}
+        className={personal && result ? undefined : CARD}
         aria-busy={loading}
       >
         {loading && (

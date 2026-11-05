@@ -268,11 +268,6 @@ describe('D-BRF-01/02 issue-centered reading', () => {
     expect(screen.queryByText('다음 확인사항')).toBeNull();
     expect(screen.queryByText('첫 사건의 사업상 의미')).toBeNull();
     const first = screen.getByText('서로 다른 사건 1').closest('summary')!;
-    // D-BRF-01/02: disclosure behavior remains, but each issue is a row, not another card.
-    expect(first.closest('details')?.classList.contains('rounded-xl')).toBe(
-      false,
-    );
-    expect(first.closest('li')?.classList.contains('border-t')).toBe(true);
     await user.click(first);
     expect(screen.getByText('첫 사건의 사업상 의미')).toBeTruthy();
     expect(

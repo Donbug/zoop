@@ -6,6 +6,7 @@ import {
   EMPTY,
   FOCUS_RING,
   ISSUE_BODY,
+  ISSUE_LIST,
   ISSUE_ROW,
   ISSUE_SUMMARY,
   NOTE,
@@ -44,7 +45,7 @@ export default function CommonPriorityIssues({
           확인 가능한 자료가 부족해 {value.items.length}개만 제공합니다.
         </p>
       )}
-      <ol className="space-y-5">
+      <ol className={ISSUE_LIST}>
         {value.items.map((item, index) => (
           <li key={item.issueId} className={ISSUE_ROW}>
             <details>

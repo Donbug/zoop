@@ -7,7 +7,7 @@ import type { BriefingEdition } from '@/types/briefing';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import { useScreenView } from '@/util/track';
 
-const FILTER_BUTTON = `min-h-11 min-w-[88px] whitespace-nowrap rounded-panel px-3 text-body font-semibold text-zoop-muted underline-offset-8 transition-colors hover:bg-zoop-selected aria-pressed:text-zoop-ink aria-pressed:underline aria-pressed:decoration-2 max-sm:flex-1 ${FOCUS_RING}`;
+const FILTER_BUTTON = `min-h-11 min-w-[88px] whitespace-nowrap rounded-panel px-3 text-body font-semibold text-zoop-muted underline-offset-8 transition-colors hover:text-zoop-ink aria-pressed:text-zoop-ink aria-pressed:underline aria-pressed:decoration-2 max-sm:flex-1 ${FOCUS_RING}`;
 const READING_BUTTON = `min-h-11 min-w-[76px] whitespace-nowrap rounded-panel px-3 text-caption font-semibold text-zoop-muted aria-pressed:bg-zoop-surface aria-pressed:text-zoop-ink aria-pressed:underline aria-pressed:decoration-2 aria-pressed:underline-offset-4 max-sm:flex-1 ${FOCUS_RING}`;
 
 // D-BRF-01 출근 · D-BRF-02 퇴근 브리핑 (/briefing). 날짜·회차는 주소(?date=&edition=)에 남는다.
@@ -58,7 +58,7 @@ export default function BriefingPage() {
         <div
           role="group"
           aria-label="브리핑 기준"
-          className="inline-flex flex-wrap gap-1"
+          className="inline-flex flex-wrap gap-1 max-sm:w-full"
         >
           <button
             type="button"
@@ -79,7 +79,7 @@ export default function BriefingPage() {
         </div>
 
         <div
-          className="inline-flex gap-0.5 rounded-md bg-zoop-control p-1 max-sm:w-full"
+          className="inline-flex gap-0.5 rounded-md border border-zoop-border bg-zoop-control p-1 max-sm:w-full"
           role="group"
           aria-label="브리핑 읽기 방식"
         >

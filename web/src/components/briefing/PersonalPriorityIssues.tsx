@@ -10,6 +10,7 @@ import {
   EMPTY,
   FOCUS_RING,
   ISSUE_BODY,
+  ISSUE_LIST,
   ISSUE_ROW,
   ISSUE_SUMMARY,
   NOTE,
@@ -214,7 +215,7 @@ export default function PersonalPriorityIssues({
         선택 종목과 관련된 후보 안에서 우선순위를 정했습니다. 새 소식이 부족하면
         관련 소식이나 이전 이슈를 이어서 확인합니다.
       </p>
-      <ol className="space-y-5">
+      <ol className={ISSUE_LIST}>
         {value.items.map((item, index) => (
           <li key={item.issueId} className={ISSUE_ROW}>
             <details>

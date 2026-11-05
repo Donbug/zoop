@@ -47,6 +47,7 @@ import {
   EMPTY,
   FOCUS_RING,
   ISSUE_BODY,
+  ISSUE_LIST,
   ISSUE_ROW,
   ISSUE_SUMMARY,
   NOTE,
@@ -898,7 +899,7 @@ export default function IssueCentricBriefing({
             evening={result.edition === 'evening'}
           />
         ) : groups.length ? (
-          <ol className="space-y-5">
+          <ol className={ISSUE_LIST}>
             {groups.map((group, index) => (
               <IssueCard
                 key={group.id}
@@ -943,7 +944,7 @@ export default function IssueCentricBriefing({
                   사용하지 않았습니다. 비교용으로 보존한 내용입니다.
                 </p>
               )}
-              <ol className="mt-3 space-y-3">
+              <ol className={`mt-3 ${ISSUE_LIST}`}>
                 {groups.map((group, index) => (
                   <IssueCard
                     key={group.id}

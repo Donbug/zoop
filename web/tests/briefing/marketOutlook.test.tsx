@@ -165,6 +165,13 @@ describe('D-BRF-01·02 저장된 전망형 시장 분석', () => {
       screen.getByRole('heading', { name: '시장에 대한 해석' }),
     ).toBeTruthy();
     expect(screen.getByRole('heading', { name: '오늘의 전망' })).toBeTruthy();
+    // D-BRF-01/02: h4 sub-headings stay smaller than the h3 section title.
+    const section = screen
+      .getByRole('heading', { level: 3 })
+      .classList.contains('text-title-sm');
+    expect(section).toBe(true);
+    for (const h4 of screen.getAllByRole('heading', { level: 4 }))
+      expect(h4.classList.contains('text-title-sm')).toBe(false);
     expect(screen.getByText('이전 전망 완화')).toBeTruthy();
     expect(
       screen.getByText(/전망 조건: 수주 증가가 실제로 확인될 경우/),

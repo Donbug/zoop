@@ -6,7 +6,7 @@ import {
   FOCUS_RING,
   NOTE,
   SECTION,
-  SECTION_TITLE,
+  SUBSECTION_TITLE,
 } from './briefingStyles';
 
 const directions = {
@@ -105,7 +105,7 @@ export default function BriefingQuickRead({
         </>
       ) : (
         <div>
-          <h4 className={SECTION_TITLE}>시장 요약</h4>
+          <h4 className={SUBSECTION_TITLE}>시장 요약</h4>
           <p className={EMPTY}>
             {'text' in result.marketSummary
               ? result.marketSummary.analysis
