@@ -122,11 +122,11 @@ export default function GraphVersions({
     );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-w-0 max-w-full flex-col gap-6">
       <Section title="그래프 버전">
         <Note>
           사용자에게 보이는 버전:{' '}
-          <strong className="font-num text-zoop-ink">
+          <strong className="font-num break-all text-zoop-ink">
             {activeVersionId ?? '없음'}
           </strong>
           . 이미 있는 버전으로만 바꿀 수 있고, 이전에 표시했던 버전은 되돌리기로

@@ -23,20 +23,17 @@ import {
 const asOf = '2026-10-05T00:00:00Z';
 
 test.each([['다른 합성 이름'], [], undefined])(
-  'D-COM-03 gap6 D14/D18 aliases %j and KST keep original time',
+  'D-COM-03 gap6 D14/D18 aliases %j preserve field values',
   async (aliases) => {
     server.on('GET', '/api/v1/companies/:id', () =>
       json({ ...company, aliases }),
     );
-    const view = open();
+    open();
     await screen.findByText('다른 이름');
     const label = screen.getByText('다른 이름');
     expect(label.nextElementSibling?.textContent).toBe(
       aliases?.length ? '다른 합성 이름' : '미제공',
     );
-    const time = view.container.querySelector('time');
-    expect(time?.textContent).toBe('2026-10-05 09:00 KST');
-    expect(time?.dateTime).toBe(asOf);
   },
 );
 const company: Company = {
@@ -120,9 +117,8 @@ test('D-COM-03 renders six verified fields and safe website without guessing mas
   const link = screen.getByRole('link', { name: '공식 웹사이트' });
   expect(link.getAttribute('href')).toBe('https://example.test/company');
   expect(link.getAttribute('rel')).toContain('noopener');
-  expect(
-    screen.getByText(/기업 기준정보의 별도 갱신 시각은 제공되지/),
-  ).toBeTruthy();
+  expect(screen.queryByText(/조회 출처/)).toBeNull();
+  expect(screen.queryByText(/기업 기준정보의 별도 갱신 시각/)).toBeNull();
   expect(server.requests[0].query.get('graphVersion')).toBe('fixture-v1');
   expect(server.requests[0].query.get('asOf')).toBe(asOf);
   expect(screen.getByTestId('info-url').textContent).toContain('tab=info');

@@ -19,11 +19,13 @@ export default function CompanyEventDetails({
   owner,
   asOf,
   graphVersion,
+  logoOf,
 }: {
   event: EventDetail;
   owner: string;
   asOf: string | null;
   graphVersion: string | null;
+  logoOf: (companyId: string) => string | null;
 }) {
   const key = `${owner}|${event.id}|${asOf}|${graphVersion}`;
   const evidence = useAsyncData(
@@ -89,6 +91,7 @@ export default function CompanyEventDetails({
               >
                 <CompanyLogo
                   name={company.name}
+                  logoUrl={logoOf(company.id)}
                   className="size-6 rounded-full border border-zoop-line bg-zoop-paper"
                 />
                 <Link
