@@ -1421,6 +1421,114 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     fireEvent.pointerDown(minimap, { button: 0, pointerId: 7 });
   }
 
+  it('D-GRP-01 consumes the return before a direct camera move and the first closing resize', async () => {
+    const { camera, redraw, resize } = await selectAndReturn();
+    await redraw();
+    expect(camera).toEqual({ position: [40, 60], zoom: 1.2 });
+    camera.position = [300, 200];
+    canvas.translateBy.mockClear();
+    canvas.zoomTo.mockClear();
+    await resize(1200);
+    expect(canvas.translateBy).not.toHaveBeenCalled();
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    expect(camera.position).toEqual([300, 200]);
+  });
+
+  it('D-GRP-01 a pending user fit survives deselection in the same update', async () => {
+    const { redraw } = await selectAndReturn();
+    canvas.zoomTo.mockClear();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '전체 그래프 맞춤' }));
+      await redraw();
+    });
+    await act(async () => {});
+    expect(canvas.zoomTo).toHaveBeenCalled();
+  });
+
+  it('D-GRP-01 selecting an edge does not restore the previous company camera', async () => {
+    const onSelectEdge = vi.fn();
+    const { camera, redraw } = await selectAndReturn({ onSelectEdge });
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const edge = data.edges.find((item) => item.relationType === 'FOLLOWS')!;
+    await act(async () =>
+      canvas.handlers.get('edge:click')!({ target: { id: edge.id } }),
+    );
+    expect(onSelectEdge).toHaveBeenCalledWith(edge.id);
+    await redraw({ onSelectEdge, selectedEdgeId: edge.id });
+    expect(camera).toEqual({ position: [120, 80], zoom: 1.5 });
+  });
+
+  it.each(['focus', 'flow'])(
+    'D-GRP-01 fits the map when %s and selection are cleared together',
+    async (layout) => {
+      const props =
+        layout === 'focus'
+          ? { focusLayout: true, focusId: 'KRX:005930' }
+          : { flow: true };
+      const { redraw } = await selectAndReturn(props);
+      canvas.zoomTo.mockClear();
+      await redraw({});
+      expect(canvas.zoomTo).toHaveBeenCalled();
+    },
+  );
+
+  it('D-GRP-01 a center request without selection does not supply the next selection return', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const view = render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+    const host = screen.getByRole('img');
+    Object.defineProperties(host, {
+      clientWidth: { configurable: true, value: 900 },
+      clientHeight: { configurable: true, value: 700 },
+    });
+    const camera = liveCamera([40, 60], 1.2);
+    view.rerender(
+      <GraphCanvas data={data} centerRequest={{ id: 'KRX:005930', seq: 1 }} />,
+    );
+    await act(async () => {});
+    camera.position = [300, 200];
+    view.rerender(<GraphCanvas data={data} selectedId="KRX:005930" />);
+    await act(async () => {});
+    camera.position = [120, 80];
+    view.rerender(<GraphCanvas data={data} />);
+    await act(async () => {});
+    expect(camera.position).toEqual([300, 200]);
+  });
+
+  it.each(['path', 'tutorial'])(
+    'D-GRP-01 an uncommitted %s click does not supply a later selection return',
+    async (mode) => {
+      const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      const onSelect = vi.fn();
+      const view = render(
+        <GraphCanvas
+          data={data}
+          onSelect={onSelect}
+          connectionPath={mode === 'path'}
+          tutorialLocked={mode === 'tutorial'}
+          tutorialTargetId="KRX:005930"
+        />,
+      );
+      await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+      const host = screen.getByRole('img');
+      Object.defineProperties(host, {
+        clientWidth: { configurable: true, value: 900 },
+        clientHeight: { configurable: true, value: 700 },
+      });
+      const camera = liveCamera([40, 60], 1.2);
+      await act(async () =>
+        canvas.handlers.get('node:click')!({ target: { id: 'KRX:005930' } }),
+      );
+      camera.position = [300, 200];
+      view.rerender(<GraphCanvas data={data} selectedId="KRX:000660" />);
+      await act(async () => {});
+      camera.position = [120, 80];
+      view.rerender(<GraphCanvas data={data} />);
+      await act(async () => {});
+      expect(camera.position).toEqual([300, 200]);
+    },
+  );
+
   it('D-GRP-01 drops the return target once the restored camera settles', async () => {
     const { camera, redraw, resize } = await selectAndReturn();
     await redraw();

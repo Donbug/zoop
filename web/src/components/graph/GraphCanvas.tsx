@@ -330,12 +330,10 @@ export default function GraphCanvas({
     graph: Graph;
     origin: [number, number];
     zoom: number;
-    /** Host size at the last restore; later draws restore again only after a resize. */
-    restoredSize?: [number, number];
   };
   const selectionCamera = useRef<SelectionCamera | null>(null);
-  // Keep the return target through the closing rail's resize/slide frames,
-  // then drop it once a draw finds the camera where the restore left it.
+  // Consume each return once. ResizeObserver preserves the projected origin
+  // through the closing rail's subsequent resize frames.
   const cameraReturn = useRef<SelectionCamera | null>(null);
   function captureSelectionCamera() {
     const graph = instance.current;
@@ -369,27 +367,6 @@ export default function GraphCanvas({
       flow
     )
       return;
-    const host = container.current;
-    const size: [number, number] = [
-      host?.clientWidth ?? 0,
-      host?.clientHeight ?? 0,
-    ];
-    const current = graph.getViewportByCanvas([0, 0]);
-    const settled =
-      graph.getZoom() === saved.zoom &&
-      current[0] === saved.origin[0] &&
-      current[1] === saved.origin[1];
-    // Only a resize may undo the restore. Any other change after it is not ours to revert.
-    if (
-      saved.restoredSize &&
-      (settled ||
-        (saved.restoredSize[0] === size[0] &&
-          saved.restoredSize[1] === size[1]))
-    ) {
-      cameraReturn.current = null;
-      return;
-    }
-    saved.restoredSize = size;
     if (graph.getZoom() !== saved.zoom) await graph.zoomTo(saved.zoom, false);
     if (cameraReturn.current !== saved || graph.destroyed) return;
     // getPosition()/translateTo() use different bases in G6. Restore the actual
@@ -400,6 +377,7 @@ export default function GraphCanvas({
         [saved.origin[0] - origin[0], saved.origin[1] - origin[1]],
         false,
       );
+    if (cameraReturn.current === saved) cameraReturn.current = null;
   }
   const preservePositions = useRef(false);
   // 화면 모드 전환처럼 색만 바뀌는 다시 그리기는 지금 노드 위치를 한 번 그대로 쓴다.
@@ -448,7 +426,13 @@ export default function GraphCanvas({
   function handleNodeSelect(id: string | null) {
     if (tutorialPhase || (tutorialLocked && id !== tutorialTargetId)) return;
     if (id === '__isolated__') return onOpenIsolated?.();
-    if (id && !previousSelected.current) {
+    if (
+      id &&
+      !previousSelected.current &&
+      !connectionPath &&
+      !tutorialLocked &&
+      !tutorialCenterId
+    ) {
       cameraReturn.current = null;
       captureSelectionCamera();
     }
@@ -465,8 +449,12 @@ export default function GraphCanvas({
   const selectNode = useEffectEvent(handleNodeSelect);
   const selectEdge = useEffectEvent((id: string) => {
     if (tutorialPhase || tutorialLocked) return;
-    if (data.edges.some((edge) => edge.id === id && isSelectableRelation(edge)))
+    if (
+      data.edges.some((edge) => edge.id === id && isSelectableRelation(edge))
+    ) {
+      abandonCameraReturn();
       onSelectEdge?.(id);
+    }
   });
   const [retry, setRetry] = useState(0);
   const stats = graphSummary(data);
@@ -1461,6 +1449,9 @@ export default function GraphCanvas({
             arrangeFocusNow ? FOCUS_FIT_ZOOM : undefined,
             moving ? 'layout' : animate ? 'fit' : false,
           );
+          // A completed manual fit stays put while its selected rail closes.
+          // A fit queued together with deselection still follows the viewport.
+          if (animate && previousSelected.current) followFit.current = false;
         }
         await moving;
         if (moving) renderMinimap?.();
@@ -1504,10 +1495,11 @@ export default function GraphCanvas({
     }
     if (previousSelected.current && !selected) {
       preservePositions.current = true;
-      followFit.current = false;
-      fitPending.current = false;
-      fitRequested.current = false;
-      cameraReturn.current = selectionCamera.current;
+      // D-GRP-01: an explicit fit (or an edge selection) wins over closing a node.
+      const pendingFit = fitPending.current || fitRequested.current;
+      cameraReturn.current =
+        pendingFit || selectedEdgeId ? null : selectionCamera.current;
+      if (cameraReturn.current) followFit.current = false;
       selectionCamera.current = null;
     }
     previousSelected.current = selected;
@@ -1518,10 +1510,9 @@ export default function GraphCanvas({
       followFit.current = false;
       fitPending.current = false;
     }
-  }, [selected]);
+  }, [selected, selectedEdgeId]);
   useEffect(() => {
     if (!centerRequest) return;
-    if (!previousSelected.current) captureSelectionFromEffect();
     preservePositions.current = false;
     followFit.current = false;
     fitPending.current = false;
