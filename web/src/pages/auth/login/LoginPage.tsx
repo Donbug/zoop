@@ -17,6 +17,7 @@ import ConfirmDialog from '@/components/common/ConfirmDialog';
 import SessionStatus from '@/components/auth/SessionStatus';
 import { authAlert, authNote, focusRing } from '@/components/auth/authStyles';
 import type { LoginLocationState } from '@/types/auth';
+import ZoopLogo from '@/components/common/ZoopLogo';
 import {
   clearSocialReturn,
   consumeSocialReturn,
@@ -230,9 +231,10 @@ export default function LoginPage() {
   return (
     <LoginFrame>
       <section className="mx-auto flex w-full max-w-[340px] flex-col gap-6 text-zoop-ink">
+        {/* 원본 로고(엠블럼 + ZOOP)를 폼 너비에 맞춰 크게 보여 주고, 소개 문구는 그 아래에 둔다. */}
         <header className="mb-5 text-center">
-          <p className="text-[length:calc(var(--text-display)*1.2)] leading-none font-[750] tracking-[-0.025em] font-heading">
-            ZOOP
+          <p>
+            <ZoopLogo className="w-full" />
           </p>
           <p className="mt-4 text-body leading-6 text-zoop-muted">
             내 종목 주변의 사건을 하나의 그래프로 봐요

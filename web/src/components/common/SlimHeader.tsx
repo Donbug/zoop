@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useColorTheme, useThemeToggle } from '@/util/theme-color';
 import ThemeSunIcon from './ThemeSunIcon';
+import ZoopWordmark from './ZoopWordmark';
 import './service-shell.css';
 
 // D-AUT-01/02 · D-ONB-01/02 · D-WAT-01/01b, Figma 619:1087.
@@ -20,7 +21,7 @@ export default function SlimHeader({
         aria-label="ZOOP"
         className="flex items-center gap-1.5 no-underline focus-visible:outline-2 focus-visible:outline-offset-2"
       >
-        <strong className="font-heading text-lead font-extrabold">ZOOP</strong>
+        <ZoopWordmark className="text-lead" />
       </Link>
       <div
         aria-label="화면 도구"
