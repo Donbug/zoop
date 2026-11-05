@@ -115,7 +115,7 @@ class CapabilitiesRuntime(ResourceWire):
         for stage, descriptor in self.stages.items():
             luna = stage in ("chat-answer", "chat-agent")
             expected = ("openai-compatible", "gpt-6-luna", "responses", "zoop-" + stage + "-resource-1") if luna else (
-                "typesafe-native", "jev-1.14.0", "systemone", "zoop-jev-chat-9")
+                "typesafe-native", "jev-1.14.0", "systemone", "zoop-jev-chat-10")
             if (descriptor.provider, descriptor.model, descriptor.api, descriptor.adapter_revision) != expected:
                 raise ValueError("chat_runtime_contract_mismatch")
             if (not luna and descriptor.fixed_input_overhead_bytes != 0) or (luna and descriptor.fixed_input_overhead_bytes == 0):

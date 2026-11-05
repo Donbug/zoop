@@ -38,7 +38,7 @@ public final class ChatRuntimeCapabilities {
             equal(s.string("provider"), luna ? "openai-compatible" : "typesafe-native");
             equal(s.string("model"), luna ? "gpt-6-luna" : "jev-1.14.0");
             equal(s.string("api"), luna ? "responses" : "systemone");
-            equal(s.string("adapterRevision"), luna ? (stage.equals("chat-answer") ? "zoop-chat-answer-resource-1" : "zoop-chat-agent-resource-1") : "zoop-jev-chat-9");
+            equal(s.string("adapterRevision"), luna ? (stage.equals("chat-answer") ? "zoop-chat-answer-resource-1" : "zoop-chat-agent-resource-1") : "zoop-jev-chat-10");
             hash(s.string("adapterDigest"));
             if (!s.isNull("providerRevision")) hash(s.string("providerRevision"));
             if (!s.isNull("mcpServerRevision")) {

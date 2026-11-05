@@ -48,7 +48,7 @@ def capabilities(env: dict[str, str] | None = None) -> dict[str, Any]:
         descriptor = {"provider": "openai-compatible" if luna else "typesafe-native",
                       "model": "gpt-6-luna" if luna else chat_jev.MODEL,
                       "api": "responses" if luna else "systemone",
-                      "adapterRevision": module.PROMPT_REVISION if luna else "zoop-jev-chat-9",
+                      "adapterRevision": module.PROMPT_REVISION if luna else chat_jev.ADAPTER_REVISION,
                       "adapterDigest": adapter(stage)["adapterDigest"] if luna else chat_jev.identity(stage),
                       "providerRevision": None, "mcpServerRevision": None,
                       "fixedInputOverheadBytes": adapter(stage)["fixedInputOverheadBytes"] if luna else 0}

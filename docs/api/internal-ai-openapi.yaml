@@ -8271,8 +8271,8 @@
                     "resourceBinding":
                       "schemaVersion": "zoop-chat-resource-binding-1"
                       "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
-                      "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
-                      "allocationDigest": "86965b868123416d6ad9a97be3abb55d586b5ee1c3f5a0845b6a0952c9769e18"
+                      "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647"
+                      "allocationDigest": "4166e1f6f799905df946fe73b946ed3d9eda044109d642400b144a7c1d674eca"
                 "notSent":
                   "summary": "A quote without a matching chat grant: nothing was sent"
                   "value":
@@ -8289,8 +8289,8 @@
                     "resourceBinding":
                       "schemaVersion": "zoop-chat-resource-binding-1"
                       "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
-                      "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
-                      "allocationDigest": "68dc5bec08a7fb289544055ce5eef81d6b53650ebc429bb4713e2795e1abaffa"
+                      "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647"
+                      "allocationDigest": "05f973c7d53939de13dd594acd8544bbe81835c0110e7519165b81552b34a092"
                 "agentHeld":
                   "summary": "chat-agent step held at an approval request"
                   "value":
@@ -8328,8 +8328,8 @@
                     "resourceBinding":
                       "schemaVersion": "zoop-chat-resource-binding-1"
                       "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
-                      "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
-                      "allocationDigest": "5cdc8ff9372b4809c0d7a1bc1bfd3fdd7908a9dca562afa391e1426a15bb6170"
+                      "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647"
+                      "allocationDigest": "59c236ae21667a7704ce546abb33b04cd25a1cdbfd16a44d6ae5e17b31804de0"
         "401":
           "description": "authentication_required: missing, malformed or unknown bearer token."
           "content":
@@ -8465,11 +8465,11 @@
                     "schemaVersion": "zoop-chat-resource-1"
                     "policyRevision": "expanded-local-2026-11-05.1"
                     "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
-                    "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
+                    "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647"
                     "providerTimeoutMs": 15000
                     "finalizing": false
                     "luna": null
-                    "allocationDigest": "86965b868123416d6ad9a97be3abb55d586b5ee1c3f5a0845b6a0952c9769e18"
+                    "allocationDigest": "4166e1f6f799905df946fe73b946ed3d9eda044109d642400b144a7c1d674eca"
               "agentContinuation":
                 "summary": "chat-agent continuation step with the application's decision (synthetic token)"
                 "value":
@@ -8500,7 +8500,7 @@
                     "schemaVersion": "zoop-chat-resource-1"
                     "policyRevision": "expanded-local-2026-11-05.1"
                     "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
-                    "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
+                    "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647"
                     "providerTimeoutMs": 600000
                     "finalizing": false
                     "luna":
@@ -8510,7 +8510,7 @@
                       "maxAnswerChars": 48000
                       "generatedTextMaxChars": 46976
                       "reasoningEffort": "high"
-                    "allocationDigest": "5cdc8ff9372b4809c0d7a1bc1bfd3fdd7908a9dca562afa391e1426a15bb6170"
+                    "allocationDigest": "59c236ae21667a7704ce546abb33b04cd25a1cdbfd16a44d6ae5e17b31804de0"
   "/internal/v1/plan-admissions":
     "post":
       "tags":

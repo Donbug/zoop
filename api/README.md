@@ -8,7 +8,9 @@ Spring Boot 실행 기반, 공통 오류 처리, 내부 AI 분석 transport 클�
 
 새 모델 실행은 Java의 `ChatResourcePolicy`를 첫 attempt metadata에 고정하고 `ChatJobResources`가 호출별 permit을 저장합니다. 같은 invocation은 저장한 resources를 그대로 사용하며, 결과의 `resourceBinding`을 대조합니다. 설치 worker capabilities는 기존 `chat.invoke` 인증으로 모델 호출 전에 확인합니다. 이전 schema5 결과·대화 이력·unknown은 당시 계약으로 읽고, 고정 정책이 없는 과거 작업의 재실행은 `chat_resource_policy_cutover_required`로 거부합니다. 전환 전에 실행 중 작업을 마치거나 취소하고 새 질문으로 시작합니다.
 
-후검증에서 프로토콜·자원 계약 오류나 명시적인 미전송 거부를 받으면 작업을 실패로 종료합니다. 바인딩 불일치는 `response_unknown`·재실행 불가로 보존합니다. replay의 readiness 검사는 자격 증명 전용 오류 `provider_key_required`·`provider_key_invalid`만 제외하며, live와 비밀값 이외의 설정 오류는 그대로 거부합니다. 기존 의미 검증 불가 시 처리의 출시 gate는 별도로 유지합니다.
+후검증 호출이 실패하면 기존 오류 계약에 따라 작업을 실패로 종료합니다. 공급자 오류는 `transient/provider_error`, 전송 결과가 불명확하거나 바인딩이 불일치하면 `transient/response_unknown`이며 후자는 재실행할 수 없습니다. 검증이 완료됐지만 판정이 `hold`이면 해당 주장을 보류하고 `insufficient_evidence` 또는 부분 답변으로 반환합니다. 조회 자료 부족과 도구 장애도 각각 기존 근거 부족 결과와 도구 오류로 구분합니다. replay의 readiness 검사는 자격 증명 전용 오류 `provider_key_required`·`provider_key_invalid`만 제외하며, live와 비밀값 이외의 설정 오류는 그대로 거부합니다.
+
+근거 기반 주장은 검증기의 선택값이 `supported`이고 기존 확률 `0.15`·confidence `0.05` 이상일 때 통과합니다. 선택값이 `contradicted`이면 해당 주장을 제외하고, `insufficient`이면 보류합니다. 모델 종료 기록은 같은 쓰기 작업을 최대 3초까지 기다리며, 대기 중 호출 스레드가 중단돼도 원래 마감 안에서 기록을 마친 뒤 중단 상태를 복원합니다.
 
 | 환경 변수 (`ZOOP_CHAT_RESOURCE_` 접두사) | 기본값 |
 | --- | --- |

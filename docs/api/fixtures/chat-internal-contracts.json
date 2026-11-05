@@ -160,7 +160,7 @@
     "capabilities": {
       "schemaVersion": "zoop-ai-chat-6",
       "capabilitiesSchemaVersion": "zoop-chat-capabilities-1",
-      "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+      "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
       "runtime": {
         "workerContractRevision": "zoop-chat-worker-resource-1",
         "stageSchemaVersion": "zoop-ai-chat-6",
@@ -191,8 +191,8 @@
             "provider": "typesafe-native",
             "model": "jev-1.14.0",
             "api": "systemone",
-            "adapterRevision": "zoop-jev-chat-9",
-            "adapterDigest": "200ca53067be26703738dfe0207760807c397cb0c7dcb05250279e7e12929d76",
+            "adapterRevision": "zoop-jev-chat-10",
+            "adapterDigest": "344eb1872c7681756c1fb3461cf013cdc171ae4ad14bce42d67f84b2576ea91b",
             "providerRevision": "da3d84abb00b8d57b45bd84c9ba2c6c7af5aada27340104c3b1b23621760516a",
             "mcpServerRevision": null,
             "fixedInputOverheadBytes": 0
@@ -211,8 +211,8 @@
             "provider": "typesafe-native",
             "model": "jev-1.14.0",
             "api": "systemone",
-            "adapterRevision": "zoop-jev-chat-9",
-            "adapterDigest": "9907deccb3bcf61d5cb86576e32eb4b6b7d48ddbc699291a4c2123376d4572d4",
+            "adapterRevision": "zoop-jev-chat-10",
+            "adapterDigest": "6732c51f981c949c2505a42c8383381f17446d7c71ca296bb6e284874e653343",
             "providerRevision": "da3d84abb00b8d57b45bd84c9ba2c6c7af5aada27340104c3b1b23621760516a",
             "mcpServerRevision": null,
             "fixedInputOverheadBytes": 0
@@ -254,7 +254,7 @@
             "schemaVersion": "zoop-chat-resource-1",
             "policyRevision": "expanded-local-2026-11-05.1",
             "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
             "providerTimeoutMs": 15000,
             "finalizing": false,
             "luna": null
@@ -264,17 +264,17 @@
           "schemaVersion": "zoop-chat-resource-1",
           "policyRevision": "expanded-local-2026-11-05.1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
           "providerTimeoutMs": 15000,
           "finalizing": false,
           "luna": null,
-          "allocationDigest": "86965b868123416d6ad9a97be3abb55d586b5ee1c3f5a0845b6a0952c9769e18"
+          "allocationDigest": "4166e1f6f799905df946fe73b946ed3d9eda044109d642400b144a7c1d674eca"
         },
         "binding": {
           "schemaVersion": "zoop-chat-resource-binding-1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
-          "allocationDigest": "86965b868123416d6ad9a97be3abb55d586b5ee1c3f5a0845b6a0952c9769e18"
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
+          "allocationDigest": "4166e1f6f799905df946fe73b946ed3d9eda044109d642400b144a7c1d674eca"
         }
       },
       "chat-router:live": {
@@ -286,7 +286,7 @@
             "schemaVersion": "zoop-chat-resource-1",
             "policyRevision": "expanded-local-2026-11-05.1",
             "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
             "providerTimeoutMs": 15000,
             "finalizing": false,
             "luna": null
@@ -296,17 +296,17 @@
           "schemaVersion": "zoop-chat-resource-1",
           "policyRevision": "expanded-local-2026-11-05.1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
           "providerTimeoutMs": 15000,
           "finalizing": false,
           "luna": null,
-          "allocationDigest": "bdf298d148002b25e0eaf71a12a858a25620537c10ee28a28776c45e4f415c02"
+          "allocationDigest": "cfc68e0d4845746cf6f3ec5111f19403e2bb91fc315c5b301bb5e9fea22e77bb"
         },
         "binding": {
           "schemaVersion": "zoop-chat-resource-binding-1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
-          "allocationDigest": "bdf298d148002b25e0eaf71a12a858a25620537c10ee28a28776c45e4f415c02"
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
+          "allocationDigest": "cfc68e0d4845746cf6f3ec5111f19403e2bb91fc315c5b301bb5e9fea22e77bb"
         }
       },
       "chat-answer:replay": {
@@ -318,7 +318,7 @@
             "schemaVersion": "zoop-chat-resource-1",
             "policyRevision": "expanded-local-2026-11-05.1",
             "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
             "providerTimeoutMs": 600000,
             "finalizing": true,
             "luna": {
@@ -335,7 +335,7 @@
           "schemaVersion": "zoop-chat-resource-1",
           "policyRevision": "expanded-local-2026-11-05.1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
           "providerTimeoutMs": 600000,
           "finalizing": true,
           "luna": {
@@ -346,13 +346,13 @@
             "reasoningEffort": "high",
             "generatedTextMaxChars": 46976
           },
-          "allocationDigest": "68dc5bec08a7fb289544055ce5eef81d6b53650ebc429bb4713e2795e1abaffa"
+          "allocationDigest": "05f973c7d53939de13dd594acd8544bbe81835c0110e7519165b81552b34a092"
         },
         "binding": {
           "schemaVersion": "zoop-chat-resource-binding-1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
-          "allocationDigest": "68dc5bec08a7fb289544055ce5eef81d6b53650ebc429bb4713e2795e1abaffa"
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
+          "allocationDigest": "05f973c7d53939de13dd594acd8544bbe81835c0110e7519165b81552b34a092"
         }
       },
       "chat-answer:live": {
@@ -364,7 +364,7 @@
             "schemaVersion": "zoop-chat-resource-1",
             "policyRevision": "expanded-local-2026-11-05.1",
             "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
             "providerTimeoutMs": 600000,
             "finalizing": true,
             "luna": {
@@ -381,7 +381,7 @@
           "schemaVersion": "zoop-chat-resource-1",
           "policyRevision": "expanded-local-2026-11-05.1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
           "providerTimeoutMs": 600000,
           "finalizing": true,
           "luna": {
@@ -392,13 +392,13 @@
             "reasoningEffort": "high",
             "generatedTextMaxChars": 46976
           },
-          "allocationDigest": "d5e873f4ddae5eaede59b5a31b105caca2561f5d3bf0417bf44ea7f2ac635d15"
+          "allocationDigest": "f388e8eda0e007e62b9f737b6603e9efa26ae36ddee928162636c4c5ef1b1a0e"
         },
         "binding": {
           "schemaVersion": "zoop-chat-resource-binding-1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
-          "allocationDigest": "d5e873f4ddae5eaede59b5a31b105caca2561f5d3bf0417bf44ea7f2ac635d15"
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
+          "allocationDigest": "f388e8eda0e007e62b9f737b6603e9efa26ae36ddee928162636c4c5ef1b1a0e"
         }
       },
       "chat-verification:replay": {
@@ -410,7 +410,7 @@
             "schemaVersion": "zoop-chat-resource-1",
             "policyRevision": "expanded-local-2026-11-05.1",
             "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
             "providerTimeoutMs": 45000,
             "finalizing": false,
             "luna": null
@@ -420,17 +420,17 @@
           "schemaVersion": "zoop-chat-resource-1",
           "policyRevision": "expanded-local-2026-11-05.1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
           "providerTimeoutMs": 45000,
           "finalizing": false,
           "luna": null,
-          "allocationDigest": "e3a443031a2109bd44e75188fac12b6bd26b275584ddc197bc2d7be182911818"
+          "allocationDigest": "57e1c3d7ada24455a5a653c6da342bab84420ace0ae97a273db36c5b71766bab"
         },
         "binding": {
           "schemaVersion": "zoop-chat-resource-binding-1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
-          "allocationDigest": "e3a443031a2109bd44e75188fac12b6bd26b275584ddc197bc2d7be182911818"
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
+          "allocationDigest": "57e1c3d7ada24455a5a653c6da342bab84420ace0ae97a273db36c5b71766bab"
         }
       },
       "chat-verification:live": {
@@ -442,7 +442,7 @@
             "schemaVersion": "zoop-chat-resource-1",
             "policyRevision": "expanded-local-2026-11-05.1",
             "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
             "providerTimeoutMs": 45000,
             "finalizing": false,
             "luna": null
@@ -452,17 +452,17 @@
           "schemaVersion": "zoop-chat-resource-1",
           "policyRevision": "expanded-local-2026-11-05.1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
           "providerTimeoutMs": 45000,
           "finalizing": false,
           "luna": null,
-          "allocationDigest": "fd36ffb5e06f1f2c2fc7261c99d0e4ad9e578da165d052508f11defa0df8b6de"
+          "allocationDigest": "635534ed93380b4dccad03be76e36620559ffdd2d3492f667dce8c5dd81b7bce"
         },
         "binding": {
           "schemaVersion": "zoop-chat-resource-binding-1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
-          "allocationDigest": "fd36ffb5e06f1f2c2fc7261c99d0e4ad9e578da165d052508f11defa0df8b6de"
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
+          "allocationDigest": "635534ed93380b4dccad03be76e36620559ffdd2d3492f667dce8c5dd81b7bce"
         }
       },
       "chat-agent:replay": {
@@ -474,7 +474,7 @@
             "schemaVersion": "zoop-chat-resource-1",
             "policyRevision": "expanded-local-2026-11-05.1",
             "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
             "providerTimeoutMs": 600000,
             "finalizing": false,
             "luna": {
@@ -491,7 +491,7 @@
           "schemaVersion": "zoop-chat-resource-1",
           "policyRevision": "expanded-local-2026-11-05.1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
           "providerTimeoutMs": 600000,
           "finalizing": false,
           "luna": {
@@ -502,13 +502,13 @@
             "reasoningEffort": "high",
             "generatedTextMaxChars": 46976
           },
-          "allocationDigest": "5cdc8ff9372b4809c0d7a1bc1bfd3fdd7908a9dca562afa391e1426a15bb6170"
+          "allocationDigest": "59c236ae21667a7704ce546abb33b04cd25a1cdbfd16a44d6ae5e17b31804de0"
         },
         "binding": {
           "schemaVersion": "zoop-chat-resource-binding-1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
-          "allocationDigest": "5cdc8ff9372b4809c0d7a1bc1bfd3fdd7908a9dca562afa391e1426a15bb6170"
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
+          "allocationDigest": "59c236ae21667a7704ce546abb33b04cd25a1cdbfd16a44d6ae5e17b31804de0"
         }
       },
       "chat-agent:live": {
@@ -520,7 +520,7 @@
             "schemaVersion": "zoop-chat-resource-1",
             "policyRevision": "expanded-local-2026-11-05.1",
             "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
             "providerTimeoutMs": 600000,
             "finalizing": false,
             "luna": {
@@ -537,7 +537,7 @@
           "schemaVersion": "zoop-chat-resource-1",
           "policyRevision": "expanded-local-2026-11-05.1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
           "providerTimeoutMs": 600000,
           "finalizing": false,
           "luna": {
@@ -548,13 +548,13 @@
             "reasoningEffort": "high",
             "generatedTextMaxChars": 46976
           },
-          "allocationDigest": "f4c37dc7a0e1d7387c161dee9c9e1b9597e852f7b5710db6a7f96980df3c060e"
+          "allocationDigest": "dd11831f359f3af4540b7f50046da5df26dd9b7216f1e9feb9ca886f155b12f8"
         },
         "binding": {
           "schemaVersion": "zoop-chat-resource-binding-1",
           "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
-          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
-          "allocationDigest": "f4c37dc7a0e1d7387c161dee9c9e1b9597e852f7b5710db6a7f96980df3c060e"
+          "runtimeFingerprint": "54d6a04ea7dd658385a1e664a9a4d6c9dc5d32c2d2d5d4bbbe8e8bb26e840647",
+          "allocationDigest": "dd11831f359f3af4540b7f50046da5df26dd9b7216f1e9feb9ca886f155b12f8"
         }
       }
     }
