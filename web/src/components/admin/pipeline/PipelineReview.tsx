@@ -121,7 +121,7 @@ export default function PipelineReview() {
         <AnalysisCandidates graphRevision={graphRevision} />
       </div>
       {versionsOpened && (
-        <div hidden={tab !== 'versions'}>
+        <div hidden={tab !== 'versions'} className="min-w-0 max-w-full">
           <GraphVersions
             onActivated={() => setGraphRevision((value) => value + 1)}
             refreshKey={versionsRefresh}

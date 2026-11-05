@@ -288,7 +288,7 @@ export default function CompanyDocumentPanel() {
     <section
       aria-label="뉴스·공시"
       data-screen-id="D-COM-02"
-      className={`[&_blockquote]:my-3 [&_blockquote]:border-l-2 ${dark ? '[&_blockquote]:rounded-md [&_blockquote]:border-zoop-border [&_blockquote]:bg-zoop-control' : '[&_blockquote]:border-zoop-line [&_blockquote]:bg-zoop-wash'} [&_blockquote]:p-3 [&_blockquote]:text-caption [&_blockquote]:leading-[1.7] [&_blockquote]:wrap-anywhere [&_summary]:cursor-pointer [&_h4]:font-semibold`}
+      className={`border-b-0! [&_blockquote]:my-3 [&_blockquote]:border-l-2 ${dark ? '[&_blockquote]:rounded-md [&_blockquote]:border-zoop-border [&_blockquote]:bg-zoop-control' : '[&_blockquote]:border-zoop-line [&_blockquote]:bg-zoop-wash'} [&_blockquote]:p-3 [&_blockquote]:text-caption [&_blockquote]:leading-[1.7] [&_blockquote]:wrap-anywhere [&_summary]:cursor-pointer [&_h4]:font-semibold`}
     >
       <h2>뉴스·공시 · 근거 문서</h2>
       <nav aria-label="문서 종류">
