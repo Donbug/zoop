@@ -63,6 +63,8 @@ public final class AiTransportException extends AiClientException {
         RESPONSE_TOO_LARGE,
         /** Syntax, schema, enum, type, identity or request-id echo violation in a response. */
         RESPONSE_MALFORMED,
+        /** The stage reply cannot be bound to its persisted resource allocation. */
+        RESOURCE_BINDING_MISMATCH,
         /** A redirect was received; it is never followed and the bearer token is never re-sent. */
         REDIRECT_REFUSED,
         /** A status or body that is neither a documented success nor a decodable AI error envelope. */

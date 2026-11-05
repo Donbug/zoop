@@ -9,11 +9,8 @@ Rules (ZOOP-AIG-001 6.3.2-6.3.3, design summary 5.1):
   and separate from the S1 and pipeline gates. Without them nothing is sent. Replay never touches the network.
 - Every quoted span must be allowed by the operator chat grant registry: an enabled grant with known rights, `model-send`, the
   stage as purpose and the exact recipient (`authored-replay`, or `<provider>:<revision>` live). Otherwise nothing is sent.
-- Each stage has its own client timeout (router 4 s, answer 25 s, verification 6 s, agent step 30 s); a timeout after sending
-  is `unknown`.
-- The models are pinned: Luna `gpt-6-luna` at reasoning effort `medium` for both `chat-answer` and
-  `chat-agent`, Jev `jev-1.14.0`. The model that answered must be the pinned one (a Luna answer may name a `gpt-6-luna-...`
-  snapshot) and is what the receipt records.
+- Timeouts, effort and output limits are the invocation's immutable Java-owned resource allocation.
+- Both Luna stages use Responses; every fresh stage validates the installed runtime fingerprint before claiming a send.
 - An agent step (`chat-agent`) is one Responses request, so the same ledger rules hold per step: the application gives every
   step its own invocation id. Its MCP grant token is excluded from every identity and redacted from the stored raw answer.
   Its tool results reach the provider from the application's MCP server, which checks their send grants for the recipient
@@ -21,8 +18,6 @@ Rules (ZOOP-AIG-001 6.3.2-6.3.3, design summary 5.1):
 - Order of one invocation: the ledger first (a known invocation answers from its record, whatever the gate or keys are now),
   then the gate, grants and sender for a new one, then one atomic claim with the live ceiling, the send, the raw answer stored,
   and only then usage and answer interpretation. Any interpretation failure keeps the raw answer as a definite failure.
-- Luna's tokens (ZOOP-AIG-001 6.3.3): a direct answer whose estimated input passes 24k is refused unsent, and a final answer over
-  2k without reasoning, or cut by the output cap, fails with a code the application shows as `budget_exceeded`.
 """
 from __future__ import annotations
 
@@ -38,16 +33,15 @@ import httpx
 from pydantic import ValidationError
 
 from . import chat_agent, chat_jev, chat_luna
-from .chat_contracts import (CHAT_SCHEMA_VERSION, INPUT_BUDGET_EXCEEDED, MAX_ANSWER_TOKENS, MAX_INPUT_TOKENS,
-                             OUTPUT_BUDGET_EXCEEDED, AgentInput, AnswerInput, ChatAnswer, ChatGrantRegistry, Receipt,
-                             RouterInput, StageFailure, StageRequest, StageResult, Usage, VerificationInput)
+from .chat_contracts import (CHAT_SCHEMA_VERSION, INPUT_BUDGET_EXCEEDED, OUTPUT_BUDGET_EXCEEDED,
+                             AgentInput, AnswerInput, ChatAnswer, ChatGrantRegistry, Receipt,
+                             RouterInput, StageFailure, StageRequest, StageResult, Usage, VerificationInput, estimated_tokens)
 from .contracts import canonical, digest
-from .provider import DEFAULT_BASE_URL, NATIVE_DEFAULT_BASE_URL, ProviderError, native_revision, validate_base_url
+from .provider import DEFAULT_BASE_URL, NATIVE_DEFAULT_BASE_URL, ProviderError, native_revision
 
-# An agent step includes the MCP calls the provider makes after an approval; the application bounds the whole run (35 s).
-STAGE_TIMEOUT = {"chat-router": 4.0, "chat-answer": 25.0, "chat-verification": 6.0, "chat-agent": 30.0}
-LUNA_STAGES = {"chat-answer": (chat_luna, "ZOOP_AI_CHAT_ANSWER_MODEL", "ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT"),
-               "chat-agent": (chat_agent, "ZOOP_AI_CHAT_AGENT_MODEL", "ZOOP_AI_CHAT_AGENT_REASONING_EFFORT")}
+from . import chat_resources
+LUNA_STAGES = {"chat-answer": (chat_luna, "ZOOP_AI_CHAT_ANSWER_MODEL"),
+               "chat-agent": (chat_agent, "ZOOP_AI_CHAT_AGENT_MODEL")}
 LUNA = "openai-compatible"
 JEV = "typesafe-native"
 REPLAY = "authored-replay"
@@ -90,17 +84,17 @@ def stage_config(stage: str, mode: str, env: dict[str, str] | None = None) -> Ch
     if mode == "replay":
         return ChatStageConfig(REPLAY, "authored-replay-1", "authored-synthetic-" + stage, None, _prompt_version(stage), mode)
     if stage in LUNA_STAGES:
-        module, model_key, effort_key = LUNA_STAGES[stage]
+        module, model_key = LUNA_STAGES[stage]
+        if any(key in env for key in ("ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT", "ZOOP_AI_CHAT_AGENT_REASONING_EFFORT")):
+            raise ProviderError("chat_legacy_effort_configuration")
         base = env.get("ZOOP_AI_BASE_URL", "").strip() or DEFAULT_BASE_URL
-        validate_base_url(base)
+        chat_resources.validate_endpoint(base)
         model = env.get(model_key, "").strip()
         if not model:
             raise ProviderError("stage_model_required")
         if model != module.MODEL:
             raise ProviderError("answer_model_unsupported")
-        effort = env.get(effort_key, "").strip() or module.REASONING_EFFORT
-        if effort != module.REASONING_EFFORT:
-            raise ProviderError("reasoning_effort_unsupported")
+        effort = None
         server = None
         if stage == "chat-agent":
             # The only host a run's grant may reach: set by the operator, never taken from a request.
@@ -113,7 +107,7 @@ def stage_config(stage: str, mode: str, env: dict[str, str] | None = None) -> Ch
                 raise ProviderError("mcp_server_url_invalid") from None
         return ChatStageConfig(LUNA, digest({"endpoint": base}), model, effort, _prompt_version(stage), mode, server)
     base = env.get("TYPESAFE_BASE_URL", "").strip() or NATIVE_DEFAULT_BASE_URL
-    validate_base_url(base)
+    chat_resources.validate_endpoint(base)
     if "/systemone" in base:
         raise ProviderError("native_base_url_includes_endpoint_path")
     model = env.get("ZOOP_AI_CHAT_JEV_MODEL", "").strip()
@@ -133,15 +127,21 @@ def _identified_input(request: StageRequest) -> dict[str, Any]:
 
 def request_identity(request: StageRequest, config: ChatStageConfig) -> str:
     """What the provider is asked: the input and the frozen stage configuration. It keys the authored replay fixture."""
-    return digest({"schemaVersion": CHAT_SCHEMA_VERSION, "stage": request.stage, "input": _identified_input(request),
-                   "config": config.wire()})
+    value = {"schemaVersion": request.schema_version, "stage": request.stage, "input": _identified_input(request),
+             "config": config.wire()}
+    if request.resources is not None:
+        value.update(mode=request.mode, resources=request.resources.wire())
+    return digest(value)
 
 
 def request_digest(request: StageRequest) -> str:
     """What the caller asked under an invocation id, without the configuration: a later configuration change (gate, key, model
     setting) never makes a stored invocation look new or conflicting."""
-    return digest({"schemaVersion": CHAT_SCHEMA_VERSION, "stage": request.stage, "mode": request.mode,
-                   "input": _identified_input(request)})
+    value = {"schemaVersion": request.schema_version, "stage": request.stage, "mode": request.mode,
+             "input": _identified_input(request)}
+    if request.resources is not None:
+        value["resources"] = request.resources.wire()
+    return digest(value)
 
 
 def live_ceiling(env: dict[str, str] | None = None) -> int:
@@ -225,12 +225,44 @@ class ChatLedger:
         if recorded is not None and recorded != request_digest(request):
             raise ProviderError("invocation_conflict")
         if status in ("succeeded", "failed", "unknown"):
-            return StageResult.model_validate_json(result)
+            outcome = StageResult.model_validate_json(result)
+            if outcome.schema_version != request.schema_version:
+                raise ProviderError("invocation_conflict")
+            return outcome
         if status == "sent":
             # Claimed and possibly sent; its outcome was never stored: never send again.
             return _failed(request, "provider_response_unknown", sent=True, unknown=True,
                            receipt=None if receipt is None else Receipt.model_validate_json(receipt))
         return None
+
+    def prior_context(self, request: StageRequest, payload: AgentInput) -> int:
+        continuation = payload.continuation
+        if continuation is None:
+            return 0
+        rows = self.db.execute(
+            "SELECT invocation_id,result FROM chat_invocations WHERE stage='chat-agent' AND mode=? AND status='succeeded' "
+            "AND json_extract(result,'$.schemaVersion')=? AND json_extract(result,'$.answer.responseId')=?",
+            (request.mode, CHAT_SCHEMA_VERSION, continuation.previous_response_id)).fetchall()
+        principal = request.invocation_id.partition(":")[0] if ":" in request.invocation_id else ""
+        for invocation, encoded in rows:
+            previous_principal = invocation.partition(":")[0] if ":" in invocation else ""
+            if previous_principal != principal:
+                continue
+            previous = StageResult.model_validate_json(encoded)
+            if previous.answer.get("status") != "approval_required" or previous.receipt is None:
+                continue
+            if (previous.resource_binding.policy_digest != request.resources.policy_digest
+                    or previous.resource_binding.runtime_fingerprint != request.resources.runtime_fingerprint):
+                raise ProviderError("chat_runtime_contract_mismatch")
+            known = {item["approvalRequestId"] for item in previous.answer["approvalRequests"]}
+            if any(item.approval_request_id not in known for item in continuation.decisions):
+                raise ProviderError("agent_context_unavailable")
+            usage = previous.receipt.usage
+            if usage.input_tokens is None or usage.output_tokens is None:
+                raise ProviderError("agent_context_unavailable")
+            # Full MCP callbacks contain the structured envelope and its JSON text; the negotiated reserve covers both.
+            return usage.input_tokens + usage.output_tokens + sum(item.approve for item in continuation.decisions) * 296448
+        raise ProviderError("agent_context_unavailable")
 
     def claim(self, request: StageRequest, identity: str, ceiling: int | None, receipt: Receipt) -> StageResult | None:
         """Takes the right to send, or returns the outcome another claimer recorded meanwhile. Raises `chat_budget_exhausted`
@@ -278,9 +310,9 @@ class ChatLedger:
 
 
 def _failed(request: StageRequest, code: str, *, sent: bool, unknown: bool, receipt: Receipt | None) -> StageResult:
-    return StageResult(schema_version=CHAT_SCHEMA_VERSION, invocation_id=request.invocation_id, stage=request.stage,
+    return StageResult(schema_version=request.schema_version, invocation_id=request.invocation_id, stage=request.stage,
                        status="failed", answer=None, failure=StageFailure(code=code, sent=sent, unknown=unknown),
-                       receipt=receipt)
+                       receipt=receipt, resource_binding=request.binding())
 
 
 def _no_usage() -> Usage:
@@ -291,11 +323,15 @@ def provider_body(request: StageRequest, config: ChatStageConfig) -> tuple[str, 
     """The endpoint path and exact request body a live stage sends."""
     parsed = request.parsed()
     if request.stage == "chat-answer":
-        return "chat/completions", chat_luna.build_request(parsed, config.model, config.reasoning_effort)
+        body = chat_luna.build_request(parsed, config.model, request.resources.luna)
+        chat_resources.check_fixed_material(request.stage, body)
+        return "responses", body
     if request.stage == "chat-agent":
         if config.mcp_server_url is None:
             raise ProviderError("mcp_server_url_required")
-        return "responses", chat_agent.build_request(parsed, config.model, config.reasoning_effort, config.mcp_server_url)
+        body = chat_agent.build_request(parsed, config.model, request.resources.luna, config.mcp_server_url)
+        chat_resources.check_fixed_material(request.stage, body)
+        return "responses", body
     if request.stage == "chat-router":
         return "systemone", chat_jev.build_router_request(parsed, config.model)
     return "systemone", chat_jev.build_verification_request(parsed, config.model)
@@ -316,7 +352,7 @@ class LiveSender:
         return (self.env.get("TYPESAFE_BASE_URL", "").strip() or NATIVE_DEFAULT_BASE_URL,
                 self.env.get("TYPESAFE_API_KEY", ""))
 
-    def preflight(self, request: StageRequest, config: ChatStageConfig) -> None:
+    def preflight(self, request: StageRequest | None, config: ChatStageConfig) -> None:
         key = self._endpoint(config)[1]
         if not key:
             raise ProviderError("provider_key_required")
@@ -324,11 +360,13 @@ class LiveSender:
         # client refuses it locally, which would look like an unknown fate. Refuse it here, before anything is reserved.
         if any(ord(char) < 33 or ord(char) > 126 for char in key):
             raise ProviderError("provider_key_invalid")
+        if request is not None:
+            provider_body(request, config)
 
     def send(self, request: StageRequest, config: ChatStageConfig) -> Any:
         base, key = self._endpoint(config)
         path, body = provider_body(request, config)
-        with httpx.Client(base_url=base.rstrip("/") + "/", timeout=STAGE_TIMEOUT[request.stage],
+        with httpx.Client(base_url=base.rstrip("/") + "/", timeout=request.resources.provider_timeout_ms / 1000,
                           headers={"Authorization": "Bearer " + key}, follow_redirects=False,
                           transport=self.transport) as client:
             try:
@@ -351,13 +389,21 @@ class LiveSender:
 class ReplaySender:
     """Authored fixture matched by the exact request identity. Nothing leaves the process."""
 
-    def __init__(self, path: Path):
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if data.get("schemaVersion") != CHAT_SCHEMA_VERSION or data.get("recordingKind") != "authored-test":
-            raise ProviderError("replay_fixture_invalid")
-        self.entries = {entry["inputDigest"]: entry for entry in data["responses"]}
+    def __init__(self, path: Path | None):
+        self.path = path
+        self.entries: dict[str, Any] | None = None
 
     def _entry(self, request: StageRequest, config: ChatStageConfig) -> dict[str, Any]:
+        if self.entries is None:
+            try:
+                if self.path is None:
+                    raise ProviderError("replay_fixture_required")
+                data = json.loads(self.path.read_text(encoding="utf-8"))
+                if data.get("schemaVersion") != CHAT_SCHEMA_VERSION or data.get("recordingKind") != "authored-test":
+                    raise ProviderError("replay_fixture_invalid")
+                self.entries = {entry["inputDigest"]: entry for entry in data["responses"]}
+            except (OSError, ValueError, KeyError, TypeError):
+                raise ProviderError("replay_fixture_invalid") from None
         entry = self.entries.get(request_identity(request, config))
         if entry is None or entry.get("stage") != request.stage:
             raise ProviderError("replay_input_mismatch")
@@ -402,13 +448,9 @@ def usage_of(raw: Any, provider: str, stage: str | None = None) -> Usage:
     if provider == JEV:
         return Usage(input_tokens=_count(block, "input_tokens"), output_tokens=_count(block, "output_tokens"),
                      cached_tokens=None, reasoning_tokens=None)
-    if stage == "chat-agent":
-        return Usage(input_tokens=_count(block, "input_tokens"), output_tokens=_count(block, "output_tokens"),
-                     cached_tokens=_count(_details(block, "input_tokens_details"), "cached_tokens"),
-                     reasoning_tokens=_count(_details(block, "output_tokens_details"), "reasoning_tokens"))
-    return Usage(input_tokens=_count(block, "prompt_tokens"), output_tokens=_count(block, "completion_tokens"),
-                 cached_tokens=_count(_details(block, "prompt_tokens_details"), "cached_tokens"),
-                 reasoning_tokens=_count(_details(block, "completion_tokens_details"), "reasoning_tokens"))
+    return Usage(input_tokens=_count(block, "input_tokens"), output_tokens=_count(block, "output_tokens"),
+                 cached_tokens=_count(_details(block, "input_tokens_details"), "cached_tokens"),
+                 reasoning_tokens=_count(_details(block, "output_tokens_details"), "reasoning_tokens"))
 
 
 def responded_model(raw: Any, config: ChatStageConfig) -> str:
@@ -435,16 +477,33 @@ def interpret(request: StageRequest, config: ChatStageConfig, raw: Any) -> dict[
 
 
 def _interpret_answer(raw: Any, payload: AnswerInput) -> dict[str, Any]:
-    try:
-        choice = raw["choices"][0]
-        message = choice["message"]
-        content = message.get("content")
-    except (KeyError, IndexError, TypeError, AttributeError):
-        raise ValueError("answer_response_invalid") from None
-    if choice.get("finish_reason") == "length":
-        raise ValueError(OUTPUT_BUDGET_EXCEEDED)
-    if message.get("refusal") or not isinstance(content, str):
-        raise ValueError("answer_refused")
+    if not isinstance(raw, dict):
+        raise ValueError("answer_response_invalid")
+    if raw.get("status") == "incomplete":
+        details = raw.get("incomplete_details")
+        raise ValueError(OUTPUT_BUDGET_EXCEEDED if isinstance(details, dict) and details.get("reason") == "max_output_tokens"
+                         else "answer_incomplete")
+    if raw.get("status") != "completed" or not isinstance(raw.get("output"), list):
+        raise ValueError("answer_response_invalid")
+    texts = []
+    for item in raw["output"]:
+        if not isinstance(item, dict):
+            raise ValueError("answer_response_invalid")
+        if item.get("type") == "reasoning":
+            continue
+        if item.get("type") != "message" or not isinstance(item.get("content"), list):
+            raise ValueError("answer_response_invalid")
+        for part in item["content"]:
+            if not isinstance(part, dict):
+                raise ValueError("answer_response_invalid")
+            if part.get("type") == "refusal":
+                raise ValueError("answer_refused")
+            if part.get("type") != "output_text" or not isinstance(part.get("text"), str):
+                raise ValueError("answer_response_invalid")
+            texts.append(part["text"])
+    if len(texts) != 1:
+        raise ValueError("answer_response_invalid")
+    content = texts[0]
     try:
         answer = ChatAnswer.model_validate_json(content)
     except ValidationError:
@@ -463,19 +522,37 @@ def _interpret_answer(raw: Any, payload: AnswerInput) -> dict[str, Any]:
     return answer.wire()
 
 
-def check_input_budget(request: StageRequest) -> None:
-    """A direct answer goes out with all its input at once, so one too large is refused before anything is sent. An agent step's
-    input grows at the provider: the application adds up what each step reports (OrchestratedChatEngine)."""
+def check_input_budget(request: StageRequest, ledger: ChatLedger) -> None:
+    """Admission uses current-call input, not cumulative billed input across agent continuations."""
+    if request.resources is None or request.resources.luna is None:
+        return
+    estimated = estimated_tokens(canonical(_identified_input(request))) + chat_resources.adapter(request.stage)["fixedInputOverheadBytes"]
     parsed = request.parsed()
-    if isinstance(parsed, AnswerInput) and chat_luna.input_tokens(parsed) > MAX_INPUT_TOKENS:
+    if isinstance(parsed, AgentInput):
+        estimated += ledger.prior_context(request, parsed)
+    if estimated > request.resources.luna.max_input_tokens:
         raise ProviderError(INPUT_BUDGET_EXCEEDED)
 
 
-def check_answer_tokens(answer: dict[str, Any], usage: Usage, stage: str) -> None:
-    """A final Luna answer over its length, reasoning aside, by the provider's own count; none reported is not checked."""
-    if stage not in LUNA_STAGES or answer.get("status") == "approval_required" or usage.output_tokens is None:
+def check_answer_tokens(answer: dict[str, Any], usage: Usage, request: StageRequest) -> None:
+    if request.stage not in LUNA_STAGES:
         return
-    if usage.output_tokens - (usage.reasoning_tokens or 0) > MAX_ANSWER_TOKENS:
+    if (usage.input_tokens is None or usage.output_tokens is None or usage.reasoning_tokens is None
+            or usage.reasoning_tokens > usage.output_tokens
+            or (usage.cached_tokens is not None and usage.cached_tokens > usage.input_tokens)):
+        raise ValueError("provider_usage_invalid")
+    limits = request.resources.luna
+    if usage.input_tokens > limits.max_input_tokens:
+        raise ValueError(INPUT_BUDGET_EXCEEDED)
+    if usage.output_tokens > limits.max_output_tokens:
+        raise ValueError(OUTPUT_BUDGET_EXCEEDED)
+    if answer.get("status") == "approval_required":
+        if request.resources.finalizing:
+            raise ValueError("agent_finalization_required")
+        return
+    final = answer.get("answer", answer)
+    if (usage.output_tokens - usage.reasoning_tokens > limits.max_visible_output_tokens
+            or sum(len(section["text"]) for section in final["sections"]) > limits.generated_text_max_chars):
         raise ValueError(OUTPUT_BUDGET_EXCEEDED)
 
 
@@ -511,12 +588,13 @@ def invoke(request: StageRequest, *, state_dir: Path, registry: ChatGrantRegistr
         if stored is not None:
             return _as_stored(request, stored, registry)
         try:
+            chat_resources.validate(request, env)
             config = stage_config(request.stage, request.mode, env)
             ceiling = live_ceiling(env) if request.mode == "live" else None
             identity = request_identity(request, config)
             check_grants(request, config.recipient(), registry)
             check_recipient(request, config.recipient())
-            check_input_budget(request)
+            check_input_budget(request, ledger)
             sender.preflight(request, config)
         except ProviderError as refused:
             return _failed(request, refused.code, sent=False, unknown=False, receipt=None)
@@ -544,14 +622,15 @@ def invoke(request: StageRequest, *, state_dir: Path, registry: ChatGrantRegistr
             receipt = receipt.model_copy(update={"usage": usage_of(raw, config.provider, request.stage),
                                                  "model": responded_model(raw, config)})
             answer = interpret(request, config, raw)
-            check_answer_tokens(answer, receipt.usage, request.stage)
+            check_answer_tokens(answer, receipt.usage, request)
         except ValueError as invalid:
             result = _failed(request, str(invalid), sent=True, unknown=False, receipt=receipt)
         except Exception:  # noqa: BLE001 - any other interpretation error keeps the stored raw answer as a definite failure
             result = _failed(request, "provider_response_invalid", sent=True, unknown=False, receipt=receipt)
         else:
-            result = StageResult(schema_version=CHAT_SCHEMA_VERSION, invocation_id=request.invocation_id,
-                                 stage=request.stage, status="succeeded", answer=answer, failure=None, receipt=receipt)
+            result = StageResult(schema_version=request.schema_version, invocation_id=request.invocation_id,
+                                 stage=request.stage, status="succeeded", answer=answer, failure=None, receipt=receipt,
+                                 resource_binding=request.binding())
         ledger.finish(result)
         return result
     finally:

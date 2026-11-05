@@ -148,6 +148,12 @@ public final class ChatMcpTools {
                 .callHandler((context, request) -> call(context, request)).build()).toList();
     }
 
+    public int definitionBytes() {
+        var root = com.zoop.common.json.StrictJson.newObject();
+        root.set("tools", mapper.valueToTree(specifications().stream().map(SyncToolSpecification::tool).toList()));
+        return com.zoop.common.json.Canonical.bytes(root).length;
+    }
+
     /** Whether the context's grant lists the tool; {@code tools/list} shows only these. */
     public static boolean visible(McpTransportContext context, McpSchema.Tool tool) {
         return context.get(GRANT) instanceof ChatMcpGrant grant
@@ -232,7 +238,7 @@ public final class ChatMcpTools {
         CompletableFuture<Void> mine = new CompletableFuture<>();
         CompletableFuture<Void> earlier = flights.putIfAbsent(flight, mine);
         try {
-            if (earlier != null) awaitEarlier(earlier, control.remaining());
+            if (earlier != null) awaitEarlier(earlier, control.readRemaining());
             Optional<ChatKeptToolResult> reused = executor.keptToolResult(run.jobId(), run.attemptNo(),
                     call.capabilityId(), digest);
             if (reused.isPresent()) {
@@ -258,7 +264,11 @@ public final class ChatMcpTools {
                 || ChatRunControl.RESULTS_OVER_BUDGET.equals(result.error())) {
             return refused(result.error());
         }
-        Map<String, Object> structured = structured(result, delivery.withheld, delivery.cachedFrom);
+        return callback(result, delivery.withheld, delivery.cachedFrom);
+    }
+
+    private McpSchema.CallToolResult callback(ChatToolResult result, ChatMcpSendGate.Withheld withheld, String cachedFrom) {
+        Map<String, Object> structured = structured(result, withheld, cachedFrom);
         return McpSchema.CallToolResult.builder().structuredContent(structured)
                 .addTextContent(mapper.writeValueAsString(structured)).isError(!result.succeeded()).build();
     }
@@ -304,6 +314,10 @@ public final class ChatMcpTools {
 
         @Override
         public String keep(ChatToolResult result) {
+            var wire = callback(result, withheld, cachedFrom);
+            if (mapper.writeValueAsBytes(wire).length > 790528) {
+                throw new com.zoop.chat.executor.ChatToolCallRefused(ChatRunControl.RESULT_TOO_LARGE);
+            }
             return mapper.writeValueAsString(structured(result, withheld, cachedFrom));
         }
     }

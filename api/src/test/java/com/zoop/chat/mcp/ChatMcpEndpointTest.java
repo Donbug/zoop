@@ -110,6 +110,22 @@ class ChatMcpEndpointTest {
     }
 
     @Test
+    void aStillValidSignedGrantCannotStartAnApprovedReadAfterTheReadCutoff() throws Exception {
+        String token = token(ChatCapability.COMPANY_READ);
+        var grant = grants.verify(token).orElseThrow();
+        assertTrue(grant.expiresAt().isAfter(clock.instant()));
+        var approved = approve("company_read", "{\"targets\":[\"KRX:005930\"]}");
+        assertTrue(approved.approved());
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        attached.control().readCutoff(NOW.minusMillis(1));
+        var reply = rpc(token, call("company_read", "{\"targets\":[\"KRX:005930\"]}"));
+        assertEquals(ChatMcpTools.RUN_NOT_ACTIVE, error(reply));
+        assertEquals("reserved", store.toolCalls(JOB).getFirst().status);
+        assertEquals(0, companyReads.size());
+        assertEquals(grant.expiresAt(), grants.verify(token).orElseThrow().expiresAt());
+    }
+
+    @Test
     void aBrowserOriginIsRefusedEvenWithAToken() throws Exception {
         var request = request("Bearer " + token(ChatCapability.COMPANY_READ), ping());
         request.addHeader("Origin", "https://example.com");
@@ -425,11 +441,11 @@ class ChatMcpEndpointTest {
     }
 
     private void running(String jobId, int attemptNo) {
-        String attempts = "[{\"n\":" + attemptNo + ",\"mode\":\"run\",\"requestKey\":\"" + jobId
-                + "\",\"status\":\"running\",\"ownerToken\":\"owner-" + jobId + "\"}]";
+        String attempts = com.zoop.chat.executor.ChatResourceFixtures.freshAttempts("[{\"n\":" + attemptNo + ",\"mode\":\"run\",\"requestKey\":\"" + jobId
+                + "\",\"status\":\"running\",\"ownerToken\":\"owner-" + jobId + "\"}]");
         store.add(new ChatJobRow(jobId, "conv-0001", "member-a", 1, "삼성전자 최근 사건", "a".repeat(64), NOW, CONTEXT,
                 SELECTION, List.of(), "gv-1", "queued", null, null, null, null, 0, null, null, 0, attempts, NOW, NOW, null));
-        assertTrue(store.start(jobId, "owner-" + jobId, NOW.plusSeconds(45), NOW.plusSeconds(60), attempts, NOW));
+        assertTrue(store.start(jobId, "owner-" + jobId, NOW.plusSeconds(1200), NOW.plusSeconds(1215), attempts, NOW));
     }
 
     /** What the server does when it approves a model's call request: reserve exactly that call. */

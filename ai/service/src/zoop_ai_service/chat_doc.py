@@ -1,13 +1,15 @@
 """Authored OpenAPI semantics and examples of the chatbot model stage family. Every example is built through the real wire models, so an example that
 stops validating fails at generation; the route and model schemas themselves come from the application (`app.openapi()`)."""
 from __future__ import annotations
+import json
+from importlib.resources import files
 
 from typing import Any
 
 from .chat_wire import ChatMcpHealth, ChatStageRequest, ChatStageResult
 
 DESCRIPTION = """\
-**Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-5`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
+**Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-6`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
 stage synchronously through the installed `zoop-ai-chat invoke`: `chat-router` (native Jev, typed probabilities per requirement), `chat-answer` (Luna, a strict
 JSON answer by sections), `chat-verification` (native Jev, per-claim support and unsupported-causality verdicts plus per-section prohibited-advice) or `chat-agent` (one step of a Luna Responses run
 that calls the ZOOP MCP tools). It is off unless its all-or-nothing server configuration group is set (otherwise 409 `execution_unavailable` after
@@ -22,12 +24,12 @@ and keeps it out of every identity and stored answer. The MCP server URL is neve
 through this runtime); a step is sent only when it is exactly the stage's own recipient, otherwise it fails `mcp_recipient_mismatch` with nothing sent.
 
 **Once per invocation.** `invocationId` (equal to `Idempotency-Key`) names one stage of one attempt. The runtime sends it at most once: the same id and input
-return the stored outcome, another input under the same id is the stage failure `invocation_conflict`, and a request whose outcome is unknown stays `unknown`.
+return the stored outcome, changed input/resources under the same id are `invocation_conflict`, and a request whose outcome is unknown stays `unknown`.
 The id is bound to the calling principal. A **200** carries the stage outcome: `status=succeeded` with the typed `answer`, or `status=failed` with a stable
 `failure.code`, whether a request was `sent` and whether its fate is `unknown`. A **502/504 `stage_outcome_unknown`** means the runtime may have sent the
 request: never resend that invocation. A **503** means nothing was sent.
 
-**Verification server facts.** The v5 verification input has `requestBinding` (`invocationId`, pinned `graphVersionId`, `asOf`)
+**Verification server facts.** The verification input has `requestBinding` (`invocationId`, pinned `graphVersionId`, `asOf`)
 and ordered sections (`sectionId`, `requirementIds`, `basis`, ordered `claims`, `evidenceIds`, `serverFacts`). The application alone
 derives bounded typed `portfolio_scope`, `graph_comparison`, `publication_record` and `briefing_selection` facts from
 successful reads in that request, never from answer text. A publication record is an issue's last review decision (kind,
@@ -40,7 +42,17 @@ requirements, versions or extra fields. Old stage envelopes are refused; the ind
 
 **Live and rights.** Nothing reaches a provider unless the chat gate is open (`ZOOP_AI_CHAT_LIVE_ENABLED=1` and a positive `ZOOP_AI_CHAT_MAX_CALLS`, shared by
 the chat stages and separate from the S1 and pipeline gates), and quoted spans are sent only under the operator chat grant registry (`model-send`, the stage
-as purpose and the exact recipient). Stage time limits: router 4 s, answer 25 s, verification 6 s, agent step 30 s.
+as purpose and the exact recipient). Each invocation carries its frozen resource allocation; the provider timeout is integer milliseconds.
+The service child deadline is provider timeout +5 s, followed by at most5 s termination grace.
+
+**Resource preflight (`GET /internal/v1/chat-runtime-capabilities`).** Under `chat.invoke`, this content-free route returns the installed worker's
+closed capability manifest and SHA-256 of its canonical `runtime`. It starts only `zoop-ai-chat capabilities`, with neither ledger nor provider work.
+Every fresh schema6 stage validates that fingerprint and the allocation digest before a send; replies bind the requested policy, runtime and allocation
+digests in `resourceBinding`. Java owns policy and invocation allocations. Luna direct and agent calls both use Responses; direct answers use `store=false`.
+The local profile admits512k current-context input,64k total output,16k visible output and48k final Unicode code points with high effort; output is
+configurable through128k and efforts are none/low/medium/high/xhigh/max. Successful Luna usage includes input/output/reasoning counts; missing or
+inconsistent counts fail `provider_usage_invalid` with the raw response retained. Historical schema5 ledger outcomes remain exact read-only outcomes;
+fresh schema5 execution is refused. A20-minute job ceiling and600-second provider ceiling are offline upper bounds, not normal latency targets.
 
 **MCP preflight (`GET /internal/v1/chat-mcp-health`).** Under the same `chat.invoke` scope, the service runs `zoop-ai-chat probe-mcp` with no request body,
 grant, model call, ledger row or live-budget charge. The child sends a content-free JSON-RPC `ping` to the operator-configured MCP URL and treats only that
@@ -53,40 +65,44 @@ EV = "ev-" + "1" * 64
 
 
 def examples() -> dict[str, Any]:
+    allocations = json.loads(files(__package__).joinpath("chat_resource_examples.json").read_text(encoding="utf-8"))
     request = ChatStageRequest.model_validate({
-        "schemaVersion": "zoop-ai-chat-5", "invocationId": "job-00000001:1:chat-router", "stage": "chat-router", "mode": "replay",
+        "schemaVersion": "zoop-ai-chat-6", "invocationId": "job-00000001:1:chat-router", "stage": "chat-router", "mode": "replay",
         "input": {"turns": [{"text": "HBM이 뭐야?"}], "requirements": [{"requirementId": "r1", "text": "HBM이 뭐야", "explicit": True}],
-                  "capabilities": []}})
+                  "capabilities": []}, "resources": allocations["chat-router:replay"]["resources"]})
     receipt = {"provider": "authored-replay", "providerRevision": "authored-replay-1", "model": "authored-synthetic-chat-router",
                "promptVersion": "zoop-jev-chat-router-0123456789abcdef", "executionMode": "replay",
                "usage": {"inputTokens": None, "outputTokens": None, "cachedTokens": None, "reasoningTokens": None},
                "sentAt": "2026-10-22T03:00:00+00:00", "receivedAt": "2026-10-22T03:00:01+00:00"}
     succeeded = ChatStageResult.model_validate({
-        "schemaVersion": "zoop-ai-chat-5", "invocationId": "job-00000001:1:chat-router", "stage": "chat-router", "status": "succeeded",
+        "schemaVersion": "zoop-ai-chat-6", "invocationId": "job-00000001:1:chat-router", "stage": "chat-router", "status": "succeeded",
         "answer": {"requirements": [{"requirementId": "r1", "types": {"Q01": 0.02, "Q02": 0.95, "Q03": 0.04, "Q04": 0.01, "Q05": 0.01,
                                                                       "Q06": 0.01, "Q07": 0.01, "Q08": 0.01},
                                      "capabilities": {}, "prohibitedAdvice": 0.02, "dependsOn": None}]},
-        "failure": None, "receipt": receipt})
+        "failure": None, "receipt": receipt, "resourceBinding": allocations["chat-router:replay"]["binding"]})
     failed = ChatStageResult.model_validate({
-        "schemaVersion": "zoop-ai-chat-5", "invocationId": "job-00000001:1:chat-answer", "stage": "chat-answer", "status": "failed",
-        "answer": None, "failure": {"code": "source_grant_denied", "sent": False, "unknown": False}, "receipt": None})
+        "schemaVersion": "zoop-ai-chat-6", "invocationId": "job-00000001:1:chat-answer", "stage": "chat-answer", "status": "failed",
+        "answer": None, "failure": {"code": "source_grant_denied", "sent": False, "unknown": False}, "receipt": None,
+        "resourceBinding": allocations["chat-answer:replay"]["binding"]})
     agent = ChatStageRequest.model_validate({
-        "schemaVersion": "zoop-ai-chat-5", "invocationId": "job-00000001:1:chat-agent:2", "stage": "chat-agent", "mode": "replay",
+        "schemaVersion": "zoop-ai-chat-6", "invocationId": "job-00000001:1:chat-agent:2", "stage": "chat-agent", "mode": "replay",
         "input": {"turns": [{"text": "SK하이닉스 최근 사건 알려줘"}],
                   "requirements": [{"requirementId": "r1", "label": "SK하이닉스 최근 사건", "general": False}],
                   "mcp": {"authorization": "zmcp1.k1.synthetic-grant-token.synthetic-mac", "allowedTools": ["company_read", "issue_read"],
                           "recipient": "authored-replay"},
                   "maxCitations": 20,
                   "continuation": {"previousResponseId": "resp_synthetic_1",
-                                   "decisions": [{"approvalRequestId": "mcpr_synthetic_1", "approve": True}]}}})
+                                   "decisions": [{"approvalRequestId": "mcpr_synthetic_1", "approve": True}]}},
+        "resources": allocations["chat-agent:replay"]["resources"]})
     held = ChatStageResult.model_validate({
-        "schemaVersion": "zoop-ai-chat-5", "invocationId": "job-00000001:1:chat-agent:1", "stage": "chat-agent", "status": "succeeded",
+        "schemaVersion": "zoop-ai-chat-6", "invocationId": "job-00000001:1:chat-agent:1", "stage": "chat-agent", "status": "succeeded",
         "answer": {"responseId": "resp_synthetic_1", "status": "approval_required", "answer": None, "mcpCalls": [],
                    "approvalRequests": [{"approvalRequestId": "mcpr_synthetic_1", "toolName": "company_read",
                                          "arguments": {"targets": ["KRX:000660"]}, "requirementIds": ["r1"]}]},
-        "failure": None, "receipt": {**receipt, "model": "authored-synthetic-chat-agent", "promptVersion": "zoop-chat-agent-0123456789abcdef"}})
-    reachable = ChatMcpHealth.model_validate({"schemaVersion": "zoop-ai-chat-5", "mcp": "reachable"})
-    unreachable = ChatMcpHealth.model_validate({"schemaVersion": "zoop-ai-chat-5", "mcp": "unreachable", "reason": "mcp_timeout"})
+        "failure": None, "receipt": {**receipt, "model": "authored-synthetic-chat-agent", "promptVersion": "zoop-chat-agent-resource-1"},
+        "resourceBinding": allocations["chat-agent:replay"]["binding"]})
+    reachable = ChatMcpHealth.model_validate({"schemaVersion": "zoop-ai-chat-6", "mcp": "reachable"})
+    unreachable = ChatMcpHealth.model_validate({"schemaVersion": "zoop-ai-chat-6", "mcp": "unreachable", "reason": "mcp_timeout"})
     return {"request": request.wire(), "succeeded": succeeded.wire(), "failed": failed.wire(), "agent": agent.wire(), "held": held.wire(),
             "reachable": reachable.wire(), "unreachable": unreachable.wire()}
 

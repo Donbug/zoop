@@ -60,10 +60,10 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Real Java adapters -> ai/service (uvicorn) -> installed {@code zoop-ai-chat}, replay only. The inputs are built by the
+ * Real Java adapters -> ai/service (uvicorn) -> source-pinned {@code zoop-ai-chat}, replay only. The inputs are built by the
  * production {@link ChatModelStages} from the same synthetic scenario the gate authored its replay fixture from
  * ({@code api/scripts/ai_chat_gate.py}); the replay answers only an input identical in every field, so a passing stage proves
- * the two sides agree on {@code zoop-ai-chat-5}. Not runnable on its own: {@code make api-ai-chat-smoke} starts the service and
+ * the two sides agree on {@code zoop-ai-chat-6}. Not runnable on its own: {@code make api-ai-chat-smoke} starts the service and
  * exports {@code ZOOP_AI_CHAT_CONTRACT_MANIFEST}. Without it every test fails; none skips.
  */
 @Tag("ai-chat-contract")
@@ -87,6 +87,8 @@ class AiChatContractTest {
     private String baseUrl;
     private String chatToken;
     private String readerToken;
+    private JsonNode allocations;
+    private com.zoop.ai.chat.ChatRuntimeCapabilities installed;
 
     @BeforeAll
     void load() throws IOException {
@@ -98,6 +100,15 @@ class AiChatContractTest {
         baseUrl = manifest.get("baseUrl").stringValue();
         chatToken = manifest.get("chatToken").stringValue();
         readerToken = manifest.get("readerToken").stringValue();
+        allocations = manifest.get("allocations");
+        installed = new com.zoop.ai.chat.ChatRuntimeCapabilities(manifest.get("capabilities"));
+    }
+
+    private com.zoop.ai.chat.ChatModelPermit permit(String stage) { return permit(stage, "replay"); }
+
+    private com.zoop.ai.chat.ChatModelPermit permit(String stage, String mode) {
+        return new com.zoop.ai.chat.ChatModelPermit(stage, mode, allocations.path(stage + ":" + mode),
+                installed.fixedInputOverheadBytes(stage));
     }
 
     @AfterAll
@@ -106,8 +117,8 @@ class AiChatContractTest {
     }
 
     private ChatModelStages stages(String token, String mode) {
-        var client = new HttpChatStageClient(AiClientSettings.of(baseUrl, token, Duration.ofSeconds(3), Duration.ofSeconds(35),
-                2_097_152));
+        var client = new HttpChatStageClient(AiClientSettings.ofChat(baseUrl, token, Duration.ofSeconds(3), Duration.ofSeconds(613),
+                2_097_152, Set.of()));
         clients.add(client);
         return new ChatModelStages(client, mode, new CompanyNameResolver(null) {
             @Override
@@ -172,7 +183,7 @@ class AiChatContractTest {
 
     @Test
     void theRouterAnswersTheServerSplitRequirementsWithTypedProbabilities() {
-        ChatRouteDecision decision = stages().route(run(ROUTER_QUESTION), BOUND);
+        ChatRouteDecision decision = stages().route(run(ROUTER_QUESTION), BOUND, permit("chat-router"));
         assertNull(decision.ambiguity());
         var concept = decision.requirements().get(0);
         var facts = decision.requirements().get(1);
@@ -189,19 +200,22 @@ class AiChatContractTest {
 
     @Test
     void theRouterCarriesADependentRequirementCheckpoint() {
-        ChatRouteDecision decision = stages().route(run(DEPENDENCY_QUESTION), BOUND);
+        ChatRouteDecision decision = stages().route(run(DEPENDENCY_QUESTION), BOUND, permit("chat-router"));
 
         assertNull(decision.requirements().getFirst().dependsOn());
         assertEquals(new ChatRouteDecision.Dependency("r1", "exactly", 2), decision.requirements().get(1).dependsOn());
+        assertEquals("succeeded null", recorded.getLast());
     }
 
     @Test
     void theAnswerIsGeneratedFromTheGrantedQuote() {
-        ChatGeneratedAnswer answer = stages().generate(run(ANSWER_QUESTION), context(EVIDENCE));
+        ChatGeneratedAnswer answer = stages().generate(run(ANSWER_QUESTION), context(EVIDENCE), permit("chat-answer"));
         assertEquals(List.of(new ChatGeneratedAnswer.Section("evidence_grounded", EVIDENCE_TEXT, List.of("r1"), List.of(EVIDENCE))),
                 answer.sections());
         assertEquals(List.of("c-samsung"), answer.graphTargetIds());
         assertEquals("authored-synthetic-chat-answer", receipts.getLast().model());
+        assertEquals("succeeded null", recorded.getLast());
+        assertEquals(100L, receipts.getLast().outputTokens());
     }
 
     @Test
@@ -210,14 +224,16 @@ class AiChatContractTest {
                 new ChatGeneratedAnswer.Section("evidence_grounded", EVIDENCE_TEXT, List.of("r1"), List.of(EVIDENCE)),
                 new ChatGeneratedAnswer.Section("general_knowledge", GENERAL_TEXT, List.of("r2"), List.of()));
         ChatRun run = run(ANSWER_QUESTION, "chat-verify-gate");
-        ChatSemanticVerdicts verdicts = stages().verify(run, sections, List.of(citation(EVIDENCE, "art-synthetic")),
-                ChatModels.ServerFacts.withoutTools(run, sections));
+        ChatSemanticVerdicts verdicts = stages().verify(run, sections, List.of(citation(EVIDENCE, "art-synthetic")), ChatModels.ServerFacts.withoutTools(run, sections), permit("chat-verification"));
         assertEquals(List.of(
                 new ChatSemanticVerdicts.Verdict("no", List.of(
                         new ChatSemanticVerdicts.ClaimVerdict("s0c0", "supported", "no"))),
                 new ChatSemanticVerdicts.Verdict("no", List.of(
                         new ChatSemanticVerdicts.ClaimVerdict("s1c0", null, "no")))),
                 verdicts.sections());
+        assertEquals("succeeded null", recorded.getLast(), "a fallback must not count as a verified CLI outcome");
+        assertEquals("authored-synthetic-chat-verification", receipts.getLast().model());
+        org.junit.jupiter.api.Assertions.assertNotNull(receipts.getLast().receivedAt());
     }
 
     @Test
@@ -249,10 +265,10 @@ class AiChatContractTest {
                                 List.of(EVIDENCE), true, false);
                     }
                 }));
-        ChatModels.Router router = (run, bound) -> new ChatRouteDecision(List.of(new ChatRouteDecision.Requirement(
+        ChatModels.Router router = (run, bound, permit) -> new ChatRouteDecision(List.of(new ChatRouteDecision.Requirement(
                 "r1", "내 종목 지도 변경", true, Map.of(ChatQueryType.Q05, 0.9, ChatQueryType.Q07, 0.9),
                 Map.of("portfolio.scope.read", 0.9, "graph.version.diff", 0.9), List.of(), 0.0, null)), null);
-        ChatModels.Generator generator = (run, context) -> {
+        ChatModels.Generator generator = (run, context, permit) -> {
             assertEquals(1, context.branches().size(), "scope branch is merged into its parent");
             return new ChatGeneratedAnswer(List.of(new ChatGeneratedAnswer.Section("evidence_grounded",
                     "보유 종목 삼성전자와 관심 종목 NVIDIA의 조회된 지도 변경입니다.", List.of("r1"), List.of(EVIDENCE))),
@@ -262,7 +278,7 @@ class AiChatContractTest {
         try (var runner = new ChatToolRunner(registry);
                 var engine = new OrchestratedChatEngine(router, generator, stages(), registry, runner,
                         (id, version, asOf, trace) -> Optional.of(citation(id, "art-synthetic")),
-                        Clock.fixed(Instant.parse("2026-10-22T00:00:00Z"), ZoneOffset.UTC))) {
+                        Clock.fixed(Instant.parse("2026-10-22T00:00:00Z"), ZoneOffset.UTC), stages())) {
             var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
                     engine.answer(run("내 종목 지도 변경", "chat-facts-gate"), control));
             assertEquals("answered", outcome.result().outcome());
@@ -270,14 +286,16 @@ class AiChatContractTest {
         assertEquals(2, reads.get(), "verifier must not requery membership");
         assertEquals(3, control.modelCalls);
         assertEquals("replay", receipts.getLast().executionMode());
+        assertEquals("succeeded null", recorded.getLast(), "the bound verifier must actually succeed");
     }
 
-    private static final class GateControl implements ChatRunControl {
+    private static final class GateControl extends com.zoop.chat.executor.ChatResourceFixtures.Control {
+        @Override protected Clock resourceClock() { return Clock.fixed(Instant.parse("2026-10-22T00:00:00Z"), ZoneOffset.UTC); }
         int modelCalls;
         int toolCalls;
         public void phase(String phase) { }
         public void beforeModelCall() { modelCalls++; }
-        public Duration remaining() { return Duration.ofSeconds(60); }
+        public Duration remaining() { return Duration.ofSeconds(1200); }
         public void shortenDeadline(Instant deadline) { }
         public boolean owned() { return true; }
         public int toolCallsLeft() { return 12; }
@@ -295,37 +313,37 @@ class AiChatContractTest {
     void theSameInvocationIsAnsweredFromTheLedgerAndNeverSentAgain() {
         ChatModelStages stages = stages();
         ChatRun run = run(ROUTER_QUESTION);
-        ChatRouteDecision first = stages.route(run, BOUND);
+        ChatRouteDecision first = stages.route(run, BOUND, permit("chat-router"));
         ChatStageReply.Receipt sent = receipts.getLast();
-        ChatRouteDecision again = stages.route(run, BOUND);
+        ChatRouteDecision again = stages.route(run, BOUND, permit("chat-router"));
         assertEquals(first, again);
         assertEquals(sent.sentAt(), receipts.getLast().sentAt(), "a resend returns the stored outcome");
     }
 
     @Test
     void aQuoteWithoutAChatGrantIsRefusedBeforeSending() {
-        assertEquals(Fate.REFUSED, fate(() -> stages().generate(run(ANSWER_QUESTION), context(UNGRANTED_EVIDENCE))));
+        assertEquals(Fate.REFUSED, fate(() -> stages().generate(run(ANSWER_QUESTION), context(UNGRANTED_EVIDENCE), permit("chat-answer"))));
         assertEquals("failed source_grant_denied", recorded.getLast());
         assertNull(receipts.getLast());
     }
 
     @Test
     void anInputTheFixtureDoesNotKnowIsRefusedNotGuessed() {
-        assertEquals(Fate.REFUSED, fate(() -> stages().route(run("등록되지 않은 질문"), BOUND)));
+        assertEquals(Fate.REFUSED, fate(() -> stages().route(run("등록되지 않은 질문"), BOUND, permit("chat-router"))));
         assertEquals("failed replay_input_mismatch", recorded.getLast());
     }
 
     @Test
-    void liveModeIsRefusedWhileTheServiceGateIsClosed() {
-        // The service knows a supported model, so the request reaches the live gate itself; enable, budget and keys are unset.
-        assertEquals(Fate.REFUSED, fate(() -> stages(chatToken, "live").route(run(ROUTER_QUESTION), BOUND)));
-        assertEquals("failed chat_live_disabled", recorded.getLast());
+    void missingLiveProviderConfigurationIsRefusedBeforeSending() {
+        // Required provider configuration is checked before the closed spending gate.
+        assertEquals(Fate.REFUSED, fate(() -> stages(chatToken, "live").route(run(ROUTER_QUESTION), BOUND, permit("chat-router", "live"))));
+        assertEquals("failed provider_key_required", recorded.getLast());
         assertNull(receipts.getLast(), "nothing was sent");
     }
 
     @Test
     void aPrincipalWithoutChatInvokeIsRefused() {
-        assertEquals(Fate.REFUSED, fate(() -> stages(readerToken, "replay").route(run(ROUTER_QUESTION), BOUND)));
+        assertEquals(Fate.REFUSED, fate(() -> stages(readerToken, "replay").route(run(ROUTER_QUESTION), BOUND, permit("chat-router"))));
         assertEquals("failed scope_denied", recorded.getLast());
     }
 }

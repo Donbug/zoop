@@ -80,22 +80,22 @@ class ChatModelStagesTest {
     });
 
     private ChatModelStages stages(ChatModelRecorder recorder) {
-        return new ChatModelStages(call -> {
+        return new ChatModelStages(com.zoop.chat.executor.ChatResourceFixtures.client(call -> {
             calls.add(call);
             return answer.apply(call);
-        }, "replay", new CompanyNameResolver(null) {
+        }), "replay", new CompanyNameResolver(null) {
         @Override
         public List<Mention> mentions(String text) {
             return match(text, CATALOG);
         }
-    }, new IssueNameResolver(null) {
+            }, new IssueNameResolver(null) {
         @Override
         public Names at(String graphVersion, Instant asOf) {
             issueReads++;
             if (issueOutage) throw new com.zoop.chat.tool.ChatToolUnavailable("graph down");
             return text -> match(text, issueCatalog);
         }
-    }, (evidenceId, graphVersion, asOf, traceId) -> evidenceId.equals(EV_A)
+            }, (evidenceId, graphVersion, asOf, traceId) -> evidenceId.equals(EV_A)
             ? Optional.of(citation(EV_A, "삼성전자가 HBM을 공급한다."))
             : Optional.empty(),
             articleId -> Optional.of("news-provider-1"), recorder);
@@ -117,13 +117,44 @@ class ChatModelStagesTest {
     }
 
     private static ChatStageReply succeeded(ChatStageCall call, String answerJson) {
-        return new ChatStageReply(call.invocationId(), call.stage(), true, StrictJson.parseObject(answerJson).node(), null,
-                RECEIPT);
+        var receipt = call.stage().equals("chat-answer") || call.stage().equals("chat-agent")
+                ? new ChatStageReply.Receipt("openai-compatible", "synthetic", "gpt-6-luna", "synthetic", "replay",
+                        100L, 100L, 0L, RECEIPT.sentAt(), RECEIPT.receivedAt()) : RECEIPT;
+        return new ChatStageReply(call.invocationId(), call.stage(), true, StrictJson.parseObject(answerJson).node(), null, receipt, call.permit().binding());
     }
 
     private static ChatStageReply failed(ChatStageCall call, boolean sent, boolean unknown) {
-        return new ChatStageReply(call.invocationId(), call.stage(), false, null,
-                new ChatStageReply.Failure("some_failure", sent, unknown), sent ? RECEIPT : null);
+        return new ChatStageReply(call.invocationId(), call.stage(), false, null, new ChatStageReply.Failure("some_failure", sent, unknown), sent ? RECEIPT : null, call.permit().binding());
+    }
+
+    @Test
+    void sixBranchesCanReuseTwentyKoreanQuotesWithinTheCurrentContext() {
+        List<String> ids = java.util.stream.IntStream.range(100, 120).mapToObj(i -> "ev-" + String.format("%064x", i)).toList();
+        var received = new ArrayList<ChatStageCall>();
+        var recorder = org.mockito.Mockito.mock(ChatModelRecorder.class);
+        org.mockito.Mockito.when(recorder.start(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString())).thenReturn("aix-shared-quotes");
+        var client = com.zoop.chat.executor.ChatResourceFixtures.client(call -> {
+            received.add(call);
+            return succeeded(call, """
+                    {"sections":[{"basis":"evidence_grounded","text":"합성 설명입니다.","requirementIds":["r1"],"evidenceIds":[]}],
+                    "insufficientRequirementIds":["r2","r3","r4","r5","r6"],"graphTargetIds":[]}""");
+        });
+        var model = new ChatModelStages(client, "replay", null, null, (id, version, asOf, trace) -> Optional.of(
+                citation(id, "가".repeat(2000))), article -> Optional.of("news-provider-1"), recorder);
+        var result = new ChatToolResult("chat-tool-1", "tc-shared", "company.read", "gv-1", List.of(), ids, false, false, null);
+        var branches = java.util.stream.IntStream.rangeClosed(1, 6).mapToObj(i -> new ChatBranchContext.Branch(
+                "r" + i, "합성 요구", Set.of(ChatQueryType.Q03), false, List.of(result), false)).toList();
+        var generated = model.generate(run(root("합성 자료 설명")), new ChatBranchContext(List.of(), null, branches, 20),
+                com.zoop.chat.executor.ChatResourceFixtures.permit("chat-answer"));
+        assertEquals("합성 설명입니다.", generated.sections().getFirst().text());
+        assertEquals(1, received.size());
+        var input = received.getFirst().input();
+        assertTrue(StrictJson.write(input).length > 720000);
+        assertTrue(com.zoop.chat.executor.ChatResourcePolicy.estimatedInputTokens("chat-answer", input)
+                + received.getFirst().permit().fixedInputOverheadBytes() < 512000);
+        assertEquals(6, input.path("branches").size());
+        for (var branch : input.path("branches")) assertEquals(20, branch.path("evidence").size());
     }
 
     @Test
@@ -135,7 +166,7 @@ class ChatModelStagesTest {
                  "approvalRequests":[{"approvalRequestId":"mcpr_1","toolName":"company_read","arguments":{"targets":["KRX:000660"],"limit":null},"requirementIds":["r1"]}]}""");
         var held = stages.step(run(root("SK하이닉스 최근 사건")), 1, new com.zoop.chat.orchestrator.ChatModels.AgentInput(
                 List.of(requirement), "zmcp1.k1.payload.mac-synthetic", List.of("company_read"), "authored-replay", 20, null,
-                List.of()));
+                List.of()), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-agent"));
         assertFalse(held.completed());
         assertEquals("company_read", held.approvals().getFirst().toolName());
         assertEquals(List.of("r1"), held.approvals().getFirst().requirementIds());
@@ -157,7 +188,7 @@ class ChatModelStagesTest {
                            "insufficientRequirementIds":[],"graphTargetIds":["KRX:000660"]}}""".formatted(EV_A));
         var done = stages.step(run(root("SK하이닉스 최근 사건")), 2, new com.zoop.chat.orchestrator.ChatModels.AgentInput(
                 List.of(requirement), "zmcp1.k1.payload.mac-synthetic", List.of("company_read"), "authored-replay", 20, "resp_1",
-                List.of(new com.zoop.chat.orchestrator.ChatModels.Decision("mcpr_1", true))));
+                List.of(new com.zoop.chat.orchestrator.ChatModels.Decision("mcpr_1", true))), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-agent"));
         assertTrue(done.completed());
         assertEquals(List.of(EV_A), done.answer().sections().getFirst().evidenceIds());
         var continuation = calls.get(1).input().path("continuation");
@@ -172,7 +203,7 @@ class ChatModelStagesTest {
                   {"requirementId":"r1","types":{"Q02":0.9},"capabilities":{},"prohibitedAdvice":0.0,"dependsOn":null},
                   {"requirementId":"r2","types":{"Q03":0.8},"capabilities":{"company.read":0.9,"graph.version.diff":0.8},
                    "prohibitedAdvice":0.05,"dependsOn":null}]}""");
-        ChatRouteDecision decision = stages.route(run(root("PER이 뭐야? 삼성전자 관련 사건 알려줘")), Set.of("company.read", "issue.read"));
+        ChatRouteDecision decision = stages.route(run(root("PER이 뭐야? 삼성전자 관련 사건 알려줘")), Set.of("company.read", "issue.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
 
         ChatStageCall call = calls.getFirst();
         assertEquals("chat-router", call.stage());
@@ -202,9 +233,7 @@ class ChatModelStagesTest {
                    "prohibitedAdvice":0.0,
                    "dependsOn":{"requirementId":"r1","cardinality":"exactly","count":2}}]}""");
 
-        ChatRouteDecision decision = stages.route(
-                run(root("내 종목과 연결된 회사를 찾아줘? 정확히 두 곳이면 그 회사 최근 사건을 알려줘")),
-                Set.of("portfolio.scope.read", "graph.path.read", "company.read"));
+        ChatRouteDecision decision = stages.route(run(root("내 종목과 연결된 회사를 찾아줘? 정확히 두 곳이면 그 회사 최근 사건을 알려줘")), Set.of("portfolio.scope.read", "graph.path.read", "company.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
 
         assertNull(decision.requirements().getFirst().dependsOn());
         assertEquals(new ChatRouteDecision.Dependency("r1", "exactly", 2), decision.requirements().get(1).dependsOn());
@@ -220,8 +249,7 @@ class ChatModelStagesTest {
                    "prohibitedAdvice":0.0,
                    "dependsOn":{"requirementId":"r1","cardinality":"atLeast","count":1}}]}""");
 
-        ChatRouteDecision decision = stages.route(run(root("내 종목 찾아줘? 삼성전자 소식도 알려줘")),
-                Set.of("portfolio.scope.read", "company.read"));
+        ChatRouteDecision decision = stages.route(run(root("내 종목 찾아줘? 삼성전자 소식도 알려줘")), Set.of("portfolio.scope.read", "company.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
 
         assertEquals(List.of(SAMSUNG.id()), decision.requirements().get(1).targets());
         assertNull(decision.requirements().get(1).dependsOn());
@@ -229,7 +257,7 @@ class ChatModelStagesTest {
 
     @Test
     void aSharedNameIsAClarificationWithoutAnyModelCallUntilTheMemberPicks() {
-        ChatRouteDecision decision = stages.route(run(root("한미 관련 공시 알려줘")), Set.of("company.read"));
+        ChatRouteDecision decision = stages.route(run(root("한미 관련 공시 알려줘")), Set.of("company.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
         assertTrue(calls.isEmpty());
         assertEquals("company", decision.ambiguity().kind());
         assertEquals(List.of("c-hanmi-pharm", "c-hanmi-science"),
@@ -239,7 +267,7 @@ class ChatModelStagesTest {
                 {"requirements":[{"requirementId":"r1","types":{"Q03":0.9},"capabilities":{"company.read":0.9},
                   "prohibitedAdvice":0.0,"dependsOn":null}]}""");
         ChatRouteDecision picked = stages.route(run(root("한미 관련 공시 알려줘"),
-                new ChatRun.Turn("chat-job-0002", "한미사이언스", "c-hanmi-science", "한미사이언스 (008930)")), Set.of("company.read"));
+                new ChatRun.Turn("chat-job-0002", "한미사이언스", "c-hanmi-science", "한미사이언스 (008930)")), Set.of("company.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
         assertNull(picked.ambiguity());
         assertEquals(List.of("c-hanmi-science"), picked.requirements().getFirst().targets());
         assertEquals("한미사이언스 (008930)", calls.getFirst().input().get("turns").get(1).get("choiceLabel").stringValue());
@@ -252,21 +280,20 @@ class ChatModelStagesTest {
         answer = call -> succeeded(call, """
                 {"requirements":[{"requirementId":"r1","types":{"Q03":0.9},"capabilities":{},"prohibitedAdvice":0.0,"dependsOn":null}]}""");
         issueCatalog = List.of(supply);
-        ChatRouteDecision named = stages.route(run(root("HBM 공급 계약에 삼성전자가 엮였어")), Set.of("issue.read"));
+        ChatRouteDecision named = stages.route(run(root("HBM 공급 계약에 삼성전자가 엮였어")), Set.of("issue.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
         assertEquals(List.of(SAMSUNG.id(), "iss-supply"), named.requirements().getFirst().targets());
         assertTrue(calls.getFirst().input().toString().indexOf("iss-supply") < 0, "issue ids are never sent to the router");
 
         calls.clear();
         issueCatalog = List.of(supply, again);
-        ChatRouteDecision shared = stages.route(run(root("HBM 공급 계약 사건 알려줘")), Set.of("issue.read"));
+        ChatRouteDecision shared = stages.route(run(root("HBM 공급 계약 사건 알려줘")), Set.of("issue.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
         assertEquals(1, calls.size(), "issues are resolved after the router, so a shared issue name asks after it");
         assertEquals("other", shared.ambiguity().kind(), "the public choice kinds have none for issues");
         assertEquals(List.of("차세대 HBM 공급 계약 (2026-09-22)", "HBM 추가 공급 계약 (2026-10-02)"),
                 shared.ambiguity().options().stream().map(ChatRouteDecision.Option::label).toList());
 
         ChatRouteDecision picked = stages.route(run(root("HBM 공급 계약 사건 알려줘"),
-                new ChatRun.Turn("chat-job-0002", "HBM 추가 공급 계약", "iss-supply-2", "HBM 추가 공급 계약 (2026-10-02)")),
-                Set.of("issue.read"));
+                new ChatRun.Turn("chat-job-0002", "HBM 추가 공급 계약", "iss-supply-2", "HBM 추가 공급 계약 (2026-10-02)")), Set.of("issue.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
         assertNull(picked.ambiguity());
         assertEquals(List.of("iss-supply-2"), picked.requirements().getFirst().targets());
     }
@@ -278,7 +305,7 @@ class ChatModelStagesTest {
         answer = call -> succeeded(call, """
                 {"requirements":[{"requirementId":"r1","types":{"Q02":0.9,"Q03":0.2},"capabilities":{},
                   "prohibitedAdvice":0.0,"dependsOn":null}]}""");
-        ChatRouteDecision concept = stages.route(run(root("HBM 공급 계약이 뭐야")), Set.of("issue.read"));
+        ChatRouteDecision concept = stages.route(run(root("HBM 공급 계약이 뭐야")), Set.of("issue.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
         assertEquals(List.of(), concept.requirements().getFirst().targets(), "a concept names no issue");
         assertEquals(0, issueReads);
 
@@ -286,7 +313,7 @@ class ChatModelStagesTest {
                 {"requirements":[{"requirementId":"r1","types":{"Q02":0.6,"Q03":0.4},"capabilities":{},
                   "prohibitedAdvice":0.0,"dependsOn":null}]}""");
         assertThrows(com.zoop.chat.tool.ChatToolUnavailable.class,
-                () -> stages.route(run(root("HBM 공급 계약이 뭐야")), Set.of("issue.read")),
+                () -> stages.route(run(root("HBM 공급 계약이 뭐야")), Set.of("issue.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router")),
                 "a question that may look the issue up needs the graph, and its outage is the reads' outage");
         assertEquals(1, issueReads);
     }
@@ -299,8 +326,7 @@ class ChatModelStagesTest {
         answer = call -> succeeded(call, """
                 {"requirements":[{"requirementId":"r1","types":{"Q01":0.9},"capabilities":{"zoopPolicy.read":0.9},
                   "prohibitedAdvice":0.0,"dependsOn":null}]}""");
-        ChatRouteDecision policy = stages.route(run(root("탈퇴하면 HBM 공급 계약 대화 기록은 어떻게 돼?")),
-                Set.of("zoopPolicy.read", "issue.read"));
+        ChatRouteDecision policy = stages.route(run(root("탈퇴하면 HBM 공급 계약 대화 기록은 어떻게 돼?")), Set.of("zoopPolicy.read", "issue.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
         assertEquals(1, policy.requirements().size());
         assertEquals(List.of(), policy.requirements().getFirst().targets());
         assertEquals(0, issueReads, "a document question is not held up by the graph");
@@ -309,7 +335,7 @@ class ChatModelStagesTest {
         answer = call -> succeeded(call, """
                 {"requirements":[{"requirementId":"r1","types":{"Q01":0.9,"Q06":0.9},"capabilities":{"zoopPolicy.read":0.9},
                   "prohibitedAdvice":0.0,"dependsOn":null}]}""");
-        stages.route(run(root("HBM 공급 계약 브리핑과 약관")), Set.of("zoopPolicy.read", "issue.read"));
+        stages.route(run(root("HBM 공급 계약 브리핑과 약관")), Set.of("zoopPolicy.read", "issue.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
         assertEquals(0, issueReads);
     }
 
@@ -319,7 +345,7 @@ class ChatModelStagesTest {
                 {"requirements":[{"requirementId":"r1","types":{"Q03":0.9},"capabilities":{"company.read":0.9},
                   "prohibitedAdvice":0.0,"dependsOn":null}]}""");
         ChatRouteDecision typed = stages.route(run(root("한미 관련 공시 알려줘"),
-                new ChatRun.Turn("chat-job-0002", "한미사이언스", null, null)), Set.of("company.read"));
+                new ChatRun.Turn("chat-job-0002", "한미사이언스", null, null)), Set.of("company.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
         assertNull(typed.ambiguity());
         assertEquals(List.of("c-hanmi-science"), typed.requirements().getFirst().targets());
     }
@@ -327,7 +353,7 @@ class ChatModelStagesTest {
     @Test
     void aFreeTextReplyNarrowsARootWithTooManyRequirements() {
         String seven = "A가 뭐야? B는? C는? D는? E는? F는? 삼성전자 관련 사건은?";
-        ChatRouteDecision tooMany = stages.route(run(root(seven)), Set.of("company.read"));
+        ChatRouteDecision tooMany = stages.route(run(root(seven)), Set.of("company.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
         assertEquals(7, tooMany.requirements().size());
         assertTrue(calls.isEmpty(), "the router is not asked about more requirements than the planner accepts");
 
@@ -335,7 +361,7 @@ class ChatModelStagesTest {
                 {"requirements":[{"requirementId":"r1","types":{"Q02":0.9},"capabilities":{},"prohibitedAdvice":0.0,"dependsOn":null},
                   {"requirementId":"r2","types":{"Q03":0.9},"capabilities":{"company.read":0.9},"prohibitedAdvice":0.0,"dependsOn":null}]}""");
         ChatRouteDecision narrowed = stages.route(run(root(seven),
-                new ChatRun.Turn("chat-job-0002", "A가 뭐야? 삼성전자 관련 사건은?", null, null)), Set.of("company.read"));
+                new ChatRun.Turn("chat-job-0002", "A가 뭐야? 삼성전자 관련 사건은?", null, null)), Set.of("company.read"), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
         assertEquals(List.of("A가 뭐야", "삼성전자 관련 사건은"),
                 narrowed.requirements().stream().map(ChatRouteDecision.Requirement::label).toList());
         assertEquals(List.of("c-samsung"), narrowed.requirements().get(1).targets());
@@ -352,8 +378,7 @@ class ChatModelStagesTest {
                         new ChatToolItem(EV_B, "evidence", "허가 없는 기사 제목", List.of(), List.of(EV_B))),
                 List.of(EV_A), false, false, null);
         var branch = new ChatBranchContext.Branch("r1", "삼성전자 관련 사건", Set.of(ChatQueryType.Q03), false, List.of(result), false);
-        ChatGeneratedAnswer generated = stages.generate(run(root("삼성전자 관련 사건")),
-                new ChatBranchContext(List.of(), null, List.of(branch), 20));
+        ChatGeneratedAnswer generated = stages.generate(run(root("삼성전자 관련 사건")), new ChatBranchContext(List.of(), null, List.of(branch), 20), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-answer"));
 
         JsonNode sent = calls.getFirst().input().get("branches").get(0);
         assertNull(sent.get("paths"), "a branch without a path read sends no paths");
@@ -377,8 +402,7 @@ class ChatModelStagesTest {
         var sections = List.of(new ChatGeneratedAnswer.Section("general_knowledge", "PER은…", List.of("r1"), List.of()),
                 new ChatGeneratedAnswer.Section("evidence_grounded", "공급합니다.", List.of("r2"), List.of(EV_A)));
         ChatRun run = run(root("q"));
-        ChatSemanticVerdicts verdicts = stages.verify(run, sections, List.of(citation(EV_A, "인용")),
-                ChatModels.ServerFacts.withoutTools(run, sections));
+        ChatSemanticVerdicts verdicts = stages.verify(run, sections, List.of(citation(EV_A, "인용")), ChatModels.ServerFacts.withoutTools(run, sections), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-verification"));
         assertEquals(new ChatSemanticVerdicts.Verdict("no", List.of(
                 new ChatSemanticVerdicts.ClaimVerdict("s0c0", null, "no"))), verdicts.sections().get(0));
         assertEquals(new ChatSemanticVerdicts.Verdict("hold", List.of(
@@ -402,7 +426,7 @@ class ChatModelStagesTest {
                 List.of(), List.of(hit), null);
         var branch = new ChatBranchContext.Branch("r1", "HBM 소식", Set.of(ChatQueryType.Q03), false, List.of(search), true);
 
-        stages.generate(run(root("HBM 소식")), new ChatBranchContext(List.of(), null, List.of(branch), 20));
+        stages.generate(run(root("HBM 소식")), new ChatBranchContext(List.of(), null, List.of(branch), 20), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-answer"));
 
         JsonNode sent = calls.getFirst().input().get("branches").get(0);
         assertEquals(id, sent.get("evidence").get(0).get("evidenceId").stringValue());
@@ -422,7 +446,7 @@ class ChatModelStagesTest {
         ChatRun run = run(root("q"));
         var sections = List.of(new ChatGeneratedAnswer.Section("web_reported", "HBM은 D램을 쌓은 메모리라고 보도됐어요.",
                 List.of("r1"), List.of(hit)));
-        stages.verify(run, sections, List.of(web), ChatModels.ServerFacts.withoutTools(run, sections));
+        stages.verify(run, sections, List.of(web), ChatModels.ServerFacts.withoutTools(run, sections), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-verification"));
         JsonNode sent = calls.getFirst().input();
         assertEquals("web-search:synthetic", sent.get("citations").get(0).get("sourceId").stringValue());
         assertEquals(hit, sent.get("citations").get(0).get("evidenceId").stringValue());
@@ -439,7 +463,7 @@ class ChatModelStagesTest {
         ChatRun run = run(root("q"));
         var sections = List.of(new ChatGeneratedAnswer.Section("zoop_documented", "탈퇴하면 지워집니다.",
                 List.of("r1"), List.of(EV_B)));
-        stages.verify(run, sections, List.of(doc), ChatModels.ServerFacts.withoutTools(run, sections));
+        stages.verify(run, sections, List.of(doc), ChatModels.ServerFacts.withoutTools(run, sections), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-verification"));
         JsonNode sent = calls.getFirst().input();
         assertEquals("zoop-docs", sent.get("citations").get(0).get("sourceId").stringValue());
         assertEquals("zoop_documented", sent.get("sections").get(0).get("basis").stringValue());
@@ -481,7 +505,7 @@ class ChatModelStagesTest {
                 List.of(EV_A), false, false, null, List.of(paths));
         var branch = new ChatBranchContext.Branch("r1", "삼성전자와 엔비디아의 관계", Set.of(ChatQueryType.Q04), false,
                 List.of(result), false);
-        stages.generate(run(root("삼성전자와 엔비디아의 관계")), new ChatBranchContext(List.of(), null, List.of(branch), 20));
+        stages.generate(run(root("삼성전자와 엔비디아의 관계")), new ChatBranchContext(List.of(), null, List.of(branch), 20), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-answer"));
         return calls.getFirst().input().get("branches").get(0).get("paths");
     }
 
@@ -489,27 +513,27 @@ class ChatModelStagesTest {
     void stageFailuresMapToTheirFate() {
         ChatRun run = run(root("PER이 뭐야"));
         answer = call -> failed(call, true, true);
-        assertEquals(Fate.UNKNOWN, fate(() -> stages.route(run, Set.of())));
+        assertEquals(Fate.UNKNOWN, fate(() -> stages.route(run, Set.of(), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"))));
         assertTrue(recorded.getLast().startsWith("finish unknown"));
         answer = call -> failed(call, true, false);
-        assertEquals(Fate.NOT_SENT, fate(() -> stages.route(run, Set.of())));
+        assertEquals(Fate.NOT_SENT, fate(() -> stages.route(run, Set.of(), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"))));
         answer = call -> failed(call, false, false);
-        assertEquals(Fate.REFUSED, fate(() -> stages.route(run, Set.of())));
+        assertEquals(Fate.REFUSED, fate(() -> stages.route(run, Set.of(), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"))));
         answer = call -> succeeded(call, "{\"requirements\":[]}");
-        assertEquals(Fate.NOT_SENT, fate(() -> stages.route(run, Set.of())), "an answer for other requirements is malformed");
+        assertEquals(Fate.NOT_SENT, fate(() -> stages.route(run, Set.of(), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"))), "an answer for other requirements is malformed");
 
         answer = call -> { throw rejection(503); };
-        assertEquals(Fate.NOT_SENT, fate(() -> stages.route(run, Set.of())));
+        assertEquals(Fate.NOT_SENT, fate(() -> stages.route(run, Set.of(), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"))));
         answer = call -> { throw rejection(504); };
-        assertEquals(Fate.UNKNOWN, fate(() -> stages.route(run, Set.of())));
+        assertEquals(Fate.UNKNOWN, fate(() -> stages.route(run, Set.of(), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"))));
         answer = call -> { throw rejection(409); };
-        assertEquals(Fate.REFUSED, fate(() -> stages.route(run, Set.of())));
+        assertEquals(Fate.REFUSED, fate(() -> stages.route(run, Set.of(), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"))));
         answer = call -> { throw new AiTransportException(AiOperation.CHAT_STAGE, "r", AiTransportException.Failure.CONNECT_FAILED,
                 OptionalInt.empty(), null); };
-        assertEquals(Fate.NOT_SENT, fate(() -> stages.route(run, Set.of())));
+        assertEquals(Fate.NOT_SENT, fate(() -> stages.route(run, Set.of(), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"))));
         answer = call -> { throw new AiTransportException(AiOperation.CHAT_STAGE, "r", AiTransportException.Failure.TIMEOUT,
                 OptionalInt.empty(), null); };
-        assertEquals(Fate.UNKNOWN, fate(() -> stages.route(run, Set.of())));
+        assertEquals(Fate.UNKNOWN, fate(() -> stages.route(run, Set.of(), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"))));
     }
 
     @Test
@@ -557,7 +581,7 @@ class ChatModelStagesTest {
                 {"requirements":[{"requirementId":"r1","types":{"Q02":0.9},"capabilities":{},"prohibitedAdvice":0.0,"dependsOn":null}]}""");
         var restored = new AtomicBoolean();
         Thread stage = Thread.ofPlatform().start(() -> {
-            stages.route(run(root("PER이 뭐야")), Set.of());
+            stages.route(run(root("PER이 뭐야")), Set.of(), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
             restored.set(Thread.currentThread().isInterrupted());
         });
 

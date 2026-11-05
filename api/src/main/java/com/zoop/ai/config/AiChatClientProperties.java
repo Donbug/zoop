@@ -13,8 +13,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * transport. Independent of the other AI clients, so a principal and token with only {@code chat.invoke} can be used. Disabled
  * unless {@code enabled=true}; when enabled every value is validated at startup and a failure names
  * {@code zoop.ai.chat-client.<setting>}, never a value. {@code mode} is {@code replay} (authored fixtures on the AI side, no
- * network) or {@code live} (real model calls behind the AI service's own chat gate). The request timeout covers the longest stage
- * (answer, 25 s) plus the service's margin. The token is never printed.
+ * network) or {@code live} (real model calls behind the AI service's own chat gate). The configured transport ceiling must
+ * cover the longest provider allowance plus thirteen seconds; each request uses its persisted permit's derived timeout.
  */
 @ConfigurationProperties("zoop.ai.chat-client")
 public record AiChatClientProperties(
@@ -23,7 +23,7 @@ public record AiChatClientProperties(
         String token,
         @DefaultValue("replay") String mode,
         @DefaultValue("3s") Duration connectTimeout,
-        @DefaultValue("35s") Duration requestTimeout,
+        @DefaultValue("613s") Duration requestTimeout,
         @DefaultValue("2097152") int maxResponseBytes) {
     static final String PREFIX = "zoop.ai.chat-client";
 
@@ -31,7 +31,7 @@ public record AiChatClientProperties(
         // Outside the try: a bad host list is reported under zoop.ai, not under this client's prefix.
         Set<String> plaintextHttpHosts = transport.hosts();
         try {
-            return AiClientSettings.of(baseUrl, token, connectTimeout, requestTimeout, maxResponseBytes, plaintextHttpHosts);
+            return AiClientSettings.ofChat(baseUrl, token, connectTimeout, requestTimeout, maxResponseBytes, plaintextHttpHosts);
         } catch (AiClientConfigurationException error) {
             throw error.under(PREFIX);
         }

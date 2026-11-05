@@ -108,6 +108,9 @@ public final class ChatMcpAgent implements ChatAgentPath {
     }
 
     @Override
+    public int toolDefinitionBytes() { return tools.definitionBytes(); }
+
+    @Override
     public Outcome run(ChatRun run, ChatRunControl control, List<ChatModels.AgentRequirement> requirements,
             List<ChatCapability> allowed, int maxCitations, Steps steps) {
         String token = grants.issue(run, allowed);
@@ -125,7 +128,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
         int approved = 0;
         int denied = 0;
         int webApproved = 0;
-        long inputTokens = 0;
+        boolean finalizing = false;
         Set<String> notices = new LinkedHashSet<>();
         String web = ChatMcpTools.name(ChatCapability.WEB_SEARCH);
         Set<String> searchable = new LinkedHashSet<>();
@@ -140,14 +143,22 @@ public final class ChatMcpAgent implements ChatAgentPath {
         for (int step = 1, rounds = 0; ; step++) {
             var input = new ChatModels.AgentInput(requirements, token, names, recipient, maxCitations, previous,
                     decisions);
+            long explicitUnits = com.zoop.chat.executor.ChatResourcePolicy.estimatedInputTokens("chat-agent", input.stageInput(run));
+            if (previous == null && !steps.contextFits(0, 0, explicitUnits, 0)) {
+                throw new ChatModels.Failure(ChatModels.Failure.Fate.REFUSED, ChatModels.INPUT_BUDGET_EXCEEDED, "agent context is over its bound");
+            }
             int number = step;
             ChatModels.AgentStep outcome;
             try {
-                outcome = steps.run(() -> agent.step(run, number, input));
+                outcome = steps.run(permit -> agent.step(run, number, input, permit), finalizing);
             } catch (ChatModels.Failure failure) {
                 // This run remains failed. The observation affects only the path selected by later jobs.
                 if (circuit != null) circuit.agentFailed(failure.code());
                 throw failure;
+            }
+            if (outcome.inputTokens() == null || outcome.outputTokens() == null
+                    || outcome.inputTokens() < 0 || outcome.outputTokens() < 0) {
+                throw new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, "provider_usage_invalid", "agent usage is incomplete");
             }
             if (outcome.completed()) {
                 List<ChatToolResult> results = kept(run);
@@ -159,16 +170,8 @@ public final class ChatMcpAgent implements ChatAgentPath {
                 throw new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, "the agent kept asking after its last round");
             }
             rounds++;
-            // A continuation carries at least what this step took as input. With no room for one more, the run stops unsent;
-            // with room for only one, that one writes the answer. A provider that reports nothing counts as nothing.
-            long last = outcome.inputTokens() == null ? 0 : outcome.inputTokens();
-            inputTokens += last;
-            if (inputTokens + last > ChatModels.MAX_INPUT_TOKENS) {
-                throw new ChatModels.Failure(ChatModels.Failure.Fate.REFUSED, ChatModels.INPUT_BUDGET_EXCEEDED,
-                        "the run has no input tokens left for another step");
-            }
-            // Past the last round, or with time or tokens for only one more step, nothing more runs: the next step answers.
-            boolean closing = rounds > MAX_ROUNDS || steps.closing() || inputTokens + 2 * last > ChatModels.MAX_INPUT_TOKENS;
+            // Billing input can repeat across Responses continuations; only the current context governs admission.
+            boolean closing = finalizing || rounds > MAX_ROUNDS || steps.closing();
             if (closing) rounds = MAX_ROUNDS + 1;
             List<ChatToolResult> done = closing ? List.of() : kept(run);
             done.forEach(result -> served.getOrDefault(result.toolCallId(), List.of())
@@ -177,6 +180,10 @@ public final class ChatMcpAgent implements ChatAgentPath {
             gaps.addAll(openFromStart);
             Set<String> webOpen = webOpen(gaps, concepts, searched, searchable);
             List<ChatModels.Decision> next = new ArrayList<>();
+            // False is one ASCII character longer than true, so this bounds the exact next input for every decision.
+            var nextInput = new ChatModels.AgentInput(requirements, token, names, recipient, maxCitations, outcome.responseId(),
+                    outcome.approvals().stream().map(request -> new ChatModels.Decision(request.id(), false)).toList());
+            long continuationUnits = com.zoop.chat.executor.ChatResourcePolicy.estimatedInputTokens("chat-agent", nextInput.stageInput(run));
             int round = 0;
             for (ChatModels.ApprovalRequest request : outcome.approvals()) {
                 boolean approve = false;
@@ -186,6 +193,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
                 // check. Past four in a round the rest are denied; Luna may ask for them again in the next round.
                 List<String> serves = request.requirementIds();
                 if (!closing && round < MAX_ROUND_CALLS && names.contains(request.toolName())
+                        && steps.contextFits(outcome.inputTokens(), outcome.outputTokens(), continuationUnits, round + 1)
                         && !serves.isEmpty() && reachable.keySet().containsAll(serves)
                         && (search ? webOpen.containsAll(serves)
                                 : !concepts.containsAll(serves)
@@ -213,6 +221,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
             }
             previous = outcome.responseId();
             decisions = next;
+            finalizing = closing;
         }
     }
 

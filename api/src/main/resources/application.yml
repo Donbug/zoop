@@ -129,6 +129,18 @@ zoop:
     # submit and retry answer 503 MODEL_UNAVAILABLE instead of leaving a job queued forever, and startup refuses intake on
     # without an engine. Reading conversations and jobs always works.
     questions-enabled: ${ZOOP_CHAT_QUESTIONS_ENABLED:false}
+    resources:
+      max-input-tokens: ${ZOOP_CHAT_RESOURCE_MAX_INPUT_TOKENS:512000}
+      max-output-tokens: ${ZOOP_CHAT_RESOURCE_MAX_OUTPUT_TOKENS:64000}
+      max-visible-output-tokens: ${ZOOP_CHAT_RESOURCE_MAX_VISIBLE_OUTPUT_TOKENS:16000}
+      max-answer-chars: ${ZOOP_CHAT_RESOURCE_MAX_ANSWER_CHARS:48000}
+      reasoning-effort: ${ZOOP_CHAT_RESOURCE_REASONING_EFFORT:high}
+      job-timeout: ${ZOOP_CHAT_RESOURCE_JOB_TIMEOUT:1200s}
+      router-provider-timeout: ${ZOOP_CHAT_RESOURCE_ROUTER_PROVIDER_TIMEOUT:15s}
+      generation-provider-timeout: ${ZOOP_CHAT_RESOURCE_GENERATION_PROVIDER_TIMEOUT:600s}
+      verification-provider-timeout: ${ZOOP_CHAT_RESOURCE_VERIFICATION_PROVIDER_TIMEOUT:45s}
+      direct-retrieval-timeout: ${ZOOP_CHAT_RESOURCE_DIRECT_RETRIEVAL_TIMEOUT:120s}
+      web-supplement-timeout: ${ZOOP_CHAT_RESOURCE_WEB_SUPPLEMENT_TIMEOUT:240s}
     approved-docs:
       # Q01 help.search and screenSpec.read. Keep off until immutable approved versions of both guides have been registered
       # in chat_document_versions. Enabling without both current approved documents fails startup instead of exposing drafts.
@@ -260,7 +272,7 @@ zoop:
       token: ${ZOOP_AI_CHAT_CLIENT_TOKEN:}
       mode: ${ZOOP_AI_CHAT_CLIENT_MODE:replay}
       connect-timeout: ${ZOOP_AI_CHAT_CLIENT_CONNECT_TIMEOUT:3s}
-      request-timeout: ${ZOOP_AI_CHAT_CLIENT_REQUEST_TIMEOUT:35s}
+      request-timeout: ${ZOOP_AI_CHAT_CLIENT_REQUEST_TIMEOUT:613s}
       max-response-bytes: ${ZOOP_AI_CHAT_CLIENT_MAX_RESPONSE_BYTES:2097152}
   document-import:
     # Operator-only, non-web import of S2-1 extracted text (see api/docs/DOCUMENT_IMPORT.md). Disabled by default; the

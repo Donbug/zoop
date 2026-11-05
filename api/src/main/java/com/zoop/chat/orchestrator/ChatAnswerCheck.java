@@ -50,7 +50,13 @@ final class ChatAnswerCheck {
     /** Distinct evidence one answer cites at most. */
     static final int MAX_CITATIONS = 20;
     static final int MAX_GRAPH_TARGETS = 50;
-    static final int MAX_ANSWER = 12_000;
+    static final int MAX_ANSWER = 96_000;
+    static {
+        if (MAX_SECTIONS * (GENERAL_NOTICE.codePointCount(0, GENERAL_NOTICE.length()) + 1)
+                + (MAX_SECTIONS - 1) * 2 > com.zoop.chat.executor.ChatResourcePolicy.SERVER_TEXT_RESERVE) {
+            throw new ExceptionInInitializerError("chat server notice reserve is too small");
+        }
+    }
     private static final Set<String> BASES = Set.of("general_knowledge", "zoop_documented", "evidence_grounded",
             "web_reported");
     /** Current-fact markers a general explanation must not carry. */
@@ -78,6 +84,13 @@ final class ChatAnswerCheck {
     }
 
     static Result check(List<Branch> branches, ChatGeneratedAnswer answer) {
+        return check(branches, answer, com.zoop.chat.executor.ChatResourcePolicy.defaults().maxAnswerChars());
+    }
+
+    static Result check(List<Branch> branches, ChatGeneratedAnswer answer, int maxAnswerChars) {
+        long authored = answer.sections().stream().mapToLong(s -> s.text() == null ? 0
+                : s.text().codePointCount(0, s.text().length())).sum();
+        if (authored > maxAnswerChars - com.zoop.chat.executor.ChatResourcePolicy.SERVER_TEXT_RESERVE) return Result.fail("length");
         Map<String, Branch> byId = new HashMap<>();
         branches.forEach(b -> byId.put(b.requirementId(), b));
         if (answer.sections().size() > MAX_SECTIONS) return Result.fail("schema");
@@ -175,7 +188,8 @@ final class ChatAnswerCheck {
             targets.add(new GraphTarget(id, returned.get(id)));
         }
 
-        if (joined(sections).length() > MAX_ANSWER) return Result.fail("length");
+        String joined = joined(sections);
+        if (joined.codePointCount(0, joined.length()) > maxAnswerChars) return Result.fail("length");
         // A dropped section is checked too: advice wording fails the answer wherever it is.
         if (answer.sections().stream().anyMatch(s -> ADVICE.matcher(s.text()).find())) {
             return Result.fail("investment_wording");

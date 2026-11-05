@@ -23,6 +23,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .auth import authenticate
 from .chat_stages import ChatStages
 from .chat_wire import STAGES, ChatMcpHealth, ChatStageRequest, ChatStageResult
+from .chat_resources import ChatCapabilities
 from .config import Principal
 from .jobs import ApiError, JobService, Observation, Reply
 from .logs import emit
@@ -780,6 +781,21 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
     async def handoff_bundle(request: Request, principal: Annotated[Principal, Depends(require("handoff.read"))],
                              handoff_id: Annotated[str, PATH_HANDOFF_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
         return await handoff_call(request, "bundle", principal, handoff_id)
+
+    @app.get("/internal/v1/chat-runtime-capabilities", operation_id="getChatRuntimeCapabilities", tags=["chat-stages"],
+             response_model=ChatCapabilities, summary="Inspect the installed chat runtime contract without model or ledger work",
+             responses=CHAT_PROBE_ERRORS)
+    async def chat_runtime_capabilities(request: Request, _principal: Annotated[Principal, Depends(require("chat.invoke"))],
+                                       x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        chat_stages = request.app.state.chat
+        if chat_stages is None:
+            raise ApiError(409, "execution_unavailable")
+        graph_query(request, ())
+        if request.headers.get("Idempotency-Key") is not None or await read_body(request):
+            raise invalid("body")
+        seen = _context(request)["seen"] = Observation()
+        result = await run_in_threadpool(chat_stages.capabilities, seen)
+        return JSONResponse(result.wire(), status_code=200)
 
     @app.get("/internal/v1/chat-mcp-health", operation_id="probeChatMcp", tags=["chat-stages"], status_code=200,
              response_model=ChatMcpHealth, summary="Probe the configured ZOOP MCP endpoint without a grant or model call",

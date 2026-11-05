@@ -4,6 +4,27 @@
 
 Spring Boot 실행 기반, 공통 오류 처리, 내부 AI 분석 transport 클라이언트와 ERD v6에 맞춘 인증 DB 스키마가 있습니다. 공개 약관 조회·이메일 회원가입·로그인·회원/비회원 세션 발급 및 조회가 구현됐습니다. 문서 저장(`artifacts`·`articles`·`article_versions`)과 operator 전용 비웹 import([문서 import](docs/DOCUMENT_IMPORT.md)), S1 문서 분석([문서 분석](docs/DOCUMENT_ANALYSIS.md))도 지원합니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
 
+## 챗봇 자원 정책
+
+새 모델 실행은 Java의 `ChatResourcePolicy`를 첫 attempt metadata에 고정하고 `ChatJobResources`가 호출별 permit을 저장합니다. 같은 invocation은 저장한 resources를 그대로 사용하며, 결과의 `resourceBinding`을 대조합니다. 설치 worker capabilities는 기존 `chat.invoke` 인증으로 모델 호출 전에 확인합니다. 이전 schema5 결과·대화 이력·unknown은 당시 계약으로 읽고, 고정 정책이 없는 과거 작업의 재실행은 `chat_resource_policy_cutover_required`로 거부합니다. 전환 전에 실행 중 작업을 마치거나 취소하고 새 질문으로 시작합니다.
+
+후검증에서 프로토콜·자원 계약 오류나 명시적인 미전송 거부를 받으면 작업을 실패로 종료합니다. 바인딩 불일치는 `response_unknown`·재실행 불가로 보존합니다. replay의 readiness 검사는 자격 증명 전용 오류 `provider_key_required`·`provider_key_invalid`만 제외하며, live와 비밀값 이외의 설정 오류는 그대로 거부합니다. 기존 의미 검증 불가 시 처리의 출시 gate는 별도로 유지합니다.
+
+| 환경 변수 (`ZOOP_CHAT_RESOURCE_` 접두사) | 기본값 |
+| --- | --- |
+| `MAX_INPUT_TOKENS` / `MAX_OUTPUT_TOKENS` / `MAX_VISIBLE_OUTPUT_TOKENS` | `512000` / `64000` / `16000` |
+| `MAX_ANSWER_CHARS` / `REASONING_EFFORT` | `48000` code point / `high` |
+| `JOB_TIMEOUT` / `GENERATION_PROVIDER_TIMEOUT` | `1200s` / `600s` |
+| `ROUTER_PROVIDER_TIMEOUT` / `VERIFICATION_PROVIDER_TIMEOUT` | `15s` / `45s` |
+| `DIRECT_RETRIEVAL_TIMEOUT` / `WEB_SUPPLEMENT_TIMEOUT` | `120s` / `240s` |
+
+출력은 32,000~128,000토큰, effort는 `none|low|medium|high|xhigh|max`를 지원합니다. 모델 카드 상한인 입력 922,000·문맥 1,050,000 안에서 입력+출력을 검사하고, 표시 출력은 총 출력보다 작아야 합니다. 본문은 안내·구분자에 1,024 code point를 예약합니다. 명시 입력은 정규 JSON의 `(ASCII 수 // 4) + (나머지 code point 수 × 3 // 4)`로 추정하고 설치 runtime의 고정 여유를 더합니다. 현재 문맥 admission과 누적 청구 사용량은 구분합니다. 두 Luna 단계는 Responses이며 direct는 `store=false`, agent는 `store=true`와 승인 continuation을 사용합니다.
+
+기존 `ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT`·`ZOOP_AI_CHAT_AGENT_REASONING_EFFORT`를 제거하고 Java의 `ZOOP_CHAT_RESOURCE_REASONING_EFFORT`로 옮깁니다. 남아 있는 옛 effort 설정은 유료 routing 전에 거부합니다. `ZOOP_AI_CHAT_CLIENT_REQUEST_TIMEOUT` 기본값은 `613s`이며 가장 긴 설정 provider timeout+13초 이상이어야 합니다. 실제 HTTP 요청·body 대기는 permit의 T+13초를 사용하고, child는 T+5초와 최대 5초 종료 유예, Java 단계는 T+20초로 제한합니다. 모델 실행 기록은 시작·종료 각각 3초를 사용합니다.
+
+기본 완료 예약은 생성 620초+인용 재열람 30초+검증 65초+저장 10초입니다. direct 의존 조회는 같은 120초 창을 공유하고 agent의 승인·MCP callback도 완료 예약 전 마감에 묶입니다. 20분·600초는 오프라인 상한이며 운영 응답 지연 목표가 아닙니다. 비용·지연·MCP 유효기간 승인과 실제 모델 품질·검증 실패 처리의 출시 gate를 별도로 충족해야 합니다. 플래그 기본값과 기존 권한·호출 원장은 유지합니다.
+
+
 ## 도구
 
 - Java 21

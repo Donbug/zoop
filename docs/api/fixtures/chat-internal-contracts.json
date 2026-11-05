@@ -2,15 +2,22 @@
   "requests": [
     {
       "capabilityId": "document.search",
-      "targets": ["KRX:000660"],
+      "targets": [
+        "KRX:000660"
+      ],
       "limit": 5,
-      "evidenceScope": ["ev-hbm-1"],
+      "evidenceScope": [
+        "ev-hbm-1"
+      ],
       "since": "2026-10-01T00:00:00Z",
       "searchText": "HBM 공급 계약"
     },
     {
       "capabilityId": "graph.path.read",
-      "targets": ["KRX:000660", "NASDAQ:NVDA"],
+      "targets": [
+        "KRX:000660",
+        "NASDAQ:NVDA"
+      ],
       "limit": 20
     }
   ],
@@ -25,11 +32,17 @@
           "id": "ev-hbm-1",
           "kind": "article",
           "label": "합성 HBM 공급 계약",
-          "companyIds": ["KRX:000660"],
-          "evidenceIds": ["ev-hbm-1"]
+          "companyIds": [
+            "KRX:000660"
+          ],
+          "evidenceIds": [
+            "ev-hbm-1"
+          ]
         }
       ],
-      "evidenceIds": ["ev-hbm-1"],
+      "evidenceIds": [
+        "ev-hbm-1"
+      ],
       "truncated": false,
       "nextAllowed": false,
       "error": null
@@ -91,8 +104,12 @@
           "id": "r1",
           "mode": "tools",
           "stage": 1,
-          "types": ["Q03"],
-          "capabilities": ["document.search"]
+          "types": [
+            "Q03"
+          ],
+          "capabilities": [
+            "document.search"
+          ]
         }
       ],
       "path": "direct",
@@ -103,7 +120,9 @@
           "requirementId": "r1",
           "explicit": true,
           "status": "answered",
-          "toolCallIds": ["call-document-1"]
+          "toolCallIds": [
+            "call-document-1"
+          ]
         }
       ]
     },
@@ -120,5 +139,424 @@
         }
       ]
     }
-  ]
+  ],
+  "resourceContracts": {
+    "policy": {
+      "schemaVersion": "zoop-chat-resource-policy-1",
+      "policyRevision": "expanded-local-2026-11-05.1",
+      "maxInputTokens": 512000,
+      "maxOutputTokens": 64000,
+      "maxVisibleOutputTokens": 16000,
+      "maxAnswerChars": 48000,
+      "reasoningEffort": "high",
+      "jobTimeoutMs": 1200000,
+      "routerProviderTimeoutMs": 15000,
+      "generationProviderTimeoutMs": 600000,
+      "verificationProviderTimeoutMs": 45000,
+      "directRetrievalTimeoutMs": 120000,
+      "webSupplementTimeoutMs": 240000
+    },
+    "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+    "capabilities": {
+      "schemaVersion": "zoop-ai-chat-6",
+      "capabilitiesSchemaVersion": "zoop-chat-capabilities-1",
+      "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+      "runtime": {
+        "workerContractRevision": "zoop-chat-worker-resource-1",
+        "stageSchemaVersion": "zoop-ai-chat-6",
+        "resourceSchemaVersion": "zoop-chat-resource-1",
+        "modelLimits": {
+          "contextWindowTokens": 1050000,
+          "maxInputTokens": 922000,
+          "maxOutputTokens": 128000
+        },
+        "structuralLimits": {
+          "maxSections": 12,
+          "maxClaimsPerSection": 20,
+          "maxCitations": 20,
+          "maxAnswerChars": 96000,
+          "serverAddedTextReserveChars": 1024
+        },
+        "supportedReasoningEfforts": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "defaultReasoningEffort": "medium",
+        "stages": {
+          "chat-router": {
+            "provider": "typesafe-native",
+            "model": "jev-1.14.0",
+            "api": "systemone",
+            "adapterRevision": "zoop-jev-chat-9",
+            "adapterDigest": "200ca53067be26703738dfe0207760807c397cb0c7dcb05250279e7e12929d76",
+            "providerRevision": "da3d84abb00b8d57b45bd84c9ba2c6c7af5aada27340104c3b1b23621760516a",
+            "mcpServerRevision": null,
+            "fixedInputOverheadBytes": 0
+          },
+          "chat-answer": {
+            "provider": "openai-compatible",
+            "model": "gpt-6-luna",
+            "api": "responses",
+            "adapterRevision": "zoop-chat-answer-resource-1",
+            "adapterDigest": "c45fd6f7ecb2dba7bd25bf46db1db7756f9b65b9880ab5e5ed715e68eb94b8d6",
+            "providerRevision": "72ad3db948b22df147713c287d484511770cbb538350527656ee1311058d7425",
+            "mcpServerRevision": null,
+            "fixedInputOverheadBytes": 9346
+          },
+          "chat-verification": {
+            "provider": "typesafe-native",
+            "model": "jev-1.14.0",
+            "api": "systemone",
+            "adapterRevision": "zoop-jev-chat-9",
+            "adapterDigest": "9907deccb3bcf61d5cb86576e32eb4b6b7d48ddbc699291a4c2123376d4572d4",
+            "providerRevision": "da3d84abb00b8d57b45bd84c9ba2c6c7af5aada27340104c3b1b23621760516a",
+            "mcpServerRevision": null,
+            "fixedInputOverheadBytes": 0
+          },
+          "chat-agent": {
+            "provider": "openai-compatible",
+            "model": "gpt-6-luna",
+            "api": "responses",
+            "adapterRevision": "zoop-chat-agent-resource-1",
+            "adapterDigest": "a4ca6c64f9ffd56b77b6ca2f70a641a5adbb355dca49eba06fc861bcb799c28c",
+            "providerRevision": "72ad3db948b22df147713c287d484511770cbb538350527656ee1311058d7425",
+            "mcpServerRevision": "e2f532dbbce956bdc630c5f12835975782d4682780d0839ce72f09ab9ed9800f",
+            "fixedInputOverheadBytes": 73712
+          }
+        },
+        "timeModel": {
+          "workerProcessMarginMs": 5000,
+          "workerTerminationGraceMs": 5000,
+          "serviceSlotWaitMs": 1000,
+          "httpTransportDecodeMs": 2000,
+          "applicationModelRecordingMs": 6000,
+          "applicationGuardMs": 1000
+        }
+      },
+      "configurationErrors": {
+        "chat-router": "provider_key_required",
+        "chat-answer": "provider_key_required",
+        "chat-verification": "provider_key_required",
+        "chat-agent": "provider_key_required"
+      }
+    },
+    "allocations": {
+      "chat-router:replay": {
+        "preimage": {
+          "schemaVersion": "zoop-chat-resource-allocation-1",
+          "stage": "chat-router",
+          "mode": "replay",
+          "resources": {
+            "schemaVersion": "zoop-chat-resource-1",
+            "policyRevision": "expanded-local-2026-11-05.1",
+            "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "providerTimeoutMs": 15000,
+            "finalizing": false,
+            "luna": null
+          }
+        },
+        "resources": {
+          "schemaVersion": "zoop-chat-resource-1",
+          "policyRevision": "expanded-local-2026-11-05.1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "providerTimeoutMs": 15000,
+          "finalizing": false,
+          "luna": null,
+          "allocationDigest": "86965b868123416d6ad9a97be3abb55d586b5ee1c3f5a0845b6a0952c9769e18"
+        },
+        "binding": {
+          "schemaVersion": "zoop-chat-resource-binding-1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "allocationDigest": "86965b868123416d6ad9a97be3abb55d586b5ee1c3f5a0845b6a0952c9769e18"
+        }
+      },
+      "chat-router:live": {
+        "preimage": {
+          "schemaVersion": "zoop-chat-resource-allocation-1",
+          "stage": "chat-router",
+          "mode": "live",
+          "resources": {
+            "schemaVersion": "zoop-chat-resource-1",
+            "policyRevision": "expanded-local-2026-11-05.1",
+            "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "providerTimeoutMs": 15000,
+            "finalizing": false,
+            "luna": null
+          }
+        },
+        "resources": {
+          "schemaVersion": "zoop-chat-resource-1",
+          "policyRevision": "expanded-local-2026-11-05.1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "providerTimeoutMs": 15000,
+          "finalizing": false,
+          "luna": null,
+          "allocationDigest": "bdf298d148002b25e0eaf71a12a858a25620537c10ee28a28776c45e4f415c02"
+        },
+        "binding": {
+          "schemaVersion": "zoop-chat-resource-binding-1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "allocationDigest": "bdf298d148002b25e0eaf71a12a858a25620537c10ee28a28776c45e4f415c02"
+        }
+      },
+      "chat-answer:replay": {
+        "preimage": {
+          "schemaVersion": "zoop-chat-resource-allocation-1",
+          "stage": "chat-answer",
+          "mode": "replay",
+          "resources": {
+            "schemaVersion": "zoop-chat-resource-1",
+            "policyRevision": "expanded-local-2026-11-05.1",
+            "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "providerTimeoutMs": 600000,
+            "finalizing": true,
+            "luna": {
+              "maxInputTokens": 512000,
+              "maxOutputTokens": 64000,
+              "maxVisibleOutputTokens": 16000,
+              "maxAnswerChars": 48000,
+              "reasoningEffort": "high",
+              "generatedTextMaxChars": 46976
+            }
+          }
+        },
+        "resources": {
+          "schemaVersion": "zoop-chat-resource-1",
+          "policyRevision": "expanded-local-2026-11-05.1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "providerTimeoutMs": 600000,
+          "finalizing": true,
+          "luna": {
+            "maxInputTokens": 512000,
+            "maxOutputTokens": 64000,
+            "maxVisibleOutputTokens": 16000,
+            "maxAnswerChars": 48000,
+            "reasoningEffort": "high",
+            "generatedTextMaxChars": 46976
+          },
+          "allocationDigest": "68dc5bec08a7fb289544055ce5eef81d6b53650ebc429bb4713e2795e1abaffa"
+        },
+        "binding": {
+          "schemaVersion": "zoop-chat-resource-binding-1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "allocationDigest": "68dc5bec08a7fb289544055ce5eef81d6b53650ebc429bb4713e2795e1abaffa"
+        }
+      },
+      "chat-answer:live": {
+        "preimage": {
+          "schemaVersion": "zoop-chat-resource-allocation-1",
+          "stage": "chat-answer",
+          "mode": "live",
+          "resources": {
+            "schemaVersion": "zoop-chat-resource-1",
+            "policyRevision": "expanded-local-2026-11-05.1",
+            "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "providerTimeoutMs": 600000,
+            "finalizing": true,
+            "luna": {
+              "maxInputTokens": 512000,
+              "maxOutputTokens": 64000,
+              "maxVisibleOutputTokens": 16000,
+              "maxAnswerChars": 48000,
+              "reasoningEffort": "high",
+              "generatedTextMaxChars": 46976
+            }
+          }
+        },
+        "resources": {
+          "schemaVersion": "zoop-chat-resource-1",
+          "policyRevision": "expanded-local-2026-11-05.1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "providerTimeoutMs": 600000,
+          "finalizing": true,
+          "luna": {
+            "maxInputTokens": 512000,
+            "maxOutputTokens": 64000,
+            "maxVisibleOutputTokens": 16000,
+            "maxAnswerChars": 48000,
+            "reasoningEffort": "high",
+            "generatedTextMaxChars": 46976
+          },
+          "allocationDigest": "d5e873f4ddae5eaede59b5a31b105caca2561f5d3bf0417bf44ea7f2ac635d15"
+        },
+        "binding": {
+          "schemaVersion": "zoop-chat-resource-binding-1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "allocationDigest": "d5e873f4ddae5eaede59b5a31b105caca2561f5d3bf0417bf44ea7f2ac635d15"
+        }
+      },
+      "chat-verification:replay": {
+        "preimage": {
+          "schemaVersion": "zoop-chat-resource-allocation-1",
+          "stage": "chat-verification",
+          "mode": "replay",
+          "resources": {
+            "schemaVersion": "zoop-chat-resource-1",
+            "policyRevision": "expanded-local-2026-11-05.1",
+            "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "providerTimeoutMs": 45000,
+            "finalizing": false,
+            "luna": null
+          }
+        },
+        "resources": {
+          "schemaVersion": "zoop-chat-resource-1",
+          "policyRevision": "expanded-local-2026-11-05.1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "providerTimeoutMs": 45000,
+          "finalizing": false,
+          "luna": null,
+          "allocationDigest": "e3a443031a2109bd44e75188fac12b6bd26b275584ddc197bc2d7be182911818"
+        },
+        "binding": {
+          "schemaVersion": "zoop-chat-resource-binding-1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "allocationDigest": "e3a443031a2109bd44e75188fac12b6bd26b275584ddc197bc2d7be182911818"
+        }
+      },
+      "chat-verification:live": {
+        "preimage": {
+          "schemaVersion": "zoop-chat-resource-allocation-1",
+          "stage": "chat-verification",
+          "mode": "live",
+          "resources": {
+            "schemaVersion": "zoop-chat-resource-1",
+            "policyRevision": "expanded-local-2026-11-05.1",
+            "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "providerTimeoutMs": 45000,
+            "finalizing": false,
+            "luna": null
+          }
+        },
+        "resources": {
+          "schemaVersion": "zoop-chat-resource-1",
+          "policyRevision": "expanded-local-2026-11-05.1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "providerTimeoutMs": 45000,
+          "finalizing": false,
+          "luna": null,
+          "allocationDigest": "fd36ffb5e06f1f2c2fc7261c99d0e4ad9e578da165d052508f11defa0df8b6de"
+        },
+        "binding": {
+          "schemaVersion": "zoop-chat-resource-binding-1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "allocationDigest": "fd36ffb5e06f1f2c2fc7261c99d0e4ad9e578da165d052508f11defa0df8b6de"
+        }
+      },
+      "chat-agent:replay": {
+        "preimage": {
+          "schemaVersion": "zoop-chat-resource-allocation-1",
+          "stage": "chat-agent",
+          "mode": "replay",
+          "resources": {
+            "schemaVersion": "zoop-chat-resource-1",
+            "policyRevision": "expanded-local-2026-11-05.1",
+            "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "providerTimeoutMs": 600000,
+            "finalizing": false,
+            "luna": {
+              "maxInputTokens": 512000,
+              "maxOutputTokens": 64000,
+              "maxVisibleOutputTokens": 16000,
+              "maxAnswerChars": 48000,
+              "reasoningEffort": "high",
+              "generatedTextMaxChars": 46976
+            }
+          }
+        },
+        "resources": {
+          "schemaVersion": "zoop-chat-resource-1",
+          "policyRevision": "expanded-local-2026-11-05.1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "providerTimeoutMs": 600000,
+          "finalizing": false,
+          "luna": {
+            "maxInputTokens": 512000,
+            "maxOutputTokens": 64000,
+            "maxVisibleOutputTokens": 16000,
+            "maxAnswerChars": 48000,
+            "reasoningEffort": "high",
+            "generatedTextMaxChars": 46976
+          },
+          "allocationDigest": "5cdc8ff9372b4809c0d7a1bc1bfd3fdd7908a9dca562afa391e1426a15bb6170"
+        },
+        "binding": {
+          "schemaVersion": "zoop-chat-resource-binding-1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "allocationDigest": "5cdc8ff9372b4809c0d7a1bc1bfd3fdd7908a9dca562afa391e1426a15bb6170"
+        }
+      },
+      "chat-agent:live": {
+        "preimage": {
+          "schemaVersion": "zoop-chat-resource-allocation-1",
+          "stage": "chat-agent",
+          "mode": "live",
+          "resources": {
+            "schemaVersion": "zoop-chat-resource-1",
+            "policyRevision": "expanded-local-2026-11-05.1",
+            "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+            "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+            "providerTimeoutMs": 600000,
+            "finalizing": false,
+            "luna": {
+              "maxInputTokens": 512000,
+              "maxOutputTokens": 64000,
+              "maxVisibleOutputTokens": 16000,
+              "maxAnswerChars": 48000,
+              "reasoningEffort": "high",
+              "generatedTextMaxChars": 46976
+            }
+          }
+        },
+        "resources": {
+          "schemaVersion": "zoop-chat-resource-1",
+          "policyRevision": "expanded-local-2026-11-05.1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "providerTimeoutMs": 600000,
+          "finalizing": false,
+          "luna": {
+            "maxInputTokens": 512000,
+            "maxOutputTokens": 64000,
+            "maxVisibleOutputTokens": 16000,
+            "maxAnswerChars": 48000,
+            "reasoningEffort": "high",
+            "generatedTextMaxChars": 46976
+          },
+          "allocationDigest": "f4c37dc7a0e1d7387c161dee9c9e1b9597e852f7b5710db6a7f96980df3c060e"
+        },
+        "binding": {
+          "schemaVersion": "zoop-chat-resource-binding-1",
+          "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813",
+          "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971",
+          "allocationDigest": "f4c37dc7a0e1d7387c161dee9c9e1b9597e852f7b5710db6a7f96980df3c060e"
+        }
+      }
+    }
+  }
 }

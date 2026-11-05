@@ -83,12 +83,14 @@ final class ChatRetrieval {
     enum Outside { NAMED, ANCHOR }
 
     private final ChatToolRunner runner;
+    private final java.time.Clock clock;
 
-    ChatRetrieval(ChatToolRunner runner) {
+    ChatRetrieval(ChatToolRunner runner, java.time.Clock clock) {
         this.runner = runner;
+        this.clock = clock;
     }
 
-    Outcome run(ChatRun run, ChatRunControl control, ChatPlan.Run plan) {
+    Outcome run(ChatRun run, ChatRunControl control, ChatPlan.Run plan, Instant cutoff) {
         Map<String, List<ChatToolResult>> results = new LinkedHashMap<>();
         Map<String, String> limitations = new LinkedHashMap<>();
         Set<String> noneFound = new LinkedHashSet<>();
@@ -189,7 +191,8 @@ final class ChatRetrieval {
                 }
             }
             if (calls.isEmpty()) continue;
-            List<ChatToolResult> stageResults = runner.runStage(run, control, 1, calls);
+            List<ChatToolResult> stageResults = runner.runStage(run, control, 1, calls, null,
+                    java.time.Duration.between(clock.instant(), cutoff));
             for (ChatToolResult result : stageResults) {
                 if (!result.succeeded() && !passing(result)) return new Outcome(results, limitations, noneFound, null, result);
             }

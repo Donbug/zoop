@@ -154,7 +154,7 @@ ai/service/.venv/bin/python ai/service/scripts/online_admission_actual_smoke.py 
 
 ## 챗봇 모델 단계 클라이언트
 
-`com.zoop.ai.chat.ChatStageClient`(`HttpChatStageClient`)는 `POST /internal/v1/chat-stages/{stage}`(계약 `zoop-ai-chat-5`)로 챗봇 모델 단계 하나를 동기로 실행합니다. 단계는 `chat-router`(Jev), `chat-answer`(Luna), `chat-verification`(Jev), `chat-agent`(Luna Responses 승인 루프의 한 단계)입니다. 같은 전송 계층(`AiHttpTransport`: 재시도·redirect·proxy 없음, 응답 크기·마감 제한, `X-Request-ID` 대조)을 쓰고 오류 봉투는 S1(`zoop-ai-internal-1`)입니다. `Idempotency-Key`는 `invocationId`(`<chatJobId>.<attemptNo>.<router|answer|verify|agent-n>`)입니다. 같은 시도의 같은 단계는 AI 쪽에서 두 번 보내지지 않고, 재실행(rerun)은 새 시도 번호로 새 invocation이 됩니다.
+`com.zoop.ai.chat.ChatStageClient`(`HttpChatStageClient`)는 `POST /internal/v1/chat-stages/{stage}`(계약 `zoop-ai-chat-6`)로 챗봇 모델 단계 하나를 동기로 실행합니다. 단계는 `chat-router`(Jev), `chat-answer`(Luna Responses), `chat-verification`(Jev), `chat-agent`(Luna Responses 승인 루프의 한 단계)입니다. 모델 호출 전에 `GET /internal/v1/chat-runtime-capabilities`를 기존 `chat.invoke` 인증으로 읽고 닫힌 manifest·fingerprint·시간 계약을 검사합니다. Java는 작업에 고정한 정책과 호출별 resources를 보내고, 성공·실패 모두 `resourceBinding`을 대조합니다. `Idempotency-Key`는 `<chatJobId>.<attemptNo>.<router|answer|verify|agent-n>`이며 같은 invocation은 같은 resources로 저장 결과를 읽습니다.
 
 `com.zoop.chat.model.ChatModelStages`가 오케스트레이터의 네 포트(`ChatModels.Router/Generator/Verifier/Agent`)를 구현합니다.
 
@@ -169,9 +169,11 @@ ai/service/.venv/bin/python ai/service/scripts/online_admission_actual_smoke.py 
 |---|---|---|
 | `ZOOP_AI_CHAT_CLIENT_ENABLED` | `false` | `true`일 때만 클라이언트·어댑터·`OrchestratedChatEngine` bean을 등록합니다. 그래야 `ZOOP_CHAT_QUESTIONS_ENABLED=true`로 기동할 수 있습니다 |
 | `ZOOP_AI_CHAT_CLIENT_MODE` | `replay` | `replay`(AI 쪽 고정 응답, 네트워크 없음) 또는 `live`(실제 Luna/Jev 호출. AI 서비스의 chat live gate·호출 상한이 따로 열려 있어야 하며 유료 호출은 별도 승인 필요). 다른 값은 기동 실패 |
-| `…_BASE_URL`, `…_TOKEN`, `…_CONNECT_TIMEOUT`, `…_REQUEST_TIMEOUT`, `…_MAX_RESPONSE_BYTES` | 없음, 없음, `3s`, `35s`, `2097152` | S1 표와 같은 규칙. 토큰의 principal에는 `chat.invoke` scope가 필요합니다. 요청 마감은 가장 긴 단계(answer 25초)와 서비스 여유를 덮고, 단계별 상한은 오케스트레이터가 따로 끊습니다 |
+| `…_BASE_URL`, `…_TOKEN`, `…_CONNECT_TIMEOUT`, `…_REQUEST_TIMEOUT`, `…_MAX_RESPONSE_BYTES` | 없음, 없음, `3s`, `613s`, `2097152` | principal에 `chat.invoke`가 필요합니다. 설정 request timeout은 가장 긴 provider timeout+13초 이상이어야 하며, 개별 요청과 body 대기는 permit의 T+13초를 사용합니다. 자원 키·결합 제약·옛 effort 설정 이행은 [API README](../README.md#챗봇-자원-정책)를 따릅니다 |
 
 **종단 replay gate.** `make service-install api-ai-chat-smoke`(`api/scripts/ai_chat_gate.py`, Gradle `aiChatContractTest`, CI에서 실행)는 합성 시나리오에 대해 Java 어댑터가 만들어야 할 단계 입력과 replay 응답을 Python 쪽에서 작성합니다. replay 응답은 worker의 request identity(입력·설정 digest)로 찾으므로, Java가 만든 입력이 한 필드라도 다르면 `replay_input_mismatch`로 거절됩니다. 작성한 fixture는 먼저 프로세스 안에서 worker runtime으로 재생해 확인합니다. 그다음 실제 `ai/service`(loopback, replay 전용, live gate 닫힘)를 띄우고, 실제 `ChatModelStages` → `HttpChatStageClient`로 다음을 검사합니다.
+
+이 gate는 현재 checkout의 worker source를 명시한 임시 CLI launcher를 사용하고 capabilities·invoke의 실제 모듈 경로를 각각 대조합니다. 각 단계의 성공 상태·schema6 binding·영수증까지 확인하므로 후검증 fallback은 CLI 성공 증거를 대신하지 못합니다. 설치 wheel의 배포 일치 증명은 별도 검사입니다.
 
 - 세 단계의 성공
 - 같은 invocation 재전송 시 저장된 결과 반환(재발송 없음)

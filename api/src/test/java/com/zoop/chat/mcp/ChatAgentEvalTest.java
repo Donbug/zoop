@@ -85,7 +85,8 @@ class ChatAgentEvalTest {
         }
 
         @Override
-        public ChatModels.AgentStep step(com.zoop.chat.executor.ChatRun run, int step, ChatModels.AgentInput input) {
+        public ChatModels.AgentStep step(com.zoop.chat.executor.ChatRun run, int step, ChatModels.AgentInput input,
+                com.zoop.ai.chat.ChatModelPermit permit) {
             var grant = grants.verify(input.grantToken()).orElseThrow();
             var context = McpTransportContext.create(Map.of(ChatMcpTools.GRANT, grant));
             for (ChatModels.Decision decision : input.decisions()) {
@@ -95,7 +96,7 @@ class ChatAgentEvalTest {
             if (step > steps.size()) throw new AssertionError("the script has no step " + step);
             JsonNode scripted = steps.get(step - 1);
             if (scripted.has("answer")) {
-                return new ChatModels.AgentStep("resp_" + step, List.of(), answer(scripted.get("answer")));
+                return new ChatModels.AgentStep("resp_" + step, List.of(), answer(scripted.get("answer")), 100L, 100L);
             }
             List<ChatModels.ApprovalRequest> calls = new ArrayList<>();
             scripted.get("calls").forEach(c -> {
@@ -106,7 +107,7 @@ class ChatAgentEvalTest {
                 asked.put(request.id(), request);
                 calls.add(request);
             });
-            return new ChatModels.AgentStep("resp_" + step, calls, null);
+            return new ChatModels.AgentStep("resp_" + step, calls, null, 100L, 100L);
         }
 
         private void make(McpTransportContext context, ChatModels.ApprovalRequest request) {
@@ -190,15 +191,14 @@ class ChatAgentEvalTest {
             var luna = new Luna(c.path("agent"), tools, grants);
             var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, null);
             ChatRouteDecision decision = decision(c.get("requirements"));
-            ChatModels.Router router = (r, bound) -> decision;
-            ChatModels.Generator generator = (r, context) -> {
+            ChatModels.Router router = (r, bound, permit) -> decision;
+            ChatModels.Generator generator = (r, context, permit) -> {
                 throw new AssertionError("the run left the agent path");
             };
-            ChatModels.Verifier verifier = (r, sections, citations, facts) -> new ChatSemanticVerdicts(sections.stream()
+            ChatModels.Verifier verifier = (r, sections, citations, facts, permit) -> new ChatSemanticVerdicts(sections.stream()
                     .map(s -> new ChatSemanticVerdicts.Verdict("general_knowledge".equals(s.basis()) ? null : "supported", "no"))
                     .toList());
-            try (var engine = new OrchestratedChatEngine(router, generator, verifier, registry, runner, world.citations(), clock,
-                    agent)) {
+            try (var engine = new OrchestratedChatEngine(router, generator, verifier, registry, runner, world.citations(), clock, com.zoop.chat.executor.ChatResourceFixtures.runtime(), agent)) {
                 var attached = executor.attach(job, 1).orElseThrow();
                 ChatEngineOutcome outcome = engine.answer(attached.run(), attached.control());
                 compare(c, observe(outcome, luna, store.toolCalls(job).stream().map(t -> t.row.capabilityId()).toList()));
@@ -209,12 +209,12 @@ class ChatAgentEvalTest {
     }
 
     private static void running(MemoryChatStore store, String job, String question) {
-        String attempts = "[{\"n\":1,\"mode\":\"run\",\"requestKey\":\"" + job + "\",\"status\":\"running\","
-                + "\"ownerToken\":\"owner-1\"}]";
+        String attempts = com.zoop.chat.executor.ChatResourceFixtures.freshAttempts("[{\"n\":1,\"mode\":\"run\",\"requestKey\":\"" + job + "\",\"status\":\"running\","
+                + "\"ownerToken\":\"owner-1\"}]");
         String context = "{\"items\":[],\"evidenceCount\":0,\"period\":null,\"asOf\":null,\"graphVersion\":\"" + GRAPH + "\"}";
         store.add(new ChatJobRow(job, "conv-" + job, "member-a", 1, question, "a".repeat(64), NOW, context, SELECTION, List.of(),
                 GRAPH, "queued", null, null, null, null, 0, null, null, 0, attempts, NOW, NOW, null));
-        assertTrue(store.start(job, "owner-1", NOW.plusSeconds(60), NOW.plusSeconds(60), attempts, NOW));
+        assertTrue(store.start(job, "owner-1", NOW.plusSeconds(1200), NOW.plusSeconds(1215), attempts, NOW));
     }
 
     private static ChatRouteDecision decision(JsonNode requirements) {

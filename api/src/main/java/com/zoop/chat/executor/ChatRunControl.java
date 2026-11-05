@@ -23,6 +23,16 @@ public interface ChatRunControl {
     /** Time left until the run's deadline (zero or negative once passed). */
     Duration remaining();
 
+    ChatResourcePolicy resourcePolicy();
+
+    /** Persists a new invocation allocation, or returns the exact allocation already owned by that invocation. */
+    tools.jackson.databind.JsonNode modelResources(String invocationId, tools.jackson.databind.JsonNode proposed);
+
+    /** Closes every new tool reservation and callback at the owner's cutoff, including attached MCP requests. */
+    void readCutoff(Instant cutoff);
+
+    Duration readRemaining();
+
     /**
      * Brings the run's deadline forward to {@code deadline} (never later): from then on {@link #remaining}, every fenced
      * record, a tool request reaching the run from outside and the final store keep to it, so a result past it is not stored

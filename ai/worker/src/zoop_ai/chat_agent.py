@@ -25,14 +25,11 @@ from urllib.parse import urlsplit, urlunsplit
 from pydantic import ValidationError
 
 from .chat_contracts import (OUTPUT_BUDGET_EXCEEDED, PROVIDER_ID, AgentAnswer, AgentInput, ApprovalRequest, ChatAnswer,
-                             McpCallSummary, MAX_APPROVALS, MAX_MCP_CALLS, MAX_OUTPUT_TOKENS, MAX_REQUIREMENTS, REQUIREMENT_ID)
+                             McpCallSummary, LunaResources, MAX_APPROVALS, MAX_MCP_CALLS, MAX_REQUIREMENTS, REQUIREMENT_ID)
 from .contracts import canonical, digest
 
-PROMPT_REVISION = "zoop-chat-agent-2026-10-30-2"
-# Pinned like the answer stage; the agent runs at medium effort until high has proven quality and the 45 s limit (MCP actions
-# contract 3.2).
+PROMPT_REVISION = "zoop-chat-agent-resource-1"
 MODEL = "gpt-6-luna"
-REASONING_EFFORT = "medium"
 SERVER_LABEL = "zoop"
 REDACTED = "[redacted]"
 # The provider could not reach the ZOOP MCP server (a failed tool listing, or its 424): the failure the application counts
@@ -60,7 +57,7 @@ PROMPT = (
     "insufficientRequirementIds에 넣는다. 모든 요구는 구간과 insufficientRequirementIds 중 정확히 한 곳에 속한다. "
     "전체 인용은 서로 다른 evidenceId maxCitations개 이하다. 매수·매도·보유 권유, 목표 주가, 가격·수익 예측, 수익 보장을 "
     "쓰지 않는다. graphTargetIds에는 본문이 실제로 가리키는 도구 결과 items의 company·issue id만 넣는다. 한국어로 간결하게 "
-    "쓰고, 답변 전체는 공백 포함 2,000자를 넘기지 않는다."
+    "쓰고, 답변 전체는 공백 포함 {generatedTextMaxChars}자를 넘기지 않는다."
 )
 
 
@@ -93,19 +90,18 @@ def _tool(payload: AgentInput, url: str) -> dict[str, Any]:
             "allowed_tools": list(payload.mcp.allowed_tools), "require_approval": "always"}
 
 
-def build_request(payload: AgentInput, model: str, reasoning_effort: str | None, url: str) -> dict[str, Any]:
+def build_request(payload: AgentInput, model: str, resources: LunaResources, url: str) -> dict[str, Any]:
     """The exact Responses body of one step to the server at `url` (the canonical operator URL). Instructions, tools with their
     authorization and the answer format are sent on every step: a continuation does not inherit them."""
     request: dict[str, Any] = {
         "model": model,
         "store": True,
-        "max_output_tokens": MAX_OUTPUT_TOKENS,
-        "instructions": PROMPT,
+        "max_output_tokens": resources.max_output_tokens,
+        "instructions": PROMPT.replace("{generatedTextMaxChars}", str(resources.generated_text_max_chars)),
         "tools": [_tool(payload, url)],
         "text": {"format": {"type": "json_schema", "name": "chat_answer", "strict": True, "schema": schema()}},
     }
-    if reasoning_effort is not None:
-        request["reasoning"] = {"effort": reasoning_effort}
+    request["reasoning"] = {"effort": resources.reasoning_effort}
     if payload.continuation is None:
         question = {"turns": [t.wire() for t in payload.turns], "requirements": [r.wire() for r in payload.requirements],
                     "maxCitations": payload.max_citations}
@@ -171,6 +167,10 @@ def interpret(raw: Any, payload: AgentInput) -> AgentAnswer:
     response_id = raw.get("id") if isinstance(raw, dict) else None
     if not isinstance(response_id, str) or not re.fullmatch(PROVIDER_ID, response_id):
         raise ValueError("agent_response_invalid")
+    if raw.get("status") == "incomplete":
+        details = raw.get("incomplete_details")
+        cut = isinstance(details, dict) and details.get("reason") == "max_output_tokens"
+        raise ValueError(OUTPUT_BUDGET_EXCEEDED if cut else "agent_incomplete")
     allowed = set(payload.mcp.allowed_tools)
     approvals: list[ApprovalRequest] = []
     calls: list[McpCallSummary] = []
@@ -216,10 +216,6 @@ def interpret(raw: Any, payload: AgentInput) -> AgentAnswer:
             raise ValueError("agent_response_invalid")
         return AgentAnswer(response_id=response_id, status="approval_required", approval_requests=approvals,
                            mcp_calls=calls, answer=None)
-    if raw.get("status") == "incomplete":
-        details = raw.get("incomplete_details")
-        cut = isinstance(details, dict) and details.get("reason") == "max_output_tokens"
-        raise ValueError(OUTPUT_BUDGET_EXCEEDED if cut else "agent_incomplete")
     if raw.get("status") != "completed":
         raise ValueError("agent_response_invalid")
     if refused:

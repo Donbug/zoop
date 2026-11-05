@@ -1,5 +1,5 @@
 """Wire models of the chatbot model stage family (`/internal/v1/chat-stages`). The service never imports `zoop_ai`: these mirror the worker's
-`zoop-ai-chat-5` contract as an allowlisted view (unknown keys are dropped on output, missing ones fail closed), and the field-for-field agreement is
+`zoop-ai-chat-6` contract as an allowlisted view, and the field-for-field agreement is
 tested. The stage input stays an opaque object for the service: the installed `zoop-ai-chat` validates it completely."""
 from __future__ import annotations
 
@@ -9,7 +9,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
-CHAT_SCHEMA = "zoop-ai-chat-5"
+from .chat_resources import Resources, ResourceBinding
+
+CHAT_SCHEMA = "zoop-ai-chat-6"
 ChatStage = Literal["chat-router", "chat-answer", "chat-verification", "chat-agent"]
 STAGES: tuple[str, ...] = ("chat-router", "chat-answer", "chat-verification", "chat-agent")
 # The caller's invocation id. The service prefixes it with the principal before the child sees it, so two principals never share a ledger row.
@@ -29,12 +31,13 @@ class ChatView(ChatWire):
 
 
 class ChatStageRequest(ChatWire):
-    schema_version: Literal["zoop-ai-chat-5"]
+    schema_version: Literal["zoop-ai-chat-6"]
     invocation_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{8,96}$",
                                description="Identifies one stage of one attempt; must equal Idempotency-Key. The same id and input never send twice.")
     stage: ChatStage
     mode: Literal["replay", "live"]
-    input: dict[str, Any] = Field(description="The closed zoop-ai-chat-5 stage input (RouterInput, AnswerInput, VerificationInput or AgentInput).")
+    input: dict[str, Any] = Field(description="The closed zoop-ai-chat-6 stage input.")
+    resources: Resources
 
 
 class ChatUsage(ChatView):
@@ -64,7 +67,7 @@ class ChatStageFailure(ChatView):
 class ChatMcpHealth(ChatView):
     """Whether the operator's ZOOP MCP server answered a content-free probe at its configured URL (`zoop-ai-chat probe-mcp`): an MCP ping
     with no grant that the endpoint itself must refuse as unauthenticated. Nothing is run and no model is called."""
-    schema_version: Literal["zoop-ai-chat-5"]
+    schema_version: Literal["zoop-ai-chat-6"]
     mcp: Literal["reachable", "unreachable"]
     reason: Literal["mcp_timeout", "mcp_connect_failed", "mcp_unavailable", "mcp_status_unexpected"] | None = Field(
         default=None, description="Why it is unreachable: no answer in time, no connection, a gateway in front answering 502/503/504 for a "
@@ -161,11 +164,11 @@ ANSWERS: dict[str, type[ChatWire]] = {"chat-router": RouterAnswer, "chat-answer"
                                       "chat-agent": AgentAnswer}
 
 
-class ChatStageResult(ChatView):
+class ChatStageResult(ChatWire):
     """The outcome. Besides the field shapes the door checks the invariants: `succeeded` has an answer of its own stage's model, no failure and a
     receipt; `failed` has a failure and no answer; `unknown` implies `sent`; a receipt is present exactly when something was sent and names the
     requested mode."""
-    schema_version: Literal["zoop-ai-chat-5"]
+    schema_version: Literal["zoop-ai-chat-6"]
     invocation_id: str
     stage: ChatStage
     status: Literal["succeeded", "failed"]
@@ -174,3 +177,4 @@ class ChatStageResult(ChatView):
                     "(chat-verification) or AgentAnswer (chat-agent).")
     failure: ChatStageFailure | None
     receipt: ChatReceipt | None = Field(description="Who received the request and what they reported; present once a request was sent.")
+    resource_binding: ResourceBinding

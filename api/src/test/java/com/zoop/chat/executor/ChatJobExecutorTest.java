@@ -83,6 +83,56 @@ class ChatJobExecutorTest {
     }
 
     @Test
+    void aRerunKeepsTheFirstAttemptsPolicyEvenWhenConfigurationChanges() {
+        String id = "job-policy-freeze";
+        store.add(queued(id, null, null, 0, "run"));
+        var firstEngine = new ScriptedChatEngine((run, control) -> {
+            assertEquals(64000, control.resourcePolicy().maxOutputTokens());
+            control.beforeModelCall();
+            return new ChatEngineOutcome.Failed("transient", "provider_error", true);
+        });
+        executor(firstEngine).runOnce();
+        var first = mapper.readTree(store.job(id).row.attempts()).get(0).deepCopy();
+        var attempts = mapper.createArrayNode().add(first);
+        attempts.addObject().put("n", 2).put("mode", "rerun").put("status", "queued").put("requestKey", id + "-rerun");
+        store.add(withAttempts(queued(id, null, null, 0, "run"), attempts.toString()));
+        var changed = ChatResourcePolicy.defaults().snapshot().put("maxOutputTokens", 128000);
+        var secondEngine = new ScriptedChatEngine((run, control) -> {
+            assertEquals(64000, control.resourcePolicy().maxOutputTokens());
+            var resources = new ChatJobResources(control, ChatResourceFixtures.capabilities(), clock, "replay");
+            var permit = resources.permit(id + ".2.answer", "chat-answer", Duration.ofSeconds(300), true);
+            var same = resources.permit(id + ".2.answer", "chat-answer", Duration.ofSeconds(200), true);
+            assertEquals(com.zoop.common.json.Canonical.write(permit.resources()), com.zoop.common.json.Canonical.write(same.resources()));
+            assertEquals(64000, same.resources().path("luna").path("maxOutputTokens").intValue());
+            return ScriptedChatEngine.generalAnswer("고정 정책으로 저장한 답");
+        });
+        var beans = new StaticListableBeanFactory(Map.of("engine", secondEngine));
+        new ChatJobExecutor(store, store, beans.getBeanProvider(ChatEngine.class), mapper, clock, new NoTransactions(), null,
+                ChatResourcePolicy.fromSnapshot(changed)).runOnce();
+        assertEquals("completed", store.job(id).row.status());
+        assertEquals(com.zoop.common.json.Canonical.write(first.path("resourcePolicy")),
+                com.zoop.common.json.Canonical.write(mapper.readTree(store.job(id).row.attempts()).get(0).path("resourcePolicy")));
+    }
+
+    @Test
+    void aHistoricalRetryWithoutAFrozenPolicyRefusesBeforeAnyNewModelStage() {
+        String id = "job-historical-policy";
+        String attempts = "[{\"n\":1,\"mode\":\"run\",\"status\":\"failed\"},{\"n\":2,\"mode\":\"rerun\",\"status\":\"queued\"}]";
+        store.add(withAttempts(queued(id, null, null, 0, "run"), attempts));
+        var sends = new java.util.concurrent.atomic.AtomicInteger();
+        executor(new ScriptedChatEngine((run, control) -> {
+            control.resourcePolicy();
+            sends.incrementAndGet();
+            control.beforeModelCall();
+            return ScriptedChatEngine.generalAnswer("새 실행");
+        })).runOnce();
+        assertEquals(0, sends.get());
+        assertEquals("failed", store.job(id).row.status());
+        assertEquals(0, store.job(id).row.runs());
+        assertEquals("internal", job(store.job(id)).kind());
+    }
+
+    @Test
     void aReplyRunsWithTheWholeClarificationChainInOrder() {
         store.add(withResult(queued("job-00001", null, null, 0, "run", "completed"),
                 ScriptedChatEngine.clarification("어느 기업인가요?", "choice-a", "choice-b").result()));
@@ -316,8 +366,8 @@ class ChatJobExecutorTest {
         store.add(queued("job-00002", null, null, 0, "run"));
         var engine = new ScriptedChatEngine((run, control) -> {
             if (run.jobId().equals("job-00001")) control.beforeModelCall();
-            // Past the 60 s deadline, still inside the 15 s lease grace: the write would be accepted by the fence.
-            clock.advance(Duration.ofSeconds(65));
+            // Past the frozen job deadline, still inside its lease grace.
+            clock.advance(ChatJobExecutor.MAX_DEADLINE.plusSeconds(5));
             return ScriptedChatEngine.generalAnswer("늦은 답");
         });
         var executor = executor(engine);
@@ -365,7 +415,7 @@ class ChatJobExecutorTest {
         // Attempt 1 made four calls and left one reserved call that never ran; attempt 2 is the rerun.
         String attempts = "[{\"n\":1,\"mode\":\"run\",\"requestKey\":\"job-00001\",\"status\":\"failed\"},"
                 + "{\"n\":2,\"mode\":\"rerun\",\"requestKey\":\"job-00001-r\",\"status\":\"queued\"}]";
-        store.add(withAttempts(queued("job-00001", null, null, 0, "run"), attempts));
+        store.add(withAttempts(queued("job-00001", null, null, 0, "run"), ChatResourceFixtures.freshAttempts(attempts)));
         for (int i = 0; i < 5; i++) {
             store.reserveToolCalls(List.of(new NewChatToolCall("row-" + i, "job-00001", 1, 1, i, "tc-" + i,
                     ChatToolRegistry.VERSION, "zoop-core-read", "company.read", "app:company.read", "chat-tool/v1",
@@ -439,7 +489,7 @@ class ChatJobExecutorTest {
     void aRerunDoesNotReopenTheJobsBudgetForWebSearchesThatNeverStarted() {
         String attempts = "[{\"n\":1,\"mode\":\"run\",\"requestKey\":\"job-00001\",\"status\":\"failed\"},"
                 + "{\"n\":2,\"mode\":\"rerun\",\"requestKey\":\"job-00001-r\",\"status\":\"queued\"}]";
-        store.add(withAttempts(queued("job-00001", null, null, 0, "run"), attempts));
+        store.add(withAttempts(queued("job-00001", null, null, 0, "run"), ChatResourceFixtures.freshAttempts(attempts)));
         for (int i = 0; i < ChatRunControl.MAX_WEB_CALLS; i++) {
             store.reserveToolCalls(List.of(new NewChatToolCall("row-" + i, "job-00001", 1, 1, i, "tc-" + i,
                     ChatToolRegistry.VERSION, "web-search", "web.search", "app:web.search", "chat-tool/v1",

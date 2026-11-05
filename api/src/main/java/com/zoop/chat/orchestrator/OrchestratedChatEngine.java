@@ -54,9 +54,9 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <ul>
  * <li>Every model stage is announced through {@link ChatRunControl#beforeModelCall()} and starts only when the time left
- * covers it and every required stage after it (router 4 s, tools 10 s, generation 25 s, verification 6 s, server 3 s);
- * otherwise the run ends as {@code transient/deadline_guard} without calling it. A stage gets at most its own limit: one
- * that runs out ends as {@code response_unknown}. The executor refuses a completion past the run deadline.</li>
+ * covers its persisted permit and all required finalization stages; otherwise the run ends as
+ * {@code transient/deadline_guard} before dispatch. A stage that runs past its permit ends as {@code response_unknown}.
+ * The executor refuses a completion past the same job deadline.</li>
  * <li>A model failure is {@code transient}: {@code provider_error} (rerunnable) when nothing was processed or the answer was
  * malformed, {@code response_unknown} (never rerun) when the provider may have processed it.</li>
  * <li>A tool failure leaving nothing answered ends the run before any count is evaluated: {@code tool_timeout} and unavailable
@@ -75,26 +75,7 @@ import tools.jackson.databind.node.ObjectNode;
  * intake has its own flag and startup refuses to enable it without this engine; both flags are off by default.
  */
 public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
-    /**
-     * The provisional stage limits of ZOOP-AIG-001 6.3.3 (design summary 5.1), to be re-set from measured p95. The policy's
-     * router 4 s, answer 25 s and verification 6 s are the provider call timeouts the AI runtime applies; the AI service ends a
-     * stage 3 s after that (its deadline per stage, for process start and ledger writes). A model stage here also covers what
-     * comes outside that deadline: up to 1 s waiting for a free slot before it starts, and the reply's transport and decoding.
-     * A limit equal to the service's would discard answers the service delivered in time, with their cost spent.
-     * The values remain per-stage ceilings, not time reservations. Direct stages shrink to the time left after the minimum
-     * answer, verification and terminal-write reservations below, so every direct route remains inside the 60 s job deadline.
-     */
-    record StageLimits(Duration router, Duration tools, Duration generate, Duration verify, Duration server) {
-        /** The AI service's slot wait (1 s) and 1 s for transport and decoding, beyond its own stage deadline. */
-        static final Duration SERVICE_HEADROOM = Duration.ofSeconds(2);
-        static final StageLimits POLICY = new StageLimits(Duration.ofSeconds(7).plus(SERVICE_HEADROOM), Duration.ofSeconds(10),
-                Duration.ofSeconds(28).plus(SERVICE_HEADROOM), Duration.ofSeconds(9).plus(SERVICE_HEADROOM),
-                Duration.ofSeconds(3));
-    }
-    /** Minimum direct answer window kept after reads (and after an optional search-only step). */
-    static final Duration MIN_DIRECT_GENERATE = Duration.ofSeconds(10);
-    /** Minimum semantic-verification window kept before the terminal write. */
-    static final Duration MIN_VERIFY = Duration.ofSeconds(6);
+    /** All stage allowances come from the job's frozen resource policy. */
     private static final Set<String> SUPPORT = Set.of("supported", "contradicted", "hold");
     private static final Set<String> ADVICE = Set.of("no", "yes", "hold");
 
@@ -106,26 +87,10 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     private final ChatCitationSource citations;
     private final ChatPlanner planner = new ChatPlanner();
     private final Clock clock;
-    private final StageLimits limits;
+    private final ChatModels.Runtime runtime;
     private final ExecutorService models = Executors.newVirtualThreadPerTaskExecutor();
     /** The agent path when registered (MCP endpoint on, agent enabled); null keeps every run on the direct path. */
     private final ChatAgentPath agent;
-    /**
-     * One agent step: the AI service's {@code chat-agent} deadline (30 s + 3 s) and the service headroom. Each step is its own
-     * model call and its own guard; together they stay inside the run deadline or the run ends as {@code deadline_guard}.
-     */
-    static final Duration AGENT_STEP = Duration.ofSeconds(33).plus(StageLimits.SERVICE_HEADROOM);
-    /** The least an agent step is given: the time to write the answer (MCP actions contract 3.2). */
-    static final Duration MIN_AGENT_STEP = Duration.ofSeconds(10);
-    /**
-     * An agent run ends within 45 s of its start, verification and saving included (MCP actions contract 3.2). This equals
-     * the job-wide deadline and remains named here because the agent budget is part of the external execution contract.
-     */
-    static final Duration AGENT_JOB = Duration.ofSeconds(45);
-    /** All agent steps together (MCP round trips, approvals, tool calls and the final answer): at most 35 s. */
-    static final Duration AGENT_TOTAL = Duration.ofSeconds(35);
-    /** The web search after the server's own reads: at most this, and never the time the answer still needs. */
-    static final Duration WEB_AFTER_READS = Duration.ofSeconds(20);
     /**
      * A rerun whose job has fewer calls left than its plan needs: the same input always would, so it is not rerun and the
      * member is asked to narrow the question ({@code budget_exceeded}, chat failure contract).
@@ -133,32 +98,20 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     static final ChatEngineOutcome.Failed TOOL_BUDGET_SPENT = new ChatEngineOutcome.Failed("budget_exceeded", null, false);
 
     public OrchestratedChatEngine(ChatModels.Router router, ChatModels.Generator generator, ChatModels.Verifier verifier,
-            ChatToolRegistry registry, ChatToolRunner runner, ChatCitationSource citations, Clock clock) {
-        this(router, generator, verifier, registry, runner, citations, clock, StageLimits.POLICY, null);
+            ChatToolRegistry registry, ChatToolRunner runner, ChatCitationSource citations, Clock clock, ChatModels.Runtime runtime) {
+        this(router, generator, verifier, registry, runner, citations, clock, runtime, null);
     }
 
     public OrchestratedChatEngine(ChatModels.Router router, ChatModels.Generator generator, ChatModels.Verifier verifier,
             ChatToolRegistry registry, ChatToolRunner runner, ChatCitationSource citations, Clock clock,
-            ChatAgentPath agent) {
-        this(router, generator, verifier, registry, runner, citations, clock, StageLimits.POLICY, agent);
-    }
-
-    OrchestratedChatEngine(ChatModels.Router router, ChatModels.Generator generator, ChatModels.Verifier verifier,
-            ChatToolRegistry registry, ChatToolRunner runner, ChatCitationSource citations, Clock clock,
-            StageLimits limits) {
-        this(router, generator, verifier, registry, runner, citations, clock, limits, null);
-    }
-
-    OrchestratedChatEngine(ChatModels.Router router, ChatModels.Generator generator, ChatModels.Verifier verifier,
-            ChatToolRegistry registry, ChatToolRunner runner, ChatCitationSource citations, Clock clock,
-            StageLimits limits, ChatAgentPath agent) {
+            ChatModels.Runtime runtime, ChatAgentPath agent) {
         this.agent = agent;
-        this.limits = limits;
+        this.runtime = runtime;
         this.router = router;
         this.generator = generator;
         this.verifier = verifier;
         this.registry = registry;
-        this.retrieval = new ChatRetrieval(runner);
+        this.retrieval = new ChatRetrieval(runner, clock);
         this.citations = citations;
         this.clock = clock;
     }
@@ -197,6 +150,10 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             if (ChatModels.OUTPUT_BUDGET_EXCEEDED.equals(failure.code())) {
                 return new ChatEngineOutcome.Failed("budget_exceeded", "output_limit", false);
             }
+            if (failure.category() == com.zoop.ai.chat.ChatStageReply.FailureCategory.CONTRACT
+                    && failure.fate() != ChatModels.Failure.Fate.UNKNOWN) {
+                return new ChatEngineOutcome.Failed("internal", null, false);
+            }
             if (failure.fate() == ChatModels.Failure.Fate.REFUSED) return new ChatEngineOutcome.Failed("internal", null, false);
             boolean unknown = failure.fate() == ChatModels.Failure.Fate.UNKNOWN;
             return new ChatEngineOutcome.Failed("transient", unknown ? "response_unknown" : "provider_error", !unknown);
@@ -207,9 +164,16 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
 
     private ChatEngineOutcome run(ChatRun run, ChatRunControl control, ObjectNode route) {
         Set<String> bound = registry.bound();
-        ChatRouteDecision decision = model(control, limits.router(),
-                limits.tools().plus(MIN_DIRECT_GENERATE).plus(MIN_VERIFY).plus(limits.server()),
-                () -> router.route(run, bound));
+        var policy = control.resourcePolicy();
+        if (agent != null && agent.toolDefinitionBytes() > 65536) {
+            throw new ChatModels.Failure(ChatModels.Failure.Fate.REFUSED, "chat_resource_policy_invalid", "MCP definitions exceed the installed allowance");
+        }
+        var installed = runtime.preflight(policy, agent != null);
+        var resources = new com.zoop.chat.executor.ChatJobResources(control, installed.capabilities(), clock, installed.mode());
+        Duration finalization = policy.finalization();
+        control.readCutoff(resources.readCutoff());
+        ChatRouteDecision decision = model(run, resources, control, "chat-router", "router", policy.routerProviderTimeout().plusSeconds(20),
+                finalization, false, permit -> router.route(run, bound, permit));
         ChatPlan plan = planner.plan(run, decision, bound);
         var coverage = new ChatRequirementCoverage(decision);
         if (plan instanceof ChatPlan.Stop stop) return stopped(run, route, stop, coverage);
@@ -236,16 +200,11 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             // checked below against exactly the results of the calls that ran, each requirement against its own.
             control.phase("retrieving");
             if (control.toolCallsLeft() < 1) throw new Stop(TOOL_BUDGET_SPENT);
-            // The direct path now has a 60 s ceiling; keep the agent path on its separate 45 s external contract.
-            control.shortenDeadline(run.deadline().minus(ChatJobExecutor.MAX_DEADLINE.minus(AGENT_JOB)));
-            Duration after = MIN_VERIFY.plus(limits.server());
-            // Luna has min(35 s, what is left of it before verification and saving): never 35 s on top.
-            Duration luna = min(AGENT_TOTAL, control.remaining().minus(after));
-            if (luna.compareTo(MIN_AGENT_STEP) < 0) throw new DeadlineGuard();
+            Instant readEnd = resources.readCutoff();
+            control.readCutoff(readEnd);
+            guard(control, finalization.plus(com.zoop.chat.executor.ChatResourcePolicy.INITIAL_AGENT));
             ChatAgentPath.Outcome ran = agent.run(run, control, agentRequirements(confirmed), agentTools,
-                    // The last 10 s write the answer: no new tool starts in them.
-                    ChatAnswerCheck.MAX_CITATIONS, steps(control, clock.instant().plus(luna), after,
-                            MIN_AGENT_STEP.multipliedBy(2)));
+                    ChatAnswerCheck.MAX_CITATIONS, steps(run, resources, control, readEnd, false));
             Map<String, List<ChatToolResult>> results = new LinkedHashMap<>();
             confirmed.requirements().stream().filter(p -> p.mode() == Mode.TOOLS)
                     .forEach(p -> results.put(p.id(), ran.resultsOf(p.id())));
@@ -266,8 +225,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             control.phase("retrieving");
             // A rerun reads within what is left of the job's calls, never a new budget.
             if (ChatPlanner.worstCaseCalls(confirmed) > control.toolCallsLeft()) throw new Stop(TOOL_BUDGET_SPENT);
-            guard(control, limits.tools().plus(MIN_DIRECT_GENERATE).plus(MIN_VERIFY).plus(limits.server()));
-            retrieved = retrieval.run(run, control, confirmed);
+            guard(control, finalization.plusMillis(1));
+            Instant readEnd = resources.directReadCutoff();
+            retrieved = retrieval.run(run, control, confirmed, readEnd);
             if (retrieved.failed() != null) throw new Stop(toolFailure(retrieved.failed()));
             coverage.read(confirmed, retrieved.results());
             if (retrieved.stop() != null) return stopped(run, route, retrieved.stop(), coverage);
@@ -279,7 +239,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             if (webScope != null) return stopped(run, route, webScope, coverage);
             List<ChatModels.AgentRequirement> gaps = webGaps(run, confirmed, retrieved);
             if (!gaps.isEmpty()) {
-                WebAfterReads web = webAfterReads(run, control, gaps, directStart, route);
+                WebAfterReads web = webAfterReads(run, control, gaps, directStart, route, resources);
                 agentNotices = web.notices();
                 if (!web.hits().isEmpty()) {
                     retrieved = retrieved.withResults(web.hits());
@@ -328,11 +288,11 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         } else {
             control.phase("writing");
             var context = new ChatBranchContext(run.turns(), run.context(), branches, ChatAnswerCheck.MAX_CITATIONS);
-            generated = modelAtLeast(control, limits.generate(), MIN_DIRECT_GENERATE,
-                    MIN_VERIFY.plus(limits.server()),
-                    () -> generator.generate(run, context));
+            generated = model(run, resources, control, "chat-answer", "answer", policy.generationProviderTimeout().plusSeconds(20),
+                    com.zoop.chat.executor.ChatResourcePolicy.CITATIONS.plus(policy.verificationProviderTimeout()).plusSeconds(30),
+                    true, permit -> generator.generate(run, context, permit));
         }
-        var checked = ChatAnswerCheck.check(branches, generated);
+        var checked = ChatAnswerCheck.check(branches, generated, policy.maxAnswerChars());
         route.put("deterministicCheck", checked.failedCheck() == null ? "passed" : checked.failedCheck());
         if (checked.failedCheck() != null) return validationFailed();
         var passed = checked.passed();
@@ -344,7 +304,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         // the operator-owned grant/source registries, so start the independent reads together: serial reads can consume
         // the verification reservation even when every one succeeds. The original section/evidence order still decides
         // the response order below, and every read remains fresh for this run.
-        Map<String, Optional<Citation>> readableCitations = readCitations(run, passed.sections(), hits);
+        Map<String, Optional<Citation>> readableCitations = readCitations(run, control, passed.sections(), hits);
         Map<String, Citation> cited = new LinkedHashMap<>();
         for (var section : passed.sections()) {
             for (String id : section.evidenceIds()) {
@@ -368,8 +328,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         control.phase("verifying");
         List<Citation> allCited = List.copyOf(cited.values());
         ChatModels.ServerFacts facts = ChatModels.ServerFacts.capture(run, passed.sections(), branches);
-        ChatSemanticVerdicts verdicts = modelAtLeast(control, limits.verify(), MIN_VERIFY, limits.server(),
-                () -> verifier.verify(run, passed.sections(), allCited, facts));
+        ChatSemanticVerdicts verdicts = model(run, resources, control, "chat-verification", "verify",
+                policy.verificationProviderTimeout().plusSeconds(20), com.zoop.chat.executor.ChatResourcePolicy.COMMIT,
+                false, permit -> verifier.verify(run, passed.sections(), allCited, facts, permit));
         Verified verified = verified(passed.sections(), verdicts);
         if (verified == null) return validationFailed();
         Set<String> held = verified.heldRequirements();
@@ -464,7 +425,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      * need no second store read and are rebound directly. A failed read keeps the existing fail-closed behavior.
      */
     private Map<String, Optional<Citation>> readCitations(ChatRun run,
-            List<ChatGeneratedAnswer.Section> sections, Map<String, ChatWebResult> hits) {
+            ChatRunControl control, List<ChatGeneratedAnswer.Section> sections, Map<String, ChatWebResult> hits) {
         Map<String, Future<Optional<Citation>>> pending = new LinkedHashMap<>();
         for (var section : sections) {
             for (String id : section.evidenceIds()) {
@@ -475,11 +436,16 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         }
         Map<String, Optional<Citation>> read = new LinkedHashMap<>();
         try {
-            for (var entry : pending.entrySet()) read.put(entry.getKey(), entry.getValue().get());
+            long end = System.nanoTime() + Math.min(com.zoop.chat.executor.ChatResourcePolicy.CITATIONS.toNanos(),
+                    Math.max(0, control.remaining().minus(control.resourcePolicy().verificationProviderTimeout()).minusSeconds(30).toNanos()));
+            for (var entry : pending.entrySet()) read.put(entry.getKey(), entry.getValue().get(Math.max(1, end - System.nanoTime()), TimeUnit.NANOSECONDS));
         } catch (InterruptedException interrupted) {
             pending.values().forEach(future -> future.cancel(true));
             Thread.currentThread().interrupt();
             throw new ChatToolUnavailable("interrupted while reopening answer citations", interrupted);
+        } catch (TimeoutException expired) {
+            pending.values().forEach(future -> future.cancel(true));
+            throw new ChatToolUnavailable("answer citation reopening timed out", expired);
         } catch (ExecutionException failed) {
             pending.values().forEach(future -> future.cancel(true));
             if (failed.getCause() instanceof RuntimeException runtime) throw runtime;
@@ -611,25 +577,15 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         return new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, "verdicts do not match the sections");
     }
 
-    /**
-     * One model stage: it starts only when the time left covers it and what follows, is announced before it is sent, and
-     * gets at most its own limit. A stage that runs out is interrupted and ends as a response of unknown fate: the provider
-     * may have processed it, so it is never rerun and its late answer never becomes a result.
-     */
-    private <T> T model(ChatRunControl control, Duration stage, Duration after, Supplier<T> call) {
-        guard(control, stage.plus(after));
-        return awaitModel(control, stage, call);
-    }
-
-    /**
-     * A direct model stage with a fixed minimum and a larger provisional ceiling. It uses slack left by faster earlier stages
-     * but never consumes the minimum reserved for the stages and terminal write after it.
-     */
-    private <T> T modelAtLeast(ChatRunControl control, Duration ceiling, Duration minimum, Duration after,
-            Supplier<T> call) {
-        guard(control, minimum.plus(after));
-        Duration available = control.remaining().minus(after);
-        return awaitModel(control, min(ceiling, available), call);
+    /** A resolved permit is persisted before dispatch; its application ceiling includes bounded model recording. */
+    private <T> T model(ChatRun run, com.zoop.chat.executor.ChatJobResources resources, ChatRunControl control,
+            String stage, String suffix, Duration ceiling, Duration after, boolean finalizing,
+            java.util.function.Function<com.zoop.ai.chat.ChatModelPermit, T> call) {
+        Duration allowance = min(ceiling, control.remaining().minus(after));
+        guard(control, after.plus(com.zoop.chat.executor.ChatResourcePolicy.APPLICATION_MARGIN).plusMillis(1));
+        var permit = resources.permit(run.jobId() + "." + run.attemptNo() + "." + suffix, stage, allowance, finalizing);
+        guard(control, permit.applicationTimeout().plus(after));
+        return awaitModel(control, permit.applicationTimeout(), () -> call.apply(permit));
     }
 
     private <T> T awaitModel(ChatRunControl control, Duration stage, Supplier<T> call) {
@@ -703,19 +659,33 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         return !dated && !scopeDiffers;
     }
 
-    private ChatAgentPath.Steps steps(ChatRunControl control, Instant end, Duration after, Duration closingAt) {
+    private ChatAgentPath.Steps steps(ChatRun run, com.zoop.chat.executor.ChatJobResources resources,
+            ChatRunControl control, Instant readEnd, boolean optionalWeb) {
         return new ChatAgentPath.Steps() {
+            private int number;
+
             @Override
-            public ChatModels.AgentStep run(Supplier<ChatModels.AgentStep> step) {
-                // Each step waits at most what is left of the budget, and never less than the time an answer needs.
-                Duration limit = min(AGENT_STEP, Duration.between(clock.instant(), end));
-                if (limit.compareTo(MIN_AGENT_STEP) < 0) throw new DeadlineGuard();
-                return model(control, limit, after, step);
+            public boolean contextFits(long priorInput, long priorOutput, long explicitBytes, int approvedCalls) {
+                return resources.contextFits(priorInput, priorOutput, explicitBytes, approvedCalls);
+            }
+
+            @Override
+            public ChatModels.AgentStep run(java.util.function.Function<com.zoop.ai.chat.ChatModelPermit, ChatModels.AgentStep> step,
+                    boolean finalizing) {
+                Duration after = optionalWeb ? resources.policy().finalization()
+                        : com.zoop.chat.executor.ChatResourcePolicy.CITATIONS.plus(resources.policy().verificationProviderTimeout()).plusSeconds(30);
+                Duration budget = finalizing ? (optionalWeb
+                        ? Duration.between(clock.instant(), readEnd.plus(com.zoop.chat.executor.ChatResourcePolicy.WEB_FINAL))
+                        : control.remaining().minus(after)) : Duration.between(clock.instant(), readEnd);
+                if (!finalizing && budget.compareTo(com.zoop.chat.executor.ChatResourcePolicy.INITIAL_AGENT) < 0) throw new DeadlineGuard();
+                Duration ceiling = min(resources.policy().generationProviderTimeout().plusSeconds(20), budget);
+                return model(run, resources, control, "chat-agent", "agent-" + (++number), ceiling, after, finalizing, step);
             }
 
             @Override
             public boolean closing() {
-                return Duration.between(clock.instant(), end).compareTo(closingAt) < 0;
+                return Duration.between(clock.instant(), readEnd)
+                        .compareTo(com.zoop.chat.executor.ChatResourcePolicy.APPROVED_CONTINUATION) < 0;
             }
         };
     }
@@ -729,10 +699,10 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
      * Luna's own closing answer is dropped. A fault here is a notice and never fails a run that has its reads.
      */
     private WebAfterReads webAfterReads(ChatRun run, ChatRunControl control, List<ChatModels.AgentRequirement> gaps,
-            boolean agentRefused, ObjectNode route) {
-        Duration after = MIN_DIRECT_GENERATE.plus(MIN_VERIFY).plus(limits.server());
-        Duration budget = min(WEB_AFTER_READS, control.remaining().minus(after));
-        if (budget.compareTo(MIN_AGENT_STEP) < 0) {
+            boolean agentRefused, ObjectNode route, com.zoop.chat.executor.ChatJobResources resources) {
+        Duration budget = min(resources.policy().webSupplementTimeout(), control.remaining().minus(resources.policy().finalization()));
+        if (budget.compareTo(com.zoop.chat.executor.ChatResourcePolicy.INITIAL_AGENT
+                .plus(com.zoop.chat.executor.ChatResourcePolicy.WEB_FINAL)) < 0) {
             route.put("webAfterReads", "no_time");
             return new WebAfterReads(Map.of(), List.of(WEB_BUDGET_EXHAUSTED));
         }
@@ -742,8 +712,10 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         }
         ChatAgentPath.Outcome ran;
         try {
+            Instant end = clock.instant().plus(budget);
+            control.readCutoff(end.minus(com.zoop.chat.executor.ChatResourcePolicy.WEB_FINAL));
             ran = agent.run(run, control, gaps, List.of(ChatCapability.WEB_SEARCH), ChatAnswerCheck.MAX_CITATIONS,
-                    steps(control, clock.instant().plus(budget), after, MIN_AGENT_STEP));
+                    steps(run, resources, control, end.minus(com.zoop.chat.executor.ChatResourcePolicy.WEB_FINAL), true));
         } catch (ChatModels.Failure | DeadlineGuard fault) {
             route.put("webAfterReads", "failed");
             return new WebAfterReads(Map.of(), List.of(WEB_UNAVAILABLE));
