@@ -16,6 +16,11 @@ test('M-GRP-01 mobile menu switches arrangement, respects focus lock and closes 
   const summary = screen.getByText('···').closest('summary')!;
   await userEvent.click(summary);
   expect(summary.closest('details')!.open).toBe(true);
+  // D-GRP-01: keep the popup above the zoom column and the always-visible minimap.
+  expect(
+    screen.getByRole('button', { name: '흐름 순으로 정렬' }).parentElement!
+      .className,
+  ).toContain('bottom-52');
   await userEvent.click(
     screen.getByRole('button', { name: '흐름 순으로 정렬' }),
   );

@@ -6,9 +6,10 @@ Quotes, companies and events are synthetic development fixtures, not public
 market observations or a real member's portfolio. No environment, certificate,
 credential or test-account files were read for these captures.
 
-Base: PR #570 `896025ac` plus approved PR #576 head
-`2847619afe379271075efb3bc763dd8919d1be8f`, followed by the camera review fixes.
-The approved #576 layout implementation is preserved.
+Historical first-review captures, before the second-review fixes. Current base
+is main `10d6e9d4`; see [second-review evidence](../minimap-focusbar-fix2-2026-11-05/README.md)
+for current camera behavior and the smaller mobile minimap. Desktop focus layout
+in these earlier images is already part of that main baseline.
 
 | Screenshot                                 | Viewport   | Check                                                                                    |
 | ------------------------------------------ | ---------- | ---------------------------------------------------------------------------------------- |
@@ -41,12 +42,9 @@ The approved #576 layout implementation is preserved.
 
 ## Review scope and remaining observation
 
-The one-shot camera return relies on the existing ResizeObserver preserving
-the projected canvas origin through closing-rail resize frames. User fits
-queued together with deselection take precedence; a completed manual fit is
-not repeated merely because its selection rail closes.
-
-Separately, shrinking an already-selected desktop focus view directly to a
-mobile viewport can retain its earlier zoom and crop nodes. A fresh mobile
-focus entry fits correctly. This existing continuous-resize behavior was not
-changed by altering #576's layout implementation in this review.
+These first-review images used a 192x128 mobile minimap and the former completed
+fit behavior. The second review changes mobile size to 144x96 and keeps whole fit
+following rail/viewport changes until manual camera input. It also discards
+selection returns after a browser viewport change. Use the linked second-review
+captures and measurements for current behavior; these earlier images remain as
+historical evidence.

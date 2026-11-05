@@ -1,5 +1,13 @@
 // Shared by the G6 option and its camera-fit adapter (padding on each side).
 export const MINIMAP_PADDING = 10;
+const DESKTOP_SIZE: [number, number] = [192, 128];
+const MOBILE_SIZE: [number, number] = [144, 96];
+/** D-GRP-01: plugin dimensions and first-frame fit reservation share one source. */
+export function minimapSize(): [number, number] {
+  return window.matchMedia?.('(max-width: 767px)').matches
+    ? [...MOBILE_SIZE]
+    : [...DESKTOP_SIZE];
+}
 
 type MinimapHost = {
   getPluginInstance: (key: string) => unknown;

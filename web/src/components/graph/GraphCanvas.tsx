@@ -39,7 +39,11 @@ import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
 import { applyGraphReading, keepAppliedStyles } from './graph-readability';
 import { applyMapDimming, restoreMapDimming } from './graph-dimming';
-import { configureMinimap, MINIMAP_PADDING } from './graph-minimap';
+import {
+  configureMinimap,
+  MINIMAP_PADDING,
+  minimapSize,
+} from './graph-minimap';
 import { graphText, loadGraphFonts } from './graph-fonts';
 import {
   cameraMotion,
@@ -312,6 +316,7 @@ export default function GraphCanvas({
   const defaultZoomPending = useRef(false);
   const followFit = useRef(true);
   const minimapGraph = useRef<Graph | null>(null);
+  const minimapDimensions = useRef('');
   const minimapFilter = useRef({
     hiddenNodes: new Set<string>(),
     edges: new Set<string>(),
@@ -330,6 +335,7 @@ export default function GraphCanvas({
     graph: Graph;
     origin: [number, number];
     zoom: number;
+    viewport: [number, number];
   };
   const selectionCamera = useRef<SelectionCamera | null>(null);
   // Consume each return once. ResizeObserver preserves the projected origin
@@ -342,7 +348,11 @@ export default function GraphCanvas({
       !graph ||
       graph.destroyed ||
       (focusLayout && Boolean(focusId)) ||
-      flow
+      flow ||
+      connectionPath ||
+      tutorialPhase ||
+      tutorialLocked ||
+      tutorialCenterId
     )
       return;
     const origin = graph.getViewportByCanvas([0, 0]);
@@ -350,6 +360,10 @@ export default function GraphCanvas({
       graph,
       origin: [origin[0], origin[1]],
       zoom: graph.getZoom(),
+      viewport: [
+        document.documentElement.clientWidth,
+        document.documentElement.clientHeight,
+      ],
     };
   }
   function abandonCameraReturn() {
@@ -357,6 +371,7 @@ export default function GraphCanvas({
     cameraReturn.current = null;
   }
   const captureSelectionFromEffect = useEffectEvent(captureSelectionCamera);
+  const currentSelectedEdge = useEffectEvent(() => selectedEdgeId);
   async function restoreSelectionCamera(graph: Graph) {
     const saved = cameraReturn.current;
     if (
@@ -367,6 +382,13 @@ export default function GraphCanvas({
       flow
     )
       return;
+    if (
+      saved.viewport[0] !== document.documentElement.clientWidth ||
+      saved.viewport[1] !== document.documentElement.clientHeight
+    ) {
+      cameraReturn.current = null;
+      return;
+    }
     if (graph.getZoom() !== saved.zoom) await graph.zoomTo(saved.zoom, false);
     if (cameraReturn.current !== saved || graph.destroyed) return;
     // getPosition()/translateTo() use different bases in G6. Restore the actual
@@ -426,19 +448,10 @@ export default function GraphCanvas({
   function handleNodeSelect(id: string | null) {
     if (tutorialPhase || (tutorialLocked && id !== tutorialTargetId)) return;
     if (id === '__isolated__') return onOpenIsolated?.();
-    if (
-      id &&
-      !previousSelected.current &&
-      !connectionPath &&
-      !tutorialLocked &&
-      !tutorialCenterId
-    ) {
-      cameraReturn.current = null;
-      captureSelectionCamera();
-    }
     // 이미 선택한 노드를 다시 눌러도 수동 이동한 지도에서 중앙으로 돌아온다.
-    centerTarget.current = id;
-    if (id) {
+    // A new selection waits for the route effect, which records the camera first.
+    if (id && id === selected) {
+      centerTarget.current = id;
       preservePositions.current = false;
       followFit.current = false;
       fitPending.current = false;
@@ -834,27 +847,31 @@ export default function GraphCanvas({
       ) ?? []),
       ...document.querySelectorAll<HTMLElement>('[data-screen-id="M-GRP-01"]'),
     ];
-    const obstacles: Rect[] = overlays
+    const measured = overlays
       .filter((el) => el.getClientRects().length && !el.closest('.hidden'))
-      .map((el) => {
-        const r = el.getBoundingClientRect();
-        return {
-          x: r.left - hostRect.left,
-          y: r.top - hostRect.top,
-          width: r.width,
-          height: r.height,
-        };
-      });
+      .map((el) => ({ el, rect: el.getBoundingClientRect() }))
+      .filter(({ rect }) => rect.width > 0 && rect.height > 0);
+    const obstacles: Rect[] = measured.map(({ rect: r }) => {
+      return {
+        x: r.left - hostRect.left,
+        y: r.top - hostRect.top,
+        width: r.width,
+        height: r.height,
+      };
+    });
     // The plugin creates its DOM asynchronously. Reserve its known geometry
     // on the first fit as well, before it has a measurable container.
     // Mobile moves it left of the round zoom buttons (GraphMobileTools breakpoint).
     const mobile = window.matchMedia?.('(max-width: 767px)').matches ?? false;
-    obstacles.push({
-      x: mobile ? 8 : host.clientWidth - 192,
-      y: host.clientHeight - 64 - 128,
-      width: 192,
-      height: 128,
-    });
+    if (!measured.some(({ el }) => el.matches('.graph-overview'))) {
+      const [width, height] = minimapSize();
+      obstacles.push({
+        x: mobile ? 8 : host.clientWidth - width,
+        y: host.clientHeight - 64 - height,
+        width,
+        height,
+      });
+    }
     // Desktop layouts can be wider than the browser. Reserve the clipped
     // portion too, rather than fitting nodes behind horizontal page overflow.
     const viewportWidth = document.documentElement.clientWidth;
@@ -1371,13 +1388,22 @@ export default function GraphCanvas({
             .map((edge) => String(edge.id)),
         );
         minimapFilter.current = { hiddenNodes, edges: minimapEdges };
-        if (minimapGraph.current !== graph) {
+        const overviewSize = minimapSize();
+        const overviewKey = overviewSize.join(',');
+        if (
+          minimapGraph.current !== graph ||
+          minimapDimensions.current !== overviewKey
+        ) {
+          // G6 updates the inner canvas size but not its wrapper. Recreate on
+          // breakpoint changes so both the visible box and mask use the new size.
+          if (minimapGraph.current === graph) graph.setPlugins([]);
           minimapGraph.current = graph;
+          minimapDimensions.current = overviewKey;
           graph.setPlugins([
             {
               type: 'minimap',
               key: 'graph-overview',
-              size: [192, 128],
+              size: overviewSize,
               padding: MINIMAP_PADDING,
               position: 'right-bottom',
               // G6 passes this value to classList.add: it must be one token.
@@ -1449,9 +1475,6 @@ export default function GraphCanvas({
             arrangeFocusNow ? FOCUS_FIT_ZOOM : undefined,
             moving ? 'layout' : animate ? 'fit' : false,
           );
-          // A completed manual fit stays put while its selected rail closes.
-          // A fit queued together with deselection still follows the viewport.
-          if (animate && previousSelected.current) followFit.current = false;
         }
         await moving;
         if (moving) renderMinimap?.();
@@ -1498,7 +1521,7 @@ export default function GraphCanvas({
       // D-GRP-01: an explicit fit (or an edge selection) wins over closing a node.
       const pendingFit = fitPending.current || fitRequested.current;
       cameraReturn.current =
-        pendingFit || selectedEdgeId ? null : selectionCamera.current;
+        pendingFit || currentSelectedEdge() ? null : selectionCamera.current;
       if (cameraReturn.current) followFit.current = false;
       selectionCamera.current = null;
     }
@@ -1510,7 +1533,7 @@ export default function GraphCanvas({
       followFit.current = false;
       fitPending.current = false;
     }
-  }, [selected, selectedEdgeId]);
+  }, [selected]);
   useEffect(() => {
     if (!centerRequest) return;
     preservePositions.current = false;
