@@ -187,6 +187,7 @@ describe('D-GRP-01 fit bounds', () => {
   const node = (x: number, labelFontSize: number) =>
     ({
       id: String(x),
+      data: { kind: 'issue' },
       style: {
         x,
         y: 0,
@@ -220,6 +221,12 @@ describe('D-GRP-01 fit bounds', () => {
     const footprint = fitFootprint(node(0, 13));
     expect(footprint.labelWidth).toBeLessThanOrEqual(170 + 24);
     expect(footprint.labelHeight).toBeGreaterThan(13 * 1.5 * 2);
+    // 사건 이름은 최대 2줄이다(2026-11-05). 40자도 2줄 높이로 잰다.
+    expect(footprint.labelHeight).toBe(2 * 13 * 1.5 + 18);
+    // 기업 이름은 줄을 바꾸지 않으므로 한 줄 폭·높이로 잰다.
+    const company = fitFootprint({ ...node(0, 13), data: { kind: 'company' } });
+    expect(company.labelHeight).toBe(13 * 1.5 + 18);
+    expect(company.labelWidth).toBeGreaterThan(170 + 24);
     // 한 줄 폭(520px)으로 재면 300px 안에서 아주 작게 줄던 경우: 이제 두 노드가 들어가는 배율을 고른다.
     expect(
       fitZoom([node(0, 13), node(120, 13)].map(fitFootprint), safe, 1.8).zoom,
