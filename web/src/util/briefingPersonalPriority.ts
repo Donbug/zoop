@@ -139,7 +139,7 @@ function validV3Basis(
   // member's companies. Keep its real version; never relabel it as a new AI run.
   if (
     basis.promptVersion === 'common-impact-relative-v1' &&
-    (!analysis.resultVersion.startsWith('common-impact-relative-v1-') ||
+    (!/^common-impact-relative-v1-[a-f0-9]{64}$/.test(analysis.resultVersion) ||
       comparison.status !== 'newly_selected')
   )
     return false;
