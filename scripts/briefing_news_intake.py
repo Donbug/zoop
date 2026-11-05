@@ -302,8 +302,8 @@ def collect(cfg, round_, parent, *, fetcher_factory=None, monotonic=time.monoton
             companies = None
             if cfg.get('companyCatalogue'):
                 catalogue = json.loads(Path(cfg['companyCatalogue']).read_bytes())
-                companies = [{'companyId': c['company_id'], 'name': c['name'], 'aliases': c['aliases']}
-                             for c in catalogue['companies']]
+                from briefing_company_names import catalogue_companies
+                companies = catalogue_companies(catalogue)
             from briefing_company_names import matches
             ordered = sorted(candidates.values(), key=lambda c: (bool(matches(c.title or '', companies or [])),
                 c.published_at or c.archive_day or '', c.url), reverse=True)

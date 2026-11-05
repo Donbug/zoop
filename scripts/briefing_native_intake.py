@@ -14,7 +14,7 @@ from briefing_usage import CommandPipe,UsageSession,write_once
 b=server.b
 require=server.require
 SCHEMA='briefing-native-intake-v1'
-INPUT_PRIORITY='briefing-source-priority-v3'
+INPUT_PRIORITY='briefing-source-priority-v4'
 BUSINESS_ACTION=re.compile(r'계약|수주|투자|인수|합병|매출|영업이익|손실|실적|공급|생산|양산|공장|출시|허가|승인|규제|제재|소송|리콜|가동.{0,8}중단|증자|배당|자사주|납품|도입|철회|취소|감산|증설|contract|revenue|earnings|investment|acqui|factory|production|launch|approval|recall|layoff',re.I)
 
 def source_priority(title,text,companies,matches):
@@ -108,7 +108,8 @@ def collect(cfg,round,root,*,all_candidates=False):
     result=json.loads((root/'collection-result.json').read_bytes()) if (root/'collection-result.json').exists() else run(config)
     write_once(root/'collection-result.json',result)
     catalogue=json.loads(Path(cfg['companyCatalogue']).read_bytes())
-    companies=[{'companyId':c['company_id'],'name':c['name'],'aliases':c['aliases'],'ticker':c['ticker']} for c in catalogue['companies']]
+    from briefing_company_names import catalogue_companies
+    companies=catalogue_companies(catalogue)
     eligible=[]
     # Reuse unprocessed acquisitions from this owned worker, without fetching them or changing their clocks.
     cohorts=[(root,result)]
