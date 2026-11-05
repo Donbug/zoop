@@ -558,6 +558,10 @@ def run_slot(cfg,edition,cutoff=None,recover_unpaid=False,*,producer=None,observ
             write_once(root/'activated.json',activated)
             observer('activation','completed',{'graphVersion':activated['graphVersion']})
             print(json.dumps({'roundId':round['id'],'stage':'native_source_ready','graphVersion':activated['graphVersion']}),flush=True)
+            # Only deterministic provider reads here. Persist once before the
+            # cutoff; failed/late indicators cannot block verified news or be
+            # passed off as an on-time price observation.
+            capture_market(cfg,round,observer)
             observer('cutoff','started',{'cutoff':slot.isoformat()})
             while (remaining:=(slot-clock()).total_seconds())>0:sleep(min(30,remaining))
             observer('cutoff','completed')
@@ -581,3 +585,14 @@ def run_slot(cfg,edition,cutoff=None,recover_unpaid=False,*,producer=None,observ
                 server.record_input_failure(cfg,round,root/'failure',stage=last_stage[0],reason='automatic_chain_failed')
             conn.execute("UPDATE briefing_common_schedule_jobs SET status='requires_recovery',finished_at=now() WHERE id=%s AND status IN ('queued','running')",(round['id'],))
             raise
+
+
+def capture_market(cfg,round_,observer):
+    import briefing_live_market as market
+    observer('market','started')
+    try:
+        value=market.collect(cfg['work'],round_)
+        count=sum(x['value'] is not None for x in value['marketVariables']['indicators'])
+        observer('market','completed',{'availableIndicators':count})
+    except (OSError,ValueError,KeyError,TypeError,market.b.ReplayError):
+        observer('market','failed',{'reason':'market_capture_unavailable'})

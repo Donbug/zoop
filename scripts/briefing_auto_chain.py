@@ -26,10 +26,10 @@ class Journal:
         server.require(not self.root.is_symlink() and self.root.stat().st_mode&0o077==0,'private_chain_state')
         self.round_id=round_id
     def __call__(self,stage,status,detail=None):
-        server.require(stage in ('collection','native','authority','import','activation','cutoff','generation','publication','slot'),'chain_stage')
+        server.require(stage in ('collection','native','authority','import','activation','market','cutoff','generation','publication','slot'),'chain_stage')
         server.require(status in ('started','completed','failed','requires_recovery'),'chain_status')
         # Restrict the journal to operational facts; no source body, prompt, account or provider response.
-        safe={k:v for k,v in (detail or {}).items() if k in ('graphVersion','reason','candidateDocuments','selectedDocuments','cutoff')}
+        safe={k:v for k,v in (detail or {}).items() if k in ('graphVersion','reason','candidateDocuments','selectedDocuments','cutoff','availableIndicators')}
         path=self.root/(stage+'-'+status+'.json')
         if path.exists():return
         write_once(path,{'schemaVersion':VERSION,'roundId':self.round_id,'stage':stage,'status':status,'at':server.b.now(),'detail':safe})

@@ -252,6 +252,8 @@ export type BriefingResponse = {
         status: 'available';
         /** Stored collection time only; never infer it from the observation time. */
         collectedAt?: string | null;
+        referenceAt?: string | null;
+        rateCutoffAt?: string | null;
         indicators: MarketIndicator[];
       }
     | { status: 'unavailable'; reason: string };

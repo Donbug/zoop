@@ -38,7 +38,8 @@ export type PersonalPriority = {
       nextCheck: string;
       evidenceIds: string[];
       judgmentBasis?: {
-        promptVersion: 'personal-impact-relative-v3';
+        promptVersion:
+          'personal-impact-relative-v3' | 'common-impact-relative-v1';
         directionReason: string;
         confidence: 'limited' | 'moderate' | 'high';
         effectSizeStatus: 'unquantified' | 'quantified';
@@ -124,12 +125,22 @@ function validV3Basis(
   const comparison = analysis.comparison;
   if (!basis) return !comparison;
   if (
-    basis.promptVersion !== 'personal-impact-relative-v3' ||
+    !['personal-impact-relative-v3', 'common-impact-relative-v1'].includes(
+      basis.promptVersion,
+    ) ||
     typeof basis.directionReason !== 'string' ||
     !basis.directionReason ||
     !['limited', 'moderate', 'high'].includes(basis.confidence) ||
     !['unquantified', 'quantified'].includes(basis.effectSizeStatus) ||
     !comparison
+  )
+    return false;
+  // The server can filter exact, independently checked COMMON prose to the
+  // member's companies. Keep its real version; never relabel it as a new AI run.
+  if (
+    basis.promptVersion === 'common-impact-relative-v1' &&
+    (!analysis.resultVersion.startsWith('common-impact-relative-v1-') ||
+      comparison.status !== 'newly_selected')
   )
     return false;
   if (comparison.status === 'newly_selected')

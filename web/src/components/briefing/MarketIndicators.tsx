@@ -82,6 +82,15 @@ export default function MarketIndicators({
           주요 시장 지표
         </h3>
       </div>
+      {variables?.status === 'available' &&
+        variables.collectedAt &&
+        variables.referenceAt &&
+        Date.parse(variables.collectedAt) >
+          Date.parse(variables.referenceAt) && (
+          <p className={`${NOTE} mb-3`}>
+            사후 조회한 일별 값 · {briefingTime(variables.collectedAt)} 수집
+          </p>
+        )}
       {variables?.status === 'unavailable' && (
         <p className={`${EMPTY} mb-3`}>{variables.reason}</p>
       )}

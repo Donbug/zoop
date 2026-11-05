@@ -8,6 +8,7 @@ import type { Result } from './ExplicitPersonalBriefing';
 import IssueCentricBriefing from './IssueCentricBriefing';
 import BriefingContinuity from './BriefingContinuity';
 import BriefingItemDetails from './BriefingItemDetails';
+import { withRoundMarket } from '@/util/briefingPersonalMarket';
 import {
   CARD,
   EMPTY,
@@ -476,7 +477,11 @@ function MemberScheduledPersonalBriefing({
           <>
             <div className={NOTE}>이 회차에 고정된 기준 종목</div>
             {chips(published.selection!.choice.companyIds)}
-            <PersonalResult result={published.selection!} compact={compact} />
+            <PersonalResult
+              result={published.selection!}
+              round={round}
+              compact={compact}
+            />
           </>
         ) : (
           <p role="status" className={EMPTY}>
@@ -534,7 +539,11 @@ function MemberScheduledPersonalBriefing({
                 </p>
               )}
               {chips(preview.selection.choice.companyIds)}
-              <PersonalResult result={preview.selection} compact={compact} />
+              <PersonalResult
+                result={preview.selection}
+                round={round}
+                compact={compact}
+              />
             </div>
           )}
           {preview?.status === 'generating' && (
@@ -549,15 +558,20 @@ function MemberScheduledPersonalBriefing({
 }
 function PersonalResult({
   result,
+  round,
   compact,
 }: {
   result: Result;
+  round: BriefingResponse;
   compact: boolean;
 }) {
   return (
     <>
       <IssueCentricBriefing
-        result={result.verifiedPresentation ?? result.presentation}
+        result={withRoundMarket(
+          result.verifiedPresentation ?? result.presentation,
+          round,
+        )}
         compact={compact}
         selectionDetails={result.details}
       />

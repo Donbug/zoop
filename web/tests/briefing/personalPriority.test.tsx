@@ -296,6 +296,20 @@ function withV3Comparison(): PersonalPriority {
   return value;
 }
 
+test('scheduled personal view accepts exact checked common prose without changing its real prompt version', () => {
+  const value = withV3Comparison();
+  const analysis = value.items[0].aiAnalyses![0];
+  analysis.judgmentBasis!.promptVersion = 'common-impact-relative-v1';
+  analysis.resultVersion = 'common-impact-relative-v1-' + 'a'.repeat(64);
+  analysis.comparison = { status: 'newly_selected', baseline: null };
+  expect(personalPriorityOf(response(value))).not.toBeNull();
+  expect(analysis.judgmentBasis!.promptVersion).toBe(
+    'common-impact-relative-v1',
+  );
+  analysis.resultVersion = 'personal-impact-relative-v3-forged-label';
+  expect(personalPriorityOf(response(value))).toBeNull();
+});
+
 test('v3 displays business direction, confidence, unknown scale and the immutable baseline', async () => {
   const value = withV3Comparison();
   expect(personalPriorityOf(response(value))).not.toBeNull();

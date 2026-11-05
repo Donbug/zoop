@@ -11,6 +11,8 @@ import httpx,psycopg
 import briefing_auto_chain as chain
 import briefing_native_intake as native
 import briefing_usage as usage
+import briefing_live_market as market
+from test_briefing_market_data import index_bytes,fx_bytes
 from test_briefing_priority_generation import Transport
 from scripts.collection_smoke import LocalSite
 from scripts.korea_corpus_smoke import config,article,listing,SUBSTANCE
@@ -43,6 +45,12 @@ os.environ.update({'BRIEFING_SERVER_WORK_ROOT':str(work),'BRIEFING_SERVER_AUTHOR
     'BRIEFING_SERVER_SOURCE_SCOPE':str(authority/'model-scope.json'),'ZOOP_INGESTION_EXECUTABLE':str(root/'ingest'),'ZOOP_GRAPH_HANDOFF_EXECUTABLE':str(root/'handoff'),
     'PYTHONPATH':os.pathsep.join([str(repo/'ai/pipeline/src'),str(repo/'scripts'),str(repo/'ai/service/src')])})
 site=LocalSite();provider=[];business=Transport();real_transport=httpx.HTTPTransport
+market_requests=[]
+def market_peer(url):
+ market_requests.append(url)
+ days=[('2026-11-02','2500.00'),('2026-11-03','2510.00'),('2026-11-04','2520.00')]
+ if 'FX_USDKRW' in url:return 200,fx_bytes(days)
+ return 200,index_bytes('^KS11' if '%5EKS11' in url else '^KQ11',values=days)
 class Peer(httpx.BaseTransport):
  def __init__(self,*args,**kwargs):self.local=real_transport(*args,**kwargs)
  def handle_request(self,request):
@@ -73,10 +81,11 @@ try:
    result=original_run(*args,**kwargs)
    if result.returncode!=0 and isinstance(result.stderr,bytes):print('syntheticCommandFailure:'+result.stderr.decode(),file=sys.stderr)
    return result
-  with patch.object(subprocess,'run',command),patch.object(httpx,'HTTPTransport',Peer),patch.object(native.server.b,'authenticated_transport',return_value=business),patch.object(usage,'now',receipt_now):
+  with patch.object(subprocess,'run',command),patch.object(httpx,'HTTPTransport',Peer),patch.object(native.server.b,'authenticated_transport',return_value=business),patch.object(usage,'now',receipt_now),patch.object(market.market,'transport',market_peer),patch.object(market.b,'now',lambda:datetime.now(timezone.utc).isoformat()):
    chain.run_slot(cfg,'morning',sleep=sleep)
   journal=work/'chain'/r['id']
   assert (journal/'collection-completed.json').exists() and (journal/'publication-completed.json').exists()
+  assert (journal/'market-completed.json').exists() and len(market_requests)==3
   assert len(provider)<=(8 if shared else 6),len(provider)
   assert len(business.requests)==(8 if shared else 10),len(business.requests)
   if shared:
@@ -86,8 +95,12 @@ try:
   with patch.object(httpx,'HTTPTransport',Peer),patch.object(native.server.b,'authenticated_transport',return_value=business):
    assert chain.work_once(cfg) is False
   assert before==len(provider)+len(business.requests)
+  assert len(market_requests)==3
  with psycopg.connect(dsn) as conn:
-  row=conn.execute("SELECT public_snapshot FROM briefing_rounds WHERE id='brf-2026-11-04-morning' AND status='published'").fetchone();assert row
+  row=conn.execute("SELECT public_snapshot,published_payload->'marketVariables' FROM briefing_rounds WHERE id='brf-2026-11-04-morning' AND status='published'").fetchone();assert row
+  assert row[0]['marketCapture']['capturedBeforeCutoff'] is True
+  assert [i['value'] for i in row[1]['indicators']]==[2510.0,2510.0,2520.0]
+  assert row[1]['indicators'][2]['valueKind']=='reference'
   source=row[0]['commonPriority']['items'][0]['sources'][0]
   assert source['publishedAt'] is None and source['publishedDate']=='2026-11-04'
   assert conn.execute("SELECT count(*) FROM ai_executions WHERE actual_cost IS NOT NULL").fetchone()[0]==0
