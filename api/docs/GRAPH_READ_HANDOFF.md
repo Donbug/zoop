@@ -48,6 +48,12 @@ client는 비-loopback 주소에 HTTPS를 요구하고 proxy·redirect·자동 �
 
 공개 publication의 현재 권한 검사는 모든 원본 구성에서 정확한 `(articleId, articleVersion)` 집합을 모아, 같은 조회 트랜잭션에서 기사·버전·본문 artifact를 최대 256개 identity씩 JOIN합니다. 반복 기사의 불변 registry 사실만 공유하고, 각 구성의 receipt·해시·현재 read/store/quote-display grant·revision·만료·공개 제외는 각각 검사합니다. 누락되거나 불일치하는 registry 사실은 `503 SOURCE_UNAVAILABLE`로 닫으며, `GET /api/v1/graph`의 REPEATABLE READ·읽기 전용·5초 제한을 유지합니다.
 
+현재 권한 검사에서 위 오류를 감지하면 `GraphPublicationAuthority`가 WARN 로그 `Graph publication authority unavailable`을 한 번 남깁니다. `category`는 `publication`, `receipt`, `json`, `registry` 중 하나입니다. `reason`은 `basis_unavailable`, `basis_mismatch`, `publication_invalid`, `receipt_invalid`, `json_invalid`, `source_registry_invalid`, `source_registry_unreadable`, `source_registry_too_large` 중 하나이며, 공개 응답은 기존 `503 SOURCE_UNAVAILABLE`·`retryable=false`를 유지합니다.
+
+`requestFingerprint`는 호출자가 전달한 request ID의 UTF-8 SHA-256입니다. 인자가 `null`이면 기존 MDC의 `requestId`를 사용하고, 둘 다 없으면 `unavailable`로 기록합니다. HTTP에서는 `X-Request-ID`, chat tool에서는 `ChatToolScope.traceId`인 job ID로 대조합니다. `ChatToolRunner`는 각 virtual thread의 읽기 구간에만 job ID를 MDC에 넣습니다. 이 값은 job 단위 연결이며 개별 tool call을 식별하지는 않습니다.
+
+로그에는 위 분류·사유·fingerprint만 넣으며 원문, URL·경로, grant 내용, 예외 메시지·stack은 기록하지 않습니다. 현재 활성본의 진단은 `GET /api/v1/companies/{id}/documents?limit=1`에 고유한 `X-Request-ID`를 지정하고, 해당 ID의 SHA-256으로 로그를 조회합니다. 특정 실패의 과거 조회 조건을 재현할 때는 실제 기록된 `graphVersion`과 `asOf`를 사용합니다. `graphVersion`만 지정하면 최초 활성화 시점의 조회가 될 수 있으므로 현재 상태와 혼동하지 않습니다. 모델 요청은 발생하지 않으며, 성공한 조회는 이 실패 로그를 남기지 않으므로 HTTP 상태도 함께 확인합니다.
+
 ### 합성 종단 smoke
 
 이미 설치된 pipeline·service·worker 환경, 최신 API jar와 비어 있는 전용 loopback PostgreSQL을 준비합니다. 아래 변수는 운영자가 해당 로컬 검증 환경에서 지정합니다.

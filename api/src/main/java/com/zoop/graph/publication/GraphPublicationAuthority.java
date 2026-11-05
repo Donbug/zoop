@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
+import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
 import com.zoop.document.evidence.service.DocumentReadSources;
 import com.zoop.document.evidence.service.GraphReceiptGrants;
@@ -20,9 +21,13 @@ import com.zoop.graph.publication.GraphPublicationReader.Publication;
 import com.zoop.graph.read.DisclosureExclusionReader;
 import com.zoop.graph.read.DisclosureExclusions;
 import com.zoop.graph.read.DisclosureExclusions.ArticleTarget;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /** Current source authority and durable source exclusions, shared by every version's read and publication gates. */
 public final class GraphPublicationAuthority {
+    private static final Logger log = LoggerFactory.getLogger(GraphPublicationAuthority.class);
     private final DocumentRegistryRepository registry;
     private final DocumentReadSources sources;
     private final DisclosureExclusionReader exclusions;
@@ -73,6 +78,31 @@ public final class GraphPublicationAuthority {
             }
             return new DisclosureExclusions(revision, issues, relations, evidence, articles);
         } catch (PublicationException | GraphReceiptGrants.Malformed | StrictJson.Malformed | SourceRegistry.Invalid malformed) {
+            String category;
+            String reason;
+            if (malformed instanceof PublicationException failure) {
+                category = "publication";
+                // PublicationException accepts arbitrary strings; only these local basis codes are safe to emit.
+                reason = switch (failure.code()) {
+                    case "basis_unavailable" -> "basis_unavailable";
+                    case "basis_mismatch" -> "basis_mismatch";
+                    case null, default -> "publication_invalid";
+                };
+            } else if (malformed instanceof GraphReceiptGrants.Malformed) {
+                category = "receipt"; reason = "receipt_invalid";
+            } else if (malformed instanceof StrictJson.Malformed) {
+                category = "json"; reason = "json_invalid";
+            } else {
+                category = "registry";
+                reason = switch (((SourceRegistry.Invalid) malformed).code()) {
+                    case "source_registry_unreadable" -> "source_registry_unreadable";
+                    case "source_registry_too_large" -> "source_registry_too_large";
+                    case null, default -> "source_registry_invalid";
+                };
+            }
+            String correlation = requestId == null ? MDC.get("requestId") : requestId;
+            log.warn("Graph publication authority unavailable (category={}, reason={}, requestFingerprint={})",
+                    category, reason, correlation == null ? "unavailable" : Canonical.sha256(correlation));
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
         }
     }

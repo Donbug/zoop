@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.zoop.common.exception.GlobalExceptionHandler;
+import com.zoop.common.request.RequestIdFilter;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.StrictJson;
@@ -22,9 +24,20 @@ import com.zoop.graph.read.DisclosureExclusions;
 import com.zoop.graph.read.GraphSnapshotFilter;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+@ExtendWith(OutputCaptureExtension.class)
 class GraphPublicationAuthorityTest {
     @TempDir Path temp;
     private static final Instant NOW = Instant.parse("2026-10-31T01:00:00Z");
@@ -106,6 +119,63 @@ class GraphPublicationAuthorityTest {
         var authority = restored.authority();
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
                 () -> authority.current(ambiguous, "test")).getErrorCode());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "missing, publication, basis_unavailable",
+            "mismatch, publication, basis_mismatch",
+            "receipt, receipt, receipt_invalid",
+            "json, json, json_invalid",
+            "registry, registry, source_registry_invalid",
+            "unknown, publication, publication_invalid"
+    })
+    void authorityFailureLogsOnlyClosedReasonAndCorrelationWhileHttpStaysUnavailable(
+            String scenario, String category, String reason, CapturedOutput output) throws Exception {
+        var setup = setup();
+        String canary = "PRIVATE_CANARY_article_prompt_grant_https://secret.invalid/private";
+        var source = setup.contributions().getFirst();
+        var bundle = (tools.jackson.databind.node.ObjectNode) source.bundle().node().deepCopy();
+        bundle.put("private", canary);
+        var article = (tools.jackson.databind.node.ObjectNode) bundle.get("articles").get(0);
+        GraphPublicationAuthority authority = setup.authority();
+        switch (scenario) {
+            case "missing" -> setup.registry().removeArtifact("text");
+            case "mismatch" -> article.put("textSha256", "0".repeat(64));
+            case "receipt" -> article.putArray("observations");
+            case "json" -> article.remove("textSha256");
+            case "registry" -> Files.writeString(setup.secondRegistry(), "{\"private\":\"" + canary + "\"}");
+            case "unknown" -> authority = new GraphPublicationAuthority(setup.registry(), null,
+                    version -> { throw new PublicationException(canary); }, Clock.fixed(NOW, ZoneOffset.UTC));
+            default -> throw new AssertionError(scenario);
+        }
+        var changed = new Contribution(source.sourceVersionId(), source.sourceId(), source.sourceKind(), source.receipt(),
+                source.projectionArtifact(), source.projection(), StrictJson.Obj.of(bundle));
+        var publication = publication("synthetic-diagnostic", List.of(changed, setup.contributions().getLast()));
+        var mvc = MockMvcBuilders.standaloneSetup(new AuthorityReadController(authority, publication))
+                .setControllerAdvice(new GlobalExceptionHandler()).addFilters(new RequestIdFilter()).build();
+        mvc.perform(get("/api/v1/graph").header(RequestIdFilter.HEADER, "synthetic-authority-read"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error.code").value("SOURCE_UNAVAILABLE"))
+                .andExpect(jsonPath("$.error.requestId").value("synthetic-authority-read"))
+                .andExpect(jsonPath("$.error.retryable").value(false))
+                .andExpect(jsonPath("$.error.reason").doesNotExist())
+                .andExpect(jsonPath("$.error.category").doesNotExist());
+        var diagnostics = output.getAll().lines().filter(line -> line.contains("Graph publication authority unavailable")).toList();
+        assertEquals(1, diagnostics.size());
+        assertTrue(diagnostics.getFirst().endsWith("(category=" + category + ", reason=" + reason
+                + ", requestFingerprint=ea8089e3a30d2588116e612473cab14bd9ae23852720bdd63d1e3dc9e8912558)"));
+        assertFalse(output.getAll().contains(canary));
+        assertFalse(output.getAll().contains(temp.toString()));
+        assertFalse(output.getAll().contains("at com.zoop.graph.publication"));
+    }
+
+    @RestController
+    private record AuthorityReadController(GraphPublicationAuthority authority, Publication publication) {
+        @GetMapping("/api/v1/graph")
+        DisclosureExclusions read(jakarta.servlet.http.HttpServletRequest request) {
+            return authority.current(publication, RequestIdFilter.currentId(request));
+        }
     }
 
     private record Setup(GraphPublicationAuthority authority, InMemoryDocumentRegistry registry, List<Contribution> contributions,
