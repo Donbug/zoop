@@ -31,7 +31,15 @@ const FIT_LABEL_WRAP = 170;
  * 맞춤 경계: 노드 원은 지도 좌표, 이름표는 화면 px로 따로 잰다.
  * 이름표 크기가 지금 배율에 따라 바뀌므로 지도 좌표에 섞으면 맞춤을 반복할수록 더 축소될 수 있다.
  */
-export function fitFootprint(node: NodeData) {
+type FitFootprint = {
+  x: number;
+  y: number;
+  radius: number;
+  labelWidth: number;
+  labelHeight: number;
+  labelAbove?: boolean;
+};
+export function fitFootprint(node: NodeData): FitFootprint {
   const s = node.style ?? {};
   const dimensions = Array.isArray(s.size)
     ? s.size
@@ -47,7 +55,17 @@ export function fitFootprint(node: NodeData) {
     radius: radius + 4,
     labelWidth: label ? Math.min(oneLine, FIT_LABEL_WRAP) + 24 : 0,
     labelHeight: label ? lines * fontSize * 1.5 + 8 + 10 : 0,
+    labelAbove: s.labelPlacement === 'top',
   };
+}
+
+/** D-GRP-01: whole-map LOD hides issue titles; they must not shrink the mobile overview. */
+export function overviewFootprint(node: NodeData) {
+  return fitFootprint(
+    node.data?.kind === 'issue'
+      ? { ...node, style: { ...node.style, labelText: '' } }
+      : node,
+  );
 }
 
 /**
@@ -58,30 +76,96 @@ export function fitZoom(
   footprints: ReturnType<typeof fitFootprint>[],
   safe: { width: number; height: number },
   maxZoom: number,
+  /**
+   * 'labels': center on circles plus titles (whole-map fit).
+   * 'circles': keep the circles' center, as selection and neighborhood fits always did,
+   * and reserve title room symmetrically around it.
+   */
+  centerOn: 'labels' | 'circles' = 'labels',
 ) {
-  const left = Math.min(...footprints.map((f) => f.x - f.radius)),
-    right = Math.max(...footprints.map((f) => f.x + f.radius)),
-    top = Math.min(...footprints.map((f) => f.y - f.radius)),
-    bottom = Math.max(...footprints.map((f) => f.y + f.radius));
-  const labelWidth = Math.max(...footprints.map((f) => f.labelWidth));
-  const labelHeight = Math.max(...footprints.map((f) => f.labelHeight));
-  const solve = (scale: number) =>
-    Math.max(
-      MIN_GRAPH_ZOOM,
-      Math.min(
-        maxZoom,
-        Math.max(1, safe.width - labelWidth * scale) /
-          Math.max(1, right - left),
-        Math.max(1, safe.height - labelHeight * scale) /
-          Math.max(1, bottom - top),
-      ),
+  const circleCenter: [number, number] = [
+    (Math.min(...footprints.map((f) => f.x - f.radius)) +
+      Math.max(...footprints.map((f) => f.x + f.radius))) /
+      2,
+    (Math.min(...footprints.map((f) => f.y - f.radius)) +
+      Math.max(...footprints.map((f) => f.y + f.radius))) /
+      2,
+  ];
+  // D-GRP-01: measure each label at its own node. Reserving the widest label
+  // at both outer graph edges wastes most of a narrow mobile viewport.
+  const bounds = (zoom: number) => {
+    let left = Infinity,
+      right = -Infinity,
+      top = Infinity,
+      bottom = -Infinity;
+    const labelScale = Math.max(1, zoom);
+    for (const f of footprints) {
+      const radius = f.radius * zoom;
+      const halfWidth = Math.max(radius, (f.labelWidth * labelScale) / 2);
+      const labelHeight = f.labelHeight * labelScale;
+      left = Math.min(left, f.x * zoom - halfWidth);
+      right = Math.max(right, f.x * zoom + halfWidth);
+      top = Math.min(
+        top,
+        f.y * zoom - radius - (f.labelAbove ? labelHeight : 0),
+      );
+      bottom = Math.max(
+        bottom,
+        f.y * zoom + radius + (f.labelAbove ? 0 : labelHeight),
+      );
+    }
+    return { left, right, top, bottom };
+  };
+  const occupied = (zoom: number) => {
+    const b = bounds(zoom);
+    if (centerOn === 'circles') {
+      const [cx, cy] = [circleCenter[0] * zoom, circleCenter[1] * zoom];
+      return Math.max(
+        (2 * Math.max(cx - b.left, b.right - cx)) / safe.width,
+        (2 * Math.max(cy - b.top, b.bottom - cy)) / safe.height,
+      );
+    }
+    return Math.max(
+      (b.right - b.left) / safe.width,
+      (b.bottom - b.top) / safe.height,
     );
-  // 배율 1 이상에서는 이름표가 기본 크기(13)로 함께 커지므로 그만큼 한 번 더 여백을 잡는다.
-  const first = solve(1);
-  const zoom = first > 1 ? solve(first) : first;
+  };
+  const fits = (zoom: number) => occupied(zoom) <= 1 + 1e-9;
+  let lower = MIN_GRAPH_ZOOM,
+    upper = Math.max(lower, maxZoom);
+  if (fits(upper)) lower = upper;
+  else {
+    if (!fits(lower)) {
+      // Opposite-side labels can overlap at minimum zoom, then separate enough
+      // to fit before larger zooms exceed the viewport. Find a feasible point
+      // in the convex occupied span before searching its upper boundary.
+      let left = lower,
+        right = upper;
+      for (let step = 0; step < 48; step++) {
+        const a = left + (right - left) / 3;
+        const b = right - (right - left) / 3;
+        if (occupied(a) <= occupied(b)) right = b;
+        else left = a;
+      }
+      const feasible = (left + right) / 2;
+      if (fits(feasible)) lower = feasible;
+    }
+    if (fits(lower))
+      for (let step = 0; step < 28; step++) {
+        const middle = (lower + upper) / 2;
+        if (fits(middle)) lower = middle;
+        else upper = middle;
+      }
+  }
+  const zoom = lower;
+  const measured = bounds(zoom);
+  if (centerOn === 'circles') return { zoom, center: circleCenter };
   return {
     zoom,
-    center: [(left + right) / 2, (top + bottom) / 2] as [number, number],
+    center: [
+      (measured.left + measured.right) / (2 * zoom),
+      (measured.top + measured.bottom) / (2 * zoom),
+    ] as [number, number],
   };
 }
 

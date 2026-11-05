@@ -11,6 +11,7 @@ import {
   graphSummary as graphSummaryOf,
   toG6Data,
 } from '@/components/graph/graph-model';
+import { intersects } from '@/components/graph/graph-geometry';
 import { createMockGraph } from '@/mocks/graph/response';
 import type { Graph, GraphData } from '@antv/g6';
 
@@ -202,6 +203,49 @@ test('D-GRP-01 titles connected to the hovered or selected node are never culled
     [],
   );
   expect([...result]).toEqual(['other']);
+});
+
+test('D-GRP-01 kept titles slide apart instead of printing over one another', () => {
+  // 2026-11-05: 연결된 제목은 계속 보이되, 네 방향이 모두 차면 빈자리까지 밀어 겹치지 않게 둔다.
+  const side = (placement: 'top' | 'bottom' | 'left' | 'right') => ({
+    placement,
+    box:
+      placement === 'top'
+        ? { x: 50, y: 60, width: 100, height: 30 }
+        : placement === 'bottom'
+          ? { x: 50, y: 140, width: 100, height: 30 }
+          : placement === 'left'
+            ? { x: -55, y: 85, width: 100, height: 30 }
+            : { x: 155, y: 85, width: 100, height: 30 },
+  });
+  const alternatives = (['top', 'bottom', 'left', 'right'] as const).map(side);
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+  const placements = new Map<string, 'top' | 'bottom' | 'left' | 'right'>();
+  const shifts = new Map<string, number>();
+  const hidden = culledLabels(
+    ids.map((id) => ({
+      id,
+      priority: 5,
+      box: alternatives[0].box,
+      distance: 0,
+      degree: 0,
+      evidence: 0,
+      keep: true,
+      alternatives,
+    })),
+    [{ id: 'circle', box: { x: 85, y: 85, width: 30, height: 30 } }],
+    placements,
+    shifts,
+  );
+  expect([...hidden]).toEqual([]);
+  expect(shifts.size).toBeGreaterThan(0);
+  const boxes = ids.map((id) => {
+    const box = side(placements.get(id) ?? 'top').box;
+    return { ...box, y: box.y + (shifts.get(id) ?? 0) };
+  });
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++)
+      expect(intersects(boxes[i], boxes[j], 2)).toBe(false);
 });
 
 test('D-GRP-01 a selection keeps its connected titles while another node is hovered', () => {
@@ -482,6 +526,43 @@ function cullingGraph() {
   return { graph, visible, room };
 }
 
+test('D-GRP-01 selected company neighbors keep their titles, nodes and connections', async () => {
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const company = data.nodes.find(
+    (n) =>
+      n.kind === 'company' &&
+      data.edges.filter((e) => e.source === n.id || e.target === n.id).length >
+        2,
+  )!;
+  const linked = new Set(
+    data.edges
+      .filter((e) => e.source === company.id || e.target === company.id)
+      .flatMap((e) => [e.source, e.target]),
+  );
+  const base = toG6Data(data, 1200, 700, company.id);
+  for (const node of base.nodes ?? [])
+    node.style = { ...node.style, x: 45, y: 22 };
+  const { graph, visible } = cullingGraph();
+  await applyGraphReading(graph, base, data, {
+    ...context,
+    zoom: 0.2,
+    selected: company.id,
+  });
+  const issues = data.nodes.filter(
+    (n) =>
+      n.kind === 'issue' &&
+      linked.has(n.id) &&
+      base.nodes?.some((node) => node.id === n.id),
+  );
+  expect(issues.length).toBeGreaterThan(1);
+  for (const issue of issues) expect(visible(issue.id, 'label')).toBe(true);
+  for (const issue of issues) expect(visible(issue.id, 'key')).toBe(true);
+  for (const edge of data.edges.filter(
+    (e) => e.source === company.id || e.target === company.id,
+  ))
+    expect(visible(edge.id, 'key')).toBe(true);
+});
+
 test('D-GRP-01 overlapping titles never fold a follow-up issue or its FOLLOWS line', async () => {
   const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
   const follow = data.edges.find((e) => e.relationType === 'FOLLOWS')!;
@@ -550,7 +631,6 @@ test('D-GRP-01 an overlapping issue title moves to a free side of its circle', (
     distance: 0,
     degree: 0,
     evidence: 0,
-    keep: true,
     alternatives: alternatives
       ? [
           { placement: 'top' as const, box: top },
