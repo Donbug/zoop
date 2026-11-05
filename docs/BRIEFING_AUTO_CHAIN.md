@@ -84,7 +84,7 @@ Korea 정책뉴스·보도자료·해명자료의 기사별 KOGL1 **텍스트**�
 
 승인한 당일 미발행 회차만 `--recover-recorded-slot morning YYYY-MM-DD` 또는 `evening`으로 유한 복구할 수 있다. 별도 `BRIEFING_RECORDED_RECOVERY_AUTHORIZATION`이 필요하며 일반 정기 작업에는 넣지 않는다. 기존 실패·requires_recovery 이력, 실행 중 작업 없음, 미응답 없음, 같은 DB writer lock을 확인한다. 기존 수집 결과만 읽고 새 수집을 하지 않으며, 당시 마감 이전에 실제 수집된 원문만 허용한다. 회차의 원래 마감·회원 자격·설정 리비전은 유지하고 실제 생성·발행 시각은 현재 시각으로 남긴다. 마감 뒤 조립된 내부 그래프는 이 명시적 복구 경로에서만 허용하며 관측 시각 검사는 완화하지 않는다. 복구 영수증은 별도 경로에 추가하고 완료된 문서 준비·검증 결과는 재사용한다. 미응답 요청·기존 발행본을 다시 만들지 않는다.
 
-API의 native 근거 읽기에는 `zoop-ai-ingest`도 필요하다. API 이미지는 저장소 루트 context(`docker build -f api/Dockerfile .`)에서 해당 CLI와 고정 의존성을 포함하고, 네트워크 없는 `--help` 검사로 확인한다. API 배포는 현재 실행 서비스의 정확한 task definition을 복사해 승인된 EFS 읽기 전용 mount와 기존 환경 설정을 보존한다.
+API의 공개 근거 조회는 Java의 현재 권한·artifact 검사를 사용하며 native CLI는 전용 worker에만 필요하다. API 배포는 현재 실행 서비스의 정확한 task definition을 복사해 승인된 EFS 읽기 전용 mount와 기존 환경 설정을 보존한다.
 
 ## 검증 범위
 

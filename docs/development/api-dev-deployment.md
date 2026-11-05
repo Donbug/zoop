@@ -55,7 +55,7 @@ PR CI의 `api-container` job은 다음 명령과 같은 컨테이너 빌드를 �
 docker build \
   --file api/Dockerfile \
   --tag "zoop-api:ci-${GITHUB_SHA}" \
-  .
+  api
 ```
 
 이 검증에서는 다음 작업을 수행하지 않는다.

@@ -211,7 +211,7 @@ jobs:
             --file api/Dockerfile \
             --label "org.opencontainers.image.revision=$IMAGE_COMMIT" \
             --tag "$tagged_image" \
-            .
+            api
 
           docker push "$tagged_image"
 

@@ -333,7 +333,7 @@ class ImagePublicationWorkflowTests(unittest.TestCase):
                 result = self.run_shell(commands + build["run"], env)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(calls.read_text().splitlines(), [
-                    f"docker build --file {kind}/Dockerfile --label org.opencontainers.image.revision={SHA} --tag {image}:{tag} {'.' if kind=='api' else kind}",
+                    f"docker build --file {kind}/Dockerfile --label org.opencontainers.image.revision={SHA} --tag {image}:{tag} {kind}",
                     f"docker push {image}:{tag}",
                     f"aws ecr describe-images --repository-name zoop-{kind} --image-ids imageTag={tag} --query imageDetails[0].imageDigest --output text",
                 ])
