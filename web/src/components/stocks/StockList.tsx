@@ -45,7 +45,7 @@ export default function StockList({
             <div className="min-w-0 flex-1">
               <Link
                 to={`/companies/${encoded}`}
-                className="block truncate text-body font-bold text-zoop-ink hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+                className="block truncate text-body font-bold max-md:-my-3 max-md:py-3 text-zoop-ink hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
               >
                 {row.name}
               </Link>
@@ -96,5 +96,35 @@ export default function StockList({
         );
       })}
     </ul>
+  );
+}
+
+/** D-STK-01 목록을 불러오는 동안 같은 행 높이의 자리표시를 보여 준다. 움직임은 넣지 않는다. */
+export function StockListSkeleton({
+  label,
+  rows = 5,
+}: {
+  label: string;
+  rows?: number;
+}) {
+  return (
+    <div role="status" aria-live="polite" aria-busy="true" className="mt-5">
+      <span className="sr-only">{label}</span>
+      <ul aria-hidden="true" className="border-t-[0.667px] border-zoop-line">
+        {Array.from({ length: rows }, (_, index) => (
+          <li
+            key={index}
+            className="flex items-center gap-3 border-b-[0.667px] border-zoop-line px-2 py-3.5 max-md:px-0 max-md:py-3"
+          >
+            <span className="size-8 shrink-0 rounded-full bg-zoop-line/60" />
+            <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <span className="h-4 w-28 max-w-full rounded-sm bg-zoop-line/60" />
+              <span className="h-3 w-40 max-w-full rounded-sm bg-zoop-line/60" />
+            </span>
+            <span className="h-4 w-16 shrink-0 rounded-sm bg-zoop-line/60" />
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

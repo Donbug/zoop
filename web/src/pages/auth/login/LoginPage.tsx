@@ -32,7 +32,10 @@ const SOCIAL_LABEL: Record<string, string> = {
 // D-AUT-01: 승인된 중앙 로그인 시안. 셸의 3px 모서리 규칙보다 우선한다.
 const pillInput = `h-12 w-full rounded-full! border-0 bg-zoop-soft px-5 text-body text-zoop-ink placeholder:text-zoop-muted focus:bg-zoop-paper focus:ring-1 focus:ring-zoop-ink disabled:opacity-60 ${focusRing}`;
 const pillButton = `mt-2 flex h-12 w-full items-center justify-center rounded-full! bg-zoop-ink text-body font-bold text-zoop-paper disabled:cursor-progress disabled:opacity-60 ${focusRing}`;
-const textLink = `min-h-0! rounded! bg-transparent text-zoop-muted hover:text-zoop-ink hover:underline aria-disabled:opacity-60 disabled:opacity-60 ${focusRing}`;
+const textLinkBase = `rounded! bg-transparent text-zoop-muted hover:text-zoop-ink hover:underline aria-disabled:opacity-60 disabled:opacity-60 ${focusRing}`;
+const textLink = `min-h-0! ${textLinkBase}`;
+/** 로그인 아래 보조 링크는 텍스트 크기는 그대로 두고 누르는 높이만 44px로 둔다. */
+const footerLink = `inline-flex min-h-11! items-center ${textLinkBase}`;
 const startCircle = `group grid rounded-full! aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ${focusRing}`;
 
 /** 제공자 상표 색은 유지하고 aria-label로 이름을 제공한다. */
@@ -228,7 +231,7 @@ export default function LoginPage() {
     <LoginFrame>
       <section className="mx-auto flex w-full max-w-[340px] flex-col gap-6 text-zoop-ink">
         <header className="mb-5 text-center">
-          <p className="text-[length:calc(var(--text-display)*1.2)] leading-none font-[750] tracking-[-0.045em] font-heading">
+          <p className="text-[length:calc(var(--text-display)*1.2)] leading-none font-[750] tracking-[-0.025em] font-heading">
             ZOOP
           </p>
           <p className="mt-4 text-body leading-6 text-zoop-muted">
@@ -316,12 +319,12 @@ export default function LoginPage() {
                 {flow.busy ? '로그인하고 있어요' : '로그인'}
               </button>
             )}
-            <div className="mt-1 flex items-center justify-between gap-2 px-2 text-caption">
+            <div className="flex items-center justify-between gap-2 px-2 text-caption">
               <Link
                 to="/signup"
                 state={location.state}
                 aria-disabled={busy}
-                className={textLink}
+                className={footerLink}
                 onClick={(event) => busy && event.preventDefault()}
               >
                 이메일로 회원가입
@@ -329,7 +332,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 disabled={busy}
-                className={textLink}
+                className={footerLink}
                 onClick={() => {
                   setGuestError(false);
                   setGuestConfirm(true);

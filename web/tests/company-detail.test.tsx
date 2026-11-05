@@ -488,7 +488,7 @@ test.each([0, 120, null, 'unavailable'] as const)(
       }),
     );
     open(pinned);
-    await screen.findByText(/주요 지표 · 합성 공급자/);
+    await screen.findByText(/출처 합성 공급자/);
     const metrics = within(screen.getByRole('region', { name: '주요 지표' }));
     expect(metrics.queryByText('합성 시총') !== null).toBe(
       cap === null || cap === 'unavailable',

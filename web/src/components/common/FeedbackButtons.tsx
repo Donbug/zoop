@@ -181,7 +181,7 @@ function MemberFeedback({
         {toggle('down', '도움이 안 됐어요')}
       </div>
       {!reasonOpen && current === 'down' && (
-        <div className="flex flex-wrap items-center gap-2 text-[11px] text-zoop-muted">
+        <div className="flex flex-wrap items-center gap-2 text-caption text-zoop-muted">
           {currentReason && <p>남긴 이유: {currentReason}</p>}
           <button
             type="button"

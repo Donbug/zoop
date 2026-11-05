@@ -29,7 +29,7 @@ export default function BriefingPage() {
       className="mx-auto w-full max-w-[1040px] text-zoop-ink [&_input:not([type=checkbox])]:rounded-md [&_input:not([type=checkbox])]:border-zoop-border [&_input:not([type=checkbox])]:bg-zoop-surface [&_input]:placeholder:text-zoop-muted [&_select]:rounded-md [&_select]:border-zoop-border [&_select]:bg-zoop-control"
       data-screen-id={edition === 'morning' ? 'D-BRF-01' : 'D-BRF-02'}
     >
-      <h1 className="text-display font-[750] tracking-[-0.045em]">
+      <h1 className="text-display font-[750] tracking-[-0.025em]">
         출퇴근 브리핑
       </h1>
 
