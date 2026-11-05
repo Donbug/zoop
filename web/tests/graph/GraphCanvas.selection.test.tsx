@@ -24,6 +24,7 @@ import {
 import MapPage from '@/pages/map/MapPage';
 import * as graphApi from '@/apis/graph/graph';
 import * as mapDimming from '@/components/graph/graph-dimming';
+import * as geometry from '@/components/graph/graph-geometry';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import { toggleTheme, useColorTheme } from '@/util/theme-color';
@@ -39,6 +40,8 @@ const canvas = vi.hoisted(() => ({
   layout: vi.fn(),
   fitView: vi.fn(),
   setPlugins: vi.fn(),
+  minimapRender: vi.fn(),
+  off: vi.fn(),
   setZoomRange: vi.fn(),
   zoomTo: vi.fn(),
   translateTo: vi.fn(),
@@ -49,6 +52,7 @@ const canvas = vi.hoisted(() => ({
   getZoom: vi.fn(() => 1),
   getZoomRange: vi.fn(() => [0.01, 2.5]),
   getPosition: vi.fn(() => [0, 0]),
+  getViewportByCanvas: vi.fn((point: number[]) => point),
   setSize: vi.fn(),
   setNode: vi.fn(),
   setEdge: vi.fn(),
@@ -70,8 +74,9 @@ vi.mock('@antv/g6', () => ({
     fitView = canvas.fitView;
     setPlugins = canvas.setPlugins;
     getPluginInstance() {
-      return undefined;
+      return { onDraw: canvas.minimapRender, onRender: canvas.minimapRender };
     }
+    off = canvas.off;
     setZoomRange = canvas.setZoomRange;
     getZoom = canvas.getZoom;
     getZoomRange = canvas.getZoomRange;
@@ -80,9 +85,7 @@ vi.mock('@antv/g6', () => ({
     translateTo = canvas.translateTo;
     translateBy = canvas.translateBy;
     translateElementTo = canvas.translateElementTo;
-    getViewportByCanvas(point: number[]) {
-      return point;
-    }
+    getViewportByCanvas = canvas.getViewportByCanvas;
     getNodeData() {
       return canvas.setData.mock.lastCall?.[0]?.nodes ?? [];
     }
@@ -112,6 +115,7 @@ beforeEach(() => {
   sessionStorage.clear();
   canvas.getZoom.mockReturnValue(1);
   canvas.getPosition.mockReturnValue([0, 0]);
+  canvas.getViewportByCanvas.mockImplementation((point) => point);
   canvas.translateBy.mockResolvedValue(undefined);
   canvas.handlers.clear();
   canvas.resizeCallbacks.length = 0;
@@ -1202,7 +1206,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     ).toEqual({ zoom: 1.8, position: [40, 60], size: [0, 0], layout: 2 });
   });
 
-  it('D-GRP-01 enables the desktop minimap only above sixty visible nodes', async () => {
+  it('D-GRP-01 keeps one minimap on small/narrow graphs, selection, focus, flow and resize', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const smallIds = new Set(data.nodes.slice(0, 50).map((node) => node.id));
     const small = {
@@ -1222,8 +1226,6 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       configurable: true,
       value: 800,
     });
-    await waitFor(() => expect(canvas.setPlugins).toHaveBeenCalledWith([]));
-    rerender(<GraphCanvas data={data} />);
     await waitFor(() =>
       expect(canvas.setPlugins).toHaveBeenLastCalledWith([
         expect.objectContaining({
@@ -1233,12 +1235,631 @@ describe('D-GRP-02 · canvas selection bridge', () => {
         }),
       ]),
     );
+    expect(canvas.setPlugins).toHaveBeenCalledTimes(1);
+    const drawn = canvas.minimapRender.mock.calls.length;
     Object.defineProperty(host, 'clientWidth', {
       configurable: true,
       value: 375,
     });
     act(() => canvas.resizeCallbacks.at(-1)?.());
-    await waitFor(() => expect(canvas.setPlugins).toHaveBeenLastCalledWith([]));
+    await waitFor(() =>
+      expect(canvas.minimapRender.mock.calls.length).toBeGreaterThan(drawn),
+    );
+    for (const props of [
+      { selectedId: 'KRX:005930' },
+      { focusId: 'KRX:005930', focusLayout: true },
+      { flow: true },
+    ]) {
+      const before = canvas.setData.mock.calls.length;
+      rerender(<GraphCanvas data={small} {...props} />);
+      await waitFor(() =>
+        expect(canvas.setData.mock.calls.length).toBeGreaterThan(before),
+      );
+      expect(canvas.setPlugins).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it.each(['none', 'delayed route', 'wheel', 'drag', 'zoom'])(
+    'D-GRP-01 returns the preselection camera after switches and resize unless the user intervenes: %s',
+    async (interaction) => {
+      const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      const { rerender } = render(<GraphCanvas data={data} />);
+      await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+      const host = screen.getByRole('img');
+      Object.defineProperties(host, {
+        clientWidth: { configurable: true, value: 900 },
+        clientHeight: { configurable: true, value: 700 },
+      });
+      canvas.getPosition.mockReturnValue([40, 60]);
+      canvas.getViewportByCanvas.mockImplementation((point) => [
+        point[0] + canvas.getPosition()[0],
+        point[1] + canvas.getPosition()[1],
+      ]);
+      canvas.getZoom.mockReturnValue(1.2);
+      canvas.translateBy.mockClear();
+      if (interaction === 'delayed route') {
+        // An uncommitted click must wait for the router before moving the camera.
+        act(() =>
+          canvas.handlers.get('node:click')!({ target: { id: 'KRX:005930' } }),
+        );
+        await act(async () => {});
+        expect(canvas.translateBy).not.toHaveBeenCalled();
+      }
+      rerender(<GraphCanvas data={data} selectedId="KRX:005930" />);
+      await waitFor(() => expect(canvas.translateBy).toHaveBeenCalled());
+      const positions = () =>
+        new Map(
+          (canvas.setData.mock.lastCall![0] as GraphData).nodes!.map((n) => [
+            n.id,
+            [n.style!.x, n.style!.y],
+          ]),
+        );
+      const before = positions();
+      canvas.getPosition.mockReturnValue([120, 80]);
+      canvas.getZoom.mockReturnValue(1.5);
+      const count = canvas.setData.mock.calls.length;
+      rerender(<GraphCanvas data={data} selectedId="KRX:000660" />);
+      await waitFor(() =>
+        expect(canvas.setData.mock.calls.length).toBeGreaterThan(count),
+      );
+      if (interaction === 'wheel') fireEvent.wheel(host, { deltaY: 20 });
+      if (interaction === 'drag') {
+        fireEvent.pointerDown(host, {
+          button: 0,
+          pointerId: 1,
+          clientX: 10,
+          clientY: 10,
+        });
+        fireEvent.pointerMove(host, { pointerId: 1, clientX: 40, clientY: 30 });
+        fireEvent.pointerUp(window, { button: 0, pointerId: 1 });
+      }
+      if (interaction === 'zoom') {
+        await userEvent.click(
+          screen.getByRole('button', {
+            name: '확대',
+          }),
+        );
+        await act(async () => {});
+      }
+      canvas.translateTo.mockClear();
+      canvas.translateBy.mockClear();
+      canvas.zoomTo.mockClear();
+      const drawCount = canvas.setData.mock.calls.length;
+      rerender(<GraphCanvas data={data} />);
+      await waitFor(() =>
+        expect(canvas.setData.mock.calls.length).toBeGreaterThan(drawCount),
+      );
+      await act(async () => {});
+      Object.defineProperty(host, 'clientWidth', {
+        configurable: true,
+        value: 1200,
+      });
+      act(() => canvas.resizeCallbacks[0]());
+      await waitFor(() =>
+        expect(canvas.setSize).toHaveBeenLastCalledWith(1200, 700),
+      );
+      await act(async () => {});
+      if (interaction === 'none' || interaction === 'delayed route') {
+        expect(canvas.translateBy).toHaveBeenLastCalledWith([-80, -20], false);
+        expect(canvas.translateTo).not.toHaveBeenCalled();
+        expect(canvas.zoomTo).toHaveBeenLastCalledWith(1.2, false);
+      } else {
+        expect(canvas.translateTo).not.toHaveBeenCalled();
+        expect(canvas.translateBy).not.toHaveBeenCalled();
+        expect(canvas.zoomTo).not.toHaveBeenCalled();
+      }
+      expect(positions()).toEqual(before);
+    },
+  );
+
+  /** A camera whose translateBy/zoomTo calls move what getViewportByCanvas reports. */
+  function liveCamera(position: [number, number], zoom: number) {
+    const camera = { position, zoom };
+    canvas.getPosition.mockImplementation(() => camera.position);
+    canvas.getViewportByCanvas.mockImplementation((point) => [
+      point[0] + camera.position[0],
+      point[1] + camera.position[1],
+    ]);
+    canvas.getZoom.mockImplementation(() => camera.zoom);
+    canvas.translateBy.mockImplementation(async ([dx, dy]: number[]) => {
+      camera.position = [camera.position[0] + dx, camera.position[1] + dy];
+    });
+    canvas.zoomTo.mockImplementation(async (next: number) => {
+      camera.zoom = next;
+    });
+    return camera;
+  }
+  it('D-GRP-01 Shift+Enter on a collapsed node keeps its neighborhood fit after closing', async () => {
+    const base = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    // Extra single-company issues fold behind 삼성전자's "+N" badge.
+    const issue = base.nodes.find((node) => node.id === 'mock-issue-20')!;
+    const link = base.edges.find(
+      (edge) => edge.source === issue.id || edge.target === issue.id,
+    )!;
+    const extra = Array.from(
+      { length: 8 },
+      (_, index) => `fold-issue-${index}`,
+    );
+    const data = {
+      ...base,
+      nodes: [
+        ...base.nodes,
+        ...extra.map((id, index) => ({
+          ...issue,
+          id,
+          label: `접힌 사건 ${index}`,
+        })),
+      ],
+      edges: [
+        ...base.edges,
+        ...extra.map((id) => ({
+          ...link,
+          id: `edge-${id}`,
+          source: link.source === issue.id ? id : link.source,
+          target: link.target === issue.id ? id : link.target,
+        })),
+      ],
+    };
+    const onSelect = vi.fn();
+    const { rerender } = render(
+      <GraphCanvas data={data} onSelect={onSelect} />,
+    );
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+    const host = screen.getByRole('img');
+    Object.defineProperties(host, {
+      clientWidth: { configurable: true, value: 900 },
+      clientHeight: { configurable: true, value: 700 },
+    });
+    await act(async () => {});
+    const drawn = canvas.setData.mock.lastCall![0] as GraphData;
+    const visible = new Set(
+      drawn
+        .nodes!.filter((node) => node.style?.visibility !== 'hidden')
+        .map((node) => node.id),
+    );
+    const collapsed = data.nodes.find((node) => !visible.has(node.id))!;
+    expect(collapsed).toBeDefined();
+    const camera = liveCamera([40, 60], 1.2);
+    fireEvent.keyDown(
+      document.querySelector(`[data-node-id="${collapsed.id}"]`)!,
+      {
+        key: 'Enter',
+        shiftKey: true,
+      },
+    );
+    expect(onSelect).toHaveBeenCalledWith(collapsed.id);
+    canvas.zoomTo.mockClear();
+    rerender(
+      <GraphCanvas data={data} onSelect={onSelect} selectedId={collapsed.id} />,
+    );
+    await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
+    await act(async () => {});
+    // The neighborhood fit moved the camera on purpose.
+    camera.position = [300, 200];
+    camera.zoom = 1.6;
+    canvas.translateBy.mockClear();
+    canvas.zoomTo.mockClear();
+    const count = canvas.setData.mock.calls.length;
+    rerender(<GraphCanvas data={data} onSelect={onSelect} />);
+    await waitFor(() =>
+      expect(canvas.setData.mock.calls.length).toBeGreaterThan(count),
+    );
+    await act(async () => {});
+    expect(canvas.zoomTo).not.toHaveBeenCalledWith(1.2, false);
+    expect(camera.position).toEqual([300, 200]);
+  });
+
+  /** Select, move the camera for the selection, then deselect: the camera returns to [40, 60] @ 1.2. */
+  async function selectAndReturn(
+    props: Partial<Parameters<typeof GraphCanvas>[0]> = {},
+    duringSelection?: (camera: ReturnType<typeof liveCamera>) => void,
+  ) {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const { rerender } = render(<GraphCanvas data={data} {...props} />);
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+    const host = screen.getByRole('img');
+    Object.defineProperties(host, {
+      clientWidth: { configurable: true, value: 900 },
+      clientHeight: { configurable: true, value: 700 },
+    });
+    await act(async () => {});
+    const camera = liveCamera([40, 60], 1.2);
+    let count = canvas.setData.mock.calls.length;
+    rerender(<GraphCanvas data={data} {...props} selectedId="KRX:005930" />);
+    await waitFor(() =>
+      expect(canvas.setData.mock.calls.length).toBeGreaterThan(count),
+    );
+    await act(async () => {});
+    camera.position = [120, 80];
+    camera.zoom = 1.5;
+    duringSelection?.(camera);
+    count = canvas.setData.mock.calls.length;
+    const redraw = async (next = props) => {
+      const before = canvas.setData.mock.calls.length;
+      rerender(<GraphCanvas data={data} {...next} />);
+      await waitFor(() =>
+        expect(canvas.setData.mock.calls.length).toBeGreaterThan(before),
+      );
+      await act(async () => {});
+    };
+    const resize = async (width: number) => {
+      Object.defineProperty(host, 'clientWidth', {
+        configurable: true,
+        value: width,
+      });
+      act(() => canvas.resizeCallbacks[0]());
+      await waitFor(() =>
+        expect(canvas.setSize).toHaveBeenLastCalledWith(width, 700),
+      );
+      await act(async () => {});
+    };
+    return { camera, host, redraw, resize };
+  }
+  function dragMinimap(host: HTMLElement) {
+    const minimap = document.createElement('div');
+    minimap.className = 'graph-overview';
+    host.parentElement!.append(minimap);
+    fireEvent.pointerDown(minimap, { button: 0, pointerId: 7 });
+  }
+
+  it('D-GRP-01 consumes the return before a direct camera move and the first closing resize', async () => {
+    const { camera, redraw, resize } = await selectAndReturn();
+    await redraw();
+    expect(camera).toEqual({ position: [40, 60], zoom: 1.2 });
+    camera.position = [300, 200];
+    canvas.translateBy.mockClear();
+    canvas.zoomTo.mockClear();
+    await resize(1200);
+    expect(canvas.translateBy).not.toHaveBeenCalled();
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    expect(camera.position).toEqual([300, 200]);
+  });
+
+  it('D-GRP-01 edge-only changes retain sidebar centering and a queued fit', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const view = render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+    const host = screen.getByRole('img');
+    Object.defineProperties(host, {
+      clientWidth: { configurable: true, value: 900 },
+      clientHeight: { configurable: true, value: 700 },
+    });
+    liveCamera([40, 60], 1.2);
+    const props = {
+      data,
+      selectedId: 'KRX:005930',
+      centerRequest: { id: 'KRX:005930', seq: 1 },
+    };
+    view.rerender(<GraphCanvas {...props} />);
+    await act(async () => {});
+    view.rerender(<GraphCanvas {...props} selectedEdgeId="mock-follows-1" />);
+    await act(async () => {});
+    canvas.translateBy.mockClear();
+    act(() => canvas.resizeCallbacks[0]());
+    await waitFor(() => expect(canvas.translateBy).toHaveBeenCalled());
+    canvas.zoomTo.mockClear();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '전체 그래프 맞춤' }));
+      view.rerender(<GraphCanvas {...props} selectedEdgeId="mock-follows-2" />);
+    });
+    expect(canvas.zoomTo).toHaveBeenCalled();
+  });
+
+  it('D-GRP-01 whole fit follows panel closure and subsequent resize until manual movement', async () => {
+    const { host, redraw, resize } = await selectAndReturn();
+    await userEvent.click(
+      screen.getByRole('button', { name: '전체 그래프 맞춤' }),
+    );
+    await act(async () => {});
+    canvas.zoomTo.mockClear();
+    await redraw();
+    await resize(1200);
+    expect(canvas.zoomTo).toHaveBeenCalled();
+    canvas.zoomTo.mockClear();
+    await resize(1280);
+    expect(canvas.zoomTo).toHaveBeenCalled();
+    fireEvent.wheel(host, { deltaY: 20 });
+    canvas.zoomTo.mockClear();
+    await resize(1300);
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+  });
+
+  it.each(['width', 'height'])(
+    'D-GRP-01 discards the return when browser %s changes',
+    async (axis) => {
+      const width = vi
+        .spyOn(document.documentElement, 'clientWidth', 'get')
+        .mockReturnValue(1920);
+      const height = vi
+        .spyOn(document.documentElement, 'clientHeight', 'get')
+        .mockReturnValue(900);
+      const { camera, redraw } = await selectAndReturn();
+      if (axis === 'width') width.mockReturnValue(1280);
+      else height.mockReturnValue(812);
+      canvas.zoomTo.mockClear();
+      canvas.translateBy.mockClear();
+      await redraw();
+      expect(canvas.zoomTo).not.toHaveBeenCalled();
+      expect(canvas.translateBy).not.toHaveBeenCalled();
+      expect(camera).toEqual({ position: [120, 80], zoom: 1.5 });
+      width.mockReturnValue(1920);
+      height.mockReturnValue(900);
+      await redraw({ selectedId: null, evidenceMode: true });
+      expect(canvas.translateBy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { connectionPath: true },
+    { tutorialLocked: true },
+    { tutorialCenterId: 'KRX:005930' },
+    { tutorialPhase: 'pan' as const },
+  ])(
+    'D-GRP-01 effect selection in a special camera mode does not record a return: %j',
+    async (props) => {
+      const { redraw, camera } = await selectAndReturn(props);
+      canvas.zoomTo.mockClear();
+      canvas.translateBy.mockClear();
+      await redraw({});
+      expect(canvas.zoomTo).not.toHaveBeenCalled();
+      expect(canvas.translateBy).not.toHaveBeenCalled();
+      expect(camera).toEqual({ position: [120, 80], zoom: 1.5 });
+    },
+  );
+
+  it.each([false, true])(
+    'D-GRP-01 mobile fit reserves only one minimap obstacle (measured=%s)',
+    async (measured) => {
+      let mobile = true;
+      vi.stubGlobal('matchMedia', () => ({
+        matches: mobile,
+        addEventListener() {},
+        removeEventListener() {},
+      }));
+      const free = vi.spyOn(geometry, 'freeViewport');
+      const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      render(<GraphCanvas data={data} />);
+      const host = screen.getByRole('img');
+      Object.defineProperties(host, {
+        clientWidth: { configurable: true, value: 375 },
+        clientHeight: { configurable: true, value: 700 },
+      });
+      host.getBoundingClientRect = () =>
+        ({
+          left: 0,
+          top: 0,
+          right: 375,
+          bottom: 700,
+          width: 375,
+          height: 700,
+        }) as DOMRect;
+      if (measured) {
+        const overview = document.createElement('div');
+        overview.className = 'graph-overview';
+        overview.getClientRects = () =>
+          [{ width: 144, height: 96 }] as unknown as DOMRectList;
+        overview.getBoundingClientRect = () =>
+          ({ left: 12, top: 540, width: 144, height: 96 }) as DOMRect;
+        host.parentElement!.append(overview);
+      }
+      await waitFor(() =>
+        expect(canvas.setPlugins).toHaveBeenLastCalledWith([
+          expect.objectContaining({ size: [144, 96] }),
+        ]),
+      );
+      await userEvent.click(
+        screen.getByRole('button', { name: '전체 그래프 맞춤' }),
+      );
+      await act(async () => {});
+      const obstacles = free.mock.lastCall![2];
+      expect(obstacles).toEqual([
+        { x: measured ? 12 : 8, y: 540, width: 144, height: 96 },
+      ]);
+      mobile = false;
+      canvas.setPlugins.mockClear();
+      act(() => canvas.resizeCallbacks[0]());
+      await waitFor(() =>
+        expect(canvas.setPlugins).toHaveBeenLastCalledWith([
+          expect.objectContaining({ size: [192, 128] }),
+        ]),
+      );
+      expect(canvas.setPlugins).toHaveBeenNthCalledWith(1, []);
+      mobile = true;
+      act(() => canvas.resizeCallbacks[0]());
+      await waitFor(() =>
+        expect(canvas.setPlugins).toHaveBeenLastCalledWith([
+          expect.objectContaining({ size: [144, 96] }),
+        ]),
+      );
+    },
+  );
+
+  it('D-GRP-01 a pending user fit survives deselection in the same update', async () => {
+    const { redraw } = await selectAndReturn();
+    canvas.zoomTo.mockClear();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '전체 그래프 맞춤' }));
+      await redraw();
+    });
+    await act(async () => {});
+    expect(canvas.zoomTo).toHaveBeenCalled();
+  });
+
+  it('D-GRP-01 selecting an edge does not restore the previous company camera', async () => {
+    const onSelectEdge = vi.fn();
+    const { camera, redraw } = await selectAndReturn({ onSelectEdge });
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const edge = data.edges.find((item) => item.relationType === 'FOLLOWS')!;
+    await act(async () =>
+      canvas.handlers.get('edge:click')!({ target: { id: edge.id } }),
+    );
+    expect(onSelectEdge).toHaveBeenCalledWith(edge.id);
+    await redraw({ onSelectEdge, selectedEdgeId: edge.id });
+    expect(camera).toEqual({ position: [120, 80], zoom: 1.5 });
+  });
+
+  it.each(['focus', 'flow'])(
+    'D-GRP-01 fits the map when %s and selection are cleared together',
+    async (layout) => {
+      const props =
+        layout === 'focus'
+          ? { focusLayout: true, focusId: 'KRX:005930' }
+          : { flow: true };
+      const { redraw } = await selectAndReturn(props);
+      canvas.zoomTo.mockClear();
+      await redraw({});
+      expect(canvas.zoomTo).toHaveBeenCalled();
+    },
+  );
+
+  it('D-GRP-01 a center request without selection does not supply the next selection return', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const view = render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+    const host = screen.getByRole('img');
+    Object.defineProperties(host, {
+      clientWidth: { configurable: true, value: 900 },
+      clientHeight: { configurable: true, value: 700 },
+    });
+    const camera = liveCamera([40, 60], 1.2);
+    view.rerender(
+      <GraphCanvas data={data} centerRequest={{ id: 'KRX:005930', seq: 1 }} />,
+    );
+    await act(async () => {});
+    camera.position = [300, 200];
+    view.rerender(<GraphCanvas data={data} selectedId="KRX:005930" />);
+    await act(async () => {});
+    camera.position = [120, 80];
+    view.rerender(<GraphCanvas data={data} />);
+    await act(async () => {});
+    expect(camera.position).toEqual([300, 200]);
+  });
+
+  it.each(['path', 'tutorial'])(
+    'D-GRP-01 an uncommitted %s click does not supply a later selection return',
+    async (mode) => {
+      const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      const onSelect = vi.fn();
+      const view = render(
+        <GraphCanvas
+          data={data}
+          onSelect={onSelect}
+          connectionPath={mode === 'path'}
+          tutorialLocked={mode === 'tutorial'}
+          tutorialTargetId="KRX:005930"
+        />,
+      );
+      await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+      const host = screen.getByRole('img');
+      Object.defineProperties(host, {
+        clientWidth: { configurable: true, value: 900 },
+        clientHeight: { configurable: true, value: 700 },
+      });
+      const camera = liveCamera([40, 60], 1.2);
+      await act(async () =>
+        canvas.handlers.get('node:click')!({ target: { id: 'KRX:005930' } }),
+      );
+      camera.position = [300, 200];
+      view.rerender(<GraphCanvas data={data} selectedId="KRX:000660" />);
+      await act(async () => {});
+      camera.position = [120, 80];
+      view.rerender(<GraphCanvas data={data} />);
+      await act(async () => {});
+      expect(camera.position).toEqual([300, 200]);
+    },
+  );
+
+  it('D-GRP-01 drops the return target once the restored camera settles', async () => {
+    const { camera, redraw, resize } = await selectAndReturn();
+    await redraw();
+    expect(camera).toEqual({ position: [40, 60], zoom: 1.2 });
+    // The detail rail closes: the camera stays where the restore left it.
+    await resize(1200);
+    // Later the map moves by any path, and the holdings sidebar resizes the canvas.
+    camera.position = [300, 200];
+    canvas.translateBy.mockClear();
+    canvas.zoomTo.mockClear();
+    await resize(1000);
+    expect(canvas.translateBy).not.toHaveBeenCalled();
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    expect(camera.position).toEqual([300, 200]);
+  });
+
+  it.each([
+    ['minimap', 'during selection'],
+    ['minimap', 'after return'],
+    ['arrow key', 'during selection'],
+    ['arrow key', 'after return'],
+  ])(
+    'D-GRP-01 a %s move %s cancels the selection camera return',
+    async (path, timing) => {
+      const props =
+        path === 'arrow key' ? { tutorialPhase: 'pan' as const } : {};
+      const move = (host: HTMLElement) => {
+        if (path === 'minimap') {
+          dragMinimap(host);
+          canvas.translateBy([30, 0], false);
+        } else {
+          fireEvent.keyDown(
+            screen.getByRole('button', { name: '강조된 지도 이동 영역' }),
+            { key: 'ArrowRight' },
+          );
+        }
+      };
+      const { camera, host, redraw, resize } = await selectAndReturn(
+        timing === 'after return' ? {} : props,
+        timing === 'during selection'
+          ? () => move(screen.getByRole('img'))
+          : undefined,
+      );
+      await act(async () => {});
+      let moved = camera.position;
+      await redraw(props);
+      if (timing === 'after return') {
+        expect(camera).toEqual({ position: [40, 60], zoom: 1.2 });
+        move(host);
+        await act(async () => {});
+        moved = camera.position;
+      }
+      expect(camera.position).toEqual(moved);
+      canvas.translateBy.mockClear();
+      canvas.zoomTo.mockClear();
+      await resize(1200);
+      expect(canvas.translateBy).not.toHaveBeenCalled();
+      expect(canvas.zoomTo).not.toHaveBeenCalled();
+      expect(camera.position).toEqual(moved);
+    },
+  );
+
+  it('D-GRP-01 does not undo a focus move drawn together with the deselection', async () => {
+    const { camera, redraw } = await selectAndReturn();
+    canvas.translateBy.mockClear();
+    canvas.zoomTo.mockClear();
+    await redraw({ focusId: 'KRX:000660' });
+    expect(canvas.focusElement).toHaveBeenLastCalledWith('KRX:000660', false);
+    expect(canvas.translateBy).not.toHaveBeenCalled();
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    expect(camera).toEqual({ position: [120, 80], zoom: 1.5 });
+  });
+
+  it('D-GRP-01 does not undo a center request drawn together with the deselection', async () => {
+    const { camera, redraw } = await selectAndReturn();
+    canvas.zoomTo.mockClear();
+    await redraw({ centerRequest: { id: 'KRX:000660', seq: 1 } });
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    expect(camera.zoom).toBe(1.5);
+  });
+
+  it('D-GRP-01 moves the mobile minimap left of the round zoom buttons', async () => {
+    render(
+      <GraphCanvas
+        data={createMockGraph({ mode: 'all', personalFilter: 'all' })}
+      />,
+    );
+    const root = await screen.findByTestId('graph-canvas');
+    expect(root.className).toContain('[&_.graph-overview]:right-0!');
+    expect(root.className).toContain('max-md:[&_.graph-overview]:right-auto!');
+    expect(root.className).toContain('max-md:[&_.graph-overview]:left-2!');
   });
 
   it('D-GRP-01 redraws at the current container size after resize and ignores a disposed observer', async () => {
