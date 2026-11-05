@@ -32,6 +32,8 @@ cfg={'enabled':True,'autoChain':chain.VERSION,'priorityContract':'priority-busin
      'serverCommand':java+['com.zoop.briefing.server.BriefingServerCommand'],
      'nativeCommand':java+['com.zoop.briefing.server.BriefingAutoNativeTestCommand'],
      'ledgerCommand':java+['com.zoop.briefing.usage.BriefingUsageCommand','--stdio']}
+shared=os.environ.get('BRIEFING_AUTO_TEST_SHARED')=='true'
+if shared:cfg.update(sharePriorityAnalysis=True,nativeCallLimit=8)
 # Test-owned executables; never install or overwrite the host's /usr/local/bin.
 for label,module in [('ingest','zoop_ai_pipeline.ingestion_cli'),('handoff','zoop_ai_pipeline.handoff_cli')]:
  p=root/label;p.write_text('#!'+sys.executable+'\nimport sys\nsys.path.insert(0,'+repr(str(repo/'ai/pipeline/src'))+')\nfrom '+module+' import main\nraise SystemExit(main())\n');p.chmod(0o700)
@@ -45,15 +47,22 @@ class Peer(httpx.BaseTransport):
  def __init__(self,*args,**kwargs):self.local=real_transport(*args,**kwargs)
  def handle_request(self,request):
   if request.url.host in ('api.openai.com','api.typesafe.ai'):
-   payload=json.loads(request.content);provider.append(payload);reply=simulate(payload);reply['model']=payload['model'];return httpx.Response(200,json=reply,request=request)
+   payload=json.loads(request.content);provider.append(payload);reply=simulate(payload);reply['model']=payload['model']
+   if shared and len(provider)==2:
+    answer=json.loads(reply['choices'][0]['message']['content']);assert 'relations' in answer
+    answer['relations']=[];reply['choices'][0]['message']['content']=json.dumps(answer)
+   return httpx.Response(200,json=reply,request=request)
   assert request.url.host=='127.0.0.1','unexpected network peer'
   return self.local.handle_request(request)
  def close(self):self.local.close()
 try:
  site.route('/robots.txt',b'User-agent: *\nAllow: /\n',content_type='text/plain')
- site.route(ROUTES['policy-news'][0],listing(['100000001']).replace(b'2026.10.23',b'2026.11.04').replace(b'2026-10-01',b'2026-11-03').replace(b'2026-10-23',b'2026-11-04'))
+ site.route(ROUTES['policy-news'][0],listing(['100000001','100000002'] if shared else ['100000001']).replace(b'2026.10.23',b'2026.11.04').replace(b'2026-10-01',b'2026-11-03').replace(b'2026-10-23',b'2026-11-04'))
  body='합성기업은 공급 계약을 발표했다. '+SUBSTANCE
- site.route(ROUTES['policy-news'][1],article(site,'100000001',body=body).replace(b'2026.10.23',b'2026.11.04'))
+ def serve_article():
+  identifier=parse_qs(urlsplit(site.log[-1]['path']).query)['newsId'][0]
+  site.routes[ROUTES['policy-news'][1]]['body']=article(site,identifier,body=body).replace(b'2026.10.23',b'2026.11.04')
+ site.route(ROUTES['policy-news'][1],hook=serve_article)
  with freeze_time('2026-11-04 00:02:00+00:00') as frozen:
   r=chain.round_for(datetime.now(native.server.KST).date(),'morning');collection=work/'native'/r['id'];collection.mkdir(parents=True,mode=0o700)
   raw,_=config(collection,site,planId=r['id']+'-sources-v1',stateDir=str(collection/'collection'),fromDay='2026-11-03',throughDay='2026-11-04')
@@ -68,8 +77,11 @@ try:
    chain.run_slot(cfg,'morning',sleep=sleep)
   journal=work/'chain'/r['id']
   assert (journal/'collection-completed.json').exists() and (journal/'publication-completed.json').exists()
-  assert len(provider)<=6,len(provider)
-  assert len(business.requests)==10,len(business.requests)
+  assert len(provider)<=(8 if shared else 6),len(provider)
+  assert len(business.requests)==(8 if shared else 10),len(business.requests)
+  if shared:
+   assert len(provider)==7,len(provider)
+   assert len(list(collection.glob('candidates-v3/*/source-qualification.json')))==1
   before=len(provider)+len(business.requests)
   with patch.object(httpx,'HTTPTransport',Peer),patch.object(native.server.b,'authenticated_transport',return_value=business):
    assert chain.work_once(cfg) is False

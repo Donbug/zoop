@@ -22,7 +22,7 @@ def priority_selection(frozen, assessed, checked, core):
     return {**core, 'selected': ranked['selected']}
 
 
-def attach(payload, snapshot, pool, common, personal, summary, records, calls):
+def attach(payload, snapshot, pool, common, personal, summary, records, calls, *, shared_personal=False):
     # Private proofs/records remain in the immutable snapshot, not the read DTO.
     common_proof = priority.prove(common, calls)
     personal_proof = priority.prove(personal, calls)
@@ -32,13 +32,19 @@ def attach(payload, snapshot, pool, common, personal, summary, records, calls):
     snapshot['serverGeneration']['priority'] = {'version': priority.VERSION,
         'common': common, 'personal': personal, 'summary': summary[0],
         'proofs': {'common': common_proof, 'personal': personal_proof, 'summary': summary_proof}}
+    if shared_personal:
+        snapshot['serverGeneration']['priority']['personalReuse'] = {
+            'version': 'literal-common-personal-projection-v1', 'sourceResultVersion': common['resultVersion'],
+            'generationRequestDigest': common_proof['generationRequestDigest'],
+            'verificationRequestDigest': common_proof['verificationRequestDigest']}
     by_id = {r['issueId']: r for r in records}
     for candidate in pool['candidates']:
         candidate['priorityAnalysisInput'] = priority.priority_input(candidate['analysisInput'])
         record = by_id.get(candidate['issueId'])
         if record is not None:
             candidate['sharedView'] = selected_view.materialize(record, payload['metadata'], payload['generatedAt'])
-            candidate['sharedView']['priorityPersonal'] = priority.item(personal, candidate['issueId'])
+            candidate['sharedView']['priorityPersonal'] = (priority.shared_personal_item(common, candidate['issueId'], calls)
+                if shared_personal else priority.item(personal, candidate['issueId']))
     pool['priorityContract'] = priority.VERSION
     pool['inputSha256'] = b.digest(b.canonical({k: v for k, v in pool.items() if k != 'inputSha256'}))
     cards = snapshot['commonPriority']['items']
@@ -57,7 +63,10 @@ def produce(cfg, job):
     r = {'id': job['id'], 'date': str(job['round_date']), 'edition': job['edition'],
          'scheduledAt': job['scheduled_at'].isoformat(), 'windowFrom': job['window_from'].isoformat(),
          'windowTo': job['scheduled_at'].isoformat()}
-    prepared = runtime.java(cfg, 'prepare', {'round': r}, work / 'prepare.request.json')
+    request = {'round': r}
+    if cfg.get('recordedRecoveryAuthorization'):
+        request['recordedRecovery'] = True
+    prepared = runtime.java(cfg, 'prepare', request, work / 'prepare.request.json')
     runtime.require(not cfg.get('expectedGraphVersion') or prepared['graphVersion']==cfg['expectedGraphVersion'],'admitted_graph_changed')
     write_once(work / 'prepared.json', prepared)
     frozen = runtime.frozen_input(prepared); write_once(work / 'frozen.json', frozen)
@@ -101,14 +110,15 @@ def produce(cfg, job):
                 row['resultVersion'] = m.VERSION + '-' + b.digest(b.canonical(row)); records.append(row)
             if targets:
                 common = priority.generate(client, targets, 'common')
-                personal = priority.generate(client, targets, 'personal')
+                personal = common if cfg.get('sharePriorityAnalysis') else priority.generate(client, targets, 'personal')
                 summary = priority.summary(client, common)
             calls = priority.verified_calls(work / 'model')
             core_ids = {i['issueId'] for i in core['selected']}
             payload, snapshot, pool = runtime.make_publication(prepared, frozen, core,
                 [r for r in records if r['issueId'] in core_ids], calls, assessed, checked, b.now(),cfg=cfg)
             if targets:
-                attach(payload, snapshot, pool, common, personal, summary, records, calls)
+                attach(payload, snapshot, pool, common, personal, summary, records, calls,
+                    shared_personal=cfg.get('sharePriorityAnalysis') is True)
             else:
                 pool['priorityContract'] = priority.VERSION
             write_once(work / 'result.json', {'payload': payload, 'snapshot': snapshot, 'pool': pool})

@@ -189,7 +189,8 @@ jobs:
           docker build \
             --file api/Dockerfile \
             --tag "zoop-api:ci-${GITHUB_SHA}" \
-            api
+            .
+          docker run --rm --network none --entrypoint /usr/local/bin/zoop-ai-ingest "zoop-api:ci-${GITHUB_SHA}" --help
       - name: Build and check dedicated briefing runtime without credentials or model calls
         run: |
           docker build --file deployment/briefing/Dockerfile --build-arg "API_IMAGE=zoop-api:ci-${GITHUB_SHA}" --tag "zoop-briefing:ci-${GITHUB_SHA}" .

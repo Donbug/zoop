@@ -75,6 +75,24 @@ class Transport:
 
 class PriorityGenerationTests(unittest.TestCase):
     def client(self,path,t):return m.company.context.legacy.MarketSummaryClient(Path(path),t,16,prompt_root=m.PROMPTS)
+    def test_personal_filter_reuses_exact_checked_common_prose_and_real_receipts(self):
+        t=Transport()
+        with tempfile.TemporaryDirectory() as path:
+            common=p.generate(self.client(path,t),inputs(),'common');calls=p.verified_calls(path)
+            before=copy.deepcopy(common)
+            projected=p.shared_personal_item(common,'i0',calls)
+            original=p.item(common,'i0')['aiAnalyses'][0];actual=projected['aiAnalyses'][0]
+            self.assertEqual(2,len(t.requests))
+            self.assertEqual(original['companyConnection'],actual['forMyStocks'])
+            self.assertEqual(original['businessImpact'],actual['businessImpact'])
+            self.assertEqual(original['outlook'],actual['outlook'])
+            self.assertEqual('common-impact-relative-v1',actual['judgmentBasis']['promptVersion'])
+            self.assertEqual(original['resultVersion'],actual['resultVersion'])
+            self.assertNotIn('companyConnection',actual)
+            self.assertEqual(before,common)
+            with self.assertRaises(ValueError):p.shared_personal_item(common,'i0',[])
+            bad=copy.deepcopy(common);bad['draft']['issues']['i0']['companies']['C']['outlook']['text']=original['outlook'].replace('매출','수익')
+            with self.assertRaises(ValueError):p.shared_personal_item(bad,'i0',calls)
     def test_independent_requests_and_exact_receipts_bind_both_views_and_summary(self):
         t=Transport()
         with tempfile.TemporaryDirectory() as path:

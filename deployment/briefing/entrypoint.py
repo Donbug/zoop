@@ -43,6 +43,8 @@ def main():
         import briefing_auto_chain
         cfg.update({'autoChain':briefing_auto_chain.VERSION,'priorityContract':'priority-business-producer-v1','nativeCallLimit':6,'additiveGraphAllowed':os.environ.get('BRIEFING_SERVER_ADDITIVE_GRAPH_ALLOWED')=='true',
             'samsungNewsroomEnabled':os.environ.get('BRIEFING_SAMSUNG_NEWSROOM_ENABLED')=='true'})
+        if os.environ.get('BRIEFING_SHARED_PRIORITY_ANALYSIS_ENABLED')=='true':
+            cfg.update(sharePriorityAnalysis=True,nativeCallLimit=8)
         if cfg['samsungNewsroomEnabled']:
             cfg['sourceAuthorizationRef']=os.environ['BRIEFING_SOURCE_AUTHORIZATION_REF']
             if not cfg['sourceAuthorizationRef'].strip():raise ValueError('explicit_company_source_authorization_required')
@@ -69,6 +71,9 @@ def main():
         cfg['selectedWorkerConfig']=str(temp/'selected-config.json')
         briefing_auto_chain.validate_selected_config(cfg)
         if sys.argv[1:]:
+            if len(sys.argv)==4 and sys.argv[1]=='--recover-recorded-slot' and sys.argv[2] in ('morning','evening'):
+                from briefing_recorded_recovery import recover
+                result=recover(cfg,sys.argv[2],sys.argv[3]);print(json.dumps(result));return
             if len(sys.argv)==3 and sys.argv[1]=='--slot' and sys.argv[2] in ('morning','evening'):
                 briefing_auto_chain.run_slot(cfg,sys.argv[2]);return
             raise ValueError('auto_chain_slot_arguments')

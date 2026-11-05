@@ -36,9 +36,12 @@ public final class BriefingServerCommand {
     private final GraphPublicationReader reader;
     private final GraphPublicationAuthority authority;
     private final DocumentBriefingContentAccess readAccess;
+    private final String recoveryAuthorization, recoveryRound;
 
     public BriefingServerCommand(Map<String,String> env) {
         source = new DriverManagerDataSource(required(env,"DB_URL"),required(env,"DB_USERNAME"),required(env,"DB_PASSWORD"));
+        recoveryAuthorization=env.get("BRIEFING_RECORDED_RECOVERY_AUTHORIZATION");
+        recoveryRound=env.get("BRIEFING_RECORDED_RECOVERY_ROUND");
         jdbc = new JdbcTemplate(source); named = new NamedParameterJdbcTemplate(source);
         work = Path.of(required(env,"BRIEFING_SERVER_WORK_ROOT")).toAbsolutePath().normalize();
         artifacts = Path.of(required(env,"BRIEFING_USAGE_ARTIFACT_ROOT")).toAbsolutePath().normalize();
@@ -80,7 +83,18 @@ public final class BriefingServerCommand {
         String version=graphRows.getFirst().get("id").toString();
         if(graphRows.getFirst().get("published_at")==null)throw new IllegalStateException("published_graph_clock_required");
         Instant graphPublished=((Timestamp)graphRows.getFirst().get("published_at")).toInstant();
-        if(graphPublished.isAfter(cutoff)) throw new IllegalStateException("graph_after_cutoff");
+        boolean recovery=request.node().path("recordedRecovery").asBoolean(false);
+        if(recovery) {
+            if(recoveryAuthorization==null||recoveryAuthorization.isBlank()||!id.equals(recoveryRound))
+                throw new IllegalStateException("recorded_recovery_authorization_required");
+            var saved=jdbc.queryForList("SELECT status,published_at,scheduled_at,window_from,window_to FROM briefing_rounds WHERE id=?",id);
+            boolean failedHistory=Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM briefing_common_schedule_jobs j WHERE j.id=? AND j.status='requires_recovery') AND EXISTS(SELECT 1 FROM briefing_attempts a WHERE a.round_id=? AND a.status='failed')",Boolean.class,id,id));
+            if(saved.size()!=1||!Set.of("failed","scheduled").contains(saved.getFirst().get("status"))||!failedHistory||saved.getFirst().get("published_at")!=null
+                    ||!cutoff.equals(((Timestamp)saved.getFirst().get("window_to")).toInstant())
+                    ||!from.equals(((Timestamp)saved.getFirst().get("window_from")).toInstant()))
+                throw new IllegalStateException("recorded_recovery_requires_failed_original");
+        }
+        if(graphPublished.isAfter(cutoff)&&!recovery) throw new IllegalStateException("graph_after_cutoff");
         var publication=reader.read(version); var excluded=authority.current(publication,"briefing-server");
         var visible=GraphSnapshotFilter.apply(publication.snapshot(),null,excluded);
         var current=GrantRegistry.read(grantsPath);
@@ -91,6 +105,9 @@ public final class BriefingServerCommand {
         result.put("exclusionRevision",excluded.revision());
         result.put("preparedAt",Instant.now().toString()); result.put("model","gpt-6-luna");
         result.put("schemaVersion","briefing-server-input-v1");
+        if(recovery)result.putObject("recovery").put("kind","recorded-cutoff-recovery-v1")
+                .put("authorizationRef",recoveryAuthorization).put("graphPublishedAt",graphPublished.toString())
+                .put("sourceObservationCutoff",cutoff.toString());
         var candidates=result.putArray("candidates"); var bindings=result.putArray("sourceBindings");
         Set<String> bound=new HashSet<>(); int outside=0, denied=0;
         for(var issue:visible.issues()) {
@@ -103,7 +120,8 @@ public final class BriefingServerCommand {
                 if(grant==null || !inScope(row.get("provider").toString(),e.articleId(),e.articleVersion(),row.get("sha256").toString())) {denied++;continue;}
                 BriefingSourceClock sourceClock;
                 try { sourceClock=BriefingSourceClock.read(row); } catch(IllegalArgumentException unknown) {outside++;continue;}
-                Instant at=sourceClock.availableAt(); if(!at.isAfter(from)||at.isAfter(cutoff)) {outside++;continue;}
+                Instant at=sourceClock.availableAt(); if(!at.isAfter(from)||at.isAfter(cutoff)
+                        ||recovery&&((Timestamp)row.get("collected_at")).toInstant().isAfter(cutoff)) {outside++;continue;}
                 String docKey=e.articleId()+"\n"+e.articleVersion();
                 if(bound.add(docKey)) bindings.addObject().put("documentId",e.articleId()).put("documentVersion",e.articleVersion()).put("grantId",grant.grantId())
                     .put("grantRevision",grant.revision()).putArray("recipients").add("openai");
@@ -216,6 +234,7 @@ public final class BriefingServerCommand {
                 if(!Objects.equals(row.get("title"),pin.stringOrNull("title"))||!Objects.equals(row.get("publisher"),pin.stringOrNull("publisher"))||!articleInfo.get("kind").equals(pin.string("sourceKind")))reject();
                 if(!inScope(provider,e.articleId(),e.articleVersion(),row.get("sha256").toString()))reject();
                 if(!at.isAfter(from)||at.isAfter(to)||!sourceClock.matches(pin)||!article.url().equals(pin.string("url"))||!row.get("sha256").equals(pin.string("bodySha256")))reject();
+                if(prepared.has("recovery")&&((Timestamp)row.get("collected_at")).toInstant().isAfter(to))reject();
                 String text=new String(files.readVerified(row.get("storage_uri").toString(),row.get("sha256").toString(),((Number)row.get("bytes")).longValue()),java.nio.charset.StandardCharsets.UTF_8);
                 if(!text.substring(text.offsetByCodePoints(0,e.start()),text.offsetByCodePoints(0,e.end())).equals(pin.string("quote")))reject();
             }
