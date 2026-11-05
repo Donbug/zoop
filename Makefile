@@ -26,7 +26,7 @@ config-check:
 	$(if $(CONFIG_PYTHON),$(CONFIG_PYTHON),$(UV) run --no-project --with pyyaml $(PYTHON)) scripts/repo_checks.py config
 
 tooling-test:
-	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m unittest discover -s scripts/tests -v
+	PYTHONDONTWRITEBYTECODE=1 $(UV) run --no-project --with-requirements deployment/briefing/requirements.txt --with pyyaml --with openapi-spec-validator $(PYTHON) -m unittest discover -s scripts/tests -v
 CHAT_LIVE_SPIKE_EVIDENCE ?=
 CHAT_LIVE_SPIKE_REPORT ?=
 CHAT_LIVE_SPIKE_MANIFEST ?=
