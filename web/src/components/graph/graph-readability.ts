@@ -8,6 +8,10 @@ import { issuePillPadding, issuePillRadius } from './graph-model';
 export const OVERVIEW_ZOOM = 0.45;
 /** Zooming in this much past the whole-graph fit brings issue titles back. */
 const WHOLE_FIT_MARGIN = 1.2;
+/** Issue title wrap width in screen px at the smallest (zoom-corrected) font. */
+const ISSUE_WRAP = 170;
+/** D-GRP-01 (2026-11-05): issue titles wrap to at most two lines; company names never wrap. */
+export const ISSUE_MAX_LINES = 2;
 
 export type ReadingContext = {
   zoom: number;
@@ -148,6 +152,9 @@ export function readingStyles(
       // "there is an issue here"; its title and count come back on zoom, hover or selection.
       const overview =
         source?.kind === 'issue' && zoom < overviewZoom && !emphasized;
+      // 확대하면 글자는 지도 좌표의 기본 크기로 커지는데 줄바꿈 폭이 화면 170px로 고정되어 있으면
+      // 크게 확대할수록 줄이 더 바뀐다. 폭을 글자 크기에 비례시켜 어느 배율에서도 같은 자리에서 줄을 바꾼다.
+      const wrapWidth = (ISSUE_WRAP * size) / screenLabelSize(node);
       return {
         ...node,
         style: {
@@ -171,16 +178,13 @@ export function readingStyles(
           // D-GRP-01: G keeps a fixed 16px line height; it must grow with the zoom-corrected font
           // or wrapped lines overlap and the culling below measures a box shorter than the text.
           labelLineHeight: size * 1.3,
-          labelWordWrap: true,
-          labelWordWrapWidth: 170 / zoom,
+          // D-GRP-01 (2026-11-05): 기업 이름은 줄을 바꾸지 않고 한 줄로 둔다. 사건 이름은 최대 2줄까지 바꾸고
+          // 넘치면 말줄임표로 줄인다.
+          labelWordWrap: source?.kind === 'issue',
+          labelWordWrapWidth: wrapWidth,
           labelTextOverflow: 'ellipsis',
-          labelMaxWidth: 170 / zoom,
-          // D-GRP-01: the zoomed-out overview shows two lines of each issue title; zooming in,
-          // hovering or selecting brings back the whole title.
-          labelMaxLines:
-            source?.kind === 'issue' && zoom < overviewZoom && !emphasized
-              ? 2
-              : Math.max(1, (source?.label ?? '').length),
+          labelMaxWidth: wrapWidth,
+          labelMaxLines: source?.kind === 'issue' ? ISSUE_MAX_LINES : 1,
           badges:
             source?.kind === 'issue' &&
             source.evidenceCount !== null &&
@@ -383,6 +387,7 @@ export async function applyGraphReading(
     style?: {
       visibility?: string;
       fontSize?: number;
+      wordWrap?: boolean;
       wordWrapWidth?: number;
       maxLines?: number;
     };
@@ -409,6 +414,7 @@ export async function applyGraphReading(
     if (!shape?.update || !style) return;
     shape.update({
       fontSize: style.labelFontSize,
+      wordWrap: style.labelWordWrap,
       wordWrapWidth: style.labelWordWrapWidth,
       maxLines: style.labelMaxLines,
       lineHeight: style.labelLineHeight,

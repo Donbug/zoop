@@ -40,12 +40,20 @@ export function fitFootprint(node: NodeData) {
   const label = String(s.labelText ?? '');
   const fontSize = screenLabelSize(node);
   const oneLine = textWidth(label, fontSize);
-  const lines = label ? Math.max(1, Math.ceil(oneLine / FIT_LABEL_WRAP)) : 0;
+  // 기업 이름은 한 줄, 사건 이름은 최대 2줄이다(graph-readability.ts readingStyles).
+  const issue = node.data?.kind === 'issue';
+  const lines = !label
+    ? 0
+    : issue
+      ? Math.min(2, Math.max(1, Math.ceil(oneLine / FIT_LABEL_WRAP)))
+      : 1;
   return {
     x: Number(s.x ?? 0),
     y: Number(s.y ?? 0),
     radius: radius + 4,
-    labelWidth: label ? Math.min(oneLine, FIT_LABEL_WRAP) + 24 : 0,
+    labelWidth: label
+      ? (issue ? Math.min(oneLine, FIT_LABEL_WRAP) : oneLine) + 24
+      : 0,
     labelHeight: label ? lines * fontSize * 1.5 + 8 + 10 : 0,
   };
 }

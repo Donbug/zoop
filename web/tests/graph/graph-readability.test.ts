@@ -435,12 +435,36 @@ test('D-GRP-01 wrapped label lines grow with the zoom-corrected font and the ove
       Number(issueStyle.labelFontSize),
     );
   }
-  expect(style(0.2, issue.id).labelMaxLines).toBe(2);
   expect(style(0.2, issue.id).labelTextOverflow).toBe('ellipsis');
-  // Zooming in, or hovering/selecting the issue, shows the whole title again.
-  expect(style(0.53, issue.id).labelMaxLines).toBeGreaterThan(2);
-  expect(style(0.2, issue.id, issue.id).labelMaxLines).toBeGreaterThan(2);
-  expect(style(0.2, company.id).labelMaxLines).toBeGreaterThan(2);
+  // D-GRP-01 (2026-11-05): issue titles wrap to at most two lines at any zoom, hovered or not;
+  // company names never wrap.
+  for (const zoom of [0.2, 0.53, 2.5]) {
+    expect(style(zoom, issue.id).labelMaxLines).toBe(2);
+    expect(style(zoom, issue.id, issue.id).labelMaxLines).toBe(2);
+    expect(style(zoom, issue.id).labelWordWrap).toBe(true);
+    expect(style(zoom, company.id).labelWordWrap).toBe(false);
+    expect(style(zoom, company.id).labelMaxLines).toBe(1);
+  }
+});
+
+test('D-GRP-01 issue titles break at the same place at any zoom: wrap width follows the font', () => {
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const base = toG6Data(data, 1200, 700);
+  const issue = data.nodes.find((n) => n.kind === 'issue')!;
+  const style = (zoom: number) =>
+    readingStyles(base, data, { ...context, zoom }).nodes!.find(
+      (node) => node.id === issue.id,
+    )!.style!;
+  // Zoomed far in, the font stops shrinking at its map size; the wrap width used to keep
+  // shrinking (170 / zoom), so titles broke into more lines the closer the user looked.
+  for (const zoom of [0.2, 1, 2.5]) {
+    const s = style(zoom);
+    expect(Number(s.labelWordWrapWidth) / Number(s.labelFontSize)).toBeCloseTo(
+      170 / 13,
+      5,
+    );
+  }
+  expect(Number(style(2.5).labelWordWrapWidth)).toBeGreaterThan(170 / 2.5);
 });
 
 /** A renderer whose labels all share one box (or each get their own), recording shape visibility. */
