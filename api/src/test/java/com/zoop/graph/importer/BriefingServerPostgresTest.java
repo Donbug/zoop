@@ -271,6 +271,11 @@ class BriefingServerPostgresTest {
             int port=((org.springframework.boot.web.server.context.WebServerApplicationContext)app).getWebServer().getPort();
             var response=java.net.http.HttpClient.newHttpClient().send(java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+port+"/api/v1/briefings?date=2026-11-04&edition=morning")).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
             assertEquals(200,response.statusCode(),response.body());assertEquals(1,com.zoop.common.json.StrictJson.parseObject(response.body()).node().path("commonPriority").path("items").size());
+            var market=com.zoop.common.json.StrictJson.parseObject(response.body()).node().path("marketVariables");
+            assertEquals("available",market.path("status").asString());
+            assertEquals(2510.0,market.path("indicators").get(0).path("value").asDouble());
+            assertEquals("2026-11-03",market.path("indicators").get(0).path("observedDate").asString());
+            assertEquals("reference",market.path("indicators").get(2).path("valueKind").asString());
             assertFalse(response.body().contains("generationRequestDigest"));
             // Exercise prospective settings and the actual dispatcher, rather than inserting a finished delivery.
             String member="auto-member",peer="auto-peer",other="auto-other";
@@ -313,6 +318,7 @@ class BriefingServerPostgresTest {
             var mine=http.send(java.net.http.HttpRequest.newBuilder(uri).header("Cookie","zoop_session="+token).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
             assertEquals(200,mine.statusCode(),mine.body());assertEquals("no-store",mine.headers().firstValue("Cache-Control").orElseThrow());
             assertEquals("ready",com.zoop.common.json.StrictJson.parseObject(mine.body()).string("status"));
+            assertEquals(market,com.zoop.common.json.StrictJson.parseObject(mine.body()).node().at("/selection/presentation/marketVariables"));
             String otherToken=sessions.issue(other,null,"auto-other").token();
             var notMine=http.send(java.net.http.HttpRequest.newBuilder(uri).header("Cookie","zoop_session="+otherToken).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
             assertEquals(200,notMine.statusCode());assertEquals("not_published",com.zoop.common.json.StrictJson.parseObject(notMine.body()).string("status"));

@@ -119,6 +119,8 @@ def publication_schedule(round_,cfg=None):
     return {**result,'confirmed':True}
 
 def make_publication(prepared,frozen,selection,passed,calls,assessed,checked,now,cfg=None):
+    import briefing_live_market
+    capture=briefing_live_market.publication(cfg['work'],prepared['round']) if cfg and cfg.get('work') else None
     r=prepared['round']; metadata={'source':'published-graph-briefing-server','asOf':r['windowTo'],
         'graphVersion':prepared['graphVersion'],'partial':True,'requestId':'server:'+r['id'],
         'schedule':publication_schedule(r,cfg),
@@ -164,9 +166,15 @@ def make_publication(prepared,frozen,selection,passed,calls,assessed,checked,now
         'reviewRevision':prepared['reviewRevision'],'ruleRevision':prepared['ruleRevision'],'selectedFrom':len(frozen['candidates']),
         'items':items,'references':{'eventIds':[i['eventId'] for i in items],
             'evidenceIds':sorted({e for i in items for e in i['evidenceIds']}),'companyIds':sorted({c['id'] for i in items for c in i['companies']})},
-        'emptyReason':None if items else 'no_issues_in_window','marketVariables':None,'metadata':metadata,'outlook':None}
+        'emptyReason':None if items else 'no_issues_in_window',
+        'marketVariables':copy.deepcopy(capture['marketVariables']) if capture else None,'metadata':metadata,'outlook':None}
     snapshot={'sourceBindings':prepared['sourceBindings'],'itemDetails':details,'marketSummary':{'status':'unavailable','reason':'회차 마감에 결속된 시장 요약·지표 입력이 없습니다.'},
         'serverGeneration':{'version':'briefing-server-v1','inputSha256':prepared['inputSha256'],'coverage':prepared['coverage'],'analyses':analyses,'records':passed,'selected':selection['selected']}}
+    if capture:
+        # The original HTTP bodies remain private. This fixed receipt binds the
+        # displayed indicators without claiming the AI prose used new prices.
+        snapshot['marketCapture']={k:copy.deepcopy(capture[k]) for k in ('schemaVersion','round','sha256','capturedBeforeCutoff','indicatorBindings','rawRefs')}
+        snapshot['marketSummary']['reason']='시장 지표는 별도로 제공하며, 검증된 시장 전체 분석은 아직 없습니다.'
     row={'round':{k:frozen[k] for k in ['roundId','date','edition','cutoff']},'selection':selection,'assessments':assessed,
          'selectionVerification':checked,'passed':passed}
     registry={(s['documentId'],s['documentVersion']):s for c in frozen['candidates'] for s in c['sources'].values()}
