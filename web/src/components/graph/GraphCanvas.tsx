@@ -58,6 +58,7 @@ import MapEmptyState from './MapEmptyState';
 import type { PersonalScope } from '@/types/map';
 import {
   fitFootprint,
+  overviewFootprint,
   fitZoom,
   freeViewport,
   type Rect,
@@ -910,7 +911,9 @@ export default function GraphCanvas({
     const visibleNodes = graph
       .getNodeData()
       .filter((node) => node.style?.visibility !== 'hidden');
-    const allFootprints = visibleNodes.map(fitFootprint);
+    // Whole-map reading hides issue titles. Reserving their full wrapped text
+    // here can use up the entire mobile height before fitting a single circle.
+    const allFootprints = visibleNodes.map(overviewFootprint);
     if (!allFootprints.length) return false;
     // The zoom-out floor is the scale that keeps the full visible graph inside
     // the unobstructed viewport, with 0.53 as the floor for naturally small maps.
@@ -1929,11 +1932,15 @@ export default function GraphCanvas({
       if (camera) {
         retainFocus();
         await graph.zoomTo(camera.zoom, false);
-        // 저장한 값은 getPosition()(캔버스 원점의 화면 위치)이다. translateTo는 기준이 달라
-        // 노드가 화면 밖으로 밀려나므로, 지금 위치와의 차이만큼 옮겨 같은 화면을 되살린다.
+        // D-GRP-01: G6 getPosition() is world-space, while translateBy() takes
+        // screen pixels. At 20% zoom, a world delta of 500 is only 100px.
+        // Reusing the world delta as pixels sends the restored graph off-screen.
         const current = graph.getPosition();
         await graph.translateBy(
-          [camera.position[0] - current[0], camera.position[1] - current[1]],
+          [
+            (camera.position[0] - current[0]) * camera.zoom,
+            (camera.position[1] - current[1]) * camera.zoom,
+          ],
           false,
         );
       } else {

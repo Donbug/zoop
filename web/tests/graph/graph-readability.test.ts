@@ -180,28 +180,26 @@ test('R1–R3 culls node and edge labels together, prioritizes selection and avo
   expect([...result].sort()).toEqual(['company', 'edge', 'far']);
 });
 
-test('D-GRP-01 titles connected to the hovered or selected node are never culled', () => {
-  // 2026-11-04 리뷰: 머무르거나 클릭한 노드에 연결된 사건 제목은 겹쳐도 계속 보여요.
+test('D-GRP-01 the selected title wins while overlapping neighbor titles wait for room', () => {
   const box = { x: 0, y: 0, width: 100, height: 30 };
-  const entry = (id: string, priority: number, keep = false) => ({
+  const entry = (id: string, priority: number) => ({
     id,
     priority,
     box,
     distance: 0,
     degree: 0,
     evidence: 0,
-    keep,
   });
   const result = culledLabels(
     [
-      entry('company', 1),
-      entry('linked-a', 5, true),
-      entry('linked-b', 5, true),
+      entry('company', 0),
+      entry('linked-a', 5),
+      entry('linked-b', 5),
       entry('other', 6),
     ],
     [],
   );
-  expect([...result]).toEqual(['other']);
+  expect([...result]).toEqual(['linked-a', 'linked-b', 'other']);
 });
 
 test('D-GRP-01 a selection keeps its connected titles while another node is hovered', () => {
@@ -482,6 +480,43 @@ function cullingGraph() {
   return { graph, visible, room };
 }
 
+test('D-GRP-01 selected company neighbors yield overlapping titles but retain nodes and connections', async () => {
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const company = data.nodes.find(
+    (n) =>
+      n.kind === 'company' &&
+      data.edges.filter((e) => e.source === n.id || e.target === n.id).length >
+        2,
+  )!;
+  const linked = new Set(
+    data.edges
+      .filter((e) => e.source === company.id || e.target === company.id)
+      .flatMap((e) => [e.source, e.target]),
+  );
+  const base = toG6Data(data, 1200, 700, company.id);
+  for (const node of base.nodes ?? [])
+    node.style = { ...node.style, x: 45, y: 22 };
+  const { graph, visible } = cullingGraph();
+  await applyGraphReading(graph, base, data, {
+    ...context,
+    zoom: 0.2,
+    selected: company.id,
+  });
+  const issues = data.nodes.filter(
+    (n) =>
+      n.kind === 'issue' &&
+      linked.has(n.id) &&
+      base.nodes?.some((node) => node.id === n.id),
+  );
+  expect(issues.length).toBeGreaterThan(1);
+  expect(issues.some((n) => !visible(n.id, 'label'))).toBe(true);
+  for (const issue of issues) expect(visible(issue.id, 'key')).toBe(true);
+  for (const edge of data.edges.filter(
+    (e) => e.source === company.id || e.target === company.id,
+  ))
+    expect(visible(edge.id, 'key')).toBe(true);
+});
+
 test('D-GRP-01 overlapping titles never fold a follow-up issue or its FOLLOWS line', async () => {
   const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
   const follow = data.edges.find((e) => e.relationType === 'FOLLOWS')!;
@@ -550,7 +585,6 @@ test('D-GRP-01 an overlapping issue title moves to a free side of its circle', (
     distance: 0,
     degree: 0,
     evidence: 0,
-    keep: true,
     alternatives: alternatives
       ? [
           { placement: 'top' as const, box: top },

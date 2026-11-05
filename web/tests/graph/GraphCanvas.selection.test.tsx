@@ -1154,8 +1154,26 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     act(() => canvas.handlers.get('aftertransform')!({ target: { id: '' } }));
     rerender(<GraphCanvas data={all} memoryOwner="member-a" />);
     await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalledWith(1.8, false));
-    // 저장한 화면 위치(40, 60)와 지금 위치(5, 10)의 차이만큼 옮긴다.
-    expect(canvas.translateBy).toHaveBeenCalledWith([35, 50], false);
+    // G6 returns world-space pan; convert the delta to pixels at restored zoom 1.8.
+    expect(canvas.translateBy).toHaveBeenCalledWith([63, 90], false);
+  });
+  it('D-GRP-01 mobile reload converts saved world pan to pixels at the saved zoom', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const { unmount } = render(
+      <GraphCanvas data={data} memoryOwner="mobile-reload" />,
+    );
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+    canvas.getZoom.mockReturnValue(0.2);
+    canvas.getPosition.mockReturnValue([500, -200]);
+    act(() => canvas.handlers.get('aftertransform')!({ target: { id: '' } }));
+    unmount();
+    canvas.getPosition.mockReturnValue([0, 0]);
+    canvas.translateBy.mockClear();
+    render(<GraphCanvas data={data} memoryOwner="mobile-reload" />);
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(2));
+    expect(canvas.zoomTo).toHaveBeenCalledWith(0.2, false);
+    // G6 getPosition is world-space; translateBy consumes screen pixels.
+    expect(canvas.translateBy).toHaveBeenCalledWith([100, -40], false);
   });
   it('opens the default layout instead of a saved camera taken at another map size', async () => {
     const all = createMockGraph({ mode: 'all', personalFilter: 'all' });

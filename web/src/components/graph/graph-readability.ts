@@ -12,7 +12,7 @@ const WHOLE_FIT_MARGIN = 1.2;
 export type ReadingContext = {
   zoom: number;
   anchor: string | null;
-  /** Clicked node: its connected titles stay while another node is hovered, until deselected. */
+  /** Connected titles remain eligible while another node is hovered; collisions still yield. */
   selected?: string | null;
   edge: string | null;
   focus: string | null;
@@ -29,8 +29,6 @@ export type LabelCandidate = {
   distance: number;
   degree: number;
   evidence: number;
-  /** Never culled: titles connected to the hovered or selected node (D-GRP-01, 2026-11-04). */
-  keep?: boolean;
   /** Other sides the title may move to when its own box overlaps, in order of preference. */
   alternatives?: { placement: LabelPlacement; box: Rect }[];
 };
@@ -107,10 +105,11 @@ export function culledLabels(
       placements?.set(item.id, fit.placement);
       add({ id: item.id, box: fit.box });
     } else {
-      // Nothing fits: the title goes back to its first side (shown anyway when kept).
+      // D-GRP-01: keep the selected/hovered node itself (priority 0), but let
+      // neighboring titles wait for space instead of printing over one another.
       const box = options[0]?.box ?? item.box;
       if (options.length) placements?.set(item.id, options[0].placement);
-      if (item.keep || free(box)) add({ id: item.id, box });
+      if (free(box)) add({ id: item.id, box });
       else hidden.add(item.id);
     }
   }
@@ -543,7 +542,7 @@ export async function applyGraphReading(
     const shared =
       source?.kind === 'issue' && (companies.get(id)?.size ?? 0) > 1;
     const priority =
-      id === context.anchor || id === context.focus
+      id === context.anchor || id === context.selected || id === context.focus
         ? 0
         : source?.kind === 'company'
           ? emphasis
@@ -569,10 +568,6 @@ export async function applyGraphReading(
         : 0,
       degree: degrees.get(id) ?? 0,
       evidence: source?.evidenceCount ?? 0,
-      // D-GRP-01 (2026-11-04 review): titles of issues connected to the hovered or clicked
-      // node stay while the pointer rests there or until the selection is cleared, even if
-      // they overlap. Unrelated titles yield to them instead.
-      keep: source?.kind === 'issue' && related.has(id),
       alternatives: source?.kind === 'issue' ? sides(node, box) : undefined,
     });
     labels.set(id, label);

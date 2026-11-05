@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   fitFootprint,
+  overviewFootprint,
   fitZoom,
   freeViewport,
   intersects,
@@ -14,6 +15,75 @@ import { createMockGraph } from '@/mocks/graph/response';
 import type { NodeData } from '@antv/g6';
 
 describe('D-GRP-01/01b · graph readability', () => {
+  it('D-GRP-01 neighborhood fit finds room between opposite-side labels even when minimum zoom does not fit', () => {
+    const result = fitZoom(
+      [
+        {
+          x: 0,
+          y: 150,
+          radius: 1,
+          labelWidth: 50,
+          labelHeight: 70,
+          labelAbove: true,
+        },
+        { x: 0, y: 0, radius: 1, labelWidth: 50, labelHeight: 70 },
+      ],
+      { width: 320, height: 80 },
+      2.5,
+    );
+    expect(result.zoom).toBeGreaterThan(0.4);
+    expect(result.zoom).toBeLessThan(0.54);
+  });
+  it('D-GRP-01 mobile fit reserves label space at its own node rather than both graph edges', () => {
+    const footprints = [
+      { x: 0, y: 0, radius: 24, labelWidth: 100, labelHeight: 38 },
+      { x: 1000, y: 100, radius: 8, labelWidth: 0, labelHeight: 0 },
+    ];
+    const result = fitZoom(footprints, { width: 320, height: 430 }, 2.5);
+    expect(result.zoom).toBeGreaterThan(0.25);
+    const left = -Math.max(24 * result.zoom, 50);
+    const right = 1008 * result.zoom;
+    expect(right - left).toBeLessThanOrEqual(320.001);
+    expect(result.zoom).toBeLessThanOrEqual(2.5);
+  });
+  it('D-GRP-01 mobile overview fit does not reserve space for hidden issue titles', () => {
+    const issue: NodeData = {
+      id: 'synthetic-issue',
+      data: { kind: 'issue' },
+      style: {
+        x: 0,
+        y: 0,
+        size: 8,
+        labelText: '합성 검증 긴 사건 제목 '.repeat(30),
+      },
+    };
+    const company: NodeData = {
+      id: 'synthetic-company',
+      data: { kind: 'company' },
+      style: { x: 1000, y: 200, size: 40, labelText: '합성 기업' },
+    };
+    const overview = [issue, company].map(overviewFootprint);
+    expect(overview[0].labelWidth).toBe(0);
+    expect(overview[0].labelHeight).toBe(0);
+    expect(overview[1].labelWidth).toBeGreaterThan(0);
+    const safe = { width: 320, height: 430 };
+    const fitted = fitZoom(overview, safe, 2.5);
+    const shortIssue = {
+      ...issue,
+      style: { ...issue.style, labelText: '합성 사건' },
+    };
+    expect(fitted).toEqual(
+      fitZoom([shortIssue, company].map(overviewFootprint), safe, 2.5),
+    );
+    expect(fitted.zoom).toBeGreaterThan(
+      fitZoom(
+        [issue, company].map((node) => fitFootprint(node)),
+        safe,
+        2.5,
+      ).zoom,
+    );
+    expect(fitFootprint(issue).labelHeight).toBeGreaterThan(0);
+  });
   it('accepts G6-normalized tuple sizes after a real layout', () => {
     const nodes: NodeData[] = [
       { id: 'a', style: { x: 0, y: 0, size: [88, 88], labelText: '기업' } },
@@ -123,7 +193,10 @@ describe('D-GRP-01 fit bounds', () => {
       1.8,
     );
     expect(afterZoomOut.zoom).toBe(atNormal.zoom);
-    expect(atNormal.center).toEqual([60, 0]);
+    expect(afterZoomOut.center).toEqual(atNormal.center);
+    expect(atNormal.center[0]).toBe(60);
+    // The full visible footprint includes the text below the circles.
+    expect(atNormal.center[1]).toBeGreaterThan(0);
   });
 
   it('wraps a long title at the display width instead of measuring it on one line', () => {
