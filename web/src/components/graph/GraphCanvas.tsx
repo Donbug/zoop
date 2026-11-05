@@ -61,6 +61,7 @@ import {
   overviewFootprint,
   fitZoom,
   freeViewport,
+  panCorrection,
   type Rect,
 } from './graph-geometry';
 import {
@@ -1682,6 +1683,49 @@ export default function GraphCanvas({
     } | null = null;
     let wheelPending = false;
     let previousZoom = 1;
+    // D-GRP-01: pan bounds. `clamping` marks our own correction move; `restoring`
+    // pauses the bounds while a remembered camera is checked for visible nodes.
+    let clamping = false;
+    let restoring = false;
+    /** Screen box of the visible circles, or null when there are none. */
+    const graphScreenBox = (g: Graph): Rect | null => {
+      let left = Infinity,
+        top = Infinity,
+        right = -Infinity,
+        bottom = -Infinity;
+      for (const node of g.getNodeData()) {
+        if (node.style?.visibility === 'hidden') continue;
+        const f = fitFootprint(node);
+        if (![f.x, f.y, f.radius].every(Number.isFinite)) continue;
+        left = Math.min(left, f.x - f.radius);
+        right = Math.max(right, f.x + f.radius);
+        top = Math.min(top, f.y - f.radius);
+        bottom = Math.max(bottom, f.y + f.radius);
+      }
+      if (!Number.isFinite(left)) return null;
+      const [x1, y1] = g.getViewportByCanvas([left, top]);
+      const [x2, y2] = g.getViewportByCanvas([right, bottom]);
+      if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+      return {
+        x: Math.min(x1, x2),
+        y: Math.min(y1, y2),
+        width: Math.abs(x2 - x1),
+        height: Math.abs(y2 - y1),
+      };
+    };
+    /** Moves the map back when it was dragged or zoomed into empty canvas. True if it moved. */
+    const keepGraphInView = (g: Graph) => {
+      if (clamping || restoring) return false;
+      const box = graphScreenBox(g);
+      if (!box || host.clientWidth <= 0 || host.clientHeight <= 0) return false;
+      const [dx, dy] = panCorrection(box, host.clientWidth, host.clientHeight);
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return false;
+      clamping = true;
+      void g.translateBy([dx, dy], false).finally(() => {
+        clamping = false;
+      });
+      return true;
+    };
     // 누른 뒤 일정 거리 이상 움직였으면 지도 이동이다. 손을 뗄 때 생기는 클릭으로 노드·연결을 고르지 않는다.
     let dragged = false;
     const pointerDown = (event: PointerEvent) => {
@@ -1910,11 +1954,15 @@ export default function GraphCanvas({
       });
       // 끌기(drag-canvas)가 아닌 다른 카메라 이동(버튼 확대·맞춤·선택 이동)이 시작되면 휠 확대를 멈춰 서로 다투지 않게 한다.
       graph.on('beforetransform', () => {
-        if (!pointerStart && !wheelZoom.owns()) wheelZoom.interrupt();
+        // The pan-bounds correction is part of the current move, not a new one.
+        if (!pointerStart && !wheelZoom.owns() && !clamping)
+          wheelZoom.interrupt();
       });
       graph.on('aftertransform', () => {
         if (!graph || disposed) return;
         try {
+          // The correction move fires its own aftertransform, which does the rest.
+          if (keepGraphInView(graph)) return;
           const nextZoom = graph.getZoom();
           const zoomChanged = Math.abs(nextZoom - previousZoom) > 0.0001;
           if (
@@ -1959,7 +2007,9 @@ export default function GraphCanvas({
       followFit.current = !camera;
       fitPending.current = !camera;
       defaultZoomPending.current = !camera;
+      let restored = false;
       if (camera) {
+        restoring = true;
         retainFocus();
         await graph.zoomTo(camera.zoom, false);
         // D-GRP-01: G6 getPosition() is world-space, while translateBy() takes
@@ -1973,7 +2023,23 @@ export default function GraphCanvas({
           ],
           false,
         );
-      } else {
+        restoring = false;
+        // D-GRP-01: a remembered camera that shows no node at all (for example one saved
+        // before the restore fix) would open on empty canvas. Open on the whole fit instead.
+        const box = graphScreenBox(graph);
+        // No measurable node (nothing drawn yet) is not evidence of an empty view.
+        restored =
+          !box ||
+          (box.x < host.clientWidth &&
+            box.x + box.width > 0 &&
+            box.y < host.clientHeight &&
+            box.y + box.height > 0);
+        if (restored) keepGraphInView(graph);
+      }
+      if (!restored) {
+        followFit.current = true;
+        fitPending.current = true;
+        defaultZoomPending.current = true;
         // The initial graph is rendered before the data-sync effect can observe
         // the new instance. Fit that first frame here so a fresh visitor does
         // not open on an unscaled corner of the full public graph.

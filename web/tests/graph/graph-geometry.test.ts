@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   fitFootprint,
   overviewFootprint,
+  panCorrection,
   fitZoom,
   freeViewport,
   intersects,
@@ -224,5 +225,31 @@ describe('D-GRP-01 fit bounds', () => {
     expect(
       fitZoom([node(0, 13), node(120, 13)].map(fitFootprint), safe, 1.8).zoom,
     ).toBeGreaterThan(0.5);
+  });
+});
+
+describe('D-GRP-01 지도 이동 범위 (panCorrection)', () => {
+  it('그래프가 가운데 띠에 닿아 있으면 옮기지 않는다', () => {
+    // An edge node at the very center is fine.
+    expect(
+      panCorrection({ x: 600, y: 400, width: 2000, height: 2000 }, 1200, 800),
+    ).toEqual([0, 0]);
+    expect(
+      panCorrection(
+        { x: -1700, y: -1500, width: 2000, height: 1700 },
+        1200,
+        800,
+      ),
+    ).toEqual([0, 0]);
+  });
+  it('그래프가 바깥으로 나가면 화면 폭·높이의 1/4 안쪽까지 되돌린다', () => {
+    // Right edge of the graph at x=100 (< 300): move right by 200.
+    expect(
+      panCorrection({ x: -900, y: 0, width: 1000, height: 500 }, 1200, 800),
+    ).toEqual([200, 0]);
+    // Graph starts below 3/4 of the height (600): move up to 600.
+    expect(
+      panCorrection({ x: 0, y: 900, width: 500, height: 500 }, 1200, 800),
+    ).toEqual([0, -300]);
   });
 });
