@@ -55,6 +55,10 @@ describe('D-BRF-01·02 저장된 주요 시장 지표', () => {
     expect(screen.queryByText(/2026-10-12 대비/)).toBeNull();
     expect(screen.queryByText(/합성 지수 출처/)).toBeNull();
     expect(card('KOSPI').getByText('2,600.25 pt')).toBeTruthy();
+    const row = screen.getByText('KOSPI').closest('li')!;
+    expect(row.classList.contains('border')).toBe(false);
+    expect(row.classList.contains('rounded-panel')).toBe(false);
+    expect(row.closest('ul')?.classList.contains('divide-x')).toBe(true);
   });
 
   it('shows all three stored values, observation dates, baselines and nonzero changes', () => {

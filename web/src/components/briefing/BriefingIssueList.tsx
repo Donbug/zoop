@@ -91,7 +91,7 @@ export default function BriefingIssueList({
                   title={`${item.rank}. ${item.title} · 근거 ${item.evidenceCount}건`}
                 >
                   <p className={NOTE}>{eventTimeLabel(item)}</p>
-                  <h4 className="text-body font-bold">
+                  <h4 className="text-lead font-bold">
                     {item.rank}. {item.title}
                   </h4>
                   {(item.matchedCompanyIds ?? []).length > 0 && (

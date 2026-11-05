@@ -7,8 +7,8 @@ import type { BriefingEdition } from '@/types/briefing';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import { useScreenView } from '@/util/track';
 
-const FILTER_BUTTON = `min-h-10 min-w-[88px] whitespace-nowrap rounded-md border border-zoop-border bg-zoop-surface px-4 text-caption font-semibold text-zoop-ink transition-colors aria-pressed:border-zoop-ink aria-pressed:bg-zoop-ink aria-pressed:text-zoop-on-ink max-sm:flex-1 ${FOCUS_RING}`;
-const READING_BUTTON = `min-w-[76px] whitespace-nowrap rounded-md text-caption font-semibold text-zoop-muted aria-pressed:bg-zoop-surface aria-pressed:text-zoop-ink aria-pressed:shadow-sm max-sm:flex-1 ${FOCUS_RING}`;
+const FILTER_BUTTON = `min-h-11 min-w-[88px] whitespace-nowrap rounded-panel px-3 text-body font-semibold text-zoop-muted underline-offset-8 transition-colors hover:bg-zoop-selected aria-pressed:text-zoop-ink aria-pressed:underline aria-pressed:decoration-2 max-sm:flex-1 ${FOCUS_RING}`;
+const READING_BUTTON = `min-h-11 min-w-[76px] whitespace-nowrap rounded-panel px-3 text-caption font-semibold text-zoop-muted aria-pressed:bg-zoop-surface aria-pressed:text-zoop-ink aria-pressed:underline aria-pressed:decoration-2 aria-pressed:underline-offset-4 max-sm:flex-1 ${FOCUS_RING}`;
 
 // D-BRF-01 출근 · D-BRF-02 퇴근 브리핑 (/briefing). 날짜·회차는 주소(?date=&edition=)에 남는다.
 export default function BriefingPage() {
@@ -54,50 +54,52 @@ export default function BriefingPage() {
         />
       </div>
 
-      <div
-        role="group"
-        aria-label="브리핑 기준"
-        className="mt-3 inline-flex flex-wrap gap-2"
-      >
-        <button
-          type="button"
-          aria-pressed={!personal}
-          onClick={() => updateQuery({ view: null })}
-          className={FILTER_BUTTON}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-zoop-border pb-4">
+        <div
+          role="group"
+          aria-label="브리핑 기준"
+          className="inline-flex flex-wrap gap-1"
         >
-          공통
-        </button>
-        <button
-          type="button"
-          aria-pressed={personal}
-          onClick={() => updateQuery({ view: 'personal' })}
-          className={FILTER_BUTTON}
-        >
-          개인화 브리핑
-        </button>
-      </div>
+          <button
+            type="button"
+            aria-pressed={!personal}
+            onClick={() => updateQuery({ view: null })}
+            className={FILTER_BUTTON}
+          >
+            공통
+          </button>
+          <button
+            type="button"
+            aria-pressed={personal}
+            onClick={() => updateQuery({ view: 'personal' })}
+            className={FILTER_BUTTON}
+          >
+            개인화 브리핑
+          </button>
+        </div>
 
-      <div
-        className="mt-3 flex items-center justify-end gap-2"
-        role="group"
-        aria-label="브리핑 읽기 방식"
-      >
-        <button
-          type="button"
-          aria-pressed={compact}
-          className={`min-h-11 border border-zoop-border px-3 ${READING_BUTTON}`}
-          onClick={() => updateQuery({ reading: 'compact' })}
+        <div
+          className="inline-flex gap-0.5 rounded-md bg-zoop-control p-1 max-sm:w-full"
+          role="group"
+          aria-label="브리핑 읽기 방식"
         >
-          간단히
-        </button>
-        <button
-          type="button"
-          aria-pressed={!compact}
-          className={`min-h-11 border border-zoop-border px-3 ${READING_BUTTON}`}
-          onClick={() => updateQuery({ reading: 'full' })}
-        >
-          전체 보기
-        </button>
+          <button
+            type="button"
+            aria-pressed={compact}
+            className={READING_BUTTON}
+            onClick={() => updateQuery({ reading: 'compact' })}
+          >
+            간단히
+          </button>
+          <button
+            type="button"
+            aria-pressed={!compact}
+            className={READING_BUTTON}
+            onClick={() => updateQuery({ reading: 'full' })}
+          >
+            전체 보기
+          </button>
+        </div>
       </div>
 
       <PublishedBriefing

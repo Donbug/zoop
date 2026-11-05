@@ -369,7 +369,7 @@ export default function PublishedBriefing({
             <>
               <header className="border-b border-zoop-border pb-[18px]">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-title-sm font-bold tracking-[-0.025em]">
+                  <h2 className="text-title font-bold tracking-[-0.025em]">
                     {result.edition === 'morning' ? '출근' : '퇴근'} 브리핑
                   </h2>
                   <span className={STATUS_PILL}>

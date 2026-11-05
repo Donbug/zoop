@@ -5,7 +5,15 @@ import type {
 } from '@/util/briefingPersonalPriority';
 import { briefingTime } from '@/util/briefingTime';
 import ImpactCue from '@/components/common/ImpactCue';
-import { BODY, EMPTY, FOCUS_RING, NOTE } from './briefingStyles';
+import {
+  BODY,
+  EMPTY,
+  FOCUS_RING,
+  ISSUE_BODY,
+  ISSUE_ROW,
+  ISSUE_SUMMARY,
+  NOTE,
+} from './briefingStyles';
 
 const labels = {
   new_issue: '새 소식',
@@ -206,13 +214,11 @@ export default function PersonalPriorityIssues({
         선택 종목과 관련된 후보 안에서 우선순위를 정했습니다. 새 소식이 부족하면
         관련 소식이나 이전 이슈를 이어서 확인합니다.
       </p>
-      <ol className="space-y-3">
+      <ol className="space-y-5">
         {value.items.map((item, index) => (
-          <li key={item.issueId}>
-            <details className="overflow-hidden rounded-xl border border-zoop-border bg-zoop-surface">
-              <summary
-                className={`cursor-pointer list-none p-5 sm:p-6 ${FOCUS_RING}`}
-              >
+          <li key={item.issueId} className={ISSUE_ROW}>
+            <details>
+              <summary className={`${ISSUE_SUMMARY} ${FOCUS_RING}`}>
                 <span className="flex flex-wrap justify-between gap-2 text-caption text-zoop-muted">
                   <span>핵심 이슈 {index + 1} · 개인 종목 기준</span>
                   <span className="rounded-full bg-zoop-card px-3 py-1">
@@ -245,7 +251,7 @@ export default function PersonalPriorityIssues({
                   <span>자세히 보기 +</span>
                 </span>
               </summary>
-              <div className="space-y-5 border-t border-zoop-border p-5 sm:p-6">
+              <div className={ISSUE_BODY}>
                 {item.analysisOmittedReason && !item.aiAnalyses?.length && (
                   <p className={NOTE}>
                     이전 분석에 별개 사건이 섞여 있어, 여기서는 원문으로 확인된
