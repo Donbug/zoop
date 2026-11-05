@@ -76,7 +76,21 @@ export function fitZoom(
   footprints: ReturnType<typeof fitFootprint>[],
   safe: { width: number; height: number },
   maxZoom: number,
+  /**
+   * 'labels': center on circles plus titles (whole-map fit).
+   * 'circles': keep the circles' center, as selection and neighborhood fits always did,
+   * and reserve title room symmetrically around it.
+   */
+  centerOn: 'labels' | 'circles' = 'labels',
 ) {
+  const circleCenter: [number, number] = [
+    (Math.min(...footprints.map((f) => f.x - f.radius)) +
+      Math.max(...footprints.map((f) => f.x + f.radius))) /
+      2,
+    (Math.min(...footprints.map((f) => f.y - f.radius)) +
+      Math.max(...footprints.map((f) => f.y + f.radius))) /
+      2,
+  ];
   // D-GRP-01: measure each label at its own node. Reserving the widest label
   // at both outer graph edges wastes most of a narrow mobile viewport.
   const bounds = (zoom: number) => {
@@ -104,6 +118,13 @@ export function fitZoom(
   };
   const occupied = (zoom: number) => {
     const b = bounds(zoom);
+    if (centerOn === 'circles') {
+      const [cx, cy] = [circleCenter[0] * zoom, circleCenter[1] * zoom];
+      return Math.max(
+        (2 * Math.max(cx - b.left, b.right - cx)) / safe.width,
+        (2 * Math.max(cy - b.top, b.bottom - cy)) / safe.height,
+      );
+    }
     return Math.max(
       (b.right - b.left) / safe.width,
       (b.bottom - b.top) / safe.height,
@@ -138,6 +159,7 @@ export function fitZoom(
   }
   const zoom = lower;
   const measured = bounds(zoom);
+  if (centerOn === 'circles') return { zoom, center: circleCenter };
   return {
     zoom,
     center: [

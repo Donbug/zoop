@@ -34,6 +34,23 @@ describe('D-GRP-01/01b · graph readability', () => {
     expect(result.zoom).toBeGreaterThan(0.4);
     expect(result.zoom).toBeLessThan(0.54);
   });
+  it('D-GRP-01 selection fit keeps the circles centered and still fits the titles', () => {
+    // 2026-11-05: only the whole-map fit centers on titles too; a selection fit
+    // keeps its circles in the middle, as before, with title room on both sides.
+    const footprints = [
+      { x: 0, y: 0, radius: 20, labelWidth: 80, labelHeight: 60 },
+      { x: 200, y: 0, radius: 20, labelWidth: 80, labelHeight: 60 },
+    ];
+    const safe = { width: 400, height: 300 };
+    const circles = fitZoom(footprints, safe, 2.5, 'circles');
+    expect(circles.center).toEqual([100, 0]);
+    const labels = fitZoom(footprints, safe, 2.5);
+    expect(labels.center[1]).toBeGreaterThan(0);
+    // From the circle center, the radius plus the title below fits in half the height.
+    expect(
+      20 * circles.zoom + Math.max(1, circles.zoom) * 60,
+    ).toBeLessThanOrEqual(safe.height / 2 + 0.001);
+  });
   it('D-GRP-01 mobile fit reserves label space at its own node rather than both graph edges', () => {
     const footprints = [
       { x: 0, y: 0, radius: 24, labelWidth: 100, labelHeight: 38 },

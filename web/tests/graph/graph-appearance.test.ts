@@ -12,8 +12,13 @@ test.each(['light', 'dark'] as const)(
       '[&_#company-detail-panel_.company-list_button:not(.company-issue-evidence)]:bg-[var(--map-surface)]!',
     );
     expect(classes).toContain(
-      '[&_#company-detail-panel_.company-list_button:not(.company-issue-evidence):is(:hover,[aria-pressed=true])]:bg-[var(--map-selected)]!',
+      '[&_#company-detail-panel_.company-list_button:not(.company-issue-evidence)[aria-pressed=true]]:bg-[var(--map-selected)]!',
     );
+    // A tapped row on a phone must not stay highlighted: hover only on hover-capable pointers.
+    expect(classes).toContain(
+      '[@media(hover:hover)]:[&_#company-detail-panel_.company-list_button:not(.company-issue-evidence):hover]:bg-[var(--map-selected)]!',
+    );
+    expect(classes).not.toContain(':is(:hover,');
   },
 );
 import { createMockGraph } from '@/mocks/graph/response';

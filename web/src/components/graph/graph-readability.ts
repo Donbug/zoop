@@ -12,7 +12,7 @@ const WHOLE_FIT_MARGIN = 1.2;
 export type ReadingContext = {
   zoom: number;
   anchor: string | null;
-  /** Connected titles remain eligible while another node is hovered; collisions still yield. */
+  /** Clicked node: its connected titles stay while another node is hovered, until deselected. */
   selected?: string | null;
   edge: string | null;
   focus: string | null;
@@ -29,6 +29,8 @@ export type LabelCandidate = {
   distance: number;
   degree: number;
   evidence: number;
+  /** Never culled: titles connected to the hovered or selected node (D-GRP-01, 2026-11-04). */
+  keep?: boolean;
   /** Other sides the title may move to when its own box overlaps, in order of preference. */
   alternatives?: { placement: LabelPlacement; box: Rect }[];
 };
@@ -48,12 +50,37 @@ function anchorNeighbors(base: GraphData, context: ReadingContext) {
   return related;
 }
 
+/** Spots further from the circle: up from the top, down from the bottom, up or down beside. */
+const SLIDE_STEPS = 4;
+function slideSpots(options: { placement: LabelPlacement; box: Rect }[]) {
+  const spots: { placement: LabelPlacement; box: Rect; shift: number }[] = [];
+  for (let step = 1; step <= SLIDE_STEPS; step++)
+    for (const option of options) {
+      const distance = step * (option.box.height + 4);
+      const directions =
+        option.placement === 'top'
+          ? [-1]
+          : option.placement === 'bottom'
+            ? [1]
+            : [-1, 1];
+      for (const direction of directions)
+        spots.push({
+          placement: option.placement,
+          shift: direction * distance,
+          box: { ...option.box, y: option.box.y + direction * distance },
+        });
+    }
+  return spots;
+}
+
 // D-GRP-01/01b · R1–R3. Only labels are culled; data, badges and positions stay intact.
 export function culledLabels(
   candidates: LabelCandidate[],
   bodies: { id: string; box: Rect }[],
   /** Filled with the side chosen for each title that has alternatives. */
   placements?: Map<string, LabelPlacement>,
+  /** Filled with the extra screen-px slide of kept titles that found no free side. */
+  shifts?: Map<string, number>,
 ) {
   const cells = new Map<string, { id: string; box: Rect }[]>();
   const keys = (r: Rect) => {
@@ -101,17 +128,29 @@ export function culledLabels(
     // its circle, so titles shown on hover sit side by side instead of on top of each other.
     const options = item.alternatives ?? [];
     const fit = options.find((option) => free(option.box));
+    shifts?.delete(item.id);
     if (fit) {
       placements?.set(item.id, fit.placement);
       add({ id: item.id, box: fit.box });
-    } else {
-      // D-GRP-01: keep the selected/hovered node itself (priority 0), but let
-      // neighboring titles wait for space instead of printing over one another.
-      const box = options[0]?.box ?? item.box;
-      if (options.length) placements?.set(item.id, options[0].placement);
-      if (free(box)) add({ id: item.id, box });
-      else hidden.add(item.id);
+      continue;
     }
+    // D-GRP-01 (2026-11-05): connected titles always stay (keep). When every side of the
+    // circle is taken, slide the title further out, one title height at a time, until it
+    // lands on free space, so kept titles sit apart instead of printing over one another.
+    const slid = item.keep
+      ? slideSpots(options).find((spot) => free(spot.box))
+      : undefined;
+    if (slid) {
+      placements?.set(item.id, slid.placement);
+      shifts?.set(item.id, slid.shift);
+      add({ id: item.id, box: slid.box });
+      continue;
+    }
+    // Nothing fits: the title goes back to its first side (shown anyway when kept).
+    const box = options[0]?.box ?? item.box;
+    if (options.length) placements?.set(item.id, options[0].placement);
+    if (item.keep || free(box)) add({ id: item.id, box });
+    else hidden.add(item.id);
   }
   return hidden;
 }
@@ -230,9 +269,10 @@ export function readingStyles(
 }
 
 /** G6 label style for an issue title on one side of its circle (top is the default). */
-const placementStyle = (side: LabelPlacement) => ({
+/** shift: extra vertical slide in graph units (screen px / zoom), so it scales with the circle. */
+const placementStyle = (side: LabelPlacement, shift = 0) => ({
   labelPlacement: side,
-  labelOffsetY: side === 'top' ? -5 : side === 'bottom' ? 5 : 0,
+  labelOffsetY: (side === 'top' ? -5 : side === 'bottom' ? 5 : 0) + shift,
   labelOffsetX: side === 'left' ? -5 : side === 'right' ? 5 : 0,
 });
 
@@ -244,6 +284,8 @@ const appliedLabels = new WeakMap<
     styles: Map<string, string>;
     /** Issue titles moved off their default top side to avoid an overlap. */
     placements: Map<string, LabelPlacement>;
+    /** Extra slide (graph units) of kept titles that found no free side. */
+    shifts: Map<string, number>;
   }
 >();
 
@@ -337,7 +379,12 @@ export async function applyGraphReading(
   // Hover keeps the zoom, so most label styles are unchanged: only push and redraw the changed ones.
   let applied = appliedLabels.get(graph);
   if (!applied) {
-    applied = { base, styles: new Map(), placements: new Map() };
+    applied = {
+      base,
+      styles: new Map(),
+      placements: new Map(),
+      shifts: new Map(),
+    };
     appliedLabels.set(graph, applied);
   } else if (applied.base !== base) {
     // setData keeps applied label styles on elements that stay (keepAppliedStyles);
@@ -364,10 +411,12 @@ export async function applyGraphReading(
       previous.set(id, key);
       return [{ id, style }];
     });
-  const { placements } = applied;
+  const { placements, shifts } = applied;
   for (const node of styles.nodes ?? []) {
     const side = placements.get(String(node.id));
-    if (side) node.style = { ...node.style, ...placementStyle(side) };
+    const shift = shifts.get(String(node.id)) ?? 0;
+    if (side || shift)
+      node.style = { ...node.style, ...placementStyle(side ?? 'top', shift) };
   }
   const nodeUpdates = changed(styles.nodes, true);
   const edgeUpdates = changed(styles.edges);
@@ -507,8 +556,10 @@ export async function applyGraphReading(
         box: { x: cx + half + gap, y: cy - height / 2, width, height },
       },
     ];
+    // A slid title's measured box is off its side; use the computed side box instead.
+    const slid = shifts.has(String(node.id));
     return options.map((option) =>
-      option.placement === current ? { ...option, box } : option,
+      option.placement === current && !slid ? { ...option, box } : option,
     );
   };
   const anchorPoint = anchor
@@ -568,6 +619,10 @@ export async function applyGraphReading(
         : 0,
       degree: degrees.get(id) ?? 0,
       evidence: source?.evidenceCount ?? 0,
+      // D-GRP-01 (2026-11-04 review): titles of issues connected to the hovered or clicked
+      // node stay while the pointer rests there or until the selection is cleared. They
+      // slide apart when they would overlap (2026-11-05). Unrelated titles yield to them.
+      keep: source?.kind === 'issue' && related.has(id),
       alternatives: source?.kind === 'issue' ? sides(node, box) : undefined,
     });
     labels.set(id, label);
@@ -595,17 +650,27 @@ export async function applyGraphReading(
     labels.set(id, label);
   }
   const chosen = new Map<string, LabelPlacement>();
-  const culled = culledLabels(candidates, bodies, chosen);
+  const chosenShift = new Map<string, number>();
+  const culled = culledLabels(candidates, bodies, chosen, chosenShift);
   for (const id of culled) showLabel(labels.get(id), false);
   // Move titles whose side changed, then hide the culled ones again (a redraw shows them).
   const moves = candidates.flatMap((candidate) => {
     if (!candidate.alternatives?.length) return [];
     const side = chosen.get(candidate.id) ?? 'top';
-    if (side === (placements.get(candidate.id) ?? 'top')) return [];
+    const shift =
+      Math.round(((chosenShift.get(candidate.id) ?? 0) / context.zoom) * 10) /
+      10;
+    if (
+      side === (placements.get(candidate.id) ?? 'top') &&
+      shift === (shifts.get(candidate.id) ?? 0)
+    )
+      return [];
     if (side === 'top') placements.delete(candidate.id);
     else placements.set(candidate.id, side);
+    if (shift) shifts.set(candidate.id, shift);
+    else shifts.delete(candidate.id);
     previous.delete(candidate.id);
-    return [{ id: candidate.id, style: placementStyle(side) }];
+    return [{ id: candidate.id, style: placementStyle(side, shift) }];
   });
   if (moves.length) {
     graph.updateNodeData(moves);

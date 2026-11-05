@@ -11,6 +11,7 @@ import {
   graphSummary as graphSummaryOf,
   toG6Data,
 } from '@/components/graph/graph-model';
+import { intersects } from '@/components/graph/graph-geometry';
 import { createMockGraph } from '@/mocks/graph/response';
 import type { Graph, GraphData } from '@antv/g6';
 
@@ -180,26 +181,71 @@ test('R1–R3 culls node and edge labels together, prioritizes selection and avo
   expect([...result].sort()).toEqual(['company', 'edge', 'far']);
 });
 
-test('D-GRP-01 the selected title wins while overlapping neighbor titles wait for room', () => {
+test('D-GRP-01 titles connected to the hovered or selected node are never culled', () => {
+  // 2026-11-04 리뷰: 머무르거나 클릭한 노드에 연결된 사건 제목은 겹쳐도 계속 보여요.
   const box = { x: 0, y: 0, width: 100, height: 30 };
-  const entry = (id: string, priority: number) => ({
+  const entry = (id: string, priority: number, keep = false) => ({
     id,
     priority,
     box,
     distance: 0,
     degree: 0,
     evidence: 0,
+    keep,
   });
   const result = culledLabels(
     [
-      entry('company', 0),
-      entry('linked-a', 5),
-      entry('linked-b', 5),
+      entry('company', 1),
+      entry('linked-a', 5, true),
+      entry('linked-b', 5, true),
       entry('other', 6),
     ],
     [],
   );
-  expect([...result]).toEqual(['linked-a', 'linked-b', 'other']);
+  expect([...result]).toEqual(['other']);
+});
+
+test('D-GRP-01 kept titles slide apart instead of printing over one another', () => {
+  // 2026-11-05: 연결된 제목은 계속 보이되, 네 방향이 모두 차면 빈자리까지 밀어 겹치지 않게 둔다.
+  const side = (placement: 'top' | 'bottom' | 'left' | 'right') => ({
+    placement,
+    box:
+      placement === 'top'
+        ? { x: 50, y: 60, width: 100, height: 30 }
+        : placement === 'bottom'
+          ? { x: 50, y: 140, width: 100, height: 30 }
+          : placement === 'left'
+            ? { x: -55, y: 85, width: 100, height: 30 }
+            : { x: 155, y: 85, width: 100, height: 30 },
+  });
+  const alternatives = (['top', 'bottom', 'left', 'right'] as const).map(side);
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+  const placements = new Map<string, 'top' | 'bottom' | 'left' | 'right'>();
+  const shifts = new Map<string, number>();
+  const hidden = culledLabels(
+    ids.map((id) => ({
+      id,
+      priority: 5,
+      box: alternatives[0].box,
+      distance: 0,
+      degree: 0,
+      evidence: 0,
+      keep: true,
+      alternatives,
+    })),
+    [{ id: 'circle', box: { x: 85, y: 85, width: 30, height: 30 } }],
+    placements,
+    shifts,
+  );
+  expect([...hidden]).toEqual([]);
+  expect(shifts.size).toBeGreaterThan(0);
+  const boxes = ids.map((id) => {
+    const box = side(placements.get(id) ?? 'top').box;
+    return { ...box, y: box.y + (shifts.get(id) ?? 0) };
+  });
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++)
+      expect(intersects(boxes[i], boxes[j], 2)).toBe(false);
 });
 
 test('D-GRP-01 a selection keeps its connected titles while another node is hovered', () => {
@@ -480,7 +526,7 @@ function cullingGraph() {
   return { graph, visible, room };
 }
 
-test('D-GRP-01 selected company neighbors yield overlapping titles but retain nodes and connections', async () => {
+test('D-GRP-01 selected company neighbors keep their titles, nodes and connections', async () => {
   const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
   const company = data.nodes.find(
     (n) =>
@@ -509,7 +555,7 @@ test('D-GRP-01 selected company neighbors yield overlapping titles but retain no
       base.nodes?.some((node) => node.id === n.id),
   );
   expect(issues.length).toBeGreaterThan(1);
-  expect(issues.some((n) => !visible(n.id, 'label'))).toBe(true);
+  for (const issue of issues) expect(visible(issue.id, 'label')).toBe(true);
   for (const issue of issues) expect(visible(issue.id, 'key')).toBe(true);
   for (const edge of data.edges.filter(
     (e) => e.source === company.id || e.target === company.id,

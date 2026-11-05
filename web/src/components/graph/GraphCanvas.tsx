@@ -933,7 +933,8 @@ export default function GraphCanvas({
           .map(fitFootprint)
       : allFootprints;
     if (!footprints.length) return false;
-    const fit = fitZoom(footprints, safe, maxZoom);
+    // Whole-map fit centers circles and titles together; a selection keeps its circles centered.
+    const fit = fitZoom(footprints, safe, maxZoom, ids ? 'circles' : 'labels');
     const motion = animate ? cameraMotion(animate) : false;
     // G6 5.1.1은 확대와 이동을 함께 움직이는 transform을 Graph에 공개하지 않아 viewport에서 직접 부른다.
     const viewport = (
