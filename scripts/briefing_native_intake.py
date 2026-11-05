@@ -14,7 +14,7 @@ from briefing_usage import CommandPipe,UsageSession,write_once
 b=server.b
 require=server.require
 SCHEMA='briefing-native-intake-v1'
-INPUT_PRIORITY='briefing-source-priority-v2'
+INPUT_PRIORITY='briefing-source-priority-v3'
 BUSINESS_ACTION=re.compile(r'계약|수주|투자|인수|합병|매출|영업이익|손실|실적|공급|생산|양산|공장|출시|허가|승인|규제|제재|소송|리콜|가동.{0,8}중단|증자|배당|자사주|납품|도입|철회|취소|감산|증설|contract|revenue|earnings|investment|acqui|factory|production|launch|approval|recall|layoff',re.I)
 
 def source_priority(title,text,companies,matches):
@@ -38,6 +38,9 @@ def attempted_documents(base):
     for selected_path in base.glob('*/selected-source.json'):
         if any(selected_path.parent.glob('*-native-v2/native.started.json')):
             prior=json.loads(selected_path.read_bytes());processed.add((prior['documentId'],prior['documentVersion']))
+    for selected_path in base.glob('*/candidates-v3/*/selected-source.json'):
+        if (selected_path.parent/'native.started.json').exists():
+            prior=json.loads(selected_path.read_bytes());processed.add((prior['documentId'],prior['documentVersion']))
     return processed
 
 def atomic(path,value):
@@ -52,13 +55,8 @@ def atomic(path,value):
 
 def source_matches(text,companies):
     """Relevance only. Actual roles and importance still need native and independent model checks."""
-    matches=[]
-    for company in companies:
-        for alias in [company['name'],*company['aliases']]:
-            if len(alias)<3:continue
-            expression=r'(?<![A-Za-z0-9])'+re.escape(alias)+r'(?![A-Za-z0-9])' if alias.isascii() else re.escape(alias)
-            if re.search(expression,text,re.I):matches.append(company['companyId']);break
-    return matches
+    from briefing_company_names import matches
+    return matches(text,companies)
 
 
 def relevance_text(raw):
@@ -72,10 +70,12 @@ def relevance_text(raw):
             if node.getparent() is not None:node.getparent().remove(node)
     return node_text(body[0])
 
-def collect(cfg,round,root):
+def collect(cfg,round,root,*,all_candidates=False):
     from zoop_ai_pipeline.korea_corpus import Config,run,package
     base=Path(cfg['work'])/'native';root.mkdir(mode=0o700,parents=True,exist_ok=True)
     config_path=root/'collection-config.json'
+    if cfg.get('recordedOnly'):
+        require(config_path.is_file() and (root/'collection-result.json').is_file(),'recorded_collection_required')
     if not config_path.exists():
         exclusions=set()
         for state in base.glob('*/collection/STATE.json'):
@@ -134,6 +134,7 @@ def collect(cfg,round,root):
     official_coverage={'enabled':cfg.get('samsungNewsroomEnabled') is True,'retained':0,'excludedOrUnavailable':0}
     if cfg.get('samsungNewsroomEnabled') is True:
         import briefing_samsung_intake as samsung
+        if cfg.get('recordedOnly'):require((root/'samsung-newsroom/result.json').is_file(),'recorded_official_collection_required')
         official=samsung.collect(cfg,round,root);official_coverage['retained']=len(official)
         official_coverage['excludedOrUnavailable']=len(json.loads((root/'samsung-newsroom/result.json').read_bytes())['errors'])
         for row,exported,selected_root in official:
@@ -146,13 +147,15 @@ def collect(cfg,round,root):
                 eligible.append((row,exported,matches,selected_root))
     eligible.sort(key=source_rank,reverse=True)
     require(bool(eligible),'no_current_company_source')
-    # One source set leaves at least four physical calls for briefing generation/verification and bounded repairs.
+    coverage={'complete':False,'candidateDocuments':len(eligible),'selectedDocuments':1,'collection':result['counts'],'samsungNewsroom':official_coverage}
+    if all_candidates:
+        return [({**row,'coverage':coverage,'matchedCompanyIds':matched},exported,companies,selected_root) for row,exported,matched,selected_root in eligible]
     chosen,exported,matches,selected_root=eligible[0]
     write_once(root/'selected-source.json',{'candidate':chosen['candidate'],'documentId':exported['document']['documentId'],
         'documentVersion':exported['document']['documentVersion'],'matchedCompanyIds':matches,
         'nativeBodySha256':chosen['nativeBodySha256'],'nativeReceiptSha256':chosen['nativeReceiptSha256'],'collectionRoot':str(selected_root),
         'inputPriority':chosen['inputPriority'],
-        'coverage':{'complete':False,'candidateDocuments':len(eligible),'selectedDocuments':1,'collection':result['counts'],'samsungNewsroom':official_coverage}})
+        'coverage':coverage})
     return chosen,exported,companies,selected_root
 
 class NativeTransport(httpx.BaseTransport):
@@ -214,7 +217,7 @@ def read_verifier(path):
 def configure_runtime(cfg,root,cutoff):
     from zoop_ai_pipeline.live_runtime import LiveRuntime
     start=datetime.now(timezone.utc)
-    end=datetime.fromisoformat(cutoff).astimezone(timezone.utc)
+    end=datetime.fromisoformat(cfg.get('recoveryDeadline') or cutoff).astimezone(timezone.utc)
     require((end-start).total_seconds()>190,'native_preparation_window')
     os.environ.update({'ZOOP_AI_PIPELINE_LIVE_ENABLED':'1','ZOOP_AI_PIPELINE_LIVE_MODEL':'gpt-6-luna',
         'ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT':'high','ZOOP_AI_PIPELINE_LIVE_MAX_OUTPUT_TOKENS':'12000',
@@ -286,20 +289,68 @@ def source_qualification(root,s3,session):
     session.stage='source_qualification';session.outcome='withheld'
     return result
 
+def candidate_pin(entry):
+    chosen,exported,companies,selected_root=entry
+    return {'candidate':chosen['candidate'],'documentId':exported['document']['documentId'],
+        'documentVersion':exported['document']['documentVersion'],'matchedCompanyIds':chosen['matchedCompanyIds'],
+        'nativeBodySha256':chosen['nativeBodySha256'],'nativeReceiptSha256':chosen['nativeReceiptSha256'],
+        'collectionRoot':str(selected_root),'inputPriority':chosen['inputPriority'],'coverage':chosen.get('coverage',{})}
+
+
+def prepare_candidates(cfg,round,entries,collection_root,observer=None):
+    """Terminal quality failures move to the next unsent document, never a verdict upgrade."""
+    notify=observer or (lambda *args:None)
+    attempt_root=collection_root/'candidates-v3';attempt_root.mkdir(mode=0o700,parents=True,exist_ok=True)
+    outcomes=[]
+    for entry in entries:
+        pin=candidate_pin(entry);root=attempt_root/(round['id']+'-'+b.digest(b.canonical([pin['documentId'],pin['documentVersion']]))[:16]+'-native-v2')
+        root.mkdir(mode=0o700,parents=True,exist_ok=True)
+        write_once(root/'selected-source.json',pin)
+        if (root/'ready.json').exists():return json.loads((root/'ready.json').read_bytes())
+        if (root/'native.started.json').exists():
+            # Closed/HOLD records remain preserved. Unknown sends are never replayed.
+            if (root/'source-qualification.json').exists():
+                outcomes.append({'documentId':pin['documentId'],'status':'saved_withheld'});continue
+            raise ValueError('briefing_server_native_interrupted_requires_recovery')
+        rows=[json.loads(p.read_bytes()) for p in (Path(cfg['work'])/'budget').glob('*.json')]
+        own=[r for r in rows if r['roundId']==round['id']]
+        native_calls=sum(r.get('phase')=='native' for r in own)
+        # A normal successful native document needs 5 calls. Do not start one
+        # that cannot fit while retaining generation AND independent checking.
+        reserved_common=8 if cfg.get('sharePriorityAnalysis') else 10
+        if len(own)+5+reserved_common>16 or native_calls+5>cfg.get('nativeCallLimit',6):
+            outcomes.append({'documentId':pin['documentId'],'status':'not_sent','reason':'remaining_shared_call_capacity'})
+            break
+        result=prepare_candidate(cfg,round,entry,root)
+        if result.get('status')!='withheld':
+            notify('native','completed');return result
+        outcomes.append({'documentId':pin['documentId'],'status':'withheld','reason':result['reason']})
+    result={'schemaVersion':SCHEMA,'status':'withheld','reason':'all_company_candidates_withheld','candidates':outcomes}
+    # New unique recovery roots keep older outcomes and unknown reservations intact.
+    path=collection_root/'candidate-outcomes-v3.json'
+    if path.exists():path=attempt_root/('outcomes-'+b.digest(b.canonical(result))[:16]+'.json')
+    write_once(path,result);return result
+
+
 def prepare(cfg,round,observer=None):
     observer=observer or (lambda *args:None)
+    collection_root=Path(cfg.get('recordedCollectionRoot') or Path(cfg['work'])/'native'/round['id'])
+    legacy=collection_root/(round['id']+'-native-v2')/'ready.json'
+    if legacy.exists():return json.loads(legacy.read_bytes())
+    for ready in sorted((collection_root/'candidates-v3').glob('*/ready.json')):
+        return json.loads(ready.read_bytes())
+    observer('collection','started')
+    entries=collect(cfg,round,collection_root,all_candidates=True)
+    observer('collection','completed');observer('native','started')
+    return prepare_candidates(cfg,round,entries,collection_root,observer)
+
+
+def prepare_candidate(cfg,round,entry,root):
     from zoop_ai_pipeline import extraction,relation
     from zoop_ai_pipeline.extraction_contracts import Submit
     from zoop_ai_pipeline.relation_contracts import Submit as RelationSubmit
     from zoop_ai_pipeline.ingestion_contracts import Authority
-    collection_root=Path(cfg['work'])/'native'/round['id']
-    root=collection_root/(round['id']+'-native-v2');root.mkdir(mode=0o700,parents=True,exist_ok=True)
-    if (root/'ready.json').exists():return json.loads((root/'ready.json').read_bytes())
-    require(not (root/'native.started.json').exists(),'native_interrupted_requires_recovery')
-    observer('collection','started')
-    chosen,exported,companies,selected_collection=collect(cfg,round,collection_root)
-    observer('collection','completed')
-    observer('native','started')
+    chosen,exported,companies,selected_collection=entry
     runtime_type=configure_runtime(cfg,root,round['windowTo']);pure=runtime_type.from_env()
     original=Path(chosen['nativeItemRoot']) if chosen.get('nativeItemRoot') else selected_collection/'collection/items'/chosen['candidate']['newsId']
     sources=Path(cfg['authorityRoot'])/('source-'+root.name+'.json');sources.parent.mkdir(mode=0o700,parents=True,exist_ok=True);current=json.loads((original/'sources.json').read_bytes())
@@ -311,7 +362,7 @@ def prepare(cfg,round,observer=None):
     write_once(sources,current)
     ingestion=original/'ingestion';authority=Authority(sources)
     def current_rights():
-        require(datetime.now(timezone.utc)<datetime.fromisoformat(round['windowTo']).astimezone(timezone.utc)-timedelta(seconds=190),'native_dispatch_deadline')
+        require(datetime.now(timezone.utc)<datetime.fromisoformat(cfg.get('recoveryDeadline') or round['windowTo']).astimezone(timezone.utc)-timedelta(seconds=190),'native_dispatch_deadline')
         authority.check(chosen.get('sourceId','korea-portal'),chosen['candidate']['newsId'],('read','store','quote-display','model-send'))
         require(json.loads((original/'rights.json').read_bytes())==chosen['rights'],'rights_pin')
     # Prospective grant is read anew by native engines; no acquisition registry or old source grant is edited.
@@ -354,7 +405,7 @@ def prepare(cfg,round,observer=None):
                 'observation':selector,'manifest':manifest,'handoffReceipt':envelope.get('receipt'),
                 'sourceId':chosen.get('sourceId','korea-portal'),'documentId':exported['document']['documentId'],'documentVersion':exported['document']['documentVersion'],
                 'bodySha256':b.digest(exported['document']['text'].encode()),'readyAt':b.now()}
-            write_once(root/'ready.json',result);observer('native','completed');return result
+            write_once(root/'ready.json',result);return result
     finally:
         if transport:transport.shutdown()
         os.environ.pop('ZOOP_AI_API_KEY',None);os.environ.pop('TYPESAFE_API_KEY',None)

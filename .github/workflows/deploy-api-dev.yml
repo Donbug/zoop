@@ -279,8 +279,13 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Copy the exact service revision, including approved read-only evidence mounts.
+          current_definition="$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0].taskDefinition' --output text)"
+          test -n "$current_definition" && test "$current_definition" != None
           aws ecs describe-task-definition \
-            --task-definition "$ECS_TASK_DEFINITION" \
+            --task-definition "$current_definition" \
             --query taskDefinition \
             > task-definition.json
 

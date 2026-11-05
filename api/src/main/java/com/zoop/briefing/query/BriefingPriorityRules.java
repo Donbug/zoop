@@ -83,7 +83,10 @@ public final class BriefingPriorityRules {
         choice(previous, "status", Set.of("unavailable", "maintained", "strengthened", "weakened"));
         Set<String> evidence = strings(a, "evidenceIds"); check(!evidence.isEmpty() && sources.containsAll(evidence));
         var basis = field(a, "judgmentBasis"); keys(basis, "promptVersion directionReason confidence effectSizeStatus");
-        same(text(basis, "promptVersion"), personal ? "personal-impact-relative-v3" : "common-impact-relative-v1");
+        // A personal company filter may reuse the common producer's exact verified
+        // prose. Keep its real prompt version instead of relabeling it PERSONAL.
+        if (personal) check(Set.of("personal-impact-relative-v3", "common-impact-relative-v1").contains(text(basis, "promptVersion")));
+        else same(text(basis, "promptVersion"), "common-impact-relative-v1");
         text(basis, "directionReason"); choice(basis, "confidence", Set.of("limited", "moderate", "high"));
         choice(basis, "effectSizeStatus", Set.of("unquantified", "quantified"));
         if (personal) {

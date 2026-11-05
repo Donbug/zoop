@@ -39,8 +39,8 @@ def config_check(cfg):
     server.require(cfg.get('enabled') is True and cfg.get('autoChain')==VERSION and cfg.get('priorityContract')==priority.VERSION,'auto_chain_opt_in')
     root=Path(cfg['work']);root.mkdir(mode=0o700,parents=True,exist_ok=True)
     server.require(not root.is_symlink() and root.stat().st_mode&0o077==0,'private_work')
-    # Leave ten requests for #557. Native processing has six physical provider calls, including its verifier.
-    server.require(cfg.get('nativeCallLimit')==6,'native_priority_capacity')
+    # Literal common->personal reuse saves two requests, never a verification.
+    server.require(cfg.get('nativeCallLimit')==(8 if cfg.get('sharePriorityAnalysis') else 6),'native_priority_capacity')
     server.require(cfg.get('additiveGraphAllowed') is True,'additive_graph_opt_in_required')
     server.require(bool(cfg.get('authorizationRef')) and bool(cfg.get('dsn')),'chain_authorization')
 

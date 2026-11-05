@@ -105,7 +105,7 @@ class BriefingServerPostgresTest {
                 registry.insertArtifactIfAbsent(new ArtifactRow(textId, "extracted_text", stored.uri(), stored.sha256(), stored.bytes(), "text/plain; charset=utf-8", NOW));
                 registry.insertVersionIfAbsent(new VersionRow(HandoffFixtures.ARTICLE_ID, HandoffFixtures.ARTICLE_VERSION, "합성 제목", null,
                         "https://example.invalid/a", dayOnly?null:Instant.parse("2026-10-08T00:00:00Z"), dayOnly?java.time.LocalDate.parse("2026-10-08"):null, dayOnly?"day":"datetime", null, textId,
-                        Instant.parse("2026-10-14T01:02:03.456789Z")));
+                        info.getTestMethod().orElseThrow().getName().startsWith("recoverySourceObservedAfter") ? NOW.minusSeconds(30) : Instant.parse("2026-10-14T01:02:03.456789Z")));
             });
         }
     }
@@ -115,7 +115,8 @@ class BriefingServerPostgresTest {
     }
 
     private static String password(){String value=System.getenv("ZOOP_COMPANY_TEST_DB_PASSWORD");return value==null||value.isBlank()?"synthetic-test-only":value;}
-    private com.zoop.briefing.server.BriefingServerCommand server() throws Exception {
+    private com.zoop.briefing.server.BriefingServerCommand server() throws Exception { return server(java.util.Map.of()); }
+    private com.zoop.briefing.server.BriefingServerCommand server(java.util.Map<String,String> overrides) throws Exception {
         work=temp.toRealPath().resolve("work");Files.createDirectories(work);
         grant=temp.resolve("grants.json");
         if(!Files.exists(grant))Files.writeString(grant,"""
@@ -125,10 +126,11 @@ class BriefingServerPostgresTest {
             """);
         Path scope=temp.toRealPath().resolve("model-scope.json");
         if(!Files.exists(scope))Files.writeString(scope,"{\"schemaVersion\":\"briefing-model-scope-v1\",\"authorizationRef\":\"synthetic\",\"sources\":[{\"sourceId\":\""+HandoffFixtures.SOURCE+"\",\"documentId\":\""+HandoffFixtures.ARTICLE_ID+"\",\"documentVersion\":\""+HandoffFixtures.ARTICLE_VERSION+"\",\"bodySha256\":\""+Canonical.sha256(HandoffFixtures.TEXT.getBytes(StandardCharsets.UTF_8))+"\"}]}");
-        return new com.zoop.briefing.server.BriefingServerCommand(java.util.Map.of(
+        var env=new java.util.HashMap<>(java.util.Map.of(
             "DB_URL",url,"DB_USERNAME","company_test","DB_PASSWORD",password(),
             "BRIEFING_SERVER_WORK_ROOT",work.toString(),"BRIEFING_USAGE_ARTIFACT_ROOT",temp.toRealPath().resolve("producer").toString(),
             "BRIEFING_SERVER_SOURCE_SCOPE",scope.toString(),"ZOOP_DOCUMENT_READ_GRANTS",grant.toString(),"ZOOP_DOCUMENT_READ_INGESTION_SOURCES",authority.toString()));
+        env.putAll(overrides);return new com.zoop.briefing.server.BriefingServerCommand(env);
     }
     private ObjectNode request(String edition) {
         var request=com.zoop.common.json.StrictJson.newObject();request.putObject("round")
@@ -138,6 +140,31 @@ class BriefingServerPostgresTest {
     private ObjectNode prepared() throws Exception {
         publish(importNative(HandoffFixtures.Spec.standard()));
         return server().prepare(com.zoop.common.json.StrictJson.Obj.of(request("morning")));
+    }
+    private ObjectNode failedRecoveryRequest() {
+        var request=request("morning");var r=(ObjectNode)request.get("round");String cutoff=NOW.minusSeconds(120).toString();
+        r.put("scheduledAt",cutoff).put("windowTo",cutoff);request.put("recordedRecovery",true);
+        jdbc.update("INSERT INTO briefing_rounds(id,round_date,edition,scheduled_at,window_from,window_to,open_start,status) VALUES('brf-2026-11-02-morning','2026-11-02','morning',?::timestamptz,'2026-10-07T00:00:00Z',?::timestamptz,false,'failed')",cutoff,cutoff);
+        jdbc.update("INSERT INTO briefing_common_schedule_jobs(id,round_date,edition,scheduled_at,window_from,status,finished_at) VALUES('brf-2026-11-02-morning','2026-11-02','morning',?::timestamptz,'2026-10-07T00:00:00Z','requires_recovery',now())",cutoff);
+        jdbc.update("INSERT INTO briefing_attempts(id,round_id,attempt_no,request_key,purpose,trigger,owner_token,status,stages,started_at,finished_at,lease_until) VALUES('old-failed','brf-2026-11-02-morning',1,'old-request','generation','scheduler','old-owner','failed','{}',now(),now(),now())");
+        return request;
+    }
+    private java.util.Map<String,String> recoveryEnvironment() {
+        return java.util.Map.of("BRIEFING_RECORDED_RECOVERY_AUTHORIZATION","synthetic-explicit-recovery", "BRIEFING_RECORDED_RECOVERY_ROUND","brf-2026-11-02-morning");
+    }
+    @Test void recordedRecoveryRequiresExactOperatorBindingAndPreservesFailedHistory() throws Exception {
+        publish(importNative(HandoffFixtures.Spec.standard()));var request=failedRecoveryRequest();
+        assertThrows(IllegalStateException.class,()->server().prepare(com.zoop.common.json.StrictJson.Obj.of(request)));
+        var result=server(recoveryEnvironment()).prepare(com.zoop.common.json.StrictJson.Obj.of(request));
+        assertEquals("recorded-cutoff-recovery-v1",result.at("/recovery/kind").asString());
+        assertEquals("failed",jdbc.queryForObject("SELECT status FROM briefing_attempts WHERE id='old-failed'",String.class));
+        assertEquals(1,result.path("candidates").size());
+        request.put("recordedRecovery",false);
+        assertThrows(IllegalStateException.class,()->server(recoveryEnvironment()).prepare(com.zoop.common.json.StrictJson.Obj.of(request)));
+    }
+    @Test void recoverySourceObservedAfterCutoffCannotBeBackdatedByItsPublisherTime() throws Exception {
+        publish(importNative(HandoffFixtures.Spec.standard()));var request=failedRecoveryRequest();
+        assertThrows(IllegalStateException.class,()->server(recoveryEnvironment()).prepare(com.zoop.common.json.StrictJson.Obj.of(request)));
     }
     @Test void forgedQuoteCannotPassByRecomputingTheInputHash() throws Exception {
         ObjectNode input=prepared();var candidate=(ObjectNode)input.path("candidates").get(0);
@@ -201,12 +228,20 @@ class BriefingServerPostgresTest {
 
     @Test @Tag("briefing-auto-postgres")
     void actualCollectionNativeRegistrationPriorityPublicationAndReplayProtection() throws Exception {
+        collectionAndPublication(false);
+    }
+    @Test @Tag("briefing-auto-postgres")
+    void heldFirstDocumentContinuesAndPersonalSharesVerifiedCommonWithinSixteenCalls() throws Exception {
+        collectionAndPublication(true);
+    }
+    private void collectionAndPublication(boolean shared) throws Exception {
         String previous=publish(importNative(HandoffFixtures.Spec.standard()));server();
         int previousIssues=reader().read(previous).snapshot().issues().size();
         jdbc.update("INSERT INTO companies(id,name,name_key,search_text) VALUES('SYNTH-1','합성기업','','')");
         Path script=Path.of("../scripts/tests/fixtures/briefing_auto_chain_smoke.py").toAbsolutePath().normalize();
         var process=new ProcessBuilder(System.getenv().getOrDefault("BRIEFING_AUTO_TEST_PYTHON","python3"),script.toString(),temp.toString(),System.getProperty("zoop.briefing.usage.classpath"));
         var e=process.environment();e.put("DB_URL",url);e.put("DB_USERNAME","company_test");e.put("DB_PASSWORD",password());
+        if(shared)e.put("BRIEFING_AUTO_TEST_SHARED","true");
         e.put("BRIEFING_USAGE_ARTIFACT_ROOT",temp.toRealPath().resolve("producer").toString());
         e.put("ZOOP_DOCUMENT_READ_GRANTS",grant.toString());e.put("ZOOP_DOCUMENT_READ_INGESTION_SOURCES",authority.toString());
         e.put("JAVA",Path.of(System.getProperty("java.home"),"bin/java").toString());
@@ -218,7 +253,7 @@ class BriefingServerPostgresTest {
         assertTrue(round.publicSnapshot().at("/commonPriority/items/0/sources/0/publishedAt").isNull());
         assertEquals("2026-11-04",round.publicSnapshot().at("/commonPriority/items/0/sources/0/publishedDate").asString());
         assertEquals("completed",jdbc.queryForObject("SELECT status FROM briefing_common_schedule_jobs",String.class));
-        assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM briefing_attempts WHERE status='completed'",Integer.class));
+        assertEquals(shared?3:2,jdbc.queryForObject("SELECT count(*) FROM briefing_attempts WHERE status='completed'",Integer.class));
         assertTrue(jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class)<=16);
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ai_executions WHERE actual_cost IS NOT NULL OR input_tokens IS NULL",Integer.class));
         String active=versions.active().orElseThrow().id();assertNotEquals(previous,active);

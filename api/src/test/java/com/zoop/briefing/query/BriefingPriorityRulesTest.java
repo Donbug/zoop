@@ -52,6 +52,13 @@ class BriefingPriorityRulesTest {
         a.putObject("comparison").put("status", "newly_selected").putNull("baseline");
         assertDoesNotThrow(() -> BriefingPriorityRules.validate(personal, personal.path("roundId").asString(),
                 Instant.parse(personal.path("cutoff").asString()), true, Set.of("brf-test-company"), Set.of("brf-test-evidence")));
+        ((ObjectNode)a.get("judgmentBasis")).put("promptVersion", "common-impact-relative-v1");
+        assertDoesNotThrow(() -> BriefingPriorityRules.validate(personal, personal.path("roundId").asString(),
+                Instant.parse(personal.path("cutoff").asString()), true, Set.of("brf-test-company"), Set.of("brf-test-evidence")));
+        ((ObjectNode)a.get("judgmentBasis")).put("promptVersion", "invented-version");
+        assertThrows(IllegalArgumentException.class, () -> BriefingPriorityRules.validate(personal, personal.path("roundId").asString(),
+                Instant.parse(personal.path("cutoff").asString()), true, Set.of("brf-test-company"), Set.of("brf-test-evidence")));
+        ((ObjectNode)a.get("judgmentBasis")).put("promptVersion", "common-impact-relative-v1");
         assertThrows(IllegalArgumentException.class, () -> BriefingPriorityRules.validate(personal, personal.path("roundId").asString(),
                 Instant.parse(personal.path("cutoff").asString()), true, Set.of("another-company"), Set.of("brf-test-evidence")));
     }

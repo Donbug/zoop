@@ -123,6 +123,24 @@ def common_view(record, candidate_count):
         'status': 'available' if items else 'collection_insufficient', 'items': items}
 
 
+def shared_personal_item(record, issue_id, calls):
+    """Select a member's companies later; reuse exactly the independently checked prose.
+
+    This is a projection of COMMON output, not a claim that PERSONAL ran. The
+    actual prompt version, result version and two provider receipt IDs survive.
+    """
+    c.require(record['scope'] == 'common', 'shared_personal_requires_common')
+    prove(record, calls)
+    source = item(record, issue_id)
+    analyses = copy.deepcopy(source['aiAnalyses'])
+    for analysis in analyses:
+        analysis['forMyStocks'] = analysis.pop('companyConnection')
+        analysis['comparison'] = {'status': 'newly_selected', 'baseline': None}
+    return {k: copy.deepcopy(source[k]) for k in ('issueId', 'title', 'topicTag', 'reason', 'originRoundId', 'originCutoff', 'sources')} | {
+        'kind': 'new_issue', 'connections': copy.deepcopy(source['companies']),
+        'aiAnalyses': analyses, 'priorAnalysis': [], 'price': None}
+
+
 def summary(client, common_record):
     f = common_record['frozen']; refs = sorted({e for i in f['issues'] for e in i['sources']})
     frozen = m.seal({'version': 'priority-round-business-v1', **{k: f[k] for k in ('roundId', 'date', 'edition', 'cutoff')},

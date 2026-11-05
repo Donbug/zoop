@@ -125,6 +125,10 @@ def make_publication(prepared,frozen,selection,passed,calls,assessed,checked,now
         'selection':{'basis':'market','reason':'현재 공개 그래프에 보존된 자료 범위에서 검증한 사업 중요도와 신규 정보입니다.'},
         'failures':[{'section':'collection','code':'limited_source_coverage','message':'전체 뉴스·시장 지표를 수집한 결과가 아닙니다.','retryable':False,'asOf':r['windowTo']}]}
     regular_times=('09:20','08:30') if r['edition']=='morning' else ('17:30',)
+    if prepared.get('recovery'):
+        metadata['failures'].append({'section':'collection','code':'recorded_cutoff_recovery',
+            'message':'회차 마감 전에 저장된 원문으로 나중에 복구 생성한 브리핑입니다. 실제 생성·발행 시각을 함께 확인하세요.',
+            'retryable':False,'asOf':r['windowTo']})
     if datetime.fromisoformat(r['scheduledAt']).astimezone(KST).strftime('%H:%M') not in regular_times:
         metadata['failures'].append({'section':'schedule','code':'initial_delayed_publication',
             'message':'초기 운영 검증 회차입니다. 실제 자료 마감은 '+r['windowTo']+'이며 정규 출퇴근 시각으로 소급하지 않았습니다.',

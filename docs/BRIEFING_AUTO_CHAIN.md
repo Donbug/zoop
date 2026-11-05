@@ -24,7 +24,9 @@ Korea 정책뉴스·보도자료·해명자료의 기사별 KOGL1 **텍스트**�
 
 `BRIEFING_SAMSUNG_NEWSROOM_ENABLED=true`와 별도 `BRIEFING_SOURCE_AUTHORIZATION_REF`가 있으면 삼성전자 한국 뉴스룸의 **직접 제작 텍스트**도 검토한다. [공식 콘텐츠 이용 안내](https://news.samsung.com/kr/%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90-%EB%89%B4%EC%8A%A4%EB%A3%B8-%EC%BD%98%ED%85%90%EC%B8%A0-%EC%9D%B4%EC%9A%A9%EC%97%90-%EB%8C%80%ED%95%9C-%EC%95%88%EB%82%B4)를 실제로 확인하고 RSS의 자체 작성자와 기사 byline을 검사한다. 외부 기고·이미지·첨부는 사용하지 않는다. RSS 날짜는 탐색 순서만 정하며, 게시 시각·발행기관·본문은 실제 기사 응답에서 확인한다. 한 feed의 최근 후보 최대3개를 검토해 최대2개를 native 수집·정제하고 전체 입력 후보와 함께 정렬한다. 알 수 없는 게시 시각·미래 게시 시각·회차 밖 시각·정책 변경·접근 거부는 그대로 제외한다. 원문과 인용은 변경하지 않으며 생성 분석은 별도 결과다. 다른 기업 RSS가 접근 가능하다는 이유만으로 처리·공개 권한을 부여하지 않는다.
 
-회차당 native 처리 대상은 여전히 1개 문서이고 공유 16회 상한은 유지한다. 처리 완료뿐 아니라 판단 보류·전송 불명확한 native 준비도 원문 버전 단위로 자동 재전송하지 않는다. 부분 수집을 시장 전체로 표시하거나 입력 부족을 ‘새 소식 없음’으로 발행하지 않는다.
+입력 검토에서는 네이버와 네이버파이낸셜, 카카오와 카카오톡처럼 다른 법인·제품명을 구분한다. 부분 문자열이나 모기업 관계를 기업의 직접 참여 근거로 쓰지 않는다. 같은 문서에 상위 회사명이 따로 등장하더라도 인용 제목만으로 실제 당사자를 바꾸지 않는다. 이 검사는 후보 검토 순서에만 사용하며, 실제 기업 연결은 native·독립 검증이 판단한다.
+
+후보 하나가 품질 보류되면 그 원문 버전의 완료 결과를 보존하고 다음 적격 후보를 검토한다. 다음 후보 처리와 최종 분석에 필요한 예산이 남아 있는지 먼저 확인한다. 전송 불명확·기술 실패는 자동 재전송하지 않으며, 처리 완료·보류 문서는 새 후보로 다시 보내지 않는다. 부분 수집을 시장 전체로 표시하거나 입력 부족을 ‘새 소식 없음’으로 발행하지 않는다.
 
 ## 비활성 배포 준비
 
@@ -43,6 +45,7 @@ Korea 정책뉴스·보도자료·해명자료의 기사별 KOGL1 **텍스트**�
 | `ZOOP_BRIEFING_PERSONAL_SCHEDULER_MEMBER_IDS` | 개인화 자동화 허용 ID 목록. 기본 빈 값. API/worker/selected 승인 파일이 동일해야 함 |
 | `ZOOP_BRIEFING_SELECTED_GENERATION_ENABLED` | 별도 승인 후 필요한 개인화 추가 분석만 허용. 기본 false이며 공유 예산은 유지 |
 | `BRIEFING_SAMSUNG_NEWSROOM_ENABLED`, `BRIEFING_SOURCE_AUTHORIZATION_REF` | 기본 비활성. 직접 제작 텍스트·정책·작성자 검사를 통과한 자료만 추가. 개인화 허용 목록·모델 예산을 확대하지 않음 |
+| `BRIEFING_SHARED_PRIORITY_ANALYSIS_ENABLED=true` | 같은 회차·이슈의 독립 검증된 공통 분석을 개인화 후보에 그대로 재사용. 기본 false이며 원래 프롬프트·검증 영수증·digest를 보존 |
 
 설정 검토 후 `--initialize-authority`는 **새 소유 폴더만** 초기화한다. 새 read grant ID는 `briefing-kogl1-auto-v1`로 분리해 종전 `briefing-kogl1-live`도 원래 권한과 함께 보존한다. API의 `ZOOP_DOCUMENT_READ_INGESTION_SOURCES`는 그 폴더의 `serving-delegates.json`, `ZOOP_DOCUMENT_READ_GRANTS`는 `serving-grants.json`, artifact root는 기존 shared artifact root를 가리킨다. `zoop-grant-authority-delegates-1`은 기존 원본과 새 `grants.json`에 위임한다. 철회는 즉시 반영되고 중복 소유·중첩 delegate·읽기 실패는 차단된다. API/worker에는 이 reader가 포함된 동일 검토 버전이 필요하다.
 
@@ -62,7 +65,7 @@ Korea 정책뉴스·보도자료·해명자료의 기사별 KOGL1 **텍스트**�
 
 날짜만 있는 기사는 `publishedAt=NULL`, 원래 `publishedDate`, 실제 최초 수집 `availableAt`, `eligibilityBasis=first_observed`를 저장한다. 관측 시각을 게시 시각으로 바꾸지 않는다. 마감 이후 관측·미래 게시일은 제외한다. 공통/개인화 카드에 `게시일 … · 최초 수집 …`와 저장된 발행기관을 표시한다. 기존 정밀 게시 시각도 계속 읽는다. 원문 인용·버전·SHA·offset과 현재 권한을 전송 및 조회에서 재검사한다.
 
-native 최대 **6회**, #557 기본 생성·검증 10회가 공통의 **회차 16회/보수적 USD1, 실행일 KST USD2** 한도를 공유한다. native 기본 성공 경로는 5회여서 합성 전체 검사는 15회다. 보완·개인화 추가 분석도 같은 한도 내에서만 실행하며 부족하면 보류한다. 전송 불명확 요청은 예약을 유지하고 자동 재전송하지 않는다. 비용은 기준·USD를 가진 추정치이고 청구 근거 없는 실제 비용은 NULL이다. 미확인 전송·토큰도 NULL이다.
+기본 설정의 native 최대 **6회**와 생성·검증 10회는 **회차 16회/보수적 USD1, 실행일 KST USD2** 한도를 공유한다. 공유 분석을 명시적으로 켜면 native 최대8회와 공통 생성·독립 검증8회로 같은 한도를 나눈다. 기본 성공 경로는 native5회+공통8회이며 개인화는 검증된 공통 문장을 그대로 투영한다. 새 개인화 AI 생성이라고 표시하거나 원래 common 프롬프트 버전을 바꾸지 않는다. 이 재사용은 선택 회원·선택 종목·회차·이슈·원문 및 검증 digest를 확인하고, 개인화 추가 해석을 작성하지 않는다. 보완·개인화 추가 분석도 같은 한도 내에서만 실행하며 부족하면 보류한다. 전송 불명확 요청은 예약을 유지하고 자동 재전송하지 않는다. 비용은 기준·USD를 가진 추정치이고 청구 근거 없는 실제 비용은 NULL이다. 미확인 전송·토큰도 NULL이다.
 
 ## 저장과 복구
 
@@ -78,6 +81,10 @@ native 최대 **6회**, #557 기본 생성·검증 10회가 공통의 **회차 1
 마감 10분 전까지 준비를 시작하지 못하면 소급 수집하지 않고 `collection_window_missed` 실패 시도(모델 호출 0)를 남긴다. 슬롯 실행은 45분으로 제한된다. PostgreSQL 공통 writer lock은 기존 생산자와 공유한다. 실패·중단 슬롯은 requires_recovery로 남으며 다음 poll에서 모델을 다시 부르지 않는다. 이미 발행 원본과 complete pool이 확인되는 경우만 저장 증거로 completed를 복구한다.
 
 복구 시 journal·attempt·예약·현재 권한·그래프를 확인한다. 기존 발행본 UPDATE, Flyway 이력 수정, DB 복원, 다른 작성자 그래프 되돌리기는 하지 않는다. 유료 재실행은 별도 승인된 새 시도로 검토한다. 종전 `--recover-unpaid-slot`은 증명된 무전송 schema 실패만을 위한 legacy 기능이며 auto-chain에는 노출하지 않는다.
+
+승인한 당일 미발행 회차만 `--recover-recorded-slot morning YYYY-MM-DD` 또는 `evening`으로 유한 복구할 수 있다. 별도 `BRIEFING_RECORDED_RECOVERY_AUTHORIZATION`이 필요하며 일반 정기 작업에는 넣지 않는다. 기존 실패·requires_recovery 이력, 실행 중 작업 없음, 미응답 없음, 같은 DB writer lock을 확인한다. 기존 수집 결과만 읽고 새 수집을 하지 않으며, 당시 마감 이전에 실제 수집된 원문만 허용한다. 회차의 원래 마감·회원 자격·설정 리비전은 유지하고 실제 생성·발행 시각은 현재 시각으로 남긴다. 마감 뒤 조립된 내부 그래프는 이 명시적 복구 경로에서만 허용하며 관측 시각 검사는 완화하지 않는다. 복구 영수증은 별도 경로에 추가하고 완료된 문서 준비·검증 결과는 재사용한다. 미응답 요청·기존 발행본을 다시 만들지 않는다.
+
+API의 공개 근거 조회는 Java의 현재 권한·artifact 검사를 사용하며 native CLI는 전용 worker에만 필요하다. API 배포는 현재 실행 서비스의 정확한 task definition을 복사해 승인된 EFS 읽기 전용 mount와 기존 환경 설정을 보존한다.
 
 ## 검증 범위
 
