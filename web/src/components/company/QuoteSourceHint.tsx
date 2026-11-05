@@ -28,7 +28,11 @@ export default function QuoteSourceHint({
     /* A missing or unsafe source has no external link. */
   }
   return (
-    <PanelDisclosure label={`시세 출처: ${source.name}`} trigger={source.name}>
+    <PanelDisclosure
+      label={`시세 출처: ${source.name}`}
+      trigger={source.name}
+      wideTarget
+    >
       <p>
         {source.official ? '공식 시세 API' : '공개 자료'} · 종목 기호{' '}
         {source.symbol}

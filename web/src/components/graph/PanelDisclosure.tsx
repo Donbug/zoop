@@ -6,10 +6,13 @@ export default function PanelDisclosure({
   label,
   trigger,
   children,
+  wideTarget = false,
 }: {
   label: string;
   trigger?: ReactNode;
   children: ReactNode;
+  /** 44px 터치 영역. 위아래에 다른 컨트롤이 붙은 목록 행에서는 켜지 않는다. */
+  wideTarget?: boolean;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
@@ -51,7 +54,7 @@ export default function PanelDisclosure({
       <summary
         aria-label={label}
         title={label}
-        className={`${touchTarget} cursor-pointer list-none text-zoop-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink [&::-webkit-details-marker]:hidden`}
+        className={`${wideTarget ? touchTarget : ''} cursor-pointer list-none text-zoop-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink [&::-webkit-details-marker]:hidden`}
       >
         {trigger ?? label}
       </summary>
