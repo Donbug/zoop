@@ -1,6 +1,5 @@
 import CompanyInfoTab from './CompanyInfoTab';
 import PriceChart from './PriceChart';
-import QuoteSourceHint from './QuoteSourceHint';
 import HoldingProfit from './HoldingProfit';
 import { formatKst, formatMoney } from '@/util/format';
 import { formatTimelineTime } from '@/util/event-time';
@@ -15,11 +14,11 @@ import {
   useState,
 } from 'react';
 import CompanyLogo from '@/components/common/CompanyLogo';
+import { companyLogo } from '@/util/company-logo';
 import LoadingIndicator from '@/components/common/LoadingIndicator';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { getCompanyMetrics } from '@/apis/graph/companies';
-import { BRIEFING_DISCLAIMER } from '@/components/briefing/briefingCorrections';
 import {
   Link,
   useLocation,
@@ -713,6 +712,45 @@ export default function CompanyWorkspace() {
       !graph.loading &&
       (tab !== 'events' || (!events.loading && !event.loading)),
   );
+  // D-COM-05: 사건 목록과 펼친 상세는 동일한 공개 그래프/기업 로고를 쓴다.
+  function logoFor(companyId: string) {
+    const node = graph.data?.nodes.find(
+      (item) => item.id === companyId && item.kind === 'company',
+    );
+    return companyLogo(
+      companyId,
+      companyId === id
+        ? (company.data?.logoUrl ?? node?.logoUrl)
+        : node?.logoUrl,
+    );
+  }
+  function eventLogos(item: Event) {
+    const companyIds = [
+      ...new Set(item.companyIds.length ? item.companyIds : [id]),
+    ];
+    return (
+      <span className="inline-flex shrink-0 -space-x-1" aria-hidden="true">
+        {companyIds.map((companyId) => {
+          const node = graph.data?.nodes.find(
+            (candidate) =>
+              candidate.id === companyId && candidate.kind === 'company',
+          );
+          return (
+            <CompanyLogo
+              key={companyId}
+              name={
+                companyId === id
+                  ? (company.data?.name ?? node?.label ?? id)
+                  : (node?.label ?? companyId)
+              }
+              logoUrl={logoFor(companyId)}
+              className="size-6 rounded-full border border-zoop-line bg-zoop-paper text-caption font-semibold"
+            />
+          );
+        })}
+      </span>
+    );
+  }
   const selectedEventDetails = eventId ? (
     <div role="region" aria-label="선택 사건 상세" id="company-selected-event">
       <Status resource={event} label="선택 사건" />
@@ -724,6 +762,7 @@ export default function CompanyWorkspace() {
             owner={owner}
             asOf={asOf}
             graphVersion={version}
+            logoOf={logoFor}
           />
           <p>
             근거 인용 {event.data.evidenceIds.length}건 · 문서{' '}
@@ -895,7 +934,6 @@ export default function CompanyWorkspace() {
                   company.data.summary?.reason ??
                   '기업 요약 미제공'}
               </p>
-              <Basis metadata={company.data.metadata} />
             </>
           )}
         </section>
@@ -920,19 +958,6 @@ export default function CompanyWorkspace() {
                   className=""
                 />
               </span>
-              <div className="flex flex-wrap items-baseline gap-x-1 text-caption text-zoop-muted [&>details]:my-0!">
-                공급자 관측{' '}
-                <ReferenceTime
-                  value={quote.data.quote.asOf}
-                  missing="시각 미제공"
-                />{' '}
-                ·{' '}
-                <QuoteSourceHint
-                  source={quote.data.source}
-                  derived={quote.data.quote.derived}
-                />{' '}
-                · {quote.data.source.delayNote ?? '지연 정보 미제공'}
-              </div>
               <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-caption [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
                 <dt>시가총액</dt>
                 <dd>
@@ -1089,183 +1114,194 @@ export default function CompanyWorkspace() {
             </button>
           ))}
         </nav>
-        <section aria-label="시세 차트" data-screen-id="D-COM-06">
-          <h2 className="sr-only">시세 차트·기준 시점</h2>
-          <nav aria-label="차트 기간" className="items-center gap-3!">
-            <div
-              role="group"
-              aria-label="관계로 거르기"
-              className={`inline-flex overflow-hidden border ${dark ? 'rounded-md border-zoop-border' : 'rounded-[3px] border-zoop-line'}`}
-            >
-              {(
-                [
-                  ['all', '전체'],
-                  ['INVOLVES', '직접 관련'],
-                  ['STRUCTURALLY_RELATED_TO', '구조적 관련'],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  aria-pressed={relation === value}
-                  className="min-w-14 rounded-none! border-0! border-r! border-zoop-line! last:border-r-0!"
-                  onClick={() =>
-                    updateQuery({
-                      relation: value === 'all' ? null : value,
-                      bucket: null,
-                    })
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div
-              className={`inline-flex overflow-hidden border ${dark ? 'rounded-md border-zoop-border' : 'rounded-[3px] border-zoop-line'}`}
-            >
-              {periods.map((p) => (
-                <button
-                  key={p.value}
-                  aria-pressed={period === p.value}
-                  disabled={unavailablePeriod(p.value) !== null}
-                  title={unavailablePeriod(p.value) ?? undefined}
-                  className="min-w-14 rounded-none! border-0! border-r! border-zoop-line! last:border-r-0!"
-                  onClick={() => {
-                    // 선택한 사건은 유지하고, 새 기간의 버킷으로 다시 맞춘다(FS044).
-                    const selected = events.data?.items.find(
-                      (item) => item.id === eventId,
-                    );
-                    updateQuery({
-                      period: p.value,
-                      bucket: selected ? bucketKey(selected, p.value) : null,
-                    });
-                  }}
-                >
-                  {p.label}
-                  {unavailablePeriod(p.value) !== null && (
-                    <span className="sr-only">
-                      {' '}
-                      · {unavailablePeriod(p.value)}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <button
-              className="font-semibold"
-              onClick={() =>
-                updateQuery({
-                  asOf: null,
-                  graphVersion: null,
-                  graphAsOf: null,
-                  event: null,
-                  bucket: null,
-                  document: null,
-                  evidence: null,
-                  docScope: null,
-                })
-              }
-            >
-              최신 시점
-            </button>
-          </nav>
-          <p>
-            기준{' '}
-            {asOf
-              ? formatKst(asOf)
-              : versionOnly
-                ? '시점 없음'
-                : '최신 제공 시점 확인 중'}{' '}
-            · {periods.find((p) => p.value === period)?.bucket} 버킷
-          </p>
-          {prices.data?.status === 'available' &&
-            prices.data.points.length > 1 && (
-              <PriceChange
-                label={periods.find((p) => p.value === period)?.label ?? ''}
-                first={prices.data.points[0].close}
-                last={prices.data.points.at(-1)!.close}
-                currency={prices.data.currency}
-              />
-            )}
-          <Status resource={prices} label="차트" />
-          {prices.data?.status === 'unavailable' && (
-            <p>차트 미제공 · {prices.data.reason}</p>
-          )}
-          {prices.data?.status === 'available' &&
-            (prices.data.interval !==
-            periods.find((p) => p.value === period)?.interval ? (
-              <p role="alert">
-                요청한 기간과 공급된 봉 해상도가 달라 차트를 표시하지 않았어요.
-              </p>
-            ) : (
-              <>
-                <PriceChart
-                  currency={prices.data.currency}
-                  points={prices.data.points}
-                  range={prices.data.range}
-                  asOf={asOf}
-                  period={period}
-                  groups={groups}
-                  selectedBucket={selectedBucket}
-                  selectedEvent={event.data}
-                  onBucket={(bucket) => {
-                    // D13: 직접 접어 둔 버킷도 차트에서 고르면 펼친다.
-                    setGroupOpen((open) => ({ ...open, [bucket]: true }));
-                    updateQuery({
-                      tab: 'events',
-                      bucket,
-                      event: null,
-                      document: null,
-                      evidence: null,
-                    });
-                  }}
-                />
-                <p>
-                  {prices.data.source.name} ·{' '}
-                  {periods.find((p) => p.value === period)?.bucket}별 종가 ·
-                  마지막 시세{' '}
-                  {formatKst(prices.data.points.at(-1)?.time ?? null)} ·{' '}
-                  {prices.data.source.delayNote ?? '지연 정보 미제공'}
-                </p>
-                <details className="text-caption">
-                  <summary className="cursor-pointer text-zoop-muted">
-                    표로 보기
-                  </summary>
-                  <table className="mt-2 w-full text-left tabular-nums">
-                    <thead>
-                      <tr className="text-zoop-muted">
-                        <th className="py-1 font-medium">시각</th>
-                        <th className="py-1 text-right font-medium">종가</th>
-                        <th className="py-1 text-right font-medium">거래량</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {prices.data.points.map((point) => (
-                        <tr
-                          key={point.time}
-                          className="border-t-[0.667px] border-zoop-line"
-                        >
-                          <td className="py-1">
-                            <ReferenceTime value={point.time} />
-                          </td>
-                          <td className="py-1 text-right">
-                            {number(point.close)}
-                          </td>
-                          <td className="py-1 text-right">
-                            {point.volume == null ? '—' : number(point.volume)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </details>
-              </>
-            ))}
-          <p className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-caption text-zoop-muted">
-            차트와 사건의 시점이 겹쳐도 인과관계를 뜻하지 않아요.
-          </p>
-        </section>
         {tab === 'events' && (
-          <section aria-label="사건 타임라인" data-screen-id="D-COM-05">
+          <section aria-label="시세 차트" data-screen-id="D-COM-06">
+            <h2 className="sr-only">시세 차트·기준 시점</h2>
+            <nav aria-label="차트 기간" className="items-center gap-3!">
+              <div
+                role="group"
+                aria-label="관계로 거르기"
+                className={`inline-flex overflow-hidden border ${dark ? 'rounded-md border-zoop-border' : 'rounded-[3px] border-zoop-line'}`}
+              >
+                {(
+                  [
+                    ['all', '전체'],
+                    ['INVOLVES', '직접 관련'],
+                    ['STRUCTURALLY_RELATED_TO', '구조적 관련'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    aria-pressed={relation === value}
+                    className="min-w-14 rounded-none! border-0! border-r! border-zoop-line! last:border-r-0!"
+                    onClick={() =>
+                      updateQuery({
+                        relation: value === 'all' ? null : value,
+                        bucket: null,
+                      })
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div
+                className={`inline-flex overflow-hidden border ${dark ? 'rounded-md border-zoop-border' : 'rounded-[3px] border-zoop-line'}`}
+              >
+                {periods.map((p) => (
+                  <button
+                    key={p.value}
+                    aria-pressed={period === p.value}
+                    disabled={unavailablePeriod(p.value) !== null}
+                    title={unavailablePeriod(p.value) ?? undefined}
+                    className="min-w-14 rounded-none! border-0! border-r! border-zoop-line! last:border-r-0!"
+                    onClick={() => {
+                      // 선택한 사건은 유지하고, 새 기간의 버킷으로 다시 맞춘다(FS044).
+                      const selected = events.data?.items.find(
+                        (item) => item.id === eventId,
+                      );
+                      updateQuery({
+                        period: p.value,
+                        bucket: selected ? bucketKey(selected, p.value) : null,
+                      });
+                    }}
+                  >
+                    {p.label}
+                    {unavailablePeriod(p.value) !== null && (
+                      <span className="sr-only">
+                        {' '}
+                        · {unavailablePeriod(p.value)}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="font-semibold"
+                onClick={() =>
+                  updateQuery({
+                    asOf: null,
+                    graphVersion: null,
+                    graphAsOf: null,
+                    event: null,
+                    bucket: null,
+                    document: null,
+                    evidence: null,
+                    docScope: null,
+                  })
+                }
+              >
+                최신 시점
+              </button>
+            </nav>
+            <p>
+              기준{' '}
+              {asOf
+                ? formatKst(asOf)
+                : versionOnly
+                  ? '시점 없음'
+                  : '최신 제공 시점 확인 중'}{' '}
+              · {periods.find((p) => p.value === period)?.bucket} 버킷
+            </p>
+            {prices.data?.status === 'available' &&
+              prices.data.points.length > 1 && (
+                <PriceChange
+                  label={periods.find((p) => p.value === period)?.label ?? ''}
+                  first={prices.data.points[0].close}
+                  last={prices.data.points.at(-1)!.close}
+                  currency={prices.data.currency}
+                />
+              )}
+            <Status resource={prices} label="차트" />
+            {prices.data?.status === 'unavailable' && (
+              <p>차트 미제공 · {prices.data.reason}</p>
+            )}
+            {prices.data?.status === 'available' &&
+              (prices.data.interval !==
+              periods.find((p) => p.value === period)?.interval ? (
+                <p role="alert">
+                  요청한 기간과 공급된 봉 해상도가 달라 차트를 표시하지
+                  않았어요.
+                </p>
+              ) : (
+                <>
+                  <PriceChart
+                    currency={prices.data.currency}
+                    points={prices.data.points}
+                    range={prices.data.range}
+                    asOf={asOf}
+                    period={period}
+                    groups={groups}
+                    selectedBucket={selectedBucket}
+                    selectedEvent={event.data}
+                    onBucket={(bucket) => {
+                      // D13: 직접 접어 둔 버킷도 차트에서 고르면 펼친다.
+                      setGroupOpen((open) => ({ ...open, [bucket]: true }));
+                      updateQuery({
+                        tab: 'events',
+                        bucket,
+                        event: null,
+                        document: null,
+                        evidence: null,
+                      });
+                    }}
+                  />
+                  <p>
+                    {prices.data.source.name} ·{' '}
+                    {periods.find((p) => p.value === period)?.bucket}별 종가 ·
+                    마지막 시세{' '}
+                    {formatKst(prices.data.points.at(-1)?.time ?? null)} ·{' '}
+                    {prices.data.source.delayNote ?? '지연 정보 미제공'}
+                  </p>
+                  <details className="text-caption">
+                    <summary className="cursor-pointer text-zoop-muted">
+                      표로 보기
+                    </summary>
+                    <table className="mt-2 w-full text-left tabular-nums">
+                      <thead>
+                        <tr className="text-zoop-muted">
+                          <th className="py-1 font-medium">시각</th>
+                          <th className="py-1 text-right font-medium">종가</th>
+                          <th className="py-1 text-right font-medium">
+                            거래량
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {prices.data.points.map((point) => (
+                          <tr
+                            key={point.time}
+                            className="border-t-[0.667px] border-zoop-line"
+                          >
+                            <td className="py-1">
+                              <ReferenceTime value={point.time} />
+                            </td>
+                            <td className="py-1 text-right">
+                              {number(point.close)}
+                            </td>
+                            <td className="py-1 text-right">
+                              {point.volume == null
+                                ? '—'
+                                : number(point.volume)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </details>
+                </>
+              ))}
+            <p className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-caption text-zoop-muted">
+              차트와 사건의 시점이 겹쳐도 인과관계를 뜻하지 않아요.
+            </p>
+          </section>
+        )}
+        {tab === 'events' && (
+          <section
+            aria-label="사건 타임라인"
+            data-screen-id="D-COM-05"
+            className="border-b-0!"
+          >
             <h2>사건 타임라인</h2>
             <Status resource={events} label="타임라인" />
             {!ready && !versionOnly && (
@@ -1276,7 +1312,6 @@ export default function CompanyWorkspace() {
             )}
             {events.data && (
               <>
-                <Basis metadata={events.data.metadata} />
                 {events.data.metadata.partial && (
                   <p role="status">
                     일부 사건만 조회됐어요.{' '}
@@ -1413,8 +1448,9 @@ export default function CompanyWorkspace() {
                             )}
                           </div>
                           {!expanded && (
-                            <p className="truncate text-caption text-zoop-muted">
-                              {items[0].title}
+                            <p className="flex items-center gap-2 truncate text-caption text-zoop-muted">
+                              {eventLogos(items[0])}
+                              <span className="truncate">{items[0].title}</span>
                             </p>
                           )}
                           {expanded && (
@@ -1429,13 +1465,16 @@ export default function CompanyWorkspace() {
                                         {relationLabel(item.relationTypes) ||
                                           '직접 관계 미확인'}
                                       </p>
-                                      <button
-                                        aria-pressed={eventId === item.id}
-                                        onClick={() => selectEvent(item)}
-                                        className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-left text-body! font-semibold text-zoop-ink underline-offset-4 hover:underline aria-pressed:underline"
-                                      >
-                                        {item.title}
-                                      </button>
+                                      <div className="flex min-w-0 items-center gap-2">
+                                        {eventLogos(item)}
+                                        <button
+                                          aria-pressed={eventId === item.id}
+                                          onClick={() => selectEvent(item)}
+                                          className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-left text-body! font-semibold text-zoop-ink underline-offset-4 hover:underline aria-pressed:underline"
+                                        >
+                                          {item.title}
+                                        </button>
+                                      </div>
                                       <p className="text-caption text-zoop-muted tabular-nums">
                                         {item.eventTime ? (
                                           <time dateTime={item.eventTime}>
@@ -1507,6 +1546,7 @@ export default function CompanyWorkspace() {
                     <summary>시점 미상 사건 {visibleUnknown.length}건</summary>
                     {visibleUnknown.map((item) => (
                       <div key={item.id}>
+                        {eventLogos(item)}{' '}
                         <button onClick={() => selectEvent(item)}>
                           {item.title}
                         </button>{' '}
@@ -1564,7 +1604,6 @@ export default function CompanyWorkspace() {
             )}
           </section>
         )}
-        <p className="text-caption text-zoop-muted">{BRIEFING_DISCLAIMER}</p>
       </div>
       {/* D-COM-04: 넓은 화면은 와이어프레임처럼 오른쪽 열에 두고 스크롤해도 화면 안에 남는다.
           1000px 이하에서는 본문 아래로 옮겨 넓게 본다. */}
@@ -1611,7 +1650,6 @@ export default function CompanyWorkspace() {
         )}
         {graph.data && (
           <>
-            <Basis metadata={graph.data.metadata} />
             {graph.data.metadata.partial && (
               <button type="button" className={ui.button} onClick={graph.retry}>
                 관계 그래프 다시 조회

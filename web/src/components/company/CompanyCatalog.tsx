@@ -156,8 +156,7 @@ export default function CompanyCatalog({
       </ul>
     );
   }
-  const heading =
-    'mb-2! block font-mono text-caption! font-normal! tracking-[0.12em] text-zoop-muted';
+  const heading = 'mb-2! block text-caption! font-semibold! text-zoop-muted';
   const holdingIds = portfolio.data?.connected
     ? portfolio.data.holdings.map((h) => h.companyId)
     : [];
@@ -211,7 +210,7 @@ export default function CompanyCatalog({
       </form>
       {query && (
         <section aria-label="기업 검색 결과">
-          <h2 className={heading}>SEARCH · 검색 결과</h2>
+          <h2 className={heading}>검색 결과</h2>
           {list.loading ? (
             <LoadingIndicator label="검색 중" className="flex min-h-9 w-full" />
           ) : list.error ? (
@@ -232,7 +231,7 @@ export default function CompanyCatalog({
         </section>
       )}
       <section aria-label="보유 기업">
-        <h2 className={heading}>HOLDINGS · 보유 기업</h2>
+        <h2 className={heading}>보유 기업</h2>
         {!member ? (
           <p>로그인 후 확인할 수 있어요.</p>
         ) : portfolio.loading ? (
@@ -251,7 +250,7 @@ export default function CompanyCatalog({
         )}
       </section>
       <section aria-label="관심 기업">
-        <h2 className={heading}>WATCH · 관심 기업</h2>
+        <h2 className={heading}>관심 기업</h2>
         {!member ? (
           <p>로그인 후 확인할 수 있어요.</p>
         ) : settings.status === 'loading' ? (
@@ -270,11 +269,11 @@ export default function CompanyCatalog({
         )}
       </section>
       <section aria-label="최근 본 기업">
-        <h2 className={heading}>RECENT · 최근 본 기업</h2>
+        <h2 className={heading}>최근 본 기업</h2>
         {rows(recent)}
       </section>
       <section aria-label="연결된 기업">
-        <h2 className={heading}>LINKED · 연결된 기업</h2>
+        <h2 className={heading}>연결된 기업</h2>
         {graphResource?.loading ? (
           <LoadingIndicator
             label="연결 기업 확인 중"
@@ -290,7 +289,7 @@ export default function CompanyCatalog({
         ) : !graph ? (
           <p>관계 그래프를 불러오면 연결 기업을 표시해요.</p>
         ) : (
-          <p>조회된 연결 기업이 없어요.</p>
+          <p>연결된 기업이 없어요.</p>
         )}
         {graph?.metadata.partial && (
           <p role="status">일부 연결 기업 자료가 누락됐어요.</p>

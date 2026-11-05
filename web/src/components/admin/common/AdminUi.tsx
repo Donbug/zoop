@@ -142,7 +142,7 @@ export function Table({
   children: ReactNode;
 }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="min-w-0 max-w-full overflow-x-auto">
       <table className="w-full border-collapse">
         <caption className="sr-only">{caption}</caption>
         {children}
