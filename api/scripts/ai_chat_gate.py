@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Real Java -> ai/service -> installed `zoop-ai-chat` replay gate for the chatbot model stages.
+"""Real Java -> ai/service -> source-pinned `zoop-ai-chat` replay gate for the chatbot model stages.
 
 Authors the exact stage inputs the Java adapters (`com.zoop.chat.model.ChatModelStages`) must build for a fixed synthetic
 scenario, and an authored replay answer for each, keyed by the worker's own request identity. A Java input that differs in
 any field has no replay entry and is refused (`replay_input_mismatch`), so the gate proves the two sides agree on the
-`zoop-ai-chat-5` inputs and answers, not only on the envelope. Before any process starts, the fixture is replayed in-process
-through the worker runtime so an authoring mistake fails here and not as a Java mismatch.
+`zoop-ai-chat-6` inputs, resources, bindings and answers. The fixture first replays in-process, then the same checkout's
+CLI records its actual module origins for capabilities and invoke. Installed-distribution parity has its own verification.
 
 Then starts one real `ai/service` (127.0.0.1, fresh temp state, replay only, live gate closed: a supported Jev model name so
 a live request reaches the gate, but no live enable, budget or provider key; synthetic in-memory principals, no model call,
@@ -38,16 +38,18 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "ai" / "service" / "tests"))
 sys.path.insert(0, str(ROOT / "ai" / "worker" / "tests"))
+sys.path.insert(0, str(ROOT / "ai" / "worker" / "src"))
 
 from support import PGREP, ServiceProcess, Workspace, remove_tree, terminate_runtime  # noqa: E402
 
 API = ROOT / "api"
 RESULTS = API / "build" / "test-results" / "aiChatContractTest"
 GRADLE_TIMEOUT_SECONDS = 900
-SCHEMA = "zoop-ai-chat-5"
+SCHEMA = "zoop-ai-chat-6"
 # Not a secret: the one Jev model the worker supports. Set so a live request passes the stage configuration and is refused
 # by the closed live gate itself; live enable, budget and provider keys stay unset.
 LIVE_JEV_MODEL = "jev-1.14.0"
+GATE_ENV = {"ZOOP_AI_CHAT_JEV_MODEL": LIVE_JEV_MODEL, "ZOOP_AI_CHAT_ANSWER_MODEL": "gpt-6-luna"}
 # One test per contract boundary: a boundary whose test went missing fails the gate even when every remaining test passes.
 CONTRACT_TESTS = frozenset({
     "theRouterAnswersTheServerSplitRequirementsWithTypedProbabilities",
@@ -58,7 +60,7 @@ CONTRACT_TESTS = frozenset({
     "theSameInvocationIsAnsweredFromTheLedgerAndNeverSentAgain",
     "aQuoteWithoutAChatGrantIsRefusedBeforeSending",
     "anInputTheFixtureDoesNotKnowIsRefusedNotGuessed",
-    "liveModeIsRefusedWhileTheServiceGateIsClosed",
+    "missingLiveProviderConfigurationIsRefusedBeforeSending",
     "aPrincipalWithoutChatInvokeIsRefused",
 })
 
@@ -131,11 +133,12 @@ class GateFailure(Exception):
     pass
 
 
-def _request(stage: str, payload: dict[str, Any]):
+def _request(stage: str, payload: dict[str, Any], mode: str = "replay", env: dict[str, str] | None = None):
     from zoop_ai.chat_contracts import StageRequest
+    from chat_resource_support import resources
     invocation = payload.get("requestBinding", {}).get("invocationId", "gate-authoring")
     return StageRequest.model_validate({"schemaVersion": SCHEMA, "invocationId": invocation, "stage": stage,
-                                        "mode": "replay", "input": payload})
+                                        "mode": mode, "input": payload, "resources": resources(stage, mode, env=GATE_ENV if env is None else env)})
 
 
 def _noul(p: float) -> dict[str, Any]:
@@ -193,9 +196,10 @@ def author_replay() -> dict[str, Any]:
     entry("chat-router", DEPENDENCY_ROUTER_INPUT,
           {"model": "authored-synthetic-chat-router", "answers": dependency_answers})
 
-    entry("chat-answer", ANSWER_INPUT, {"model": "authored-synthetic-chat-answer",
-                                         "choices": [{"message": {"role": "assistant",
-                                                                 "content": json.dumps(ANSWER, ensure_ascii=False)}}]})
+    entry("chat-answer", ANSWER_INPUT, {"model": "authored-synthetic-chat-answer", "status": "completed",
+                                      "output": [{"type": "message", "content": [{"type": "output_text", "text": json.dumps(ANSWER, ensure_ascii=False)}]}],
+                                      "usage": {"input_tokens": 100, "output_tokens": 100, "input_tokens_details": {"cached_tokens": 0},
+                                                "output_tokens_details": {"reasoning_tokens": 0}}})
 
     supported = {"type": "choice", "choice": "supported", "confidence": 0.93,
                  "probabilities": {"supported": 0.97, "contradicted": 0.015, "insufficient": 0.015}}
@@ -239,18 +243,18 @@ def check_fixture(replay: dict[str, Any], registry: dict[str, Any], state: Path)
             assert outbound["state"]["requestBinding"] == payload["requestBinding"]
             for sent, expected in zip(outbound["state"]["sections"], payload["sections"], strict=True):
                 assert sent["serverFacts"] == expected["serverFacts"]
-        result = invoke(request, state_dir=state, registry=parsed, sender=sender, env={})
+        result = invoke(request, state_dir=state, registry=parsed, sender=sender, env=GATE_ENV)
         if result.status != "succeeded":
             raise GateFailure(f"authored {stage} fixture does not replay: {result.failure.code if result.failure else '?'}")
     answer = invoke(_request("chat-answer", ANSWER_INPUT).model_copy(update={"invocation_id": "check-answer-again"}),
-                    state_dir=state, registry=parsed, sender=sender, env={})
+                    state_dir=state, registry=parsed, sender=sender, env=GATE_ENV)
     if answer.answer != ANSWER:
         raise GateFailure("authored chat-answer fixture does not round-trip")
 
 
 def run_gradle(manifest: Path, captured: list[str]) -> int:
     env = {**os.environ, "ZOOP_AI_CHAT_CONTRACT_MANIFEST": str(manifest)}
-    process = subprocess.Popen([str(API / "gradlew"), "-p", str(API), "aiChatContractTest", "--console=plain"], env=env,
+    process = subprocess.Popen([str(API / "gradlew"), "-p", str(API), "aiChatContractTest", "--offline", "--no-daemon", "--max-workers=2", "--console=plain"], env=env,
                                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                                errors="replace")
 
@@ -335,7 +339,7 @@ def check_native_http(root: Path, command: Path) -> None:
     state = root / "native-chat-state"
     try:
         workspace = Workspace(root / "native")
-        settings = {"ZOOP_AI_CHAT_LIVE_ENABLED": "1", "ZOOP_AI_CHAT_MAX_CALLS": "2",
+        settings = {**GATE_ENV, "ZOOP_AI_CHAT_LIVE_ENABLED": "1", "ZOOP_AI_CHAT_MAX_CALLS": "2",
                     "ZOOP_AI_CHAT_JEV_MODEL": LIVE_JEV_MODEL, "TYPESAFE_BASE_URL": provider.base,
                     "TYPESAFE_API_KEY": "synthetic-loopback-only"}
         registry = grants()
@@ -346,8 +350,7 @@ def check_native_http(root: Path, command: Path) -> None:
         env = workspace.env(**settings, ZOOP_AI_SERVICE_CHAT_COMMAND=str(command), ZOOP_AI_CHAT_STATE_DIR=str(state),
                             ZOOP_AI_SERVICE_CHAT_GRANTS=str(grant_path))
         service = ServiceProcess(workspace, env=env).start()
-        body = _request("chat-verification", FACT_VERIFICATION_INPUT).wire()
-        body["mode"] = "live"
+        body = _request("chat-verification", FACT_VERIFICATION_INPUT, mode="live", env=settings).wire()
 
         def send(value):
             return service.request("POST", "/internal/v1/chat-stages/chat-verification", as_="chatter",
@@ -418,18 +421,29 @@ def main(argv: list[str]) -> int:
         chat_replay, chat_grants = chat / "replay.json", chat / "grants.json"
         chat_replay.write_text(json.dumps(replay, ensure_ascii=False), encoding="utf-8")
         chat_grants.write_text(json.dumps(registry), encoding="utf-8")
-        command = Path(sys.executable).parent / "zoop-ai-chat"
-        if not command.is_file():
-            raise GateFailure("the installed zoop-ai-chat command is missing: run `make service-install`")
+        command = root / "bin" / "zoop-ai-chat"
+        command.parent.mkdir()
+        command.write_text("\n".join(("#!" + sys.executable, "import sys,json", "from pathlib import Path",
+                           "sys.path.insert(0," + repr(str(ROOT / "ai" / "worker" / "src")) + ")",
+                           "from zoop_ai import chat_cli,chat_runtime,chat_resources",
+                           "(Path(" + repr(str(root)) + ")/('worker-origin-'+sys.argv[1]+'.json')).write_text(json.dumps("
+                           + "{'cli':chat_cli.__file__,'runtime':chat_runtime.__file__,'resources':chat_resources.__file__}))",
+                           "raise SystemExit(chat_cli.main())", "")), encoding="utf-8")
+        command.chmod(0o755)
         env = workspace.env(ZOOP_AI_SERVICE_CHAT_COMMAND=str(command), ZOOP_AI_CHAT_STATE_DIR=str(chat / "state"),
                             ZOOP_AI_SERVICE_CHAT_GRANTS=str(chat_grants), ZOOP_AI_SERVICE_CHAT_REPLAY=str(chat_replay),
-                            ZOOP_AI_CHAT_JEV_MODEL=LIVE_JEV_MODEL)
+                            **GATE_ENV)
         chat_child = (command, chat / "state")
         service = ServiceProcess(workspace, env=env).start()
 
         tokens = workspace.credentials.tokens
         manifest = {"baseUrl": f"http://127.0.0.1:{workspace.port}", "chatToken": tokens["chatter"],
                     "readerToken": tokens["reader"]}
+        from chat_resource_support import resources
+        from zoop_ai.chat_resources import capabilities
+        manifest["capabilities"] = capabilities(GATE_ENV)
+        manifest["allocations"] = {f"{stage}:{mode}": resources(stage, mode, env=GATE_ENV)
+                                   for stage in ("chat-router", "chat-answer", "chat-verification") for mode in ("replay", "live")}
         manifest_path = root / "manifest.json"
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         manifest_path.chmod(0o600)
@@ -439,6 +453,13 @@ def main(argv: list[str]) -> int:
         if code != 0:
             raise GateFailure(f"gradle aiChatContractTest exited with {code}")
         tests, failures = verify_junit()
+        expected_origins = {name: str(ROOT / "ai" / "worker" / "src" / "zoop_ai" / filename) for name, filename in
+                            (("cli", "chat_cli.py"), ("runtime", "chat_runtime.py"), ("resources", "chat_resources.py"))}
+        for action in ("capabilities", "invoke"):
+            actual = json.loads((root / f"worker-origin-{action}.json").read_text())
+            if actual != expected_origins:
+                raise GateFailure(f"{action} did not execute the source-pinned worker")
+        print("chat-source-origins: " + json.dumps(expected_origins, sort_keys=True))
         if failures:
             raise GateFailure(f"{failures} chat contract test failures")
         if service.process is None or service.process.poll() is not None:

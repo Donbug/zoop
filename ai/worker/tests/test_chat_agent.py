@@ -14,12 +14,12 @@ from zoop_ai import chat_agent
 from zoop_ai.chat_contracts import AgentInput, StageRequest
 from zoop_ai.chat_runtime import LiveSender, ReplaySender, invoke, request_digest, request_identity, stage_config
 from zoop_ai.provider import ProviderError
+from chat_resource_support import PUBLIC, configured_chat, resources
 
 EV1 = "ev-" + "1" * 64
 TOKEN = "zmcp1.k1.eyJqb2IiOiJqb2ItMSJ9.c2lnbmF0dXJlLXN5bnRoZXRpYw"
 URL = "https://api.zoop.example/mcp"
-LIVE = {"ZOOP_AI_CHAT_LIVE_ENABLED": "1", "ZOOP_AI_CHAT_MAX_CALLS": "5", "ZOOP_AI_API_KEY": "luna-key-synthetic",
-        "ZOOP_AI_CHAT_AGENT_MODEL": "gpt-6-luna", "ZOOP_AI_CHAT_MCP_SERVER_URL": URL}
+LIVE = {**PUBLIC, "ZOOP_AI_CHAT_LIVE_ENABLED": "1", "ZOOP_AI_CHAT_MAX_CALLS": "5", "ZOOP_AI_API_KEY": "luna-key-synthetic"}
 # The recipient the application checked the MCP results' send grants for: the live agent stage's own.
 RECIPIENT = stage_config("chat-agent", "live", LIVE).recipient()
 
@@ -41,8 +41,8 @@ def continuation(*decisions: tuple[str, bool], previous: str = "resp_1") -> dict
 
 
 def request(payload: dict[str, Any], *, mode: str = "live", invocation: str = "job-1:a1:agent-1") -> StageRequest:
-    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-5", "invocationId": invocation, "stage": "chat-agent",
-                                        "mode": mode, "input": payload})
+    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-6", "invocationId": invocation, "stage": "chat-agent",
+                                        "mode": mode, "input": payload, "resources": resources("chat-agent", mode)})
 
 
 def approval_response(*requests: tuple[str, str, dict[str, Any]], echo_token: bool = True) -> dict[str, Any]:
@@ -101,10 +101,11 @@ def run(req: StageRequest, tmp: Path, endpoint: Endpoint | None = None, env: dic
 # ---- request -----------------------------------------------------------------------------------------------------------------
 
 def test_the_first_step_sends_the_question_with_the_zoop_mcp_tool_held_for_approval():
-    body = chat_agent.build_request(AgentInput.model_validate(agent_input()), "gpt-6-luna", "medium", URL)
-    assert body["model"] == "gpt-6-luna" and body["store"] is True and body["reasoning"] == {"effort": "medium"}
-    assert body["max_output_tokens"] == 8000
-    assert body["instructions"] == chat_agent.PROMPT and "previous_response_id" not in body
+    req = request(agent_input())
+    body = chat_agent.build_request(req.parsed(), "gpt-6-luna", req.resources.luna, URL)
+    assert body["model"] == "gpt-6-luna" and body["store"] is True and body["reasoning"] == {"effort": "high"}
+    assert body["max_output_tokens"] == 64000
+    assert body["instructions"] == chat_agent.PROMPT.replace("{generatedTextMaxChars}", "46976") and "previous_response_id" not in body
     # The official remote MCP authentication: the raw grant in the tool's own `authorization`, no headers, no scheme prefix.
     assert body["tools"] == [{"type": "mcp", "server_label": "zoop", "server_url": URL, "authorization": TOKEN,
                               "allowed_tools": ["company_read", "graph_path_read"], "require_approval": "always"}]
@@ -118,12 +119,12 @@ def test_the_first_step_sends_the_question_with_the_zoop_mcp_tool_held_for_appro
 
 def test_a_continuation_resumes_the_stored_response_with_only_the_applications_decisions():
     payload = AgentInput.model_validate(agent_input(continuation=continuation(("mcpr_1", True), ("mcpr_2", False))))
-    body = chat_agent.build_request(payload, "gpt-6-luna", "medium", URL)
+    body = chat_agent.build_request(payload, "gpt-6-luna", request(agent_input()).resources.luna, URL)
     assert body["previous_response_id"] == "resp_1" and body["store"] is True
     assert body["input"] == [{"type": "mcp_approval_response", "approval_request_id": "mcpr_1", "approve": True},
                              {"type": "mcp_approval_response", "approval_request_id": "mcpr_2", "approve": False}]
     # Instructions, tools with their authorization and format are sent again: a continuation does not inherit them.
-    assert body["tools"][0]["require_approval"] == "always" and body["instructions"] == chat_agent.PROMPT
+    assert body["tools"][0]["require_approval"] == "always" and body["instructions"] == chat_agent.PROMPT.replace("{generatedTextMaxChars}", "46976")
     assert body["tools"][0]["authorization"] == TOKEN and body["tools"][0]["server_url"] == URL
 
 
@@ -218,6 +219,9 @@ def test_a_provider_that_could_not_reach_the_mcp_server_is_mcp_unreachable(tmp_p
 
 
 def test_a_continuation_step_ends_with_the_final_answer_and_the_calls_the_provider_made(tmp_path):
+    held = run(request(agent_input(), invocation="job-1:a1:held"), tmp_path, Endpoint(approval_response(
+        ("mcpr_1", "company_read", {}), ("mcpr_2", "graph_path_read", {}))))
+    assert held.status == "succeeded"
     calls = [{"type": "mcp_call", "id": "mcp_1", "server_label": "zoop", "name": "company_read",
               "arguments": "{\"targets\":[\"KRX:000660\"]}", "output": "{}", "error": None},
              {"type": "mcp_call", "id": "mcp_2", "server_label": "zoop", "name": "graph_path_read",
@@ -244,8 +248,8 @@ def test_a_continuation_step_ends_with_the_final_answer_and_the_calls_the_provid
     (final_response(answer(), status="incomplete"), "agent_incomplete"),
     ({**final_response(answer(), status="incomplete"), "incomplete_details": {"reason": "max_output_tokens"}},
      "output_budget_exceeded"),
-    ({**final_response(answer()), "usage": {"input_tokens": 100, "output_tokens": 3001,
-                                            "output_tokens_details": {"reasoning_tokens": 1000}}}, "output_budget_exceeded"),
+    ({**final_response(answer()), "usage": {"input_tokens": 100, "output_tokens": 50000,
+                                            "output_tokens_details": {"reasoning_tokens": 33000}}}, "output_budget_exceeded"),
     (final_response(answer(sections=[{"basis": "general_knowledge", "text": "x", "requirementIds": ["r9"],
                                       "evidenceIds": []}])), "answer_requirement_unknown"),
     (final_response({"sections": "nope"}), "answer_schema_invalid"),
@@ -268,6 +272,9 @@ def test_the_citation_budget_holds_for_the_final_answer(tmp_path):
 
 
 def test_a_step_is_sent_once_and_the_same_id_with_other_decisions_is_a_conflict(tmp_path):
+    held = run(request(agent_input(), invocation="job-1:a1:held"), tmp_path,
+               Endpoint(approval_response(("mcpr_1", "company_read", {}))))
+    assert held.status == "succeeded"
     endpoint = Endpoint(final_response(answer()))
     payload = agent_input(continuation=continuation(("mcpr_1", True)))
     first = run(request(payload), tmp_path, endpoint)
@@ -291,7 +298,7 @@ def test_a_timeout_after_sending_is_unknown_and_never_resent(tmp_path):
 @pytest.mark.parametrize("env, code", [
     ({**LIVE, "ZOOP_AI_CHAT_AGENT_MODEL": ""}, "stage_model_required"),
     ({**LIVE, "ZOOP_AI_CHAT_AGENT_MODEL": "gpt-6"}, "answer_model_unsupported"),
-    ({**LIVE, "ZOOP_AI_CHAT_AGENT_REASONING_EFFORT": "high"}, "reasoning_effort_unsupported"),
+    ({**LIVE, "ZOOP_AI_CHAT_AGENT_REASONING_EFFORT": "high"}, "chat_legacy_effort_configuration"),
     ({k: v for k, v in LIVE.items() if k != "ZOOP_AI_CHAT_LIVE_ENABLED"}, "chat_live_disabled"),
 ])
 def test_live_agent_configuration_is_pinned_and_gated(tmp_path, env, code):
@@ -300,9 +307,9 @@ def test_live_agent_configuration_is_pinned_and_gated(tmp_path, env, code):
     assert result.failure.code == code and not result.failure.sent and not endpoint.calls
 
 
-def test_the_agent_configuration_pins_luna_at_medium():
+def test_the_agent_configuration_pins_luna_and_invocations_own_effort():
     config = stage_config("chat-agent", "live", LIVE)
-    assert (config.provider, config.model, config.reasoning_effort) == ("openai-compatible", "gpt-6-luna", "medium")
+    assert (config.provider, config.model, config.reasoning_effort) == ("openai-compatible", "gpt-6-luna", None)
     with pytest.raises(ProviderError):
         stage_config("chat-agent", "live", {**LIVE, "ZOOP_AI_CHAT_AGENT_MODEL": "gpt-5"})
 
@@ -312,7 +319,7 @@ def test_the_agent_configuration_pins_luna_at_medium():
 def test_an_authored_replay_step_matches_its_input_whatever_the_token(tmp_path):
     config = stage_config("chat-agent", "replay")
     fixture = tmp_path / "replay.json"
-    fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-5", "recordingKind": "authored-test", "responses": [
+    fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-6", "recordingKind": "authored-test", "responses": [
         {"stage": "chat-agent", "inputDigest": request_identity(request(agent_input(mcp={**agent_input()["mcp"], "recipient": "authored-replay"}),
                                                 mode="replay"), config),
          "response": {**approval_response(("mcpr_1", "company_read", {"targets": ["KRX:000660"]})),
@@ -338,7 +345,7 @@ def test_a_step_for_another_recipient_than_the_stages_own_is_never_sent(tmp_path
         result = run(request(payload), tmp_path, endpoint)
     else:
         fixture = tmp_path / "replay.json"
-        fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-5", "recordingKind": "authored-test",
+        fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-6", "recordingKind": "authored-test",
                                        "responses": []}), encoding="utf-8")
         result = invoke(request(payload, mode="replay"), state_dir=tmp_path, registry=None, sender=ReplaySender(fixture))
     assert result.status == "failed" and result.failure.code == "mcp_recipient_mismatch"
@@ -347,7 +354,7 @@ def test_a_step_for_another_recipient_than_the_stages_own_is_never_sent(tmp_path
 
 
 def test_the_recipient_is_checked_here_and_never_sent_to_the_provider():
-    body = chat_agent.build_request(AgentInput.model_validate(agent_input()), "gpt-6-luna", "medium", URL)
+    body = chat_agent.build_request(AgentInput.model_validate(agent_input()), "gpt-6-luna", request(agent_input()).resources.luna, URL)
     assert RECIPIENT not in json.dumps(body)
 
 

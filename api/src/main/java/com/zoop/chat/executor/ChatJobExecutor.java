@@ -64,9 +64,10 @@ import tools.jackson.databind.node.ObjectNode;
  * the result.
  */
 @Component
+@org.springframework.boot.context.properties.EnableConfigurationProperties(ChatResourcePolicy.class)
 public class ChatJobExecutor {
-    /** Direct runs get 60 s through terminal-state commit; agent paths keep their own shorter policy. */
-    public static final Duration MAX_DEADLINE = Duration.ofSeconds(60);
+    /** Default resource envelope; configured jobs freeze their own policy before their first model stage. */
+    public static final Duration MAX_DEADLINE = Duration.ofSeconds(1200);
     static final Duration LEASE_GRACE = Duration.ofSeconds(15);
     static final String RESULT_SCHEMA_VERSION = "chat-result/v1";
     static final String ROUTE_SCHEMA_VERSION = "chat-route/v1";
@@ -86,15 +87,23 @@ public class ChatJobExecutor {
     private final TransactionTemplate transaction;
     /** Rechecks what earlier answers carry over; null carries no target. */
     private final ChatTargetAccess targets;
+    private final ChatResourcePolicy resourcePolicy;
 
     public ChatJobExecutor(ChatRepository chats, ChatExecutionRepository runs, ObjectProvider<ChatEngine> engines,
             ObjectMapper mapper, Clock clock, PlatformTransactionManager transactionManager) {
         this(chats, runs, engines, mapper, clock, transactionManager, null);
     }
 
-    @Autowired
     public ChatJobExecutor(ChatRepository chats, ChatExecutionRepository runs, ObjectProvider<ChatEngine> engines,
             ObjectMapper mapper, Clock clock, PlatformTransactionManager transactionManager, ChatTargetAccess targets) {
+        this(chats, runs, engines, mapper, clock, transactionManager, targets, ChatResourcePolicy.defaults());
+    }
+
+    @Autowired
+    public ChatJobExecutor(ChatRepository chats, ChatExecutionRepository runs, ObjectProvider<ChatEngine> engines,
+            ObjectMapper mapper, Clock clock, PlatformTransactionManager transactionManager, ChatTargetAccess targets,
+            ChatResourcePolicy resourcePolicy) {
+        this.resourcePolicy = resourcePolicy;
         this.targets = targets;
         this.chats = chats;
         this.runs = runs;
@@ -127,10 +136,15 @@ public class ChatJobExecutor {
             ChatJobRow job = next.get();
             Instant now = clock.instant();
             String token = UUID.randomUUID().toString();
-            Instant deadline = now.plus(MAX_DEADLINE);
             ArrayNode attempts = attempts(job.attempts());
             ObjectNode attempt = current(attempts, "queued")
                     .orElseThrow(() -> new IllegalStateException("queued chat job without a queued attempt: " + job.id()));
+            ObjectNode first = (ObjectNode) attempts.get(0);
+            if (!first.has("resourcePolicy") && attempts.size() == 1 && !attempt.has("startedAt")) {
+                first.set("resourcePolicy", resourcePolicy.snapshot());
+            }
+            ChatResourcePolicy frozen = first.has("resourcePolicy") ? ChatResourcePolicy.fromSnapshot(first.get("resourcePolicy")) : null;
+            Instant deadline = now.plus(frozen == null ? resourcePolicy.jobTimeout() : frozen.jobTimeout());
             attempt.put("status", "running").put("ownerToken", token).put("startedAt", now.toString());
             if (!runs.start(job.id(), token, deadline, deadline.plus(LEASE_GRACE), attempts.toString(), now)) {
                 return Optional.<Claim>empty();
@@ -396,6 +410,63 @@ public class ChatJobExecutor {
         }
 
         @Override
+        public ChatResourcePolicy resourcePolicy() {
+            return recorded(() -> transaction.execute(status -> {
+                runs.limitWait(waitBudget());
+                ChatJobRow job = runs.lockOwned(claim.job().id(), claim.ownerToken(), clock.instant()).orElseThrow(ChatRunSuperseded::new);
+                JsonNode snapshot = attempts(job.attempts()).get(0).get("resourcePolicy");
+                if (snapshot == null) throw new IllegalStateException("chat_resource_policy_cutover_required");
+                return ChatResourcePolicy.fromSnapshot(snapshot);
+            }));
+        }
+
+        @Override
+        public JsonNode modelResources(String invocationId, JsonNode proposed) {
+            return recorded(() -> transaction.execute(status -> {
+                runs.limitWait(waitBudget());
+                Instant now = clock.instant();
+                ChatJobRow job = runs.lockOwned(claim.job().id(), claim.ownerToken(), now).orElseThrow(ChatRunSuperseded::new);
+                ArrayNode all = attempts(job.attempts());
+                ObjectNode a = attempt(all, claim.attemptNo());
+                ObjectNode allocations;
+                if (a.has("modelResources")) allocations = (ObjectNode) a.get("modelResources");
+                else allocations = a.putObject("modelResources");
+                JsonNode existing = allocations.get(invocationId);
+                if (existing != null) return existing.deepCopy();
+                allocations.set(invocationId, proposed.deepCopy());
+                runs.recordModelCall(job.id(), job.runs(), all.toString(), now);
+                return proposed.deepCopy();
+            }));
+        }
+
+        @Override
+        public void readCutoff(Instant cutoff) {
+            recorded(() -> transaction.execute(status -> {
+                runs.limitWait(waitBudget());
+                Instant now = clock.instant();
+                ChatJobRow job = runs.lockOwned(claim.job().id(), claim.ownerToken(), now).orElseThrow(ChatRunSuperseded::new);
+                ArrayNode all = attempts(job.attempts());
+                ObjectNode a = attempt(all, claim.attemptNo());
+                if (!a.has("readCutoff") || cutoff.isBefore(Instant.parse(a.path("readCutoff").asString()))) {
+                    a.put("readCutoff", cutoff.toString());
+                    runs.recordModelCall(job.id(), job.runs(), all.toString(), now);
+                }
+                return true;
+            }));
+        }
+
+        @Override
+        public Duration readRemaining() {
+            return recorded(() -> transaction.execute(status -> {
+                runs.limitWait(waitBudget());
+                ChatJobRow job = runs.lockOwned(claim.job().id(), claim.ownerToken(), clock.instant()).orElseThrow(ChatRunSuperseded::new);
+                JsonNode cutoff = attempt(attempts(job.attempts()), claim.attemptNo()).get("readCutoff");
+                Instant end = cutoff == null ? deadline.minus(resourcePolicy().finalization()) : Instant.parse(cutoff.asString());
+                return Duration.between(clock.instant(), end);
+            }));
+        }
+
+        @Override
         public void shortenDeadline(Instant at) {
             if (!at.isBefore(deadline)) return;
             Boolean shortened = recorded(() -> transaction.execute(status ->
@@ -407,6 +478,7 @@ public class ChatJobExecutor {
         @Override
         public Optional<String> claimToolCall(String capabilityId, String inputDigest) {
             return recorded(() -> transaction.execute(status -> {
+                requireReadTime();
                 runs.limitWait(waitBudget());
                 return runs.claimReservedToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), capabilityId,
                         inputDigest, clock.instant());
@@ -458,6 +530,7 @@ public class ChatJobExecutor {
         @Override
         public List<String> reserveToolCalls(int planRevision, List<ChatToolCallReservation> calls) {
             if (planRevision < 1 || calls.isEmpty()) throw new IllegalArgumentException("an empty or unnumbered tool plan");
+            requireReadTime();
             List<String> reserved = recorded(() -> transaction.execute(status -> {
                 runs.limitWait(waitBudget());
                 Instant now = clock.instant();
@@ -499,6 +572,7 @@ public class ChatJobExecutor {
 
         @Override
         public void toolCallStarted(String toolCallId) {
+            requireReadTime();
             Boolean started = recorded(() -> transaction.execute(status -> {
                 runs.limitWait(waitBudget());
                 return runs.startToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId,
@@ -541,6 +615,10 @@ public class ChatJobExecutor {
             Duration left = Duration.between(clock.instant(), deadline);
             if (left.toMillis() < 1) throw new ChatRunSuperseded();
             return left;
+        }
+
+        private void requireReadTime() {
+            if (readRemaining().toMillis() < 1) throw new ChatRunSuperseded();
         }
 
         /** A record the database could not make in time is not made: the run cannot go on as if it were. */

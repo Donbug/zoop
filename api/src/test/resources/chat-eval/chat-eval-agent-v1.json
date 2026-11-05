@@ -103,9 +103,9 @@
       "agent": [
         {"calls": [
           {"id": "w1", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r1"]},
-          {"id": "w2", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r1", "r2"]},
-          {"id": "c1", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": ["r2"]}
+          {"id": "w2", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r1", "r2"]}
         ]},
+        {"calls": [{"id": "c1", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": ["r2"]}]},
         {"answer": {"sections": [
           {"basis": "web_reported", "text": "웹 보도에 따르면 HBM은 D램을 쌓은 메모리입니다.", "requirementIds": ["r1"], "evidenceIds": ["$web"]},
           {"basis": "evidence_grounded", "text": "SK하이닉스는 메모리 반도체를 만듭니다.", "requirementIds": ["r2"], "evidenceIds": ["$reads"]}
@@ -127,15 +127,13 @@
         {"id": "r2", "label": "카카오 소식 알려줘", "types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "targets": ["KRX:035720"]}
       ],
       "agent": [
+        {"calls": [{"id": "p1", "tool": "zoopPolicy_read", "requirementIds": ["r1"]}]},
         {"calls": [
-          {"id": "p1", "tool": "zoopPolicy_read", "requirementIds": ["r1"]},
-          {"id": "c1", "tool": "company_read", "targets": ["KRX:035720"], "requirementIds": ["r2"]}
-        ]},
-        {"calls": [
+          {"id": "c1", "tool": "company_read", "targets": ["KRX:035720"], "requirementIds": ["r2"]},
           {"id": "w1", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r1"]},
-          {"id": "w2", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r1", "r2"]},
-          {"id": "w3", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r2"]}
+          {"id": "w2", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r1", "r2"]}
         ]},
+        {"calls": [{"id": "w3", "tool": "web_search", "targets": ["HBM"], "requirementIds": ["r2"]}]},
         {"answer": {"sections": [
           {"basis": "zoop_documented", "text": "탈퇴하면 정해진 기간 뒤 질문 기록을 지웁니다.", "requirementIds": ["r1"], "evidenceIds": ["$reads"]},
           {"basis": "web_reported", "text": "웹 보도에 따른 내용입니다.", "requirementIds": ["r2"], "evidenceIds": ["$web"]}
@@ -220,10 +218,8 @@
         {"id": "r2", "label": "삼성전자는", "types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}, "targets": ["KRX:005930"]}
       ],
       "agent": [
-        {"calls": [
-          {"id": "c1", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": ["r1"]},
-          {"id": "c2", "tool": "company_read", "targets": ["KRX:005930"], "requirementIds": ["r2"]}
-        ]},
+        {"calls": [{"id": "c1", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": ["r1"]}]},
+        {"calls": [{"id": "c2", "tool": "company_read", "targets": ["KRX:005930"], "requirementIds": ["r2"]}]},
         {"answer": {"sections": [{"basis": "evidence_grounded", "text": "삼성전자의 근거로 SK하이닉스를 설명합니다.", "requirementIds": ["r1"], "evidenceIds": ["$reads:r2"]}], "insufficientRequirementIds": ["r2"]}}
       ],
       "expect": {
@@ -240,10 +236,8 @@
         {"id": "r1", "label": "SK하이닉스는", "types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9, "issue.read": 0.9}, "targets": ["KRX:000660"]}
       ],
       "agent": [
-        {"calls": [
-          {"id": "c1", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": ["r1"]},
-          {"id": "i1", "tool": "issue_read", "targets": ["KRX:000660"], "requirementIds": ["r1"]}
-        ]},
+        {"calls": [{"id": "c1", "tool": "company_read", "targets": ["KRX:000660"], "requirementIds": ["r1"]}]},
+        {"calls": [{"id": "i1", "tool": "issue_read", "targets": ["KRX:000660"], "requirementIds": ["r1"]}]},
         {"answer": {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 메모리 반도체를 만듭니다.", "requirementIds": ["r1"], "evidenceIds": ["$reads"]}]}}
       ],
       "expect": {

@@ -588,7 +588,8 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
               "cancelExtractionJob": "extraction.cancel", "recoverExtractionJob": "extraction.recover",
               "getGraphVersionStatus": "graph.read", "getGraphVersionFocus": "graph.read",
               "getGraphHandoffStatus": "handoff.read", "getGraphHandoffBundle": "handoff.read", "queryGraphHandoffExposure": "handoff.exposure",
-              "invokeChatStage": "chat.invoke", "probeChatMcp": "chat.invoke", "admitPlan": "plan.admit", "getPlanAdmission": "plan.read",
+              "invokeChatStage": "chat.invoke", "probeChatMcp": "chat.invoke", "getChatRuntimeCapabilities": "chat.invoke",
+              "admitPlan": "plan.admit", "getPlanAdmission": "plan.read",
               "getPlanAdmissionPolicy": "plan.policy", "setPlanAdmissionPolicy": "plan.policy", "exportObservation": "observation.read",
               "requestRoundRun": "round.run", "getRoundRun": "round.read", "requestRoundHandoff": "round.run", "getRoundHandoff": "round.read"}
     for path in spec["paths"].values():

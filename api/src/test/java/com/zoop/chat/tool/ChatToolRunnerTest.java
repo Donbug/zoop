@@ -455,7 +455,8 @@ class ChatToolRunnerTest {
     }
 
     /** Records what the runner asks of the run; it supersedes the run after a set number of starts. */
-    private static final class RecordingControl implements ChatRunControl {
+    private static final class RecordingControl extends com.zoop.chat.executor.ChatResourceFixtures.Control {
+        @Override protected java.time.Clock resourceClock() { return java.time.Clock.systemUTC(); }
         final List<String> events = Collections.synchronizedList(new ArrayList<>());
         final List<ChatToolCallReservation> reserved = Collections.synchronizedList(new ArrayList<>());
         final List<String> started = Collections.synchronizedList(new ArrayList<>());

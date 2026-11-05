@@ -34,8 +34,15 @@ final class WireJson {
     }
 
     static final class Malformed extends RuntimeException {
+        final com.zoop.ai.AiTransportException.Failure failure;
+
         Malformed(String path) {
+            this(path, com.zoop.ai.AiTransportException.Failure.RESPONSE_MALFORMED);
+        }
+
+        Malformed(String path, com.zoop.ai.AiTransportException.Failure failure) {
             super("malformed " + path, null, false, false);
+            this.failure = failure;
         }
     }
 

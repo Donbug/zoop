@@ -13,15 +13,15 @@ import httpx
 import pytest
 
 from zoop_ai import chat_cli, chat_jev, chat_luna, chat_runtime
-from zoop_ai.chat_contracts import ChatGrantRegistry, Receipt, RouterInput, StageRequest, VerificationInput, estimated_tokens
+from zoop_ai.chat_contracts import ChatGrantRegistry, Receipt, RouterInput, StageRequest, VerificationInput
 from zoop_ai.chat_runtime import ChatLedger, LiveSender, ReplaySender, invoke, request_identity, stage_config
 from zoop_ai.provider import ProviderError
+from chat_resource_support import PUBLIC, configured_chat, resources
 
 EV1 = "ev-" + "1" * 64
 EV2 = "ev-" + "2" * 64
-LIVE = {"ZOOP_AI_CHAT_LIVE_ENABLED": "1", "ZOOP_AI_CHAT_MAX_CALLS": "5", "ZOOP_AI_API_KEY": "luna-key-synthetic",
-        "ZOOP_AI_CHAT_ANSWER_MODEL": "gpt-6-luna", "ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT": "medium",
-        "TYPESAFE_API_KEY": "jev-key-synthetic", "ZOOP_AI_CHAT_JEV_MODEL": chat_jev.MODEL}
+LIVE = {**PUBLIC, "ZOOP_AI_CHAT_LIVE_ENABLED": "1", "ZOOP_AI_CHAT_MAX_CALLS": "5",
+        "ZOOP_AI_API_KEY": "luna-key-synthetic", "TYPESAFE_API_KEY": "jev-key-synthetic"}
 
 
 def router_input() -> dict[str, Any]:
@@ -52,8 +52,8 @@ def verification_input(invocation: str = "job-1:a1:stage") -> dict[str, Any]:
 
 
 def request(stage: str, payload: dict[str, Any], *, mode: str = "live", invocation: str = "job-1:a1:stage") -> StageRequest:
-    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-5", "invocationId": invocation, "stage": stage,
-                                        "mode": mode, "input": payload})
+    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-6", "invocationId": invocation, "stage": stage,
+                                        "mode": mode, "input": payload, "resources": resources(stage, mode)})
 
 
 def grants(recipient: str, stages: list[str] | None = None, **change: Any) -> ChatGrantRegistry:
@@ -474,9 +474,10 @@ def test_quotes_are_sent_only_under_a_matching_chat_grant(tmp_path):
 
 def luna(content: Any, model: str = "gpt-6-luna"):
     def respond(path, body):
-        return httpx.Response(200, json={"model": model, "choices": [{"message": {"content": json.dumps(content)}}],
-                                         "usage": {"prompt_tokens": 100, "completion_tokens": 20,
-                                                   "completion_tokens_details": {"reasoning_tokens": 7}}})
+        return httpx.Response(200, json={"model": model, "status": "completed",
+                                         "output": [{"type": "message", "content": [{"type": "output_text", "text": json.dumps(content)}]}],
+                                         "usage": {"input_tokens": 100, "output_tokens": 20,
+                                                   "output_tokens_details": {"reasoning_tokens": 7}}})
     return respond
 
 
@@ -488,9 +489,10 @@ def test_the_answer_request_is_strict_json_with_the_chat_prompt_and_its_answer_i
     result = run(request("chat-answer", answer_input()), tmp_path, endpoint, registry=grants(recipient))
     assert result.status == "succeeded" and result.answer == good
     path, body, auth = endpoint.calls[0]
-    assert path.endswith("/chat/completions") and auth == "Bearer luna-key-synthetic"
-    assert body["messages"][0]["content"] == chat_luna.PROMPT and body["reasoning_effort"] == "medium"
-    assert body["response_format"]["json_schema"]["strict"] is True
+    assert path.endswith("/responses") and auth == "Bearer luna-key-synthetic"
+    assert body["instructions"] == chat_luna.rendered_prompt(request("chat-answer", answer_input()).resources.luna)
+    assert body["reasoning"] == {"effort": "high"} and body["store"] is False
+    assert body["text"]["format"]["strict"] is True
     assert result.receipt.usage.reasoning_tokens == 7
 
     for i, (content, code) in enumerate([
@@ -505,10 +507,11 @@ def test_the_answer_request_is_strict_json_with_the_chat_prompt_and_its_answer_i
 
 def sized(content: Any, *, output: int, reasoning: int, finish: str = "stop"):
     def respond(path, body):
-        return httpx.Response(200, json={"model": "gpt-6-luna", "choices": [{"finish_reason": finish,
-                                                                             "message": {"content": json.dumps(content)}}],
-                                         "usage": {"prompt_tokens": 100, "completion_tokens": output,
-                                                   "completion_tokens_details": {"reasoning_tokens": reasoning}}})
+        return httpx.Response(200, json={"model": "gpt-6-luna", "status": "incomplete" if finish == "length" else "completed",
+                                         "incomplete_details": {"reason": "max_output_tokens"} if finish == "length" else None,
+                                         "output": [{"type": "message", "content": [{"type": "output_text", "text": json.dumps(content)}]}],
+                                         "usage": {"input_tokens": 100, "output_tokens": output,
+                                                   "output_tokens_details": {"reasoning_tokens": reasoning}}})
     return respond
 
 
@@ -516,32 +519,31 @@ GOOD_ANSWER = {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉�
                              "evidenceIds": [EV1]}], "insufficientRequirementIds": [], "graphTargetIds": []}
 
 
-def test_an_answer_is_limited_to_2k_tokens_without_its_reasoning_and_cut_answers_fail_alike(tmp_path):
+def test_an_answer_uses_visible_token_allocation_and_cut_answers_fail_alike(tmp_path):
     recipient = f"openai-compatible:{stage_config('chat-answer', 'live', LIVE).provider_revision}"
-    endpoint = Endpoint(sized(GOOD_ANSWER, output=7000, reasoning=5000))
+    endpoint = Endpoint(sized(GOOD_ANSWER, output=50000, reasoning=36000))
     fits = run(request("chat-answer", answer_input()), tmp_path, endpoint, registry=grants(recipient))
     assert fits.status == "succeeded", fits
-    assert endpoint.calls[0][1]["max_completion_tokens"] == 8000
+    assert endpoint.calls[0][1]["max_output_tokens"] == 64000
 
-    for i, response in enumerate([sized(GOOD_ANSWER, output=7000, reasoning=4999),
-                                  sized(GOOD_ANSWER, output=8000, reasoning=7000, finish="length")]):
+    for i, response in enumerate([sized(GOOD_ANSWER, output=50000, reasoning=33000),
+                                  sized(GOOD_ANSWER, output=64000, reasoning=60000, finish="length")]):
         over = run(request("chat-answer", answer_input(), invocation=f"job-1:a1:long-{i}"), tmp_path, Endpoint(response),
                    registry=grants(recipient))
         assert over.failure.code == "output_budget_exceeded" and over.failure.sent and not over.failure.unknown
         assert over.receipt is not None
 
 
-def test_a_direct_answer_over_its_input_limit_is_refused_before_anything_is_sent(tmp_path, monkeypatch):
+def test_a_direct_answer_over_its_input_limit_is_refused_before_anything_is_sent(tmp_path):
     recipient = f"openai-compatible:{stage_config('chat-answer', 'live', LIVE).provider_revision}"
-    monkeypatch.setattr(chat_runtime, "MAX_INPUT_TOKENS", chat_luna.input_tokens(request("chat-answer", answer_input()).parsed()) - 1)
+    packet = request("chat-answer", answer_input()).wire()
+    packet["resources"] = resources("chat-answer", maxInputTokens=1)
     endpoint = Endpoint(sized(GOOD_ANSWER, output=10, reasoning=0))
-    refused = run(request("chat-answer", answer_input()), tmp_path, endpoint, registry=grants(recipient))
+    refused = run(StageRequest.model_validate(packet), tmp_path, endpoint, registry=grants(recipient))
     assert refused.failure.code == "input_budget_exceeded" and not refused.failure.sent
     assert endpoint.calls == []
 
 
-def test_token_estimates_count_korean_higher_than_latin_text():
-    assert estimated_tokens("a" * 400) == 100 and estimated_tokens("가" * 400) == 300
 
 
 # ---- ledger: idempotency, unknown fate, budget ---------------------------------------------------------------------------
@@ -649,7 +651,7 @@ def test_the_raw_answer_is_stored_before_it_is_interpreted(tmp_path, monkeypatch
     assert json.loads(stored_row(tmp_path, "job-1:a1:stage")[1])["usage"]["output_tokens"] == [3]
 
     def details_list(path, body):
-        return httpx.Response(200, json={"model": "gpt-6-luna", "choices": [], "usage": {"prompt_tokens_details": []}})
+        return httpx.Response(200, json={"model": "gpt-6-luna", "output": [], "usage": {"input_tokens_details": []}})
     recipient = f"openai-compatible:{stage_config('chat-answer', 'live', LIVE).provider_revision}"
     odd = run(request("chat-answer", answer_input(), invocation="job-1:a1:odd"), tmp_path, Endpoint(details_list),
               registry=grants(recipient))
@@ -672,7 +674,7 @@ def test_the_raw_answer_is_stored_before_it_is_interpreted(tmp_path, monkeypatch
 
 def test_the_answer_model_is_pinned_and_the_model_that_answered_is_checked_and_recorded(tmp_path):
     for env, code in (({**LIVE, "ZOOP_AI_CHAT_ANSWER_MODEL": "gpt-5"}, "answer_model_unsupported"),
-                      ({**LIVE, "ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT": "low"}, "reasoning_effort_unsupported")):
+                      ({**LIVE, "ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT": "low"}, "chat_legacy_effort_configuration")):
         refused = run(request("chat-answer", answer_input()), tmp_path, Endpoint(luna({})), env=env)
         assert refused.failure.code == code and not refused.failure.sent
     good = {"sections": [], "insufficientRequirementIds": ["r2"], "graphTargetIds": []}
@@ -702,7 +704,7 @@ def test_the_live_ceiling_is_shared_by_all_chat_stages(tmp_path):
 def replay_file(tmp: Path, req: StageRequest, response: Any) -> Path:
     path = tmp / "replay.json"
     entry = {"stage": req.stage, "inputDigest": request_identity(req, stage_config(req.stage, "replay")), "response": response}
-    path.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-5", "recordingKind": "authored-test", "responses": [entry]}),
+    path.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-6", "recordingKind": "authored-test", "responses": [entry]}),
                     encoding="utf-8")
     return path
 
@@ -712,10 +714,10 @@ def test_replay_answers_by_exact_identity_and_a_mismatch_sends_nothing(tmp_path)
     questions = chat_jev.build_router_request(req.parsed(), "authored-synthetic-chat-router")["questions"]
     path = replay_file(tmp_path, req, {"model": "authored-synthetic-chat-router",
                                       "answers": {k: scripted_answer(q, 0.5) for k, q in questions.items()}})
-    result = invoke(req, state_dir=tmp_path, registry=None, sender=ReplaySender(path), env={})
+    result = invoke(req, state_dir=tmp_path, registry=None, sender=ReplaySender(path), env=PUBLIC)
     assert result.status == "succeeded" and result.receipt.execution_mode == "replay"
     other = request("chat-router", {**router_input(), "turns": [{"text": "다른"}]}, mode="replay", invocation="job-2:a1:r")
-    missed = invoke(other, state_dir=tmp_path, registry=None, sender=ReplaySender(path), env={})
+    missed = invoke(other, state_dir=tmp_path, registry=None, sender=ReplaySender(path), env=PUBLIC)
     assert missed.failure.code == "replay_input_mismatch" and not missed.failure.sent
 
 
@@ -765,7 +767,7 @@ def test_path_pairs_keep_their_status_and_steps_name_only_quoted_evidence():
 
 def test_the_answer_prompt_explains_paths_and_its_version_moved():
     assert "status=cut" in chat_luna.PROMPT and "evidenceIds" in chat_luna.PROMPT
-    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-11-04-4-")
+    assert chat_luna.prompt_version().startswith("zoop-chat-answer-resource-1-")
     assert "web_reported" in chat_luna.PROMPT and "web-search:" in chat_luna.PROMPT
 
 

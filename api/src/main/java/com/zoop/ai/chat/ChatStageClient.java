@@ -1,8 +1,8 @@
 package com.zoop.ai.chat;
 
 /**
- * The chatbot model stage transport ({@code POST /internal/v1/chat-stages/{stage}}, contract {@code zoop-ai-chat-5}): one
- * synchronous stage per call. The client never retries; the invocation id makes a resend of the same input safe.
+ * The chatbot model stage transport ({@code POST /internal/v1/chat-stages/{stage}}, contract {@code zoop-ai-chat-6}): one
+ * synchronous stage per call. The invocation id and exact persisted allocation identify its single-send outcome.
  *
  * <p>Outcomes: a returned {@link ChatStageReply} is the stage outcome (succeeded, or failed with whether a request was sent and
  * whether its fate is unknown). A thrown {@link com.zoop.ai.AiClientException} is a transport-level answer; its
@@ -11,4 +11,8 @@ package com.zoop.ai.chat;
  */
 public interface ChatStageClient {
     ChatStageReply invoke(ChatStageCall call);
+
+    ChatRuntimeCapabilities capabilities();
+
+    void requireTimeout(java.time.Duration required);
 }

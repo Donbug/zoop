@@ -28,20 +28,26 @@ public final class ChatModels {
     private ChatModels() {
     }
 
+    public interface Runtime {
+        RuntimeContext preflight(com.zoop.chat.executor.ChatResourcePolicy policy, boolean agent);
+    }
+
+    public record RuntimeContext(String mode, com.zoop.ai.chat.ChatRuntimeCapabilities capabilities) { }
+
     /** Jev router: the question chain and its frozen selection → requirements with typed probabilities. */
     public interface Router {
-        ChatRouteDecision route(ChatRun run, Set<String> boundCapabilities);
+        ChatRouteDecision route(ChatRun run, Set<String> boundCapabilities, com.zoop.ai.chat.ChatModelPermit permit);
     }
 
     /** Luna answer generator: answers the answerable requirements of the run from their branch context. */
     public interface Generator {
-        ChatGeneratedAnswer generate(ChatRun run, ChatBranchContext context);
+        ChatGeneratedAnswer generate(ChatRun run, ChatBranchContext context, com.zoop.ai.chat.ChatModelPermit permit);
     }
 
     /** Jev semantic verification of the sections that passed the deterministic checks. */
     public interface Verifier {
         ChatSemanticVerdicts verify(ChatRun run, List<ChatGeneratedAnswer.Section> sections, List<Citation> citations,
-                ServerFacts facts);
+                ServerFacts facts, com.zoop.ai.chat.ChatModelPermit permit);
     }
 
     /** Canonical facts are server observations, not article evidence and never a model's assertions. */
@@ -279,7 +285,7 @@ public final class ChatModels {
      * run from 1; each step is its own model call. Luna proposes tool calls; only the server decides them.
      */
     public interface Agent {
-        AgentStep step(ChatRun run, int step, AgentInput input);
+        AgentStep step(ChatRun run, int step, AgentInput input, com.zoop.ai.chat.ChatModelPermit permit);
     }
 
     /** A requirement the agent answers, with the ids the server already resolved for it. */
@@ -329,6 +335,33 @@ public final class ChatModels {
                 throw new IllegalArgumentException("a continuation, and only a continuation, carries decisions");
             }
         }
+
+        /** The stage input shared by context admission and the model adapter. */
+        public tools.jackson.databind.node.ObjectNode stageInput(ChatRun run) {
+            var input = com.zoop.common.json.StrictJson.newObject();
+            var turns = input.putArray("turns");
+            for (var turn : run.turns()) {
+                var wire = turns.addObject().put("text", turn.question());
+                if (turn.choiceLabel() == null) wire.putNull("choiceLabel");
+                else wire.put("choiceLabel", turn.choiceLabel());
+            }
+            var required = input.putArray("requirements");
+            for (var requirement : requirements) {
+                var wire = required.addObject().put("requirementId", requirement.id()).put("label", requirement.label())
+                        .put("general", requirement.general());
+                requirement.targets().forEach(wire.putArray("targets")::add);
+            }
+            var mcp = input.putObject("mcp").put("authorization", grantToken).put("recipient", recipient);
+            allowedTools.forEach(mcp.putArray("allowedTools")::add);
+            input.put("maxCitations", Math.min(20, maxCitations));
+            if (previousResponseId != null) {
+                var continuation = input.putObject("continuation").put("previousResponseId", previousResponseId);
+                var decided = continuation.putArray("decisions");
+                decisions.forEach(decision -> decided.addObject().put("approvalRequestId", decision.approvalRequestId())
+                        .put("approve", decision.approve()));
+            }
+            return input;
+        }
     }
 
     /**
@@ -343,21 +376,17 @@ public final class ChatModels {
         }
     }
 
-    /** Luna's accumulated input of one run (ZOOP-AIG-001 6.3.3). */
-    public static final long MAX_INPUT_TOKENS = 24_000;
     /** A failure code of the answer stages: the input is over its limit, nothing more is sent for this run. */
     public static final String INPUT_BUDGET_EXCEEDED = "input_budget_exceeded";
     /** A failure code of the answer stages: the answer passed its length or was cut at the output cap. */
     public static final String OUTPUT_BUDGET_EXCEEDED = "output_budget_exceeded";
 
     /**
-     * One step's outcome: held at {@code approvals} (no answer), or the final {@code answer} (no approvals). {@code inputTokens}
-     * is what the provider reported for the step, null when it reported none.
+     * One step's outcome: held at {@code approvals} or the final {@code answer}. Input and output counts describe this step,
+     * not a cumulative billing budget; successful provider results require both counts.
      */
-    public record AgentStep(String responseId, List<ApprovalRequest> approvals, ChatGeneratedAnswer answer, Long inputTokens) {
-        public AgentStep(String responseId, List<ApprovalRequest> approvals, ChatGeneratedAnswer answer) {
-            this(responseId, approvals, answer, null);
-        }
+    public record AgentStep(String responseId, List<ApprovalRequest> approvals, ChatGeneratedAnswer answer, Long inputTokens,
+            Long outputTokens) {
 
         public AgentStep {
             approvals = List.copyOf(approvals);
@@ -383,15 +412,21 @@ public final class ChatModels {
 
         private final Fate fate;
         private final String code;
+        private final com.zoop.ai.chat.ChatStageReply.FailureCategory category;
 
         public Failure(Fate fate, String message) {
             this(fate, null, message);
         }
 
         public Failure(Fate fate, String code, String message) {
+            this(fate, code, message, com.zoop.ai.chat.ChatStageReply.FailureCategory.forCode(code));
+        }
+
+        public Failure(Fate fate, String code, String message, com.zoop.ai.chat.ChatStageReply.FailureCategory category) {
             super(message);
             this.fate = fate;
             this.code = code;
+            this.category = category;
         }
 
         public Fate fate() {
@@ -402,5 +437,7 @@ public final class ChatModels {
         public String code() {
             return code;
         }
+
+        public com.zoop.ai.chat.ChatStageReply.FailureCategory category() { return category; }
     }
 }

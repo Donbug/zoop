@@ -4183,7 +4183,7 @@ paths:
             - "BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다."
         teamQuestions:
           - "대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다."
-          - "Jev 0.70/0.35, 도구 호출 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.9를 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다."
+          - "서버 자원 정책은 작업별로 고정한다. 로컬 기본 상한은 현재 문맥 입력 512000토큰, reasoning 포함 출력 64000토큰·표시 출력 16000토큰, 합계 본문 48000 code point, 작업 1200초다. 시간 값은 오프라인 검증 상한이며 운영 지연·비용 승인과 실제 모델 품질 검증은 출시 조건이다. 내부 6회·웹 2회·동시 4회·승인 3라운드와 재실행 3회 상한을 유지한다."
   "/api/v1/chat/jobs/{job_id}":
     get:
       tags:
@@ -13786,7 +13786,7 @@ components:
           description: "이 구간의 근거 수준. web_reported는 보조 웹 검색이 보도한 내용으로, 인용한 웹 결과의 snippet에 적힌 것만 담으며 줍이 확인한 사실이 아니다. general_knowledge 구간은 서버가 고정 안내 문장 '일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.'로 시작하고 최신 사실·수치·전망·투자 판단을 담지 않는다."
         text:
           type: "string"
-          maxLength: 12000
+          maxLength: 96000
         evidenceIds:
           items:
             type: "string"
@@ -14311,8 +14311,8 @@ components:
           type: "string"
         answer:
           type: "string"
-          maxLength: 12000
-          description: "표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 이어 붙인 전체가 12000자를 넘으면 검증 실패다. 돌려줄 때 인용 근거를 지금 읽을 수 없으면 저장 결과와 달리 고정 안내 문장만 담고 sections·citations는 빈 배열이다(getQuestionJob)."
+          maxLength: 96000
+          description: "표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 안내 문장과 구분자까지 Unicode code point로 합산한다. 작업에 고정된 기본 상한은 48000이고 설정 가능한 계약 최대치는 96000이다. 돌려줄 때 인용 근거를 지금 읽을 수 없으면 고정 안내 문장만 담고 sections·citations는 빈 배열이다(getQuestionJob)."
         sections:
           items:
             "$ref": "#/components/schemas/ChatAnswerSection"

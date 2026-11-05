@@ -26,7 +26,7 @@ from pydantic import Field, model_validator
 
 from .contracts import Wire
 
-CHAT_SCHEMA_VERSION = "zoop-ai-chat-5"
+CHAT_SCHEMA_VERSION = "zoop-ai-chat-6"
 ChatStage = Literal["chat-router", "chat-answer", "chat-verification", "chat-agent"]
 QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
 # `zoop_documented` rests on ZOOP's own approved documents (policies), `evidence_grounded` on public evidence,
@@ -43,17 +43,12 @@ MAX_QUESTION = 4000
 MAX_TEXT = 12000
 MAX_PATHS = 20
 MAX_PATH_STEPS = 6
-# ZOOP-AIG-001 6.3.3: Luna's accumulated input and the final answer, whose length does not count reasoning. The provider's output
-# cap does count it, so it leaves reasoning a share of its own, provisional until the live spike measures it.
-MAX_INPUT_TOKENS = 24000
-MAX_ANSWER_TOKENS = 2000
-MAX_OUTPUT_TOKENS = 8000
 INPUT_BUDGET_EXCEEDED = "input_budget_exceeded"
 OUTPUT_BUDGET_EXCEEDED = "output_budget_exceeded"
 
 
 def estimated_tokens(text: str) -> int:
-    """A generous estimate before sending, with no tokenizer at hand: about 4 ASCII characters and 1.3 others to a token."""
+    """Negotiated admission estimate: ASCII characters /4 and other code points *3/4."""
     ascii_chars = sum(1 for char in text if ord(char) < 128)
     return ascii_chars // 4 + (len(text) - ascii_chars) * 3 // 4
 
@@ -567,14 +562,74 @@ INPUTS: dict[str, type[Wire]] = {"chat-router": RouterInput, "chat-answer": Answ
                                  "chat-verification": VerificationInput, "chat-agent": AgentInput}
 
 
+ReasoningEffort = Literal["none", "low", "medium", "high", "xhigh", "max"]
+Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+
+
+class LunaResources(Wire):
+    max_input_tokens: int = Field(ge=1, le=922000)
+    max_output_tokens: int = Field(ge=32000, le=128000)
+    max_visible_output_tokens: int = Field(ge=4000, le=64000)
+    max_answer_chars: int = Field(ge=12000, le=96000)
+    generated_text_max_chars: int = Field(ge=10976, le=94976)
+    reasoning_effort: ReasoningEffort
+
+    @model_validator(mode="after")
+    def bounds(self):
+        if (self.max_input_tokens + self.max_output_tokens > 1050000
+                or self.max_visible_output_tokens >= self.max_output_tokens
+                or self.generated_text_max_chars != self.max_answer_chars - 1024):
+            raise ValueError("chat_resource_policy_invalid")
+        return self
+
+
+class Resources(Wire):
+    schema_version: Literal["zoop-chat-resource-1"]
+    policy_revision: str = Field(pattern=r"^[A-Za-z0-9._-]{1,96}$")
+    policy_digest: Sha256
+    runtime_fingerprint: Sha256
+    provider_timeout_ms: int = Field(ge=1, le=2147483647)
+    finalizing: bool
+    luna: LunaResources | None
+    allocation_digest: Sha256
+
+
+class ResourceBinding(Wire):
+    schema_version: Literal["zoop-chat-resource-binding-1"]
+    policy_digest: Sha256
+    runtime_fingerprint: Sha256
+    allocation_digest: Sha256
+
+
 class StageRequest(Wire):
     """What the application asks of one stage. `invocation_id` identifies the attempt's stage: the same id with the same input
     returns the stored outcome and never sends again; the same id with another input is refused."""
-    schema_version: Literal["zoop-ai-chat-5"]
+    schema_version: Literal["zoop-ai-chat-5", "zoop-ai-chat-6"]
     invocation_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{8,160}$")
     stage: ChatStage
     mode: Literal["replay", "live"]
     input: dict[str, Any]
+    resources: Resources | None = None
+
+    @model_validator(mode="after")
+    def envelope(self):
+        if (self.schema_version == CHAT_SCHEMA_VERSION) != (self.resources is not None):
+            raise ValueError("chat_resource_policy_invalid")
+        return self
+
+    def binding(self) -> ResourceBinding | None:
+        if self.resources is None:
+            return None
+        return ResourceBinding(schema_version="zoop-chat-resource-binding-1",
+                               policy_digest=self.resources.policy_digest,
+                               runtime_fingerprint=self.resources.runtime_fingerprint,
+                               allocation_digest=self.resources.allocation_digest)
+
+    def wire(self) -> dict[str, Any]:
+        value = super().wire()
+        if self.schema_version == "zoop-ai-chat-5":
+            value.pop("resources")
+        return value
 
     def parsed(self) -> Wire:
         parsed = INPUTS[self.stage].model_validate(self.input)
@@ -621,10 +676,23 @@ class StageFailure(Wire):
 
 
 class StageResult(Wire):
-    schema_version: Literal["zoop-ai-chat-5"]
+    schema_version: Literal["zoop-ai-chat-5", "zoop-ai-chat-6"]
     invocation_id: str
     stage: ChatStage
     status: Literal["succeeded", "failed"]
     answer: dict[str, Any] | None
     failure: StageFailure | None
     receipt: Receipt | None
+    resource_binding: ResourceBinding | None = None
+
+    @model_validator(mode="after")
+    def binding_required(self):
+        if (self.schema_version == CHAT_SCHEMA_VERSION) != (self.resource_binding is not None):
+            raise ValueError("chat_resource_policy_invalid")
+        return self
+
+    def wire(self) -> dict[str, Any]:
+        value = super().wire()
+        if self.schema_version == "zoop-ai-chat-5":
+            value.pop("resourceBinding")
+        return value

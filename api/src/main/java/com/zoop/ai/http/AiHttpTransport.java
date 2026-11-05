@@ -100,8 +100,16 @@ final class AiHttpTransport implements AutoCloseable {
 
     Reply exchange(AiOperation operation, String method, URI uri, byte[] body, String idempotencyKey, Rejections rejections,
                    int... success) {
+        return exchange(operation, method, uri, body, idempotencyKey, rejections, settings.requestTimeout(), success);
+    }
+
+    Reply exchange(AiOperation operation, String method, URI uri, byte[] body, String idempotencyKey, Rejections rejections,
+                   Duration timeout, int... success) {
+        if (timeout.isNegative() || timeout.isZero() || timeout.compareTo(settings.requestTimeout()) > 0) {
+            throw new IllegalArgumentException("chat transport timeout is below the required allocation");
+        }
         String requestId = requestId();
-        HttpRequest.Builder builder = HttpRequest.newBuilder(uri).timeout(settings.requestTimeout())
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri).timeout(timeout)
                 .header("Authorization", authorization).header("Accept", "application/json")
                 .header("X-Request-ID", requestId);
         if (idempotencyKey != null) {
@@ -144,7 +152,7 @@ final class AiHttpTransport implements AutoCloseable {
         try {
             return parser.get();
         } catch (Malformed error) {
-            throw transport(reply.operation(), reply.requestId(), Failure.RESPONSE_MALFORMED, OptionalInt.of(reply.status()), null);
+            throw transport(reply.operation(), reply.requestId(), error.failure, OptionalInt.of(reply.status()), null);
         }
     }
 
@@ -173,7 +181,7 @@ final class AiHttpTransport implements AutoCloseable {
         CompletableFuture<HttpResponse<byte[]>> future = http.sendAsync(request, info ->
                 new BoundedBodySubscriber(limit, info.headers().firstValueAsLong("Content-Length").orElse(-1)));
         try {
-            return future.get(settings.requestTimeout().toMillis(), TimeUnit.MILLISECONDS);
+            return future.get(request.timeout().orElseThrow().toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException error) {
             future.cancel(true);
             throw transport(operation, requestId, Failure.TIMEOUT, OptionalInt.empty(), null);

@@ -99,6 +99,9 @@ class ChatAgentPathEngineTest {
         }
 
         @Override
+        public int toolDefinitionBytes() { return 2; }
+
+        @Override
         public boolean available() {
             return available;
         }
@@ -111,7 +114,7 @@ class ChatAgentPathEngineTest {
             if (failure != null) throw failure;
             // One step through the engine's guard and limit, like the real path.
             closing.add(steps.closing());
-            steps.run(() -> new ChatModels.AgentStep("resp_1", List.of(), answer));
+            steps.run(permit -> new ChatModels.AgentStep("resp_1", List.of(), answer, 100L, 100L), false);
             Map<String, List<String>> calls = served;
             if (calls == null) {
                 calls = new java.util.HashMap<>();
@@ -137,7 +140,7 @@ class ChatAgentPathEngineTest {
         agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of(),
                 List.of(HYNIX));
         agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
-        var control = new Control(Duration.ofSeconds(60));
+        var control = new Control(Duration.ofSeconds(1200));
 
         var outcome = engine(agent).answer(run(), control);
         ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class, outcome, outcome.toString()).result();
@@ -165,7 +168,7 @@ class ChatAgentPathEngineTest {
         agent.notices = List.of("web_unavailable", "web_budget_exhausted");
 
         ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)))).result();
 
         assertEquals(List.of(List.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH)), agent.allowed);
         assertEquals("complete", result.answerStatus(), "a web fault leaves nothing unanswered");
@@ -183,7 +186,7 @@ class ChatAgentPathEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
 
         ChatResult viaAgent = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)))).result();
         assertEquals(List.of(List.of(ChatCapability.WEB_SEARCH)), agent.allowed);
         assertTrue(generated.isEmpty(), "the direct generator is not called");
         assertEquals("general_knowledge", viaAgent.answerBasis());
@@ -192,7 +195,7 @@ class ChatAgentPathEngineTest {
         agent.available = false;
         directAnswer = agent.answer;
         ChatResult direct = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)))).result();
         assertEquals(1, generated.size());
         assertEquals(List.of("web_unavailable"), direct.notices().stream().map(n -> n.code()).toList(),
                 "not mcp_direct_start: there was nothing to read but the web");
@@ -200,7 +203,7 @@ class ChatAgentPathEngineTest {
         // Without the web, a concept question stays on the direct path as before.
         generated.clear();
         var plain = new Agent(Set.of(ChatCapability.COMPANY_READ));
-        assertInstanceOf(ChatEngineOutcome.Completed.class, engine(plain).answer(run(), new Control(Duration.ofSeconds(60))));
+        assertInstanceOf(ChatEngineOutcome.Completed.class, engine(plain).answer(run(), new Control(Duration.ofSeconds(1200))));
         assertTrue(plain.requirements.isEmpty());
         assertEquals(1, generated.size());
     }
@@ -213,7 +216,7 @@ class ChatAgentPathEngineTest {
         agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of(),
                 List.of());
         agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
-        engine(agent).answer(run(), new Control(Duration.ofSeconds(60)));
+        engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)));
         assertEquals(List.of(List.of(ChatCapability.COMPANY_READ)), agent.allowed);
     }
 
@@ -266,7 +269,7 @@ class ChatAgentPathEngineTest {
                 List.of());
         agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
 
-        engine(agent).answer(run(), new Control(Duration.ofSeconds(60)));
+        engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)));
 
         assertTrue(agent.allowed.getFirst().contains(ChatCapability.WEB_SEARCH));
         assertEquals(List.of(false, true), agent.requirements.getFirst().stream().map(ChatModels.AgentRequirement::web).toList());
@@ -284,14 +287,14 @@ class ChatAgentPathEngineTest {
 
         agent.faulted = Set.of("r1");
         ChatResult answered = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)))).result();
         assertEquals(List.of("tool_unavailable"), answered.notices().stream().map(n -> n.code()).toList());
         assertEquals(List.of("요구 r1"), answered.notices().getFirst().labels());
         assertEquals(List.of("evidence_insufficient"), answered.limitations().stream().map(l -> l.kind()).toList());
 
         agent.faulted = Set.of("r2");
         ChatResult limited = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)))).result();
         assertTrue(limited.notices().isEmpty());
         assertEquals(List.of("tool_unavailable"), limited.limitations().stream().map(l -> l.kind()).toList());
         assertEquals("partial", limited.answerStatus());
@@ -321,7 +324,7 @@ class ChatAgentPathEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no"), new Verdict("supported", "no")));
 
         ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)))).result();
 
         assertEquals("answered", result.outcome());
         assertEquals("mixed", result.answerBasis());
@@ -339,7 +342,7 @@ class ChatAgentPathEngineTest {
             agent.answer = new ChatGeneratedAnswer(List.of(mixed), List.of(), List.of());
             verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
             assertEquals(new ChatEngineOutcome.Failed("validation_failed", null, false),
-                    engine(agent).answer(run(), new Control(Duration.ofSeconds(60))), mixed.basis());
+                    engine(agent).answer(run(), new Control(Duration.ofSeconds(1200))), mixed.basis());
         }
     }
 
@@ -356,7 +359,7 @@ class ChatAgentPathEngineTest {
 
         agent.served = Map.of("tc-0", List.of("r2"));
         assertEquals(new ChatEngineOutcome.Failed("validation_failed", null, false),
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200))));
 
         agent.served = Map.of("tc-0", List.of("r1"));
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
@@ -381,7 +384,7 @@ class ChatAgentPathEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
 
         ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)))).result();
         assertEquals("web_reported", result.answerBasis());
         assertEquals(List.of("web_result"), result.citations().stream().map(Citation::sourceKind).toList());
     }
@@ -398,13 +401,13 @@ class ChatAgentPathEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("no",
                 List.of(new ChatSemanticVerdicts.ClaimVerdict(null, "supported", "hold")))));
         ChatResult kept = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)))).result();
         assertEquals("web_reported", kept.answerBasis());
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("no",
                 List.of(new ChatSemanticVerdicts.ClaimVerdict(null, "supported", "yes")))));
         ChatResult blocked = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)))).result();
         assertEquals("insufficient_evidence", blocked.outcome());
     }
 
@@ -423,7 +426,7 @@ class ChatAgentPathEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200))));
 
         assertEquals(List.of(List.of(ChatCapability.WEB_SEARCH)), agent.allowed);
         var asked = agent.requirements.getFirst().getFirst();
@@ -445,7 +448,7 @@ class ChatAgentPathEngineTest {
         directAnswer = new ChatGeneratedAnswer(List.of(grounded("내부 기업 자료입니다.", EV_HYNIX)), List.of(), List.of());
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200))));
 
         assertEquals(1, agent.requirements.size(), "an item count alone does not close the web gate");
         assertTrue(agent.requirements.getFirst().getFirst().readByServer());
@@ -461,7 +464,7 @@ class ChatAgentPathEngineTest {
         var agent = new Agent(Set.of(ChatCapability.WEB_SEARCH));
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200))));
         ChatResult result = outcome.result();
 
         assertEquals("clarification", result.outcome());
@@ -480,7 +483,7 @@ class ChatAgentPathEngineTest {
         var agent = new Agent(Set.of(ChatCapability.WEB_SEARCH));
         directAnswer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
 
-        engine(agent).answer(run(), new Control(Duration.ofSeconds(60)));
+        engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)));
 
         assertEquals(1, generated.size(), "the read ran and was answered");
         assertEquals(List.of(), agent.requirements, "the web does not stand in for ZOOP's own record");
@@ -495,7 +498,7 @@ class ChatAgentPathEngineTest {
         directAnswer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200))));
 
         assertEquals("failed", outcome.routeSummary().path("webAfterReads").asString());
     }
@@ -509,7 +512,7 @@ class ChatAgentPathEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of());
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(ChatJobExecutor.MAX_DEADLINE)));
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(780))));
 
         assertEquals(List.of(), agent.requirements);
         assertEquals("no_time", outcome.routeSummary().path("webAfterReads").asString());
@@ -527,11 +530,11 @@ class ChatAgentPathEngineTest {
 
         agent.answer = new ChatGeneratedAnswer(List.of(section), List.of(), List.of(HIT));
         assertEquals(new ChatEngineOutcome.Failed("validation_failed", null, false),
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))), "a web hit is no map target");
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200))), "a web hit is no map target");
 
         agent.answer = new ChatGeneratedAnswer(List.of(section), List.of(), List.of());
         ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)))).result();
 
         assertEquals("web_reported", result.answerBasis());
         assertEquals(List.of(), result.graphTargets());
@@ -547,7 +550,7 @@ class ChatAgentPathEngineTest {
         agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
 
         assertEquals(new ChatEngineOutcome.Failed("validation_failed", null, false),
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60))));
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200))));
         assertEquals(0, verifierCalls);
     }
 
@@ -568,7 +571,7 @@ class ChatAgentPathEngineTest {
                         List.of(HYNIX, NVDA, "KRX:005930", "NASDAQ:AMD", "NYSE:TSM", "NASDAQ:ASML"))));
         for (ChatRouteDecision plan : plans) {
             decision = plan;
-            engine(agent).answer(run(), new Control(Duration.ofSeconds(60)));
+            engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)));
         }
         assertTrue(agent.requirements.isEmpty(), "the agent took none of them");
         assertEquals(4, generated.size(), "each was answered by the direct generator");
@@ -580,7 +583,7 @@ class ChatAgentPathEngineTest {
                 List.of(HYNIX)));
         var agent = new Agent(Set.of(ChatCapability.COMPANY_READ));
         agent.available = false;
-        var control = new Control(Duration.ofSeconds(60));
+        var control = new Control(Duration.ofSeconds(1200));
         // The direct answer has no sections, so there is nothing to verify.
         verdicts = new ChatSemanticVerdicts(List.of());
 
@@ -595,7 +598,7 @@ class ChatAgentPathEngineTest {
 
         // A run that was never an agent candidate reads on the same direct path and says so, with no preflight mark.
         var plain = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(new Agent(Set.of())).answer(run(), new Control(Duration.ofSeconds(60)))).routeSummary();
+                engine(new Agent(Set.of())).answer(run(), new Control(Duration.ofSeconds(1200)))).routeSummary();
         assertEquals("direct", plain.path("path").asString());
         assertTrue(plain.path("agentPreflight").isMissingNode());
     }
@@ -612,7 +615,7 @@ class ChatAgentPathEngineTest {
         agent.available = false;
 
         ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)))).result();
 
         assertEquals("answered", result.outcome());
         assertEquals("complete", result.answerStatus());
@@ -624,11 +627,11 @@ class ChatAgentPathEngineTest {
         agent.answer = directAnswer;
         agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
         var viaAgent = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(1200)))).result();
         assertEquals("complete", viaAgent.answerStatus());
         assertTrue(viaAgent.notices().isEmpty());
         var plain = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine(new Agent(Set.of())).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+                engine(new Agent(Set.of())).answer(run(), new Control(Duration.ofSeconds(1200)))).result();
         assertTrue(plain.notices().isEmpty());
     }
 
@@ -638,7 +641,7 @@ class ChatAgentPathEngineTest {
                 List.of(HYNIX)));
         var agent = new Agent(Set.of(ChatCapability.COMPANY_READ));
         agent.failure = new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, "mcp_unreachable", "MCP unavailable");
-        var control = new Control(Duration.ofSeconds(60));
+        var control = new Control(Duration.ofSeconds(1200));
 
         assertEquals(new ChatEngineOutcome.Failed("transient", "provider_error", true),
                 engine(agent).answer(run(), control));
@@ -660,25 +663,21 @@ class ChatAgentPathEngineTest {
     }
 
     @Test
-    void anAgentRunKeepsToFortyFiveSecondsFromItsStartWithLunaAtMostThirtyFive() {
+    void agentReadsRetainFinalizationAfterOrdinaryRouterLatency() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
                 List.of(HYNIX)));
         var agent = new Agent(Set.of(ChatCapability.COMPANY_READ));
         agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of(),
                 List.of(HYNIX));
         agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
-        // At the start of the job the direct and agent paths share the 45 s deadline. Verification and the final store keep
-        // nine seconds, so Luna receives its 35 s ceiling when the router returns immediately.
         var control = new Control(ChatJobExecutor.MAX_DEADLINE);
         assertInstanceOf(ChatEngineOutcome.Completed.class, engine(agent).answer(run(), control));
-        assertEquals(NOW.plus(OrchestratedChatEngine.AGENT_JOB), control.deadline);
-        assertEquals(List.of(false), agent.closing, "35 s leave room for more than the closing step");
-        // A router that took 20 s leaves 25 s of the job: 16 s for Luna, only the step that writes the answer.
-        assertInstanceOf(ChatEngineOutcome.Completed.class, routedFor(agent, Duration.ofSeconds(20)));
-        assertEquals(List.of(false, true), agent.closing);
-        // One that took 27 s leaves 18 s, only 9 s for Luna: the agent does not start.
+        assertEquals(NOW.plus(ChatJobExecutor.MAX_DEADLINE), control.deadline);
+        assertEquals(List.of(false), agent.closing);
+        assertInstanceOf(ChatEngineOutcome.Completed.class, routedFor(agent, Duration.ofSeconds(13)));
+        assertEquals(List.of(false, false), agent.closing);
         assertEquals(new ChatEngineOutcome.Failed("transient", "deadline_guard", true),
-                routedFor(agent, Duration.ofSeconds(27)));
+                routedFor(agent, Duration.ofSeconds(1181)));
         assertEquals(2, agent.requirements.size());
     }
 
@@ -757,22 +756,22 @@ class ChatAgentPathEngineTest {
         var registry = new ChatToolRegistry(List.of(company, issue, policy, documents, scope));
         var runner = new ChatToolRunner(registry);
         runners.add(runner);
-        ChatModels.Router router = (run, bound) -> {
+        ChatModels.Router router = (run, bound, permit) -> {
             now = now.plus(routerTakes);
             return decision;
         };
-        ChatModels.Generator generator = (run, context) -> {
+        ChatModels.Generator generator = (run, context, permit) -> {
             generated.add(context);
             return directAnswer;
         };
-        ChatModels.Verifier verifier = (run, sections, citations, facts) -> {
+        ChatModels.Verifier verifier = (run, sections, citations, facts, permit) -> {
             verifierCalls++;
             verifiedCitations = citations;
             return verdicts;
         };
         ChatCitationSource citations = (id, version, asOf, trace) -> Optional.ofNullable(readable.get(id));
         var engine = new OrchestratedChatEngine(router, generator, verifier, registry, runner, citations,
-                clock, OrchestratedChatEngine.StageLimits.POLICY, agent);
+                clock, com.zoop.chat.executor.ChatResourceFixtures.runtime(), agent);
         engines.add(engine);
         return engine;
     }
@@ -793,7 +792,8 @@ class ChatAgentPathEngineTest {
     }
 
     /** Records what the engine asks of the run; its deadline is on the engine's clock. */
-    private final class Control implements ChatRunControl {
+    private final class Control extends com.zoop.chat.executor.ChatResourceFixtures.Control {
+        @Override protected Clock resourceClock() { return clock; }
         final List<String> phases = new ArrayList<>();
         final List<ChatToolCallReservation> reserved = new ArrayList<>();
         Instant deadline;

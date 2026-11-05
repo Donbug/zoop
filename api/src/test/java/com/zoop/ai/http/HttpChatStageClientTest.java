@@ -35,8 +35,8 @@ class HttpChatStageClientTest {
     @BeforeEach
     void start() throws IOException {
         server = new StubAiServer();
-        client = new HttpChatStageClient(AiClientSettings.of(server.baseUrl(), TOKEN, Duration.ofSeconds(2), Duration.ofSeconds(5),
-                65_536));
+        client = new HttpChatStageClient(AiClientSettings.ofChat(server.baseUrl(), TOKEN, Duration.ofSeconds(2), Duration.ofSeconds(613),
+                65_536, java.util.Set.of()));
     }
 
     @AfterEach
@@ -46,13 +46,13 @@ class HttpChatStageClientTest {
     }
 
     private static ChatStageCall call() {
-        return new ChatStageCall(INVOCATION, "chat-router", "replay", StrictJson.newObject().put("probe", true));
+        return new ChatStageCall(INVOCATION, "chat-router", "replay", StrictJson.newObject().put("probe", true), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
     }
 
     private static String result(String invocation, String stage, String status, String answer, String failure, String receipt) {
         return """
-                {"schemaVersion":"zoop-ai-chat-5","invocationId":"%s","stage":"%s","status":"%s","answer":%s,"failure":%s,\
-                "receipt":%s}""".formatted(invocation, stage, status, answer, failure, receipt);
+                {"schemaVersion":"zoop-ai-chat-6","invocationId":"%s","stage":"%s","status":"%s","answer":%s,"failure":%s,\
+                "receipt":%s,"resourceBinding":%s}""".formatted(invocation, stage, status, answer, failure, receipt, call().permit().binding());
     }
 
     private static final String RECEIPT = """
@@ -78,13 +78,13 @@ class HttpChatStageClientTest {
         assertEquals("/internal/v1/chat-stages/chat-router", seen.path());
         assertEquals(INVOCATION, seen.header("Idempotency-Key"));
         assertEquals("Bearer " + TOKEN, seen.header("Authorization"));
-        assertEquals("{\"schemaVersion\":\"zoop-ai-chat-5\",\"invocationId\":\"" + INVOCATION + "\",\"stage\":\"chat-router\","
-                + "\"mode\":\"replay\",\"input\":{\"probe\":true}}", seen.body());
+        assertEquals("{\"schemaVersion\":\"zoop-ai-chat-6\",\"invocationId\":\"" + INVOCATION + "\",\"stage\":\"chat-router\","
+                + "\"mode\":\"replay\",\"input\":{\"probe\":true},\"resources\":" + call().permit().resources() + "}", seen.body());
     }
 
     @Test
     void getsTheContentFreeMcpHealthWithoutAnIdempotencyKey() {
-        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-5\",\"mcp\":\"reachable\",\"reason\":null}"));
+        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-6\",\"mcp\":\"reachable\",\"reason\":null}"));
 
         ChatMcpHealth health = client.probeMcp();
 
@@ -99,14 +99,14 @@ class HttpChatStageClientTest {
 
     @Test
     void decodesOnlyTheClosedMcpHealthReasons() {
-        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-5\",\"mcp\":\"unreachable\"," +
+        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-6\",\"mcp\":\"unreachable\"," +
                 "\"reason\":\"mcp_timeout\"}"));
         assertEquals(ChatMcpHealth.Reason.TIMEOUT, client.probeMcp().reason());
 
         for (String body : new String[] {
-                "{\"schemaVersion\":\"zoop-ai-chat-5\",\"mcp\":\"reachable\",\"reason\":\"mcp_timeout\"}",
-                "{\"schemaVersion\":\"zoop-ai-chat-5\",\"mcp\":\"unreachable\",\"reason\":null}",
-                "{\"schemaVersion\":\"zoop-ai-chat-5\",\"mcp\":\"unreachable\",\"reason\":\"other\"}"}) {
+                "{\"schemaVersion\":\"zoop-ai-chat-6\",\"mcp\":\"reachable\",\"reason\":\"mcp_timeout\"}",
+                "{\"schemaVersion\":\"zoop-ai-chat-6\",\"mcp\":\"unreachable\",\"reason\":null}",
+                "{\"schemaVersion\":\"zoop-ai-chat-6\",\"mcp\":\"unreachable\",\"reason\":\"other\"}"}) {
             server.respond(Reply.json(200, body));
             AiTransportException malformed = assertThrows(AiTransportException.class, client::probeMcp);
             assertEquals(Failure.RESPONSE_MALFORMED, malformed.failure());
@@ -177,11 +177,47 @@ class HttpChatStageClientTest {
     }
 
     @Test
+    void capabilitiesUseAuthenticatedContentFreeGetAndVerifyTheInstalledFingerprint() {
+        var expected = com.zoop.chat.executor.ChatResourceFixtures.contracts().path("capabilities");
+        server.respond(Reply.json(200, expected.toString()));
+        assertEquals(expected.path("runtimeFingerprint").stringValue(), client.capabilities().fingerprint());
+        var seen = server.requests.getFirst();
+        assertEquals("GET", seen.method());
+        assertEquals("/internal/v1/chat-runtime-capabilities", seen.path());
+        assertEquals("", seen.body());
+        assertNull(seen.header("Idempotency-Key"));
+        assertEquals("Bearer " + TOKEN, seen.header("Authorization"));
+    }
+
+    @Test
+    void aThirtyFiveSecondTransportRefusesResourcePreflightWithoutSending() {
+        try (var shortClient = new HttpChatStageClient(AiClientSettings.of(server.baseUrl(), TOKEN, Duration.ofSeconds(3),
+                Duration.ofSeconds(35), 65536))) {
+            var stages = new com.zoop.chat.model.ChatModelStages(shortClient, "replay", null, null, null, null, null);
+            var refused = assertThrows(com.zoop.chat.orchestrator.ChatModels.Failure.class,
+                    () -> stages.preflight(com.zoop.chat.executor.ChatResourcePolicy.defaults(), false));
+            assertEquals(com.zoop.chat.orchestrator.ChatModels.Failure.Fate.REFUSED, refused.fate());
+            assertTrue(server.requests.isEmpty());
+        }
+    }
+
+    @Test
+    void aReplyBoundToAnotherAllocationIsUnknownInsteadOfACompletedAnswer() {
+        var changed = (tools.jackson.databind.node.ObjectNode) WireJson.parse(
+                result(INVOCATION, "chat-router", "succeeded", "{}", "null", RECEIPT), "body");
+        ((tools.jackson.databind.node.ObjectNode) changed.path("resourceBinding")).put("allocationDigest", "0".repeat(64));
+        server.respond(Reply.json(200, changed.toString()));
+        var failure = assertThrows(AiTransportException.class, () -> client.invoke(call()));
+        assertEquals(Failure.RESOURCE_BINDING_MISMATCH, failure.failure());
+        assertTrue(failure.requestMaybeProcessed());
+    }
+
+    @Test
     void theCallRefusesAnUnsafeInvocationOrUnknownStageBeforeSending() {
         var input = StrictJson.newObject();
-        assertThrows(IllegalArgumentException.class, () -> new ChatStageCall("short", "chat-router", "replay", input));
-        assertThrows(IllegalArgumentException.class, () -> new ChatStageCall(INVOCATION, "chat-other", "replay", input));
-        assertThrows(IllegalArgumentException.class, () -> new ChatStageCall(INVOCATION, "chat-router", "save_only", input));
+        assertThrows(IllegalArgumentException.class, () -> new ChatStageCall("short", "chat-router", "replay", input, com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router")));
+        assertThrows(IllegalArgumentException.class, () -> new ChatStageCall(INVOCATION, "chat-other", "replay", input, com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router")));
+        assertThrows(IllegalArgumentException.class, () -> new ChatStageCall(INVOCATION, "chat-router", "save_only", input, com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router")));
         assertTrue(server.requests.isEmpty());
     }
 }

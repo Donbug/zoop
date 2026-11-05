@@ -29,6 +29,8 @@ public interface ChatAgentPath {
     /** The capabilities the agent may be given (those exposed as MCP tools). */
     Set<ChatCapability> tools();
 
+    int toolDefinitionBytes();
+
     /**
      * Runs the agent for {@code requirements} with {@code tools}. Every step is one model call made through {@code steps},
      * which applies the run's deadline guard and stage limit. Model failures surface as {@link ChatModels.Failure}.
@@ -38,13 +40,16 @@ public interface ChatAgentPath {
 
     /** Runs one agent step under the engine's guard and limit, and says when no further round fits. */
     interface Steps {
-        ChatModels.AgentStep run(Supplier<ChatModels.AgentStep> step);
+        ChatModels.AgentStep run(java.util.function.Function<com.zoop.ai.chat.ChatModelPermit, ChatModels.AgentStep> step,
+                boolean finalizing);
 
         /**
-         * Whether the time left fits only one more step: the agent then denies what it is asked, so that step is the one
-         * that writes the answer (the last 10 s start no new tool, MCP actions contract 3.2).
+         * Whether the owner's read window can still fit an approved-results continuation. Once closed, the next step
+         * writes the answer using its reserved finalization allowance.
          */
         boolean closing();
+
+        boolean contextFits(long priorInputTokens, long priorOutputTokens, long explicitInputBytes, int approvedCalls);
     }
 
     /**

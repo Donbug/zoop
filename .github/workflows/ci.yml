@@ -37,7 +37,7 @@ jobs:
       - name: Validate public configuration, contracts, generated documents and secrets
         run: |
           make public-check
-          uv run --no-project --with-requirements deployment/briefing/requirements.txt --with pyyaml make tooling-test
+          make tooling-test
       - name: Validate PR title
         if: github.event_name == 'pull_request'
         env:

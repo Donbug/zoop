@@ -187,6 +187,8 @@ allowlist는 `scripts/package_artifacts.py`의 `FILES/TREES/REQUIRED`입니다. 
 
 `make tooling-test`는 임시 fixture에서만 의도적인 합성 `.env`/DB/key/log/recording/cache 파일을 만들고 실제 ZIP entries·checksum·CI gate 실패 조건을 검사합니다. 실제 `.env`는 읽거나 복사하지 않습니다. 임시 fixture/artifact는 종료 시 삭제합니다.
 
+이 target은 `uv run --no-project`로 브리핑 검사 의존성과 `pyyaml`, `openapi-spec-validator`를 함께 준비하므로 로컬과 CI에서 같은 명령을 사용합니다. 계약 회귀 검사도 이 환경에서 실행합니다.
+
 ### 배포 설계가 확정된 뒤 직접 등록할 항목
 
 - [ ] 팀이 FE/BE/AI 확정 스택, 배포 대상 계정·지역·서비스, 도메인/TLS, 산출물 형태를 결정하고 기록합니다.

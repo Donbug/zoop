@@ -15,6 +15,20 @@ import static org.junit.jupiter.api.Assertions.*;
 /** D-AI-02 layer-1 checks that need no engine: the citation budget and what a general section may say. */
 class ChatAnswerCheckTest {
     @Test
+    void generatedTextUsesCodePointsAndLeavesRoomForTheServerNotice() {
+        var concept = new Branch("c", "개념", Set.of(ChatQueryType.Q02), true, List.of(), false);
+        String text = "😀".repeat(46976);
+        var answer = new ChatGeneratedAnswer(List.of(new Section("general_knowledge", text, List.of("c"), List.of())),
+                List.of(), List.of());
+        var checked = ChatAnswerCheck.check(List.of(concept), answer, 48000);
+        assertNull(checked.failedCheck());
+        assertEquals(ChatAnswerCheck.GENERAL_NOTICE + " " + text, checked.passed().sections().getFirst().text());
+        var over = new ChatGeneratedAnswer(List.of(new Section("general_knowledge", text + "😀", List.of("c"), List.of())),
+                List.of(), List.of());
+        assertEquals("length", ChatAnswerCheck.check(List.of(concept), over, 48000).failedCheck());
+    }
+
+    @Test
     void allSectionsTogetherCiteAtMostTwentyEvidenceIds() {
         var a = branch("a", evidence("a", 11));
         var b = branch("b", evidence("b", 11));

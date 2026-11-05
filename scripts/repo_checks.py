@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -233,10 +234,11 @@ def contracts() -> None:
         (value["$id"], Resource.from_contents(value)) for value in chat_schemas.values())
     chat_fixtures = json.loads((ROOT / "docs/api/fixtures/chat-internal-contracts.json")
                                .read_text(encoding="utf-8"))
-    if set(chat_fixtures) != set(chat_schema_paths):
-        raise ValueError("Chat internal contract fixture groups differ from the three schemas.")
+    if set(chat_fixtures) != {*chat_schema_paths, "resourceContracts"}:
+        raise ValueError("Chat internal contract fixture groups differ from the portable schemas and resourceContracts.")
     chat_records_checked = 0
-    for kind, values in chat_fixtures.items():
+    for kind in chat_schema_paths:
+        values = chat_fixtures[kind]
         if not isinstance(values, list) or not values:
             raise ValueError(f"Chat internal contract fixture group {kind} must be a non-empty list.")
         chat_schema = chat_schemas[kind]
@@ -245,10 +247,112 @@ def contracts() -> None:
         for value in values:
             chat_validator.validate(value)
             chat_records_checked += 1
+    chat_records_checked += chat_resource_fixtures(chat_fixtures["resourceContracts"], internal_spec)
     for path in (*ROOT.glob("prototype/*/pyproject.toml"), *ROOT.glob("ai/*/pyproject.toml")):
         tomllib.loads(path.read_text(encoding="utf-8"))
     print(f"OpenAPI (public target + internal AI transport, YAML equals JSON), {len(paths)} JSON documents/schemas, "
           f"{records_checked} AI and {chat_records_checked} chat portable fixture records with format checks, app TOML: passed.")
+
+
+def chat_resource_fixtures(value: dict, internal_spec: dict) -> int:
+    from jsonschema import Draft202012Validator, FormatChecker
+
+    schemas = internal_spec["components"]["schemas"]
+    request_properties = schemas["ChatStageRequest"]["properties"]
+    resource_properties = schemas["Resources"]["properties"]
+    luna_properties = schemas["LunaResources"]["properties"]
+    stages, modes = request_properties["stage"]["enum"], request_properties["mode"]["enum"]
+
+    def closed(properties: dict) -> dict:
+        return {"type": "object", "additionalProperties": False,
+                "required": list(properties), "properties": properties}
+
+    policy_properties = {key: schema for key, schema in luna_properties.items()
+                         if key != "generatedTextMaxChars"}
+    policy_properties.update({
+        "schemaVersion": {"const": "zoop-chat-resource-policy-1"},
+        "policyRevision": resource_properties["policyRevision"],
+        **{key: resource_properties["providerTimeoutMs"] for key in (
+            "jobTimeoutMs", "routerProviderTimeoutMs", "generationProviderTimeoutMs",
+            "verificationProviderTimeoutMs", "directRetrievalTimeoutMs", "webSupplementTimeoutMs")},
+    })
+    allocation = closed({
+        "preimage": closed({
+            "schemaVersion": {"const": "zoop-chat-resource-allocation-1"},
+            "stage": request_properties["stage"],
+            "mode": request_properties["mode"],
+            "resources": closed({key: schema for key, schema in resource_properties.items()
+                                 if key != "allocationDigest"}),
+        }),
+        "resources": {"$ref": "#/components/schemas/Resources"},
+        "binding": {"$ref": "#/components/schemas/ResourceBinding"},
+    })
+    schema = closed({
+        "policy": closed(policy_properties),
+        "policyDigest": resource_properties["policyDigest"],
+        "capabilities": {"$ref": "#/components/schemas/ChatCapabilities"},
+        "allocations": closed({f"{stage}:{mode}": allocation for stage in stages for mode in modes}),
+    })
+    schema["components"] = internal_spec["components"]
+    Draft202012Validator(schema, format_checker=FormatChecker()).validate(value)
+
+    def digest(preimage: dict) -> str:
+        return hashlib.sha256(json.dumps(preimage, ensure_ascii=False, sort_keys=True,
+                                         separators=(",", ":")).encode("utf-8")).hexdigest()
+
+    policy = value["policy"]
+    capabilities = value["capabilities"]
+    runtime = capabilities["runtime"]
+    if value["policyDigest"] != digest(policy):
+        raise ValueError("Chat resource fixture policyDigest differs from its canonical policy.")
+    if capabilities["runtimeFingerprint"] != digest(runtime):
+        raise ValueError("Chat resource fixture runtimeFingerprint differs from its canonical runtime.")
+    if set(runtime["stages"]) != set(stages) or set(capabilities["configurationErrors"]) != set(stages):
+        raise ValueError("Chat resource fixture capabilities must describe exactly the four stages.")
+    if runtime["supportedReasoningEfforts"] != luna_properties["reasoningEffort"]["enum"]:
+        raise ValueError("Chat resource fixture capabilities reasoning efforts differ from the contract.")
+    for stage, descriptor in runtime["stages"].items():
+        is_jev = stage in ("chat-router", "chat-verification")
+        expected = {
+            "provider": "typesafe-native" if is_jev else "openai-compatible",
+            "model": "jev-1.14.0" if is_jev else "gpt-6-luna",
+            "api": "systemone" if is_jev else "responses",
+            "adapterRevision": "zoop-jev-chat-9" if is_jev else f"zoop-{stage}-resource-1",
+        }
+        if any(descriptor[key] != expected_value for key, expected_value in expected.items()):
+            raise ValueError(f"Chat resource fixture capabilities descriptor differs for {stage}.")
+        if ((is_jev and descriptor["fixedInputOverheadBytes"] != 0)
+                or (not is_jev and descriptor["fixedInputOverheadBytes"] < 1)
+                or (stage != "chat-agent" and descriptor["mcpServerRevision"] is not None)):
+            raise ValueError(f"Chat resource fixture capabilities overhead/MCP revision differs for {stage}.")
+    if (policy["maxInputTokens"] + policy["maxOutputTokens"] > runtime["modelLimits"]["contextWindowTokens"]
+            or policy["maxVisibleOutputTokens"] >= policy["maxOutputTokens"]):
+        raise ValueError("Chat resource fixture policy exceeds the model token bounds.")
+    luna = {key: policy[key] for key in luna_properties if key != "generatedTextMaxChars"}
+    luna["generatedTextMaxChars"] = policy["maxAnswerChars"] - runtime["structuralLimits"]["serverAddedTextReserveChars"]
+    for key, entry in value["allocations"].items():
+        stage, mode = key.split(":")
+        resources = entry["resources"]
+        preimage = {
+            "schemaVersion": "zoop-chat-resource-allocation-1", "stage": stage, "mode": mode,
+            "resources": {name: field for name, field in resources.items() if name != "allocationDigest"},
+        }
+        if entry["preimage"] != preimage or resources["allocationDigest"] != digest(preimage):
+            raise ValueError(f"Chat resource fixture allocation preimage/digest differs for {key}.")
+        expected_binding = {"schemaVersion": "zoop-chat-resource-binding-1", **{
+            name: resources[name] for name in ("policyDigest", "runtimeFingerprint", "allocationDigest")}}
+        if entry["binding"] != expected_binding:
+            raise ValueError(f"Chat resource fixture binding differs from its allocation for {key}.")
+        timeout_key = {"chat-router": "routerProviderTimeoutMs",
+                       "chat-verification": "verificationProviderTimeoutMs"}.get(stage, "generationProviderTimeoutMs")
+        if (resources["policyRevision"] != policy["policyRevision"]
+                or resources["policyDigest"] != value["policyDigest"]
+                or resources["runtimeFingerprint"] != capabilities["runtimeFingerprint"]
+                or resources["providerTimeoutMs"] != policy[timeout_key]
+                or resources["finalizing"] != (stage == "chat-answer")
+                or resources["luna"] != (luna if stage in ("chat-answer", "chat-agent") else None)):
+            raise ValueError(f"Chat resource fixture allocation differs from its policy/runtime for {key}.")
+    return 2 + 3 * len(value["allocations"])
 
 
 def copy_file(root: Path, target: Path, relative: str) -> None:

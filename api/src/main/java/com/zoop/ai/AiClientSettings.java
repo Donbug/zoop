@@ -37,7 +37,7 @@ public record AiClientSettings(URI baseUri, String token, Duration connectTimeou
             throw new AiClientConfigurationException("token", "is missing or not a service bearer token");
         }
         bound("connect-timeout", connectTimeout, Duration.ofSeconds(30));
-        bound("request-timeout", requestTimeout, Duration.ofSeconds(120));
+        bound("request-timeout", requestTimeout, Duration.ofMillis((long) Integer.MAX_VALUE + 13000));
         if (maxResponseBytes < 64 * 1024 || maxResponseBytes > 32 * 1024 * 1024) {
             throw new AiClientConfigurationException("max-response-bytes", "must be between 65536 and 33554432");
         }
@@ -52,6 +52,13 @@ public record AiClientSettings(URI baseUri, String token, Duration connectTimeou
     /** Parses a base URL string; {@code plaintextHttpHosts} are lower-case host names also allowed over {@code http}. */
     public static AiClientSettings of(String baseUrl, String token, Duration connectTimeout, Duration requestTimeout,
                                       int maxResponseBytes, Set<String> plaintextHttpHosts) {
+        bound("request-timeout", requestTimeout, Duration.ofSeconds(120));
+        return ofChat(baseUrl, token, connectTimeout, requestTimeout, maxResponseBytes, plaintextHttpHosts);
+    }
+
+    /** Chat stages negotiate provider milliseconds plus thirteen seconds of HTTP allowance. */
+    public static AiClientSettings ofChat(String baseUrl, String token, Duration connectTimeout, Duration requestTimeout,
+            int maxResponseBytes, Set<String> plaintextHttpHosts) {
         if (baseUrl == null || baseUrl.isBlank()) {
             throw new AiClientConfigurationException("base-url", "is required");
         }

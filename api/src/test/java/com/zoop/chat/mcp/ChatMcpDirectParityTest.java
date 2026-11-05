@@ -92,12 +92,12 @@ class ChatMcpDirectParityTest {
     }
 
     private void running(String job, String selection, String graph) {
-        String attempts = "[{\"n\":1,\"mode\":\"run\",\"requestKey\":\"" + job + "\",\"status\":\"running\","
-                + "\"ownerToken\":\"owner-1\"}]";
+        String attempts = com.zoop.chat.executor.ChatResourceFixtures.freshAttempts("[{\"n\":1,\"mode\":\"run\",\"requestKey\":\"" + job + "\",\"status\":\"running\","
+                + "\"ownerToken\":\"owner-1\"}]");
         String context = "{\"items\":[],\"evidenceCount\":0,\"period\":null,\"asOf\":null,\"graphVersion\":\"" + graph + "\"}";
         store.add(new ChatJobRow(job, "conv-" + job, "member-a", 1, "질문", "a".repeat(64), NOW, context, selection, List.of(),
                 graph, "queued", null, null, null, null, 0, null, null, 0, attempts, NOW, NOW, null));
-        assertTrue(store.start(job, "owner-1", NOW.plusSeconds(60), NOW.plusSeconds(60), attempts, NOW));
+        assertTrue(store.start(job, "owner-1", NOW.plusSeconds(1200), NOW.plusSeconds(1215), attempts, NOW));
     }
 
     private ChatToolResult direct(String job, ChatToolRequest request) {

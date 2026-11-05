@@ -120,7 +120,7 @@ class OrchestratedChatEngineTest {
                 List.of(), List.of());
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
 
-        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
 
         assertEquals("answered", result.outcome());
         assertTrue(result.citations().isEmpty(), "a record is no article");
@@ -149,7 +149,7 @@ class OrchestratedChatEngineTest {
                 evidence(HYNIX))), List.of(), List.of());
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
 
-        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
 
         assertEquals("answered", result.outcome());
         assertEquals(List.of(List.of("briefing:1970-01-01:morning")), briefing.stream().map(ChatToolRequest::targets).toList());
@@ -161,7 +161,7 @@ class OrchestratedChatEngineTest {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.95), Map.of()));
         answer = new ChatGeneratedAnswer(List.of(general("HBM은 고대역폭 메모리입니다.", "r1")), List.of(), List.of());
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
-        var control = new Control(Duration.ofSeconds(60));
+        var control = new Control(Duration.ofSeconds(1200));
 
         ChatResult result = completed(engine().answer(run(), control));
         assertEquals("answered", result.outcome());
@@ -185,7 +185,7 @@ class OrchestratedChatEngineTest {
                 new ChatSemanticVerdicts.ClaimVerdict("s0c2", null, "hold"),
                 new ChatSemanticVerdicts.ClaimVerdict("s0c3", null, "hold")))));
 
-        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
 
         assertEquals("answered", result.outcome());
         assertEquals(ChatAnswerCheck.GENERAL_NOTICE
@@ -207,7 +207,7 @@ class OrchestratedChatEngineTest {
             List<String> targets = java.util.stream.IntStream.range(0, count).mapToObj(i -> "KRX:00000" + i).toList();
             decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q04, 0.9), Map.of("graph.path.read", 0.9),
                     targets));
-            engine().answer(run(), new Control(Duration.ofSeconds(60)));
+            engine().answer(run(), new Control(Duration.ofSeconds(1200)));
             assertEquals(Set.of(targets.subList(0, 5), List.copyOf(
                     java.util.stream.Stream.concat(java.util.stream.Stream.of(targets.getFirst()),
                             targets.subList(5, count).stream()).toList())), Set.copyOf(asked),
@@ -222,7 +222,7 @@ class OrchestratedChatEngineTest {
         answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리입니다.", "r1"),
                 grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r2"), evidence(HYNIX))), List.of(), List.of(HYNIX));
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no"), new Verdict("supported", "no")));
-        var control = new Control(Duration.ofSeconds(60));
+        var control = new Control(Duration.ofSeconds(1200));
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class, engine().answer(run(), control));
         ChatResult result = outcome.result();
@@ -246,7 +246,7 @@ class OrchestratedChatEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no"), new Verdict("supported", "no")));
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+                engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         ChatResult result = outcome.result();
         assertEquals("answered", result.outcome());
         assertEquals("mixed", result.answerBasis());
@@ -277,7 +277,7 @@ class OrchestratedChatEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+                engine().answer(run(), new Control(Duration.ofSeconds(1200))));
 
         var coverage = outcome.routeSummary().path("coverage");
         assertEquals(2, coverage.size());
@@ -301,7 +301,7 @@ class OrchestratedChatEngineTest {
         decision = dependent("exactly", 2);
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+                engine().answer(run(), new Control(Duration.ofSeconds(1200))));
 
         assertEquals("clarification", outcome.result().outcome());
         var coverage = outcome.routeSummary().path("coverage");
@@ -319,7 +319,7 @@ class OrchestratedChatEngineTest {
         answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리 칩을 쌓은 메모리입니다.", "r1-c")), List.of("r1"),
                 List.of());
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
-        ChatResult noEvidence = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult noEvidence = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertEquals("answered", noEvidence.outcome(), "it used to be insufficient_evidence with no concept either");
         assertEquals("general_knowledge", noEvidence.answerBasis());
         assertEquals(List.of("evidence_insufficient"), noEvidence.limitations().stream().map(l -> l.kind()).toList());
@@ -329,7 +329,7 @@ class OrchestratedChatEngineTest {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9), Map.of()));
         answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리 칩을 쌓은 메모리입니다.", "r1-c")), List.of(),
                 List.of());
-        var control = new Control(Duration.ofSeconds(60));
+        var control = new Control(Duration.ofSeconds(1200));
         ChatResult noLookup = completed(engine().answer(run(), control));
         assertEquals("answered", noLookup.outcome(), "it used to be guidance");
         assertEquals(List.of("out_of_scope"), noLookup.limitations().stream().map(l -> l.kind()).toList());
@@ -346,7 +346,7 @@ class OrchestratedChatEngineTest {
                     grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))), List.of(), List.of());
             verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
             var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                    engine().answer(run(), new Control(Duration.ofSeconds(60))));
+                    engine().answer(run(), new Control(Duration.ofSeconds(1200))));
             assertEquals("evidence_grounded", outcome.result().answerBasis(), text);
             assertEquals(1, outcome.result().sections().size(), text);
             assertTrue(outcome.result().limitations().isEmpty(), "the concept is the server's own addition: " + text);
@@ -356,18 +356,18 @@ class OrchestratedChatEngineTest {
         answer = new ChatGeneratedAnswer(List.of(general("HBM 시장은 2026년에 커졌습니다.", "r1-c")), List.of("r1"),
                 List.of());
         verdicts = new ChatSemanticVerdicts(List.of());
-        ChatResult nothingLeft = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult nothingLeft = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertEquals("insufficient_evidence", nothingLeft.outcome());
         assertEquals("guidance", nothingLeft.answerStatus());
 
         answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리입니다. 지금 매수하세요.", "r1-c"),
                 grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))), List.of(), List.of());
-        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
 
         // A general section of the router's own requirement still fails the answer.
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
         answer = new ChatGeneratedAnswer(List.of(general("HBM 시장은 2026년에 커졌습니다.", "r1")), List.of(), List.of());
-        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
     }
 
     @Test
@@ -381,7 +381,7 @@ class OrchestratedChatEngineTest {
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(),
                 List.of(new ChatToolItem(HYNIX, "company", "SK하이닉스", List.of(HYNIX), List.of())), List.of(), false, false));
         var found = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+                engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertEquals("insufficient_evidence", found.result().outcome());
         assertEquals(ChatResults.insufficientReason(run(), ChatResults.InsufficientCause.EVIDENCE_INSUFFICIENT, false),
                 found.result().reason());
@@ -393,14 +393,14 @@ class OrchestratedChatEngineTest {
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(), List.of(),
                 List.of(), false, false));
         var none = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+                engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertTrue(none.result().reason().startsWith("조회한 범위에서 관련된 공개 자료를 찾지 못했어요."), none.result().reason());
         assertEquals("nothing_found", none.routeSummary().path("reason").asString());
 
         tools.put(ChatCapability.COMPANY_READ, scoped);
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9)));
         var narrowed = ChatPlannerTest.run(0, "v1", List.of(HYNIX), List.of("ev-other"), List.of("ev-other"));
-        ChatResult selection = completed(engine().answer(narrowed, new Control(Duration.ofSeconds(60))));
+        ChatResult selection = completed(engine().answer(narrowed, new Control(Duration.ofSeconds(1200))));
         assertEquals("insufficient_evidence", selection.outcome());
         assertTrue(selection.reason().endsWith("선택을 해제하고 다시 물으면 더 넓게 찾아볼 수 있어요."), selection.reason());
 
@@ -409,7 +409,7 @@ class OrchestratedChatEngineTest {
                 List.of(), false, false));
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
                 List.of(NVDA)));
-        ChatResult elsewhere = completed(engine().answer(narrowed, new Control(Duration.ofSeconds(60))));
+        ChatResult elsewhere = completed(engine().answer(narrowed, new Control(Duration.ofSeconds(1200))));
         assertEquals("insufficient_evidence", elsewhere.outcome());
         assertFalse(elsewhere.reason().contains("선택한 근거 안에서만"), elsewhere.reason());
         assertTrue(elsewhere.reason().endsWith("지도에서 대상을 고른 뒤 다시 물어봐 주세요."), elsewhere.reason());
@@ -421,7 +421,7 @@ class OrchestratedChatEngineTest {
                 req("r2", Map.of(ChatQueryType.Q02, 0.9), Map.of()).withAdvice(0.97));
         answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리입니다.", "r1")), List.of(), List.of());
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
-        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertEquals(List.of("investment_advice"), result.limitations().stream().map(l -> l.kind()).toList());
         assertEquals("요구 r2", result.limitations().getFirst().label());
         assertEquals("partial", result.answerStatus());
@@ -429,7 +429,7 @@ class OrchestratedChatEngineTest {
 
         generated.clear();
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()).withAdvice(0.97));
-        var control = new Control(Duration.ofSeconds(60));
+        var control = new Control(Duration.ofSeconds(1200));
         ChatResult guidance = completed(engine().answer(run(), control));
         assertEquals("guidance", guidance.outcome());
         assertEquals(ChatResults.reason("investment_advice"), guidance.reason());
@@ -441,7 +441,7 @@ class OrchestratedChatEngineTest {
     void moreCompaniesThanTheCheckpointAllowsAskWhichOnesBeforeTheNextStage() {
         issueCompanies = List.of(HYNIX, NVDA, AMD);
         decision = dependent("exactly", 2);
-        var control = new Control(Duration.ofSeconds(60));
+        var control = new Control(Duration.ofSeconds(1200));
 
         ChatResult result = completed(engine().answer(run(), control));
         assertEquals("clarification", result.outcome());
@@ -462,7 +462,7 @@ class OrchestratedChatEngineTest {
                 List.of(), List.of("iss-1"));
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
 
-        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertEquals("answered", result.outcome());
         assertEquals(List.of("precondition_unmet"), result.limitations().stream().map(l -> l.kind()).toList());
         assertEquals(List.of(new GraphTarget("iss-1", "issue")), result.graphTargets());
@@ -474,7 +474,7 @@ class OrchestratedChatEngineTest {
         answer = new ChatGeneratedAnswer(List.of(grounded("사건", List.of("r1"), "ev-issue"),
                 grounded("두 회사", List.of("r2"), evidence(HYNIX), evidence(NVDA))), List.of(), List.of());
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no"), new Verdict("supported", "no")));
-        var control = new Control(Duration.ofSeconds(60));
+        var control = new Control(Duration.ofSeconds(1200));
 
         ChatResult result = completed(engine().answer(run(), control));
         assertEquals("answered", result.outcome());
@@ -490,7 +490,7 @@ class OrchestratedChatEngineTest {
         answer = new ChatGeneratedAnswer(List.of(grounded("조회 범위에서 해당 사건은 없습니다.", List.of("r1"))), List.of(),
                 List.of());
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
-        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertEquals("answered", result.outcome());
         assertTrue(generated.getFirst().branches().getFirst().noneFound());
         assertEquals(List.of("precondition_unmet"), result.limitations().stream().map(l -> l.kind()).toList());
@@ -501,9 +501,9 @@ class OrchestratedChatEngineTest {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
                 List.of(HYNIX)));
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
-        assertFailed("transient", null, true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("transient", null, true, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> { throw new IllegalStateException("bug"); });
-        assertFailed("internal", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("internal", null, false, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertTrue(generated.isEmpty());
     }
 
@@ -519,7 +519,7 @@ class OrchestratedChatEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+                engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         ChatResult result = outcome.result();
         assertEquals("answered", result.outcome());
         assertEquals("partial", result.answerStatus());
@@ -539,7 +539,7 @@ class OrchestratedChatEngineTest {
             }
             return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
         });
-        ChatResult late = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult late = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertEquals(List.of("tool_unavailable"), late.limitations().stream().map(l -> l.kind()).toList());
     }
 
@@ -554,7 +554,7 @@ class OrchestratedChatEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+                engine().answer(run(), new Control(Duration.ofSeconds(1200))));
 
         ChatResult result = outcome.result();
         assertEquals("complete", result.answerStatus());
@@ -576,7 +576,7 @@ class OrchestratedChatEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
 
         var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
-                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+                engine().answer(run(), new Control(Duration.ofSeconds(1200))));
 
         assertEquals(List.of("tool_unavailable"), outcome.result().limitations().stream().map(l -> l.kind()).toList());
         assertTrue(outcome.result().notices().isEmpty());
@@ -591,7 +591,7 @@ class OrchestratedChatEngineTest {
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(), List.of(),
                 List.of(), false, false));
 
-        assertFailed("transient", null, true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("transient", null, true, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertTrue(generated.isEmpty(), "an empty read beside a fault is not 'nothing found'");
     }
 
@@ -602,7 +602,7 @@ class OrchestratedChatEngineTest {
                 Map.of("issue.read", 0.9, "company.read", 0.9), List.of("iss-1")),
                 req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9)).dependingOn(new Dependency("r1", "exactly", 1)));
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
-        var control = new Control(Duration.ofSeconds(60));
+        var control = new Control(Duration.ofSeconds(1200));
 
         assertFailed("transient", null, true, engine().answer(run(), control));
         assertEquals(2, control.reserved.size(), "the dependent stage never ran");
@@ -618,7 +618,7 @@ class OrchestratedChatEngineTest {
                 List.of(), List.of());
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("hold", "no")));
 
-        assertFailed("transient", null, true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("transient", null, true, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
     }
 
     @Test
@@ -627,7 +627,7 @@ class OrchestratedChatEngineTest {
                 req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)),
                 req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("issue.read", 0.9), List.of("iss-1")));
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> { throw new IllegalStateException("bug"); });
-        assertFailed("internal", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("internal", null, false, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertTrue(generated.isEmpty(), "a bug is not passed off as a partial answer");
     }
 
@@ -636,7 +636,7 @@ class OrchestratedChatEngineTest {
         // The second stage cannot run when its source could not be read: that is the fault, not a checkpoint miss.
         decision = dependent("exactly", 2);
         tools.put(ChatCapability.ISSUE_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
-        var control = new Control(Duration.ofSeconds(60));
+        var control = new Control(Duration.ofSeconds(1200));
         assertFailed("transient", null, true, engine().answer(run(), control));
         assertEquals(1, control.reserved.size(), "the dependent stage never ran");
 
@@ -648,7 +648,7 @@ class OrchestratedChatEngineTest {
         answer = new ChatGeneratedAnswer(List.of(grounded("HBM 공급 사건이 있습니다.", List.of("r1"), "ev-issue")),
                 List.of(), List.of());
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
-        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertEquals("partial", result.answerStatus());
         assertEquals(List.of("tool_unavailable"), result.limitations().stream().map(l -> l.kind()).toList());
         assertEquals("요구 r2", result.limitations().getFirst().label());
@@ -663,7 +663,7 @@ class OrchestratedChatEngineTest {
         answer = new ChatGeneratedAnswer(List.of(grounded("HBM 공급 사건이 있습니다.", List.of("r2"), "ev-issue")),
                 List.of(), List.of());
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("hold", "no")));
-        assertFailed("transient", null, true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("transient", null, true, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
     }
 
     @Test
@@ -693,7 +693,7 @@ class OrchestratedChatEngineTest {
                         List.of("r2"), List.of()));
         for (var candidate : bad) {
             answer = candidate;
-            assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+            assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         }
         assertEquals(0, verifierCalls);
     }
@@ -704,7 +704,7 @@ class OrchestratedChatEngineTest {
                 List.of(HYNIX)));
         answer = new ChatGeneratedAnswer(List.of(grounded("사실", List.of("r2"), evidence(HYNIX))), List.of(), List.of());
         readable.remove(evidence(HYNIX));
-        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertEquals(0, verifierCalls);
     }
 
@@ -721,16 +721,16 @@ class OrchestratedChatEngineTest {
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no"), new Verdict("contradicted", "no"), supported,
                 supported));
-        ChatResult contradicted = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult contradicted = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertEquals(List.of("개념", "엔비디아", "둘을 잇는 문장"), contradicted.sections().stream()
                 .map(s -> s.text().replace(ChatAnswerCheck.GENERAL_NOTICE + " ", "")).toList());
         assertTrue(contradicted.limitations().isEmpty(), "a separately verified joining claim still answers r2");
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "yes"), supported, supported, supported));
-        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no"), new Verdict("hold", "no"), supported,
                 new Verdict("hold", "no")));
-        ChatResult held = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult held = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertEquals("answered", held.outcome());
         assertEquals(List.of("개념", "엔비디아"), held.sections().stream()
                 .map(s -> s.text().replace(ChatAnswerCheck.GENERAL_NOTICE + " ", "")).toList(),
@@ -746,14 +746,14 @@ class OrchestratedChatEngineTest {
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "hold"), new Verdict("hold", "no"),
                 new Verdict("hold", "no"), new Verdict("hold", "no")));
-        ChatResult none = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult none = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         assertEquals("insufficient_evidence", none.outcome());
         assertEquals("none", none.answerBasis());
         assertTrue(none.reason().startsWith("근거는 찾았지만"), none.reason());
         assertEquals(List.of("SK하이닉스", "NVIDIA"), none.applied().companies().stream().map(c -> c.label()).toList());
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
-        assertFailed("transient", "provider_error", true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("transient", "provider_error", true, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
     }
 
     @Test
@@ -767,7 +767,7 @@ class OrchestratedChatEngineTest {
                 new ChatSemanticVerdicts.ClaimVerdict("s0c0", "supported", "no"),
                 new ChatSemanticVerdicts.ClaimVerdict("s0c1", "supported", "yes")))));
 
-        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))));
 
         assertEquals("answered", result.outcome());
         assertEquals("공급 계약이 확인됐습니다.", result.answer());
@@ -798,20 +798,20 @@ class OrchestratedChatEngineTest {
     void aTokenLimitAsksToNarrowTheQuestionInsteadOfRerunningIt() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
         routerFailure = new ChatModels.Failure(ChatModels.Failure.Fate.REFUSED, ChatModels.INPUT_BUDGET_EXCEEDED, "input");
-        assertFailed("budget_exceeded", "context_too_large", false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("budget_exceeded", "context_too_large", false, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
         routerFailure = new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, ChatModels.OUTPUT_BUDGET_EXCEEDED, "output");
-        assertFailed("budget_exceeded", "output_limit", false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("budget_exceeded", "output_limit", false, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
     }
 
     @Test
     void modelFailuresAreRerunOnlyWhenNothingMayHaveBeenProcessed() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
         routerFailure = new ChatModels.Failure(ChatModels.Failure.Fate.UNKNOWN, "timed out after sending");
-        assertFailed("transient", "response_unknown", false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("transient", "response_unknown", false, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
 
         routerFailure = null;
         generatorFailure = new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, "connection refused");
-        assertFailed("transient", "provider_error", true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertFailed("transient", "provider_error", true, engine().answer(run(), new Control(Duration.ofSeconds(1200))));
     }
 
     @Test
@@ -822,12 +822,12 @@ class OrchestratedChatEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
 
         answer = new ChatGeneratedAnswer(List.of(grounded("엔비디아", List.of("r2"), evidence(NVDA))), List.of(), List.of());
-        var control = new Control(Duration.ofSeconds(60));
+        var control = new Control(Duration.ofSeconds(1200));
         assertFailed("validation_failed", null, false, engine().answer(narrowed, control));
         assertTrue(control.reserved.getFirst().requestMeta().contains(evidence(HYNIX)), "the scope is part of the record");
 
         answer = new ChatGeneratedAnswer(List.of(grounded("하이닉스", List.of("r2"), evidence(HYNIX))), List.of(), List.of());
-        ChatResult result = completed(engine().answer(narrowed, new Control(Duration.ofSeconds(60))));
+        ChatResult result = completed(engine().answer(narrowed, new Control(Duration.ofSeconds(1200))));
         assertEquals(List.of(evidence(HYNIX)), result.citations().stream().map(Citation::evidenceId).toList());
     }
 
@@ -839,12 +839,12 @@ class OrchestratedChatEngineTest {
                 List.of(HYNIX)));
 
         var selectedOther = ChatPlannerTest.run(0, "v1", List.of(NVDA));
-        assertTrue(completed(engine().answer(selectedOther, new Control(Duration.ofSeconds(60))))
+        assertTrue(completed(engine().answer(selectedOther, new Control(Duration.ofSeconds(1200))))
                 .applied().questionOverrodeContext());
         var selectedSame = ChatPlannerTest.run(0, "v1", List.of(HYNIX));
-        assertFalse(completed(engine().answer(selectedSame, new Control(Duration.ofSeconds(60))))
+        assertFalse(completed(engine().answer(selectedSame, new Control(Duration.ofSeconds(1200))))
                 .applied().questionOverrodeContext());
-        assertFalse(completed(engine().answer(run(), new Control(Duration.ofSeconds(60))))
+        assertFalse(completed(engine().answer(run(), new Control(Duration.ofSeconds(1200))))
                 .applied().questionOverrodeContext(), "nothing was selected, so nothing was replaced");
     }
 
@@ -852,18 +852,30 @@ class OrchestratedChatEngineTest {
     void aModelStageThatRunsPastItsLimitIsInterruptedAndNeverRerun() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
         var interrupted = new java.util.concurrent.CountDownLatch(1);
-        ChatModels.Generator slow = (run, context) -> {
+        ChatModels.Generator slow = (run, context, permit) -> {
             try {
-                Thread.sleep(5_000);
+                Thread.sleep(60_000);
             } catch (InterruptedException stop) {
                 interrupted.countDown();
             }
             return new ChatGeneratedAnswer(List.of(general("늦은 답", "r1")), List.of(), List.of());
         };
-        var limits = new OrchestratedChatEngine.StageLimits(Duration.ofMillis(200), Duration.ofMillis(200),
-                Duration.ofMillis(200), Duration.ofMillis(200), Duration.ofMillis(200));
-        var control = new Control(Duration.ofSeconds(60));
-        try (var engine = engine(slow, limits)) {
+        var control = new Control(Duration.ofSeconds(1200)) {
+            @Override public tools.jackson.databind.JsonNode modelResources(String id, tools.jackson.databind.JsonNode proposed) {
+                if (id.endsWith(".answer")) {
+                    var changed = ((tools.jackson.databind.node.ObjectNode) proposed).deepCopy();
+                    changed.put("providerTimeoutMs", 1);
+                    changed.remove("allocationDigest");
+                    var preimage = com.zoop.common.json.StrictJson.newObject().put("schemaVersion", "zoop-chat-resource-allocation-1")
+                            .put("stage", "chat-answer").put("mode", "replay");
+                    preimage.set("resources", changed.deepCopy());
+                    changed.put("allocationDigest", com.zoop.common.json.Canonical.digest(preimage));
+                    return changed;
+                }
+                return super.modelResources(id, proposed);
+            }
+        };
+        try (var engine = engine(slow)) {
             assertFailed("transient", "response_unknown", false, engine.answer(run(), control));
         }
         assertEquals(2, control.modelCalls, "the generator was announced, so the run counts as having called a model");
@@ -886,7 +898,7 @@ class OrchestratedChatEngineTest {
                 List.of("r1"), List.of("ev-doc"))), List.of(), List.of());
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
 
-        ChatResult result = completed(engine().answer(ChatPlannerTest.run(0, null), new Control(Duration.ofSeconds(60))));
+        ChatResult result = completed(engine().answer(ChatPlannerTest.run(0, null), new Control(Duration.ofSeconds(1200))));
         assertEquals("answered", result.outcome());
         assertEquals("zoop_documented", result.answerBasis());
         assertEquals(List.of("zoop_doc"), result.citations().stream().map(Citation::sourceKind).toList());
@@ -896,7 +908,7 @@ class OrchestratedChatEngineTest {
         // The read passed it on as a ZOOP document, but the record now says otherwise: the answer cannot stand on it.
         readable.put("ev-doc", readable.get(evidence(HYNIX)));
         assertFailed("validation_failed", null, false,
-                engine().answer(ChatPlannerTest.run(0, null), new Control(Duration.ofSeconds(60))));
+                engine().answer(ChatPlannerTest.run(0, null), new Control(Duration.ofSeconds(1200))));
     }
 
     @Test
@@ -926,7 +938,7 @@ class OrchestratedChatEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no"), new Verdict("supported", "no")));
         var run = ChatPlannerTest.run(0, "v1", List.of(HYNIX), List.of(evidence(HYNIX)), List.of(evidence(HYNIX)));
 
-        ChatResult result = completed(engine().answer(run, new Control(Duration.ofSeconds(60))));
+        ChatResult result = completed(engine().answer(run, new Control(Duration.ofSeconds(1200))));
         var policy = asked.stream().filter(r -> r.capabilityId().equals("zoopPolicy.read")).toList();
         var company = asked.stream().filter(r -> r.capabilityId().equals("company.read")).toList();
         assertEquals(1, policy.size());
@@ -949,7 +961,7 @@ class OrchestratedChatEngineTest {
         answer = new ChatGeneratedAnswer(List.of(grounded("조회된 관계 변경입니다.", List.of("r1"), "ev-issue")),
                 List.of(), List.of());
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("hold", "no")));
-        assertEquals("insufficient_evidence", completed(engine().answer(run(), new Control(Duration.ofSeconds(60)))).outcome());
+        assertEquals("insufficient_evidence", completed(engine().answer(run(), new Control(Duration.ofSeconds(1200)))).outcome());
         var fact = assertInstanceOf(ChatModels.ComparisonFact.class,
                 verifiedFacts.forRequest(verifiedRun, verifiedSections).getFirst().getFirst());
         assertEquals(List.of(new ChatModels.GraphChange("edge-stable", "edge",
@@ -972,7 +984,7 @@ class OrchestratedChatEngineTest {
         answer = new ChatGeneratedAnswer(List.of(grounded("보유·관심 종목의 조회된 변경입니다.", List.of("r1"),
                 "ev-issue")), List.of(), List.of());
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict("hold", "no")));
-        var control = new Control(Duration.ofSeconds(60));
+        var control = new Control(Duration.ofSeconds(1200));
         assertEquals("insufficient_evidence", completed(engine().answer(run(), control)).outcome());
         assertEquals(2, control.reserved.size(), "scope and diff once each; no verifier membership requery");
         assertEquals(1, generated.getFirst().branches().size(), "scope stays merged into parent");
@@ -1028,10 +1040,10 @@ class OrchestratedChatEngineTest {
     }
 
     private OrchestratedChatEngine engine() {
-        return engine(null, OrchestratedChatEngine.StageLimits.POLICY);
+        return engine(null);
     }
 
-    private OrchestratedChatEngine engine(ChatModels.Generator replacement, OrchestratedChatEngine.StageLimits limits) {
+    private OrchestratedChatEngine engine(ChatModels.Generator replacement) {
         List<ChatTool> adapters = tools.entrySet().stream().map(e -> (ChatTool) new ChatTool() {
             public ChatCapability capability() { return e.getKey(); }
             public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
@@ -1041,16 +1053,16 @@ class OrchestratedChatEngineTest {
         var registry = new ChatToolRegistry(adapters);
         var runner = new ChatToolRunner(registry);
         runners.add(runner);
-        ChatModels.Router router = (run, bound) -> {
+        ChatModels.Router router = (run, bound, permit) -> {
             if (routerFailure != null) throw routerFailure;
             return decision;
         };
-        ChatModels.Generator generator = (run, context) -> {
+        ChatModels.Generator generator = (run, context, permit) -> {
             generated.add(context);
             if (generatorFailure != null) throw generatorFailure;
             return answer;
         };
-        ChatModels.Verifier verifier = (run, sections, citations, facts) -> {
+        ChatModels.Verifier verifier = (run, sections, citations, facts, permit) -> {
             verifierCalls++;
             verifiedFacts = facts;
             verifiedRun = run;
@@ -1059,7 +1071,7 @@ class OrchestratedChatEngineTest {
         };
         ChatCitationSource citations = (id, version, asOf, trace) -> Optional.ofNullable(readable.get(id));
         var engine = new OrchestratedChatEngine(router, replacement != null ? replacement : generator, verifier, registry,
-                runner, citations, Clock.fixed(NOW, ZoneOffset.UTC), limits);
+                runner, citations, Clock.fixed(NOW, ZoneOffset.UTC), com.zoop.chat.executor.ChatResourceFixtures.runtime());
         engines.add(engine);
         return engine;
     }
@@ -1089,7 +1101,8 @@ class OrchestratedChatEngineTest {
     }
 
     /** Records what the engine asks of the run. */
-    private static final class Control implements ChatRunControl {
+    private static class Control extends com.zoop.chat.executor.ChatResourceFixtures.Control {
+        @Override protected Clock resourceClock() { return Clock.fixed(NOW, ZoneOffset.UTC); }
         final List<String> phases = new ArrayList<>();
         final List<ChatToolCallReservation> reserved = Collections.synchronizedList(new ArrayList<>());
         final Duration remaining;

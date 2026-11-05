@@ -49,6 +49,6 @@ public class ChatModelConfiguration {
     OrchestratedChatEngine chatEngine(ChatModelStages stages, ChatToolRegistry registry, ChatToolRunner runner,
             ChatCitationSource citations, Clock clock, ObjectProvider<ChatAgentPath> agent) {
         // The agent path exists only with the MCP endpoint and its agent flag on (ChatMcpConfiguration); otherwise direct.
-        return new OrchestratedChatEngine(stages, stages, stages, registry, runner, citations, clock, agent.getIfAvailable());
+        return new OrchestratedChatEngine(stages, stages, stages, registry, runner, citations, clock, stages, agent.getIfAvailable());
     }
 }

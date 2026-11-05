@@ -12,11 +12,12 @@ from typing import Any
 
 import pytest
 
-from zoop_ai_service.chat_stages import PROBE_DEADLINE, STAGE_DEADLINE, ChatStages, interpret, interpret_probe
+from zoop_ai_service.chat_stages import PROBE_DEADLINE, ChatStages, interpret, interpret_probe
 from zoop_ai_service.chat_wire import ChatStageRequest
 from zoop_ai_service.config import ChatConfig, ServiceConfig
 from zoop_ai_service.jobs import ApiError, Observation
 from zoop_ai_service.runtime import Outcome
+from chat_resource_fixtures import allocation
 
 
 def config(tmp_path: Path, *, replay: bool = True) -> ServiceConfig:
@@ -27,8 +28,8 @@ def config(tmp_path: Path, *, replay: bool = True) -> ServiceConfig:
 
 
 def request(stage: str = "chat-router", *, mode: str = "replay", invocation: str = "job-00000001:1:router") -> ChatStageRequest:
-    return ChatStageRequest.model_validate({"schemaVersion": "zoop-ai-chat-5", "invocationId": invocation, "stage": stage, "mode": mode,
-                                            "input": {"turns": [{"text": "q"}]}})
+    return ChatStageRequest.model_validate({"schemaVersion": "zoop-ai-chat-6", "invocationId": invocation, "stage": stage, "mode": mode,
+                                            "input": {"turns": [{"text": "q"}]}, "resources": allocation(stage, mode)["resources"]})
 
 
 RECEIPT = {"provider": "authored-replay", "providerRevision": "authored-replay-1", "model": "authored-synthetic-chat-router",
@@ -38,10 +39,10 @@ RECEIPT = {"provider": "authored-replay", "providerRevision": "authored-replay-1
 
 
 def result(invocation: str, stage: str = "chat-router", status: str = "succeeded", **extra: Any) -> dict[str, Any]:
-    body = {"schemaVersion": "zoop-ai-chat-5", "invocationId": invocation, "stage": stage, "status": status,
+    body = {"schemaVersion": "zoop-ai-chat-6", "invocationId": invocation, "stage": stage, "status": status,
             "answer": {"requirements": []} if status == "succeeded" else None,
             "failure": None if status == "succeeded" else {"code": "source_grant_denied", "sent": False, "unknown": False},
-            "receipt": dict(RECEIPT) if status == "succeeded" else None}
+            "receipt": dict(RECEIPT) if status == "succeeded" else None, "resourceBinding": allocation(stage)["binding"]}
     body.update(extra)
     return body
 
@@ -83,8 +84,8 @@ def test_exit_codes_map_to_outcomes_and_anything_unexpected_is_abnormal():
 
 
 def test_probe_exit_codes_map_only_the_closed_health_envelope():
-    reachable = b'{"schemaVersion":"zoop-ai-chat-5","mcp":"reachable"}'
-    unreachable = b'{"schemaVersion":"zoop-ai-chat-5","mcp":"unreachable","reason":"mcp_timeout"}'
+    reachable = b'{"schemaVersion":"zoop-ai-chat-6","mcp":"reachable"}'
+    unreachable = b'{"schemaVersion":"zoop-ai-chat-6","mcp":"unreachable","reason":"mcp_timeout"}'
     assert interpret_probe(0, reachable).kind == "result"
     assert interpret_probe(2, unreachable).kind == "result"
     assert interpret_probe(64, b'{"error":"mcp_server_url_invalid"}') == Outcome(
@@ -101,7 +102,7 @@ def test_the_child_sees_a_principal_bound_id_and_the_caller_gets_its_own_back(tm
     stages = ChatStages(config(tmp_path), process)
     status, answer = stages.invoke("app", "chat-router", request(), Observation())
     sent, deadline = process.calls[0]
-    assert sent["invocationId"] == "app:job-00000001:1:router" and deadline == STAGE_DEADLINE["chat-router"]
+    assert sent["invocationId"] == "app:job-00000001:1:router" and deadline == 20.0
     assert status == 200 and answer.invocation_id == "job-00000001:1:router" and answer.status == "succeeded"
 
 
@@ -211,8 +212,8 @@ def test_a_consistent_failed_result_with_a_receipt_passes_and_keeps_its_fate(tmp
 # ---- the MCP preflight ---------------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("health", [
-    {"schemaVersion": "zoop-ai-chat-5", "mcp": "reachable"},
-    {"schemaVersion": "zoop-ai-chat-5", "mcp": "unreachable", "reason": "mcp_connect_failed"},
+    {"schemaVersion": "zoop-ai-chat-6", "mcp": "reachable"},
+    {"schemaVersion": "zoop-ai-chat-6", "mcp": "unreachable", "reason": "mcp_connect_failed"},
 ])
 def test_a_probe_relays_a_closed_health_answer_without_a_stage_invocation(tmp_path, health):
     process = Scripted(probe_outcome=Outcome("result", result=health, exit_code=0 if health["mcp"] == "reachable" else 2))
@@ -224,7 +225,7 @@ def test_a_probe_relays_a_closed_health_answer_without_a_stage_invocation(tmp_pa
 
 
 @pytest.mark.parametrize("outcome,status,code", [
-    (Outcome("result", result={"schemaVersion": "zoop-ai-chat-5", "mcp": "unreachable"}, exit_code=2), 502, "probe_failed"),
+    (Outcome("result", result={"schemaVersion": "zoop-ai-chat-6", "mcp": "unreachable"}, exit_code=2), 502, "probe_failed"),
     (Outcome("error", code="mcp_server_url_required", exit_code=64), 503, "service_configuration_invalid"),
     (Outcome("timeout"), 504, "probe_failed"),
     (Outcome("abnormal", exit_code=-9), 502, "probe_failed"),
@@ -247,7 +248,7 @@ FINAL = {"responseId": "resp_2", "status": "completed", "approvalRequests": [], 
 def test_an_agent_step_is_relayed_with_its_own_deadline(tmp_path, step):
     process = Scripted(lambda p: Outcome("result", result=result(p["invocationId"], stage="chat-agent", answer=step), exit_code=0))
     status, body = ChatStages(config(tmp_path), process).invoke("app", "chat-agent", request("chat-agent"), Observation())
-    assert status == 200 and body.answer.status == step["status"] and process.calls[0][1] == STAGE_DEADLINE["chat-agent"] == 33.0
+    assert status == 200 and body.answer.status == step["status"] and process.calls[0][1] == 605.0
 
 
 def test_an_agent_web_report_is_relayed_instead_of_becoming_outcome_unknown(tmp_path):
@@ -296,7 +297,7 @@ def test_no_slot_within_the_wait_is_busy_and_starts_nothing(tmp_path):
 
 def test_a_probe_answers_while_every_stage_slot_is_held(tmp_path):
     # An agent step holding the only stage slot must not make a reachable MCP server look unproven.
-    reachable = Outcome("result", result={"schemaVersion": "zoop-ai-chat-5", "mcp": "reachable"}, exit_code=0)
+    reachable = Outcome("result", result={"schemaVersion": "zoop-ai-chat-6", "mcp": "reachable"}, exit_code=0)
     process = Scripted(lambda payload: Outcome("result", result=result(payload["invocationId"]), exit_code=0),
                        probe_outcome=reachable)
     process.hold = threading.Event()

@@ -23,20 +23,22 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * {@link ChatStageClient} over the shared {@link AiHttpTransport}. The answer must be a {@code zoop-ai-chat-5} result for the
+ * {@link ChatStageClient} over the shared {@link AiHttpTransport}. The answer must be a {@code zoop-ai-chat-6} result for the
  * same invocation and stage; anything else is a {@code RESPONSE_MALFORMED} transport failure, which for this mutating operation
  * means the stage may have sent a request. Error envelopes are the S1 family's ({@code zoop-ai-internal-1}).
  */
 public final class HttpChatStageClient implements ChatStageClient, AutoCloseable {
-    static final String SCHEMA = "zoop-ai-chat-5";
+    static final String SCHEMA = "zoop-ai-chat-6";
     private static final String PATH = "/internal/v1/chat-stages/";
     private static final String MCP_HEALTH_PATH = "/internal/v1/chat-mcp-health";
     private static final Pattern FAILURE_CODE = Pattern.compile("[a-z0-9_]{1,64}");
     private static final Pattern NAME = Pattern.compile("[\\x20-\\x7E]{1,200}");
 
     private final AiHttpTransport transport;
+    private final Duration requestTimeout;
 
     public HttpChatStageClient(AiClientSettings settings) {
+        this.requestTimeout = settings.requestTimeout();
         this.transport = new AiHttpTransport(settings);
     }
 
@@ -45,11 +47,30 @@ public final class HttpChatStageClient implements ChatStageClient, AutoCloseable
         ObjectNode body = JsonNodeFactory.instance.objectNode();
         body.put("schemaVersion", SCHEMA).put("invocationId", call.invocationId()).put("stage", call.stage())
                 .put("mode", call.mode()).set("input", call.input());
+        body.set("resources", call.permit().resources());
         Reply reply = transport.exchange(AiOperation.CHAT_STAGE, "POST",
                 transport.uri(PATH + AiHttpTransport.segment(call.stage())),
                 WireJson.compact(body).getBytes(StandardCharsets.UTF_8), call.invocationId(),
-                HttpChatStageClient::rejection, 200);
+                HttpChatStageClient::rejection, call.permit().httpTimeout(), 200);
         return AiHttpTransport.decode(reply, () -> decode(reply.body(), call));
+    }
+
+    @Override
+    public com.zoop.ai.chat.ChatRuntimeCapabilities capabilities() {
+        Reply reply = transport.exchange(AiOperation.CHAT_RUNTIME_CAPABILITIES, "GET",
+                transport.uri("/internal/v1/chat-runtime-capabilities"), null, null, HttpChatStageClient::rejection, 200);
+        return AiHttpTransport.decode(reply, () -> {
+            try {
+                return new com.zoop.ai.chat.ChatRuntimeCapabilities(reply.body());
+            } catch (IllegalArgumentException | com.zoop.common.json.StrictJson.Malformed invalid) {
+                throw new Malformed("capabilities");
+            }
+        });
+    }
+
+    @Override
+    public void requireTimeout(Duration required) {
+        if (requestTimeout.compareTo(required) < 0) throw new IllegalStateException("chat_resource_policy_invalid");
     }
 
     /** The no-body, non-mutating MCP preflight. It never retries and never sends an idempotency key. */
@@ -81,8 +102,13 @@ public final class HttpChatStageClient implements ChatStageClient, AutoCloseable
 
     static ChatStageReply decode(JsonNode node, ChatStageCall call) {
         Obj root = Obj.of(node, "body");
-        if (!SCHEMA.equals(root.string("schemaVersion", NAME)) || !call.invocationId().equals(root.string("invocationId", NAME))
-                || !call.stage().equals(root.string("stage", NAME))) {
+        if (!call.permit().binding().equals(node.get("resourceBinding")) || !SCHEMA.equals(root.string("schemaVersion", NAME))) {
+            throw new Malformed("resourceBinding", com.zoop.ai.AiTransportException.Failure.RESOURCE_BINDING_MISMATCH);
+        }
+        if (!java.util.Set.copyOf(node.propertyNames()).equals(java.util.Set.of("schemaVersion", "invocationId", "stage", "status", "answer", "failure", "receipt", "resourceBinding"))) {
+            throw new Malformed("envelope");
+        }
+        if (!call.invocationId().equals(root.string("invocationId", NAME)) || !call.stage().equals(root.string("stage", NAME))) {
             throw new Malformed("identity");
         }
         String status = root.string("status", NAME);
@@ -102,7 +128,8 @@ public final class HttpChatStageClient implements ChatStageClient, AutoCloseable
         if (!consistent || (receipt != null && !call.mode().equals(receipt.executionMode()))) {
             throw new Malformed("outcome");
         }
-        return new ChatStageReply(call.invocationId(), call.stage(), succeeded, succeeded ? answer : null, failure, receipt);
+        return new ChatStageReply(call.invocationId(), call.stage(), succeeded, succeeded ? answer : null, failure, receipt,
+                node.get("resourceBinding"));
     }
 
     private static ChatStageReply.Receipt receipt(Obj r) {

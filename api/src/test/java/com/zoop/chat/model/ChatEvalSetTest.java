@@ -188,27 +188,27 @@ public class ChatEvalSetTest {
         List<String> stages = new ArrayList<>();
         List<ChatRouteDecision> decisions = new ArrayList<>();
         List<String> failedChecks = new ArrayList<>();
-        var modelStages = new ChatModelStages(call -> {
+        var modelStages = new ChatModelStages(com.zoop.chat.executor.ChatResourceFixtures.client(call -> {
             stages.add(STAGE_NAMES.get(call.stage()));
             return reply(call, script);
-        }, "replay", world.names, world.issues, world.citations, articleId -> Optional.of("fixture-news"), new ChatModelRecorder(null,
+        }), "replay", world.names, world.issues, world.citations, articleId -> Optional.of("fixture-news"), new ChatModelRecorder(null,
                 Clock.systemUTC()) {
             @Override
             public String start(String jobId, int attemptNo, String stage, String mode) {
                 return "aix-eval";
             }
-
+        
             @Override
             public void finish(String execution, String status, String sendState, ChatStageReply.Receipt receipt, String code) {
             }
         });
-        ChatModels.Router router = (r, bound) -> {
-            ChatRouteDecision decision = modelStages.route(r, bound);
+        ChatModels.Router router = (r, bound, permit) -> {
+            ChatRouteDecision decision = modelStages.route(r, bound, permit);
             decisions.add(decision);
             return decision;
         };
-        ChatModels.Generator generator = (r, context) -> {
-            ChatGeneratedAnswer answer = modelStages.generate(r, context);
+        ChatModels.Generator generator = (r, context, permit) -> {
+            ChatGeneratedAnswer answer = modelStages.generate(r, context, permit);
             String check = ChatEvalProbe.failedCheck(context.branches(), answer);
             if (check != null) failedChecks.add(check);
             return answer;
@@ -220,7 +220,7 @@ public class ChatEvalSetTest {
             ChatEngineOutcome outcome;
             try (var runner = com.zoop.chat.tool.ChatToolRunners.withAmpleTime(world.registry);
                     var engine = new OrchestratedChatEngine(router, generator, modelStages, world.registry, runner,
-                            world.citations, Clock.fixed(NOW, ZoneOffset.UTC))) {
+                            world.citations, Clock.fixed(NOW, ZoneOffset.UTC), modelStages)) {
                 outcome = engine.answer(run, control);
             }
             observed = observe(run, outcome, stages, decisions, failedChecks, control);
@@ -319,14 +319,16 @@ public class ChatEvalSetTest {
                 answer = out;
             }
         }
-        return new ChatStageReply(call.invocationId(), call.stage(), true, answer, null, RECEIPT);
+        var receipt = call.stage().equals("chat-answer") || call.stage().equals("chat-agent")
+                ? new ChatStageReply.Receipt("openai-compatible", "chat-eval", "gpt-6-luna", "chat-eval", "replay",
+                        100L, 100L, 0L, NOW, NOW) : RECEIPT;
+        return new ChatStageReply(call.invocationId(), call.stage(), true, answer, null, receipt, call.permit().binding());
     }
 
     private static ChatStageReply failure(ChatStageCall call, String fate) {
         boolean unknown = fate.equals("unknown");
         boolean sent = !fate.equals("refused");
-        return new ChatStageReply(call.invocationId(), call.stage(), false, null,
-                new ChatStageReply.Failure("scripted_" + fate, sent, unknown), sent ? RECEIPT : null);
+        return new ChatStageReply(call.invocationId(), call.stage(), false, null, new ChatStageReply.Failure("scripted_" + fate, sent, unknown), sent ? RECEIPT : null, call.permit().binding());
     }
 
     /** {@code $branch} cites every quote its first requirement's branch was sent, {@code $branch:N} the first N of them. */
@@ -780,13 +782,14 @@ public class ChatEvalSetTest {
     }
 
     /** Records the model calls and tool calls the engine announces; the run never runs out of time. */
-    private static final class Control implements ChatRunControl {
+    private static final class Control extends com.zoop.chat.executor.ChatResourceFixtures.Control {
+        @Override protected Clock resourceClock() { return Clock.fixed(NOW, ZoneOffset.UTC); }
         final List<String> capabilities = Collections.synchronizedList(new ArrayList<>());
         private int reserved;
 
         @Override public void phase(String phase) { }
         @Override public void beforeModelCall() { }
-        @Override public Duration remaining() { return Duration.ofSeconds(60); }
+        @Override public Duration remaining() { return Duration.ofSeconds(1200); }
         @Override public boolean owned() { return true; }
         @Override public int toolCallsLeft() { return MAX_TOOL_CALLS - reserved; }
         @Override

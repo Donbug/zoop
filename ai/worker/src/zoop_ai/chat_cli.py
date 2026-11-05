@@ -17,7 +17,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from . import chat_probe
+from . import chat_probe, chat_resources
 from .chat_contracts import ChatGrantRegistry, StageRequest
 from .chat_runtime import LiveSender, ReplaySender, invoke
 from .contracts import canonical
@@ -40,12 +40,15 @@ def _probe() -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="zoop-ai-chat")
-    parser.add_argument("command", choices=["invoke", "probe-mcp"])
+    parser.add_argument("command", choices=["invoke", "probe-mcp", "capabilities"])
     parser.add_argument("--state-dir", type=Path, help="The chat invocation ledger directory; required by invoke")
     parser.add_argument("--grants", type=Path, help="Operator-owned chat grant registry (zoop-ai-chat-1)")
     parser.add_argument("--replay", type=Path, help="Authored replay fixture; required for replay requests")
     args = parser.parse_args(argv)
 
+    if args.command == "capabilities":
+        print(canonical(chat_resources.capabilities()))
+        return 0
     if args.command == "probe-mcp":
         return _probe()
     if args.state_dir is None or not args.state_dir.is_absolute() or not args.state_dir.is_dir():
@@ -60,15 +63,7 @@ def main(argv: list[str] | None = None) -> int:
                     if args.grants else None)
     except (OSError, ValidationError, ValueError):
         return _fail("grant_registry_invalid", 64)
-    try:
-        if request.mode == "replay":
-            if args.replay is None:
-                return _fail("replay_fixture_required", 64)
-            sender = ReplaySender(args.replay)
-        else:
-            sender = LiveSender()
-    except (OSError, ValueError, KeyError, ProviderError):
-        return _fail("replay_fixture_invalid", 64)
+    sender = ReplaySender(args.replay) if request.mode == "replay" else LiveSender()
 
     result = invoke(request, state_dir=args.state_dir, registry=registry, sender=sender)
     print(canonical(result.wire()))

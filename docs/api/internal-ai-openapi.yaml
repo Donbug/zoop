@@ -260,7 +260,7 @@
     `runtime_unavailable`. All carry `Retry-After`; there is exactly one child per request and no automatic retry. A child answer that is not the contract this service
     knows is 500 `runtime_contract_mismatch` or `runtime_binding_mismatch` (not retryable). A 503 or 500 is never an empty bundle.
 
-    **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-5`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
+    **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-6`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
     stage synchronously through the installed `zoop-ai-chat invoke`: `chat-router` (native Jev, typed probabilities per requirement), `chat-answer` (Luna, a strict
     JSON answer by sections), `chat-verification` (native Jev, per-claim support and unsupported-causality verdicts plus per-section prohibited-advice) or `chat-agent` (one step of a Luna Responses run
     that calls the ZOOP MCP tools). It is off unless its all-or-nothing server configuration group is set (otherwise 409 `execution_unavailable` after
@@ -275,12 +275,12 @@
     through this runtime); a step is sent only when it is exactly the stage's own recipient, otherwise it fails `mcp_recipient_mismatch` with nothing sent.
 
     **Once per invocation.** `invocationId` (equal to `Idempotency-Key`) names one stage of one attempt. The runtime sends it at most once: the same id and input
-    return the stored outcome, another input under the same id is the stage failure `invocation_conflict`, and a request whose outcome is unknown stays `unknown`.
+    return the stored outcome, changed input/resources under the same id are `invocation_conflict`, and a request whose outcome is unknown stays `unknown`.
     The id is bound to the calling principal. A **200** carries the stage outcome: `status=succeeded` with the typed `answer`, or `status=failed` with a stable
     `failure.code`, whether a request was `sent` and whether its fate is `unknown`. A **502/504 `stage_outcome_unknown`** means the runtime may have sent the
     request: never resend that invocation. A **503** means nothing was sent.
 
-    **Verification server facts.** The v5 verification input has `requestBinding` (`invocationId`, pinned `graphVersionId`, `asOf`)
+    **Verification server facts.** The verification input has `requestBinding` (`invocationId`, pinned `graphVersionId`, `asOf`)
     and ordered sections (`sectionId`, `requirementIds`, `basis`, ordered `claims`, `evidenceIds`, `serverFacts`). The application alone
     derives bounded typed `portfolio_scope`, `graph_comparison`, `publication_record` and `briefing_selection` facts from
     successful reads in that request, never from answer text. A publication record is an issue's last review decision (kind,
@@ -293,7 +293,17 @@
 
     **Live and rights.** Nothing reaches a provider unless the chat gate is open (`ZOOP_AI_CHAT_LIVE_ENABLED=1` and a positive `ZOOP_AI_CHAT_MAX_CALLS`, shared by
     the chat stages and separate from the S1 and pipeline gates), and quoted spans are sent only under the operator chat grant registry (`model-send`, the stage
-    as purpose and the exact recipient). Stage time limits: router 4 s, answer 25 s, verification 6 s, agent step 30 s.
+    as purpose and the exact recipient). Each invocation carries its frozen resource allocation; the provider timeout is integer milliseconds.
+    The service child deadline is provider timeout +5 s, followed by at most5 s termination grace.
+
+    **Resource preflight (`GET /internal/v1/chat-runtime-capabilities`).** Under `chat.invoke`, this content-free route returns the installed worker's
+    closed capability manifest and SHA-256 of its canonical `runtime`. It starts only `zoop-ai-chat capabilities`, with neither ledger nor provider work.
+    Every fresh schema6 stage validates that fingerprint and the allocation digest before a send; replies bind the requested policy, runtime and allocation
+    digests in `resourceBinding`. Java owns policy and invocation allocations. Luna direct and agent calls both use Responses; direct answers use `store=false`.
+    The local profile admits512k current-context input,64k total output,16k visible output and48k final Unicode code points with high effort; output is
+    configurable through128k and efforts are none/low/medium/high/xhigh/max. Successful Luna usage includes input/output/reasoning counts; missing or
+    inconsistent counts fail `provider_usage_invalid` with the raw response retained. Historical schema5 ledger outcomes remain exact read-only outcomes;
+    fresh schema5 execution is refused. A20-minute job ceiling and600-second provider ceiling are offline upper bounds, not normal latency targets.
 
     **MCP preflight (`GET /internal/v1/chat-mcp-health`).** Under the same `chat.invoke` scope, the service runs `zoop-ai-chat probe-mcp` with no request body,
     grant, model call, ledger row or live-budget charge. The child sends a content-free JSON-RPC `ping` to the operator-configured MCP URL and treats only that
@@ -7704,6 +7714,136 @@
       "security":
         - "bearerAuth":
             - "handoff.read"
+  "/internal/v1/chat-runtime-capabilities":
+    "get":
+      "tags":
+        - "chat-stages"
+      "summary": "Inspect the installed chat runtime contract without model or ledger work"
+      "operationId": "getChatRuntimeCapabilities"
+      "parameters":
+        - "name": "X-Request-ID"
+          "in": "header"
+          "required": false
+          "schema":
+            "type": "string"
+            "pattern": "^[A-Za-z0-9._-]{1,128}$"
+          "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ChatCapabilities"
+        "401":
+          "description": "authentication_required: missing, malformed or unknown bearer token."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              "examples":
+                "example":
+                  "summary": "Missing, malformed or unknown bearer token"
+                  "value":
+                    "schemaVersion": "zoop-ai-internal-1"
+                    "error":
+                      "code": "authentication_required"
+                      "retryable": false
+                      "requestId": "req-0001"
+                      "runtimeCode": null
+                      "field": null
+                    "status": null
+          "headers":
+            "WWW-Authenticate":
+              "description": "Bearer"
+              "schema":
+                "type": "string"
+        "403":
+          "description": "scope_denied: the principal lacks `chat.invoke`."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              "examples":
+                "example":
+                  "summary": "Principal lacks the route's scope"
+                  "value":
+                    "schemaVersion": "zoop-ai-internal-1"
+                    "error":
+                      "code": "scope_denied"
+                      "retryable": false
+                      "requestId": "req-0001"
+                      "runtimeCode": null
+                      "field": null
+                    "status": null
+        "409":
+          "description": "execution_unavailable: the chat configuration group is not enabled, or a replay request without a configured fixture."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+        "422":
+          "description": "invalid_request: query parameters are not accepted."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              "examples":
+                "example":
+                  "summary": "Runtime validation of the submitted input"
+                  "value":
+                    "schemaVersion": "zoop-ai-internal-1"
+                    "error":
+                      "code": "invalid_request"
+                      "retryable": false
+                      "requestId": "req-0001"
+                      "runtimeCode": "input_or_configuration_invalid"
+                      "field": null
+                    "status": null
+        "500":
+          "description": "internal_error."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+        "502":
+          "description": "probe_failed: the probe child ended abnormally or returned an invalid result."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+        "503":
+          "description": "runtime_unavailable, service_busy or service_configuration_invalid (retryable)."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              "examples":
+                "example":
+                  "summary": "Runtime unavailable: retry with the same key and body"
+                  "value":
+                    "schemaVersion": "zoop-ai-internal-1"
+                    "error":
+                      "code": "runtime_unavailable"
+                      "retryable": true
+                      "requestId": "req-0001"
+                      "runtimeCode": null
+                      "field": null
+                    "status": null
+          "headers":
+            "Retry-After":
+              "description": "Seconds before retrying with the same key and body."
+              "schema":
+                "type": "integer"
+        "504":
+          "description": "probe_failed: the content-free MCP probe deadline passed."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+      "security":
+        - "bearerAuth":
+            - "chat.invoke"
   "/internal/v1/chat-mcp-health":
     "get":
       "tags":
@@ -7729,13 +7869,13 @@
                 "reachable":
                   "summary": "The configured endpoint answered its Bearer challenge"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-5"
+                    "schemaVersion": "zoop-ai-chat-6"
                     "mcp": "reachable"
                     "reason": null
                 "unreachable":
                   "summary": "No answer before the content-free probe deadline"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-5"
+                    "schemaVersion": "zoop-ai-chat-6"
                     "mcp": "unreachable"
                     "reason": "mcp_timeout"
         "401":
@@ -8095,7 +8235,7 @@
                 "succeeded":
                   "summary": "Router probabilities"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-5"
+                    "schemaVersion": "zoop-ai-chat-6"
                     "invocationId": "job-00000001:1:chat-router"
                     "stage": "chat-router"
                     "status": "succeeded"
@@ -8128,10 +8268,15 @@
                         "reasoningTokens": null
                       "sentAt": "2026-10-22T03:00:00+00:00"
                       "receivedAt": "2026-10-22T03:00:01+00:00"
+                    "resourceBinding":
+                      "schemaVersion": "zoop-chat-resource-binding-1"
+                      "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
+                      "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
+                      "allocationDigest": "86965b868123416d6ad9a97be3abb55d586b5ee1c3f5a0845b6a0952c9769e18"
                 "notSent":
                   "summary": "A quote without a matching chat grant: nothing was sent"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-5"
+                    "schemaVersion": "zoop-ai-chat-6"
                     "invocationId": "job-00000001:1:chat-answer"
                     "stage": "chat-answer"
                     "status": "failed"
@@ -8141,10 +8286,15 @@
                       "sent": false
                       "unknown": false
                     "receipt": null
+                    "resourceBinding":
+                      "schemaVersion": "zoop-chat-resource-binding-1"
+                      "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
+                      "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
+                      "allocationDigest": "68dc5bec08a7fb289544055ce5eef81d6b53650ebc429bb4713e2795e1abaffa"
                 "agentHeld":
                   "summary": "chat-agent step held at an approval request"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-5"
+                    "schemaVersion": "zoop-ai-chat-6"
                     "invocationId": "job-00000001:1:chat-agent:1"
                     "stage": "chat-agent"
                     "status": "succeeded"
@@ -8166,7 +8316,7 @@
                       "provider": "authored-replay"
                       "providerRevision": "authored-replay-1"
                       "model": "authored-synthetic-chat-agent"
-                      "promptVersion": "zoop-chat-agent-0123456789abcdef"
+                      "promptVersion": "zoop-chat-agent-resource-1"
                       "executionMode": "replay"
                       "usage":
                         "inputTokens": null
@@ -8175,6 +8325,11 @@
                         "reasoningTokens": null
                       "sentAt": "2026-10-22T03:00:00+00:00"
                       "receivedAt": "2026-10-22T03:00:01+00:00"
+                    "resourceBinding":
+                      "schemaVersion": "zoop-chat-resource-binding-1"
+                      "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
+                      "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
+                      "allocationDigest": "5cdc8ff9372b4809c0d7a1bc1bfd3fdd7908a9dca562afa391e1426a15bb6170"
         "401":
           "description": "authentication_required: missing, malformed or unknown bearer token."
           "content":
@@ -8294,7 +8449,7 @@
               "router":
                 "summary": "chat-router replay request (synthetic question)"
                 "value":
-                  "schemaVersion": "zoop-ai-chat-5"
+                  "schemaVersion": "zoop-ai-chat-6"
                   "invocationId": "job-00000001:1:chat-router"
                   "stage": "chat-router"
                   "mode": "replay"
@@ -8306,10 +8461,19 @@
                         "text": "HBM이 뭐야"
                         "explicit": true
                     "capabilities": []
+                  "resources":
+                    "schemaVersion": "zoop-chat-resource-1"
+                    "policyRevision": "expanded-local-2026-11-05.1"
+                    "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
+                    "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
+                    "providerTimeoutMs": 15000
+                    "finalizing": false
+                    "luna": null
+                    "allocationDigest": "86965b868123416d6ad9a97be3abb55d586b5ee1c3f5a0845b6a0952c9769e18"
               "agentContinuation":
                 "summary": "chat-agent continuation step with the application's decision (synthetic token)"
                 "value":
-                  "schemaVersion": "zoop-ai-chat-5"
+                  "schemaVersion": "zoop-ai-chat-6"
                   "invocationId": "job-00000001:1:chat-agent:2"
                   "stage": "chat-agent"
                   "mode": "replay"
@@ -8332,6 +8496,21 @@
                       "decisions":
                         - "approvalRequestId": "mcpr_synthetic_1"
                           "approve": true
+                  "resources":
+                    "schemaVersion": "zoop-chat-resource-1"
+                    "policyRevision": "expanded-local-2026-11-05.1"
+                    "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
+                    "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
+                    "providerTimeoutMs": 600000
+                    "finalizing": false
+                    "luna":
+                      "maxInputTokens": 512000
+                      "maxOutputTokens": 64000
+                      "maxVisibleOutputTokens": 16000
+                      "maxAnswerChars": 48000
+                      "generatedTextMaxChars": 46976
+                      "reasoningEffort": "high"
+                    "allocationDigest": "5cdc8ff9372b4809c0d7a1bc1bfd3fdd7908a9dca562afa391e1426a15bb6170"
   "/internal/v1/plan-admissions":
     "post":
       "tags":
@@ -12894,6 +13073,60 @@
         - "cachedTokens"
         - "reasoningTokens"
       "title": "CallUsage"
+    "CapabilitiesRuntime":
+      "properties":
+        "workerContractRevision":
+          "type": "string"
+          "const": "zoop-chat-worker-resource-1"
+          "title": "Workercontractrevision"
+        "stageSchemaVersion":
+          "type": "string"
+          "const": "zoop-ai-chat-6"
+          "title": "Stageschemaversion"
+        "resourceSchemaVersion":
+          "type": "string"
+          "const": "zoop-chat-resource-1"
+          "title": "Resourceschemaversion"
+        "modelLimits":
+          "$ref": "#/components/schemas/ModelLimits"
+        "structuralLimits":
+          "$ref": "#/components/schemas/StructuralLimits"
+        "supportedReasoningEfforts":
+          "items":
+            "type": "string"
+            "enum":
+              - "none"
+              - "low"
+              - "medium"
+              - "high"
+              - "xhigh"
+              - "max"
+          "type": "array"
+          "title": "Supportedreasoningefforts"
+        "defaultReasoningEffort":
+          "type": "string"
+          "const": "medium"
+          "title": "Defaultreasoningeffort"
+        "stages":
+          "additionalProperties":
+            "$ref": "#/components/schemas/StageCapability"
+          "type": "object"
+          "title": "Stages"
+        "timeModel":
+          "$ref": "#/components/schemas/TimeModel"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "workerContractRevision"
+        - "stageSchemaVersion"
+        - "resourceSchemaVersion"
+        - "modelLimits"
+        - "structuralLimits"
+        - "supportedReasoningEfforts"
+        - "defaultReasoningEffort"
+        - "stages"
+        - "timeModel"
+      "title": "CapabilitiesRuntime"
     "ChatAnswer":
       "properties":
         "sections":
@@ -12918,11 +13151,44 @@
         - "insufficientRequirementIds"
         - "graphTargetIds"
       "title": "ChatAnswer"
+    "ChatCapabilities":
+      "properties":
+        "schemaVersion":
+          "type": "string"
+          "const": "zoop-ai-chat-6"
+          "title": "Schemaversion"
+        "capabilitiesSchemaVersion":
+          "type": "string"
+          "const": "zoop-chat-capabilities-1"
+          "title": "Capabilitiesschemaversion"
+        "runtimeFingerprint":
+          "type": "string"
+          "pattern": "^[0-9a-f]{64}$"
+          "title": "Runtimefingerprint"
+        "runtime":
+          "$ref": "#/components/schemas/CapabilitiesRuntime"
+        "configurationErrors":
+          "additionalProperties":
+            "anyOf":
+              - "type": "string"
+                "pattern": "^[a-z0-9_]{1,64}$"
+              - "type": "null"
+          "type": "object"
+          "title": "Configurationerrors"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "schemaVersion"
+        - "capabilitiesSchemaVersion"
+        - "runtimeFingerprint"
+        - "runtime"
+        - "configurationErrors"
+      "title": "ChatCapabilities"
     "ChatMcpHealth":
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-ai-chat-5"
+          "const": "zoop-ai-chat-6"
           "title": "Schemaversion"
         "mcp":
           "type": "string"
@@ -13014,7 +13280,7 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-ai-chat-5"
+          "const": "zoop-ai-chat-6"
           "title": "Schemaversion"
         "invocationId":
           "type": "string"
@@ -13051,6 +13317,9 @@
             - "$ref": "#/components/schemas/ChatReceipt"
             - "type": "null"
           "description": "Who received the request and what they reported; present once a request was sent."
+        "resourceBinding":
+          "$ref": "#/components/schemas/ResourceBinding"
+      "additionalProperties": false
       "type": "object"
       "required":
         - "schemaVersion"
@@ -13060,6 +13329,7 @@
         - "answer"
         - "failure"
         - "receipt"
+        - "resourceBinding"
       "title": "ChatStageResult"
       "description": |-
         The outcome. Besides the field shapes the door checks the invariants: `succeeded` has an answer of its own stage's model, no failure and a
@@ -15266,6 +15536,27 @@
         - "toolName"
         - "failed"
       "title": "McpCallSummary"
+    "ModelLimits":
+      "properties":
+        "contextWindowTokens":
+          "type": "integer"
+          "const": 1050000
+          "title": "Contextwindowtokens"
+        "maxInputTokens":
+          "type": "integer"
+          "const": 922000
+          "title": "Maxinputtokens"
+        "maxOutputTokens":
+          "type": "integer"
+          "const": 128000
+          "title": "Maxoutputtokens"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "contextWindowTokens"
+        - "maxInputTokens"
+        - "maxOutputTokens"
+      "title": "ModelLimits"
     "NativeCaptionProjection":
       "properties":
         "profile":
@@ -17687,6 +17978,32 @@
         - "providerCalls"
         - "modelCalls"
       "title": "RelationUsage"
+    "ResourceBinding":
+      "properties":
+        "schemaVersion":
+          "type": "string"
+          "const": "zoop-chat-resource-binding-1"
+          "title": "Schemaversion"
+        "policyDigest":
+          "type": "string"
+          "pattern": "^[0-9a-f]{64}$"
+          "title": "Policydigest"
+        "runtimeFingerprint":
+          "type": "string"
+          "pattern": "^[0-9a-f]{64}$"
+          "title": "Runtimefingerprint"
+        "allocationDigest":
+          "type": "string"
+          "pattern": "^[0-9a-f]{64}$"
+          "title": "Allocationdigest"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "schemaVersion"
+        - "policyDigest"
+        - "runtimeFingerprint"
+        - "allocationDigest"
+      "title": "ResourceBinding"
     "ResultEnvelope":
       "properties":
         "schemaVersion":
@@ -17888,6 +18205,130 @@
         - "kind"
         - "sourceId"
       "title": "SourceChange"
+    "StageCapability":
+      "properties":
+        "provider":
+          "type": "string"
+          "enum":
+            - "openai-compatible"
+            - "typesafe-native"
+          "title": "Provider"
+        "model":
+          "type": "string"
+          "enum":
+            - "gpt-6-luna"
+            - "jev-1.14.0"
+          "title": "Model"
+        "api":
+          "type": "string"
+          "enum":
+            - "responses"
+            - "systemone"
+          "title": "Api"
+        "adapterRevision":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._-]{1,96}$"
+          "title": "Adapterrevision"
+        "adapterDigest":
+          "type": "string"
+          "pattern": "^[0-9a-f]{64}$"
+          "title": "Adapterdigest"
+        "providerRevision":
+          "anyOf":
+            - "type": "string"
+              "pattern": "^[0-9a-f]{64}$"
+            - "type": "null"
+          "title": "Providerrevision"
+        "mcpServerRevision":
+          "anyOf":
+            - "type": "string"
+              "pattern": "^[0-9a-f]{64}$"
+            - "type": "null"
+          "title": "Mcpserverrevision"
+        "fixedInputOverheadBytes":
+          "type": "integer"
+          "maximum": 2147483647.0
+          "minimum": 0.0
+          "title": "Fixedinputoverheadbytes"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "provider"
+        - "model"
+        - "api"
+        - "adapterRevision"
+        - "adapterDigest"
+        - "providerRevision"
+        - "mcpServerRevision"
+        - "fixedInputOverheadBytes"
+      "title": "StageCapability"
+    "StructuralLimits":
+      "properties":
+        "maxSections":
+          "type": "integer"
+          "const": 12
+          "title": "Maxsections"
+        "maxClaimsPerSection":
+          "type": "integer"
+          "const": 20
+          "title": "Maxclaimspersection"
+        "maxCitations":
+          "type": "integer"
+          "const": 20
+          "title": "Maxcitations"
+        "maxAnswerChars":
+          "type": "integer"
+          "const": 96000
+          "title": "Maxanswerchars"
+        "serverAddedTextReserveChars":
+          "type": "integer"
+          "const": 1024
+          "title": "Serveraddedtextreservechars"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "maxSections"
+        - "maxClaimsPerSection"
+        - "maxCitations"
+        - "maxAnswerChars"
+        - "serverAddedTextReserveChars"
+      "title": "StructuralLimits"
+    "TimeModel":
+      "properties":
+        "workerProcessMarginMs":
+          "type": "integer"
+          "const": 5000
+          "title": "Workerprocessmarginms"
+        "workerTerminationGraceMs":
+          "type": "integer"
+          "const": 5000
+          "title": "Workerterminationgracems"
+        "serviceSlotWaitMs":
+          "type": "integer"
+          "const": 1000
+          "title": "Serviceslotwaitms"
+        "httpTransportDecodeMs":
+          "type": "integer"
+          "const": 2000
+          "title": "Httptransportdecodems"
+        "applicationModelRecordingMs":
+          "type": "integer"
+          "const": 6000
+          "title": "Applicationmodelrecordingms"
+        "applicationGuardMs":
+          "type": "integer"
+          "const": 1000
+          "title": "Applicationguardms"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "workerProcessMarginMs"
+        - "workerTerminationGraceMs"
+        - "serviceSlotWaitMs"
+        - "httpTransportDecodeMs"
+        - "applicationModelRecordingMs"
+        - "applicationGuardMs"
+      "title": "TimeModel"
     "Usage":
       "properties":
         "providerAttempts":
@@ -18012,11 +18453,104 @@
         - "changed"
       "title": "ExposureQuery"
       "type": "object"
+    "LunaResources":
+      "additionalProperties": false
+      "properties":
+        "maxInputTokens":
+          "maximum": 922000
+          "minimum": 1
+          "title": "Maxinputtokens"
+          "type": "integer"
+        "maxOutputTokens":
+          "maximum": 128000
+          "minimum": 32000
+          "title": "Maxoutputtokens"
+          "type": "integer"
+        "maxVisibleOutputTokens":
+          "maximum": 64000
+          "minimum": 4000
+          "title": "Maxvisibleoutputtokens"
+          "type": "integer"
+        "maxAnswerChars":
+          "maximum": 96000
+          "minimum": 12000
+          "title": "Maxanswerchars"
+          "type": "integer"
+        "generatedTextMaxChars":
+          "maximum": 94976
+          "minimum": 10976
+          "title": "Generatedtextmaxchars"
+          "type": "integer"
+        "reasoningEffort":
+          "enum":
+            - "none"
+            - "low"
+            - "medium"
+            - "high"
+            - "xhigh"
+            - "max"
+          "title": "Reasoningeffort"
+          "type": "string"
+      "required":
+        - "maxInputTokens"
+        - "maxOutputTokens"
+        - "maxVisibleOutputTokens"
+        - "maxAnswerChars"
+        - "generatedTextMaxChars"
+        - "reasoningEffort"
+      "title": "LunaResources"
+      "type": "object"
+    "Resources":
+      "additionalProperties": false
+      "properties":
+        "schemaVersion":
+          "const": "zoop-chat-resource-1"
+          "title": "Schemaversion"
+          "type": "string"
+        "policyRevision":
+          "pattern": "^[A-Za-z0-9._-]{1,96}$"
+          "title": "Policyrevision"
+          "type": "string"
+        "policyDigest":
+          "pattern": "^[0-9a-f]{64}$"
+          "title": "Policydigest"
+          "type": "string"
+        "runtimeFingerprint":
+          "pattern": "^[0-9a-f]{64}$"
+          "title": "Runtimefingerprint"
+          "type": "string"
+        "providerTimeoutMs":
+          "maximum": 2147483647
+          "minimum": 1
+          "title": "Providertimeoutms"
+          "type": "integer"
+        "finalizing":
+          "title": "Finalizing"
+          "type": "boolean"
+        "luna":
+          "anyOf":
+            - "$ref": "#/components/schemas/LunaResources"
+            - "type": "null"
+        "allocationDigest":
+          "pattern": "^[0-9a-f]{64}$"
+          "title": "Allocationdigest"
+          "type": "string"
+      "required":
+        - "schemaVersion"
+        - "policyRevision"
+        - "policyDigest"
+        - "runtimeFingerprint"
+        - "providerTimeoutMs"
+        - "finalizing"
+        - "luna"
+        - "allocationDigest"
+      "title": "Resources"
+      "type": "object"
     "ChatStageRequest":
       "additionalProperties": false
       "properties":
         "schemaVersion":
-          "const": "zoop-ai-chat-5"
+          "const": "zoop-ai-chat-6"
           "title": "Schemaversion"
           "type": "string"
         "invocationId":
@@ -18040,15 +18574,18 @@
           "type": "string"
         "input":
           "additionalProperties": true
-          "description": "The closed zoop-ai-chat-5 stage input (RouterInput, AnswerInput, VerificationInput or AgentInput)."
+          "description": "The closed zoop-ai-chat-6 stage input."
           "title": "Input"
           "type": "object"
+        "resources":
+          "$ref": "#/components/schemas/Resources"
       "required":
         - "schemaVersion"
         - "invocationId"
         - "stage"
         - "mode"
         - "input"
+        - "resources"
       "title": "ChatStageRequest"
       "type": "object"
     "PlanReference":

@@ -43,7 +43,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-5}). The server decides what is
+ * The orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-6}). The server decides what is
  * sent: the router gets the question chain, the requirements split by {@link ChatRequirementSplitter} and the descriptions of
  * the bound capabilities; company and issue names are resolved here, never by the model. Company names
  * ({@link CompanyNameResolver}) are resolved before the router, so a name that fits several companies becomes a clarification
@@ -58,7 +58,7 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code <jobId>.<attempt>.<stage>}, so a rerun of the job is a new invocation and a repeat of the same one is never sent
  * twice.
  */
-public class ChatModelStages implements ChatModels.Router, ChatModels.Generator, ChatModels.Verifier, ChatModels.Agent {
+public class ChatModelStages implements ChatModels.Router, ChatModels.Generator, ChatModels.Verifier, ChatModels.Agent, ChatModels.Runtime {
     static final String ROUTER = "chat-router";
     static final String ANSWER = "chat-answer";
     static final String VERIFICATION = "chat-verification";
@@ -104,6 +104,20 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         this.recorder = recorder;
     }
 
+    @Override
+    public ChatModels.RuntimeContext preflight(com.zoop.chat.executor.ChatResourcePolicy policy, boolean agent) {
+        try {
+            var largest = java.util.stream.Stream.of(policy.generationProviderTimeout(), policy.routerProviderTimeout(),
+                    policy.verificationProviderTimeout()).max(java.util.Comparator.naturalOrder()).orElseThrow();
+            client.requireTimeout(largest.plus(com.zoop.chat.executor.ChatResourcePolicy.HTTP_MARGIN));
+            var runtime = client.capabilities();
+            runtime.requireReady(mode, agent);
+            return new ChatModels.RuntimeContext(mode, runtime);
+        } catch (RuntimeException invalid) {
+            throw new ChatModels.Failure(Fate.REFUSED, "chat_runtime_contract_mismatch", "chat runtime preflight refused");
+        }
+    }
+
     // ---------------------------------------------------------------- router
 
     /**
@@ -113,7 +127,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
      * root.
      */
     @Override
-    public ChatRouteDecision route(ChatRun run, Set<String> boundCapabilities) {
+    public ChatRouteDecision route(ChatRun run, Set<String> boundCapabilities, com.zoop.ai.chat.ChatModelPermit permit) {
         Set<String> picked = new HashSet<>();
         List<String> replies = new ArrayList<>();
         for (ChatRun.Turn turn : run.turns().subList(1, run.turns().size())) {
@@ -142,7 +156,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
                 capabilities.addObject().put("capabilityId", capability.id()).put("description", capability.description());
             }
         }
-        JsonNode answer = call(run, ROUTER, "router", input);
+        JsonNode answer = call(run, ROUTER, "router", input, permit);
         ChatRouteDecision decision = decode(() -> {
             Map<String, JsonNode> routed = new HashMap<>();
             for (JsonNode r : array(answer, "requirements")) {
@@ -273,7 +287,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     // ---------------------------------------------------------------- generator
 
     @Override
-    public ChatGeneratedAnswer generate(ChatRun run, ChatBranchContext context) {
+    public ChatGeneratedAnswer generate(ChatRun run, ChatBranchContext context, com.zoop.ai.chat.ChatModelPermit permit) {
         ObjectNode input = StrictJson.newObject();
         input.set("turns", turns(run));
         ArrayNode branches = input.putArray("branches");
@@ -325,7 +339,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             paths(wire, branch, sent);
         }
         input.put("maxCitations", Math.min(MAX_QUOTES, context.maxCitations()));
-        JsonNode answer = call(run, ANSWER, "answer", input);
+        JsonNode answer = call(run, ANSWER, "answer", input, permit);
         return decode(() -> {
             List<ChatGeneratedAnswer.Section> sections = new ArrayList<>();
             for (JsonNode s : array(answer, "sections")) {
@@ -376,7 +390,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
 
     @Override
     public ChatSemanticVerdicts verify(ChatRun run, List<ChatGeneratedAnswer.Section> sections, List<Citation> cited,
-            ChatModels.ServerFacts facts) {
+            ChatModels.ServerFacts facts, com.zoop.ai.chat.ChatModelPermit permit) {
         List<List<ChatModels.ServerFact>> bySection = facts.forRequest(run, sections);
         if (sections.isEmpty()) return new ChatSemanticVerdicts(List.of());
         ObjectNode input = StrictJson.newObject();
@@ -404,11 +418,10 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         }
         JsonNode answer;
         try {
-            answer = call(run, VERIFICATION, "verify", input);
+            answer = call(run, VERIFICATION, "verify", input, permit);
         } catch (ChatModels.Failure verifierUnavailable) {
-            // Generation already passed the server's deterministic coverage, citation ownership, evidence readability,
-            // length and investment-wording checks. A malformed or unavailable semantic verifier must not erase that
-            // answer in the interactive dev chat; keep the generated claims while the failed stage remains recorded.
+            if (verifierUnavailable.category() == ChatStageReply.FailureCategory.CONTRACT) throw verifierUnavailable;
+            // The existing semantic-unavailability outcome has its own release gate, separate from resource enforcement.
             return verificationFallback(sections);
         }
         return decode(() -> {
@@ -507,28 +520,9 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
      * the stored response with the server's decisions. Each step is its own invocation ({@code <job>.<attempt>.agent-<n>}).
      */
     @Override
-    public ChatModels.AgentStep step(ChatRun run, int step, ChatModels.AgentInput agent) {
-        ObjectNode input = StrictJson.newObject();
-        input.set("turns", turns(run));
-        ArrayNode requirements = input.putArray("requirements");
-        for (ChatModels.AgentRequirement requirement : agent.requirements()) {
-            ObjectNode wire = requirements.addObject().put("requirementId", requirement.id())
-                    .put("label", requirement.label()).put("general", requirement.general());
-            ArrayNode targets = wire.putArray("targets");
-            requirement.targets().forEach(targets::add);
-        }
-        ObjectNode mcp = input.putObject("mcp").put("authorization", agent.grantToken());
-        ArrayNode tools = mcp.putArray("allowedTools");
-        agent.allowedTools().forEach(tools::add);
-        mcp.put("recipient", agent.recipient());
-        input.put("maxCitations", Math.min(MAX_QUOTES, agent.maxCitations()));
-        if (agent.previousResponseId() != null) {
-            ObjectNode continuation = input.putObject("continuation").put("previousResponseId", agent.previousResponseId());
-            ArrayNode decisions = continuation.putArray("decisions");
-            agent.decisions().forEach(d -> decisions.addObject().put("approvalRequestId", d.approvalRequestId())
-                    .put("approve", d.approve()));
-        }
-        ChatStageReply reply = reply(run, AGENT, "agent-" + step, input);
+    public ChatModels.AgentStep step(ChatRun run, int step, ChatModels.AgentInput agent, com.zoop.ai.chat.ChatModelPermit permit) {
+        ObjectNode input = agent.stageInput(run);
+        ChatStageReply reply = reply(run, AGENT, "agent-" + step, input, permit);
         JsonNode answer = reply.answer();
         Long inputTokens = reply.receipt() == null ? null : reply.receipt().inputTokens();
         return decode(() -> {
@@ -545,7 +539,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
                 if (written == null || !written.isObject()) throw new IllegalArgumentException("answer");
                 generated = generated(written);
             }
-            return new ChatModels.AgentStep(text(answer, "responseId"), approvals, generated, inputTokens);
+            return new ChatModels.AgentStep(text(answer, "responseId"), approvals, generated, inputTokens, reply.receipt().outputTokens());
         });
     }
 
@@ -565,15 +559,21 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         return run.jobId() + "." + run.attemptNo() + "." + suffix;
     }
 
-    private JsonNode call(ChatRun run, String stage, String suffix, ObjectNode input) {
-        return reply(run, stage, suffix, input).answer();
+    private JsonNode call(ChatRun run, String stage, String suffix, ObjectNode input, com.zoop.ai.chat.ChatModelPermit permit) {
+        return reply(run, stage, suffix, input, permit).answer();
     }
 
-    private ChatStageReply reply(ChatRun run, String stage, String suffix, ObjectNode input) {
-        ChatStageCall request = new ChatStageCall(invocationId(run, suffix), stage, mode, input);
+    private ChatStageReply reply(ChatRun run, String stage, String suffix, ObjectNode input, com.zoop.ai.chat.ChatModelPermit permit) {
+        if (stage.equals(ANSWER) || stage.equals(AGENT)) {
+            long units = com.zoop.chat.executor.ChatResourcePolicy.estimatedInputTokens(stage, input) + permit.fixedInputOverheadBytes();
+            if (units > permit.resources().path("luna").path("maxInputTokens").longValue()) {
+                throw new ChatModels.Failure(Fate.REFUSED, ChatModels.INPUT_BUDGET_EXCEEDED, "current input exceeds context allowance");
+            }
+        }
+        ChatStageCall request = new ChatStageCall(invocationId(run, suffix), stage, mode, input, permit);
         String execution;
         try {
-            execution = recorder.start(run.jobId(), run.attemptNo(), stage, mode);
+            execution = record(() -> recorder.start(run.jobId(), run.attemptNo(), stage, mode));
         } catch (RuntimeException unrecorded) {
             throw new ChatModels.Failure(Fate.NOT_SENT, "the model call could not be recorded");
         }
@@ -583,16 +583,45 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         } catch (AiClientException error) {
             Fate fate = fate(error);
             String failureCode = code(error);
+            var category = ChatStageReply.FailureCategory.forCode(failureCode);
+            if (error instanceof com.zoop.ai.AiTransportException transport) {
+                category = switch (transport.failure()) {
+                    case RESOURCE_BINDING_MISMATCH, RESPONSE_MALFORMED, RESPONSE_TOO_LARGE, REDIRECT_REFUSED, UNEXPECTED_RESPONSE ->
+                            ChatStageReply.FailureCategory.CONTRACT;
+                    default -> category;
+                };
+            }
             finish(execution, fate == Fate.UNKNOWN ? "unknown" : "failed",
                     fate == Fate.UNKNOWN ? "unknown" : "not_sent", null, failureCode);
-            throw new ChatModels.Failure(fate, failureCode, "chat stage " + stage + " failed: " + failureCode);
+            throw new ChatModels.Failure(fate, failureCode, "chat stage " + stage + " failed: " + failureCode, category);
+        }
+        if (!permit.binding().equals(reply.resourceBinding())) {
+            finish(execution, "unknown", "unknown", reply.receipt(), "chat_resource_binding_mismatch");
+            throw new ChatModels.Failure(Fate.UNKNOWN, "chat_resource_binding_mismatch", "stage binding mismatch");
         }
         if (!reply.succeeded()) {
             ChatStageReply.Failure failure = reply.failure();
             Fate fate = failure.unknown() ? Fate.UNKNOWN : failure.sent() ? Fate.NOT_SENT : Fate.REFUSED;
             String sendState = failure.unknown() ? "unknown" : failure.sent() ? "sent" : "not_sent";
             finish(execution, failure.unknown() ? "unknown" : "failed", sendState, reply.receipt(), failure.code());
-            throw new ChatModels.Failure(fate, failure.code(), "chat stage " + stage + " failed: " + failure.code());
+            throw new ChatModels.Failure(fate, failure.code(), "chat stage " + stage + " failed: " + failure.code(), failure.category());
+        }
+        if (stage.equals(ANSWER) || stage.equals(AGENT)) {
+            var usage = reply.receipt();
+            String invalid = usage == null || usage.inputTokens() == null || usage.outputTokens() == null
+                    || usage.reasoningTokens() == null || usage.inputTokens() < 0 || usage.outputTokens() < 0
+                    || usage.reasoningTokens() < 0 || usage.reasoningTokens() > usage.outputTokens()
+                    ? "provider_usage_invalid" : null;
+            var luna = permit.resources().path("luna");
+            if (invalid == null && (usage.outputTokens() > luna.path("maxOutputTokens").longValue()
+                    || usage.outputTokens() - usage.reasoningTokens() > luna.path("maxVisibleOutputTokens").longValue())) {
+                invalid = ChatModels.OUTPUT_BUDGET_EXCEEDED;
+            }
+            if (invalid == null && usage.inputTokens() > luna.path("maxInputTokens").longValue()) invalid = ChatModels.INPUT_BUDGET_EXCEEDED;
+            if (invalid != null) {
+                finish(execution, "failed", "sent", usage, invalid);
+                throw new ChatModels.Failure(Fate.NOT_SENT, invalid, "provider resource usage exceeded its allocation");
+            }
         }
         finish(execution, "succeeded", "sent", reply.receipt(), null);
         return reply;
@@ -606,6 +635,9 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     static Fate fate(AiClientException error) {
         if (error instanceof AiServiceRejectionException rejected) {
             int status = rejected.httpStatus();
+            if (status == 503 && (ChatStageReply.FailureCategory.forCode(rejected.code()) == ChatStageReply.FailureCategory.CONTRACT
+                    || rejected.runtimeCode().map(ChatStageReply.FailureCategory::forCode)
+                            .filter(category -> category == ChatStageReply.FailureCategory.CONTRACT).isPresent())) return Fate.REFUSED;
             if (status == 503) return Fate.NOT_SENT;
             if (status >= 500) return Fate.UNKNOWN;
             return Fate.REFUSED;
@@ -614,32 +646,39 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     }
 
     private static String code(AiClientException error) {
-        if (error instanceof AiServiceRejectionException rejected) return rejected.code();
+        if (error instanceof AiServiceRejectionException rejected) return rejected.runtimeCode()
+                .filter(code -> ChatStageReply.FailureCategory.forCode(code) == ChatStageReply.FailureCategory.CONTRACT).orElse(rejected.code());
         if (error instanceof com.zoop.ai.AiTransportException transport) return transport.failure().name().toLowerCase(java.util.Locale.ROOT);
         return "client_error";
     }
 
     private void finish(String execution, String status, String sendState, ChatStageReply.Receipt receipt, String code) {
-        // A stage the engine cut off is interrupted, before or during this write, and an interrupted thread cannot use its
-        // database connection. The outcome is written on a thread of its own, which the cancellation never reaches, and this
-        // thread waits for it; an interrupt that arrives meanwhile is kept for after.
-        Thread writer = Thread.ofVirtual().name("chat-model-ledger").start(() -> {
-            try {
+        boolean interrupted = Thread.interrupted();
+        try {
+            record(() -> {
                 recorder.finish(execution, status, sendState, receipt, code);
-            } catch (RuntimeException unrecorded) {
-                // The stage outcome stands; the running row stays as evidence that the call was made.
-            }
-        });
-        boolean interrupted = false;
-        while (true) {
-            try {
-                writer.join();
-                break;
-            } catch (InterruptedException cutOff) {
-                interrupted = true;
-            }
+                return true;
+            });
+        } catch (RuntimeException unrecorded) {
+            org.slf4j.LoggerFactory.getLogger(ChatModelStages.class).warn("chat model outcome record did not finish", unrecorded);
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
         }
-        if (interrupted) Thread.currentThread().interrupt();
+    }
+
+    private static <T> T record(java.util.concurrent.Callable<T> write) {
+        var task = new java.util.concurrent.FutureTask<T>(write);
+        Thread.ofVirtual().name("chat-model-record").start(task);
+        try {
+            return task.get(3000, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException interrupted) {
+            task.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("model recording interrupted", interrupted);
+        } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException failed) {
+            task.cancel(true);
+            throw new IllegalStateException("model recording did not finish", failed);
+        }
     }
 
     /**

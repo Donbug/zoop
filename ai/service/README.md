@@ -413,7 +413,7 @@ ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli recover \
 
 ## 챗봇 모델 단계 (`/internal/v1/chat-stages/{stage}`)
 
-챗봇 오케스트레이터가 모델 단계 하나(`chat-router` 네이티브 Jev, `chat-answer` Luna, `chat-verification` 네이티브 Jev, `chat-agent` Luna Responses + ZOOP MCP 한 단계)를 **동기**로 실행하는 다섯 번째 가족이다. scope는 `chat.invoke`이며 설치된 `zoop-ai-chat invoke`만 고정 argv로 실행한다(단계 계약 `zoop-ai-chat-5`, 규칙은 [AI 런타임 준비 §11](../../docs/development/ai-runtime-setup.md)). 검증의 `requestBinding.invocationId`가 호출 ID와 다르면 child 실행 전에 거절한다. worker는 claim·구간·요구·버전에 결속된 서버 조회 사실을 검증하고 claim별 support·`unsupportedCausality`를 반환하며 출처 grant v1 계약은 그대로 유지한다. 아래 그룹이 없으면 인증 뒤 409 `execution_unavailable`이다.
+챗봇 오케스트레이터가 모델 단계 하나(`chat-router` 네이티브 Jev, `chat-answer` Luna Responses, `chat-verification` 네이티브 Jev, `chat-agent` Luna Responses + ZOOP MCP 한 단계)를 **동기**로 실행하는 다섯 번째 가족이다. scope는 `chat.invoke`이며 설치된 `zoop-ai-chat invoke`만 고정 argv로 실행한다(새 실행 계약 `zoop-ai-chat-6`). 검증의 `requestBinding.invocationId`가 호출 ID와 다르면 child 실행 전에 거절한다. worker는 claim·구간·요구·버전에 결속된 서버 조회 사실을 검증하며 출처 grant v1 계약은 그대로 유지한다. 아래 그룹이 없으면 인증 뒤 409 `execution_unavailable`이다.
 
 | 변수 | 규칙 |
 |---|---|
@@ -421,18 +421,26 @@ ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli recover \
 | `ZOOP_AI_CHAT_STATE_DIR` | 호출 원장(`chat.sqlite3`) 디렉터리. 없으면 0700으로 만든다(부모는 있어야 함). 이미 있으면 이 사용자 소유의 실제 디렉터리(symlink 아님)이고 group·world 권한이 없어야 하며, 그 안의 원장 파일(`chat.sqlite3`, `-wal`, `-shm`)도 이 사용자 소유의 일반 파일이고 비공개여야 한다. 아니면 기동을 거부한다(`state_dir_not_private`, `ledger_not_private`). 기존 경로를 chmod로 고치지 않는다. 서비스·worker·앱 상태와 겹쳐도 거부 |
 | `ZOOP_AI_SERVICE_CHAT_GRANTS` | 운영자 챗봇 grant registry(`schemaVersion: zoop-ai-chat-1`). S1 registry와 별도 |
 | `ZOOP_AI_SERVICE_CHAT_REPLAY` | 선택. authored replay fixture. 없으면 `mode=replay`는 409 `execution_unavailable` |
-| 챗봇 live | `ZOOP_AI_CHAT_LIVE_ENABLED=1`과 양수 `ZOOP_AI_CHAT_MAX_CALLS`가 모두 있을 때만 이 둘과 `ZOOP_AI_API_KEY`·`TYPESAFE_API_KEY`가 **챗봇 child에만** 전달된다. 모델·endpoint 이름(`ZOOP_AI_CHAT_ANSWER_MODEL`·`_REASONING_EFFORT`, `ZOOP_AI_CHAT_AGENT_MODEL`·`_REASONING_EFFORT`, `ZOOP_AI_CHAT_MCP_SERVER_URL`(chat-agent grant가 갈 수 있는 유일한 MCP 서버), `ZOOP_AI_CHAT_JEV_MODEL`, `ZOOP_AI_BASE_URL`, `TYPESAFE_BASE_URL`)은 항상 전달된다. S1·파이프라인 게이트는 이 child를 열지 않는다 |
+| 챗봇 live | `ZOOP_AI_CHAT_LIVE_ENABLED=1`과 양수 `ZOOP_AI_CHAT_MAX_CALLS`가 모두 있을 때만 이 둘과 `ZOOP_AI_API_KEY`·`TYPESAFE_API_KEY`가 **챗봇 child에만** 전달된다. 모델·endpoint 이름(`ZOOP_AI_CHAT_ANSWER_MODEL`, `ZOOP_AI_CHAT_AGENT_MODEL`, `ZOOP_AI_CHAT_MCP_SERVER_URL`, `ZOOP_AI_CHAT_JEV_MODEL`, `ZOOP_AI_BASE_URL`, `TYPESAFE_BASE_URL`)은 항상 전달된다. 옛 단계별 effort 환경변수는 `chat_legacy_effort_configuration`으로 거절한다 |
 
 - 챗봇 원장은 함께 설정된 S2/S3·graph·handoff·exposure의 모든 원장 루트와도 분리한다(`chat_roots_overlap`). S2/S3와 exposure는 같은 `RelationGate`로 직렬화하지만, 별도 원장을 쓰는 챗봇은 이 gate를 공유하지 않는다.
 
-- 본문은 `StageRequest`(`schemaVersion`, `invocationId`, `stage`, `mode`, `input`)이고 `Idempotency-Key`는 `invocationId`와 같아야 하며 경로의 stage와 본문 stage가 같아야 한다. child는 `<principal>:<invocationId>`를 받으므로 principal끼리 원장 행을 공유하지 않는다.
+- 본문은 `StageRequest`(`schemaVersion`, `invocationId`, `stage`, `mode`, `input`, `resources`)이고 `Idempotency-Key`는 `invocationId`와 같아야 하며 경로의 stage와 본문 stage가 같아야 한다. child는 `<principal>:<invocationId>`를 받으므로 principal끼리 원장 행을 공유하지 않는다.
 - **200**은 stage 결과다. `status=failed`도 200이며 `failure.sent`·`failure.unknown`이 송신 여부와 결과 불명을 말한다. **502/504 `stage_outcome_unknown`**은 child가 보냈을 수 있다는 뜻이므로 그 invocation을 다시 보내지 않는다. **503**(`runtime_unavailable`, `service_busy`, `service_configuration_invalid`)은 보내지 않았다는 뜻이다. `runtime_unavailable`은 child가 **시작조차 못 한** 경우에만 쓰고, 시작한 뒤의 출력 상한 초과나 출력 읽기 오류는 502 `stage_outcome_unknown`이다.
 - child 결과는 **고치기 전에** 검사한다. 다음을 모두 만족해야 200이고, 하나라도 어긋나면 caller id로 바꿔 200으로 정규화하지 않고 502 `stage_outcome_unknown`이다.
   - `invocationId`가 정확히 `<principal>:<invocationId>`이고, stage가 경로와 같으며, receipt의 `executionMode`가 요청 mode와 같다.
   - answer가 그 stage의 닫힌 모델(`RouterAnswer`/`ChatAnswer`/`VerificationAnswer`, 모르는 키 거절)을 따른다.
   - 성공에는 answer·receipt가 있고 failure가 없다. 실패에는 failure가 있고 answer가 없다. `unknown`이면 `sent`이고, receipt는 `sent`일 때만 있다.
-- 동시 child 4개, 슬롯을 1초 안에 얻지 못하면 503 `service_busy`. child 기한은 stage 상한 + 3초(라우터 7초, 답변 28초, 검증 9초).
-- 시험: `tests/test_chat_unit.py`(child 없음), `tests/test_chat_http.py`(실제 uvicorn + 기록용 stand-in CLI). 실제 worker CLI는 `ai/worker/tests/test_chat_stages.py`.
+  - `resourceBinding`의 policy/runtime/allocation digest가 보낸 할당과 정확히 같다. binding 누락·형식 오류·다른 할당·옛 응답 스키마는 502 `stage_outcome_unknown`에 `runtimeCode=chat_resource_binding_mismatch`를 담으며 자동 재송신할 수 없다. 송신 전 거절도 요청한 binding을 돌려주므로 설치된 runtime이 일치했다는 뜻으로 해석하지 않는다.
+- 동시 child 4개, 슬롯을 1초 안에 얻지 못하면 503 `service_busy`. child 기한은 `resources.providerTimeoutMs + 5초`이며 종료 유예는 최대 5초다. 애플리케이션 HTTP 상한은 provider 기한 +13초다.
+- Java가 job 정책과 호출별 자원 할당을 고정한다. 로컬 기본값은 현재 context 입력 512k, 총 출력 64k, reasoning 제외 출력 16k, 최종 답변 48,000 Unicode code point, effort `high`다. 출력은 최대 128k, effort는 `none/low/medium/high/xhigh/max`로 설정한다. 서버 안내문용 1,024자를 제외한 생성문 상한은 기본 46,976자다. 20분 job·600초 provider 상한은 오프라인 상한이며 일반 응답 시간 목표는 아니다.
+- 성공한 Luna 응답에는 input/output/reasoning 사용량이 모두 있어야 한다. 누락·불일치는 `provider_usage_invalid`, 출력 잘림이나 visible budget 초과는 `output_budget_exceeded`이며 raw 응답·receipt를 보존하고 자동 재송신하지 않는다. 기존 schema5 원장 결과는 원래 버전으로 읽고 새 schema5 실행은 거절한다.
+- 시험: `tests/test_chat_unit.py`, `tests/test_chat_http.py`, `tests/test_chat_resources_http.py`. worker의 실제 호출·사용량·원장 경계는 `ai/worker/tests/test_chat_resources.py`에서 검사한다.
+- 내부 OpenAPI의 자원 할당 예시는 `ai/worker/scripts/export_chat_resources.py`가 공용 fixture와 패키지 JSON으로 함께 생성한다. 설치된 서비스는 패키지 리소스로 예시를 읽으며 exporter의 `--check`가 두 생성물의 일치를 검사한다.
+
+### 설치 runtime preflight (`GET /internal/v1/chat-runtime-capabilities`)
+
+같은 `chat.invoke` 인증으로 본문·query·Idempotency-Key 없이 `zoop-ai-chat capabilities`만 실행한다. 질문·grant·원장·provider 호출 없이 worker의 닫힌 기능 명세를 반환한다. `runtimeFingerprint`는 canonical `runtime`의 SHA-256이며 서비스 버전·설치 경로·키·정책·현재 시각은 포함하지 않는다. 서비스는 닫힌 스키마·시간 계산 규칙·digest를 검증한 뒤 같은 본문을 전달한다. 불일치는 모델 실행 전 503 `service_configuration_invalid`(`runtimeCode=chat_runtime_contract_mismatch`)다. 매 새 단계는 요청의 할당 digest·현재 설치 fingerprint·관련 설정을 재검사하며, 같은 ID의 저장 결과는 현재 설정보다 먼저 읽는다.
 
 ### MCP 연결 preflight (`GET /internal/v1/chat-mcp-health`)
 

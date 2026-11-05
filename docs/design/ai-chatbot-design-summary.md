@@ -80,15 +80,19 @@ Jev가 Q01~Q08 유형과 기능 후보를 분류하면 서버가 허용 도구·
 | 동시 / 의존 | 최대 4개 / 총 3라운드, 추가 4번째 보충 없음 |
 | 대상 / 자료 | fan-out·batch 최대 5개, 문서 20개, 그래프 3-hop·노드/간선 각 50개 |
 | 개별 timeout | DB 3초·그래프 경로 5초·웹 7초, 잔여 기한으로 축소 |
-| Luna / job | MCP·Java 승인 continuation·생성 합산 35초 / running부터 terminal-state DB commit 완료까지 45초 |
-| 단계 예약 | router 4초·후검증 6초·서버 3초 |
-| Luna 토큰 | 누적 입력 24,000·최종 답변 2,000, reasoning 비용은 별도 포함 예약 |
+| Luna / job | 호출별 공급자 최대 600초 / running부터 terminal-state DB commit까지 1200초 |
+| 단계 예약 | 생성 620초·인용 재열람 30초·후검증 65초·저장 10초 = 725초 |
+| Luna 토큰 / 본문 | 현재 문맥 입력 512,000·reasoning 포함 출력 64,000·표시 출력 16,000 / 합계 48,000 code point |
 | 요구 / 확인 | 명시 요구 6개 / 확인 사슬 최대 2회 |
 | 웹 일 상한 | 회원 20회·프로젝트 500회, KST 기준, 확인 사슬·재실행 누적 |
 
-실효 Luna 시간은 min(35초, job 잔여 − 후검증 6초 − 서버 3초)다. router가 4초를 쓰면 32초다. 최종 작성용 10초를 남기고 새 도구를 중단한다. 제한으로 중단한 자료를 전체 조회라고 표시하지 않는다. 최악 경로가 예산을 넘으면 범위를 확인하며 실행 중에는 확인된 결과/안내로 종료한다.
+`ChatResourcePolicy`가 첫 시도 전에 정책을 고정하고 `ChatJobResources`가 호출별 permit을 기존 attempt metadata에 저장한다. direct 의존 조회는 `min(조회 시작+120초, job 마감−725초)`를 함께 쓴다. agent의 새 읽기와 MCP callback도 job 마감−725초 안에서 실행한다. 초기 agent 단계는 읽기 구간이 90초 이상일 때 시작하고, 승인 결과를 처리할 다음 단계에 120초를 남길 수 있을 때만 읽기를 승인한다. 마지막 단계는 확보한 생성 예약으로 답변을 작성한다. 선택적 웹 보충은 최대 240초 안에서 자체 최종 단계 90초를 남기며 direct 생성 예약과 분리한다.
 
-초기 Responses reasoning effort는 `medium`이다. 활성화 전에 도구 1·4·8회와 승인 continuation의 합성 replay 및 승인된 소량 live 지연 spike를 수행한다. `high`는 품질 이득과 45초 준수를 함께 증명한 뒤 적용한다.
+Luna 두 단계는 Responses를 사용한다. Java 기본 effort는 `high`이고 `none|low|medium|high|xhigh|max`를 설정할 수 있다. 모델 카드의 상한은 문맥 1,050,000·입력 922,000·출력 128,000토큰이다. 로컬 출력 설정은 32,000~128,000이며 입력+출력과 표시 출력의 결합 제약을 검사한다. 누적 청구 입력은 사용량 진단이고 현재 문맥 용량과 구분한다. 안내 문장·구분자에 1,024 code point를 예약해 모델 본문은 기본 46,976까지 허용한다.
+
+공급자 허용 시간 T에 대해 child는 T+5초, 종료 유예는 최대 5초, HTTP 요청과 body 대기는 T+13초, Java 단계는 T+20초다. 모델 실행 기록의 시작·종료는 각각 3초로 제한한다. `zoop-ai-chat-6`는 인증된 설치 runtime capabilities·policy/allocation digest와 결과 `resourceBinding`을 대조한다. 기존 schema5의 저장 결과와 unknown은 당시 계약으로 읽으며, 정책이 없는 과거 작업의 재실행은 명시적으로 거부한다.
+
+1200초·600초는 오프라인 검증 상한이다. 정상 지연 목표와 운영 비용·MCP 유효기간 승인은 별도로 정한다. 실제 모델 품질·검증 임계값·검증 실패 시 처리의 출시 gate도 독립적으로 충족해야 한다. 환경 키와 이행 절차는 [API README](../../api/README.md#챗봇-자원-정책)를 따른다.
 
 캐시 키에는 job·실행 세대·도구/스키마/정책 revision·정규화 인자·회원 scope·버전·asOf를 포함한다. 동일 요청의 실제 조회는 1회이고 동시 요청은 single-flight로 합친다. 성공·정상 0건만 캐시하며 실패는 실패 원장으로 별도 관리한다. hit에도 권한·철회·model-send grant를 확인하고 원 결과와 toolCallId를 그대로 연결한다. 상세는 [MCP 계약 3.3절](ai-chatbot-mcp-actions.md#33-요청-단위-캐시와-중복-억제).
 
@@ -172,7 +176,7 @@ general_knowledge에는 서버 고정 안내 ‘일반 개념 설명입니다. �
 ## 11. 개발·출시 판단
 
 1. MCP 서버 단독 클라이언트 시험과 합성 Responses replay로 typed 계약·승인/취소/unknown을 고정한다.
-2. 도구 1·4·8회·승인 라운드의 승인된 소량 live latency spike로 45초 가능성을 측정한다.
+2. 승인된 소량 live latency spike로 실제 p50/p95·토큰·비용을 측정하고 운영 지연 목표를 별도로 확정한다.
 3. 읽기 도구의 공통 gate·요청 cache/single-flight·budget·preflight direct 시작 경로를 구현한다.
 4. Q02 기본 웹, Q03~Q08 최후 검색, 비치명적 웹 오류·snapshot·grant를 구현한다.
 5. DTO/OpenAPI/저장/웹/guard와 화면 추적을 함께 갱신한다.

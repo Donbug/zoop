@@ -71,23 +71,23 @@ MCP 자격 증명은 OpenAI 모델 API 키와 별개다. job·실행 세대·sub
 | fan-out / 배치 대상 | 최대 5개, company.batch_read·issue.batch_read는 구현 예정 |
 | 동일 정규화 요청의 실제 조회 | 1회, 캐시·single-flight로 재사용 |
 | 개별 도구 | 일반 DB 3초·그래프 경로 5초·웹 7초 |
-| Luna 실행 | MCP 왕복·Java 승인 continuation·도구 실행·최종 생성 합산 최대 35초 |
-| 전체 ChatJob | running 전이부터 검증 결과의 DB terminal-state commit 완료까지 최대 45초 |
-| 기타 단계 | Jev router 4초·후검증 Jev 6초·서버 처리/저장 3초 |
-| 자료·토큰 | 문서 합계 20개, 그래프 3-hop·노드/간선 각 50개, Luna 누적 입력 24,000·최종 답변 출력 2,000 토큰 |
+| Luna 실행 | 호출별 permit의 공급자 허용 시간, 기본 최대 600초 |
+| 전체 ChatJob | terminal-state commit까지 기본 최대 1200초 |
+| 완료 예약 | 최종 생성·인용 재열람·후검증·저장에 기본 725초 |
+| 자료·토큰 | 문서 20개, 그래프 3-hop·노드/간선 각 50개, 현재 문맥 입력 512,000·총 출력 64,000·표시 출력 16,000토큰 |
 | 요구·확인 | 명시 요구 6개, 확인 질문 사슬 최대 2회 |
 
-**시간 합산:** 45초에는 후검증과 결과·영수증의 DB commit 3초가 포함되며 클라이언트로 응답을 전송하는 시간만 제외한다. Luna에 항상 35초를 더 주지 않는다. 실효 Luna 예산은 min(35초, 전체 잔여 시간 − 후검증 6초 − 서버 3초)다. router가 4초를 쓰면 최대 32초다. Luna 구간 종료 전 최종 작성용 10초를 확보해 새 도구 시작을 중단하고, 모든 개별 timeout도 잔여 기한으로 줄인다. 기한 내 모델 결과가 없으면 고정 안내로 종료하며 늦은 호출은 실행 세대 fence로 차단한다. 기한 종료가 공급자 실행/과금 취소를 보장하지는 않는다.
+**시간 합산:** 작업의 고정 정책에서 완료 예약을 먼저 남긴다. direct 의존 조회는 하나의 120초 창을 함께 쓰고, agent 승인과 MCP callback은 job 마감−725초에서 닫는다. 초기 비최종 단계에 90초, 승인 결과 continuation에 120초가 필요하다. 최종 단계는 새 읽기를 승인하지 않으며 확보한 생성 시간을 사용한다. 선택적 웹 보충의 240초와 내부 최종 단계 90초는 direct 완료 예약과 분리한다. 전체 시간 식은 [설계 요약 5.1절](ai-chatbot-design-summary.md#51-실행-상한과-요청-캐시)을 따른다.
 
 라운드 예시는 내부 핵심 조회 → 내부 보충 → 필요 웹 검색이다. Q02는 첫 라운드 검색 가능하다. 내부 의존성이 3라운드를 모두 쓰면 웹을 위해 4라운드를 만들지 않고 미확인 부분을 알린다. 라운드는 모델 API 요청 횟수가 아닌 결과 의존성 깊이다.
 
 캐시 hit·중복 시도·실패·direct 시작 경로의 조회도 총 8회와 내부/웹 상한에 포함한다. 동시 예약은 원자적으로 차감한다. 배치 내부 조회는 최대 5개 대상의 1회 도구 호출로 세되 결과·DB 부하 상한을 별도로 지킨다. 웹은 검색어 하나의 공급자 요청을 1회로 세며 배치 봉투로 2회 상한을 우회하지 않는다. 무조건 자동 재시도는 하지 않는다.
 
-초기 Responses의 `reasoning.effort`는 `medium`으로 고정한다. 구현 첫 단계에서 도구 1·4·8회와 승인 continuation 1·3라운드의 합성 replay 및 승인된 소량 live latency spike를 수행해 p50/p95·토큰·비용을 기록한다. `high`는 같은 평가 세트에서 품질 이득과 45초 준수를 모두 증명한 뒤 정책 revision으로 올린다.
+기본 `reasoning.effort`는 Java 정책의 `high`다. `none|low|medium|high|xhigh|max`와 출력 최대 128,000토큰을 결합 제약 안에서 설정한다. 두 Luna 단계가 Responses를 사용하며 direct는 `store=false`, agent continuation은 `store=true`다.
 
-모델 측 요청 1건에도 여러 추론·도구 왕복이 있을 수 있다. 모델/도구 토큰·continuation·reasoning 사용량을 실제 영수증으로 합산하고, 서버가 예약하는 모델 출력 비용은 reasoning도 포함한다. 2,000은 최종 답변 길이 상한이며 reasoning 비용까지 그 안이라고 가정하지 않는다. 모델이 초과 호출을 시도하면 gate가 거부하고 실행기가 신규 실행을 종료한다.
+공급자 영수증의 input/output/reasoning 사용량을 검사하고 표시 출력은 output−reasoning으로 계산한다. 누락·모순은 `provider_usage_invalid`, 출력 cap 절단은 `output_budget_exceeded`다. 현재 문맥 입력 허용과 누적 청구 사용량을 분리한다. 모델 본문과 서버 안내·구분자를 합한 기본 상한은 48,000 Unicode code point다.
 
-토큰 상한 구현(2026-10-30): 공급자 출력 상한은 reasoning을 포함하므로 Luna 요청에 8,000(답변 2,000 + reasoning 몫 6,000, spike 뒤 재조정)을 보내고, 받은 뒤 출력에서 reasoning을 뺀 값이 2,000을 넘거나 출력 상한에서 잘린 답은 버려 `budget_exceeded/output_limit`으로 끝낸다. direct 답변은 입력 전체를 한 번에 보내므로 추정치(토크나이저 없이 ASCII 4자·그 외 1.3자당 1토큰)가 24,000을 넘으면 보내지 않고 `budget_exceeded/context_too_large`다. agent는 입력이 공급자 쪽에서 늘어나므로 Java가 단계별 보고값을 합산한다. 다음 단계 입력은 직전 단계 이상이므로, 합계 + 직전 입력이 24,000을 넘으면 더 보내지 않고 `context_too_large`, 합계 + 직전 입력 2배가 넘으면 새 도구를 거부해 다음 단계가 답을 쓴다. 한 단계의 도구 결과로 입력이 크게 늘면 사후에야 알 수 있어 그 단계의 초과는 막지 못하고, 공급자가 사용량을 보고하지 않으면 합산하지 않는다.
+새 실행의 내부 계약은 `zoop-ai-chat-6`다. Java가 작업 정책과 호출별 resources를 고정하고, 설치 worker의 인증된 capabilities fingerprint와 결과 resourceBinding을 대조한다. schema5 저장 결과·unknown은 역사 계약으로 읽고 같은 호출을 다시 보내지 않는다. 1200초 job·600초 provider는 오프라인 상한이며 운영 지연·비용·MCP 유효기간은 별도 승인 대상이다.
 
 ### 3.3 요청 단위 캐시와 중복 억제
 
@@ -116,7 +116,7 @@ MCP endpoint와 direct adapter는 같은 Tool Service·스키마·scope·버전�
 4. Java가 ai/service의 continuation endpoint를 다시 호출한다. ai/service는 Java 결정만 `mcp_approval_response`로 전달하고 `previous_response_id`로 같은 Responses 실행을 재개한다. ai/service가 정적 목록만 보고 독자 승인하지 않는다.
 5. 거부된 도구가 있어도 Java는 continuation에 임의의 MCP 결과나 direct 결과를 위조하지 않는다. Luna는 승인된 다른 결과로 답하거나 해당 요구를 limitation/guidance로 남긴다.
 
-각 continuation은 Luna 35초·job 45초 안에 포함된다. Java→ai/service 호출이 여러 번 생기므로 승인 request/response ID, 동일 response chain, 예산 예약과 취소를 replay·소량 live 시험에서 검증한다.
+각 continuation은 고정된 같은 job 마감과 호출별 permit 안에 포함된다. 승인 request/response ID, 동일 response chain, 예산 예약과 취소를 합성 replay로 검증하고 실제 지연·비용은 별도 승인된 실측으로 확인한다.
 
 **공급자 저장 결정(2026-10-28 팀 결정):** continuation은 `previous_response_id`로 재개하고 Luna Responses 요청은 `store=true`로 보낸다. 따라서 정제 입력·MCP 도구 결과·모델 출력이 OpenAI 쪽 보관 대상이 된다. `store=false`와 이전 출력 재전송 방식은 사용하지 않는다.
 
@@ -139,7 +139,7 @@ MCP endpoint와 direct adapter는 같은 Tool Service·스키마·scope·버전�
 
 direct 경로의 자료는 MCP call receipt가 아니라 direct tool receipt와 evidence ID로 연결하고, 모델 입력에는 서버가 정규화·grant 검사한 BranchContext로 넣는다. 이 동등성은 별도 fixture로 검증한다. 실행 중 MCP 실패 자료를 일반 메시지나 `function_call_output`으로 넣는 방식은 spike로 API 계약과 인용·영수증 연결이 증명되기 전까지 채택하지 않는다.
 
-Circuit breaker 초기값은 endpoint별 최근 5회 **연결** 시도 중 3회 실패 시 30초 open, 이후 half-open health probe 1회다. 401/403·정책 거부·DB 오류는 연결 실패 통계에서 제외한다. probe는 내용 없는 health 확인으로 제한한다. direct 시작도 8/6/2·45초와 권한·grant를 초기화하거나 우회하지 않는다.
+Circuit breaker 초기값은 endpoint별 최근 5회 **연결** 시도 중 3회 실패 시 30초 open, 이후 half-open health probe 1회다. 401/403·정책 거부·DB 오류는 연결 실패 통계에서 제외한다. probe는 내용 없는 health 확인으로 제한한다. direct 시작도 같은 job 정책·8/6/2 호출 상한·권한·grant를 유지한다.
 
 ### 3.5 사용자 응답과 내부 실패의 구분
 

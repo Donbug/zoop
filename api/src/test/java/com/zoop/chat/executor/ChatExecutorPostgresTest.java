@@ -308,7 +308,7 @@ class ChatExecutorPostgresTest {
         String jobId = submit("오래 걸린 질문");
         var claim = executor.claimNext().orElseThrow();
         var later = new ChatJobExecutor(chats, runs, engines, mapper,
-                Clock.fixed(Instant.now().plus(Duration.ofMinutes(5)), ZoneOffset.UTC), transactions);
+                Clock.fixed(claim.deadline().plus(ChatJobExecutor.LEASE_GRACE).plusSeconds(1), ZoneOffset.UTC), transactions);
         assertEquals(1, later.recoverExpired());
 
         var failed = service.getJob(member, jobId);
@@ -343,7 +343,7 @@ class ChatExecutorPostgresTest {
         });
         executor.execute(claim);
         var later = new ChatJobExecutor(chats, runs, engines, mapper,
-                Clock.fixed(Instant.now().plus(Duration.ofMinutes(5)), ZoneOffset.UTC), transactions);
+                Clock.fixed(claim.deadline().plus(ChatJobExecutor.LEASE_GRACE).plusSeconds(1), ZoneOffset.UTC), transactions);
         later.recoverExpired();
 
         var failed = service.getJob(member, jobId);
@@ -459,7 +459,7 @@ class ChatExecutorPostgresTest {
             assertTrue(Duration.between(shorter, jdbc.queryForObject("SELECT deadline_at FROM chat_jobs WHERE id = ?",
                     Timestamp.class, run.jobId()).toInstant()).abs().toMillis() < 1, "never moved later");
             var attached = executor.attach(run.jobId(), 1).orElseThrow();
-            assertTrue(attached.control().remaining().compareTo(Duration.ofSeconds(45)) <= 0);
+            assertTrue(attached.control().remaining().compareTo(ChatJobExecutor.MAX_DEADLINE.minusSeconds(15)) <= 0);
             // Past the shortened deadline, though inside the claim's: the result is not stored as completed.
             control.shortenDeadline(Instant.now().minusMillis(1));
             return ScriptedChatEngine.generalAnswer("기한을 넘긴 답");
@@ -469,6 +469,25 @@ class ChatExecutorPostgresTest {
         var failed = service.getJob(member, jobId);
         assertEquals("failed", failed.status());
         assertEquals("deadline_guard", failed.failure().reason());
+    }
+
+    @Test
+    void frozenPolicyAndInvocationAllocationSurviveJsonbAndRemainOwnerFenced() {
+        String jobId = submit("고정 자원 정책");
+        var claim = executor.claimNext().orElseThrow();
+        var control = executor.attach(jobId, claim.attemptNo()).orElseThrow().control();
+        var resources = new ChatJobResources(control, ChatResourceFixtures.capabilities(), Clock.systemUTC(), "replay");
+        String invocation = jobId + ".1.answer";
+        var first = resources.permit(invocation, "chat-answer", Duration.ofSeconds(620), true);
+        var repeated = resources.permit(invocation, "chat-answer", Duration.ofSeconds(300), true);
+        assertEquals(com.zoop.common.json.Canonical.write(first.resources()), com.zoop.common.json.Canonical.write(repeated.resources()));
+        var stored = mapper.readTree(jdbc.queryForObject("SELECT attempts::text FROM chat_jobs WHERE id = ?", String.class, jobId)).get(0);
+        assertEquals(64000, stored.path("resourcePolicy").path("maxOutputTokens").intValue());
+        assertEquals(com.zoop.common.json.Canonical.write(first.resources()),
+                com.zoop.common.json.Canonical.write(stored.path("modelResources").path(invocation)));
+        assertEquals(ChatResourcePolicy.defaults().digest(), stored.path("modelResources").path(invocation).path("policyDigest").stringValue());
+        service.cancel(member, jobId, "cancel-" + suffix());
+        assertThrows(ChatRunSuperseded.class, () -> control.modelResources(jobId + ".1.other", first.resources()));
     }
 
     @Test

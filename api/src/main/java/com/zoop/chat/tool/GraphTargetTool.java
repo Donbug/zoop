@@ -28,7 +28,7 @@ import org.springframework.transaction.TransactionException;
  * empty result; any other error stays an adapter fault.
  */
 abstract class GraphTargetTool implements ChatTool {
-    /** Items one read returns at most (zoop-ai-chat-5 {@code Branch.items}). */
+    /** Items one read returns at most (zoop-ai-chat-6 {@code Branch.items}). */
     static final int MAX_ITEMS = 50;
     /**
      * Current-authority checks may reread operator-owned EFS registries. Keep one graph read bounded while still returning

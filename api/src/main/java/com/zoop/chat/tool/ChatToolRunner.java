@@ -132,10 +132,16 @@ public class ChatToolRunner implements AutoCloseable {
      */
     public List<ChatToolResult> runStage(ChatRun run, ChatRunControl control, int planRevision,
             List<ChatToolRequest> calls, String via) {
+        return runStage(run, control, planRevision, calls, via, control.readRemaining());
+    }
+
+    public List<ChatToolResult> runStage(ChatRun run, ChatRunControl control, int planRevision,
+            List<ChatToolRequest> calls, String via, Duration readBudget) {
         // Every reservation is built (every capability bound) before anything is reserved.
         List<ChatToolCallReservation> reservations = calls.stream().map(call -> reservation(run, call, via)).toList();
         List<String> ids = control.reserveToolCalls(planRevision, reservations);
-        return runReserved(run, control, ids, calls, Delivery.NONE);
+        return run(run, control, ids, calls, calls.stream().map(call -> binding(call).tool()).toList(),
+                Delivery.NONE, false, readBudget);
     }
 
     /**
@@ -318,9 +324,15 @@ public class ChatToolRunner implements AutoCloseable {
     /** Runs {@code calls} with {@code tools}; {@code alreadyStarted} when the caller already recorded their start. */
     private List<ChatToolResult> run(ChatRun run, ChatRunControl control, List<String> ids, List<ChatToolRequest> calls,
             List<ChatTool> tools, Delivery delivery, boolean alreadyStarted) {
+        return run(run, control, ids, calls, tools, delivery, alreadyStarted, control.readRemaining());
+    }
+
+    private List<ChatToolResult> run(ChatRun run, ChatRunControl control, List<String> ids, List<ChatToolRequest> calls,
+            List<ChatTool> tools, Delivery delivery, boolean alreadyStarted, Duration readBudget) {
         ChatToolScope scope = scope(run);
 
-        long stageEnd = System.nanoTime() + Math.min(stageLimit.toNanos(), Math.max(0, control.remaining().toNanos()));
+        long stageEnd = System.nanoTime() + Math.min(stageLimit.toNanos(),
+                Math.max(0, Math.min(readBudget.toNanos(), control.readRemaining().toNanos())));
         Semaphore slots = new Semaphore(MAX_CONCURRENT);
         AtomicBoolean superseded = new AtomicBoolean();
         List<CompletableFuture<ChatToolResult>> started = new ArrayList<>();
@@ -457,8 +469,13 @@ public class ChatToolRunner implements AutoCloseable {
             end = ChatToolCallEnd.failed(refused);
         } else if (error == null && problem == null) {
             result = ChatToolResult.succeeded(id, run, call, output);
-            end = new ChatToolCallEnd("succeeded", null, output.dataVersion(), output.evidenceIds(), output.truncated(),
-                    output.nextAllowed(), delivery.keep(result));
+            try {
+                end = new ChatToolCallEnd("succeeded", null, output.dataVersion(), output.evidenceIds(), output.truncated(),
+                        output.nextAllowed(), delivery.keep(result));
+            } catch (ChatToolCallRefused overLimit) {
+                result = ChatToolResult.failed(id, call.capabilityId(), overLimit.code());
+                end = ChatToolCallEnd.failed(overLimit.code());
+            }
         } else {
             Throwable cause = error instanceof CompletionException wrapped && wrapped.getCause() != null
                     ? wrapped.getCause() : error;

@@ -18,6 +18,14 @@
 
 ## 1. 현재 진행 상태
 
+### 2026-11-05 로컬 자원 정책 전환
+
+현재 자원 계약은 [설계 요약 5.1절](../design/ai-chatbot-design-summary.md#51-실행-상한과-요청-캐시)과 `ChatResourcePolicy`를 따른다. 아래 날짜별 상태의 45초·35초·입력 24k·답변 2k는 이전 정책의 기록이다. 새 실행은 schema6와 작업별 고정 정책·호출별 permit을 사용하며, 기본값은 입력 512k·총 출력 64k·표시 출력 16k·합계 본문 48k code point·effort high·job 1200초다. 출력은 결합 제약 안에서 최대 128k까지 설정한다.
+
+완료 예약 725초를 먼저 남기고 direct 의존 조회는 같은 120초 창을 쓴다. 초기 agent 90초·승인 결과 continuation 120초와 MCP callback 마감을 검사하며 direct와 agent가 같은 작업 마감을 쓴다. 설치 runtime capabilities preflight와 결과 resourceBinding을 대조하고 HTTP·child·Java 단계와 모델 기록 대기를 permit으로 제한한다. schema5 저장 결과·unknown은 역사 계약으로 읽으며, 고정 정책이 없는 과거 작업은 새 모델 실행 전에 거부한다.
+
+이 변경은 로컬 구현 범위다. 20분은 오프라인 상한이며 정상 응답 지연 목표가 아니다. 운영 비용·지연·MCP 유효기간 승인, 실제 모델 평가, 잠정 의미 임계값과 검증 실패 처리의 출시 gate는 별도로 충족한다. 설정 이행은 [API README](../../api/README.md#챗봇-자원-정책)를 따른다.
+
 ### 2026-10-28 승인된 개발 기준
 
 이 절은 아래의 2026-10-27 목표와 충돌할 때 우선한다. 다음 항목은 목표 기준이며 구현 완료 표시가 아니다. 2026-11-01 기준 구현 여부는 3장 표와 단계별 "현재 상태"를 따른다. 1~8은 구현됐고 기능 플래그는 기본으로 꺼져 있으며 합성 replay로만 확인했다. direct와 agent 경로의 job 45초도 구현했지만, 단계별 최소 예약과 상한은 live spike의 p95로 보정한다. 입력 24k·답변 2k의 추정값과 reasoning 몫도 같은 spike에서 보정한다.
@@ -136,12 +144,12 @@ flowchart LR
 
 1. job의 frozen context와 서버 allowed_tools를 만들고 모든 호출 전에 권한·scope·버전·grant·예산을 검사한다.
 2. 8/6/2 호출 상한, 총 3라운드, 동시 4개, fan-out 5와 개별 timeout을 원자 예약한다. failed·direct 시작 경로·cache hit도 논리 시도로 원장에 남긴다.
-3. running 전이부터 최종 검증 결과와 영수증의 terminal-state DB commit 완료까지 45초 안에서 예약하고 Luna에 `min(35초, remaining-9초)`를 준다. 마지막 10초에는 새 도구를 시작하지 않는다.
+3. 작업별 자원 정책을 고정하고 완료 예약을 먼저 남긴다. 현재 시간 식과 승인 마감은 위 2026-11-05 자원 정책을 따른다.
 4. 요청 캐시·single-flight와 중복 판단을 구현한다. 후속 호출은 대상·기간·페이지·근거 종류 등 정보 이득이 있을 때만 허용한다.
 5. 명시 요구마다 answered/limited/clarify 상태를 추적하고 서버 커버리지 검사로 누락·중복을 막는다.
 6. checkpoint·clarification·취소·lease·늦은 완료 거부는 현행 수명주기와 결합한다.
 
-현재 오케스트레이터의 직접 도구 계획·호출, 0.70/0.35 잠정 임계값, 인용 서버 생성, Jev 의미 검증은 기준점으로 유지한다. 기존 12회·60초 상수와 별도 coverage 단계 가정은 새 StageLimits로 교체한다.
+직접 도구 계획·호출, 인용 서버 생성, Jev 의미 검증과 requirement coverage를 유지한다. 자원 전환은 검증 임계값이나 검증 실패 시 의미적 처리의 정확성을 승인하는 근거가 아니다.
 
 ### 단계 3 — Jev router와 Luna Responses MCP
 
@@ -245,7 +253,7 @@ Q01 승인 문서 저장소와 기본 비활성 `help.search`·`screenSpec.read`
 
 ### 5.3 출시 전 검증·활성화
 
-1. [live spike 절차](chat-live-spike.md)로 MCP 도구 1·4·8회와 승인 1·3라운드의 p50/p95·토큰·비용을 측정하고, direct 경로를 포함한 terminal DB commit 45초 조건을 실측해 단계 최소 예약과 상한을 보정한다. 판정은 `scripts/chat_live_spike_report.py`로 하며, 총 8회 시나리오는 합성 공급자로 실행해 통과하기 전까지 미충족으로 남긴다.
+1. [live spike 절차](chat-live-spike.md)의 시나리오를 승인된 자원 정책에 맞춰 갱신한 뒤 MCP 도구 1·4·8회와 승인 1·3라운드의 p50/p95·토큰·비용을 측정한다. 운영 지연 목표와 비용은 그 실측으로 별도 승인한다.
 2. [운영 readiness gate](chat-operations-readiness.md)에 운영 HTTPS·grant·Responses 보유 조건·키 회전·사고 대응, NAVER 공급자 권리·보관·개인정보·처리 지역·비용 결정, 같은 후보 commit의 spike와 실제 공급자 preflight 결과를 결속한다. 승인 없는 실제 모델·공급자 호출은 하지 않는다.
 3. 고정 fixture, 실제 모델 한국어 평가, 부하·장애·철회 시험을 통과한 registry/model/prompt/policy 조합만 Q01 → Q02 → Q03~Q08 순으로 활성화한다. 실제 백엔드·웹 종단 시험과 D-AI-01/01b/02/02b 상태 계약도 이 단계에서 증명한다.
 
@@ -265,11 +273,11 @@ Q01 승인 문서 저장소와 기본 비활성 `help.search`·`screenSpec.read`
 | 체크포인트 | `exactly(2)`에 0개(잘림 없음 → 없음 답변, 잘림 → 근거 부족, 도구 오류 → 개수 평가 없이 failed)·1개·2개·3개 이상, 조합 6개 초과 시 자유 입력, 초과 시 다음 단계·생성 호출 0회, 선택 후 새 job이 같은 asOf로 같은 결과 재현, fan-out 상한 초과 |
 | 데이터 | graphVersion 고정, 문서 철회, citation offset, 브리핑 회차, 기간 경계 |
 | 그래프 | 챗봇 경로가 같은 graphVersion의 `/api/v1/graph` 결과와 일치, 공개 제외 결정 반영 후 철회 간선 미노출, 공개 활성화 이력이 없는 버전·사용 불가 버전 거부, 이전 공개 버전은 현재 공개 제외 결정을 적용해 조회(Q05), 기업 간 hop 1·2·3과 4 거부, 노드·간선 50개 절단 시 `truncated`, graphTargets가 지도에서 열림, Neo4j·AI 내부 그래프 API 호출 0회 |
-| 결과 | answerBasis를 sections에서 계산(단일·mixed·none), `zoop_documented` 구간의 `zoop_doc` 인용과 `evidence_grounded` 구간의 `article` 인용 교차 사용 거부, 이어 붙인 answer 12,000자 초과 거부, Q02 검색 성공은 web_reported, 검색 0건·장애는 제한된 general_knowledge와 notice, Q02+Q03은 mixed와 구간별 인용, 일반 개념 구간의 근거 연결·최신 사실 거부, 고정 안내 중복 없음, clarification 새 job, answerStatus complete/partial/guidance |
+| 결과 | answerBasis를 sections에서 계산(단일·mixed·none), 구간별 인용 종류·소유권 검사, 서버 안내·구분자를 포함한 code point 합계가 작업별 한도 안에 있음, 기본 48,000·계약 최대 96,000, Q02 검색 성공은 web_reported, 검색 장애는 제한된 general_knowledge와 notice, 일반 개념 구간의 최신 사실 거부, 고정 안내 중복 방지, 기존 status/outcome 유지 |
 | 제한 | 투자 판단 혼합 질문의 `investment_advice`, 체크포인트 미달 `precondition_unmet`, 문서 20개 잘림 `results_truncated`, 한 요구만 근거 부족, 요구 누락·중복 소속·본문의 제한 요구 답변 시 `validation_failed`, 모델이 근거 없이 제안한 제한 거부, 내부 필수 도구 timeout은 failure, 보조 웹 timeout은 notice와 필요 시 limitation, answered 외 outcome 계약 |
 | 확인 답 | 선택지 답·자유 입력 답, 없는 choiceId·clarification 아닌 원 작업·다른 대화 원 작업 422/404, resolves+context 422, 원 고정 문맥 복사, 원 작업 불변, 같은 확인 질문 재답변, 깊이 2 작업의 모호·체크포인트 초과는 `guidance`와 다음 단계·생성 호출 0회, 깊이 2에서 모호함이 해소되면 `answered`·도구 장애는 `failed`(guidance로 바꾸지 않음), 확인 답의 답이 루트 질문과 사슬의 답을 순서대로 합쳐 재실행 |
 | 의미 검증 | 1층 실패 시 Jev 0회, 일반 개념 구간은 Choice 없이 `prohibitedAdvice`만 판정하고 예이면 전체 실패, 전부 supported 통과, contradicted·prohibitedAdvice 예 전체 실패, 한 요구 hold 시 그 구간·통합 구간 제외와 limitation 및 answer·answerBasis·citations 재계산, 모든 요구 hold 시 insufficient_evidence, 응답 형식 오류 시 영수증 저장 후 transient |
 | 장애 | preflight direct 시작, 실행 중 MCP 오류 direct 대체 0회, auth/grant/schema 우회 0회, Jev/Luna timeout, unknown, 저장 실패 |
-| 기한·한도 | terminal-state DB commit까지 job 45초, Luna min(35초, remaining-9초), 마지막 10초 신규 도구 금지, DB 3초·그래프 5초·웹 7초, 8/6/2 원자 예약, cache hit·direct 조회·실패 시도 집계, response_unknown 재호출 0회, 입력 24k·출력 2k, 실행 3회 뒤 retry null, lease 만료 뒤 늦은 완료 거부 |
+| 기한·한도 | 고정된 작업 마감·완료 예약·공유 조회 마감과 모델 permit, 8/6/2 원자 예약, cache hit·direct 조회·실패 시도 집계, response_unknown 재호출 0회, 현재 문맥 입력과 누적 청구량 분리, 총 출력·표시 출력·본문 code point 검사, 실행 3회 뒤 retry null, lease 만료 뒤 늦은 완료 거부 |
 | UI | 새로고침 복구, 조회 오류 재확인, late response 폐기, 접근성·모바일 |
 | 관측 | 모델·도구 호출 중복 집계 없음, 미보고 비용 NULL, 요청 ID 연계 |
