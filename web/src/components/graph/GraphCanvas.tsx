@@ -67,6 +67,7 @@ import {
   MAX_GRAPH_ZOOM,
   MIN_GRAPH_ZOOM,
 } from './graph-zoom-range';
+import { createWheelZoom } from './graph-wheel-zoom';
 
 const noHighlightedEdges: string[] = [];
 /** D-GRP-07b: 포커스 배치를 화면에 맞출 때의 최대 확대 비율(100%). */
@@ -1774,12 +1775,33 @@ export default function GraphCanvas({
       pointerStart = null;
       endPan();
     };
-    const stopFollowing = (event: WheelEvent) => {
+    // 휠 확대가 움직이는 동안에는 aftertransform에서 배율 표시·이름표 다시 읽기·카메라 저장을 미루고,
+    // 배율이 멈추면 여기서 한 번만 한다. 프레임마다 React를 다시 그리거나 저장하지 않아 확대가 버벅이지 않는다.
+    const wheelZoom = createWheelZoom({
+      graph: () => graph,
+      onSettle: () => {
+        if (!graph || disposed || graph.destroyed) return;
+        const zoom = graph.getZoom();
+        setZoomPercent(Math.round(zoom * 100));
+        if (Math.abs(zoom - previousZoom) > 0.0001) scheduleReading();
+        previousZoom = zoom;
+        rememberCamera();
+      },
+    });
+    const wheel = (event: WheelEvent) => {
+      // 지도 위 휠은 페이지 스크롤·브라우저 확대가 아니라 지도 확대다(G6 zoom-canvas도 막았다).
+      event.preventDefault();
       if (event.deltaX !== 0 || event.deltaY !== 0) abandonCameraReturn();
       if (event.deltaY !== 0 && currentTutorialPhase() === 'zoom')
         wheelPending = true;
       followFit.current = false;
       centerTarget.current = null;
+      const bounds = host.getBoundingClientRect();
+      wheelZoom.wheel(
+        event,
+        [event.clientX - bounds.left, event.clientY - bounds.top],
+        host.clientHeight,
+      );
     };
     const viewportChanged = () => {
       if (centerTarget.current) {
@@ -1797,7 +1819,7 @@ export default function GraphCanvas({
     window.addEventListener('pointerup', pointerUp);
     window.addEventListener('pointercancel', pointerCancel);
     window.addEventListener('blur', windowBlur);
-    host.addEventListener('wheel', stopFollowing, { passive: true });
+    host.addEventListener('wheel', wheel, { passive: false });
     window.addEventListener('zoop:graph-viewport-change', viewportChanged);
     hovered.current = null;
     renderedData.current = null;
@@ -1835,13 +1857,13 @@ export default function GraphCanvas({
         width: host.clientWidth,
         height: host.clientHeight,
         // 카메라 이동만 움직인다(graph-motion.ts). G6 5는 이 값이 false면 화면 이동 애니메이션도 모두 끄므로 켜 두고,
-        // 노드·연결선(stateStyles)과 휠 확대·끌기는 따로 꺼서 지금처럼 바로 반응하게 한다.
+        // 노드·연결선(stateStyles)과 끌기는 따로 꺼서 지금처럼 바로 반응하게 한다.
         animation: true,
         data: initialData(host.clientWidth, host.clientHeight),
         // D-GRP-01: 빈 곳뿐 아니라 노드·연결 위에서 끌어도 지도를 움직인다(노드 자체는 옮기지 않는다).
+        // 휠 확대는 zoom-canvas 대신 graph-wheel-zoom.ts가 부드럽게 맡는다. 터치 핀치만 G6에 둔다.
         behaviors: [
           { type: 'drag-canvas', enable: true, animation: false },
-          { type: 'zoom-canvas', animation: false },
           {
             type: 'zoom-canvas',
             key: 'map-pinch-zoom',
@@ -1882,23 +1904,30 @@ export default function GraphCanvas({
       graph.on('edge:click', (event: IElementEvent) => {
         if (!dragged) selectEdge(event.target.id);
       });
+      // 끌기(drag-canvas)가 아닌 다른 카메라 이동(버튼 확대·맞춤·선택 이동)이 시작되면 휠 확대를 멈춰 서로 다투지 않게 한다.
+      graph.on('beforetransform', () => {
+        if (!pointerStart && !wheelZoom.owns()) wheelZoom.interrupt();
+      });
       graph.on('aftertransform', () => {
         if (!graph || disposed) return;
         try {
           const nextZoom = graph.getZoom();
-          setZoomPercent(Math.round(nextZoom * 100));
-          // 이름표 크기와 겹침은 배율에만 달려 있어서, 끌어서 옮기기만 하면 다시 재지 않는다.
-          if (Math.abs(nextZoom - previousZoom) > 0.0001) scheduleReading();
+          const zoomChanged = Math.abs(nextZoom - previousZoom) > 0.0001;
           if (
             wheelPending &&
             currentTutorialPhase() === 'zoom' &&
-            Math.abs(nextZoom - previousZoom) > 0.0001
+            zoomChanged
           ) {
             wheelPending = false;
             tutorialAction('zoom');
           }
-          previousZoom = nextZoom;
           syncTutorialMarker();
+          // 휠 확대가 움직이는 동안은 아래 일을 wheelZoom의 onSettle로 미룬다.
+          if (wheelZoom.running()) return;
+          setZoomPercent(Math.round(nextZoom * 100));
+          // 이름표 크기와 겹침은 배율에만 달려 있어서, 끌어서 옮기기만 하면 다시 재지 않는다.
+          if (zoomChanged) scheduleReading();
+          previousZoom = nextZoom;
           rememberCamera();
         } catch {
           /* transform may fire before canvas init */
@@ -2018,7 +2047,8 @@ export default function GraphCanvas({
       window.removeEventListener('pointerup', pointerUp);
       window.removeEventListener('pointercancel', pointerCancel);
       window.removeEventListener('blur', windowBlur);
-      host.removeEventListener('wheel', stopFollowing);
+      wheelZoom.cancel();
+      host.removeEventListener('wheel', wheel);
       window.removeEventListener('zoop:graph-viewport-change', viewportChanged);
       observer?.disconnect();
       if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
