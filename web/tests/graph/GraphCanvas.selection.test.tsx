@@ -1558,7 +1558,10 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     canvas.zoomTo.mockClear();
     await resize(1280);
     expect(canvas.zoomTo).toHaveBeenCalled();
-    fireEvent.wheel(host, { deltaY: 20 });
+    // 휠 확대는 이제 G6 behavior가 아니라 graph-wheel-zoom.ts가 실제로 zoomTo를 부른다.
+    // 축소하면 맞춤 배율로 정한 하한 아래로 내려가(mock은 setZoomRange를 따르지 않는다) 다시 그릴 때 하한으로 올리므로,
+    // 하한과 관계없는 확대로 '직접 움직임'만 만든다.
+    fireEvent.wheel(host, { deltaY: -20 });
     canvas.zoomTo.mockClear();
     await resize(1300);
     expect(canvas.zoomTo).not.toHaveBeenCalled();
