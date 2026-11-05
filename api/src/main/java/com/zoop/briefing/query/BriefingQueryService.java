@@ -4,7 +4,6 @@ import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
 
@@ -12,6 +11,7 @@ import com.zoop.briefing.storage.BriefingChange;
 import com.zoop.briefing.storage.BriefingRound;
 import com.zoop.briefing.storage.BriefingRoundRepository;
 import com.zoop.briefing.replay.BriefingReplayReadPolicy;
+import com.zoop.briefing.scheduling.BriefingSchedule;
 import com.zoop.graph.read.PublicGraphReader;
 import com.zoop.graph.snapshot.GraphSnapshotUnavailableException;
 import com.zoop.graph.version.BriefingGraphUnavailableException;
@@ -31,13 +31,12 @@ import tools.jackson.databind.node.ArrayNode;
 @Service
 public class BriefingQueryService {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    private static final LocalTime MORNING = LocalTime.of(9, 20);
-    private static final LocalTime EVENING = LocalTime.of(17, 30);
     private final BriefingRoundRepository repository;
     private final Clock clock;
     private final BriefingContentAccess access;
     private final BriefingReplayReadPolicy replay;
     private final PublicGraphReader graphSnapshots;
+    private final BriefingSchedule schedule;
     private final JsonMapper mapper = JsonMapper.builder().build();
 
     public BriefingQueryService(BriefingRoundRepository repository, Clock clock, BriefingContentAccess access) {
@@ -49,14 +48,20 @@ public class BriefingQueryService {
         this(repository, clock, access, replay, null);
     }
 
-    @Autowired
     public BriefingQueryService(BriefingRoundRepository repository, Clock clock, BriefingContentAccess access,
             BriefingReplayReadPolicy replay, PublicGraphReader graphSnapshots) {
+        this(repository, clock, access, replay, graphSnapshots, BriefingSchedule.legacy());
+    }
+
+    @Autowired
+    public BriefingQueryService(BriefingRoundRepository repository, Clock clock, BriefingContentAccess access,
+            BriefingReplayReadPolicy replay, PublicGraphReader graphSnapshots, BriefingSchedule schedule) {
         this.repository = repository;
         this.clock = clock;
         this.access = access;
         this.replay = replay;
         this.graphSnapshots = graphSnapshots;
+        this.schedule = schedule;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 5)
@@ -356,7 +361,7 @@ public class BriefingQueryService {
 
     private ObjectNode empty(LocalDate date, String edition, BriefingRound row, String requestId, String status,
             List<BriefingChange> changes) {
-        Instant scheduled = row == null ? date.atTime(time(edition)).atZone(KST).toInstant() : row.scheduledAt();
+        Instant scheduled = row == null ? schedule.slot(date, edition) : row.scheduledAt();
         var out = mapper.createObjectNode().put("id", row == null ? "brf-" + date + "-" + edition : row.id())
                 .put("date", date.toString()).put("edition", edition).put("status", status).put("scheduledAt", scheduled.toString());
         out.put("publishedAt", row == null || row.publishedAt() == null ? null : row.publishedAt().toString());
@@ -387,7 +392,12 @@ public class BriefingQueryService {
                     .put("message", "과거 발행시각 시뮬레이션에서 입력·선정·검증이 완료되지 않아 발행하지 않은 회차입니다.")
                     .put("retryable", false).putNull("asOf");
         }
-        metadata.putObject("schedule").put("morning", "09:20").put("evening", "17:30").put("confirmed", true);
+        var times = metadata.putObject("schedule");
+        for (String slot : List.of("morning", "evening")) {
+            Instant at = row != null && slot.equals(row.edition()) ? row.scheduledAt() : schedule.slot(date, slot);
+            times.put(slot, at.atZone(KST).toLocalTime().toString());
+        }
+        times.put("confirmed", true);
         metadata.putObject("selection").put("basis", "market").putNull("reason");
         String message = switch (status) {
             case "generating" -> "브리핑을 만드는 중입니다.";
@@ -399,7 +409,47 @@ public class BriefingQueryService {
         out.putObject("notice").put("kind", status.equals("generating") ? "not_ready" : status).put("message", message)
                 .put("reason", suspension == null ? null : suspension.reason())
                 .put("at", suspension == null || suspension.createdAt() == null ? null : suspension.createdAt().toString());
+        if (row != null && "failed".equals(status) && !BriefingReplayReadPolicy.marked(row)) {
+            out.set("continuity", failedRoundReference(row, requestId));
+            metadata.put("partial", true);
+        }
         return out;
+    }
+
+    /** Read-only reference, not a replacement publication, forecast or personal delivery. */
+    private ObjectNode failedRoundReference(BriefingRound row, String requestId) {
+        var value = mapper.createObjectNode().put("schemaVersion", "importance-continuity-v2")
+                .put("roundId", row.id()).put("cutoff", row.windowTo().toString()).put("mode", "validation_failed")
+                .putNull("importanceFloor").put("message", "이번 회차의 새 분석을 완료하지 못했습니다. 이전에 확인한 이슈를 참고할 수 있습니다.");
+        value.putObject("coverage").put("status", "limited").put("confirmedDocuments", 0)
+                .put("message", "수집 또는 검증이 완료되지 않아 이번 회차로 공개할 새 결과가 없습니다. 시장에 새 소식이 없다는 뜻은 아닙니다.");
+        value.putArray("references");
+        var recap = value.putObject("recap").put("status", "unavailable").putNull("previousRoundId")
+                .putNull("dataAsOf").put("message", "현재 제공 가능한 이전 공통 브리핑이 없습니다.");
+        recap.putArray("items");
+        var conditions = value.putArray("watchConditions");
+        value.putObject("forecast").put("status", "not_updated").put("message", "이전 판단을 새 전망이나 적중 결과로 갱신하지 않았습니다.");
+        Instant publishedBy = clock.instant().isBefore(row.windowTo()) ? clock.instant() : row.windowTo();
+        Instant sourceBefore = row.windowFrom() == null ? row.windowTo().minusNanos(1) : row.windowFrom();
+        var previous = repository.previousPublished(sourceBefore, publishedBy).orElse(null);
+        if (previous == null || previous.id().equals(row.id()) || !previous.windowTo().isBefore(row.windowTo())
+                || previous.publishedAt() == null || previous.publishedAt().isAfter(publishedBy)
+                || previous.windowTo().isAfter(sourceBefore) || !isCurrentlyReadable(previous, requestId)
+                || repository.changes(previous.id()).stream().anyMatch(c -> "correction".equals(c.kind()))) return value;
+        validateSnapshot(previous);
+        recap.put("status", "available").put("previousRoundId", previous.id()).put("date", previous.date().toString())
+                .put("edition", previous.edition()).put("dataAsOf", previous.windowTo().toString())
+                .put("message", "이전 공통 브리핑의 저장본입니다. 이번 회차의 새 이슈나 개인화 생성 결과가 아닙니다.");
+        recap.set("items", previous.payload().path("items").deepCopy());
+        for (var item : previous.publicSnapshot().path("commonPriority").path("items")) {
+            for (var analysis : item.path("aiAnalyses")) {
+                String next = analysis.path("nextCheck").asString("");
+                if (!next.isBlank() && conditions.size() < 6) conditions.addObject().put("text", next)
+                        .put("kind", "previous_condition").put("companyName", analysis.path("companyName").asString())
+                        .put("previousRoundId", previous.id());
+            }
+        }
+        return value;
     }
 
     /** Shared current-authority gate for public reads and feedback aggregates. Infrastructure failures propagate. */
@@ -439,12 +489,12 @@ public class BriefingQueryService {
         if (date == null) {
             date = now.toLocalDate();
             if (edition == null) {
-                if (!now.toLocalTime().isBefore(EVENING)) edition = "evening";
-                else if (!now.toLocalTime().isBefore(MORNING)) edition = "morning";
+                if (!clock.instant().isBefore(schedule.slot(date, "evening"))) edition = "evening";
+                else if (!clock.instant().isBefore(schedule.slot(date, "morning"))) edition = "morning";
                 else { edition = "evening"; date = date.minusDays(1); }
-            } else if (now.toLocalTime().isBefore(time(edition))) date = date.minusDays(1);
+            } else if (clock.instant().isBefore(schedule.slot(date, edition))) date = date.minusDays(1);
         } else if (edition == null) {
-            edition = now.toLocalDate().isAfter(date) || (now.toLocalDate().equals(date) && !now.toLocalTime().isBefore(EVENING))
+            edition = now.toLocalDate().isAfter(date) || (now.toLocalDate().equals(date) && !clock.instant().isBefore(schedule.slot(date, "evening")))
                     ? "evening" : "morning";
         }
         return new Target(date, edition);
@@ -452,7 +502,6 @@ public class BriefingQueryService {
 
     private record Target(LocalDate date, String edition) { }
     private ObjectNode unavailableSection(String reason) { return mapper.createObjectNode().put("status", "unavailable").put("reason", reason); }
-    private static LocalTime time(String edition) { return edition.equals("morning") ? MORNING : EVENING; }
     private static void validateEdition(String edition) {
         if (edition != null && !List.of("morning", "evening").contains(edition)) throw new CustomException(ErrorCode.INVALID_REQUEST);
     }

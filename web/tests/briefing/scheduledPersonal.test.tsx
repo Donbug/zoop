@@ -88,6 +88,59 @@ it('requires login and never requests private settings for guests', () => {
   ).toBeTruthy();
   expect(api).not.toHaveBeenCalled();
 });
+it('labels a common reference as unpersonalized only after delivery absence is actually confirmed', async () => {
+  member();
+  api.mockImplementation(async (path) => {
+    if (path.startsWith(settingsPath)) return saved;
+    if (path.includes('/options')) return options;
+    return { status: 'not_published', roundId: 'r' };
+  });
+  const held: BriefingResponse = {
+    ...round,
+    status: 'failed',
+    continuity: {
+      schemaVersion: 'importance-continuity-v2',
+      roundId: 'r',
+      cutoff: '2026-10-22T08:30:00+09:00',
+      mode: 'validation_failed',
+      importanceFloor: null,
+      message: '새 분석 미완료',
+      coverage: {
+        status: 'limited',
+        confirmedDocuments: 0,
+        message: '수집·검증이 완료되지 않았습니다.',
+      },
+      references: [],
+      recap: {
+        status: 'unavailable',
+        previousRoundId: null,
+        dataAsOf: null,
+        message: '이전 공통 자료 없음',
+        items: [],
+      },
+      watchConditions: [],
+      forecast: {
+        status: 'not_updated',
+        message: '새 판단을 생성하지 않았습니다.',
+      },
+    },
+  };
+  render(
+    <MemoryRouter>
+      <ScheduledPersonalBriefing round={held} compact />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByLabelText('개인화 미발행과 공통 참고 자료')).toBeNull();
+  await screen.findByLabelText('개인화 미발행과 공통 참고 자료');
+  expect(
+    screen.getByText(/내 종목으로 새로 분석한 결과가 아닙니다/),
+  ).toBeTruthy();
+  expect(
+    api.mock.calls
+      .filter(([, method]) => method === 'POST')
+      .map(([path]) => path),
+  ).toEqual([`${settingsPath}/initialize`]);
+});
 it('opens the logo-bearing chooser only on search focus and saves a prospective setting without generation', async () => {
   member();
   api.mockImplementation(async (path, method) => {

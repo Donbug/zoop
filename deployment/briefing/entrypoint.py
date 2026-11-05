@@ -12,6 +12,8 @@ def main():
     if sys.argv[1:]==['--check']:
         assert runtime.b.MODEL=='gpt-6-luna'
         import briefing_auto_chain,briefing_priority_generation
+        import briefing_news_intake
+        assert briefing_news_intake.profile('hankyung-feed')[0]['category']=='editorial'
         assert all(briefing_priority_generation.prompt_for(stage).is_file() for stage in ('priority-common','priority-personal','priority-summary'))
         print('briefing-runtime-image-ready');return
     if os.environ.get('BRIEFING_SERVER_ENABLED')!='true':raise ValueError('explicit_server_enable_required')
@@ -48,6 +50,10 @@ def main():
         if cfg['samsungNewsroomEnabled']:
             cfg['sourceAuthorizationRef']=os.environ['BRIEFING_SOURCE_AUTHORIZATION_REF']
             if not cfg['sourceAuthorizationRef'].strip():raise ValueError('explicit_company_source_authorization_required')
+        if os.environ.get('BRIEFING_NEWS_SOURCE_REGISTRY'):
+            import briefing_news_intake
+            cfg['newsSourceRegistry']=os.environ['BRIEFING_NEWS_SOURCE_REGISTRY']
+            briefing_news_intake.load_registry(cfg)
         if not (temp/'verifier-key').exists():raise ValueError('native_verifier_required')
         cfg['originalSourceAuthority']=os.environ['BRIEFING_ORIGINAL_SOURCE_AUTHORITY']
         cfg['originalReadGrants']=os.environ['BRIEFING_ORIGINAL_READ_GRANTS']

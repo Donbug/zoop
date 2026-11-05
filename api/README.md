@@ -265,7 +265,7 @@ console.log(response.status); // 활성 회원 세션이 정상 폐기되면 204
 
 ## 브리핑: DB조회와 로컬 생성·재생
 
-`com.zoop.briefing`은 PostgreSQL에 고정한 발행본을 공개 HTTP로 복원하고, `web/src/pages/briefing/BriefingPage.tsx`가 이를 조회합니다. 조회할 때 AI·검색·최신 시세를 호출하지 않습니다. 생성 시작 기준은 **09:20·17:30 KST**이며, 회차 기준 구현이 운영 scheduler·AWS 자동 실행을 뜻하지는 않습니다.
+`com.zoop.briefing`은 PostgreSQL에 고정한 발행본을 공개 HTTP로 복원하고, `web/src/pages/briefing/BriefingPage.tsx`가 이를 조회합니다. 조회할 때 AI·검색·최신 시세를 호출하지 않습니다. 기본 생성 기준은 **09:20·17:30 KST**이며, `zoop.briefing.morning-time/evening-time/schedule-effective-from`으로 다음 일정부터 변경할 수 있습니다. 기존 발행본의 저장 시각은 유지합니다. 회차 기준 구현 자체가 운영 scheduler·AWS 자동 실행의 활성화를 뜻하지는 않습니다.
 
 | 공개 GET | 현재 구현 |
 |---|---|
@@ -286,6 +286,7 @@ Swagger `/v3/api-docs`의 위 5개 operation과 목표 정본 [`docs/api/openapi
 | 완료 AI 결과 재사용·시세 자동 수집·실패 단계부터 DB/지도/화면 재개 | [회차 자동 연결과 재개](docs/BRIEFING_ROUND_SERIES.md#완료-ai-결과부터-시세db지도화면까지-자동-연결) |
 | 중요도·재보도/기업 연결 및 짧은 근거의 실제 의미 검증 | [BRIEFING_EDITORIAL_GUARDS](docs/BRIEFING_EDITORIAL_GUARDS.md), [BRIEFING_CORE_EVIDENCE](docs/BRIEFING_CORE_EVIDENCE.md) |
 | 핵심 → 참고 소식 → 이전 발행본 복기·수집 부족 구분 | [BRIEFING_CONTINUITY](docs/BRIEFING_CONTINUITY.md), [BRIEFING_EMPTY_RECAP](docs/BRIEFING_EMPTY_RECAP.md) |
+| 승인된 일반 뉴스·기업 발표를 공통 후보로 수집하고 실패 회차에서 이전 공통 자료를 분리 안내 | [뉴스 수집과 브리핑 연결](../docs/development/briefing-news-collection.md) |
 | 시장 맥락·이전 판단·기업별 조건부 전망 | [BRIEFING_MARKET_CONTEXT](docs/BRIEFING_MARKET_CONTEXT.md), [BRIEFING_COMPANY_OUTLOOK](docs/BRIEFING_COMPANY_OUTLOOK.md) |
 | 모바일 짧은 읽기·회차 시세 연결(모델 재호출 없음) | [BRIEFING_SHORT_READING_AND_PRICES](docs/BRIEFING_SHORT_READING_AND_PRICES.md) |
 | 회차 지도·과거 재구성/원래 저장본 구분 | [BRIEFING_ROUND_GRAPHS](docs/BRIEFING_ROUND_GRAPHS.md) |

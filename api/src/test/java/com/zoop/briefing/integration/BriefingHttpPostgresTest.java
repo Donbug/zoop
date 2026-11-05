@@ -503,6 +503,33 @@ class BriefingHttpPostgresTest {
     }
 
     @Test
+    void failedRoundReferencesPreviouslyPublishedEvidenceOverHttpWithoutAnyNewPublicationOrAi() throws Exception {
+        String id = "brf-test-2026-10-16-morning";
+        jdbc.update("UPDATE briefing_rounds SET status='failed' WHERE id=? AND published_at IS NULL", id);
+        String before = publishedPayload();
+        long executions = jdbc.queryForObject("SELECT count(*) FROM ai_executions", Long.class);
+        long deliveries = jdbc.queryForObject("SELECT count(*) FROM briefing_personal_deliveries", Long.class);
+        var response = get("/api/v1/briefings?date=2026-10-16&edition=morning", "failed-reference-http");
+        assertEquals(200, response.status());
+        assertEquals("failed", response.json().path("status").asString());
+        assertTrue(response.json().path("publishedAt").isNull());
+        assertTrue(response.json().path("items").isEmpty());
+        assertEquals("available", response.json().at("/continuity/recap/status").asString());
+        assertEquals(ROUND, response.json().at("/continuity/recap/previousRoundId").asString());
+        assertFalse(response.json().at("/continuity/recap/items").isEmpty());
+        assertEquals("not_updated", response.json().at("/continuity/forecast/status").asString());
+        assertEquals(before, publishedPayload());
+        assertEquals(executions, jdbc.queryForObject("SELECT count(*) FROM ai_executions", Long.class));
+        assertEquals(deliveries, jdbc.queryForObject("SELECT count(*) FROM briefing_personal_deliveries", Long.class));
+        assertNull(jdbc.queryForObject("SELECT published_at FROM briefing_rounds WHERE id=?", java.sql.Timestamp.class, id));
+        Files.writeString(GRANTS, resource("grants.json").replace("\"enabled\": true", "\"enabled\": false"));
+        var revoked = get("/api/v1/briefings?date=2026-10-16&edition=morning", "failed-reference-revoked");
+        assertEquals(200, revoked.status());
+        assertEquals("unavailable", revoked.json().at("/continuity/recap/status").asString());
+        assertTrue(revoked.json().at("/continuity/recap/items").isEmpty());
+    }
+
+    @Test
     void currentGrantRevocationAndMalformedRegistryFailClosedImmediately() throws Exception {
         assertEquals(200, get(EVENING, "before-revoke").status());
         String active = resource("grants.json");

@@ -97,6 +97,12 @@ def descriptor(source_id, category, discovery, hosts, routes, *, bodies=(), **op
 # GDELT identities. A persisted denial on either host is never cleared by this table.
 SOURCES = {
     item.source_id: item for item in [
+        descriptor("hankyung-feed", "editorial", [
+            surface("feed", "https://www.hankyung.com/feed/finance"),
+            surface("feed", "https://www.hankyung.com/feed/it"),
+        ], ["www.hankyung.com"], [r"/article/[A-Za-z0-9]+"],
+                   bodies=["//div[@id='articletxt']"],
+                   evidence_status="publisher RSS catalogue https://www.hankyung.com/feed; rolling finance/IT feeds, independent of the historical daily sitemap"),
         descriptor("openai-newsroom", "corporate-pr", [
             surface("feed", "https://openai.com/news/rss.xml"),
             surface("sitemap", "https://openai.com/sitemap.xml", routes=[r"/sitemap\.xml(?:/[a-z0-9-]+/)?"], coverage="finite-index"),

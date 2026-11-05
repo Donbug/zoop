@@ -133,6 +133,9 @@ export default function BriefingContinuity({
       </div>
       <div className="mt-4">
         <h4 className="text-body font-semibold">다음에 확인할 조건</h4>
+        {value.watchConditions.length === 0 && (
+          <p className={NOTE}>이전 발행본에 저장된 확인 조건이 없습니다.</p>
+        )}
         <ul className="mt-2 list-disc pl-5">
           {value.watchConditions.map((condition, index) => (
             <li key={`${condition.kind}:${index}`} className={BODY}>
