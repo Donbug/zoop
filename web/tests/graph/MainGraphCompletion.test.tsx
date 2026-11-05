@@ -37,6 +37,7 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     highlightedEdgeIds,
     isolateSelection,
     centerRequest,
+    overlay,
   }: {
     tutorialTargetId?: string;
     onTutorialAction?: (action: 'pan' | 'zoom') => void;
@@ -49,6 +50,7 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     highlightedEdgeIds: string[];
     isolateSelection?: boolean;
     centerRequest?: { id: string; seq: number } | null;
+    overlay?: import('react').ReactNode;
   }) => (
     <div
       data-testid="graph-canvas"
@@ -60,6 +62,7 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
       data-isolate={isolateSelection ? 'yes' : 'no'}
       data-center={centerRequest?.id ?? ''}
     >
+      {overlay}
       {onTutorialAction && (
         <>
           <button

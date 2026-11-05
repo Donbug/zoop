@@ -81,6 +81,7 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     flow,
     onFlowChange,
     focusLayout,
+    overlay,
   }: {
     data: GraphResponse;
     selectedId: string | null;
@@ -90,8 +91,10 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     flow?: boolean;
     onFlowChange?: (flow: boolean) => void;
     focusLayout?: boolean;
+    overlay?: import('react').ReactNode;
   }) => (
     <div data-testid="graph-canvas" data-selected-edge={selectedEdgeId}>
+      {overlay}
       {onFlowChange && (
         <button
           aria-pressed={flow}
@@ -160,6 +163,24 @@ function setup(url = '/?mode=all&scope=watchlist') {
 }
 
 describe('D-GRP-02 · map selection and downstream context', () => {
+  it('D-GRP-07b keeps focus controls inside the canvas beside the open holdings sidebar', async () => {
+    setup('/?mode=all&focus=KRX%3A005930&hops=1');
+    const toggle = await screen.findByRole('button', {
+      name: '보유·관심 목록',
+    });
+    if (toggle.getAttribute('aria-expanded') !== 'true')
+      await userEvent.click(toggle);
+    const controls = await screen.findByRole('group', {
+      name: '삼성전자 중심 보기',
+    });
+    expect(screen.getByTestId('graph-canvas').contains(controls)).toBe(true);
+    expect(document.getElementById('holdings-sidebar')).toBeTruthy();
+    expect(
+      document.getElementById('holdings-sidebar')!.contains(controls),
+    ).toBe(false);
+    await userEvent.click(toggle);
+    expect(screen.getByTestId('graph-canvas').contains(controls)).toBe(true);
+  });
   it.each(['merged-edge', 'kept-edge'])(
     'D-GRP-01 maps a grouped edge selection to the canvas while preserving its original address: %s',
     async (selectedEdge) => {

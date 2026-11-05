@@ -1305,6 +1305,20 @@ function MapWorkspace({
                 onPersonalFilter={changeFilter}
                 onMarket={() => void changeMode('all')}
                 filterHost={filterHost}
+                overlay={
+                  focusNode &&
+                  !pathFrom &&
+                  !evidenceOutsideFocus && (
+                    <GraphFocusControls
+                      label={focusNode.label}
+                      hops={focusHops}
+                      onHopsChange={(hops) =>
+                        updateQuery({ hops: String(hops) })
+                      }
+                      onClear={() => updateQuery({ focus: null, hops: null })}
+                    />
+                  )
+                }
                 tutorialLocked={Boolean(
                   tutorialOpen && tutorialStep && tutorialStep < 5,
                 )}
@@ -1465,15 +1479,6 @@ function MapWorkspace({
                   경로 나가기
                 </button>
               </div>
-            )}
-            {focusNode && !pathFrom && !evidenceOutsideFocus && (
-              <GraphFocusControls
-                label={focusNode.label}
-                hops={focusHops}
-                sidebarOpen={sidebarOpen}
-                onHopsChange={(hops) => updateQuery({ hops: String(hops) })}
-                onClear={() => updateQuery({ focus: null, hops: null })}
-              />
             )}
             {tutorialOpen && tutorialStep && (
               <div
