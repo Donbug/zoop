@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 /**
  * The operator's S2-1 registry or exact-tuple local authority set as graph evidence reads it. Current leaves are read fresh
  * for every decision. Unset, unreadable or invalid authority is {@code SOURCE_UNAVAILABLE} (503).
- * The log line carries the failure code only: no path, no registry content.
+ * The log line carries the failure code, closed failure kind and captured interrupt state.
  */
 public final class DocumentReadSources {
     private static final Logger log = LoggerFactory.getLogger(DocumentReadSources.class);
@@ -31,7 +31,8 @@ public final class DocumentReadSources {
         try {
             return SourceRegistry.read(path);
         } catch (SourceRegistry.Invalid error) {
-            log.warn("Document read ingestion source registry unavailable (code={}, requestId={})", error.code(), requestId);
+            log.warn("Document read ingestion source registry unavailable (code={}, requestId={}, failureKind={}, interrupted={})",
+                    error.code(), requestId, error.failureKind(), error.interrupted());
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         }
     }
