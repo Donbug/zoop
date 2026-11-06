@@ -101,8 +101,14 @@ public final class GraphPublicationAuthority {
                 };
             }
             String correlation = requestId == null ? MDC.get("requestId") : requestId;
-            log.warn("Graph publication authority unavailable (category={}, reason={}, requestFingerprint={})",
-                    category, reason, correlation == null ? "unavailable" : Canonical.sha256(correlation));
+            String fingerprint = correlation == null ? "unavailable" : Canonical.sha256(correlation);
+            if (malformed instanceof SourceRegistry.Invalid failure) {
+                log.warn("Graph publication authority unavailable (category={}, reason={}, requestFingerprint={}, failureKind={}, interrupted={})",
+                        category, reason, fingerprint, failure.failureKind(), failure.interrupted());
+            } else {
+                log.warn("Graph publication authority unavailable (category={}, reason={}, requestFingerprint={})",
+                        category, reason, fingerprint);
+            }
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
         }
     }

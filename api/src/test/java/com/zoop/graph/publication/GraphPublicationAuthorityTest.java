@@ -1,16 +1,30 @@
 package com.zoop.graph.publication;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import com.zoop.chat.dto.ChatFrozenContext;
+import com.zoop.chat.executor.ChatRun;
+import com.zoop.chat.executor.ChatRunControl;
+import com.zoop.chat.service.FrozenSelection;
+import com.zoop.chat.tool.ChatToolRegistry;
+import com.zoop.chat.tool.ChatToolRequest;
+import com.zoop.chat.tool.ChatToolRunner;
+import com.zoop.chat.tool.DocumentSearchTool;
 import com.zoop.common.exception.GlobalExceptionHandler;
 import com.zoop.common.request.RequestIdFilter;
+import com.zoop.common.request.ReadScope;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.StrictJson;
@@ -21,6 +35,7 @@ import com.zoop.document.service.InMemoryDocumentRegistry;
 import com.zoop.graph.publication.GraphPublicationReader.Contribution;
 import com.zoop.graph.publication.GraphPublicationReader.Publication;
 import com.zoop.graph.read.DisclosureExclusions;
+import com.zoop.graph.read.CompanyDocumentsService;
 import com.zoop.graph.read.GraphSnapshotFilter;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import org.junit.jupiter.api.Test;
@@ -35,6 +50,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(OutputCaptureExtension.class)
@@ -57,6 +77,45 @@ class GraphPublicationAuthorityTest {
         }
         Files.writeString(setup.secondRegistry(), registry("grant-b", true));
         assertEquals(Set.of(), setup.authority().current(publication("after-restoration", setup.contributions()), "test").issueIds());
+    }
+
+    @Test
+    void toolScopedPublicationReuseKeepsCurrentRightsAndExclusionsLive() throws Exception {
+        var setup = setup();
+        var computations = new AtomicInteger();
+        var visibleIssues = new ArrayList<Integer>();
+        var documents = new DocumentSearchTool((company, from, version, asOf, limit, trace) -> {
+            try {
+                for (int read = 0; read < 4; read++) {
+                    if (read == 1) Files.writeString(setup.secondRegistry(), registry("grant-b", false));
+                    if (read == 2) Files.writeString(setup.secondRegistry(), registry("grant-b", true));
+                    if (read == 3) setup.exclusions().put("tool-publication",
+                            new DisclosureExclusions(1, Set.of("issue-0"), Set.of(), Set.of()));
+                    var publication = ReadScope.memo("publication", () -> {
+                        computations.incrementAndGet();
+                        return publication("tool-publication", setup.contributions());
+                    });
+                    var current = setup.authority().current(publication, trace);
+                    visibleIssues.add(GraphSnapshotFilter.apply(publication.snapshot(), null, current).issues().size());
+                }
+                return new CompanyDocumentsService.Response(List.of(), null, null);
+            } catch (IOException error) {
+                throw new UncheckedIOException(error);
+            }
+        });
+        var control = mock(ChatRunControl.class);
+        when(control.readRemaining()).thenReturn(Duration.ofSeconds(60));
+        var run = new ChatRun("job-scope", "session", "member", 1, "run",
+                List.of(new ChatRun.Turn("job-scope", "synthetic", null, null)),
+                new ChatFrozenContext(List.of(), 0, null, NOW, "tool-publication"), FrozenSelection.NONE,
+                "tool-publication", 0, NOW, NOW.plusSeconds(60));
+        try (var runner = new ChatToolRunner(new ChatToolRegistry(List.of(documents)))) {
+            var result = runner.runClaimed(run, control, "tc-scope",
+                    new ChatToolRequest("document.search", List.of("synthetic-company"), 1), ChatToolRunner.Delivery.NONE);
+            assertTrue(result.succeeded());
+        }
+        assertEquals(1, computations.get(), "the tool reuses one immutable publication");
+        assertEquals(List.of(1, 0, 1, 0), visibleIssues, "grant revocation, restoration and exclusion remain live");
     }
 
     @Test
@@ -128,6 +187,8 @@ class GraphPublicationAuthorityTest {
             "receipt, receipt, receipt_invalid",
             "json, json, json_invalid",
             "registry, registry, source_registry_invalid",
+            "registry-missing, registry, source_registry_unreadable",
+            "registry-interrupted, registry, source_registry_unreadable",
             "unknown, publication, publication_invalid"
     })
     void authorityFailureLogsOnlyClosedReasonAndCorrelationWhileHttpStaysUnavailable(
@@ -145,6 +206,17 @@ class GraphPublicationAuthorityTest {
             case "receipt" -> article.putArray("observations");
             case "json" -> article.remove("textSha256");
             case "registry" -> Files.writeString(setup.secondRegistry(), "{\"private\":\"" + canary + "\"}");
+            case "registry-missing" -> Files.delete(setup.secondRegistry());
+            case "registry-interrupted" -> {
+                var registry = spy(setup.registry());
+                doAnswer(invocation -> {
+                    var facts = invocation.callRealMethod();
+                    Thread.currentThread().interrupt();
+                    return facts;
+                }).when(registry).findArticleFacts(anySet());
+                authority = new GraphPublicationAuthority(registry, new DocumentReadSources(temp.toRealPath().resolve("authority.json")),
+                        version -> setup.exclusions().getOrDefault(version, DisclosureExclusions.NONE), Clock.fixed(NOW, ZoneOffset.UTC));
+            }
             case "unknown" -> authority = new GraphPublicationAuthority(setup.registry(), null,
                     version -> { throw new PublicationException(canary); }, Clock.fixed(NOW, ZoneOffset.UTC));
             default -> throw new AssertionError(scenario);
@@ -154,20 +226,60 @@ class GraphPublicationAuthorityTest {
         var publication = publication("synthetic-diagnostic", List.of(changed, setup.contributions().getLast()));
         var mvc = MockMvcBuilders.standaloneSetup(new AuthorityReadController(authority, publication))
                 .setControllerAdvice(new GlobalExceptionHandler()).addFilters(new RequestIdFilter()).build();
-        mvc.perform(get("/api/v1/graph").header(RequestIdFilter.HEADER, "synthetic-authority-read"))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.error.code").value("SOURCE_UNAVAILABLE"))
-                .andExpect(jsonPath("$.error.requestId").value("synthetic-authority-read"))
-                .andExpect(jsonPath("$.error.retryable").value(false))
-                .andExpect(jsonPath("$.error.reason").doesNotExist())
-                .andExpect(jsonPath("$.error.category").doesNotExist());
+        try {
+            mvc.perform(get("/api/v1/graph").header(RequestIdFilter.HEADER, "synthetic-authority-read"))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.error.code").value("SOURCE_UNAVAILABLE"))
+                    .andExpect(jsonPath("$.error.requestId").value("synthetic-authority-read"))
+                    .andExpect(jsonPath("$.error.retryable").value(false))
+                    .andExpect(jsonPath("$.error.reason").doesNotExist())
+                    .andExpect(jsonPath("$.error.category").doesNotExist());
+        } finally {
+            Thread.interrupted();
+        }
         var diagnostics = output.getAll().lines().filter(line -> line.contains("Graph publication authority unavailable")).toList();
         assertEquals(1, diagnostics.size());
+        String registryDiagnostic = switch (scenario) {
+            case "registry" -> ", failureKind=NOT_IO, interrupted=false";
+            case "registry-missing" -> ", failureKind=NOT_FOUND, interrupted=false";
+            case "registry-interrupted" -> ", failureKind=INTERRUPTED_IO, interrupted=true";
+            default -> "";
+        };
         assertTrue(diagnostics.getFirst().endsWith("(category=" + category + ", reason=" + reason
-                + ", requestFingerprint=ea8089e3a30d2588116e612473cab14bd9ae23852720bdd63d1e3dc9e8912558)"));
+                + ", requestFingerprint=ea8089e3a30d2588116e612473cab14bd9ae23852720bdd63d1e3dc9e8912558"
+                + registryDiagnostic + ")"));
         assertFalse(output.getAll().contains(canary));
         assertFalse(output.getAll().contains(temp.toString()));
         assertFalse(output.getAll().contains("at com.zoop.graph.publication"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"missing, NOT_FOUND, false", "interrupted, INTERRUPTED_IO, true"})
+    void initialRegistryFailureLogsOnlyItsKindAndCapturedInterruptState(
+            String scenario, String kind, boolean interrupted, CapturedOutput output) throws Exception {
+        String canary = "PRIVATE_CANARY_registry_path_and_content";
+        Path file = temp.toRealPath().resolve(canary + ".json");
+        Files.writeString(file, registry("grant-a", true).replace("synthetic fixture", canary));
+        var sources = new DocumentReadSources(file);
+        assertNull(sources.registry("synthetic-initial-read").denial("source", "grant-a", "r1", NOW));
+        if ("missing".equals(scenario)) Files.delete(file);
+        CustomException failure;
+        try {
+            if (interrupted) Thread.currentThread().interrupt();
+            failure = assertThrows(CustomException.class, () -> sources.registry("synthetic-initial-read"));
+            assertEquals(interrupted, Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, failure.getErrorCode());
+        var diagnostics = output.getAll().lines()
+                .filter(line -> line.contains("Document read ingestion source registry unavailable")).toList();
+        assertEquals(1, diagnostics.size());
+        assertTrue(diagnostics.getFirst().endsWith("(code=source_registry_unreadable, requestId=synthetic-initial-read"
+                + ", failureKind=" + kind + ", interrupted=" + interrupted + ")"));
+        assertFalse(output.getAll().contains(canary));
+        assertFalse(output.getAll().contains(temp.toString()));
+        assertFalse(output.getAll().contains("at com.zoop.document"));
     }
 
     @RestController

@@ -2,12 +2,18 @@ package com.zoop.document.importer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.FileSystemException;
 import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.SecureDirectoryStream;
@@ -113,20 +119,42 @@ public final class SourceRegistry {
         this.routingPath=path;this.routingBytes=bytes;
     }
 
+    /** Closed diagnostic values captured before an unreadable registry's I/O cause is discarded. */
+    public enum FailureKind {
+        NOT_IO, INTERRUPTED_IO, ASYNCHRONOUS_CLOSE, CLOSED_CHANNEL, ACCESS_DENIED, NOT_FOUND,
+        FILESYSTEM_IO, OTHER_IO, OTHER_RUNTIME
+    }
+
     /**
      * The registry was refused. The message is one of {@code source_registry_unreadable}, {@code source_registry_too_large}
      * and {@code source_registry_invalid}; it carries no path, no content and no cause.
      */
     public static final class Invalid extends RuntimeException {
         private final String code;
+        private final FailureKind failureKind;
+        private final boolean interrupted;
 
         Invalid(String code) {
+            this(code, FailureKind.NOT_IO);
+        }
+
+        Invalid(String code, FailureKind failureKind) {
             super(code, null, false, false);
             this.code = code;
+            this.failureKind = failureKind;
+            this.interrupted = Thread.currentThread().isInterrupted();
         }
 
         public String code() {
             return code;
+        }
+
+        public FailureKind failureKind() {
+            return failureKind;
+        }
+
+        public boolean interrupted() {
+            return interrupted;
         }
     }
 
@@ -489,7 +517,17 @@ public final class SourceRegistry {
             if (error instanceof Invalid invalid) {
                 throw invalid;
             }
-            throw new Invalid("source_registry_unreadable");
+            FailureKind kind = switch (error) {
+                case ClosedByInterruptException ignored -> FailureKind.INTERRUPTED_IO;
+                case AsynchronousCloseException ignored -> FailureKind.ASYNCHRONOUS_CLOSE;
+                case ClosedChannelException ignored -> FailureKind.CLOSED_CHANNEL;
+                case AccessDeniedException ignored -> FailureKind.ACCESS_DENIED;
+                case NoSuchFileException ignored -> FailureKind.NOT_FOUND;
+                case FileSystemException ignored -> FailureKind.FILESYSTEM_IO;
+                case IOException ignored -> FailureKind.OTHER_IO;
+                default -> FailureKind.OTHER_RUNTIME;
+            };
+            throw new Invalid("source_registry_unreadable", kind);
         }
     }
 
