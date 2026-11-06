@@ -14,7 +14,20 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.zoop.chat.dto.ChatFrozenContext;
+import com.zoop.chat.executor.ChatRun;
+import com.zoop.chat.executor.ChatRunControl;
+import com.zoop.chat.service.FrozenSelection;
+import com.zoop.chat.tool.ChatToolRegistry;
+import com.zoop.chat.tool.ChatToolRequest;
+import com.zoop.chat.tool.ChatToolRunner;
+import com.zoop.chat.tool.ChatToolScope;
+import com.zoop.chat.tool.DocumentSearchTool;
+import com.zoop.chat.tool.DocumentTextSearch;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.response.Metadata;
@@ -25,6 +38,7 @@ import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.document.repository.VersionRow;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.version.SelectedGraphVersion;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -34,6 +48,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import tools.jackson.databind.json.JsonMapper;
@@ -118,6 +134,118 @@ class CompanyDocumentsServiceTest {
         assertEquals(NOW, result.metadata().asOf());
         assertNull(result.nextCursor());
         assertNotNull(result.items().get(0).events());
+    }
+
+    private void serveFixtureQuotes() {
+        var snapshot = GraphReadFixtures.snapshot("fixture-2026-10-08");
+        org.mockito.Mockito.doAnswer(call -> {
+            String id = call.getArgument(0);
+            var found = evidenceGraph.readPinned(call.getArgument(1), call.getArgument(2), id);
+            if (found.span() == null) throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
+            var events = snapshot.issues().stream().filter(issue -> issue.evidenceIds().contains(id))
+                    .map(PublicGraphSnapshot.Issue::issueId).toList();
+            return new EvidenceResponse(id, "quote", found.span().start(), found.span().end(),
+                    found.span().articleId(), found.span().articleVersion(), null, true, events,
+                    new Metadata("public_graph_snapshot", found.asOf(), found.graphVersion(), "req-1", false, List.of()),
+                    null, found.span().articleVersion(), null, null, null, null);
+        }).when(evidence).readPinned(anyString(), anyString(), any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"wide,20,4", "three,20,3", "one,20,1", "empty,20,0", "wide,1,4"})
+    void chatProjectionPreservesReturnedQuotesWhileHydratingOnlyItsScopeAndSkippingAnalysis(
+            String selection, int limit, int hydrationReads) {
+        serveFixtureQuotes();
+        var publicPage = service.list(COMPANY, null, null, null, null, "fixture-2026-10-08",
+                null, null, 100, "req-1");
+        var ids = publicPage.items().stream().flatMap(item -> item.quotes().stream())
+                .map(CompanyDocumentsService.Quote::evidenceId).distinct().toList();
+        List<String> scope = switch (selection) {
+            case "three" -> ids.subList(0, 3);
+            case "one" -> ids.subList(0, 1);
+            case "empty" -> List.of();
+            default -> null;
+        };
+        var text = mock(DocumentTextSearch.class);
+        when(text.matches(anyString(), anyString(), any(), any())).thenReturn(true);
+        var request = new ChatToolRequest("document.search", List.of(COMPANY), limit, scope, null, "HBM");
+        var reference = new DocumentSearchTool((company, from, version, asOf, scanLimit, evidenceScope, trace) -> publicPage)
+                .read(new ChatToolScope("job-projection", "fixture-2026-10-08", null), request);
+        clearInvocations(evidence, analyses);
+        var control = mock(ChatRunControl.class);
+        when(control.readRemaining()).thenReturn(Duration.ofSeconds(60));
+        var run = new ChatRun("job-projection", "session", "member", 1, "run",
+                List.of(new ChatRun.Turn("job-projection", "synthetic", null, null)),
+                new ChatFrozenContext(List.of(), 0, null, null, "fixture-2026-10-08"), FrozenSelection.NONE,
+                "fixture-2026-10-08", 0, NOW, NOW.plusSeconds(60));
+        var tool = new DocumentSearchTool(service, text);
+        try (var runner = new ChatToolRunner(new ChatToolRegistry(List.of(tool)))) {
+            var actual = runner.runClaimed(run, control, "tc-projection", request, ChatToolRunner.Delivery.NONE);
+            assertTrue(actual.succeeded());
+            assertEquals(reference.items(), actual.items());
+            assertEquals(reference.evidenceIds(), actual.evidenceIds());
+            assertEquals(reference.truncated(), actual.truncated());
+        }
+        verify(evidence, times(hydrationReads)).readPinned(anyString(), anyString(), any(), any(), any());
+        verifyNoInteractions(analyses);
+    }
+
+    @Test
+    void publicListKeepsAnalysisWhileChatPreservesTheOriginalCandidateWindow() {
+        serveFixtureQuotes();
+        var summary = JsonMapper.builder().build().createObjectNode().put("text", "public summary");
+        var visible = new CompanyDocumentAnalysisReader.Visible(null, summary, null, null, "summary-v1");
+        doReturn(visible).when(analyses).read(any(), any(), anyString(), anyString(), eq(true));
+        var publicPage = service.list(COMPANY, null, null, null, null, "fixture-2026-10-08",
+                null, null, 100, "req-1");
+        assertEquals(summary, publicPage.items().getFirst().documentSummary());
+        assertEquals("summary-v1", publicPage.items().getFirst().resultVersion());
+        var laterEvidence = publicPage.items().get(1).quotes().stream()
+                .map(CompanyDocumentsService.Quote::evidenceId).toList();
+        var first = service.list(COMPANY, null, null, null, null, "fixture-2026-10-08",
+                null, null, 1, "req-1");
+        clearInvocations(evidence, analyses);
+        var scoped = service.listForChat(COMPANY, null, "fixture-2026-10-08", null, 1, laterEvidence, "req-1");
+        assertTrue(scoped.items().isEmpty(), "scope does not expand the original page to later documents");
+        assertEquals(first.nextCursor(), scoped.nextCursor());
+        assertEquals(first.metadata(), scoped.metadata());
+        verifyNoInteractions(evidence, analyses);
+        var wide = service.listForChat(COMPANY, null, "fixture-2026-10-08", null, 1, null, "req-1");
+        assertEquals(first.items().getFirst().quotes(), wide.items().getFirst().quotes());
+        assertNull(wide.items().getFirst().documentSummary());
+        assertNull(wide.items().getFirst().analysisStatus());
+        assertNull(wide.items().getFirst().resultVersion());
+        verifyNoInteractions(analyses);
+    }
+
+    @Test
+    void anEmptyChatScopeStillRequiresTheInitialCurrentAuthorityGate() {
+        var reader = mock(PublicGraphReader.class);
+        when(reader.read(any(), any(), any())).thenThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
+        service = new CompanyDocumentsService(reader, jdbc, registry, evidence, analyses, JsonMapper.builder().build());
+        clearInvocations(evidence, analyses);
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> service.listForChat(COMPANY, null, "fixture-2026-10-08", null, 20, List.of(), "req-1"))
+                .getErrorCode());
+        verifyNoInteractions(evidence, analyses);
+    }
+
+    @Test
+    void aRetainedChatQuoteStillChecksCurrentDenialAndPropagatesAuthorityFailure() {
+        serveFixtureQuotes();
+        var publicPage = service.list(COMPANY, null, null, null, null, "fixture-2026-10-08",
+                null, null, 100, "req-1");
+        var selected = List.of(publicPage.items().getFirst().quotes().getFirst().evidenceId());
+        assertEquals(selected, service.listForChat(COMPANY, null, "fixture-2026-10-08", null, 20, selected, "req-1")
+                .items().stream().flatMap(item -> item.quotes().stream()).map(CompanyDocumentsService.Quote::evidenceId).toList());
+        doThrow(new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE)).when(evidence)
+                .readPinned(eq(selected.getFirst()), any(), any(), any(), any());
+        assertTrue(service.listForChat(COMPANY, null, "fixture-2026-10-08", null, 20, selected, "req-1").items().isEmpty());
+        doThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE)).when(evidence)
+                .readPinned(eq(selected.getFirst()), any(), any(), any(), any());
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> service.listForChat(COMPANY, null, "fixture-2026-10-08", null, 20, selected, "req-1"))
+                .getErrorCode());
     }
 
     @Test

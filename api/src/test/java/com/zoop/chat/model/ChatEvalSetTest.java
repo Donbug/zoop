@@ -696,7 +696,7 @@ public class ChatEvalSetTest {
 
         /** The set's documents of a company, each quoting its evidence; a company without any has none. */
         private static com.zoop.chat.tool.DocumentSearchTool.Documents documents(JsonNode set) {
-            return (company, from, version, asOf, limit, trace) -> {
+            return (company, from, version, asOf, limit, evidenceScope, trace) -> {
                 List<com.zoop.graph.read.CompanyDocumentsService.Document> found = new java.util.ArrayList<>();
                 set.path("documents").path(company).forEach(d -> {
                     List<com.zoop.graph.read.CompanyDocumentsService.Quote> quotes = new java.util.ArrayList<>();
