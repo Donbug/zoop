@@ -17,7 +17,7 @@ import { createMockGraph } from '@/mocks/graph/response';
 import { createMockEvidence } from '@/mocks/evidence/fixture';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { GraphResponse } from '@/types/map/graph';
-import { createFakeServer, json } from '../support/fakeServer';
+import { createFakeServer, deferred, json } from '../support/fakeServer';
 import { myMember } from '../support/myMember';
 import { connectedPortfolioBody, SAMSUNG_HOLDING } from '../support/fixtures';
 
@@ -36,7 +36,6 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     tutorialTargetId,
     highlightedEdgeIds,
     isolateSelection,
-    centerRequest,
     overlay,
   }: {
     tutorialTargetId?: string;
@@ -49,7 +48,6 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     onSelect: (id: string) => void;
     highlightedEdgeIds: string[];
     isolateSelection?: boolean;
-    centerRequest?: { id: string; seq: number } | null;
     overlay?: import('react').ReactNode;
   }) => (
     <div
@@ -60,7 +58,6 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
       data-view-owner={memoryOwner}
       data-highlighted={highlightedEdgeIds.join(',')}
       data-isolate={isolateSelection ? 'yes' : 'no'}
-      data-center={centerRequest?.id ?? ''}
     >
       {overlay}
       {onTutorialAction && (
@@ -507,6 +504,65 @@ it('D-GRP-05 highlights only edges supported by the selected evidence and clears
     screen.getByTestId('graph-canvas').getAttribute('data-highlighted'),
   ).toBe('');
   vi.restoreAllMocks();
+});
+
+it('M-GRP-01 leaves the evidence drawer and retains its targets after a delayed version load', async () => {
+  anonymous();
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      matches: query === '(max-width: 767px)',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+  const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const next = deferred<GraphResponse>();
+  vi.mocked(getGraph)
+    .mockResolvedValueOnce({
+      ...graph,
+      metadata: { ...graph.metadata, graphVersion: 'old-graph' },
+    })
+    .mockReturnValueOnce(next.promise);
+  vi.spyOn(evidenceApi, 'getEvidence').mockImplementation(async (id) =>
+    createMockEvidence(id),
+  );
+  const router = setup('/?mode=all&graphVersion=old-graph');
+  await screen.findByTestId('graph-canvas');
+  act(() =>
+    useGraphUiStore.getState().openEvidence({
+      kind: 'issue',
+      id: 'mock-issue-1',
+      label: '사건',
+      evidenceIds: ['mock-evidence-1'],
+      mapContext: { graphVersion: graph.metadata.graphVersion!, url: '/' },
+    }),
+  );
+  await userEvent.click(
+    await screen.findByRole('button', { name: '◇ 지도에서 보기' }),
+  );
+  expect(screen.queryByRole('dialog', { name: '근거 문서' })).toBeNull();
+  await act(async () => {
+    next.resolve(graph);
+  });
+  const expected = graph.edges
+    .filter((edge) => edge.evidenceIds.includes('mock-evidence-1'))
+    .map((edge) => edge.id)
+    .join(',');
+  await waitFor(() =>
+    expect(
+      screen.getByTestId('graph-canvas').getAttribute('data-highlighted'),
+    ).toBe(expected),
+  );
+  expect(
+    new URLSearchParams(router.state.location.search).get('graphVersion'),
+  ).toBe(graph.metadata.graphVersion);
+  await userEvent.click(
+    screen.getByRole('button', { name: 'HBM3E 12단 경쟁 선택' }),
+  );
+  expect(
+    screen.getByTestId('graph-canvas').getAttribute('data-highlighted'),
+  ).toBe('');
 });
 
 it('D-GRP-05 isolates the related event when no edge has that evidence', async () => {
@@ -1516,7 +1572,6 @@ it('D-GRP-05 15번 근거가 중심 보기 밖이면 강조하는 동안만 전�
   const canvas = screen.getByTestId('graph-canvas');
   expect(canvas.getAttribute('data-highlighted')).not.toBe('');
   expect(canvas.getAttribute('data-focus')).toBe('');
-  expect(canvas.getAttribute('data-center')).toBe(evidenceNodes[0]);
   expect(screen.queryByText(/지도에 없어요/)).toBeNull();
 
   await userEvent.click(screen.getByRole('button', { name: '근거 창 닫기' }));

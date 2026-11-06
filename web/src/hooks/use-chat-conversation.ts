@@ -97,14 +97,14 @@ export function contextFromTargets(
   return context;
 }
 
-/** 지도가 실제로 적용한 기준 시각만: 지도와 같이 기업 지도(companyId)의 정확한 시각(시간대 포함)일 때다. */
+/** 지도가 실제로 적용한 주소의 정확한 기준 시각만 보낸다(시간대 포함). */
 function requestedAsOf(url: string | undefined) {
   if (!url) return null;
   const query = new URLSearchParams(
     url.includes('?') ? url.slice(url.indexOf('?') + 1) : '',
   );
   const value = query.get('asOf');
-  return query.get('companyId') && exactTime(value) ? value : null;
+  return exactTime(value) ? value : null;
 }
 
 export function questionLength(text: string) {

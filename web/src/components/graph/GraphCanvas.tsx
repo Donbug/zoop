@@ -83,6 +83,7 @@ function mapFreeArea(host: HTMLElement): Rect {
       '.relationship-zoom,.relationship-source,.relationship-selection,.graph-overview,[data-screen-id="D-GRP-07b"]',
     ) ?? []),
     ...document.querySelectorAll<HTMLElement>('[data-screen-id="M-GRP-01"]'),
+    ...document.querySelectorAll<HTMLElement>('[data-screen-id="D-GRP-05"]'),
   ];
   const measured = overlays
     .filter((el) => el.getClientRects().length && !el.closest('.hidden'))
@@ -178,6 +179,7 @@ export default function GraphCanvas({
   memoryOwner = 'public',
   onOpenIsolated,
   centerRequest = null,
+  fitRequest = null,
   filterHost,
   tutorialPhase,
   tutorialTargetId,
@@ -227,6 +229,8 @@ export default function GraphCanvas({
   onOpenIsolated?: () => void;
   /** 보유·관심 사이드바에서 고른 기업. seq가 바뀔 때마다 그 노드를 화면 가운데로 옮긴다. */
   centerRequest?: { id: string; seq: number } | null;
+  /** Explicit answer/evidence navigation fits only these nodes after their draw completes. */
+  fitRequest?: { ids: string[]; seq: number } | null;
 }) {
   const suppliedAppearance =
     useContext(GraphAppearanceContext) ?? defaultAppearance;
@@ -401,6 +405,8 @@ export default function GraphCanvas({
   const wholeFitZoom = useRef(0);
   // D-GRP-01/03: 상세 패널을 제외한 지도 영역의 중앙에 선택 노드를 유지한다.
   const centerTarget = useRef<string | null>(null);
+  const pendingMapFit = useRef<string[] | null>(null);
+  const followFitTargets = useRef<Set<string> | null>(null);
   /**
    * D-GRP-01 (2026-11-04 결정): 지도에서 누른 노드는 화면에서 가려질 때만 옮긴다.
    * 보유·관심 사이드바나 패널 행에서 고른 노드(centerRequest)는 늘 가운데로 옮긴다.
@@ -649,24 +655,35 @@ export default function GraphCanvas({
       );
       const hover = usable(evidenceMode ? null : hovered.current);
       const spotlit = new Set(spotlight.filter((id) => visibleIds.has(id)));
-      const chosenArea = spotlit.size
-        ? {
-            nodes: spotlit,
-            edges: new Set(
-              (rendered.edges ?? [])
-                .filter(
-                  (edge) =>
-                    spotlit.has(String(edge.source)) &&
-                    spotlit.has(String(edge.target)),
-                )
-                .map((edge) => String(edge.id)),
-            ),
-          }
-        : neighborhood(chosen);
+      const markedEdges = new Set(highlightedEdgeIds);
+      if (selectedEdgeId && fitRequest) markedEdges.add(selectedEdgeId);
+      const markedNodes = new Set<string>();
+      for (const edge of rendered.edges ?? []) {
+        if (!markedEdges.has(String(edge.id))) continue;
+        markedNodes.add(String(edge.source));
+        markedNodes.add(String(edge.target));
+      }
+      const chosenArea = markedNodes.size
+        ? { nodes: markedNodes, edges: markedEdges }
+        : spotlit.size
+          ? {
+              nodes: spotlit,
+              edges: new Set(
+                (rendered.edges ?? [])
+                  .filter(
+                    (edge) =>
+                      spotlit.has(String(edge.source)) &&
+                      spotlit.has(String(edge.target)),
+                  )
+                  .map((edge) => String(edge.id)),
+              ),
+            }
+          : neighborhood(chosen);
       const hoverArea = neighborhood(hover);
       // 포커스 모드에서는 연결 없는 노드가 이미 숨겨지므로, 남은 1·2단계 노드·연결선을 흐리게 하지 않는다.
       const dimRest =
-        (Boolean(chosen) || spotlit.size > 0) && !(focusLayout && focusId);
+        (Boolean(chosen) || chosenArea.nodes.size > 0) &&
+        !(focusLayout && focusId);
       const states: Record<string, string[]> = {};
       for (const node of rendered.nodes ?? []) {
         const id = String(node.id);
@@ -1486,9 +1503,13 @@ export default function GraphCanvas({
           cameraMoved = true;
           await fitVisibleGraph(
             graph,
-            undefined,
+            followFitTargets.current ?? undefined,
             // 포커스는 노드가 적어 맞춤이 크게 확대된다. 100%를 넘기지 않아 가운데 기업이 화면을 덮지 않는다.
-            arrangeFocusNow ? FOCUS_FIT_ZOOM : undefined,
+            followFitTargets.current
+              ? 1.8
+              : arrangeFocusNow
+                ? FOCUS_FIT_ZOOM
+                : undefined,
             moving ? 'layout' : animate ? 'fit' : false,
           );
         }
@@ -1507,6 +1528,25 @@ export default function GraphCanvas({
           cameraMoved = true;
           await graph.zoomTo(initialZoom, false);
           followFit.current = false;
+        }
+        const mapFit = pendingMapFit.current;
+        if (
+          mapFit?.length &&
+          mapFit.every((id) =>
+            rendered.nodes?.some(
+              (node) => node.id === id && node.style?.visibility !== 'hidden',
+            ),
+          ) &&
+          (await fitVisibleGraph(graph, new Set(mapFit), 1.8, 'fit'))
+        ) {
+          pendingMapFit.current = null;
+          followFitTargets.current = new Set(mapFit);
+          centerTarget.current = null;
+          // Keep this target fit through the detail rail's resize frames.
+          followFit.current = true;
+          fitPending.current = false;
+          cameraMoved = true;
+          abandonCameraReturn();
         }
         if (
           tutorialCenterId &&
@@ -1559,6 +1599,15 @@ export default function GraphCanvas({
     centerAlways.current = true;
     syncSelection();
   }, [centerRequest]);
+  useEffect(() => {
+    if (followFitTargets.current) followFit.current = false;
+    followFitTargets.current = null;
+    pendingMapFit.current = null;
+    if (!fitRequest) return;
+    pendingMapFit.current = fitRequest.ids;
+    followFit.current = false;
+    syncSelection();
+  }, [fitRequest]);
   useEffect(() => {
     syncSelection();
   }, [
@@ -2152,6 +2201,7 @@ export default function GraphCanvas({
       abandonCameraReturn();
       centerTarget.current = null;
       if (action === 'fit') {
+        followFitTargets.current = null;
         preservePositions.current = false;
         followFit.current = true;
         fitPending.current = true;

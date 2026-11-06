@@ -105,6 +105,7 @@ export async function getGraph(request: GraphRequest): Promise<GraphResponse> {
   const graph = await call<GraphResponse>(graphUrl(request), 'GET', undefined, {
     skipAuth: request.mode === 'all',
   });
+  assertSnapshot(graph.metadata, request);
   return marketMap(request, graph);
 }
 

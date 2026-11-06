@@ -26,6 +26,7 @@ function fixture() {
   };
   const maskZoom = vi.fn();
   const plugin = {
+    destroyed: false,
     get canvas() {
       return ready ? canvas : undefined;
     },
@@ -38,9 +39,12 @@ function fixture() {
       plugin.setCamera(); // G6 initializes/fits before it appends the cloned shapes.
       root.childNodes = [{}];
     },
+    renderMask: () => maskZoom(zoom),
+    updateMask: () => maskZoom(zoom),
+    onTransform: () => plugin.updateMask(),
     onRender: () => {
       plugin.renderMinimap();
-      maskZoom(zoom);
+      plugin.renderMask();
     },
   };
   return {
@@ -75,6 +79,18 @@ describe('D-GRP-01 minimap content bounds', () => {
     expect(f.camera.createLandmark).toHaveBeenCalledTimes(1);
     expect(f.graph.off).toHaveBeenCalledWith('afterdraw', f.plugin.onDraw);
     expect(f.graph.off).toHaveBeenCalledWith('afteranimate', f.plugin.onRender);
+  });
+
+  it('discards queued rendering and transforms after its graph version has been disposed', () => {
+    const f = fixture();
+    configureMinimap(f.graph)?.();
+    f.plugin.destroyed = true;
+    f.root.getBounds = () => {
+      throw new Error('Disposed minimap context');
+    };
+    expect(() => f.plugin.onRender()).not.toThrow();
+    expect(() => f.plugin.onTransform()).not.toThrow();
+    expect(f.maskZoom).toHaveBeenCalledTimes(1);
   });
 
   it('does not create a camera with invalid bounds when the filtered thumbnail is empty', () => {

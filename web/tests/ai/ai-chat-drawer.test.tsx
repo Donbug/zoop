@@ -18,7 +18,7 @@ import {
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
-import type { ChatJob, ChatResult } from '@/types/ai';
+import type { ChatJob, ChatJobRequest, ChatResult } from '@/types/ai';
 import type { Session } from '@/types/auth';
 import type { GraphTarget } from '@/types/map';
 import {
@@ -300,6 +300,41 @@ describe('D-AI-01 · asking with a linked target', () => {
     await within(card).findByText(/HBM은 메모리입니다/, {}, { timeout: 3000 });
     expect(within(card).getAllByText('일반 개념').length).toBeGreaterThan(0);
     expect(server.calls('POST', JOBS)).toHaveLength(1);
+  });
+
+  it('asks about an issue with the explicit cutoff of a global historical map', async () => {
+    server.on('GET', CURRENT, () => json(conversation([])));
+    server.on('POST', JOBS, (request) => {
+      // The fake transport receives the drawer's typed question request.
+      const body = request.body as ChatJobRequest;
+      return json(
+        job({
+          id: body.jobId,
+          sessionId: request.params.id,
+          question: body.question,
+        }),
+      );
+    });
+    const { user } = await open({
+      kind: 'issue',
+      id: 'iss-global',
+      label: '시점 사건',
+      mapContext: {
+        url: '/?mode=all&select=node%3Aiss-global&graphVersion=gv-old&asOf=2026-10-01T00%3A00%3A00Z',
+        graphVersion: 'gv-old',
+        asOf: '2026-10-01T00:00:00Z',
+      },
+    });
+    await screen.findByRole('region', { name: '추천 질문' });
+    await send(user, '이 사건의 당시 근거는?');
+    await screen.findByRole('article', { name: '이 사건의 당시 근거는?' });
+    expect(server.calls('POST', JOBS)[0].body).toMatchObject({
+      context: {
+        contextIds: ['iss-global'],
+        graphVersion: 'gv-old',
+        asOf: '2026-10-01T00:00:00Z',
+      },
+    });
   });
 
   it('sends no context when the target is unlinked and refuses a blank question', async () => {
@@ -1661,19 +1696,17 @@ describe('contextFromTarget', () => {
     });
   });
 
-  it('sends only a cutoff the map itself applies: a company map with an exact time', () => {
-    for (const url of [
-      '/?mode=all&asOf=2026-10-01T00%3A00%3A00Z', // no company map: the map ignores asOf
-      '/?companyId=KRX%3A005930&asOf=2026-10-01', // not an exact time with a zone
-    ]) {
-      expect(
-        contextFromTarget({
-          kind: 'company',
-          id: 'KRX:005930',
-          mapContext: { url, graphVersion: 'gv-old' },
-        }),
-      ).toEqual({ contextIds: ['KRX:005930'], graphVersion: 'gv-old' });
-    }
+  it('sends only a cutoff the map itself applies: an exact time with a zone', () => {
+    expect(
+      contextFromTarget({
+        kind: 'company',
+        id: 'KRX:005930',
+        mapContext: {
+          url: '/?companyId=KRX%3A005930&asOf=2026-10-01',
+          graphVersion: 'gv-old',
+        },
+      }),
+    ).toEqual({ contextIds: ['KRX:005930'], graphVersion: 'gv-old' });
   });
 
   it('splits an impact path, keeps evidence and the pinned version, and sends no asOf the member did not set', () => {

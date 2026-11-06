@@ -24,9 +24,12 @@ type Camera = {
   gotoLandmark: (landmark: unknown, duration: number) => unknown;
 };
 type Overview = {
+  destroyed?: boolean;
   onDraw: () => void;
   onRender: () => void;
   renderMinimap: () => void;
+  renderMask?: () => void;
+  updateMask?: () => void;
   setCamera: () => void;
   canvas?: {
     getConfig: () => { width: number; height: number };
@@ -43,6 +46,15 @@ const prepared = new WeakSet<Overview>();
  */
 function fitContent(plugin: Overview) {
   const render = plugin.renderMinimap.bind(plugin);
+  // G6 5.1 leaves debounced renders and throttled transforms queued after
+  // destroy(). Stop each delayed entry point before it touches disposed context.
+  for (const method of ['renderMask', 'updateMask'] as const) {
+    const update = plugin[method]?.bind(plugin);
+    if (update)
+      plugin[method] = () => {
+        if (!plugin.destroyed) update();
+      };
+  }
   let previous = '';
   let previousCamera: Camera | undefined;
   plugin.setCamera = () => {
@@ -89,6 +101,7 @@ function fitContent(plugin: Overview) {
     previousCamera = camera;
   };
   plugin.renderMinimap = () => {
+    if (plugin.destroyed) return;
     render();
     plugin.setCamera();
   };
