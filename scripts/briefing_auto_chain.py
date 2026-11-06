@@ -40,7 +40,8 @@ def config_check(cfg):
     root=Path(cfg['work']);root.mkdir(mode=0o700,parents=True,exist_ok=True)
     server.require(not root.is_symlink() and root.stat().st_mode&0o077==0,'private_work')
     # Literal common->personal reuse saves two requests, never a verification.
-    server.require(cfg.get('nativeCallLimit')==(8 if cfg.get('sharePriorityAnalysis') else 6),'native_priority_capacity')
+    from briefing_call_limits import validate_auto
+    validate_auto(cfg)
     server.require(cfg.get('additiveGraphAllowed') is True,'additive_graph_opt_in_required')
     server.require(bool(cfg.get('authorizationRef')) and bool(cfg.get('dsn')),'chain_authorization')
 
@@ -51,6 +52,8 @@ def validate_selected_config(cfg):
     selected_cfg=selected.load_config(Path(cfg['selectedWorkerConfig']))
     server.require(selected_cfg.get('allowedMemberIds')==cfg.get('personalMemberIds',[]),'personal_member_cohort_binding')
     server.require(selected_cfg.get('serverBudgetWork')==cfg['work'],'shared_personal_budget_required')
+    from briefing_call_limits import round_limit
+    server.require(round_limit(selected_cfg)==round_limit(cfg),'shared_personal_call_limit_binding')
     common=conninfo_to_dict(cfg['dsn']);personal=conninfo_to_dict(selected_cfg['dsn'])
     server.require(all(common.get(k,default)==personal.get(k,default) for k,default in [('host',''),('port','5432'),('dbname',''),('options','')]),'personal_database_binding')
     server.require(Path(selected_cfg['grants']).resolve()==(Path(cfg['authorityRoot'])/'serving-grants.json').resolve(),'personal_authority_binding')

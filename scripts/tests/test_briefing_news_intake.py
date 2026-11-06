@@ -60,6 +60,45 @@ class NewsIntakeTests(unittest.TestCase):
         self.assertEqual(captured.body, body.read_bytes())
         self.assertFalse(row['rights']['rawRedistribution'])
 
+    def test_new_hankyung_body_shape_keeps_article_only_and_legacy_scope(self):
+        url='https://www.hankyung.com/article/synthetic123'
+        head='<html><head><meta property="og:title" content="삼성전자 합성 계약"/><meta property="og:site_name" content="합성 언론"/><meta property="article:published_time" content="2026-11-05T08:00:00+09:00"/></head><body>'
+        body='<article class="article-container"><div class="article-body-wrap"><div class="article-body">삼성전자는 합성 공급 계약을 체결했다.</div><div class="article-license">LICENSE OUTSIDE</div></div><aside>RELATED OUTSIDE</aside></article>'
+        captured=article(url=url);object.__setattr__(captured,'body',(head+body+'</body></html>').encode())
+        row,exported,_=news.retain(source('hankyung-feed'),'a'*64,self.round,self.root,captured)
+        self.assertIn('합성 공급 계약',exported['document']['text'])
+        self.assertNotIn('LICENSE OUTSIDE',exported['document']['text']);self.assertNotIn('RELATED OUTSIDE',exported['document']['text'])
+        self.assertEqual(captured.fetched_at,row['fetchedAt'])
+
+    def test_duplicate_hankyung_bodies_remain_ambiguous(self):
+        from zoop_ai_pipeline.news_archives import article_metadata
+        url='https://www.hankyung.com/article/synthetic123'
+        raw=b'<html><head><meta property="og:title" content="synthetic"/></head><body><article class="article-container"><div class="article-body-wrap"><div class="article-body">one</div><div class="article-body">two</div></div></article></body></html>'
+        with self.assertRaisesRegex(Exception,'article_scope_ambiguous_or_missing'):article_metadata('hankyung-feed',raw,url)
+
+    def test_new_scope_still_rejects_explicit_access_restrictions(self):
+        from zoop_ai_pipeline.ingestion_parsers import prepare
+        from zoop_ai_pipeline.news_archives import article_metadata
+        url='https://www.hankyung.com/article/synthetic123'
+        raw=b'<html><head><meta property="og:title" content="synthetic"/></head><body><article class="article-container"><div class="article-body-wrap"><div class="article-body">synthetic body</div></div><div class="subscription-required">restricted</div></article></body></html>'
+        meta=article_metadata('hankyung-feed',raw,url)
+        with self.assertRaisesRegex(Exception,'access_restricted'):prepare(raw,'text/html',meta.article_xpath)
+
+    def test_discovery_days_only_prioritize_and_never_replace_source_clock_checks(self):
+        from zoop_ai_pipeline.news_archives import Candidate
+        companies=[{'companyId':'a','name':'Apple','aliases':[]}]
+        fresh=Candidate('https://example.invalid/fresh','other company',None,None,'2026-11-05')
+        old=Candidate('https://example.invalid/old','Apple investment',None,None,'2026-11-03')
+        self.assertGreater(news.discovery_rank(fresh,self.round,companies),news.discovery_rank(old,self.round,companies))
+        with self.assertRaisesRegex(ValueError,'publication_outside_window'):
+            news.publication_in_window('2026-11-03T08:00:00+09:00',self.round,'2026-11-05T08:10:00+09:00')
+
+    def test_expanded_discovery_stays_bounded_by_the_operator_registry(self):
+        selected=source();selected.update(maxListingPages=3,maxArticleAttempts=24,maxDocuments=8)
+        cfg=self.registry([selected]);self.assertEqual(24,news.load_registry(cfg)[0]['sources'][0]['maxArticleAttempts'])
+        selected['maxArticleAttempts']=25;Path(cfg['newsSourceRegistry']).write_text(json.dumps({'schemaVersion':news.SCHEMA,'revision':'synthetic-v2','sources':[selected]}))
+        with self.assertRaisesRegex(ValueError,'source_limit'):news.load_registry(cfg)
+
     def test_foreign_canonical_or_changed_article_identity_is_not_admitted(self):
         captured = article()
         object.__setattr__(captured, 'body', captured.body.replace(captured.final_url.encode(), b'https://attacker.invalid/other'))

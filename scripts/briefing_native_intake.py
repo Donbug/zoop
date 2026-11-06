@@ -9,6 +9,7 @@ from datetime import datetime,timedelta,timezone
 from pathlib import Path
 import httpx
 import briefing_server_runtime as server
+import briefing_call_limits as limits
 from briefing_usage import CommandPipe,UsageSession,write_once
 
 b=server.b
@@ -317,8 +318,8 @@ def prepare_candidates(cfg,round,entries,collection_root,observer=None):
     """Terminal quality failures move to the next unsent document, never a verdict upgrade."""
     notify=observer or (lambda *args:None)
     attempt_root=collection_root/'candidates-v3';attempt_root.mkdir(mode=0o700,parents=True,exist_ok=True)
-    outcomes=[]
-    for entry in entries:
+    outcomes=[];reserved_common=limits.publication_reserve(cfg)
+    for index,entry in enumerate(entries):
         pin=candidate_pin(entry);root=attempt_root/(round['id']+'-'+b.digest(b.canonical([pin['documentId'],pin['documentVersion']]))[:16]+'-native-v2')
         root.mkdir(mode=0o700,parents=True,exist_ok=True)
         write_once(root/'selected-source.json',pin)
@@ -333,19 +334,23 @@ def prepare_candidates(cfg,round,entries,collection_root,observer=None):
         native_calls=sum(r.get('phase')=='native' for r in own)
         # A normal successful native document needs 5 calls. Do not start one
         # that cannot fit while retaining generation AND independent checking.
-        reserved_common=8 if cfg.get('sharePriorityAnalysis') else 10
-        if len(own)+5+reserved_common>16 or native_calls+5>cfg.get('nativeCallLimit',6):
+        if len(own)+5+reserved_common>limits.round_limit(cfg) or native_calls+5>limits.native_limit(cfg):
             outcomes.append({'documentId':pin['documentId'],'status':'not_sent','reason':'remaining_shared_call_capacity'})
+            for remaining in entries[index+1:]:
+                outcomes.append({'documentId':remaining[1]['document']['documentId'],'status':'not_sent','reason':'remaining_shared_call_capacity'})
             break
         result=prepare_candidate(cfg,round,entry,root)
         if result.get('status')!='withheld':
             notify('native','completed');return result
         outcomes.append({'documentId':pin['documentId'],'status':'withheld','reason':result['reason']})
-    result={'schemaVersion':SCHEMA,'status':'withheld','reason':'all_company_candidates_withheld','candidates':outcomes}
+    reason='remaining_shared_call_capacity' if any(o['status']=='not_sent' for o in outcomes) else 'all_company_candidates_withheld'
+    result={'schemaVersion':SCHEMA,'status':'withheld','reason':reason,'candidates':outcomes,
+        'roundCallLimit':limits.round_limit(cfg),'nativeCallLimit':limits.native_limit(cfg),'publicationCallReserve':reserved_common}
     # New unique recovery roots keep older outcomes and unknown reservations intact.
     path=collection_root/'candidate-outcomes-v3.json'
     if path.exists():path=attempt_root/('outcomes-'+b.digest(b.canonical(result))[:16]+'.json')
-    write_once(path,result);return result
+    write_once(path,result)
+    return {**result,'outcomeFile':str(path.relative_to(collection_root))}
 
 
 def prepare(cfg,round,observer=None):
@@ -543,32 +548,38 @@ def run_slot(cfg,edition,cutoff=None,recover_unpaid=False,*,producer=None,observ
                 (round['id'],slot.date(),edition,slot,start))
         try:
             baseline=native_command(cfg,'state',{},root/'baseline.request.json');write_once(root/'baseline.json',baseline)
-            print(json.dumps({'roundId':round['id'],'stage':'bounded_source_collection','cutoff':slot.isoformat()}),flush=True)
-            ready=prepare(cfg,round,observer=observer)
-            if ready.get('status')=='withheld':
-                print(json.dumps({'roundId':round['id'],'status':'requires_recovery','reason':ready['reason']}),flush=True)
-                require(False,'source_quality_withheld')
-            observer('authority','started');register_authority(cfg,ready);observer('authority','completed')
-            observer('import','started')
-            incoming=native_command(cfg,'import',ready,root/'import.request.json');write_once(root/'imported.json',incoming)
-            observer('import','completed')
-            require(clock()<slot-timedelta(seconds=10),'native_after_cutoff')
-            observer('activation','started')
-            activated=native_command(cfg,'activate',{'baseline':baseline,'incoming':incoming},root/'activate.request.json')
-            write_once(root/'activated.json',activated)
-            observer('activation','completed',{'graphVersion':activated['graphVersion']})
-            print(json.dumps({'roundId':round['id'],'stage':'native_source_ready','graphVersion':activated['graphVersion']}),flush=True)
-            # Only deterministic provider reads here. Persist once before the
-            # cutoff; failed/late indicators cannot block verified news or be
-            # passed off as an on-time price observation.
+            # Market observations are independent of whether a company/event is admissible.
+            # A later failed native stage must not discard an already captured cutoff reference.
             capture_market(cfg,round,observer)
+            print(json.dumps({'roundId':round['id'],'stage':'bounded_source_collection','cutoff':slot.isoformat()}),flush=True)
+            try:ready=prepare(cfg,round,observer=observer)
+            except ValueError as error:
+                if str(error)!='briefing_server_no_current_company_source':raise
+                ready={'status':'withheld','reason':'no_current_company_source'}
+            context=dict(cfg)
+            if ready.get('status')=='withheld':
+                from briefing_coverage_publication import record
+                context['coverageNoticeSha256']=record(cfg,round,ready['reason'],clock(),ready.get('outcomeFile'))
+                observer('native','failed',{'reason':ready['reason']})
+            else:
+                observer('authority','started');register_authority(cfg,ready);observer('authority','completed')
+                observer('import','started')
+                incoming=native_command(cfg,'import',ready,root/'import.request.json');write_once(root/'imported.json',incoming)
+                observer('import','completed')
+                require(clock()<slot-timedelta(seconds=10),'native_after_cutoff')
+                observer('activation','started')
+                activated=native_command(cfg,'activate',{'baseline':baseline,'incoming':incoming},root/'activate.request.json')
+                write_once(root/'activated.json',activated)
+                observer('activation','completed',{'graphVersion':activated['graphVersion']})
+                context['expectedGraphVersion']=activated['graphVersion']
+                print(json.dumps({'roundId':round['id'],'stage':'native_source_ready','graphVersion':activated['graphVersion']}),flush=True)
             observer('cutoff','started',{'cutoff':slot.isoformat()})
             while (remaining:=(slot-clock()).total_seconds())>0:sleep(min(30,remaining))
             observer('cutoff','completed')
             conn.execute("UPDATE briefing_common_schedule_jobs SET status='running' WHERE id=%s AND status='queued'",(round['id'],))
             job=conn.execute('SELECT * FROM briefing_common_schedule_jobs WHERE id=%s',(round['id'],)).fetchone()
             observer('generation','started')
-            (producer or server.produce)({**cfg,'expectedGraphVersion':activated['graphVersion']},job)
+            (producer or server.produce)(context,job)
             observer('generation','completed');require(server.published(conn,job),'live_publication_proof')
             observer('publication','completed')
             conn.execute("UPDATE briefing_common_schedule_jobs SET status='completed',finished_at=now() WHERE id=%s AND status='running'",(round['id'],))

@@ -56,6 +56,9 @@ def attach(payload, snapshot, pool, common, personal, summary, records, calls, *
 
 
 def produce(cfg, job):
+    if cfg.get('coverageNoticeSha256'):
+        from briefing_coverage_publication import produce as publish_coverage
+        return publish_coverage(cfg, job)
     # Import only on execution; unit/schema tests cannot initialize provider or DB resources.
     import briefing_server_runtime as runtime
     runtime.require(cfg.get('priorityContract') == priority.VERSION, 'priority_opt_in')

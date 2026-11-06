@@ -14,6 +14,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.common.json.Canonical;
+import com.zoop.common.json.StrictJson;
 import com.zoop.document.analysis.repository.JdbcDocumentAnalysisRepository;
 import com.zoop.document.evidence.service.DocumentReadSources;
 import com.zoop.document.importer.IngestionExportParser;
@@ -354,8 +355,100 @@ class BriefingServerPostgresTest {
         e.put("BRIEFING_SERVER_WORK_ROOT",work.toString());e.put("BRIEFING_USAGE_ARTIFACT_ROOT",temp.toRealPath().resolve("producer").toString());
         e.put("BRIEFING_SERVER_SOURCE_SCOPE",temp.toRealPath().resolve("model-scope.json").toString());e.put("ZOOP_DOCUMENT_READ_GRANTS",grant.toString());e.put("ZOOP_DOCUMENT_READ_INGESTION_SOURCES",authority.toString());
         e.put("JAVA",Path.of(System.getProperty("java.home"),"bin/java").toString());
+        if("coverage".equals(mode))e.put("SYNTHETIC_COVERAGE_REQUEST",temp.resolve("coverage-request.json").toString());
         Path log=temp.resolve("smoke-"+edition+".log");process.redirectErrorStream(true).redirectOutput(log.toFile());var child=process.start();
         assertTrue(child.waitFor(120,java.util.concurrent.TimeUnit.SECONDS));assertEquals(0,child.exitValue(),Files.readString(log));
+    }
+
+    private ObjectNode coverageRequest() throws Exception {
+        var request=request("evening");var round=(ObjectNode)request.get("round");
+        Instant cutoff=Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS),from=cutoff.minusSeconds(60);String date=cutoff.atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate().toString(),id="brf-"+date+"-evening";
+        round.put("id",id).put("date",date).put("scheduledAt",cutoff.toString()).put("windowTo",cutoff.toString()).put("windowFrom",from.toString());
+        jdbc.update("INSERT INTO briefing_common_schedule_jobs(id,round_date,edition,scheduled_at,window_from,status) VALUES(?,?::date,'evening',?,?,'running')",id,date,Timestamp.from(cutoff),Timestamp.from(from));
+        Path root=work.resolve("native/"+id);Files.createDirectories(root);
+        byte[] coverage="{\"complete\":false,\"candidateDocuments\":0}".getBytes(StandardCharsets.UTF_8);
+        Files.write(root.resolve("source-coverage.json"),coverage);
+        var notice=StrictJson.newObject().put("schemaVersion","briefing-coverage-notice-v1").put("reason","no_current_company_source").put("recordedAt",cutoff.minusSeconds(1).toString());
+        notice.set("round",round.deepCopy());notice.putObject("files").put("source-coverage.json",Canonical.sha256(coverage));
+        byte[] raw=StrictJson.write(notice);Files.write(root.resolve("coverage-notice.json"),raw);
+        request.put("noticeSha256",Canonical.sha256(raw));Files.write(temp.resolve("coverage-request.json"),StrictJson.write(request));return request;
+    }
+
+    @Test void coverageBulletinUsesPriorOriginalWithoutNewAiAndRemainsReadableOverHttp() throws Exception {
+        publish(importNative(HandoffFixtures.Spec.standard()));server();runProducer("morning","normal");
+        String oldPayload=jdbc.queryForObject("SELECT published_payload::text FROM briefing_rounds WHERE edition='morning'",String.class);
+        int oldCalls=jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class);
+        var coverage=coverageRequest();runProducer("evening","coverage");
+        assertEquals(oldCalls,jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class));
+        assertEquals(oldPayload,jdbc.queryForObject("SELECT published_payload::text FROM briefing_rounds WHERE edition='morning'",String.class));
+        var row=new com.zoop.briefing.storage.BriefingRoundRepository(jdbc).findById(coverage.path("round").path("id").asString()).orElseThrow();
+        assertEquals("published",row.status());assertTrue(row.payload().path("items").isEmpty());
+        assertEquals("coverage_limited",row.publicSnapshot().path("continuity").path("mode").asString());
+        assertEquals("brf-2026-11-02-morning",row.publicSnapshot().path("continuity").path("recap").path("previousRoundId").asString());
+        try(var app=new org.springframework.boot.builder.SpringApplicationBuilder(com.zoop.ZoopApplication.class).run(
+            "--server.port=0","--spring.datasource.url="+url,"--spring.datasource.username=company_test","--spring.datasource.password="+password(),
+            "--spring.flyway.enabled=false","--spring.jpa.properties.hibernate.default_schema="+schema,
+            "--zoop.document-read.grants="+grant,"--zoop.document-read.artifact-root="+temp.toRealPath().resolve("producer"),
+            "--zoop.document-read.ingestion-sources="+authority,"--zoop.graph.snapshot.source=artifact",
+            "--zoop.graph.snapshot.artifact-root="+temp.toRealPath().resolve("producer"),
+            "--ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=test","--ZOOP_AUTH_CSRF_KEYS=test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")) {
+            int port=((org.springframework.boot.web.server.context.WebServerApplicationContext)app).getWebServer().getPort();
+            var response=java.net.http.HttpClient.newHttpClient().send(java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+port+"/api/v1/briefings?date="+row.date()+"&edition=evening")).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,response.statusCode(),response.body());
+            var result=StrictJson.parseObject(response.body());assertEquals("published",result.string("status"));
+            assertEquals(1,result.object("continuity").object("recap").array("items").size());
+            assertEquals("not_updated",result.object("continuity").object("forecast").string("status"));
+            var explicit=app.getBean(com.zoop.briefing.personal.ExplicitBriefingService.class);
+            var principal=new com.zoop.auth.service.MemberSessionService.MemberPrincipal("synthetic-reader","test");
+            String company=row.publicSnapshot().at("/continuity/recap/items/0/companies/0/id").asString();
+            var mine=explicit.select(row.id(),principal,new com.zoop.briefing.personal.ExplicitBriefingService.Choice(List.of(company),3,0,3),"coverage-personal");
+            assertEquals(1,mine.at("/presentation/continuity/recap/items").size());
+            assertEquals("available",mine.at("/presentation/continuity/recap/status").asString());
+            String unrelated=jdbc.queryForList("SELECT id FROM companies WHERE id<>? ORDER BY id",String.class,company).stream()
+                .filter(id->!row.publicSnapshot().at("/continuity/recap/items/0/companies").toString().contains(id)).findFirst().orElseThrow();
+            var other=explicit.select(row.id(),principal,new com.zoop.briefing.personal.ExplicitBriefingService.Choice(List.of(unrelated),3,0,3),"coverage-unrelated");
+            assertEquals(0,other.at("/presentation/continuity/recap/items").size());
+            assertEquals("unavailable",other.at("/presentation/continuity/recap/status").asString());
+            assertEquals(0,other.at("/presentation/continuity/watchConditions").size());
+            assertEquals(oldCalls,jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class));
+        }
+    }
+
+    @Test void coverageCannotRelaxFreshEvidencePermissionOrUnknownSendGates() throws Exception {
+        publish(importNative(HandoffFixtures.Spec.standard()));server();runProducer("morning","normal");
+        var request=coverageRequest();var command=server();var prepared=command.prepareCoverage(StrictJson.Obj.of(request));
+        command.check(StrictJson.Obj.of(prepared));
+        var forged=(ObjectNode)prepared.deepCopy();forged.withArray("candidates").addObject().put("issueId","forged");
+        assertThrows(IllegalArgumentException.class,()->command.check(StrictJson.Obj.of(forged)));
+        jdbc.update("UPDATE briefing_common_schedule_jobs SET status='requires_recovery' WHERE edition='evening'");
+        assertThrows(IllegalArgumentException.class,()->command.check(StrictJson.Obj.of(prepared)));
+        jdbc.update("UPDATE briefing_common_schedule_jobs SET status='running' WHERE edition='evening'");
+        byte[] originalGrant=Files.readAllBytes(grant);
+        Files.writeString(grant,Files.readString(grant).replace("\"enabled\":true","\"enabled\":false"));
+        assertThrows(IllegalArgumentException.class,()->command.check(StrictJson.Obj.of(prepared)));
+        Files.write(grant,originalGrant);
+        var ds=jdbc.getDataSource();
+        var ledger=new com.zoop.briefing.usage.BriefingUsageLedger(new NamedParameterJdbcTemplate(ds),new DataSourceTransactionManager(ds),
+            temp.toRealPath().resolve("producer"),java.time.Duration.ofSeconds(120));
+        var claim=StrictJson.newObject().put("op","claim").put("requestKey","synthetic-unknown").put("purpose","generation")
+            .put("trigger","scheduler").putNull("adminId").putNull("inputArtifactId").put("inputDigest","a".repeat(64));
+        claim.set("round",request.path("round").deepCopy());var owner=ledger.execute(StrictJson.Obj.of(claim));
+        var start=StrictJson.newObject().put("op","model_start").put("attemptId",owner.path("attemptId").asString())
+            .put("ownerToken",owner.path("ownerToken").asString()).put("callId","synthetic-send").put("stage","native")
+            .put("feature","briefing").put("provider","synthetic").put("model","authored-model").put("promptVersion","authored-v1")
+            .putNull("retryUnit").putNull("reasoningEffort");
+        var execution=ledger.execute(StrictJson.Obj.of(start));
+        assertThrows(IllegalArgumentException.class,()->command.check(StrictJson.Obj.of(prepared)));
+        jdbc.update("UPDATE ai_executions SET status='unknown' WHERE id=?",execution.path("executionId").asString());
+        assertThrows(IllegalArgumentException.class,()->command.check(StrictJson.Obj.of(prepared)));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM briefing_rounds WHERE edition='evening' AND published_at IS NOT NULL",Integer.class));
+    }
+
+    @Test void coverageWithoutAPriorOriginalCannotInventARecap() throws Exception {
+        publish(importNative(HandoffFixtures.Spec.standard()));server();var request=coverageRequest();
+        assertThrows(IllegalStateException.class,()->server().prepareCoverage(StrictJson.Obj.of(request)));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM briefing_rounds WHERE published_at IS NOT NULL",Integer.class));
     }
     @Test void unsupportedSelectedIssueIsHeldAndItsRepairIsOneRetryUnit() throws Exception {
         publish(importNative(HandoffFixtures.Spec.standard()));server();runProducer("morning","withheld");

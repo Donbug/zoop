@@ -44,7 +44,16 @@ cfg={'work':str(root/'work'),'authorizationRef':'synthetic-server-test','keyFile
 job={'id':'brf-2026-11-02-'+edition,'round_date':'2026-11-02','edition':edition,
      'scheduled_at':datetime.fromisoformat('2026-11-02T01:03:03+00:00'),
      'window_from':datetime.fromisoformat('2026-10-07T00:00:00+00:00')}
-if mode=='input-failed':
+if mode=='coverage':
+    import briefing_coverage_publication as gap
+    request=json.loads(Path(os.environ['SYNTHETIC_COVERAGE_REQUEST']).read_bytes());r=request['round']
+    job={'id':r['id'],'round_date':r['date'],'edition':r['edition'],'scheduled_at':datetime.fromisoformat(r['scheduledAt']),
+         'window_from':datetime.fromisoformat(r['windowFrom'])}
+    cfg['coverageNoticeSha256']=request['noticeSha256']
+    result=runtime.produce(cfg,job)
+    assert result['status']=='published'
+    assert not calls
+elif mode=='input-failed':
     work=Path(cfg['work'])/job['id'];work.mkdir(mode=0o700)
     r={'id':job['id'],'date':str(job['round_date']),'edition':job['edition'],'scheduledAt':job['scheduled_at'].isoformat(),
        'windowFrom':job['window_from'].isoformat(),'windowTo':job['scheduled_at'].isoformat()}

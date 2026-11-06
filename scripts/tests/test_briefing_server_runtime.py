@@ -22,6 +22,27 @@ class BudgetTests(unittest.TestCase):
         for i in range(16):budget(self.request(i))
         with self.assertRaisesRegex(ValueError,'round_budget'):budget(self.request(17))
         self.assertEqual(16,len(self.calls))
+    def test_explicit_expansion_counts_all_physical_calls_and_stops_at_thirty_two(self):
+        cfg={**self.cfg,'roundCallLimit':32}
+        budget=runtime.Budget(cfg,'brf-2026-11-03-morning',lambda:None,self.transport)
+        for i in range(32):budget(self.request(i))
+        with self.assertRaisesRegex(ValueError,'round_budget'):budget(self.request(33))
+        self.assertEqual(32,len(self.calls))
+        self.assertEqual(32,len(list((Path(self.temp.name)/'budget').glob('*.json'))))
+    def test_expansion_keeps_unknown_reservations_and_unchanged_money_limit(self):
+        cfg={**self.cfg,'roundCallLimit':32}
+        def unknown(raw):raise TimeoutError('synthetic unknown')
+        budget=runtime.Budget(cfg,'brf-2026-11-03-morning',lambda:None,unknown)
+        with self.assertRaises(TimeoutError):budget(self.request())
+        with self.assertRaisesRegex(ValueError,'uncertain_or_reused_request'):budget(self.request())
+        request=json.loads(self.request(1));request['instructions']='x'*1100000
+        with self.assertRaisesRegex(ValueError,'round_budget'):budget(json.dumps(request).encode())
+        self.assertEqual(1,len(list((Path(self.temp.name)/'budget').glob('*.json'))))
+    def test_invalid_call_limit_never_sends_or_changes_existing_reservations(self):
+        for value in [True,15,65,32.0,'32']:
+            with self.subTest(value=value),self.assertRaisesRegex(ValueError,'round_call_limit'):
+                runtime.Budget({**self.cfg,'roundCallLimit':value},'brf-2026-11-03-morning',lambda:None,self.transport)(self.request())
+        self.assertFalse(self.calls)
     def test_unknown_transmission_keeps_reservation_and_forbids_automatic_resend(self):
         def unknown(raw):self.calls.append(raw);raise TimeoutError()
         budget=runtime.Budget(self.cfg,'brf-2026-11-03-morning',lambda:None,unknown)

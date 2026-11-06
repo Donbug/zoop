@@ -57,13 +57,14 @@ public final class BriefingServerCommand {
 
     public static void main(String[] args) throws Exception {
         try {
-            if(args.length!=2 || !Set.of("prepare","check","publish").contains(args[0])) throw new IllegalArgumentException("operation");
+            if(args.length!=2 || !Set.of("prepare","prepare-coverage","check","publish").contains(args[0])) throw new IllegalArgumentException("operation");
             var command = new BriefingServerCommand(System.getenv());
             Path path = Path.of(args[1]).toAbsolutePath().normalize();
             if(!path.startsWith(command.work) || !path.toRealPath().startsWith(command.work.toRealPath()) || Files.isSymbolicLink(path) || Files.size(path)>4*1024*1024) throw new IllegalArgumentException("private_request");
             var request = StrictJson.parseObject(Files.readAllBytes(path));
             ObjectNode result = switch(args[0]) {
                 case "prepare" -> command.prepare(request);
+                case "prepare-coverage" -> command.prepareCoverage(request);
                 case "check" -> { command.check(request.object("prepared")); yield StrictJson.newObject().put("status","current"); }
                 case "publish" -> command.publish(request);
                 default -> throw new IllegalArgumentException();
@@ -190,6 +191,11 @@ public final class BriefingServerCommand {
     }
 
     public void check(StrictJson.Obj prepared) {
+        if(prepared.has("mode")) {
+            var expected=coveragePrepared(prepared.object("round"),prepared.object("coverageNotice").string("sha256"),prepared.string("preparedAt"));
+            if(!Arrays.equals(Canonical.appBytes(expected),Canonical.appBytes(prepared.node())))reject();
+            return;
+        }
         ObjectNode copy=(ObjectNode)prepared.node().deepCopy();String digest=prepared.string("inputSha256");copy.remove("inputSha256");
         if(!digest.equals(Canonical.sha256(Canonical.appBytes(copy))))reject();
         var publication=reader.read(prepared.string("graphVersion"));
@@ -253,6 +259,19 @@ public final class BriefingServerCommand {
         if(!prepared.string("inputSha256").equals(admitted))reject();
         if(!round.string("id").equals(payload.string("id"))||!prepared.string("graphVersion").equals(payload.string("graphVersion"))
             ||!snapshot.array("sourceBindings").equals(prepared.array("sourceBindings")))reject();
+        if(prepared.has("mode")) {
+            if(!payload.array("items").isEmpty()||!payload.object("references").array("eventIds").isEmpty()
+                ||!payload.object("references").array("evidenceIds").isEmpty()||!payload.object("references").array("companyIds").isEmpty()
+                ||!payload.raw("outlook").isNull()||!snapshot.raw("continuity").equals(prepared.raw("continuity"))
+                ||!snapshot.raw("coverageNotice").equals(prepared.raw("coverageNotice"))||!snapshot.object("itemDetails").node().isEmpty()
+                ||!"briefing-coverage-notice-v1".equals(snapshot.object("serverGeneration").string("mode"))
+                ||!snapshot.object("serverGeneration").array("records").isEmpty()||!snapshot.object("serverGeneration").array("analyses").isEmpty()
+                ||!snapshot.object("serverGeneration").array("selected").isEmpty()
+                ||!request.object("pool").array("candidates").isEmpty()||request.object("pool").node().path("candidateCount").asInt(-1)!=0
+                ||jdbc.queryForObject("SELECT count(*) FROM ai_executions WHERE briefing_attempt_id=?",Integer.class,request.string("attemptId"))!=0)
+                reject();
+            for(String field:List.of("commonPriority","prioritySummary","companyOutlooks","aiPriceOutlooks","judgmentUpdate"))if(snapshot.has(field))reject();
+        }
         Set<String> allowed=new HashSet<>(); for(JsonNode c:prepared.array("candidates"))allowed.add(c.path("issueId").asString());
         Set<String> selected=new HashSet<>(); for(JsonNode i:payload.array("items"))if(!allowed.contains(i.path("eventId").asString())||!selected.add(i.path("eventId").asString()))reject();
         if(selected.size()>3)reject();
@@ -279,6 +298,108 @@ public final class BriefingServerCommand {
                 "brfp-"+pool.path("inputSha256").asString(),r.string("id"),pool.path("inputSha256").asString(),poolText,poolText);
             return StrictJson.newObject().put("status","published").put("roundId",r.string("id")).put("payloadSha256",sha);
         });
+    }
+
+    /** Source shortage is not a fresh-issue verdict. Only an exact, still-readable prior original can be recapped. */
+    public ObjectNode prepareCoverage(StrictJson.Obj request) {
+        return coveragePrepared(request.object("round"),request.string("noticeSha256"),Instant.now().toString());
+    }
+
+    private ObjectNode coveragePrepared(StrictJson.Obj round,String noticeSha,String preparedAt) {
+        try {
+            String id=round.string("id");Instant cutoff=Instant.parse(round.string("windowTo")),from=Instant.parse(round.string("windowFrom"));
+            if(!id.matches("brf-\\d{4}-\\d{2}-\\d{2}-(morning|evening)")||!id.equals("brf-"+round.string("date")+"-"+round.string("edition"))
+                ||!LocalDate.parse(round.string("date")).equals(cutoff.atZone(ZoneId.of("Asia/Seoul")).toLocalDate())
+                ||cutoff.isAfter(Instant.now())||!cutoff.equals(Instant.parse(round.string("scheduledAt")))||!from.isBefore(cutoff)
+                ||Instant.parse(preparedAt).isBefore(cutoff)||Instant.parse(preparedAt).isAfter(Instant.now()))reject();
+            var jobs=jdbc.queryForList("SELECT status,scheduled_at,window_from FROM briefing_common_schedule_jobs WHERE id=?",id);
+            if(jobs.size()!=1||!cutoff.equals(((Timestamp)jobs.getFirst().get("scheduled_at")).toInstant())
+                ||!from.equals(((Timestamp)jobs.getFirst().get("window_from")).toInstant()))reject();
+            String jobStatus=jobs.getFirst().get("status").toString();
+            if(!Set.of("queued","running").contains(jobStatus)
+                &&!("requires_recovery".equals(jobStatus)&&id.equals(recoveryRound)&&recoveryAuthorization!=null&&!recoveryAuthorization.isBlank()))reject();
+            if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM ai_executions e JOIN briefing_attempts a ON a.id=e.briefing_attempt_id WHERE a.round_id=? AND e.status IN ('running','unknown'))",Boolean.class,id)))reject();
+            Path root=work.resolve("native").resolve(id),path=root.resolve("coverage-notice.json");
+            var notice=readCoverageFile(path,noticeSha);
+            notice.exactly(Set.of("schemaVersion","round","reason","recordedAt","files"));
+            if(!"briefing-coverage-notice-v1".equals(notice.string("schemaVersion")))reject();
+            var pinned=notice.object("round");
+            for(String key:List.of("id","date","edition"))if(!round.string(key).equals(pinned.string(key)))reject();
+            for(String key:List.of("scheduledAt","windowFrom","windowTo"))if(!Instant.parse(round.string(key)).equals(Instant.parse(pinned.string(key))))reject();
+            Instant recorded=Instant.parse(notice.string("recordedAt"));if(!recorded.isAfter(from)||recorded.isAfter(cutoff))reject();
+            String reason=notice.string("reason");
+            if(!Set.of("no_current_company_source","all_company_candidates_withheld","remaining_shared_call_capacity").contains(reason))reject();
+            String outcomeName=null;
+            if(!"no_current_company_source".equals(reason)) {
+                for(String name:notice.object("files").node().properties().stream().map(Map.Entry::getKey).toList())
+                    if(!"source-coverage.json".equals(name)) {
+                        if(outcomeName!=null||!("candidate-outcomes-v3.json".equals(name)||name.matches("candidates-v3/outcomes-[a-f0-9]{16}\\.json")))reject();
+                        outcomeName=name;
+                    }
+                if(outcomeName==null)reject();
+            }
+            Set<String> names=outcomeName==null?Set.of("source-coverage.json"):Set.of("source-coverage.json",outcomeName);
+            notice.object("files").exactly(names);
+            var coverage=readCoverageFile(root.resolve("source-coverage.json"),notice.object("files").string("source-coverage.json"));
+            if(coverage.node().path("complete").asBoolean(true))reject();
+            if("no_current_company_source".equals(reason)) {
+                if(coverage.node().path("candidateDocuments").asInt(-1)!=0)reject();
+            } else {
+                var outcomes=readCoverageFile(root.resolve(outcomeName),notice.object("files").string(outcomeName));
+                if(!reason.equals(outcomes.string("reason"))||!"withheld".equals(outcomes.string("status"))||outcomes.array("candidates").isEmpty())reject();
+                boolean notSent=false;
+                for(JsonNode child:outcomes.array("candidates")) {
+                    var item=StrictJson.Obj.of(child);String status=item.string("status");
+                    if("not_sent".equals(status)){if(!"remaining_shared_call_capacity".equals(item.string("reason")))reject();notSent=true;}
+                    else if(!Set.of("withheld","saved_withheld").contains(status))reject();
+                }
+                if(notSent!="remaining_shared_call_capacity".equals(reason))reject();
+            }
+            var ids=jdbc.queryForList("""
+                SELECT id FROM briefing_rounds r WHERE status='published' AND published_at<=? AND window_to<=? AND id<>?
+                AND graph_version_id IS NOT NULL AND public_snapshot->'serverGeneration' IS NOT NULL
+                AND jsonb_typeof(published_payload->'items')='array' AND jsonb_array_length(published_payload->'items')>0
+                AND NOT EXISTS(SELECT 1 FROM briefing_changes c WHERE c.round_id=r.id)
+                ORDER BY window_to DESC,published_at DESC LIMIT 1
+                """,String.class,Timestamp.from(cutoff),Timestamp.from(from),id);
+            if(ids.isEmpty())throw new IllegalStateException("readable_prior_publication_required");
+            var prior=new com.zoop.briefing.storage.BriefingRoundRepository(jdbc).findById(ids.getFirst()).orElseThrow();
+            BriefingSnapshotValidator.validate(prior);
+            if(!readAccess.mayRead(prior,"briefing-coverage-prior"))reject();
+            var version=jdbc.queryForMap("SELECT review_revision,rule_revision,published_at FROM graph_versions WHERE id=?",prior.graphVersion());
+            if(version.get("published_at")==null||((Timestamp)version.get("published_at")).toInstant().isAfter(cutoff))reject();
+            var publication=reader.read(prior.graphVersion());var exclusions=authority.current(publication,"briefing-coverage-prior");
+            var out=StrictJson.newObject().put("mode","briefing-coverage-notice-v1").put("schemaVersion","briefing-server-input-v1")
+                .put("preparedAt",preparedAt).put("model","gpt-6-luna").put("graphVersion",prior.graphVersion())
+                .put("graphSnapshotSha256",publication.snapshotArtifact().sha256()).put("reviewRevision",((Number)version.get("review_revision")).longValue())
+                .put("ruleRevision",version.get("rule_revision")==null?0:((Number)version.get("rule_revision")).longValue()).put("exclusionRevision",exclusions.revision());
+            out.set("round",round.node().deepCopy());out.putArray("candidates");out.set("sourceBindings",prior.publicSnapshot().path("sourceBindings").deepCopy());
+            out.putObject("coverage").put("scope","retained_prior_original_only").put("completeMarketCoverage",false).put("reason",reason);
+            out.putObject("coverageNotice").put("sha256",noticeSha).set("value",notice.node().deepCopy());
+            out.putObject("previous").put("status","available").put("roundId",prior.id())
+                .put("payloadSha256",jdbc.queryForObject("SELECT payload_sha256 FROM briefing_rounds WHERE id=?",String.class,prior.id()))
+                .put("snapshotSha256",Canonical.sha256(Canonical.appBytes(prior.publicSnapshot())));
+            var continuity=out.putObject("continuity").put("schemaVersion","importance-continuity-v2").put("roundId",id).put("cutoff",cutoff.toString())
+                .put("mode","coverage_limited").putNull("importanceFloor")
+                .put("message","수집·근거 검증이 충분하지 않아 새 핵심 이슈의 유무를 판단하지 않습니다. 이전에 발행한 이슈와 확인 조건을 복기합니다.");
+            continuity.putArray("references");
+            continuity.putObject("coverage").put("status","insufficient").put("confirmedDocuments",0)
+                .put("message","이번 회차의 신규 기업 이슈 검증이 완료되지 않았습니다. 새 소식이 없었다는 뜻은 아닙니다.");
+            var recap=continuity.putObject("recap").put("status","available").put("previousRoundId",prior.id()).put("date",prior.date().toString())
+                .put("edition",prior.edition()).put("dataAsOf",prior.windowTo().toString()).put("message","마감 이전의 검증된 발행본입니다. 이번 회차의 새 소식이나 새 전망으로 취급하지 않습니다.");
+            recap.set("items",prior.payload().path("items").deepCopy());
+            var conditions=continuity.putArray("watchConditions");
+            for(JsonNode item:prior.publicSnapshot().path("commonPriority").path("items"))for(JsonNode analysis:item.path("aiAnalyses"))
+                if(!analysis.path("nextCheck").asString().isBlank())conditions.addObject().put("text",analysis.path("nextCheck").asString())
+                    .put("companyName",analysis.path("companyName").asString()).put("kind","previous_condition").put("previousRoundId",prior.id());
+            continuity.putObject("forecast").put("status","not_updated").put("message","새로운 사업 전망·주가 예측은 생성하지 않았습니다. 이전 확인 조건의 충족 여부도 이번 자료만으로 확정하지 않습니다.");
+            out.put("inputSha256",Canonical.sha256(Canonical.appBytes(out)));return out;
+        } catch(java.io.IOException error){throw new IllegalStateException("coverage_notice_unavailable",error);}
+    }
+
+    private StrictJson.Obj readCoverageFile(Path path,String sha) throws java.io.IOException {
+        if(!sha.matches("[a-f0-9]{64}")||Files.isSymbolicLink(path)||!path.toRealPath().startsWith(work.toRealPath())||Files.size(path)>1_000_000)reject();
+        byte[] raw=Files.readAllBytes(path);if(!sha.equals(Canonical.sha256(raw)))reject();return StrictJson.parseObject(raw);
     }
     private static String required(Map<String,String> env,String key){String v=env.get(key);if(v==null||v.isBlank())throw new IllegalArgumentException(key);return v;}
     private static void reject(){throw new IllegalArgumentException("briefing_server_binding_rejected");}

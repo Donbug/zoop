@@ -11,6 +11,7 @@ import copy
 from datetime import datetime
 import json
 from pathlib import Path
+import re
 import time
 from zoneinfo import ZoneInfo
 
@@ -55,7 +56,7 @@ def load_registry(cfg):
         require(source['sourceId'] not in seen and type(source['enabled']) is bool, 'duplicate_source')
         seen.add(source['sourceId'])
         profile(source['sourceId'])
-        for key, ceiling in [('maxListingPages', 3), ('maxArticleAttempts', 12), ('maxDocuments', 4)]:
+        for key, ceiling in [('maxListingPages', 3), ('maxArticleAttempts', 24), ('maxDocuments', 8)]:
             require(type(source[key]) is int and 1 <= source[key] <= ceiling, 'source_limit')
         require(source['maxDocuments'] <= source['maxArticleAttempts'], 'source_limit')
         require(isinstance(source['authorizationRef'], str) and source['authorizationRef'].strip(), 'authorization')
@@ -304,14 +305,18 @@ def collect(cfg, round_, parent, *, fetcher_factory=None, monotonic=time.monoton
                 catalogue = json.loads(Path(cfg['companyCatalogue']).read_bytes())
                 from briefing_company_names import catalogue_companies
                 companies = catalogue_companies(catalogue)
-            from briefing_company_names import matches
-            ordered = sorted(candidates.values(), key=lambda c: (bool(matches(c.title or '', companies or [])),
-                c.published_at or c.archive_day or '', c.url), reverse=True)
+            ordered = sorted(candidates.values(), key=lambda c: discovery_rank(c, round_, companies or []), reverse=True)
             fetcher.policy = policy()
             for candidate in ordered[:source['maxArticleAttempts']]:
                 state['articleAttempts'] += 1
                 try:
                     response = fetcher.fetch(candidate.url)
+                    # Preserve the exact response before parsing, including a rejected scope.
+                    # It is an observation only: it grants no eligibility or model permission.
+                    observation = source_root / ('article-' + b.digest(candidate.url.encode())[:24])
+                    b.write_once(observation.with_suffix('.bin'), response.body)
+                    write_once(observation.with_suffix('.json'), {'url': response.final_url,
+                        'fetchedAt': response.fetched_at, 'bodySha256': b.digest(response.body), 'httpStatus': response.status})
                     row, _, _ = retain(source, registry[1], round_, root, response, companies)
                     items.append(str(Path(row['nativeItemRoot']).relative_to(root)))
                     state['retained'] += 1
@@ -340,3 +345,18 @@ def collect(cfg, round_, parent, *, fetcher_factory=None, monotonic=time.monoton
     write_once(done, result)
     # The same immutable read path is used on first execution and resume.
     return collect(cfg, round_, parent, fetcher_factory=fetcher_factory, monotonic=monotonic)
+
+
+def discovery_rank(candidate, round_, companies):
+    """Prefer in-window discovery days; the original article still proves its own clock."""
+    from briefing_company_names import matches
+    from briefing_native_intake import BUSINESS_ACTION
+    hint = candidate.published_at or candidate.archive_day or ''
+    first = datetime.fromisoformat(round_['windowFrom']).astimezone(KST).date().isoformat()
+    last = datetime.fromisoformat(round_['windowTo']).astimezone(KST).date().isoformat()
+    day = hint[:10]
+    usable = bool(re.fullmatch(r'\d{4}-\d{2}-\d{2}', day))
+    in_window = usable and first <= day <= last
+    related = bool(matches(candidate.title or '', companies))
+    return (2 if in_window else 1 if not usable else 0, related,
+            related and bool(BUSINESS_ACTION.search(candidate.title or '')), hint, candidate.url)
