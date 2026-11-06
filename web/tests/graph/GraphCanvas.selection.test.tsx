@@ -33,6 +33,7 @@ import {
   MAP_LAYOUT_REVISION,
   saveModeEntry,
 } from '@/components/graph/graph-view';
+import { deferred } from '../support/fakeServer';
 
 const canvas = vi.hoisted(() => ({
   created: vi.fn(),
@@ -144,6 +145,41 @@ beforeEach(() => {
   );
 });
 describe('D-GRP-02 · canvas selection bridge', () => {
+  it('keeps cited relations and their companies bright after an asynchronous redraw', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const edge = data.edges.find((item) => item.evidenceIds.includes('mock-evidence-1'))!;
+    const unrelated = data.nodes.find(
+      (node) => node.id !== edge.source && node.id !== edge.target,
+    )!;
+    const dimming = vi.spyOn(mapDimming, 'applyMapDimming');
+    const view = render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    await act(async () => {});
+    const draw = deferred<void>();
+    const before = canvas.draw.mock.calls.length;
+    canvas.draw.mockReturnValueOnce(draw.promise);
+    view.rerender(
+      <GraphCanvas data={data} evidenceMode highlightedEdgeIds={[edge.id]} />,
+    );
+    await waitFor(() => expect(canvas.draw.mock.calls.length).toBeGreaterThan(before));
+    await act(async () => { draw.resolve(); });
+    await waitFor(() => {
+      const states = appliedStates();
+      expect(states[edge.id]).toContain('related');
+      expect(states[edge.source]).toContain('related');
+      expect(states[edge.target]).toContain('related');
+    });
+    // G6's inactive state is rendered by the dimming overlay, not element states.
+    view.rerender(
+      <GraphCanvas data={data} evidenceMode highlightedEdgeIds={[edge.id]} />,
+    );
+    await waitFor(() => {
+      const bright = dimming.mock.lastCall?.[2] as Map<string, string>;
+      expect(bright?.has(edge.id)).toBe(true);
+      expect(bright?.has(edge.source)).toBe(true);
+      expect(bright?.has(unrelated.id)).toBe(false);
+    });
+  });
   it.each(['rgb(223, 223, 220)', 'rgb(51, 51, 51)'])(
     'D-GRP-01 selection dims elements without changing the %s map background',
     async (background) => {

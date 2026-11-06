@@ -218,18 +218,43 @@ function MapWorkspace({
   const modeSequence = useRef(0);
   const [switching, setSwitching] = useState<MapMode | null>(null);
   const [transitionNotice, setTransitionNotice] = useState('');
+  const paramsKey = params.toString();
   const evidenceTarget = useGraphUiStore((state) => state.evidenceTarget);
   const evidenceOpen = Boolean(evidenceTarget);
   const [evidenceSelection, setEvidenceSelection] = useState<{
     target: GraphTarget;
     evidenceId: string;
     eventIds: string[];
+    detachedUrl?: string;
   } | null>(null);
-  // 근거 창이 닫히면 지도에서 보기 선택도 버린다. 같은 대상을 다시 열어도 예전 강조가 살아나지 않는다.
-  if (!evidenceTarget && evidenceSelection) setEvidenceSelection(null);
-  const [centeredEvidence, setCenteredEvidence] = useState<string | null>(null);
+  const [evidenceLocation, setEvidenceLocation] = useState({
+    url: paramsKey,
+    target: evidenceTarget,
+  });
+  // Drawer closure and router navigation can commit in separate renders.
+  // Only a subsequent route change or drawer reopening ends mobile navigation.
+  const evidenceRouteChanged = evidenceLocation.url !== paramsKey;
+  const evidenceDrawerChanged = evidenceLocation.target !== evidenceTarget;
+  if (evidenceRouteChanged || evidenceDrawerChanged) {
+    setEvidenceLocation({ url: paramsKey, target: evidenceTarget });
+    if (
+      evidenceSelection?.detachedUrl !== undefined &&
+      ((evidenceRouteChanged && evidenceSelection.detachedUrl !== paramsKey) ||
+        (evidenceDrawerChanged && evidenceTarget))
+    )
+      setEvidenceSelection(null);
+  }
+  if (
+    !evidenceTarget &&
+    evidenceSelection &&
+    evidenceSelection.detachedUrl === undefined
+  )
+    setEvidenceSelection(null);
+  const [answerNavigation, setAnswerNavigation] = useState<{
+    target: AnswerMapTarget;
+    seq: number;
+  } | null>(null);
   const isolatedOpen = params.get('select') === 'bundle:isolated';
-  const paramsKey = params.toString();
   useEffect(() => {
     const sequence = ++modeSequence.current;
     void Promise.resolve().then(() => {
@@ -382,8 +407,11 @@ function MapWorkspace({
   const companyId = params.get('companyId') ?? undefined;
   const historical =
     !tutorialOpen && companyId && exactTime(params.get('asOf'));
-  const asOf = historical ? params.get('asOf')! : undefined;
-  const graphVersion = historical
+  const asOf =
+    !tutorialOpen && exactTime(params.get('asOf'))
+      ? params.get('asOf')!
+      : undefined;
+  const graphVersion = !tutorialOpen
     ? (params.get('graphVersion') ?? undefined)
     : undefined;
   const detailEventId = params.get('event');
@@ -495,14 +523,16 @@ function MapWorkspace({
     data && !loading && !error && pathFrom && pathTo
       ? companyPath(data, pathFrom, pathTo)
       : null;
+  const evidenceContext = evidenceSelection?.target.mapContext;
   const activeEvidence =
-    evidenceSelection?.target === evidenceTarget &&
-    data &&
-    (!evidenceTarget?.mapContext?.graphVersion ||
-      evidenceTarget.mapContext.graphVersion === data.metadata.graphVersion) &&
-    (!evidenceTarget?.mapContext?.asOf ||
-      Date.parse(evidenceTarget.mapContext.asOf) ===
-        Date.parse(data.metadata.asOf))
+    evidenceSelection &&
+    (evidenceSelection.target === evidenceTarget ||
+      (evidenceSelection.detachedUrl === paramsKey && !evidenceTarget)) &&
+    data && !loading && !error &&
+    (!evidenceContext?.graphVersion ||
+      evidenceContext.graphVersion === data.metadata.graphVersion) &&
+    (!evidenceContext?.asOf ||
+      Date.parse(evidenceContext.asOf) === Date.parse(data.metadata.asOf))
       ? evidenceSelection
       : null;
   const evidenceEdges =
@@ -572,19 +602,50 @@ function MapWorkspace({
   const evidenceOutsideFocus = Boolean(
     focusShown?.size && evidenceNodes.some((id) => !focusShown.has(id)),
   );
-  // 강조한 선이 화면 밖에 있을 수 있어 첫 선으로 지도를 옮긴다(사건만 강조하면 선택이 옮긴다).
-  const evidenceCenter = evidenceEdgeNodes[0] ?? null;
-  const evidenceKey = activeEvidence
-    ? `${activeEvidence.evidenceId}:${evidenceOutsideFocus}`
-    : null;
-  if (evidenceKey !== centeredEvidence) {
-    setCenteredEvidence(evidenceKey);
-    if (evidenceKey && evidenceCenter)
-      setCenterRequest((old) => ({
-        id: evidenceCenter,
-        seq: (old?.seq ?? 0) + 1,
-      }));
-  }
+  const answerTarget = answerNavigation?.target;
+  const answerOnMap = Boolean(
+    answerTarget &&
+    !focusId && !impactIssueId &&
+    !loading && !error && data &&
+    (!answerTarget.graphVersion ||
+      answerTarget.graphVersion === data.metadata.graphVersion) &&
+    (answerTarget.asOf ?? null) === (asOf ?? null) &&
+    (answerTarget.kind === 'path'
+      ? params.get('path') === answerTarget.id
+      : rawSelection === `${answerTarget.kind === 'edge' ? 'edge' : 'node'}:${answerTarget.id}`),
+  );
+  const fitRequest = useMemo(() => {
+    if (!data || loading || error) return null;
+    let ids: string[] = [];
+    if (activeEvidence) {
+      const edges = data.edges.filter((edge) =>
+        edge.evidenceIds.includes(activeEvidence.evidenceId),
+      );
+      ids = edges.length
+        ? edges.flatMap((edge) => [edge.source, edge.target])
+        : activeEvidence.eventIds.filter((id) =>
+            data.nodes.some((node) => node.id === id),
+          );
+    } else if (answerOnMap && answerNavigation) {
+      const { target } = answerNavigation;
+      if (target.kind === 'edge') {
+        const edge = data.edges.find((item) => item.id === target.id);
+        if (edge) ids = [edge.source, edge.target];
+      } else if (target.kind === 'path') {
+        const [from, to] = target.id.split(',');
+        ids = companyPath(data, from, to)?.nodes.map((node) => node.id) ?? [];
+      } else if (data.nodes.some((node) => node.id === target.id)) {
+        ids = [...focusNeighborhood(data, target.id, 1)];
+      }
+    }
+    return ids.length
+      ? {
+          ids: [...new Set(ids.map((id) => grouping?.groupOf.get(id) ?? id))],
+          seq: answerNavigation?.seq ?? 0,
+        }
+      : null;
+  }, [data, loading, error, activeEvidence, answerOnMap, answerNavigation, grouping]);
+  const missingAnswerTarget = answerOnMap && !fitRequest && !activeEvidence;
   const logoOf = (companyId: string) =>
     data?.nodes.find((node) => node.id === companyId)?.logoUrl;
   useEffect(() => {
@@ -618,14 +679,14 @@ function MapWorkspace({
     updateQuery({ tour: '1' }, { replace: true });
   }, [tutorialMemberId, tutorialPending, tutorialOpen, updateQuery]);
   useEffect(() => {
-    if (previousEvent.current && !selectedPanel) {
+    if (previousEvent.current && !selectedPanel && !evidenceOpen) {
       (opener.current?.isConnected
         ? opener.current
         : mapRegion.current
       )?.focus();
     }
     previousEvent.current = selectedPanel;
-  }, [selectedPanel]);
+  }, [selectedPanel, evidenceOpen]);
   // D-GRP-03 (2026-11-04 결정): 관련 기업을 누르면 두 기업과 공유 사건만 지도에 밝게 남긴다.
   // 다른 노드를 고르면 풀린다. 사건 공유 선은 지도에 그리지 않으므로 선을 선택하지 않는다.
   const [spotlightPair, setSpotlightPair] = useState<{
@@ -683,6 +744,7 @@ function MapWorkspace({
       .sort((a, b) => b.sharedIssueCount - a.sharedIssueCount);
   }, [companyNode, data]);
   const selectNode = (id: string | null) => {
+    if (evidenceSelection?.detachedUrl !== undefined) setEvidenceSelection(null);
     if (tutorialOpen && tutorialStep && tutorialStep < 5) {
       if (!id) return;
       else {
@@ -765,6 +827,7 @@ function MapWorkspace({
     eventContext,
   );
   function selectEdge(id: string) {
+    if (evidenceSelection?.detachedUrl !== undefined) setEvidenceSelection(null);
     if (
       document.activeElement instanceof HTMLElement &&
       mapRegion.current?.contains(document.activeElement)
@@ -831,63 +894,42 @@ function MapWorkspace({
     if (action === 'evidence') useGraphUiStore.getState().openEvidence(target);
     else openAi(target);
   }
-  /**
-   * D-AI-02 "지도에서 보기": 답변을 만든 스냅샷(그래프 버전과 질문에 명시된 기준 시각)으로 연다.
-   * - 지금 지도가 같은 버전·같은 기준 시각이고 대상 노드가 있으면 그 자리에서 초점을 맞춘다.
-   * - 아니면 기업 대상이고 명시된 시각이 있을 때만 그 버전·시각의 기업 지도로 이동하며, 이전 사건·영향·회차 선택은 지운다.
-   * - 관계는 같은 스냅샷의 지도에 그 연결선이 있을 때만 선택한다(D-GRP-04).
-   * - 그 밖(사건·관계, 시각 없이 버전만 고정된 답변)은 지금 지도가 그 스냅샷을 열 수 없으므로 false: 시각을 지어내지 않는다.
-   */
+  // D-AI-02b → D-GRP-01/02/04: pin the answer's snapshot, then fit its
+  // actual targets after the graph has loaded and the canvas has drawn them.
   function viewAnswerTarget(target: AnswerMapTarget) {
-    const shownVersion = data?.metadata.graphVersion ?? null;
+    if (!['company', 'issue', 'edge', 'path'].includes(target.kind)) return false;
     const sameSnapshot =
-      (!target.graphVersion || target.graphVersion === shownVersion) &&
+      (!target.graphVersion || target.graphVersion === data?.metadata.graphVersion) &&
       (target.asOf ?? null) === (asOf ?? null);
-    if (target.kind === 'path') {
-      const ends = target.id.split(',');
-      if (
-        !sameSnapshot ||
-        !ends.every((id) => data?.nodes.some((node) => node.id === id))
-      )
-        return false;
-      updateQuery({ path: target.id, focus: null, hops: null, select: null });
-      return true;
-    }
-    if (target.kind === 'edge') {
-      if (!sameSnapshot || !data?.edges.some((edge) => edge.id === target.id))
-        return false;
-      updateQuery({
-        select: `edge:${target.id}`,
-        id: null,
-        impact: null,
-        path: null,
-        focus: null,
-        hops: null,
-      });
-      return true;
-    }
     if (sameSnapshot) {
-      if (!data?.nodes.some((node) => node.id === target.id)) return false;
-      updateQuery({ focus: target.id, hops: '1', path: null });
-      return true;
-    }
-    if (target.kind === 'company' && target.graphVersion && target.asOf) {
-      updateQuery({
-        companyId: target.id,
+      if (loading || error || !data) return false;
+      const found = target.kind === 'edge'
+        ? data.edges.some((edge) => edge.id === target.id)
+        : target.kind === 'path'
+          ? target.id.split(',').length === 2 &&
+            target.id.split(',').every((id) => data.nodes.some((node) => node.id === id))
+          : data.nodes.some((node) => node.id === target.id);
+      if (!found) return false;
+    } else if (!target.graphVersion) return false;
+    setAnswerNavigation((old) => ({ target, seq: (old?.seq ?? 0) + 1 }));
+    updateQuery({
+      ...(!sameSnapshot ? {
+        mode: 'all',
+        companyId: null,
         asOf: target.asOf,
         graphVersion: target.graphVersion,
-        select: `node:${target.id}`,
-        focus: null,
-        hops: null,
-        path: null,
-        event: null,
-        impact: null,
         round: null,
-        id: null,
-      });
-      return true;
-    }
-    return false;
+      } : {}),
+      select: target.kind === 'path' ? null : `${target.kind === 'edge' ? 'edge' : 'node'}:${target.id}`,
+      path: target.kind === 'path' ? target.id : null,
+      focus: null,
+      hops: null,
+      impact: null,
+      event: null,
+      id: null,
+    });
+    useAiChatStore.getState().close();
+    return true;
   }
   function eventAction(action: EventAction, event: EventDetail) {
     const target: GraphTarget = {
@@ -1117,11 +1159,26 @@ function MapWorkspace({
         className="relationship-main motion-safe:animate-service-enter"
       >
         <h1 className="sr-only">관계 지도</h1>
+        {missingAnswerTarget && (
+          <p role="status" className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-caption">
+            이 답변의 대상이 해당 버전의 지도에 없어요.
+          </p>
+        )}
+        {activeEvidence?.detachedUrl !== undefined &&
+          !evidenceEdges.length && !evidenceFallback && (
+            <p role="status" className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-caption">
+              이 근거와 연결된 선이나 사건이 지금 지도에 없어요.
+            </p>
+          )}
         <section
           ref={mapRegion}
           tabIndex={-1}
           aria-label="관계 지도"
           className="relationship-view"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && evidenceSelection?.detachedUrl !== undefined)
+              setEvidenceSelection(null);
+          }}
           data-screen-id={
             tutorialOpen
               ? `D-GRP-T${tutorialStep && tutorialStep > 1 ? tutorialStep : ''}`
@@ -1322,6 +1379,7 @@ function MapWorkspace({
                 tutorialCameraEnabled={tutorialOpen && tutorialStep === 2}
                 tutorialShowNeighborhood={tutorialOpen && tutorialStep === 3}
                 centerRequest={viewCenterRequest}
+                fitRequest={fitRequest}
                 tutorialCenterId={tutorialOpen ? target?.company.id : undefined}
                 memoryOwner={
                   tutorialOpen
@@ -1936,15 +1994,55 @@ function MapWorkspace({
                   : evidenceFallback
                     ? 'event'
                     : 'none'
-                : null
+                : evidenceSelection && !loading
+                  ? 'none'
+                  : null
             }
-            onViewOnMap={(selection) =>
-              setEvidenceSelection(
-                selection && evidenceTarget
-                  ? { target: evidenceTarget, ...selection }
-                  : null,
-              )
-            }
+            onViewOnMap={(selection) => {
+              if (!selection || !evidenceTarget) {
+                setEvidenceSelection(null);
+                return;
+              }
+              const context = evidenceTarget.mapContext;
+              const narrow = window.matchMedia?.('(max-width: 767px)').matches ?? false;
+              const changeSnapshot = Boolean(
+                (context?.graphVersion && context.graphVersion !== data?.metadata.graphVersion) ||
+                (context?.asOf && Date.parse(context.asOf) !== Date.parse(data?.metadata.asOf ?? '')),
+              );
+              const changes: Record<string, string | null> = {
+                ...(changeSnapshot ? {
+                  mode: 'all',
+                  graphVersion: context?.graphVersion ?? graphVersion ?? null,
+                  asOf: context?.asOf ?? null,
+                  companyId: null,
+                  round: null,
+                  focus: null,
+                  hops: null,
+                } : {}),
+                ...(changeSnapshot || narrow ? {
+                  select: null,
+                  impact: null,
+                  path: null,
+                  event: null,
+                  id: null,
+                } : {}),
+              };
+              const destination = new URLSearchParams(params);
+              for (const [key, value] of Object.entries(changes)) {
+                if (value === null) destination.delete(key);
+                else destination.set(key, value);
+              }
+              setEvidenceSelection({
+                target: evidenceTarget,
+                ...selection,
+                ...(narrow ? { detachedUrl: destination.toString() } : {}),
+              });
+              if (destination.toString() !== paramsKey) updateQuery(changes);
+              if (narrow) {
+                useGraphUiStore.getState().closeEvidence();
+                requestAnimationFrame(() => mapRegion.current?.focus());
+              }
+            }}
           />
         </section>
       </main>
