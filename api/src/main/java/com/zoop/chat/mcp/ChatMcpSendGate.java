@@ -35,8 +35,8 @@ public final class ChatMcpSendGate {
     }
 
     /** What was left out of a result, by part; all zero when nothing was. */
-    public record Withheld(int items, int evidenceIds, int paths, int webResults) {
-        static final Withheld NONE = new Withheld(0, 0, 0, 0);
+    public record Withheld(int items, int evidenceIds, int paths, int webResults, int undeliverable) {
+        static final Withheld NONE = new Withheld(0, 0, 0, 0, 0);
 
         public boolean any() {
             return items + evidenceIds + paths + webResults > 0;
@@ -44,7 +44,7 @@ public final class ChatMcpSendGate {
     }
 
     /** The output that may be sent and what was left out of it. */
-    public record Passed(ChatToolOutput output, Withheld withheld) {
+    public record Passed(ChatToolOutput output, List<ChatMcpSources.Evidence> evidence, Withheld withheld) {
     }
 
     private final ChatSendGrants grants;
@@ -60,19 +60,33 @@ public final class ChatMcpSendGate {
      * registry cannot be used and {@link com.zoop.chat.tool.ChatToolUnavailable} when evidence cannot be placed.
      */
     public Passed pass(ChatRun run, ChatToolOutput output) {
-        Predicate<String> sendable = grants.sendable();
         Set<String> evidence = new LinkedHashSet<>(output.evidenceIds());
-        for (ChatToolItem item : output.items()) {
-            evidence.addAll(item.evidenceIds());
-            if ("evidence".equals(item.kind())) evidence.add(item.id());
+        Map<String, ChatMcpSources.Evidence> placed = evidence.isEmpty() ? Map.of() : sources.evidenceOf(run, evidence);
+        return pass(run, output, placed);
+    }
+
+    Passed passCached(ChatRun run, ChatToolOutput output, List<ChatMcpSources.Evidence> original) {
+        Map<String, ChatMcpSources.Evidence> current = output.evidenceIds().isEmpty() ? Map.of()
+                : sources.evidenceOf(run, output.evidenceIds());
+        Map<String, ChatMcpSources.Evidence> retained = new java.util.LinkedHashMap<>();
+        for (var quote : original) {
+            if (quote.equals(current.get(quote.evidenceId()))) retained.put(quote.evidenceId(), quote);
         }
-        for (ChatToolPath path : output.paths()) {
-            for (ChatToolPath.Step step : path.steps()) evidence.addAll(step.evidenceIds());
-        }
-        Map<String, String> placed = evidence.isEmpty() ? Map.of() : sources.sourcesOf(run, evidence);
+        return pass(run, output, retained);
+    }
+
+    Passed pass(ChatRun run, ChatToolOutput output, Map<String, ChatMcpSources.Evidence> placed) {
+        Set<String> evidence = new LinkedHashSet<>(output.evidenceIds());
+        // Citation reads may block; evaluate current grant expiry only after they finish.
+        Predicate<String> sendable = grants.sendable();
         Set<String> allowed = new LinkedHashSet<>();
+        List<ChatMcpSources.Evidence> quotes = new ArrayList<>();
         for (String id : evidence) {
-            if (sendable.test(placed.get(id))) allowed.add(id);
+            var quote = placed.get(id);
+            if (quote != null && id.equals(quote.evidenceId()) && sendable.test(quote.sourceId())) {
+                allowed.add(id);
+                quotes.add(quote);
+            }
         }
         boolean graph = sendable.test(GRAPH_SOURCE_ID);
         boolean catalog = sendable.test(ChatCompanyProfiles.SOURCE_ID);
@@ -106,12 +120,11 @@ public final class ChatMcpSendGate {
                         .toList()));
             }
         }
-        List<String> passedEvidence = output.evidenceIds().stream().filter(allowed::contains).toList();
+        List<String> passedEvidence = List.copyOf(allowed);
         var withheld = new Withheld(output.items().size() - items.size(),
-                (int) evidence.stream().filter(id -> !allowed.contains(id)).count(), output.paths().size() - paths.size(),
-                output.webResults().size() - web.size());
-        if (!withheld.any()) return new Passed(output, Withheld.NONE);
+                evidence.size() - allowed.size(), output.paths().size() - paths.size(),
+                output.webResults().size() - web.size(), (int) evidence.stream().filter(id -> !placed.containsKey(id)).count());
         return new Passed(new ChatToolOutput(output.dataVersion(), items, passedEvidence, output.truncated(),
-                output.nextAllowed(), paths, web), withheld);
+                output.nextAllowed(), paths, web), List.copyOf(quotes), withheld);
     }
 }

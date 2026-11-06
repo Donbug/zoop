@@ -30,6 +30,8 @@ def adapter(stage: str) -> dict[str, Any]:
     identity = {"stage": stage, "adapterRevision": module.PROMPT_REVISION, "promptTemplate": module.PROMPT,
                 "inputSchema": INPUTS[stage].model_json_schema(by_alias=True), "answerSchema": answer_schema,
                 "providerOptions": options}
+    if stage == "chat-agent":
+        identity["mcpDelivery"] = chat_agent.MCP_DELIVERY
     overhead = len((module.PROMPT + canonical(answer_schema) + canonical(options)).encode("utf-8")) + 4096
     if stage == "chat-agent":
         overhead += 65536
@@ -57,7 +59,8 @@ def capabilities(env: dict[str, str] | None = None) -> dict[str, Any]:
             config = stage_config(stage, "live", env)
             descriptor["providerRevision"] = config.provider_revision
             if config.mcp_server_url is not None:
-                descriptor["mcpServerRevision"] = digest({"serverUrl": config.mcp_server_url})
+                descriptor["mcpServerRevision"] = digest({"serverUrl": config.mcp_server_url,
+                                                          "delivery": chat_agent.MCP_DELIVERY})
             LiveSender(env).preflight(None, config)
         except ProviderError as invalid:
             error = invalid.code
@@ -73,7 +76,7 @@ def capabilities(env: dict[str, str] | None = None) -> dict[str, Any]:
         if stage == "chat-agent":
             try:
                 descriptor["mcpServerRevision"] = digest({"serverUrl": chat_agent.server_url(
-                    env.get("ZOOP_AI_CHAT_MCP_SERVER_URL", ""))})
+                    env.get("ZOOP_AI_CHAT_MCP_SERVER_URL", "")), "delivery": chat_agent.MCP_DELIVERY})
             except ValueError:
                 pass  # Invalid operator URLs remain readiness errors, never fingerprinted raw values.
         stages[stage], errors[stage] = descriptor, error

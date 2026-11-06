@@ -12,5 +12,14 @@ import java.util.Map;
  */
 @FunctionalInterface
 public interface ChatMcpSources {
-    Map<String, String> sourcesOf(ChatRun run, Collection<String> evidenceIds);
+    record Evidence(String evidenceId, String sourceId, String quote) {
+        public Evidence {
+            if (evidenceId == null || evidenceId.isBlank() || sourceId == null || sourceId.isBlank()
+                    || quote == null || quote.isEmpty() || quote.length() > 2000) {
+                throw new IllegalArgumentException("bounded citation required");
+            }
+        }
+    }
+
+    Map<String, Evidence> evidenceOf(ChatRun run, Collection<String> evidenceIds);
 }

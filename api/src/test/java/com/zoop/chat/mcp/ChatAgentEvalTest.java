@@ -179,8 +179,8 @@ class ChatAgentEvalTest {
         Path grantsFile = ChatSendGrantsTest.write(dir.resolve("grants.json"), ChatCompanyProfiles.SOURCE_ID, ChatZoopDocs.SOURCE_ID,
                 ChatMcpSendGate.GRAPH_SOURCE_ID, ChatSendGrantsTest.EVIDENCE_SOURCE, ChatMcpSendGate.webSource("synthetic"));
         var gate = new ChatMcpSendGate(new ChatSendGrants(grantsFile.toString(), ChatSendGrantsTest.RECIPIENT, clock), (r, ids) -> {
-            Map<String, String> placed = new LinkedHashMap<>();
-            ids.forEach(id -> placed.put(id, ChatSendGrantsTest.EVIDENCE_SOURCE));
+            Map<String, ChatMcpSources.Evidence> placed = new LinkedHashMap<>();
+            ids.forEach(id -> placed.put(id, new ChatMcpSources.Evidence(id, ChatSendGrantsTest.EVIDENCE_SOURCE, "합성 인용")));
             return placed;
         });
         var executor = new ChatJobExecutor(store, store,

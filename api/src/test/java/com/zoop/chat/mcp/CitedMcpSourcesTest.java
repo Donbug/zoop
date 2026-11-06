@@ -47,8 +47,32 @@ class CitedMcpSourcesTest {
             assertEquals(run.context().asOf(), asOf);
             return citations.get(id);
         }, jdbc);
-        assertEquals(Map.of("ev-a", "synthetic-news", "ev-p", ChatCompanyProfiles.SOURCE_ID, "ev-d", ChatZoopDocs.SOURCE_ID),
-                sources.sourcesOf(run, List.of("ev-a", "ev-p", "ev-d", "ev-x", "ev-n")));
+        assertEquals(Map.of("ev-a", new ChatMcpSources.Evidence("ev-a", "synthetic-news", "인용"),
+                "ev-p", new ChatMcpSources.Evidence("ev-p", ChatCompanyProfiles.SOURCE_ID, "인용"),
+                "ev-d", new ChatMcpSources.Evidence("ev-d", ChatZoopDocs.SOURCE_ID, "인용")),
+                sources.evidenceOf(run, List.of("ev-a", "ev-p", "ev-d", "ev-x", "ev-n")));
+    }
+
+    @Test
+    void exactBoundedUtf16SpansAreResolvedOncePerUniqueId() {
+        var run = ChatMcpGrantsTest.run("job-00001", 1);
+        for (String quote : List.of("a".repeat(2000), "é".repeat(2000), "한".repeat(2000),
+                "😀".repeat(1000), "\"\\\n한é😀", "", "한".repeat(2001), "😀".repeat(1001))) {
+            var reads = new java.util.ArrayList<String>();
+            var source = new CitedMcpSources((id, version, asOf, trace) -> {
+                reads.add(id);
+                assertEquals(run.jobId(), trace);
+                return Optional.of(new Citation("company_profile", id, quote, null, null, null, null,
+                        0, quote.length(), null, null, null, null));
+            }, null);
+            var result = source.evidenceOf(run, List.of("ev-p", "ev-p"));
+            assertEquals(List.of("ev-p"), reads);
+            assertEquals(!quote.isEmpty() && quote.length() <= 2000, result.containsKey("ev-p"));
+            if (!result.isEmpty()) assertEquals(quote, result.get("ev-p").quote());
+        }
+        var mismatched = new CitedMcpSources((id, version, asOf, trace) ->
+                Optional.of(cited("company_profile", "ev-other", null)), null);
+        assertEquals(Map.of(), mismatched.evidenceOf(run, List.of("ev-p")));
     }
 
     @Test
@@ -57,7 +81,7 @@ class CitedMcpSourcesTest {
         when(jdbc.queryForList(any(String.class), any(SqlParameterSource.class), eq(String.class)))
                 .thenThrow(new DataAccessResourceFailureException("down"));
         var sources = new CitedMcpSources((id, version, asOf, trace) -> Optional.of(cited("article", id, "art-1")), jdbc);
-        assertThrows(ChatToolUnavailable.class, () -> sources.sourcesOf(ChatMcpGrantsTest.run("job-00001", 1),
+        assertThrows(ChatToolUnavailable.class, () -> sources.evidenceOf(ChatMcpGrantsTest.run("job-00001", 1),
                 List.of("ev-a")));
     }
 }

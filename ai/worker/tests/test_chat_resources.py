@@ -137,6 +137,28 @@ def test_unknown_outcome_holds_the_ledger_wide_fuse_and_allocation_identity(tmp_
     assert fused.failure.code == "chat_budget_exhausted" and not fused.failure.sent and sent == []
 
 
+def test_delivery_contract_cutover_refuses_continuation_and_preserves_exact_history(tmp_path, monkeypatch):
+    with monkeypatch.context() as old:
+        old.setattr(agent.chat_agent, "PROMPT_REVISION", "zoop-chat-agent-resource-1")
+        old.setattr(agent.chat_agent, "MCP_DELIVERY",
+                    {**agent.chat_agent.MCP_DELIVERY, "schemaVersion": "chat-tool/v1", "serverVersion": "1"})
+        first = agent.request(agent.agent_input())
+        recorded, sends = execute(first, tmp_path,
+                                  agent.approval_response(("mcpr_1", "company_read",
+                                                           {"targets": ["KRX:000660"], "requirementIds": ["r1"]})))
+    assert recorded.status == "succeeded" and len(sends) == 1
+    with sqlite3.connect(tmp_path / "chat.sqlite3") as db:
+        before = db.execute("SELECT * FROM chat_invocations").fetchall()
+    follow = agent.request(agent.agent_input(continuation=agent.continuation(("mcpr_1", True))),
+                           invocation="job-1:a1:agent-2")
+    refused, sends = execute(follow, tmp_path, agent.final_response(agent.answer()))
+    assert refused.failure.code == "chat_runtime_contract_mismatch" and not refused.failure.sent and sends == []
+    repeated, sends = execute(first, tmp_path, agent.final_response(agent.answer()), env={})
+    assert repeated.wire() == recorded.wire() and sends == []
+    with sqlite3.connect(tmp_path / "chat.sqlite3") as db:
+        assert db.execute("SELECT * FROM chat_invocations").fetchall() == before
+
+
 def test_schema5_history_is_ledger_first_exact_and_fresh_work_is_refused(tmp_path):
     old = StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-5", "invocationId": "historical-job:answer",
                                       "stage": "chat-answer", "mode": "replay", "input": INPUT})

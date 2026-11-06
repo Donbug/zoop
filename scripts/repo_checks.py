@@ -317,7 +317,8 @@ def chat_resource_fixtures(value: dict, internal_spec: dict) -> int:
             "provider": "typesafe-native" if is_jev else "openai-compatible",
             "model": "jev-1.14.0" if is_jev else "gpt-6-luna",
             "api": "systemone" if is_jev else "responses",
-            "adapterRevision": "zoop-jev-chat-10" if is_jev else f"zoop-{stage}-resource-1",
+            "adapterRevision": "zoop-jev-chat-10" if is_jev else (
+                "zoop-chat-agent-resource-2" if stage == "chat-agent" else "zoop-chat-answer-resource-1"),
         }
         if any(descriptor[key] != expected_value for key, expected_value in expected.items()):
             raise ValueError(f"Chat resource fixture capabilities descriptor differs for {stage}.")

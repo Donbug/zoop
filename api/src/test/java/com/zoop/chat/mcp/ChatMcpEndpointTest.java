@@ -140,6 +140,7 @@ class ChatMcpEndpointTest {
                 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18",
                  "capabilities":{},"clientInfo":{"name":"test","version":"1"}}}""").path("result");
         assertEquals("zoop-chat", result.path("serverInfo").path("name").asString());
+        assertEquals("2", result.path("serverInfo").path("version").asString());
         assertTrue(result.path("capabilities").has("tools"));
         assertFalse(result.path("capabilities").has("resources"));
     }
@@ -174,6 +175,9 @@ class ChatMcpEndpointTest {
         assertEquals("gv-1", read.path("dataVersion").asString());
         assertEquals("co-1", read.path("items").get(0).path("id").asString());
         assertEquals("ev-1", read.path("evidenceIds").get(0).asString());
+        assertEquals("chat-mcp/v2", read.path("schemaVersion").asString());
+        assertEquals("합성 인용: ev-1", read.path("evidence").get(0).path("quote").asString());
+        assertEquals(ChatSendGrantsTest.EVIDENCE_SOURCE, read.path("evidence").get(0).path("sourceId").asString());
         assertEquals(read.toString(), mapper.readTree(result.path("content").get(0).path("text").asString()).toString());
 
         assertEquals(1, companyReads.size());
@@ -332,6 +336,161 @@ class ChatMcpEndpointTest {
         assertEquals(1, companyReads.size());
     }
 
+    @Test
+    void currentReadWithdrawalFiltersCachedQuotesAndPreservesTheHistoricalReceipt() throws Exception {
+        var available = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var reads = new ArrayList<String>();
+        server.close();
+        runner.close();
+        String evidenceId = "ev-" + "1".repeat(64);
+        String recipient = "openai-compatible:" + com.zoop.common.json.Canonical.digest(
+                mapper.valueToTree(Map.of("endpoint", "https://api.openai.com/v1")));
+        ChatSendGrantsTest.write(dir.resolve("chat-grants.json"), List.of(ChatSendGrantsTest.grant(
+                com.zoop.chat.service.ChatCompanyProfiles.SOURCE_ID, Map.of("recipients", List.of(recipient)))));
+        var sources = new CitedMcpSources((id, version, asOf, trace) -> {
+            reads.add(id);
+            assertEquals("gv-1", version);
+            assertEquals(Instant.parse("2026-10-27T00:00:00Z"), asOf);
+            assertEquals(JOB, trace);
+            return available.get() ? java.util.Optional.of(new com.zoop.chat.dto.Citation("company_profile", id,
+                    "정확한 합성 MOU: \"공급\"\\한é😀", null, null, "co-1", "1", 0, 20, null, null, null, null))
+                    : java.util.Optional.empty();
+        }, null);
+        var gate = new ChatMcpSendGate(new ChatSendGrants(dir.resolve("chat-grants.json").toString(),
+                recipient, clock), sources);
+        var registry = new ChatToolRegistry(List.of(new ChatTool() {
+            public ChatCapability capability() { return ChatCapability.COMPANY_READ; }
+            public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
+                companyReads.add(request);
+                return new ChatToolOutput(scope.graphVersionId(),
+                        List.of(new ChatToolItem("co-1", "company", "삼성전자", List.of("co-1"), List.of(evidenceId))),
+                        List.of(evidenceId), false, false);
+            }
+        }));
+        runner = new ChatToolRunner(registry);
+        tools = new ChatMcpTools(registry, runner, executor, gate, mapper);
+        transport = ChatMcpConfiguration.transport(mapper);
+        server = ChatMcpConfiguration.server(transport, tools, mapper);
+        String args = "{\"targets\":[\"co-1\"]}";
+        String token = token(ChatCapability.COMPANY_READ);
+        approve("company_read", args);
+        var original = rpc(token, call("company_read", args)).path("result");
+        var manifest = original.path("structuredContent");
+        assertEquals("정확한 합성 MOU: \"공급\"\\한é😀", manifest.path("evidence").get(0).path("quote").asString());
+        assertEquals(manifest, mapper.readTree(original.path("content").get(0).path("text").asString()));
+        String oldReceipt = store.toolCalls(JOB).getFirst().end.result();
+        assertEquals(manifest, mapper.readTree(oldReceipt));
+        available.set(false);
+        approve("company_read", args);
+        var withdrawn = rpc(token, call("company_read", args)).path("result").path("structuredContent");
+        assertTrue(withdrawn.path("evidence").isEmpty());
+        assertTrue(withdrawn.path("evidenceIds").isEmpty());
+        assertTrue(withdrawn.path("items").get(0).path("evidenceIds").isEmpty());
+        assertEquals("evidence_not_deliverable", withdrawn.path("withheld").path("reason").asString());
+        assertEquals(oldReceipt, store.toolCalls(JOB).getFirst().end.result());
+        assertEquals(List.of(evidenceId, evidenceId), reads);
+        available.set(true);
+        approve("company_read", args);
+        var expanded = rpc(token, call("company_read", args)).path("result").path("structuredContent");
+        assertEquals(manifest.path("evidence"), expanded.path("evidence"), "only the original tuples can return");
+        assertEquals(1, companyReads.size());
+        Path proof = java.nio.file.Files.createDirectories(Path.of("build", "mcp-bounded-evidence"));
+        java.nio.file.Files.writeString(proof.resolve("sdk-callback.json"), original.toString());
+        java.nio.file.Files.writeString(proof.resolve("stored-envelope.json"), oldReceipt);
+        java.nio.file.Files.writeString(proof.resolve("sdk-source-manifest.json"), mapper.writeValueAsString(Map.of(
+                "recipient", recipient, "graphVersion", "gv-1", "asOf", "2026-10-27T00:00:00Z",
+                "scope", ChatMcpGrants.scope(executor.attach(JOB, 1).orElseThrow().run()), "citationReads", reads,
+                "runtimeOrigins", Map.of(
+                        "mcpTools", ChatMcpTools.class.getProtectionDomain().getCodeSource().getLocation().toString(),
+                        "toolRunner", ChatToolRunner.class.getProtectionDomain().getCodeSource().getLocation().toString(),
+                        "mcpSdk", McpStatelessSyncServer.class.getProtectionDomain().getCodeSource().getLocation().toString()))));
+    }
+
+    @Test
+    void expandedSendGrantsDoNotEnrichTheOriginalCache() throws Exception {
+        String args = "{\"targets\":[\"co-1\"]}";
+        ChatSendGrantsTest.write(dir.resolve("chat-grants.json"), com.zoop.chat.service.ChatCompanyProfiles.SOURCE_ID);
+        approve("company_read", args);
+        String token = token(ChatCapability.COMPANY_READ);
+        var first = rpc(token, call("company_read", args)).path("result").path("structuredContent");
+        assertTrue(first.path("evidence").isEmpty());
+        ChatSendGrantsTest.gate(dir);
+        approve("company_read", args);
+        var cached = rpc(token, call("company_read", args)).path("result").path("structuredContent");
+        assertTrue(cached.path("evidence").isEmpty());
+        assertTrue(cached.path("evidenceIds").isEmpty());
+        assertEquals(first.path("withheld"), cached.path("withheld"));
+        assertEquals(1, companyReads.size());
+    }
+
+    @Test
+    void legacyCacheRefusesTheCurrentReservationWithoutReadingOrChangingHistory() throws Exception {
+        String args = "{\"targets\":[\"co-1\"]}";
+        String token = token(ChatCapability.COMPANY_READ);
+        approve("company_read", args);
+        rpc(token, call("company_read", args));
+        var first = store.toolCalls(JOB).getFirst();
+        var legacy = (tools.jackson.databind.node.ObjectNode) mapper.readTree(first.end.result());
+        legacy.put("schemaVersion", "chat-tool/v1");
+        legacy.remove("evidence");
+        first.end = new com.zoop.chat.repository.ChatToolCallEnd("succeeded", null, first.end.dataVersion(),
+                first.end.evidenceIds(), first.end.truncated(), first.end.nextAllowed(), legacy.toString());
+        String historical = first.end.result();
+        approve("company_read", args);
+        assertEquals("chat_runtime_contract_mismatch", error(rpc(token, call("company_read", args))));
+        assertEquals("failed", store.toolCalls(JOB).getLast().status);
+        assertNull(store.toolCalls(JOB).getLast().end.result());
+        assertEquals(historical, first.end.result());
+        assertEquals(1, companyReads.size());
+        var failure = org.junit.jupiter.api.Assertions.assertThrows(com.zoop.chat.orchestrator.ChatModels.Failure.class,
+                () -> tools.requireContinuationSendable(executor.attach(JOB, 1).orElseThrow().run(),
+                        store.keptToolResults(JOB, 1)));
+        assertEquals("chat_runtime_contract_mismatch", failure.code());
+    }
+
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"a", "é", "한", "😀", "\"\\\u0001"})
+    void exactSdkWireIncludesBothCopiesAndRefusesTheFirstOversizeEnvelope(String unit) throws Exception {
+        var label = new java.util.concurrent.atomic.AtomicReference<>("");
+        server.close();
+        runner.close();
+        var registry = new ChatToolRegistry(List.of(new ChatTool() {
+            public ChatCapability capability() { return ChatCapability.COMPANY_READ; }
+            public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
+                String id = request.targets().getFirst();
+                return new ChatToolOutput(scope.graphVersionId(),
+                        List.of(new ChatToolItem(id, "company", label.get(), List.of(id), List.of("ev-1"))),
+                        List.of("ev-1"), false, false);
+            }
+        }));
+        runner = new ChatToolRunner(registry);
+        tools = new ChatMcpTools(registry, runner, executor, ChatSendGrantsTest.gate(dir), mapper);
+        transport = ChatMcpConfiguration.transport(mapper);
+        server = ChatMcpConfiguration.server(transport, tools, mapper);
+        String token = token(ChatCapability.COMPANY_READ);
+        approve("company_read", "{\"targets\":[\"co-0\"]}");
+        rpc(token, call("company_read", "{\"targets\":[\"co-0\"]}"));
+        int baseline = store.toolCalls(JOB).getFirst().end.result().getBytes(StandardCharsets.UTF_8).length;
+        int unitBytes = mapper.writeValueAsBytes(unit).length - 2;
+        int count = (262144 - baseline) / unitBytes;
+        label.set(unit.repeat(count));
+        approve("company_read", "{\"targets\":[\"co-1\"]}");
+        var reply = rpc(token, call("company_read", "{\"targets\":[\"co-1\"]}"));
+        var callback = reply.path("result");
+        assertFalse(callback.path("isError").asBoolean(), reply.toString());
+        assertEquals(label.get(), callback.path("structuredContent").path("items").get(0).path("label").asString());
+        assertEquals(callback.path("structuredContent"), mapper.readTree(callback.path("content").get(0).path("text").asString()));
+        int kept = store.toolCalls(JOB).get(1).end.result().getBytes(StandardCharsets.UTF_8).length;
+        assertTrue(kept <= 262144 && kept + unitBytes > 262144);
+        assertTrue(mapper.writeValueAsBytes(reply).length <= 790528, "full JSON-RPC frame fits the unchanged callback bound");
+        label.set(unit.repeat(count + 1));
+        approve("company_read", "{\"targets\":[\"co-2\"]}");
+        var refused = rpc(token, call("company_read", "{\"targets\":[\"co-2\"]}"));
+        assertEquals("result_too_large", error(refused));
+        assertNull(store.toolCalls(JOB).getLast().end.result());
+        assertTrue(store.toolCalls(JOB).getLast().end.evidenceIds().isEmpty());
+    }
     @Test
     void identicalRequestsArrivingTogetherAreReadOnce() throws Exception {
         String args = "{\"targets\":[\"co-1\"]}";

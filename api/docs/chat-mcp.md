@@ -11,7 +11,7 @@
 - 위치: 앱 데이터 소유자인 Java API JVM 안. Python(ai/service·worker)은 이 경로로 앱 DB를 읽지 않는다.
 - 구현: 공식 MCP Java SDK 2.1.0(`mcp-core`, `mcp-json-jackson3`)의 서블릿 stateless transport(`HttpServletStatelessServerTransport`)와 `McpStatelessSyncServer`. 2.0.x에는 grant별 도구 목록 필터(`McpSyncListFilter`)가 없어 2.1.0을 쓴다.
 - 프로토콜: `POST /mcp`, 요청마다 JSON 응답. 세션·SSE 스트림 없음(GET은 405). 메서드는 `initialize`, `ping`, `tools/list`, `tools/call`. 서버 기능은 tools뿐이다.
-- 같은 읽기: 도구는 `ChatToolRegistry`의 바인딩을 그대로 `ChatToolRunner`로 실행한다. 업무 로직을 복제하지 않으며 결과는 기존 `chat-tool/v1` 봉투다.
+- 같은 읽기: `ChatToolRegistry`의 내부 `chat-tool/v1` 타입과 `ChatToolRunner`를 재사용한다. MCP 서버 `zoop-chat` 버전 `2`는 전달 전용 `chat-mcp/v2` 봉투를 반환한다.
 
 ## 2. 접근 gate (`ChatMcpAccessFilter`)
 
@@ -63,7 +63,7 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 
 ### 결과와 오류
 
-성공은 `structuredContent`와 같은 JSON의 text content로 `chat-tool/v1` 봉투(`toolCallId`, `dataVersion`, `items`, `evidenceIds`, `truncated`, `nextAllowed`, 경로 읽기의 `paths`)를 돌려준다. 실패는 빈 성공이 아니라 `isError=true`와 코드다.
+성공은 `structuredContent`와 같은 JSON의 text content로 `chat-mcp/v2` 봉투를 돌려준다. 기존 필드에 필수 `evidence[]`가 더해지며 각 원소는 정확히 `{evidenceId, sourceId, quote}`다. tuple ID는 root `evidenceIds`와 같은 순서의 고유 ID이고 항목·경로 참조는 그 부분집합이다. 실패는 `isError=true`와 코드다.
 
 | 코드 | 뜻 |
 | --- | --- |
@@ -76,6 +76,7 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 | `result_too_large` | 결과 256 KiB 초과. 직렬화 크기로 먼저 거르고, 기록할 때 **저장된 JSON 텍스트**(`jsonb::text`, 공백 정규화 후) 크기로 다시 검사한다. 어느 쪽이든 `failed`/`result_too_large`로 남기며 근거·dataVersion·결과는 기록하지 않음(컬럼 제약 위반으로 run이 멈추지 않음) |
 | `job_results_too_large` | 이 결과를 남기면 job이 모델에 보낸 결과 합계가 1 MiB를 넘음. 기록 트랜잭션에서 job 행을 잠그고 검사해 `failed`로 남기며 결과는 보내지 않음 |
 | `send_grants_unavailable` | 아래 모델 전송 gate가 판단할 수 없음(grant 레지스트리를 읽지 못함·형식 위반, 근거 출처를 읽지 못함). 읽기는 실행됐지만 결과를 보내지 않고 `failed`로 남김 |
+| `chat_runtime_contract_mismatch` | 과거 v1 캐시 또는 호환되지 않는 보관 결과. 현재 예약을 실패로 기록하고 과거 기록은 유지함 |
 | `tool_timeout` `tool_unavailable` `tool_failed` | 기존 runner 실패 코드(원장에 `failed`) |
 
 등록되지 않은 이름(`portfolio_scope_read`, 점 포함 ID)은 SDK가 JSON-RPC `-32602 Unknown tool`로 답한다.
@@ -87,8 +88,8 @@ hosted MCP 결과는 ai/service의 전송 gate를 거치지 않고 이 엔드포
 - **grant 원본**: AI runtime이 `--grants`로 읽는 운영자 챗봇 grant 레지스트리(`zoop-ai-chat-1`) **같은 파일**을 `ZOOP_CHAT_MCP_SEND_GRANTS`(절대·정규화 경로)로 읽는다. 결과마다 다시 읽으므로 철회는 다음 결과부터 적용된다. 형식은 worker의 `ChatGrantRegistry`와 같이 엄격하게 본다(필드 누락·추가·중복 키, 모르는 rights·operation·목적, offset 없는 만료는 레지스트리 전체 거부).
 - **규칙**: worker의 `chat-agent` 단계 규칙과 같다. 같은 source의 grant가 `enabled`, `rights=known`, `model-send`, 목적에 `chat-agent`, 수신자에 `ZOOP_CHAT_MCP_SEND_RECIPIENT`(AI runtime이 `chat-agent` 단계에 쓰는 수신자, live `openai-compatible:<revision>`)가 있고 만료 전이어야 한다. `chat-agent` 목적은 그 단계의 Responses 저장(`store=true`)·continuation 재개를 포함하는 목적으로 등록한다.
 - **수신자 결속**: Java가 검사한 수신자와 결과를 실제로 받는 수신자가 같아야 한다. Java는 agent 단계마다 `mcp.recipient`에 `ZOOP_CHAT_MCP_SEND_RECIPIENT`를 넣고, worker는 새 invocation을 보내기 전에 그 값이 그 단계의 실제 수신자(설정된 endpoint로 계산한 `openai-compatible:<revision>`, replay `authored-replay`)와 정확히 같은지 확인한다. 다르면 `mcp_recipient_mismatch`로 아무것도 보내지 않는다(Java에서는 거절된 모델 단계). 이 값은 공급자로 보내지 않는다.
-- **출처 대응**: 기업 항목(이름) = `zoop-company-catalog`, 사건 제목·경로 단계(ID·관계 유형·역할, 이름 없음) = `zoop-graph`(새 source ID), 관계(엣지) 항목은 label이 양 끝 이름(기업명 포함)과 관계로 이루어진 복합 label이라 `zoop-graph`와 `zoop-company-catalog`가 **모두** 있어야 함, ZOOP 문서 제목 = `zoop-docs`, 근거(근거 항목의 label은 기사 제목) = direct 경로의 인용과 같은 규칙. 근거는 run의 고정 버전·asOf로 인용 읽기를 해서 기업 개요면 카탈로그, ZOOP 문서 구간이면 `zoop-docs`, 기사면 `articles.provider`(`CitedMcpSources`)이며 지금 인용할 수 없는 근거는 출처가 없어 보내지 않는다. 그 밖의 항목 종류도 보내지 않는다.
-- **뺀 부분**: 허용되지 않은 항목·경로는 **통째로**, 근거 ID는 결과와 항목·경로 단계의 목록에서 모두 뺀다. 맨 ID도 보내지 않는다. 결과에는 `withheld: {reason: "source_grant_denied", items, evidenceIds, paths}`로 개수만 남는다(아무것도 빼지 않았으면 없음). 원장의 `evidence_ids`와 `chat_tool_calls.result`도 보낸 것만 담으므로, 최종 답 검사와 다음 라운드의 도달 가능한 ID에도 뺀 것은 들어가지 않는다.
+- **출처·인용문**: root `output.evidenceIds`만 한 ID당 한 번 `citations.cite`로 읽는다. 현재 읽기 권한과 고정 graphVersion·asOf를 적용하며, 기사는 `articles.provider`, 기업 개요는 `zoop-company-catalog`, ZOOP 문서는 `zoop-docs`에 결속한다. 원문 그대로의 비어 있지 않은 인용문을 Java UTF-16 2,000단위까지 전달한다. 기업명·사건 제목·관계·경로·문서 제목은 기존 출처별 grant를 각각 검사한다.
+- **뺀 부분**: 인용할 수 없거나 출처·길이 조건을 충족하지 못한 인용문은 ID와 모든 참조까지 뺀다. 독립적으로 허용된 메타데이터는 남을 수 있다. `withheld`는 항목·근거·경로·웹 결과의 개수만 담으며, 인용 자격 미충족은 `evidence_not_deliverable`, 순수 전송 grant 차단은 `source_grant_denied`다. 웹 snippet은 `webResults`에만 남는다. 느린 인용 읽기가 끝난 뒤 현재 전송 grant와 만료를 평가한다.
 - **시간**: 검사(레지스트리·근거 출처 읽기)는 읽기와 같은 스레드에서 그 호출의 시간 한도(3초, 그래프 계산 5초)와 runner 전체 슬롯 안에서 돈다. 느린 검사는 느린 읽기처럼 `tool_timeout`이 되고, 호출 기록 스레드를 붙잡지 않는다.
 - **판단 불가**: 레지스트리를 읽지 못하거나 근거 출처를 읽지 못하면 빈 허용이 아니라 호출 거부(`send_grants_unavailable`)다. 설정이 없거나 기동 때 레지스트리를 읽지 못하면 `/mcp`를 켠 기동 자체가 실패한다.
 
@@ -97,10 +98,12 @@ hosted MCP 결과는 ai/service의 전송 gate를 거치지 않고 이 엔드포
 같은 attempt에서 **정확히 같은 정규화 요청**(기능 + 요청 digest: targets·limit·서버 주입 버전·asOf·근거 범위·비교 시작)은 한 번만 읽는다(MCP 실행 계약 3.3).
 
 - 다시 오면 처음 성공해 남긴 결과(`chat_tool_calls.result`)를 재사용한다. 결과에는 자기 `toolCallId`와 함께 `cachedFrom`(처음 읽은 호출)을 붙인다. 재사용도 승인·예약된 호출 하나로 원장과 예산에 들어간다.
-- 재사용 결과도 지금의 모델 전송 gate를 다시 거친다(grant 철회, 지금 인용할 수 없는 근거). 과거에 허용된 결과로 현재 차단을 우회하지 않는다.
+- 재사용 시 현재 읽기·전송 grant를 다시 확인하고 보관된 원래 tuple과 ID·출처·인용문이 모두 같은 부분만 전달한다. 권한이 확대되어도 원래 캐시에 없던 인용문은 보충하지 않으며 누락 개수와 불완전성도 보존한다. 과거 `chat-tool/v1` 봉투는 이력 열람에만 쓰고 현재 callback·continuation은 계약 불일치로 거부한다.
 - 요청은 먼저 자기 예약을 잡은 뒤(위 "호출 승인") 같은 요청이 읽는 중이면 그 읽기가 끝나길 기다렸다가(최대 12초, run 기한 안) 남긴 결과를 재사용한다. 첫 읽기가 실패했거나 기다림이 끝나면 직접 읽는다. 실패·timeout은 재사용하지 않는다.
 - 기다림은 **같은 인스턴스 안에서만** 합류한다. 다른 인스턴스로 동시에 온 같은 요청은 각자 읽을 수 있다(나중에 오는 반복은 DB의 남긴 결과로 재사용).
 - direct 경로는 서버가 한 단계의 같은 호출을 미리 합치므로(`ChatRetrieval`) 이 재사용을 쓰지 않는다. attempt가 바뀌면(rerun) 새로 읽는다.
+
+성공 봉투는 한 번 구성해 저장과 두 callback 복사본에 함께 쓴다. 호출당 262,144바이트·job당 1,048,576바이트는 DB `jsonb::text` 정규화 크기로도 검사한다. structured/text를 함께 담은 callback은 790,528바이트까지이며 미확인 callback당 문맥 예약은 296,448단위다.
 
 ### job당 결과 1 MiB
 
@@ -124,9 +127,12 @@ agent 단계가 하나라도 시작된 뒤의 `mcp_unreachable`는 **같은 run�
 1. Java가 run의 grant 토큰을 발급하고 `chat-agent` 1단계를 부른다. 요구마다 planner가 해석한 대상 ID(`targets`)를 넘기고, 허용 도구는 계획의 기능만이다.
 2. 단계가 `approval_required`로 멈추면 Java가 요청마다 결정한다. **run의 허용 도구이고, 지목한 요구가 모두 이 run의 요구이며, `targets`의 모든 ID가 도달 가능하고, `ChatMcpTools.approve`가 예약에 성공한 호출만 승인**하고 나머지는 거부한다. 요구를 지목하지 않았거나 일반 개념 요구만 지목한 내부 조회도 거부한다(worker는 잘못된 `requirementIds`를 빈 목록으로 넘기고 판단하지 않는다). 도달 가능한 ID는 **지목한 요구별** 서버 소유 목록이다. 첫 라운드엔 그 요구의 해석된 `targets`, 다음 라운드부터는 거기에 그 요구를 지목해 승인·실행된 결과의 항목·기업·경로 양끝·단계·근거 ID를 더한다. `targets`가 없는 호출(고정 문서, 버전 비교 전체 그래프)은 인자 검사만 거친다. 웹 검색(`web_search`)은 ID 대신 검색어를 받으므로 도달 가능 ID 대신 "앞 라운드의 내부 조회가 0건이거나 잘렸을 때만"과 검색어 검사·웹 예산으로 판단한다([챗봇 보조 웹 검색 도구](chat-web-search.md) 5장). 프롬프트의 "ID를 추측하지 않는다"와 공급자의 `allowed_tools`는 서버 검사를 대신하지 않는다. 결정을 continuation(`previous_response_id`)으로 보내면 공급자가 승인된 호출만 `/mcp`로 실행한다.
 3. 승인 라운드는 최대 3회이고, 한 라운드에 최대 4건만 승인한다(나머지는 거부, Luna는 다음 라운드에 다시 요청 가능). 공급자는 라운드의 승인 호출을 마친 뒤 단계를 답하므로 job의 동시 실행이 4개를 넘지 않는다. 다음 단계 하나만 할 시간이 남거나 라운드를 다 쓰면 남은 요청을 모두 거부해 그 단계가 답을 쓰게 한다. 그 뒤에도 묻는 run은 실패한 모델 단계다.
+   새 continuation은 전부 거부한 마무리 단계까지 기존 `steps.run` 시간 한도 안에서 보관 manifest의 소유자·예약·버전·scope와 현재 인용·출처별 전송 권한을 확인한 뒤 `agent.step`을 호출한다. 이전 자료가 철회되면 `source_grant_withdrawn`, 권한 확인이 불가능하면 `send_grants_unavailable`로 새 전송을 막는다. 이미 공급자가 받은 이력과 영수증은 보존한다.
 4. 최종 답은 **실행된 호출의 결과로** 검사한다. `/mcp`는 성공 호출의 결과 봉투를 모델에 보낸 것과 같은 JSON으로 `chat_tool_calls.result`(jsonb, 256 KiB 이하, migration `V20261028140000`)에 남기고, Java는 그 결과로 branch를 만들어 기존 결정론 검사·인용·Jev 검증·결과 생성을 그대로 거친다. 어느 인스턴스가 `/mcp` 호출을 받았든 같은 PostgreSQL에서 읽는다. 읽은 결과는 `ChatToolRunner.restore`가 job·회원·시도·tool call·capability·고정 버전·asOf·입력 digest를 예약 기록과 대조한 뒤에만 이 run의 조회로 되살리고(다르면 run은 `internal`로 끝난다), 모델 전송 gate가 항목을 뺀 결과는 잘린 결과로 되살린다. 같은 결과가 Jev 검증의 서버 사실(`graph_comparison`)이 된다([AI 연동](AI_INTEGRATION.md#챗봇-모델-단계-클라이언트)). 결과는 승인 때 지목한 요구에만 속한다. 구간은 자기 요구의 결과만 인용할 수 있어, 다른 요구용 호출의 근거를 인용하면 기존 `evidence_section`/`web_section` 검사로 `validation_failed`다. 일반 개념 요구는 자기 요구를 지목한 웹 결과만 받는다. 지목은 `chat_tool_calls.request_meta.requirementIds`에 남지만 digest에는 들어가지 않으므로, 같은 조회를 다른 요구로 다시 승인받으면 호출 한 건으로 세고 결과를 재사용한다(`cachedFrom`).
 
 **시간.** direct와 agent는 첫 attempt에 고정한 같은 `ChatResourcePolicy`를 사용한다. 로컬 기본 job 상한은 1200초이며 최종 생성·인용 재열람·검증·저장에 725초를 먼저 남긴다. direct 의존 조회는 같은 120초 창을 공유하고 승인·MCP callback은 완료 예약 전 마감까지만 시작한다. 초기 비최종 단계에 90초, 승인 결과 continuation에 120초가 필요하며 마지막 단계는 새 읽기를 승인하지 않는다. 선택적 웹 보충은 240초 안에서 자체 최종 단계 90초를 남긴다. 실제 provider·HTTP·Java 단계는 저장한 permit에 묶인다. 세부 시간 식과 설정 이행은 [API README](../README.md#챗봇-자원-정책)를 따른다. 시간 값은 오프라인 상한이며 운영 지연·비용·MCP 유효기간 승인은 별도다.
+
+**호환성.** agent adapter는 `zoop-chat-agent-resource-2`다. worker runtime fingerprint는 정규화 MCP URL과 예상 v2 전달 계약·같은 크기 상한을 함께 묶는다. API와 service/worker를 호환되는 조합으로 교체해야 하며 기존 fingerprint의 실행은 새 계약으로 재개하지 않는다. stage6·capabilities1·resources1과 Jev revision10은 유지한다. 실제 인용문 전송은 해당 수신자의 `store=true`·continuation 사용까지 포함한 현재 권한과 운영자 rollout 승인을 전제로 한다.
 
 **fan-out.** 대상이 5개(한 호출의 `targets` 상한)를 넘는 요구가 있는 계획은 agent 경로를 타지 않고 direct 경로에서 서버가 5개씩 나눠 읽는다. route 요약에 `path=agent`, `agentSteps`, `approvedCalls`, `deniedCalls`를 남긴다.
 

@@ -271,6 +271,10 @@ public class ChatJobExecutor {
         return runs.findKeptToolResult(jobId, attemptNo, capabilityId, inputDigest);
     }
 
+    public List<ChatKeptToolResult> keptToolResults(String jobId, int attemptNo) {
+        return runs.keptToolResults(jobId, attemptNo);
+    }
+
     /** Ends running jobs whose lease ran out; returns how many it ended. */
     public int recoverExpired() {
         int ended = 0;
