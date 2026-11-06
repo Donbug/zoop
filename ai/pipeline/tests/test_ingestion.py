@@ -13,9 +13,11 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from scripts.ingestion_smoke import HTML, OfflineFixture, authored_pdf, exact_check, json_bytes, sha
+from scripts.ingestion_smoke import (HTML, OfflineFixture, authored_pdf, collected_manifest,
+    exact_check, json_bytes, namespace_fingerprint, sha)
 from zoop_ai_pipeline.ingestion import Ingestor, Store
-from zoop_ai_pipeline.ingestion_contracts import Authority, Export, IngestionFailure, Inspect, Item, Run, canonical
+from zoop_ai_pipeline.ingestion_contracts import (Authority, CompletionWitnessRequest, Export,
+    IngestionFailure, Inspect, Item, Run, canonical)
 from zoop_ai_pipeline import ingestion_parsers as parsers
 
 
@@ -1316,3 +1318,386 @@ def test_pdf_projection_is_bound_to_native_pdf_page_sources(kit, media, xpath):
     _, projection, _, _ = pdf_projection_fixture(kit)
     with pytest.raises(IngestionFailure, match="projection_media_unsupported"):
         parsers.prepare(b"not admitted", media, xpath, projection=PdfBodyProjection.model_validate(projection))
+
+
+def witness_request(result):
+    return {"schemaVersion": "zoop-ingestion-completion-witness-1", "roundId": result["roundId"],
+            "sourceId": result["sourceId"], "expectedInputDigest": result["inputDigest"]}
+
+
+def read_witness(kit, request, *, authority=None):
+    store = Store(kit.root / "state", existing=True)
+    try:
+        return Ingestor(store, authority or Authority(kit.registry_path)).completion_witness(
+            CompletionWitnessRequest.model_validate(request))
+    finally:
+        store.close()
+
+
+def test_completion_witness_preserves_alias_checkpoint_parser_and_acquisition_history(kit, monkeypatch):
+    first_manifest = collected_manifest(kit, "alias", count=1)
+    payload = json.loads(first_manifest.read_bytes())
+    page_path = kit.inputs / payload["pages"][0]["response"]["file"]
+    page = json.loads(page_path.read_bytes())
+    page["items"][0]["supplierDocumentId"] = None
+    page_path.write_bytes(json_bytes(page))
+    payload["pages"][0]["response"]["sha256"] = sha(page_path.read_bytes())
+    first_manifest.write_bytes(json_bytes(payload))
+    first = execute(kit, first_manifest, "alias")
+    manifest = collected_manifest(kit)
+    result = execute(kit, manifest, revision=1)
+    request = witness_request(result)
+    original = read_witness(kit, request)
+    observations = original["evidence"]["observations"]
+    assert len(observations) == 2
+    assert observations[0]["documentId"] == first["documentRefs"][0]["documentId"]
+    assert observations[0]["documentId"] != "doc-" + parsers.digest(["synthetic-source", "supplier", "supplier-0"])
+    assert original["evidence"]["roundRevision"] == 2
+    through = "2026-10-09T02:00:00+00:00"
+    later_manifest = collected_manifest(kit, "timed", count=1, coverage=through)
+    later = execute(kit, later_manifest, "later", 2, window={"from": "2026-10-09T01:00:00+00:00", "through": through})
+    assert later["checkpoint"]["through"] == through and later["checkpoint"]["revision"] == 3
+    kit.registry["sources"][0]["grant"].update(revision="reader-2", allowedOperations=["read"])
+    kit.save_registry()
+    _unknown_parser_version(monkeypatch, "lxml", "missing")
+    assert read_witness(kit, request)["evidence"] == original["evidence"]
+    current = read_witness(kit, request)
+    assert current["authorization"]["grant"] == {"grantId": "operator-grant", "revision": "reader-2"}
+    assert all(o["acquisitionGrant"] == {"grantId": "operator-grant", "revision": "rights-1"} for o in observations)
+    assert all(o["acquiredAt"] == "2026-10-08T01:02:03+00:00" and o["observedAt"] != o["acquiredAt"] for o in observations)
+    assert original["evidence"]["checkedWindow"] is None and original["evidence"]["coverageThrough"] is None
+
+
+@pytest.mark.parametrize("fault", [
+    "manifest", "page", "receipt", "body", "content", "parser", "input-digest", "original-registry",
+    "candidate-data", "missing-candidate", "extra-candidate", "reordered-candidates", "raw-version", "version-binding",
+])
+def test_completion_witness_rejects_corrupt_exact_list_pins(kit, fault):
+    manifest = collected_manifest(kit)
+    result = execute(kit, manifest)
+    with sqlite3.connect(kit.root / "state/ingestion.sqlite3") as db:
+        for (name,) in db.execute("SELECT name FROM sqlite_master WHERE type='trigger'").fetchall():
+            db.execute(f'DROP TRIGGER "{name}"')
+        if fault in {"manifest", "page", "receipt", "body", "original-registry"}:
+            payload = json.loads(manifest.read_bytes())
+            page = json.loads((kit.inputs / payload["pages"][0]["response"]["file"]).read_bytes())
+            hashes = {"manifest": sha(manifest.read_bytes()), "page": payload["pages"][0]["response"]["sha256"],
+                "body": payload["documents"]["body-0"]["sha256"],
+                "receipt": page["items"][0]["collection"]["receipt"]["sha256"],
+                "original-registry": sha(kit.registry_path.read_bytes())}
+            db.execute("UPDATE blobs SET data=? WHERE hash=?", (b"corrupted synthetic pin", hashes[fault]))
+        elif fault == "content":
+            content = json.loads(db.execute("SELECT content FROM versions LIMIT 1").fetchone()[0])
+            content["text"] += "tampered"
+            db.execute("UPDATE versions SET content=? WHERE id=?", (canonical(content), result["documentRefs"][0]["documentVersion"]))
+        elif fault == "parser":
+            db.execute("UPDATE rounds SET parser='{}'")
+        elif fault == "input-digest":
+            db.execute("UPDATE rounds SET input_digest=?", ("0" * 64,))
+        elif fault == "candidate-data":
+            data = json.loads(db.execute("SELECT data FROM candidates WHERE ordinal=0").fetchone()[0])
+            data["candidateId"] = "different"
+            db.execute("UPDATE candidates SET data=? WHERE ordinal=0", (canonical(data),))
+        elif fault == "missing-candidate":
+            db.execute("DELETE FROM candidates WHERE ordinal=1")
+        elif fault == "extra-candidate":
+            db.execute("UPDATE candidates SET ordinal=2 WHERE ordinal=1")
+            db.execute("INSERT INTO candidates(round,source,page,ordinal,data) SELECT round,source,page,1,data FROM candidates WHERE ordinal=0")
+        elif fault == "reordered-candidates":
+            db.execute("UPDATE candidates SET ordinal=ordinal+10")
+            db.execute("UPDATE candidates SET ordinal=11-ordinal")
+        elif fault == "raw-version":
+            db.execute("UPDATE raw_versions SET metadata='{}'")
+        else:
+            db.execute("UPDATE versions SET raw_version=?", (result["documentRefs"][1]["rawVersion"],))
+    db.close()
+    before = namespace_fingerprint(kit.root / "state")
+    assert kit.cli("completion-witness", witness_request(result), expected=2) == {
+        "schemaVersion": "zoop-ingestion-completion-witness-1", "error": {"code": "ingestion_state_invalid"}}
+    assert namespace_fingerprint(kit.root / "state") == before
+
+
+@pytest.mark.parametrize("field", ["hold", "error", "ambiguity", "failure", "version", "raw_version", "document"])
+def test_completion_witness_refuses_one_unready_member_without_a_prefix(kit, field):
+    manifest = collected_manifest(kit)
+    result = execute(kit, manifest)
+    with sqlite3.connect(kit.root / "state/ingestion.sqlite3") as db:
+        value = None if field in {"version", "raw_version", "document"} else "synthetic-unready"
+        db.execute(f"UPDATE candidates SET {field}=? WHERE ordinal=1", (value,))
+    db.close()
+    assert kit.cli("completion-witness", witness_request(result), expected=2) == {
+        "schemaVersion": "zoop-ingestion-completion-witness-1", "error": {"code": "native_completion_unproven"}}
+
+
+@pytest.mark.parametrize("profile", ["authored", "timed", "coverage", "nonterminal", "partial", "failed", "zero", "51", "hold", "incomplete"])
+def test_completion_witness_refuses_unsupported_or_incomplete_rounds(kit, monkeypatch, profile):
+    if profile == "authored":
+        manifest = kit.manifest("authored", [[kit.item()]])
+    elif profile == "hold":
+        manifest = collected_manifest(kit, bodies={"valid": HTML, "held": b"<html><body>no article</body></html>"})
+    else:
+        options = {"count": 0 if profile == "zero" else 51 if profile == "51" else 2}
+        if profile in {"partial", "failed"}:
+            options["statuses"] = [profile]
+        if profile == "nonterminal":
+            options["terminal"] = False
+        if profile == "coverage":
+            options["coverage"] = "2026-10-09T02:00:00+00:00"
+        manifest = collected_manifest(kit, **options)
+    if profile == "incomplete":
+        def stop(*args):
+            raise IngestionFailure("synthetic-before-page-completion")
+        monkeypatch.setattr(Ingestor, "_complete_page", stop)
+    window = {"from": "2026-10-09T01:00:00+00:00", "through": "2026-10-09T02:00:00+00:00"} if profile == "timed" else None
+    result = execute(kit, manifest, window=window)
+    code = "native_completion_unproven" if profile in {"partial", "failed", "zero", "hold", "incomplete"} else "finite_collection_witness_unsupported"
+    assert kit.cli("completion-witness", witness_request(result), expected=2) == {
+        "schemaVersion": "zoop-ingestion-completion-witness-1", "error": {"code": code}}
+    if profile == "hold":
+        assert result["state"] == "complete" and result["counts"]["held"] == 1
+    if profile == "incomplete":
+        assert result["counts"]["textReady"] == 2 and result["state"] == "incomplete"
+
+
+@pytest.mark.parametrize("fault", ["disabled", "unknown", "denied", "expired", "evidence", "missing", "config", "private-origin"])
+def test_completion_witness_requires_current_public_read_authority(kit, fault):
+    manifest = collected_manifest(kit)
+    result = execute(kit, manifest)
+    source = kit.registry["sources"][0]
+    code = "source_unauthorized"
+    if fault == "disabled":
+        source["grant"]["enabled"] = False
+    elif fault == "unknown":
+        source["grant"]["rights"] = "unknown"
+    elif fault == "denied":
+        source["grant"]["allowedOperations"] = ["store"]
+    elif fault == "expired":
+        source["grant"]["expiresAt"] = "2000-01-01T00:00:00+00:00"
+    elif fault == "evidence":
+        source["grant"]["evidence"] = []
+    elif fault == "missing":
+        kit.registry["sources"] = []
+    elif fault == "config":
+        source["inputRoot"] += "-different"
+        code = "scope_configuration_conflict"
+    else:
+        code = "private_processing_not_public"
+        raw = json_bytes({"schemaVersion": "zoop-private-processing-1"})
+        with sqlite3.connect(kit.root / "state/ingestion.sqlite3") as db:
+            db.execute("INSERT INTO blobs VALUES(?,?)", (sha(raw), raw))
+            db.execute("UPDATE rounds SET registry_hash=?", (sha(raw),))
+        db.close()
+    kit.save_registry()
+    assert kit.cli("completion-witness", witness_request(result), expected=2) == {
+        "schemaVersion": "zoop-ingestion-completion-witness-1", "error": {"code": code}}
+
+
+def test_completion_witness_rechecks_registry_before_return(kit, monkeypatch):
+    manifest = collected_manifest(kit)
+    result = execute(kit, manifest)
+    authority = Authority(kit.registry_path)
+    prepared = Ingestor._prepared
+    def change_after_read(*args):
+        output = prepared(*args)
+        kit.registry["revision"] = "changed-during-read"
+        kit.save_registry()
+        return output
+    monkeypatch.setattr(Ingestor, "_prepared", change_after_read)
+    with pytest.raises(IngestionFailure, match="^registry_changed$"):
+        read_witness(kit, witness_request(result), authority=authority)
+
+
+def test_completion_witness_cold_read_uses_existing_files_only(kit, monkeypatch):
+    manifest = collected_manifest(kit)
+    result = execute(kit, manifest)
+    request = witness_request(result)
+    baseline = read_witness(kit, request)
+    for path in (kit.root / "state").iterdir():
+        path.chmod(0o400)
+    (kit.root / "state").chmod(0o500)
+    before = namespace_fingerprint(kit.root / "state")
+    connect, open_fd = sqlite3.connect, os.open
+    def read_connect(path, *args, **kwargs):
+        assert str(path).endswith("?mode=ro&immutable=1") and kwargs["uri"] is True
+        return connect(path, *args, **kwargs)
+    def read_open(path, flags, *args, **kwargs):
+        assert not flags & (os.O_CREAT | os.O_RDWR | os.O_WRONLY)
+        return open_fd(path, flags, *args, **kwargs)
+    def refuse(*args, **kwargs):
+        raise AssertionError("witness attempted a writer or fixture path")
+    with monkeypatch.context() as patch:
+        patch.setattr(sqlite3, "connect", read_connect)
+        patch.setattr(os, "open", read_open)
+        patch.setattr(os, "chmod", refuse)
+        patch.setattr(Path, "mkdir", refuse)
+        patch.setattr(Authority, "fixture", refuse)
+        patch.setattr(Store, "transaction", refuse)
+        assert read_witness(kit, request) == baseline
+    assert namespace_fingerprint(kit.root / "state") == before
+    (kit.root / "state").chmod(0o700)
+    for path in (kit.root / "state").iterdir():
+        path.chmod(0o600)
+
+
+def test_completion_witness_shared_lock_excludes_cooperating_writers(kit):
+    import fcntl
+    manifest = collected_manifest(kit)
+    result = execute(kit, manifest)
+    reader = Store(kit.root / "state", existing=True)
+    try:
+        contender = os.open(kit.root / "state/ingestion.lock", os.O_RDONLY)
+        try:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            assert Ingestor(reader, Authority(kit.registry_path)).completion_witness(
+                CompletionWitnessRequest.model_validate(witness_request(result)))["status"] == "complete"
+        finally:
+            os.close(contender)
+    finally:
+        reader.close()
+    writer = Store(kit.root / "state")
+    try:
+        assert kit.cli("completion-witness", witness_request(result), expected=2) == {
+            "schemaVersion": "zoop-ingestion-completion-witness-1", "error": {"code": "ingestion_busy"}}
+    finally:
+        writer.close()
+
+
+@pytest.mark.parametrize("boundary", ["receipt", "raw", "version", "checkpoint"])
+def test_completion_witness_refuses_actual_crash_wal_unchanged(kit, boundary):
+    from zoop_ai_pipeline.ingestion_contracts import digest
+    manifest = collected_manifest(kit)
+    request = kit.request(manifest)
+    source, scope = Authority(kit.registry_path).check("synthetic-source", "body")
+    expected = digest({"request": Run.model_validate(request).wire(), "configuration": source.configuration(scope),
+                       "parser": parsers.profile(scope.article_xpath, scope.text_projection)})
+    kit.cli("run", request, manifest=manifest, crash=boundary, expected=75)
+    before = namespace_fingerprint(kit.root / "state")
+    assert (kit.root / "state/ingestion.sqlite3-wal").stat().st_size > 0
+    assert kit.cli("completion-witness", {**kit.selector(), "schemaVersion": "zoop-ingestion-completion-witness-1",
+        "expectedInputDigest": expected}, expected=2) == {
+            "schemaVersion": "zoop-ingestion-completion-witness-1", "error": {"code": "ingestion_recovery_required"}}
+    assert namespace_fingerprint(kit.root / "state") == before
+
+
+@pytest.mark.parametrize("extra", [
+    {"expectedInputDigest": "A" * 64}, {"expectedInputDigest": 3}, {"roundId": ""},
+    {"now": "2026-10-08T00:00:00+00:00"}, {"limit": 1}, {"complete": True},
+])
+def test_completion_witness_request_is_strict_and_missing_store_stays_missing(kit, extra):
+    request = {"schemaVersion": "zoop-ingestion-completion-witness-1", "roundId": "original",
+               "sourceId": "synthetic-source", "expectedInputDigest": "0" * 64}
+    assert kit.cli("completion-witness", {**request, **extra}, expected=2) == {
+        "schemaVersion": request["schemaVersion"], "error": {"code": "input_or_configuration_invalid"}}
+    assert kit.cli("completion-witness", request, expected=2) == {
+        "schemaVersion": request["schemaVersion"], "error": {"code": "ingestion_state_missing"}}
+    assert not (kit.root / "state").exists()
+
+
+@pytest.mark.parametrize("extra", [("--require-store",), ("--fixture-manifest", "/unopened/manifest"),
+                                 ("--private-processing", "/unopened/private")])
+def test_completion_witness_cli_refuses_mutating_or_private_options(kit, extra):
+    request = {"schemaVersion": "zoop-ingestion-completion-witness-1", "roundId": "original",
+               "sourceId": "synthetic-source", "expectedInputDigest": "0" * 64}
+    assert kit.cli("completion-witness", request, sources=extra[0] != "--private-processing", extra=extra, expected=2) == {
+        "schemaVersion": request["schemaVersion"], "error": {"code": "input_or_configuration_invalid"}}
+    assert not (kit.root / "state").exists()
+
+
+def test_completion_witness_refuses_uncommitted_completion_wal_and_copy_rolls_back(kit, tmp_path):
+    import shutil
+    import struct
+    from zoop_ai_pipeline.ingestion_contracts import digest
+    manifest = collected_manifest(kit)
+    request = kit.request(manifest)
+    source, scope = Authority(kit.registry_path).check("synthetic-source", "body")
+    expected = digest({"request": Run.model_validate(request).wire(), "configuration": source.configuration(scope),
+                       "parser": parsers.profile(scope.article_xpath, scope.text_projection)})
+    kit.cli("run", request, manifest=manifest, crash="uncommitted-completion", expected=75)
+    native = kit.root / "state"
+    before = namespace_fingerprint(native)
+    wal = (native / "ingestion.sqlite3-wal").read_bytes()
+    page_size = struct.unpack(">I", wal[8:12])[0]
+    last_frame = 32 + ((len(wal) - 32) // (24 + page_size) - 1) * (24 + page_size)
+    assert struct.unpack(">I", wal[last_frame + 4:last_frame + 8])[0] == 0
+    assert kit.cli("completion-witness", {**kit.selector(), "schemaVersion": "zoop-ingestion-completion-witness-1",
+        "expectedInputDigest": expected}, expected=2) == {
+            "schemaVersion": "zoop-ingestion-completion-witness-1", "error": {"code": "ingestion_recovery_required"}}
+    assert namespace_fingerprint(native) == before
+    recovered = tmp_path / "private-recovery-copy"
+    recovered.mkdir()
+    for name in ("ingestion.sqlite3", "ingestion.sqlite3-wal"):
+        shutil.copyfile(native / name, recovered / name)
+    with sqlite3.connect(recovered / "ingestion.sqlite3") as db:
+        assert db.execute("SELECT state,next_page FROM rounds").fetchone() == ("running", 0)
+        assert db.execute("SELECT complete FROM pages").fetchone() == (0,)
+        assert db.execute("SELECT COUNT(*) FROM versions").fetchone() == (2,)
+        assert db.execute("SELECT COUNT(*) FROM blobs WHERE hash='synthetic-uncommitted'").fetchone() == (0,)
+    db.close()
+    assert namespace_fingerprint(native) == before
+
+
+def test_completion_witness_reads_producer_valid_large_prepared_representation(kit):
+    from zoop_ai_pipeline.ingestion_contracts import MAX_RAW
+    raw = (b"<html><body><article>" + b"<section>" * 200 + b"<p>x</p>" * 9000 +
+           b"</section>" * 200 + b"</article></body></html>")
+    manifest = collected_manifest(kit, bodies={"deep": raw})
+    result = kit.cli("run", kit.request(manifest), manifest=manifest)
+    assert result["state"] == "complete" and result["counts"]["textReady"] == 1
+    store = Store(kit.root / "state", existing=True)
+    try:
+        size = store.one("SELECT length(CAST(content AS BLOB)) n FROM versions")["n"]
+        observed_at = store.one("SELECT observed_at FROM pages")["observed_at"]
+    finally:
+        store.close()
+    assert size > MAX_RAW
+    witness = kit.cli("completion-witness", witness_request(result))
+    assert witness["evidence"]["inputDigest"] == result["inputDigest"]
+    assert witness["evidence"]["observations"][0]["documentVersion"] == result["documentRefs"][0]["documentVersion"]
+    assert witness["evidence"]["observations"][0]["observedAt"] == observed_at
+
+
+def test_completion_witness_resource_refusal_precedes_prepared_materialization(kit, monkeypatch):
+    from zoop_ai_pipeline.ingestion import MAX_WITNESS_PREPARED
+    manifest = collected_manifest(kit, count=1)
+    result = execute(kit, manifest)
+    with sqlite3.connect(kit.root / "state/ingestion.sqlite3") as db:
+        db.execute("DROP TRIGGER immutable_versions_update")
+        db.execute("UPDATE versions SET content=CAST(zeroblob(?) AS TEXT)", (MAX_WITNESS_PREPARED + 1,))
+    db.close()
+    before = namespace_fingerprint(kit.root / "state")
+    def refuse_materialization(*args):
+        raise AssertionError("oversized prepared row reached materialization")
+    monkeypatch.setattr(Ingestor, "_prepared", refuse_materialization)
+    with pytest.raises(IngestionFailure, match="^completion_witness_resource_limit$"):
+        read_witness(kit, witness_request(result))
+    assert kit.cli("completion-witness", witness_request(result), expected=2) == {
+        "schemaVersion": "zoop-ingestion-completion-witness-1",
+        "error": {"code": "completion_witness_resource_limit"}}
+    assert namespace_fingerprint(kit.root / "state") == before
+
+
+@pytest.mark.parametrize("representation", ["collected-pdf", "projected-html"])
+def test_completion_witness_accepts_produced_alternate_representations(kit, representation):
+    if representation == "collected-pdf":
+        manifest, _, _, _ = pdf_projection_fixture(kit)
+    else:
+        manifest, projection, _ = caption_fixture(kit)
+        kit.registry["sources"][0]["scopes"][0]["textProjection"] = projection
+        kit.save_registry()
+    result = execute(kit, manifest, state="witness-alternate")
+    assert result["state"] == "complete" and result["counts"]["textReady"] == 1
+    store = Store(kit.root / "witness-alternate", existing=True)
+    try:
+        observed_at = store.one("SELECT observed_at FROM pages")["observed_at"]
+    finally:
+        store.close()
+    before = namespace_fingerprint(kit.root / "witness-alternate")
+    witness = kit.cli("completion-witness", witness_request(result), state="witness-alternate")
+    observation = witness["evidence"]["observations"][0]
+    ref = result["documentRefs"][0]
+    assert (observation["documentId"], observation["rawVersion"], observation["documentVersion"]) == (
+        ref["documentId"], ref["rawVersion"], ref["documentVersion"])
+    assert witness["evidence"]["inputDigest"] == result["inputDigest"]
+    assert observation["observedAt"] == observed_at
+    assert namespace_fingerprint(kit.root / "witness-alternate") == before

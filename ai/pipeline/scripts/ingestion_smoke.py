@@ -2,6 +2,7 @@
 """Authored HTML/PDF → actual JSON subprocesses. Fresh owned state is always removed."""
 from __future__ import annotations
 
+import argparse
 import atexit
 import hashlib
 import io
@@ -120,12 +121,27 @@ class OfflineFixture:
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1", **ownership_env()}
         guard = ("import os, sys, runpy\n"
                  "def _guard(event, args):\n"
-                 " if event in {'socket.connect', 'socket.getaddrinfo', 'socket.gethostbyname', 'socket.bind'}:\n"
+                 " if event in {'socket.__new__', 'socket.connect', 'socket.getaddrinfo', 'socket.gethostbyname', 'socket.bind', 'socket.sendto'}:\n"
                  "  raise RuntimeError('network attempted')\n"
                  "sys.addaudithook(_guard)\n")
         if crash:
             # Kill the actual process at a durable stage, not a fake CLI result.
             hooks = {"receipt": "Ingestor._discover=lambda *a: os._exit(75)", "raw": "parsers.prepare=lambda *a: os._exit(75)", "version": "Ingestor._complete_page=lambda *a: os._exit(75)", "checkpoint": "original=Ingestor._complete_page\ndef stop(*a):\n original(*a)\n os._exit(75)\nIngestor._complete_page=stop"}
+            hooks["uncommitted-completion"] = (
+                "from contextlib import contextmanager\n"
+                "original=Ingestor._complete_page\n"
+                "def stop(self,*args):\n"
+                " self.db.execute('PRAGMA cache_size=1')\n"
+                " transaction=self.store.transaction\n"
+                " @contextmanager\n"
+                " def interrupted(*a,**kw):\n"
+                "  with transaction(*a,**kw):\n"
+                "   yield\n"
+                "   self.db.execute('INSERT INTO blobs VALUES(?,?)',('synthetic-uncommitted',b'x'*100000))\n"
+                "   os._exit(75)\n"
+                " self.store.transaction=interrupted\n"
+                " original(self,*args)\n"
+                "Ingestor._complete_page=stop")
             code = guard + "from zoop_ai_pipeline.ingestion import Ingestor, parsers\nfrom zoop_ai_pipeline.ingestion_cli import main\n" + hooks[crash] + "\nraise SystemExit(main())"
         else:
             code = guard + "runpy.run_module('zoop_ai_pipeline.ingestion_cli', run_name='__main__')"
@@ -331,12 +347,102 @@ def publisher_smoke(root):
     return ["authored publisher: no-publisher identity pinned to the earlier commit; declared publisher is a new raw/document version of the same document, exported exactly, replay idempotent, null == omitted, whitespace-only refused"]
 
 
+def collected_manifest(kit, name="finite", *, count=2, bodies=None, statuses=None, terminal=True, coverage=None):
+    """Hand-authored acquisition records: synthetic bytes, never a network fetch."""
+    source = kit.registry["sources"][0]
+    source["adapter"] = "collected-http"
+    kit.save_registry()
+    bodies = bodies if bodies is not None else {f"body-{i}": HTML.replace("둘째".encode(), f"합성 {i}".encode()) for i in range(count)}
+    items = []
+    for i, (ref, body) in enumerate(bodies.items()):
+        item = kit.item(f"candidate-{i}", f"supplier-{i}", f"https://example.invalid/finite/{i}", ref)
+        item["publishedAt"] = None
+        collection = {"provenance": "collected_http", "collectionId": name, "fetchedAt": "2026-10-08T01:02:03+00:00",
+            "finalUrl": item["url"], "httpStatus": 200, "contentType": "text/html", "bodySha256": sha(body),
+            "documentKind": "news", "network": "synthetic_loopback",
+            "published": {"raw": None, "precision": "unknown", "date": None, "basis": "synthetic unknown publication"}}
+        receipt = {"schemaVersion": "zoop-collection-receipt-1", "collectionId": name,
+            "sourceId": source["sourceId"], "scopeId": "body", "candidateId": item["candidateId"],
+            "grantId": source["grant"]["grantId"], "grantRevision": source["grant"]["revision"],
+            "requestedUrl": item["url"], "finalUrl": item["url"], "redirects": [], "httpStatus": 200,
+            "contentType": "text/html", "mediaType": "text/html", "contentLength": None, "etag": None,
+            "lastModified": None, "serverDate": None, "bodySha256": sha(body), "bodyBytes": len(body),
+            "fetchedAt": collection["fetchedAt"], "userAgent": "synthetic", "network": "synthetic_loopback",
+            "robots": [], "requestCount": 1}
+        collection["receipt"] = kit.file(f"{name}-receipt-{i}.json", json_bytes(receipt))
+        items.append({**item, "collection": collection})
+    return kit.manifest(name, [items], bodies=bodies, statuses=statuses, terminal=terminal, coverage=coverage)
+
+
+def namespace_fingerprint(root):
+    return {p.name: {"sha256": sha(p.read_bytes()), "mode": p.stat().st_mode, "mtimeNs": p.stat().st_mtime_ns}
+            for p in root.iterdir()}
+
+
+def completion_witness_smoke(root):
+    kit = OfflineFixture(root)
+    manifest = collected_manifest(kit)
+    original = kit.cli("run", kit.request(manifest), manifest=manifest)
+    request = {"schemaVersion": "zoop-ingestion-completion-witness-1", "roundId": "round-1",
+               "sourceId": "synthetic-source", "expectedInputDigest": original["inputDigest"]}
+    before = namespace_fingerprint(kit.root / "state")
+    from zoop_ai_pipeline.ingestion import Store
+    store = Store(kit.root / "state", existing=True)
+    try:
+        observed_at = store.one("SELECT observed_at FROM pages WHERE round=? AND source=? AND ordinal=0",
+                                ("round-1", "synthetic-source"))["observed_at"]
+    finally:
+        store.close()
+    witness = kit.cli("completion-witness", request)
+    observations = witness["evidence"]["observations"]
+    assert len(observations) == 2
+    payload = json.loads((kit.inputs / "finite-page-0.json").read_bytes())
+    for ordinal, (observation, ref, item) in enumerate(zip(observations, original["documentRefs"], payload["items"])):
+        assert observation == {"page": 0, "ordinal": ordinal, "candidateId": item["candidateId"],
+            "collectionId": "finite", "documentId": ref["documentId"], "rawVersion": ref["rawVersion"],
+            "documentVersion": ref["documentVersion"], "bodySha256": item["collection"]["bodySha256"],
+            "receiptSha256": item["collection"]["receipt"]["sha256"],
+            "acquisitionGrant": {"grantId": "operator-grant", "revision": "rights-1"},
+            "acquiredAt": "2026-10-08T01:02:03+00:00", "observedAt": observed_at}
+        assert observation["observedAt"] != observation["acquiredAt"]
+    kit.registry["sources"][0]["grant"].update(revision="reader-2", allowedOperations=["read"])
+    kit.save_registry()
+    reread = kit.cli("completion-witness", request)
+    assert reread["evidence"] == witness["evidence"]
+    assert reread["authorization"]["grant"] == {"grantId": "operator-grant", "revision": "reader-2"}
+    bad = kit.cli("completion-witness", {**request, "expectedInputDigest": "0" * 64}, expected=2)
+    assert bad == {"schemaVersion": request["schemaVersion"], "error": {"code": "round_input_conflict"}}
+    missing = kit.cli("completion-witness", request, state="missing", expected=2)
+    assert missing["error"]["code"] == "ingestion_state_missing" and not (kit.root / "missing").exists()
+    assert namespace_fingerprint(kit.root / "state") == before
+    kit.registry["sources"][0]["grant"]["enabled"] = False
+    kit.save_registry()
+    assert kit.cli("completion-witness", request, expected=2) == {
+        "schemaVersion": request["schemaVersion"], "error": {"code": "source_unauthorized"}}
+    result = {"status": "passed", "witness": witness, "currentReadOnlyAuthorization": reread["authorization"],
+        "expectedPageObservedAt": observed_at,
+        "nativeNamespaceBefore": before, "nativeNamespaceAfter": namespace_fingerprint(kit.root / "state"),
+        "checks": ["actual two-item collected CLI exact list", "historical acquisition/current read-only grant",
+                   "digest mismatch error-only", "missing namespace preserved", "revocation error-only", "bytes modes mtimes unchanged"],
+        "networkEnforcement": "CLI Python audit hook denies socket creation, DNS, connect, bind and sendto; not an OS sandbox",
+        "networkCalls": 0, "modelCalls": 0, "providerCalls": 0}
+    (root / "completion-witness-smoke.json").write_bytes(json_bytes(result))
+    return result
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--completion-witness-root", type=Path)
+    args = parser.parse_args()
+    if args.completion_witness_root:
+        print(json.dumps(completion_witness_smoke(args.completion_witness_root), ensure_ascii=False, indent=2))
+        return
     with tempfile.TemporaryDirectory(prefix="zoop-s2-ingestion-smoke-") as temporary:
         root = Path(temporary).resolve()
         result = smoke(root)
         result["reviewRegressions"] = review_smoke(root)
         result["publisherRegressions"] = publisher_smoke(root)
+        result["completionWitness"] = completion_witness_smoke(root / "completion-witness")
     assert not root.exists()
     result["temporaryStateCleanup"] = {"removed": True, "root": str(root)}
     print(json.dumps(result, ensure_ascii=False, indent=2))

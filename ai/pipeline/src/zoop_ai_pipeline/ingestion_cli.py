@@ -9,7 +9,8 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .ingestion import Ingestor, Store
-from .ingestion_contracts import SCHEMA, MAX_INPUT, Authority, Export, IngestionFailure, Inspect, Resume, Run, Tick, canonical
+from .ingestion_contracts import (SCHEMA, COMPLETION_WITNESS_SCHEMA, CompletionWitnessRequest,
+    MAX_INPUT, Authority, Export, IngestionFailure, Inspect, Resume, Run, Tick, canonical)
 from .ingestion_schedule import clock, latest_slot, not_due, tick
 from .ingestion_inventory import parse_inventory, inventory
 from .round_calendar import review
@@ -18,7 +19,7 @@ from .private_processing import select_authority
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("run", "resume", "inspect", "export", "tick", "round-inventory", "round-calendar"))
+    parser.add_argument("command", choices=("run", "resume", "inspect", "export", "completion-witness", "tick", "round-inventory", "round-calendar"))
     parser.add_argument("--state-dir", required=True, type=Path)
     authority_options = parser.add_mutually_exclusive_group(required=True)
     authority_options.add_argument("--sources", type=Path)
@@ -27,11 +28,20 @@ def main() -> int:
     parser.add_argument("--require-store", action="store_true", help="export only: also require the current grant to allow `store` (for consumers that persist the text)")
     args = parser.parse_args()
     store = None
+    schema = COMPLETION_WITNESS_SCHEMA if args.command == "completion-witness" else SCHEMA
     try:
         raw = sys.stdin.buffer.read(MAX_INPUT + 1)
         if len(raw) > MAX_INPUT:
             raise IngestionFailure("command_input_limit")
         incoming = json.loads(raw)
+        if args.command == "completion-witness":
+            if args.private_processing is not None or args.fixture_manifest is not None or args.require_store:
+                raise IngestionFailure("input_or_configuration_invalid")
+            request = CompletionWitnessRequest.model_validate(incoming)
+            authority = Authority(args.sources)
+            store = Store(args.state_dir, existing=True)
+            print(canonical(Ingestor(store, authority).completion_witness(request)))
+            return 0
         if args.command in ("round-inventory", "round-calendar"):
             if args.private_processing is not None or args.fixture_manifest is not None or args.require_store:
                 raise IngestionFailure("input_or_configuration_invalid")
@@ -77,14 +87,14 @@ def main() -> int:
         print(canonical(result))
         return 0
     except IngestionFailure as exc:
-        print(canonical({"schemaVersion": SCHEMA, "error": {"code": exc.code}}))
+        print(canonical({"schemaVersion": schema, "error": {"code": exc.code}}))
         return 2
     except (ValidationError, ValueError, TypeError, KeyError, OSError):
-        print(canonical({"schemaVersion": SCHEMA, "error": {"code": "input_or_configuration_invalid"}}))
+        print(canonical({"schemaVersion": schema, "error": {"code": "input_or_configuration_invalid"}}))
         return 2
     except Exception:
         # Parser/configuration failures are fail-closed, never body/path dumps.
-        print(canonical({"schemaVersion": SCHEMA, "error": {"code": "ingestion_internal_failure"}}))
+        print(canonical({"schemaVersion": schema, "error": {"code": "ingestion_internal_failure"}}))
         return 2
     finally:
         if store:
