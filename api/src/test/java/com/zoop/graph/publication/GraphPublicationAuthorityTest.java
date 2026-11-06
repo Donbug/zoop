@@ -84,7 +84,7 @@ class GraphPublicationAuthorityTest {
         var setup = setup();
         var computations = new AtomicInteger();
         var visibleIssues = new ArrayList<Integer>();
-        var documents = new DocumentSearchTool((company, from, version, asOf, limit, trace) -> {
+        var documents = new DocumentSearchTool((company, from, version, asOf, limit, evidenceScope, trace) -> {
             try {
                 for (int read = 0; read < 4; read++) {
                     if (read == 1) Files.writeString(setup.secondRegistry(), registry("grant-b", false));

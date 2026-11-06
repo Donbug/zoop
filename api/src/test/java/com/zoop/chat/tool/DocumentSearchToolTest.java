@@ -21,6 +21,7 @@ class DocumentSearchToolTest {
     private static final Instant PUBLISHED = Instant.parse("2026-10-20T01:00:00Z");
 
     private final List<String> asked = new ArrayList<>();
+    private final List<List<String>> scopes = new ArrayList<>();
 
     private static Document document(String id, String title, String... evidence) {
         return new Document(id, title, "합성 언론사", "https://news.example.com/" + id, PUBLISHED, "news", List.of(),
@@ -33,8 +34,9 @@ class DocumentSearchToolTest {
     }
 
     private DocumentSearchTool tool(Map<String, Response> pages) {
-        return new DocumentSearchTool((company, from, version, asOf, limit, trace) -> {
+        return new DocumentSearchTool((company, from, version, asOf, limit, evidenceScope, trace) -> {
             asked.add(company + "|" + from + "|" + version + "|" + asOf + "|" + limit);
+            scopes.add(evidenceScope);
             if (!pages.containsKey(company)) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
             return pages.get(company);
         });
@@ -77,7 +79,7 @@ class DocumentSearchToolTest {
     @Test
     void meaningfulRequirementTermsFilterExactDocumentVersionsWithinABoundedScan() {
         List<String> matched = new ArrayList<>();
-        DocumentSearchTool filtered = new DocumentSearchTool((company, from, version, asOf, limit, trace) -> {
+        DocumentSearchTool filtered = new DocumentSearchTool((company, from, version, asOf, limit, evidenceScope, trace) -> {
             asked.add(company + "|" + limit);
             return page(null, document("art-1", "일반 공급 소식", "ev-1"),
                     document("art-2", "반도체 업계", "ev-2"));
@@ -96,7 +98,7 @@ class DocumentSearchToolTest {
 
     @Test
     void genericRecentNewsRequirementDoesNotReadFullTextOrExpandTheScan() {
-        DocumentSearchTool recent = new DocumentSearchTool((company, from, version, asOf, limit, trace) -> {
+        DocumentSearchTool recent = new DocumentSearchTool((company, from, version, asOf, limit, evidenceScope, trace) -> {
             asked.add(company + "|" + limit);
             return page(null, document("art-1", "최근 문서", "ev-1"));
         }, (article, version, title, query) -> fail("generic recent-news wording has no search terms"));
@@ -127,9 +129,11 @@ class DocumentSearchToolTest {
 
         var narrowed = tool(both).read(SCOPE, new ChatToolRequest("document.search", List.of("KRX:000660"), 20, List.of("ev-2")));
         assertEquals(List.of("ev-2"), narrowed.evidenceIds());
+        assertEquals(List.of("ev-2"), scopes.getFirst());
 
         var shared = tool(both).read(SCOPE, new ChatToolRequest("document.search", List.of("KRX:000660", "NASDAQ:NVDA"), 20));
         assertEquals(List.of("ev-1", "ev-2"), shared.items().stream().map(ChatToolItem::id).toList());
+        assertNull(scopes.getLast());
     }
 
     @Test
@@ -138,7 +142,7 @@ class DocumentSearchToolTest {
                 .read(SCOPE, new ChatToolRequest("document.search", List.of("KRX:999999", "KRX:000660"), 20));
         assertEquals(List.of("ev-1"), output.evidenceIds());
 
-        var down = new DocumentSearchTool((c, f, v, a, l, t) -> {
+        var down = new DocumentSearchTool((c, f, v, a, l, evidenceScope, t) -> {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         });
         assertThrows(ChatToolUnavailable.class,

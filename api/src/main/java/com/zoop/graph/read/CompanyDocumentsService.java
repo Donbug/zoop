@@ -69,14 +69,26 @@ public class CompanyDocumentsService {
     public Response list(String companyId, String kind, String from, String to, String round, String graphVersion,
             String asOf, String cursor, Integer limit, String requestId) {
         try {
-            return read(companyId, kind, from, to, round, graphVersion, asOf, cursor, limit, requestId);
+            return read(companyId, kind, from, to, round, graphVersion, asOf, cursor, limit, requestId, null, true);
+        } catch (DataAccessException error) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, error);
+        }
+    }
+
+    /** Quote-only chat projection; scope narrows hydration inside the same pinned document window. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public Response listForChat(String companyId, String from, String graphVersion, String asOf, int limit,
+            List<String> evidenceScope, String requestId) {
+        try {
+            return read(companyId, null, from, null, null, graphVersion, asOf, null, limit, requestId,
+                    evidenceScope == null ? null : Set.copyOf(evidenceScope), false);
         } catch (DataAccessException error) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, error);
         }
     }
 
     private Response read(String companyId, String kind, String from, String to, String round, String graphVersion,
-            String asOf, String cursor, Integer limit, String requestId) {
+            String asOf, String cursor, Integer limit, String requestId, Set<String> evidenceScope, boolean includeAnalysis) {
         if (companyId == null || companyId.isBlank() || (kind != null && !Set.of("news", "disclosure").contains(kind))
                 || (limit != null && limit < 1) || (round != null && round.isBlank())) throw invalid();
         Instant start = from == null ? null : EventListService.bound(from, false);
@@ -176,6 +188,7 @@ public class CompanyDocumentsService {
             List<Quote> quotes = new ArrayList<>();
             boolean sourceAuthorized = false;
             for (String evidenceId : candidate.evidenceIds()) {
+                if (evidenceScope != null && !evidenceScope.contains(evidenceId)) continue;
                 try {
                     // Outside a round the page's own pin is kept: the version as pinned, filtered only when the first page was.
                     EvidenceResponse visible = round == null
@@ -204,12 +217,14 @@ public class CompanyDocumentsService {
             // A date-only publication is not promoted to an invented date-time on the wire.
             Instant publishedAt = "datetime".equals(candidate.version().publicationPrecision())
                     ? candidate.version().publishedAt() : null;
-            var analysis = analyses.read(candidate.article(), candidate.version(), companyId, requestId,
-                    requestedAsOf != null || graphVersion != null || round != null);
+            var analysis = includeAnalysis ? analyses.read(candidate.article(), candidate.version(), companyId, requestId,
+                    requestedAsOf != null || graphVersion != null || round != null) : null;
             page.add(new Document(candidate.snapshot().articleId(), candidate.snapshot().title(),
                     candidate.version().publisher(), candidate.snapshot().url(), publishedAt, candidate.article().kind(),
-                    candidate.events(), List.copyOf(quotes), analysis.sentiment(), candidate.snapshot().version(),
-                    analysis.summary(), analysis.status(), analysis.provenance(), analysis.resultVersion()));
+                    candidate.events(), List.copyOf(quotes), includeAnalysis ? analysis.sentiment() : null,
+                    candidate.snapshot().version(), includeAnalysis ? analysis.summary() : null,
+                    includeAnalysis ? analysis.status() : null, includeAnalysis ? analysis.provenance() : null,
+                    includeAnalysis ? analysis.resultVersion() : null));
         }
         String pinnedAt = after != null && asOf == null ? after.pinnedAt() : pinned.selected().asOf().toString();
         Candidate last = pageEnd == candidates.size() ? null : candidates.get(pageEnd - 1);

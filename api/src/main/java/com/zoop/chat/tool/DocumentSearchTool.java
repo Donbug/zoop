@@ -15,9 +15,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionException;
 
 /**
- * {@code document.search} (Q03): the news and disclosures of the target companies, newest first, through the public company
- * documents read ({@code GET /api/v1/companies/{id}/documents}), so the same pinned version, exclusions and current source
- * rights apply. A meaningful term in the requirement narrows the authorized documents against the exact verified extracted
+ * {@code document.search} (Q03): the news and disclosures of the target companies, newest first, through the same pinned
+ * company-document read as {@code GET /api/v1/companies/{id}/documents}. Its quote-only projection hydrates the planned
+ * evidence scope under current source rights and omits document analysis enrichment.
+ * A meaningful term in the requirement narrows the authorized documents against the exact verified extracted
  * text; a generic request such as "최근 소식" keeps the newest-first document read. The first 100 documents per target are a
  * hard scan bound and an unread next page is reported as truncation, never as no match.
  *
@@ -30,10 +31,11 @@ import org.springframework.transaction.TransactionException;
 public class DocumentSearchTool implements ChatTool {
     private static final int MAX_SCAN_DOCUMENTS = 100;
 
-    /** The public read of one company's documents, newest first, at most {@code limit}. */
+    /** Quote-only read of one company's documents; scope narrows hydration within the original document limit. */
     @FunctionalInterface
     public interface Documents {
-        Response list(String companyId, String from, String graphVersion, String asOf, int limit, String requestId);
+        Response list(String companyId, String from, String graphVersion, String asOf, int limit,
+                List<String> evidenceScope, String requestId);
     }
 
     @FunctionalInterface
@@ -46,8 +48,7 @@ public class DocumentSearchTool implements ChatTool {
 
     @Autowired
     public DocumentSearchTool(CompanyDocumentsService service, DocumentTextSearch textSearch) {
-        this((company, from, version, asOf, limit, trace) -> service.list(company, null, from, null, null, version, asOf, null,
-                limit, trace), textSearch::matches);
+        this(service::listForChat, textSearch::matches);
     }
 
     public DocumentSearchTool(Documents documents) {
@@ -78,7 +79,8 @@ public class DocumentSearchTool implements ChatTool {
         for (String company : request.targets()) {
             Response page;
             try {
-                page = documents.list(company, from, scope.graphVersionId(), asOf, scanLimit, scope.traceId());
+                page = documents.list(company, from, scope.graphVersionId(), asOf, scanLimit, request.evidenceScope(),
+                        scope.traceId());
             } catch (CustomException failed) {
                 if (failed.getErrorCode() == ErrorCode.RESOURCE_NOT_FOUND) continue;
                 throw new ChatToolUnavailable("the documents of " + company + " cannot be read", failed);
