@@ -54,6 +54,33 @@ class CandidateRecoveryTests(unittest.TestCase):
             result=n.prepare_candidates(self.cfg,self.round,[entry('first')],self.root)
             run.assert_not_called()
         self.assertEqual('remaining_shared_call_capacity',result['candidates'][0]['reason'])
+        self.assertEqual('remaining_shared_call_capacity',result['reason'])
+
+    def test_four_paid_calls_then_hold_can_reach_next_candidate_with_explicit_expansion(self):
+        budget=self.root/'budget';budget.mkdir()
+        for i in range(4):(budget/(str(i)+'.json')).write_text(json.dumps({'roundId':self.round['id'],'phase':'native'}))
+        cfg={**self.cfg,'roundCallLimit':32,'nativeCallLimit':24}
+        with patch.object(n,'prepare_candidate',return_value={'status':'ready','documentId':'next'}) as run:
+            result=n.prepare_candidates(cfg,self.round,[entry('next')],self.root)
+        self.assertEqual('next',result['documentId']);run.assert_called_once()
+        self.assertEqual(4,len(list(budget.glob('*.json'))))
+
+    def test_capacity_stop_records_each_unexamined_candidate_separately(self):
+        budget=self.root/'budget';budget.mkdir()
+        for i in range(4):(budget/(str(i)+'.json')).write_text(json.dumps({'roundId':self.round['id'],'phase':'native'}))
+        with patch.object(n,'prepare_candidate') as run:
+            result=n.prepare_candidates(self.cfg,self.round,[entry('next'),entry('third')],self.root)
+        run.assert_not_called()
+        self.assertEqual(['not_sent','not_sent'],[r['status']for r in result['candidates']])
+        self.assertEqual('remaining_shared_call_capacity',result['reason'])
+
+    def test_expanded_budget_still_retains_publication_capacity(self):
+        budget=self.root/'budget';budget.mkdir()
+        cfg={**self.cfg,'roundCallLimit':32,'nativeCallLimit':24}
+        for i in range(20):(budget/(str(i)+'.json')).write_text(json.dumps({'roundId':self.round['id'],'phase':'native'}))
+        with patch.object(n,'prepare_candidate') as run:
+            result=n.prepare_candidates(cfg,self.round,[entry('next')],self.root)
+        run.assert_not_called();self.assertEqual('remaining_shared_call_capacity',result['reason'])
 
     def test_existing_ready_result_is_reused_without_collection_or_new_provider(self):
         collection=self.root/'native'/self.round['id'];ready=collection/(self.round['id']+'-native-v2')/'ready.json';ready.parent.mkdir(parents=True)

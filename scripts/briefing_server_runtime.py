@@ -15,6 +15,7 @@ import briefing_personal_pool as pools
 import briefing_selected_generation as selected_view
 from briefing_usage import CommandPipe,UsageSession,recorded,write_once
 from briefing_common_schedule_worker import published
+import briefing_call_limits as limits
 
 b=m.base
 KST=ZoneInfo('Asia/Seoul')
@@ -57,12 +58,12 @@ class Budget:
             def amount(r):
                 done=root/'finished'/(r['requestDigest']+'.json')
                 return Decimal(json.loads(done.read_bytes())['upperUsd']) if done.exists() else Decimal(r['reservedUpperUsd'])
-            require(len(own)<16 and sum(map(amount,own),Decimal(0))+reserve<=1,'round_budget')
-            require(phase in ('native','briefing') and (phase!='native' or sum(r.get('phase')=='native' for r in own)<12),'native_phase_call_limit')
+            require(len(own)<limits.round_limit(self.cfg) and sum(map(amount,own),Decimal(0))+reserve<=1,'round_budget')
+            require(phase in ('native','briefing') and (phase!='native' or sum(r.get('phase')=='native' for r in own)<limits.native_limit(self.cfg)),'native_phase_call_limit')
             require(sum(map(amount,today),Decimal(0))+reserve<=2,'daily_budget')
             write_once(root/(key+'.json'),{'requestDigest':key,'roundId':self.round_id,'day':day,'reservedUpperUsd':str(reserve),'reservedAt':b.now(),
                 'provider':provider,'model':model,'phase':phase,'costBasis':'briefing-2026-11-03-conservative-upper-envelope-v2','currency':'USD','actualCost':None,
-                'authorizationRef':self.cfg.get('authorizationRef')})
+                'authorizationRef':self.cfg.get('authorizationRef'),'roundCallLimit':limits.round_limit(self.cfg)})
         return key,reserve
     def dispatch(self,encoded,reservation):
         status,raw=self.transport(encoded)
@@ -184,6 +185,9 @@ def make_publication(prepared,frozen,selection,passed,calls,assessed,checked,now
     return payload,snapshot,pool
 
 def produce(cfg,job):
+    if cfg.get('coverageNoticeSha256'):
+        from briefing_coverage_publication import produce as publish_coverage
+        return publish_coverage(cfg,job)
     work=Path(cfg['work'])/job['id'];work.mkdir(mode=0o700,exist_ok=True)
     r={'id':job['id'],'date':str(job['round_date']),'edition':job['edition'],'scheduledAt':job['scheduled_at'].isoformat(),
        'windowFrom':job['window_from'].isoformat(),'windowTo':job['scheduled_at'].isoformat()}
@@ -191,7 +195,7 @@ def produce(cfg,job):
     write_once(work/'prepared.json',prepared);frozen=frozen_input(prepared);write_once(work/'frozen.json',frozen)
     def current():
         java(cfg,'check',{'prepared':prepared},work/'check.request.json')
-    write_once(work/'authorization.json',{'authorizationRef':cfg['authorizationRef'],'roundCalls':16,'roundUpperUsd':'1','dayUpperUsd':'2','model':'gpt-6-luna'})
+    write_once(work/'authorization.json',{'authorizationRef':cfg['authorizationRef'],'roundCalls':limits.round_limit(cfg),'roundUpperUsd':'1','dayUpperUsd':'2','model':'gpt-6-luna'})
     claim={'round':r,'requestKey':'server-'+prepared['inputSha256'],'purpose':'generation','trigger':'scheduler','adminId':None,
            'inputArtifactId':None,'inputDigest':prepared['inputSha256']}
     pipe=CommandPipe(cfg['ledgerCommand']);session=ServerUsageSession(pipe,claim,work/'model'/'usage',estimate={'currency':'USD','priceVersion':'openai-luna-standard-20261103','inputPerMillion':0.10,'outputPerMillion':0.50})

@@ -3,6 +3,7 @@ package com.zoop.briefing.personal;
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
 import com.zoop.briefing.query.BriefingQueryService;
 import com.zoop.briefing.storage.BriefingRoundRepository;
+import com.zoop.briefing.storage.BriefingRound;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.graph.read.PersonalCompanies;
@@ -89,6 +90,8 @@ public class ExplicitBriefingService {
         var presentation=(ObjectNode)common.deepCopy();
         if(presentation.has("editionReview"))presentation.set("companyPriceBasis",presentation.path("editionReview").deepCopy());
         presentation.remove(List.of("commonPriority","prioritySummary","personalPriority","continuity","editionReview","issueReading","judgmentUpdate","companyOutlooks","aiPriceOutlooks","preservedPublication","issueIntelligence","outlook"));
+        if("coverage_limited".equals(common.path("continuity").path("mode").asString()))
+            presentation.set("continuity",personalCoverage(common.path("continuity"),scope));
         presentation.putNull("graphVersion");((ObjectNode)presentation.path("metadata")).putNull("graphVersion");
         presentation.putNull("sinceMorning");presentation.putNull("previousComparison");
         var items=presentation.putArray("items");var details=out.putObject("details");var aiIssues=json.createArrayNode();
@@ -136,6 +139,46 @@ public class ExplicitBriefingService {
         presentation.put("emptyReason",selected.isEmpty()?"no_issues_in_window":null);
         out.put("analysisStatus",(priority?prioritySelected:selected).isEmpty()?"no_issues":pending==0?"ready":"needs_generation").put("pendingAnalysisCount",pending).set("presentation",presentation);
         out.set("tracking",tracking(pool,round,scope,requestId));return out;
+    }
+
+    /** Reuse only already-public prior items that actually match this member's fixed choice. */
+    public void refreshCoverage(BriefingRound round,JsonNode selection,String requestId) {
+        boolean needed=false;
+        for(String view:List.of("presentation","verifiedPresentation"))
+            needed|="coverage_limited".equals(selection.path(view).path("continuity").path("mode").asString());
+        if(!needed)return;
+        // Delivery snapshots are immutable; revocation/correction is applied only to this read projection.
+        var common=reads.get(round.date(),round.edition(),requestId);
+        if(!round.id().equals(common.path("id").asString())||!"published".equals(common.path("status").asString())
+            ||!"coverage_limited".equals(common.path("continuity").path("mode").asString()))
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        Set<String> scope=new HashSet<>();selection.path("choice").path("companyIds").forEach(id->scope.add(id.asString()));
+        for(String view:List.of("presentation","verifiedPresentation"))
+            if(selection.path(view).isObject()&&"coverage_limited".equals(selection.path(view).path("continuity").path("mode").asString()))
+                ((ObjectNode)selection.path(view)).set("continuity",personalCoverage(common.path("continuity"),scope));
+    }
+
+    private ObjectNode personalCoverage(JsonNode common,Set<String> scope) {
+        var value=(ObjectNode)common.deepCopy();var recap=(ObjectNode)value.path("recap");
+        var items=json.createArrayNode();Set<String> names=new HashSet<>();
+        for(JsonNode item:recap.path("items")) {
+            boolean matched=false;
+            for(JsonNode company:item.path("companies"))if(scope.contains(company.path("id").asString())) {
+                matched=true;names.add(company.path("name").asString());
+            }
+            if(matched)items.add(item.deepCopy());
+        }
+        recap.set("items",items);
+        var conditions=json.createArrayNode();
+        for(JsonNode condition:value.path("watchConditions"))
+            if(names.contains(condition.path("companyName").asString()))conditions.add(condition.deepCopy());
+        value.set("watchConditions",conditions);value.putArray("references");
+        if(items.isEmpty()) {
+            recap.put("status","unavailable").putNull("previousRoundId").putNull("dataAsOf")
+                .put("message","선택한 종목에 연결된 이전 발행 이슈가 없습니다. 다른 종목의 과거 분석으로 채우지 않습니다.");
+            recap.remove(List.of("date","edition"));
+        }
+        return value;
     }
     static List<JsonNode> select(List<JsonNode> candidates,Set<String> scope,int max,int per){
         // issue-selection-policy-v2: business importance first, only comparable unshared

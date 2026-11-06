@@ -289,6 +289,8 @@ def load_config(path):
     target=urlsplit(cfg['dsn'])
     local=target.scheme=='postgresql' and target.hostname=='127.0.0.1' and not target.query and bool(re.fullmatch(r'/[a-z0-9_]*briefing_replay[a-z0-9_]*',target.path))
     if cfg.get('serverLedgerCommand') is not None:
+        from briefing_call_limits import round_limit
+        m.require(round_limit(cfg)==approval.get('roundCallLimit',16),'selected_shared_call_limit_authorization')
         cohort=allowed_members(cfg)
         m.require(cohort==allowed_members({'serverLedgerCommand':[], 'allowedMemberIds':approval.get('allowedMemberIds')}),'selected_member_authorization_changed')
         m.require(approval.get('scope')=='priority-selected-server-v1' and cfg.get('priorityContract')=='priority-business-producer-v1'

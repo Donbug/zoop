@@ -101,7 +101,10 @@ SOURCES = {
             surface("feed", "https://www.hankyung.com/feed/finance"),
             surface("feed", "https://www.hankyung.com/feed/it"),
         ], ["www.hankyung.com"], [r"/article/[A-Za-z0-9]+"],
-                   bodies=["//div[@id='articletxt']"],
+                   bodies=["//div[@id='articletxt']",
+                           '//article[contains(concat(" ",normalize-space(@class)," ")," article-container ")]'
+                           '//div[contains(concat(" ",normalize-space(@class)," ")," article-body-wrap ")]'
+                           '/div[contains(concat(" ",normalize-space(@class)," ")," article-body ")]'],
                    evidence_status="publisher RSS catalogue https://www.hankyung.com/feed; rolling finance/IT feeds, independent of the historical daily sitemap"),
         descriptor("openai-newsroom", "corporate-pr", [
             surface("feed", "https://openai.com/news/rss.xml"),

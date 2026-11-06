@@ -36,6 +36,8 @@ def main():
          'serverCommand':launcher[:3]+['-Dloader.main=com.zoop.briefing.server.BriefingServerCommand']+launcher[3:]+['org.springframework.boot.loader.launch.PropertiesLauncher'],
          'ledgerCommand':launcher[:3]+['-Dloader.main=com.zoop.briefing.usage.BriefingUsageCommand']+launcher[3:]+['org.springframework.boot.loader.launch.PropertiesLauncher','--stdio'],
          'inputGraceSeconds':1800}
+    import briefing_call_limits as limits
+    cfg['roundCallLimit']=limits.environment_limit(os.environ)
     cfg.update({'companyCatalogue':'/opt/zoop/briefing/company-catalogue.json',
         'authorityRoot':os.environ.get('BRIEFING_SERVER_AUTHORITY_ROOT','/mnt/zoop-artifacts/briefing_server_authority'),
         'originalSourceAuthority':'/mnt/zoop-authority/serving-authorities.json','verifierKeyFile':str(temp/'verifier-key'),
@@ -47,6 +49,7 @@ def main():
             'samsungNewsroomEnabled':os.environ.get('BRIEFING_SAMSUNG_NEWSROOM_ENABLED')=='true'})
         if os.environ.get('BRIEFING_SHARED_PRIORITY_ANALYSIS_ENABLED')=='true':
             cfg.update(sharePriorityAnalysis=True,nativeCallLimit=8)
+        cfg['nativeCallLimit']=cfg['roundCallLimit']-limits.publication_reserve(cfg)
         if cfg['samsungNewsroomEnabled']:
             cfg['sourceAuthorizationRef']=os.environ['BRIEFING_SOURCE_AUTHORIZATION_REF']
             if not cfg['sourceAuthorizationRef'].strip():raise ValueError('explicit_company_source_authorization_required')
@@ -72,7 +75,7 @@ def main():
         if template.is_symlink() or template.stat().st_mode&0o077:raise ValueError('private_selected_template_required')
         selected_cfg=json.loads(template.read_bytes())
         selected_cfg.update({'dsn':'postgresql://'+quote(dsn['user'],safe='')+':'+quote(dsn['password'],safe='')+'@'+str(dsn['host'])+':'+str(dsn['port'])+'/'+quote(dsn['dbname'],safe=''),
-            'keyFile':cfg['keyFile'],'serverLedgerCommand':cfg['ledgerCommand']})
+            'keyFile':cfg['keyFile'],'serverLedgerCommand':cfg['ledgerCommand'],'roundCallLimit':cfg['roundCallLimit']})
         private_file(temp/'selected-config.json',json.dumps(selected_cfg))
         cfg['selectedWorkerConfig']=str(temp/'selected-config.json')
         briefing_auto_chain.validate_selected_config(cfg)
