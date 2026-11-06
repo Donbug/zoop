@@ -385,14 +385,26 @@ def check_companies(obs: dict, dom) -> dict:
                 participants += 1
                 mapped += expected is not None
     public_participants = 0
-    for body in obs["http"]["events"].values():
-        for mention in (body or {}).get("mentions", []):
-            for person in mention["participants"]:
-                known = [s for s, name in dom.participants.items() if name == person["name"]]
-                need(len(known) == 1, "company_mapping", "a public participant name is not an S2 name")
-                need(person["companyId"] == (dom.companies[known[0]]["app"] if known[0] in dom.companies else None), "company_mapping",
-                     f"public participant {known[0]} -> {person['companyId']}")
-                public_participants += 1
+    expected_mentions = hs.expected_mentions(dom.world, PUBLIC)
+    participant_fields = ("companyId", "name", "role")
+    # Every authored public mention is visible in this world's timestamp-pinned, current-rights read.
+    for canonical_id, authored_issue in dom.issues.items():
+        if not authored_issue["public"]:
+            continue
+        body = obs["http"]["events"][canonical_id]
+        need(body is not None, "company_mapping", f"{canonical_id}: public event missing")
+        mentions = body["mentions"]
+        expected = {handoff.mention_id(m, m["mentionId"]): m for m in expected_mentions[authored_issue["public"]]}
+        need(len(mentions) == len(expected) and {m["mentionId"] for m in mentions} == set(expected), "company_mapping",
+             f"{canonical_id}: public mentions differ from the authored document/version/mention identities")
+        for mention in mentions:
+            want = expected[mention["mentionId"]]
+            need(mention["articleId"] == want["articleId"], "company_mapping", f"{canonical_id}: public mention article")
+            actual_participants = collections.Counter(hs.canonical({k: p[k] for k in participant_fields}) for p in mention["participants"])
+            expected_participants = collections.Counter(hs.canonical({k: p[k] for k in participant_fields}) for p in want["participants"])
+            need(actual_participants == expected_participants, "company_mapping",
+                 f"{canonical_id}: public mention participants differ from the authored company/name/role rows")
+            public_participants += len(mention["participants"])
     return {"sourceCompanyRefs": len(dom.companies), "publicByMaster": len(dom.pub_company), "privateOnly": len(dom.companies) - len(dom.pub_company),
             "receiptParticipantsChecked": participants, "receiptParticipantsMapped": mapped, "participantsNullByContract": participants - mapped, "publicParticipantsChecked": public_participants}
 
@@ -618,6 +630,8 @@ def check_public(obs: dict, dom) -> dict:
         need(sorted(edge["evidenceIds"]) == sorted(app_id(by_coords, tuple(dom.coords[l])) for l in want["ev"]), "public_display", f"edge {want['type']}: evidence")
         detail = http["edges"][edge["id"]]
         need(detail["id"] == edge["id"] and detail["derived"] == want["derived"] and detail["metadata"]["graphVersion"] == version, "public_display", "edge detail identity")
+        need((detail["relationType"], detail["source"]["id"], detail["target"]["id"]) == (want["type"], want["source"], want["target"]), "public_display",
+             f"edge detail {want['type']}: type or directed endpoints")
         if want["derived"]:
             need(edge["via"] == want["via"] and detail["relationIds"] == [] and [v["id"] for v in detail["via"]] == want["via"]
                  and detail["verification"]["status"] == "not_applicable", "public_display", "derived SHARES_ISSUE: via issue, no stored relation, not a verification")
@@ -708,6 +722,24 @@ def tampers(obs: dict, dom):
         next(v for v in o["graph"]["rel-a"]["read"]["graph"]["edges"] if v["relationId"] == edge["props"]["id"])["sourceRelationCandidateIds"].append(dom.hold)
     yield mutate("the S3 HOLD candidate is listed as a stored source", "hold_leak", list_hold)
     yield mutate("a public evidence quote differs from the authored span", "evidence_mapping", lambda o: next(iter(o["http"]["evidence"].values()))["body"].update(quote="변조된 인용"))
+    for label, change in (
+        ("a public event omits all mentions", lambda o: o["http"]["events"]["issue:supply"].update(mentions=[])),
+        ("a public event omits one mention", lambda o: o["http"]["events"]["issue:supply"]["mentions"].pop()),
+        ("a public mention omits all participants", lambda o: o["http"]["events"]["issue:factory"]["mentions"][0].update(participants=[])),
+        ("a public mention omits one participant", lambda o: o["http"]["events"]["issue:factory"]["mentions"][0]["participants"].pop()),
+        ("a public mention moves to another event", lambda o: o["http"]["events"]["issue:factory"]["mentions"].append(o["http"]["events"]["issue:supply"]["mentions"].pop())),
+        ("a public participant moves to another mention", lambda o: o["http"]["events"]["issue:supply"]["mentions"][0]["participants"].append(
+            o["http"]["events"]["issue:factory"]["mentions"][0]["participants"].pop())),
+    ):
+        yield mutate(label, "company_mapping", change)
+    follows_id = display_id("FOLLOWS", dom.publics.factory, dom.publics.supply)
+    yield mutate("a public edge detail has another relation type", "public_display", lambda o: o["http"]["edges"][follows_id].update(relationType="INVOLVES"))
+
+    def reverse_detail(o):
+        detail = o["http"]["edges"][follows_id]
+        detail["source"], detail["target"] = detail["target"], detail["source"]
+
+    yield mutate("a public edge detail reverses its endpoints", "public_display", reverse_detail)
     yield mutate("the public derived SHARES_ISSUE edge is missing", "public_display",
                  lambda o: o["http"]["graph"].update(edges=[e for e in o["http"]["graph"]["edges"] if not e["derived"]]))
     yield mutate("a private-only company id leaks into a public event body", "leak", lambda o: o["http"]["events"]["issue:factory"].update(note="co:synth-2"))
