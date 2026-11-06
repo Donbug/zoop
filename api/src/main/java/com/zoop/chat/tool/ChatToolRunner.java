@@ -10,6 +10,7 @@ import com.zoop.chat.repository.ChatKeptToolResult;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
+import com.zoop.common.request.ReadScope;
 import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
@@ -61,6 +62,8 @@ import tools.jackson.databind.node.ObjectNode;
  * the job ends through lease recovery.</li>
  * <li>The graph version and asOf come from the run's frozen context, never from the plan. Output evidence outside a call's
  * {@code evidenceScope} is an adapter fault.</li>
+ * <li>Each virtual reader owns one {@link ReadScope} for immutable publication proofs, shared only within that tool call.
+ * Current authority and exclusion checks remain fresh.</li>
  * <li>A failed call is never an empty result. Whether a stage may continue is the orchestrator's decision (a tool failure
  * ends the job as a failure before any count is evaluated).</li>
  * </ul>
@@ -369,7 +372,7 @@ public class ChatToolRunner implements AutoCloseable {
             AtomicReference<Thread> reader = new AtomicReference<>();
             pool.execute(() -> {
                 reader.set(Thread.currentThread());
-                try (var correlation = MDC.putCloseable("requestId", scope.traceId())) {
+                try (var correlation = MDC.putCloseable("requestId", scope.traceId()); var readScope = ReadScope.open()) {
                     if (!read.isDone()) read.complete(passed(call, tool.read(scope, call), delivery));
                 } catch (Throwable error) {
                     read.completeExceptionally(error);

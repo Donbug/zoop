@@ -48,6 +48,8 @@ client는 비-loopback 주소에 HTTPS를 요구하고 proxy·redirect·자동 �
 
 공개 publication의 현재 권한 검사는 모든 원본 구성에서 정확한 `(articleId, articleVersion)` 집합을 모아, 같은 조회 트랜잭션에서 기사·버전·본문 artifact를 최대 256개 identity씩 JOIN합니다. 반복 기사의 불변 registry 사실만 공유하고, 각 구성의 receipt·해시·현재 read/store/quote-display grant·revision·만료·공개 제외는 각각 검사합니다. 누락되거나 불일치하는 registry 사실은 `503 SOURCE_UNAVAILABLE`로 닫으며, `GET /api/v1/graph`의 REPEATABLE READ·읽기 전용·5초 제한을 유지합니다.
 
+챗봇의 `ChatToolRunner`는 각 도구를 실행하는 virtual thread 안에서 하나의 `ReadScope`를 열어, 같은 도구가 문서와 여러 인용을 읽는 동안 검증한 불변 publication·snapshot을 재사용합니다. 범위는 해당 도구 읽기가 성공하거나 실패해 끝날 때 닫히며, 다음 도구 호출은 새로 검증합니다. 현재 source grant와 공개 제외는 메모한 불변 값과 별도로 매번 검사하므로 같은 도구 호출 도중의 철회도 반영합니다.
+
 현재 권한 검사에서 위 오류를 감지하면 `GraphPublicationAuthority`가 WARN 로그 `Graph publication authority unavailable`을 한 번 남깁니다. `category`는 `publication`, `receipt`, `json`, `registry` 중 하나입니다. `reason`은 `basis_unavailable`, `basis_mismatch`, `publication_invalid`, `receipt_invalid`, `json_invalid`, `source_registry_invalid`, `source_registry_unreadable`, `source_registry_too_large` 중 하나이며, 공개 응답은 기존 `503 SOURCE_UNAVAILABLE`·`retryable=false`를 유지합니다.
 
 `category=registry`일 때는 `failureKind`와 `interrupted`도 기록합니다. `failureKind`는 `INTERRUPTED_IO`, `ASYNCHRONOUS_CLOSE`, `CLOSED_CHANNEL`, `ACCESS_DENIED`, `NOT_FOUND`, `FILESYSTEM_IO`, `OTHER_IO`, `OTHER_RUNTIME`, `NOT_IO` 중 하나로, 실제 예외 종류를 구분하며 직접적인 검증·경로 안전성 검사 실패는 `NOT_IO`입니다. `interrupted`는 `SourceRegistry.Invalid`를 생성할 때의 스레드 interrupt 상태를 보존하므로 이후 호출자가 상태를 해제해도 값은 유지됩니다. 초기 registry 읽기가 실패하는 `DocumentReadSources`의 기존 WARN에도 두 필드를 기록합니다. 배포 환경의 실제 실패 원인은 해당 요청에서 이 값을 관측한 뒤 판단하며, 로컬 재현만으로 배포 실패의 I/O 종류를 확정하지 않습니다.

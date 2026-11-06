@@ -1,16 +1,30 @@
 package com.zoop.graph.publication;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import com.zoop.chat.dto.ChatFrozenContext;
+import com.zoop.chat.executor.ChatRun;
+import com.zoop.chat.executor.ChatRunControl;
+import com.zoop.chat.service.FrozenSelection;
+import com.zoop.chat.tool.ChatToolRegistry;
+import com.zoop.chat.tool.ChatToolRequest;
+import com.zoop.chat.tool.ChatToolRunner;
+import com.zoop.chat.tool.DocumentSearchTool;
 import com.zoop.common.exception.GlobalExceptionHandler;
 import com.zoop.common.request.RequestIdFilter;
+import com.zoop.common.request.ReadScope;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.StrictJson;
@@ -21,6 +35,7 @@ import com.zoop.document.service.InMemoryDocumentRegistry;
 import com.zoop.graph.publication.GraphPublicationReader.Contribution;
 import com.zoop.graph.publication.GraphPublicationReader.Publication;
 import com.zoop.graph.read.DisclosureExclusions;
+import com.zoop.graph.read.CompanyDocumentsService;
 import com.zoop.graph.read.GraphSnapshotFilter;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import org.junit.jupiter.api.Test;
@@ -38,6 +53,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(OutputCaptureExtension.class)
@@ -60,6 +77,45 @@ class GraphPublicationAuthorityTest {
         }
         Files.writeString(setup.secondRegistry(), registry("grant-b", true));
         assertEquals(Set.of(), setup.authority().current(publication("after-restoration", setup.contributions()), "test").issueIds());
+    }
+
+    @Test
+    void toolScopedPublicationReuseKeepsCurrentRightsAndExclusionsLive() throws Exception {
+        var setup = setup();
+        var computations = new AtomicInteger();
+        var visibleIssues = new ArrayList<Integer>();
+        var documents = new DocumentSearchTool((company, from, version, asOf, limit, trace) -> {
+            try {
+                for (int read = 0; read < 4; read++) {
+                    if (read == 1) Files.writeString(setup.secondRegistry(), registry("grant-b", false));
+                    if (read == 2) Files.writeString(setup.secondRegistry(), registry("grant-b", true));
+                    if (read == 3) setup.exclusions().put("tool-publication",
+                            new DisclosureExclusions(1, Set.of("issue-0"), Set.of(), Set.of()));
+                    var publication = ReadScope.memo("publication", () -> {
+                        computations.incrementAndGet();
+                        return publication("tool-publication", setup.contributions());
+                    });
+                    var current = setup.authority().current(publication, trace);
+                    visibleIssues.add(GraphSnapshotFilter.apply(publication.snapshot(), null, current).issues().size());
+                }
+                return new CompanyDocumentsService.Response(List.of(), null, null);
+            } catch (IOException error) {
+                throw new UncheckedIOException(error);
+            }
+        });
+        var control = mock(ChatRunControl.class);
+        when(control.readRemaining()).thenReturn(Duration.ofSeconds(60));
+        var run = new ChatRun("job-scope", "session", "member", 1, "run",
+                List.of(new ChatRun.Turn("job-scope", "synthetic", null, null)),
+                new ChatFrozenContext(List.of(), 0, null, NOW, "tool-publication"), FrozenSelection.NONE,
+                "tool-publication", 0, NOW, NOW.plusSeconds(60));
+        try (var runner = new ChatToolRunner(new ChatToolRegistry(List.of(documents)))) {
+            var result = runner.runClaimed(run, control, "tc-scope",
+                    new ChatToolRequest("document.search", List.of("synthetic-company"), 1), ChatToolRunner.Delivery.NONE);
+            assertTrue(result.succeeded());
+        }
+        assertEquals(1, computations.get(), "the tool reuses one immutable publication");
+        assertEquals(List.of(1, 0, 1, 0), visibleIssues, "grant revocation, restoration and exclusion remain live");
     }
 
     @Test

@@ -20,12 +20,15 @@ import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.service.FrozenSelection;
 import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
+import com.zoop.common.request.ReadScope;
 import com.zoop.graph.publication.GraphPublicationAuthority;
 import com.zoop.graph.publication.GraphPublicationReader.Publication;
 import com.zoop.graph.publication.PublicationException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.MDC;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -155,6 +158,35 @@ class ChatToolRunnerTest {
         }
         assertTrue(output.getAll().contains("category=publication, reason=basis_unavailable, requestFingerprint="
                 + Canonical.sha256("job-1")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void eachVirtualReadOwnsItsImmutableProofScopeEvenWhenThePreviousReadFailed(boolean firstReadFails) {
+        var computations = new AtomicInteger();
+        var authorityChecks = new AtomicInteger();
+        var calls = new AtomicInteger();
+        var runner = runner(Map.of(ChatCapability.COMPANY_READ, (scope, request) -> {
+            assertTrue(Thread.currentThread().isVirtual());
+            int first = ReadScope.memo("publication", computations::incrementAndGet);
+            authorityChecks.incrementAndGet();
+            assertEquals(first, ReadScope.memo("publication", computations::incrementAndGet));
+            authorityChecks.incrementAndGet();
+            if (calls.getAndIncrement() == 0 && firstReadFails) throw new ChatToolUnavailable("synthetic failure");
+            return output("v1", List.of());
+        }));
+        try (var callerScope = ReadScope.open()) {
+            assertEquals(42, ReadScope.memo("publication", () -> 42));
+            for (int call = 0; call < 2; call++) {
+                var result = runner.runStage(run("v1", null), new RecordingControl(Duration.ofSeconds(60)), 1,
+                        List.of(request("company.read"))).getFirst();
+                if (call == 0 && firstReadFails) assertEquals(ChatToolRunner.UNAVAILABLE, result.error());
+                else assertTrue(result.succeeded());
+            }
+            assertEquals(42, ReadScope.memo("publication", () -> 0));
+        }
+        assertEquals(2, computations.get(), "one immutable proof per tool call");
+        assertEquals(4, authorityChecks.get(), "current authority is checked on every read");
     }
 
     @Test
