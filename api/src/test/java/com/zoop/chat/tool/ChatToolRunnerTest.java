@@ -143,7 +143,7 @@ class ChatToolRunnerTest {
         var authority = new GraphPublicationAuthority(null, null,
                 version -> { throw new PublicationException("basis_unavailable"); }, java.time.Clock.systemUTC());
         var publication = new Publication("v1", null, null, null, null, null, null, null, List.of(), null, Map.of(), Map.of());
-        var documents = new DocumentSearchTool((company, from, version, asOf, limit, trace) -> {
+        var documents = new DocumentSearchTool((company, from, version, asOf, limit, evidenceScope, trace) -> {
             assertTrue(Thread.currentThread().isVirtual());
             authority.current(publication, null);
             throw new AssertionError("authority failure must stop the document read");
