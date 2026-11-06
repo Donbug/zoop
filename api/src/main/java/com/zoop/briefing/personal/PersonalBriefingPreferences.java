@@ -145,6 +145,7 @@ public class PersonalBriefingPreferences {
         var selection=row.path("selection");var pools=jdbc.query("SELECT snapshot FROM briefing_personal_pools WHERE round_id=? AND input_sha256=? AND snapshot_sha256=encode(sha256(convert_to(snapshot::text,'UTF8')),'hex')",(rs,i)->StrictJson.parseObject(rs.getString(1)).node(),roundId,selection.path("poolVersion").asString());
         if(pools.size()!=1)throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         PersonalBriefingService.validatePool(pools.getFirst(),r);
+        selections.refreshCoverage(r,selection,requestId);
         for(var item:selection.path("presentation").path("items")){
             var c=pools.getFirst().path("candidates").valueStream().filter(x->x.path("issueId").equals(item.path("eventId"))).findFirst().orElseThrow(()->new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
             if(!access.readableForRound(c,r,requestId))throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);

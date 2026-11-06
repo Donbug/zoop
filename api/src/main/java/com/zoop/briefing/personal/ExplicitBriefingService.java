@@ -3,6 +3,7 @@ package com.zoop.briefing.personal;
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
 import com.zoop.briefing.query.BriefingQueryService;
 import com.zoop.briefing.storage.BriefingRoundRepository;
+import com.zoop.briefing.storage.BriefingRound;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.graph.read.PersonalCompanies;
@@ -141,6 +142,22 @@ public class ExplicitBriefingService {
     }
 
     /** Reuse only already-public prior items that actually match this member's fixed choice. */
+    public void refreshCoverage(BriefingRound round,JsonNode selection,String requestId) {
+        boolean needed=false;
+        for(String view:List.of("presentation","verifiedPresentation"))
+            needed|="coverage_limited".equals(selection.path(view).path("continuity").path("mode").asString());
+        if(!needed)return;
+        // Delivery snapshots are immutable; revocation/correction is applied only to this read projection.
+        var common=reads.get(round.date(),round.edition(),requestId);
+        if(!round.id().equals(common.path("id").asString())||!"published".equals(common.path("status").asString())
+            ||!"coverage_limited".equals(common.path("continuity").path("mode").asString()))
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        Set<String> scope=new HashSet<>();selection.path("choice").path("companyIds").forEach(id->scope.add(id.asString()));
+        for(String view:List.of("presentation","verifiedPresentation"))
+            if(selection.path(view).isObject()&&"coverage_limited".equals(selection.path(view).path("continuity").path("mode").asString()))
+                ((ObjectNode)selection.path(view)).set("continuity",personalCoverage(common.path("continuity"),scope));
+    }
+
     private ObjectNode personalCoverage(JsonNode common,Set<String> scope) {
         var value=(ObjectNode)common.deepCopy();var recap=(ObjectNode)value.path("recap");
         var items=json.createArrayNode();Set<String> names=new HashSet<>();

@@ -411,6 +411,10 @@ class BriefingServerPostgresTest {
             assertEquals("unavailable",other.at("/presentation/continuity/recap/status").asString());
             assertEquals(0,other.at("/presentation/continuity/watchConditions").size());
             assertEquals(oldCalls,jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class));
+            explicit.refreshCoverage(row,mine,"coverage-personal-reread");
+            assertEquals(1,mine.at("/presentation/continuity/recap/items").size());
+            Files.writeString(grant,Files.readString(grant).replace("\"enabled\":true","\"enabled\":false"));
+            assertThrows(com.zoop.common.exception.CustomException.class,()->explicit.refreshCoverage(row,mine,"coverage-personal-revoked"));
         }
     }
 
