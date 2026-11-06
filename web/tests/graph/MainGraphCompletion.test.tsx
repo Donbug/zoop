@@ -508,11 +508,14 @@ it('D-GRP-05 highlights only edges supported by the selected evidence and clears
 
 it('M-GRP-01 leaves the evidence drawer and retains its targets after a delayed version load', async () => {
   anonymous();
-  vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
-    matches: query === '(max-width: 767px)',
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  })));
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      matches: query === '(max-width: 767px)',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
   const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
   const next = deferred<GraphResponse>();
   vi.mocked(getGraph)
@@ -526,28 +529,40 @@ it('M-GRP-01 leaves the evidence drawer and retains its targets after a delayed 
   );
   const router = setup('/?mode=all&graphVersion=old-graph');
   await screen.findByTestId('graph-canvas');
-  act(() => useGraphUiStore.getState().openEvidence({
-    kind: 'issue',
-    id: 'mock-issue-1',
-    label: '사건',
-    evidenceIds: ['mock-evidence-1'],
-    mapContext: { graphVersion: graph.metadata.graphVersion!, url: '/' },
-  }));
+  act(() =>
+    useGraphUiStore.getState().openEvidence({
+      kind: 'issue',
+      id: 'mock-issue-1',
+      label: '사건',
+      evidenceIds: ['mock-evidence-1'],
+      mapContext: { graphVersion: graph.metadata.graphVersion!, url: '/' },
+    }),
+  );
   await userEvent.click(
     await screen.findByRole('button', { name: '◇ 지도에서 보기' }),
   );
   expect(screen.queryByRole('dialog', { name: '근거 문서' })).toBeNull();
-  await act(async () => { next.resolve(graph); });
+  await act(async () => {
+    next.resolve(graph);
+  });
   const expected = graph.edges
     .filter((edge) => edge.evidenceIds.includes('mock-evidence-1'))
-    .map((edge) => edge.id).join(',');
+    .map((edge) => edge.id)
+    .join(',');
   await waitFor(() =>
-    expect(screen.getByTestId('graph-canvas').getAttribute('data-highlighted')).toBe(expected),
+    expect(
+      screen.getByTestId('graph-canvas').getAttribute('data-highlighted'),
+    ).toBe(expected),
   );
-  expect(new URLSearchParams(router.state.location.search).get('graphVersion'))
-    .toBe(graph.metadata.graphVersion);
-  await userEvent.click(screen.getByRole('button', { name: 'HBM3E 12단 경쟁 선택' }));
-  expect(screen.getByTestId('graph-canvas').getAttribute('data-highlighted')).toBe('');
+  expect(
+    new URLSearchParams(router.state.location.search).get('graphVersion'),
+  ).toBe(graph.metadata.graphVersion);
+  await userEvent.click(
+    screen.getByRole('button', { name: 'HBM3E 12단 경쟁 선택' }),
+  );
+  expect(
+    screen.getByTestId('graph-canvas').getAttribute('data-highlighted'),
+  ).toBe('');
 });
 
 it('D-GRP-05 isolates the related event when no edge has that evidence', async () => {

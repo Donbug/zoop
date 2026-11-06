@@ -147,7 +147,9 @@ beforeEach(() => {
 describe('D-GRP-02 · canvas selection bridge', () => {
   it('keeps cited relations and their companies bright after an asynchronous redraw', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
-    const edge = data.edges.find((item) => item.evidenceIds.includes('mock-evidence-1'))!;
+    const edge = data.edges.find((item) =>
+      item.evidenceIds.includes('mock-evidence-1'),
+    )!;
     const unrelated = data.nodes.find(
       (node) => node.id !== edge.source && node.id !== edge.target,
     )!;
@@ -161,8 +163,12 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     view.rerender(
       <GraphCanvas data={data} evidenceMode highlightedEdgeIds={[edge.id]} />,
     );
-    await waitFor(() => expect(canvas.draw.mock.calls.length).toBeGreaterThan(before));
-    await act(async () => { draw.resolve(); });
+    await waitFor(() =>
+      expect(canvas.draw.mock.calls.length).toBeGreaterThan(before),
+    );
+    await act(async () => {
+      draw.resolve();
+    });
     await waitFor(() => {
       const states = appliedStates();
       expect(states[edge.id]).toContain('related');

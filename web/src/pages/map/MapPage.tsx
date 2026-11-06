@@ -528,7 +528,9 @@ function MapWorkspace({
     evidenceSelection &&
     (evidenceSelection.target === evidenceTarget ||
       (evidenceSelection.detachedUrl === paramsKey && !evidenceTarget)) &&
-    data && !loading && !error &&
+    data &&
+    !loading &&
+    !error &&
     (!evidenceContext?.graphVersion ||
       evidenceContext.graphVersion === data.metadata.graphVersion) &&
     (!evidenceContext?.asOf ||
@@ -605,14 +607,18 @@ function MapWorkspace({
   const answerTarget = answerNavigation?.target;
   const answerOnMap = Boolean(
     answerTarget &&
-    !focusId && !impactIssueId &&
-    !loading && !error && data &&
+    !focusId &&
+    !impactIssueId &&
+    !loading &&
+    !error &&
+    data &&
     (!answerTarget.graphVersion ||
       answerTarget.graphVersion === data.metadata.graphVersion) &&
     (answerTarget.asOf ?? null) === (asOf ?? null) &&
     (answerTarget.kind === 'path'
       ? params.get('path') === answerTarget.id
-      : rawSelection === `${answerTarget.kind === 'edge' ? 'edge' : 'node'}:${answerTarget.id}`),
+      : rawSelection ===
+        `${answerTarget.kind === 'edge' ? 'edge' : 'node'}:${answerTarget.id}`),
   );
   const fitRequest = useMemo(() => {
     if (!data || loading || error) return null;
@@ -644,7 +650,15 @@ function MapWorkspace({
           seq: answerNavigation?.seq ?? 0,
         }
       : null;
-  }, [data, loading, error, activeEvidence, answerOnMap, answerNavigation, grouping]);
+  }, [
+    data,
+    loading,
+    error,
+    activeEvidence,
+    answerOnMap,
+    answerNavigation,
+    grouping,
+  ]);
   const missingAnswerTarget = answerOnMap && !fitRequest && !activeEvidence;
   const logoOf = (companyId: string) =>
     data?.nodes.find((node) => node.id === companyId)?.logoUrl;
@@ -744,7 +758,8 @@ function MapWorkspace({
       .sort((a, b) => b.sharedIssueCount - a.sharedIssueCount);
   }, [companyNode, data]);
   const selectNode = (id: string | null) => {
-    if (evidenceSelection?.detachedUrl !== undefined) setEvidenceSelection(null);
+    if (evidenceSelection?.detachedUrl !== undefined)
+      setEvidenceSelection(null);
     if (tutorialOpen && tutorialStep && tutorialStep < 5) {
       if (!id) return;
       else {
@@ -827,7 +842,8 @@ function MapWorkspace({
     eventContext,
   );
   function selectEdge(id: string) {
-    if (evidenceSelection?.detachedUrl !== undefined) setEvidenceSelection(null);
+    if (evidenceSelection?.detachedUrl !== undefined)
+      setEvidenceSelection(null);
     if (
       document.activeElement instanceof HTMLElement &&
       mapRegion.current?.contains(document.activeElement)
@@ -897,30 +913,40 @@ function MapWorkspace({
   // D-AI-02b → D-GRP-01/02/04: pin the answer's snapshot, then fit its
   // actual targets after the graph has loaded and the canvas has drawn them.
   function viewAnswerTarget(target: AnswerMapTarget) {
-    if (!['company', 'issue', 'edge', 'path'].includes(target.kind)) return false;
+    if (!['company', 'issue', 'edge', 'path'].includes(target.kind))
+      return false;
     const sameSnapshot =
-      (!target.graphVersion || target.graphVersion === data?.metadata.graphVersion) &&
+      (!target.graphVersion ||
+        target.graphVersion === data?.metadata.graphVersion) &&
       (target.asOf ?? null) === (asOf ?? null);
     if (sameSnapshot) {
       if (loading || error || !data) return false;
-      const found = target.kind === 'edge'
-        ? data.edges.some((edge) => edge.id === target.id)
-        : target.kind === 'path'
-          ? target.id.split(',').length === 2 &&
-            target.id.split(',').every((id) => data.nodes.some((node) => node.id === id))
-          : data.nodes.some((node) => node.id === target.id);
+      const found =
+        target.kind === 'edge'
+          ? data.edges.some((edge) => edge.id === target.id)
+          : target.kind === 'path'
+            ? target.id.split(',').length === 2 &&
+              target.id
+                .split(',')
+                .every((id) => data.nodes.some((node) => node.id === id))
+            : data.nodes.some((node) => node.id === target.id);
       if (!found) return false;
     } else if (!target.graphVersion) return false;
     setAnswerNavigation((old) => ({ target, seq: (old?.seq ?? 0) + 1 }));
     updateQuery({
-      ...(!sameSnapshot ? {
-        mode: 'all',
-        companyId: null,
-        asOf: target.asOf,
-        graphVersion: target.graphVersion,
-        round: null,
-      } : {}),
-      select: target.kind === 'path' ? null : `${target.kind === 'edge' ? 'edge' : 'node'}:${target.id}`,
+      ...(!sameSnapshot
+        ? {
+            mode: 'all',
+            companyId: null,
+            asOf: target.asOf,
+            graphVersion: target.graphVersion,
+            round: null,
+          }
+        : {}),
+      select:
+        target.kind === 'path'
+          ? null
+          : `${target.kind === 'edge' ? 'edge' : 'node'}:${target.id}`,
       path: target.kind === 'path' ? target.id : null,
       focus: null,
       hops: null,
@@ -1160,13 +1186,20 @@ function MapWorkspace({
       >
         <h1 className="sr-only">관계 지도</h1>
         {missingAnswerTarget && (
-          <p role="status" className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-caption">
+          <p
+            role="status"
+            className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-caption"
+          >
             이 답변의 대상이 해당 버전의 지도에 없어요.
           </p>
         )}
         {activeEvidence?.detachedUrl !== undefined &&
-          !evidenceEdges.length && !evidenceFallback && (
-            <p role="status" className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-caption">
+          !evidenceEdges.length &&
+          !evidenceFallback && (
+            <p
+              role="status"
+              className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-caption"
+            >
               이 근거와 연결된 선이나 사건이 지금 지도에 없어요.
             </p>
           )}
@@ -1176,7 +1209,10 @@ function MapWorkspace({
           aria-label="관계 지도"
           className="relationship-view"
           onKeyDown={(event) => {
-            if (event.key === 'Escape' && evidenceSelection?.detachedUrl !== undefined)
+            if (
+              event.key === 'Escape' &&
+              evidenceSelection?.detachedUrl !== undefined
+            )
               setEvidenceSelection(null);
           }}
           data-screen-id={
@@ -2004,28 +2040,37 @@ function MapWorkspace({
                 return;
               }
               const context = evidenceTarget.mapContext;
-              const narrow = window.matchMedia?.('(max-width: 767px)').matches ?? false;
+              const narrow =
+                window.matchMedia?.('(max-width: 767px)').matches ?? false;
               const changeSnapshot = Boolean(
-                (context?.graphVersion && context.graphVersion !== data?.metadata.graphVersion) ||
-                (context?.asOf && Date.parse(context.asOf) !== Date.parse(data?.metadata.asOf ?? '')),
+                (context?.graphVersion &&
+                  context.graphVersion !== data?.metadata.graphVersion) ||
+                (context?.asOf &&
+                  Date.parse(context.asOf) !==
+                    Date.parse(data?.metadata.asOf ?? '')),
               );
               const changes: Record<string, string | null> = {
-                ...(changeSnapshot ? {
-                  mode: 'all',
-                  graphVersion: context?.graphVersion ?? graphVersion ?? null,
-                  asOf: context?.asOf ?? null,
-                  companyId: null,
-                  round: null,
-                  focus: null,
-                  hops: null,
-                } : {}),
-                ...(changeSnapshot || narrow ? {
-                  select: null,
-                  impact: null,
-                  path: null,
-                  event: null,
-                  id: null,
-                } : {}),
+                ...(changeSnapshot
+                  ? {
+                      mode: 'all',
+                      graphVersion:
+                        context?.graphVersion ?? graphVersion ?? null,
+                      asOf: context?.asOf ?? null,
+                      companyId: null,
+                      round: null,
+                      focus: null,
+                      hops: null,
+                    }
+                  : {}),
+                ...(changeSnapshot || narrow
+                  ? {
+                      select: null,
+                      impact: null,
+                      path: null,
+                      event: null,
+                      id: null,
+                    }
+                  : {}),
               };
               const destination = new URLSearchParams(params);
               for (const [key, value] of Object.entries(changes)) {

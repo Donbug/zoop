@@ -307,11 +307,13 @@ describe('D-AI-01 · asking with a linked target', () => {
     server.on('POST', JOBS, (request) => {
       // The fake transport receives the drawer's typed question request.
       const body = request.body as ChatJobRequest;
-      return json(job({
-        id: body.jobId,
-        sessionId: request.params.id,
-        question: body.question,
-      }));
+      return json(
+        job({
+          id: body.jobId,
+          sessionId: request.params.id,
+          question: body.question,
+        }),
+      );
     });
     const { user } = await open({
       kind: 'issue',

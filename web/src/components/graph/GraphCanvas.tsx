@@ -1505,7 +1505,11 @@ export default function GraphCanvas({
             graph,
             followFitTargets.current ?? undefined,
             // 포커스는 노드가 적어 맞춤이 크게 확대된다. 100%를 넘기지 않아 가운데 기업이 화면을 덮지 않는다.
-            followFitTargets.current ? 1.8 : arrangeFocusNow ? FOCUS_FIT_ZOOM : undefined,
+            followFitTargets.current
+              ? 1.8
+              : arrangeFocusNow
+                ? FOCUS_FIT_ZOOM
+                : undefined,
             moving ? 'layout' : animate ? 'fit' : false,
           );
         }
@@ -1533,7 +1537,7 @@ export default function GraphCanvas({
               (node) => node.id === id && node.style?.visibility !== 'hidden',
             ),
           ) &&
-          await fitVisibleGraph(graph, new Set(mapFit), 1.8, 'fit')
+          (await fitVisibleGraph(graph, new Set(mapFit), 1.8, 'fit'))
         ) {
           pendingMapFit.current = null;
           followFitTargets.current = new Set(mapFit);
