@@ -202,6 +202,7 @@ public final class GraphPublicationComposer {
         var counts = result.putObject("counts"); counts.put("sources", contributions.size()); counts.put("companies", snapshot.companies().size());
         counts.put("issues", snapshot.issues().size()); counts.put("relations", snapshot.relations().size()); counts.put("articles", snapshot.articles().size()); counts.put("evidence", snapshot.evidence().size());
         counts.put("labelCorrections", PublicationMerger.labelCorrections(effective).size());
+        counts.put("memberExclusions", merged.memberExclusions()); counts.put("issueRetirements", merged.issueRetirements());
         result.put("activation", "not-activated"); return result;
     }
 

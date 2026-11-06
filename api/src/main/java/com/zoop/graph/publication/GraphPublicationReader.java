@@ -103,8 +103,15 @@ public final class GraphPublicationReader {
             return owners.sources();
         }
         public String publicIssue(IssueRef original) {
-            return issueSources.values().stream().filter(o -> o.members().contains(original)).map(IssueOwners::issueId)
-                    .findFirst().orElseThrow(() -> new PublicationException("basis_mismatch"));
+            return findPublicIssue(original).orElseThrow(() -> new PublicationException("basis_mismatch"));
+        }
+        /** The public issue the receipt lists an original under, or empty: a member a decision in force removed, or one never placed. */
+        public java.util.Optional<String> findPublicIssue(IssueRef original) {
+            return issueSources.values().stream().filter(o -> o.members().contains(original)).map(IssueOwners::issueId).findFirst();
+        }
+        /** The members and public issues the stored decisions remove from the public graph ({@link PublicationMerger#effective}). */
+        public PublicationMerger.Effective effective() {
+            return PublicationMerger.effective(effectiveDecisions);
         }
         public PublicGraphSnapshot.Issue originalIssue(IssueRef ref) {
             return source(ref.sourceVersionId()).projection().issues().stream().filter(i -> i.issueId().equals(ref.issueId()))

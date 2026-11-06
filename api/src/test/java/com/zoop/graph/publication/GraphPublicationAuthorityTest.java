@@ -2,6 +2,7 @@ package com.zoop.graph.publication;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import tools.jackson.databind.node.ObjectNode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -280,6 +281,32 @@ class GraphPublicationAuthorityTest {
         assertFalse(output.getAll().contains(canary));
         assertFalse(output.getAll().contains(temp.toString()));
         assertFalse(output.getAll().contains("at com.zoop.document"));
+    }
+
+    @Test
+    void anExcludedMembersSourceExclusionHidesNothingWhileAnUnplacedMemberIsStillADamagedBasis() throws Exception {
+        var setup = setup();
+        var first = setup.contributions().getFirst(); var second = setup.contributions().getLast();
+        ObjectNode decisions = (ObjectNode) PublicationMerger.emptyDecisions().node().deepCopy();
+        decisions.put("schemaVersion", PublicationMerger.DECISIONS_SCHEMA_3);
+        decisions.putArray(PublicationMerger.LABEL_CORRECTIONS); decisions.putArray(PublicationMerger.ISSUE_RETIREMENTS);
+        var item = decisions.putArray(PublicationMerger.MEMBER_EXCLUSIONS).addObject();
+        item.put("issueId", "issue-0"); item.set("member", GraphPublicationReader.json(second.issueRef("issue-0")));
+        item.put("status", "excluded"); item.put("reviewer", "operator"); item.put("decisionRef", "scope-review"); item.put("decisionVersion", "1");
+        var merged = PublicationMerger.merge(setup.contributions(), StrictJson.Obj.of(decisions), Set.of());
+        assertEquals(List.of(first.issueRef("issue-0")), merged.issueSources().get("issue-0").members());
+        var publication = new Publication("scoped", "publication", "digest", null, null, first.receipt(), first.projectionArtifact(),
+                merged.snapshot("scoped", "publication"), setup.contributions(), StrictJson.Obj.of(decisions), merged.issueSources(), merged.relationSources());
+        // The excluded member is not public, so its source exclusion hides nothing and is not a damaged basis.
+        setup.exclusions().put(second.sourceVersionId(), new DisclosureExclusions(1, Set.of("issue-0"), Set.of(), Set.of()));
+        assertEquals(Set.of(), setup.authority().current(publication, "test").issueIds());
+        // The owner's source exclusion still hides the public issue.
+        setup.exclusions().put(first.sourceVersionId(), new DisclosureExclusions(2, Set.of("issue-0"), Set.of(), Set.of()));
+        assertEquals(Set.of("issue-0"), setup.authority().current(publication, "test").issueIds());
+        // A member the receipt does not place and no decision removed is a damaged basis, as before.
+        var damaged = new Publication("damaged", "publication", "digest", null, null, first.receipt(), first.projectionArtifact(),
+                merged.snapshot("damaged", "publication"), setup.contributions(), PublicationMerger.emptyDecisions(), merged.issueSources(), merged.relationSources());
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class, () -> setup.authority().current(damaged, "test")).getErrorCode());
     }
 
     @RestController

@@ -11,7 +11,9 @@ import com.zoop.document.evidence.service.EvidenceService;
 import com.zoop.graph.read.EventDetailService;
 import com.zoop.graph.read.PublicGraphReader;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
+import com.zoop.graph.publication.GraphPublicationReader;
 import com.zoop.graph.publication.GraphPublicationReader.Publication;
+import com.zoop.graph.publication.PublicationScope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -148,6 +150,34 @@ public class PublishedCandidates {
                         String previous = publicIssueIds.putIfAbsent(event.string("ref"), owners.issueId());
                         if (previous != null && !previous.equals(owners.issueId())) ambiguous.add(event.string("ref"));
                     }
+                }
+            }
+        }
+        // A member a decision in force removed (an excluded member) and the relation records that left with it or with a retired issue
+        // are not in the receipt; their candidates are hidden, not pending. A retired issue's members stay listed and fall above.
+        var effective = publication.effective();
+        Set<GraphPublicationReader.IssueRef> listedMembers = new HashSet<>();
+        publication.issueSources().values().forEach(o -> listedMembers.addAll(o.members()));
+        Set<GraphPublicationReader.RelationRef> listedRelations = new HashSet<>();
+        publication.relationSources().values().forEach(o -> listedRelations.addAll(o.sources()));
+        for (var source : publication.contributions()) {
+            if (!"native".equals(source.sourceKind())) continue;
+            for (var original : source.projection().issues()) {
+                var ref = source.issueRef(original.issueId());
+                if (listedMembers.contains(ref) || !effective.voided(ref)) continue;
+                var issue = source.bundle().objects("issues").stream()
+                        .filter(i -> ref.issueId().equals(i.string("id"))).findFirst().orElseThrow();
+                for (var event : issue.objects("sourceEvents")) {
+                    if ("event-candidate".equals(event.string("kind"))) excludedEvents.add(key(event.object("upstream").string("jobId"), event.string("ref")));
+                }
+            }
+            for (var original : source.projection().relations()) {
+                var ref = new GraphPublicationReader.RelationRef(source.sourceVersionId(), original.relationId());
+                if (listedRelations.contains(ref) || !PublicationScope.gone(ref, original, effective)) continue;
+                var relation = source.bundle().objects("relations").stream()
+                        .filter(r -> ref.relationId().equals(r.string("id"))).findFirst().orElseThrow();
+                for (var candidate : relation.objects("sourceRefs")) {
+                    if ("s3-relation".equals(candidate.string("kind"))) excludedRelations.add(key(candidate.string("jobId"), candidate.string("id")));
                 }
             }
         }

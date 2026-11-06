@@ -642,6 +642,97 @@ class GraphPublicationPreparePostgresTest {
     }
 
     /** Composes the first publication from {@code source} like the operator B4 and makes it the active version a person approved. */
+    @Test void aMemberExclusionAndARetirementAreStagedOnTheBaseReadBackInheritedAndRestored() {
+        String published = publish(importNative(HandoffFixtures.Spec.standard()));
+        var first = reader().read(published);
+        // A second import of the same records gives every issue a second member; the preparation stages it without a change.
+        String incoming = importNative(HandoffFixtures.Spec.standard());
+        var prepared = preparer().run();
+        assertEquals("staged", prepared.get("outcome").asString(), prepared.toString());
+        assertEquals(List.of(incoming), strings(prepared, "incomingVersionIds"));
+        String two = prepared.get("graphVersionId").asString();
+        activate(two);
+        var base = reader().read(two);
+        var issue = base.snapshot().issues().getFirst();
+        var owners = base.issueSources().get(issue.issueId());
+        assertEquals(2, owners.members().size());
+        var owner = owners.headlineSources().get("label");
+        var other = owners.members().stream().filter(m -> !m.equals(owner)).findFirst().orElseThrow();
+        var state = graph.publicationState();
+
+        // 1. Exclude the member that is not the owner: no new source, the counts say so, the reader reproduces it.
+        ObjectNode excluded = scoped();
+        var exclusion = ((tools.jackson.databind.node.ArrayNode) excluded.get(PublicationMerger.MEMBER_EXCLUSIONS)).addObject();
+        exclusion.put("issueId", issue.issueId()); exclusion.set("member", GraphPublicationReader.json(other)); exclusion.put("status", "excluded"); audit(exclusion);
+        byte[] excludedBytes = Canonical.bytes(excluded);
+        var request = new PublicationComposeRequest(two, List.of(), two, pin(two), java.util.Map.of(), state.ruleRevision(), state.reviewRevision(),
+                Canonical.sha256(excludedBytes), "synthetic");
+        var composed = GraphPublicationPreparer.operatorCompose(reader(), publications, composer(), request, excludedBytes);
+        assertEquals("succeeded", composed.get("status").asString(), composed.toString());
+        assertEquals("staged", composed.get("outcome").asString());
+        assertEquals(1, composed.get("counts").get("memberExclusions").asInt());
+        assertEquals(0, composed.get("counts").get("issueRetirements").asInt());
+        assertEquals(base.snapshot().issues().size(), composed.get("counts").get("issues").asInt());
+        String scopedVersion = composed.get("graphVersionId").asString();
+        var publication = reader().read(scopedVersion);
+        assertEquals(PublicationMerger.DECISIONS_SCHEMA_3, publication.effectiveDecisions().string("schemaVersion"));
+        assertEquals(List.of(owner), publication.issueSources().get(issue.issueId()).members());
+        assertEquals(owners.headlineSources(), publication.issueSources().get(issue.issueId()).headlineSources());
+        assertEquals(Set.of(other), publication.effective().excludedMembers());
+        assertEquals(base.snapshot().issues().size(), publication.snapshot().issues().size());
+        assertEquals("unchanged", GraphPublicationPreparer.operatorCompose(reader(), publications, composer(), request, excludedBytes).get("outcome").asString());
+        activate(scopedVersion);
+
+        // 2. Retire the issue on top: it leaves the snapshot, its receipt entry stays, its exclusion is dormant.
+        ObjectNode retired = scoped();
+        var retirement = ((tools.jackson.databind.node.ArrayNode) retired.get(PublicationMerger.ISSUE_RETIREMENTS)).addObject();
+        retirement.put("issueId", issue.issueId()); retirement.put("status", "retired"); audit(retirement);
+        byte[] retiredBytes = Canonical.bytes(retired);
+        var retire = new PublicationComposeRequest(scopedVersion, List.of(), scopedVersion, pin(scopedVersion), java.util.Map.of(), state.ruleRevision(), state.reviewRevision(),
+                Canonical.sha256(retiredBytes), "synthetic");
+        var retiredResult = GraphPublicationPreparer.operatorCompose(reader(), publications, composer(), retire, retiredBytes);
+        assertEquals("staged", retiredResult.get("outcome").asString(), retiredResult.toString());
+        assertEquals(1, retiredResult.get("counts").get("issueRetirements").asInt());
+        assertEquals(0, retiredResult.get("counts").get("memberExclusions").asInt());
+        assertEquals(base.snapshot().issues().size() - 1, retiredResult.get("counts").get("issues").asInt());
+        String gone = retiredResult.get("graphVersionId").asString();
+        var withoutIssue = reader().read(gone);
+        assertTrue(withoutIssue.snapshot().issues().stream().noneMatch(i -> i.issueId().equals(issue.issueId())));
+        assertTrue(withoutIssue.snapshot().relations().stream().noneMatch(r -> r.source().equals(issue.issueId()) || r.target().equals(issue.issueId())));
+        assertEquals(publication.issueSources().get(issue.issueId()), withoutIssue.issueSources().get(issue.issueId()));
+        assertEquals(1, PublicationMerger.memberExclusions(withoutIssue.effectiveDecisions()).size());
+        activate(gone);
+
+        // 3. Restore it: the owners approved last come back from the receipt and the exclusion applies again.
+        ObjectNode restored = scoped();
+        var restoration = ((tools.jackson.databind.node.ArrayNode) restored.get(PublicationMerger.ISSUE_RETIREMENTS)).addObject();
+        restoration.put("issueId", issue.issueId()); restoration.put("status", "restored"); audit(restoration);
+        byte[] restoredBytes = Canonical.bytes(restored);
+        var restore = new PublicationComposeRequest(gone, List.of(), gone, pin(gone), java.util.Map.of(), state.ruleRevision(), state.reviewRevision(),
+                Canonical.sha256(restoredBytes), "synthetic");
+        var restoredResult = GraphPublicationPreparer.operatorCompose(reader(), publications, composer(), restore, restoredBytes);
+        assertEquals("staged", restoredResult.get("outcome").asString(), restoredResult.toString());
+        assertEquals(0, restoredResult.get("counts").get("issueRetirements").asInt());
+        assertEquals(1, restoredResult.get("counts").get("memberExclusions").asInt());
+        assertEquals(base.snapshot().issues().size(), restoredResult.get("counts").get("issues").asInt());
+        var back = reader().read(restoredResult.get("graphVersionId").asString());
+        assertEquals(publication.issueSources(), back.issueSources());
+        assertEquals(publication.snapshot().issues(), back.snapshot().issues());
+        assertEquals(publication.snapshot().relations(), back.snapshot().relations());
+        // A stored publication that carries neither decision reads exactly as before.
+        assertEquals(first.snapshot(), reader().read(published).snapshot());
+        assertEquals(first.issueSources(), reader().read(published).issueSources());
+    }
+
+    private static ObjectNode scoped() {
+        ObjectNode root = (ObjectNode) PublicationMerger.emptyDecisions().node().deepCopy();
+        root.put("schemaVersion", PublicationMerger.DECISIONS_SCHEMA_3);
+        root.putArray(PublicationMerger.LABEL_CORRECTIONS); root.putArray(PublicationMerger.MEMBER_EXCLUSIONS); root.putArray(PublicationMerger.ISSUE_RETIREMENTS);
+        return root;
+    }
+    private static void audit(ObjectNode item) { item.put("reviewer", "operator"); item.put("decisionRef", "scope-review"); item.put("decisionVersion", "2026-11-06"); }
+    private String pin(String version) { return registry.findArtifact("artifact-receipt-" + version).orElseThrow().sha256(); }
+
     private String publish(String source) {
         String id = compose(null, source);
         jdbc.update("UPDATE graph_versions SET active = true WHERE id = ?", id);

@@ -48,6 +48,7 @@ public final class GraphPublicationAuthority {
             SourceRegistry current = sources.registry(requestId);
             Instant at = clock.instant();
             var facts = articleFacts(publication.contributions(), registry);
+            var effective = publication.effective();
             for (var source : publication.contributions()) {
                 DisclosureExclusions excluded = source.sourceVersionId().equals(publication.versionId()) ? own : exclusions.current(source.sourceVersionId());
                 revision = Math.max(revision, excluded.revision());
@@ -56,7 +57,13 @@ public final class GraphPublicationAuthority {
                 Set<String> held = new HashSet<>();
                 for (var issue : source.projection().issues()) held.add(issue.issueId());
                 for (String issue : excluded.issueIds()) {
-                    if (held.contains(issue)) issues.add(publication.publicIssue(new IssueRef(source.sourceVersionId(), issue)));
+                    if (!held.contains(issue)) continue;
+                    IssueRef original = new IssueRef(source.sourceVersionId(), issue);
+                    // An original a decision in force removed (an excluded member, a retired issue's member) is not public, so its
+                    // exclusion hides nothing now; any other original the receipt does not place is a damaged basis, as before.
+                    var publicId = publication.findPublicIssue(original);
+                    if (publicId.isPresent()) issues.add(publicId.get());
+                    else if (!effective.voided(original)) throw new PublicationException("basis_mismatch");
                 }
                 relations.addAll(excluded.relationIds()); evidence.addAll(excluded.evidenceIds()); articles.addAll(excluded.articleTargets());
                 for (var article : source.projection().articles()) {
