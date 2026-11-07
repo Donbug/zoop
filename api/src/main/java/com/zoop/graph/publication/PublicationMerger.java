@@ -218,23 +218,28 @@ public final class PublicationMerger {
             String publicId = group.getKey(); List<IssueRef> members = group.getValue();
             if (retired.contains(publicId)) {
                 // Retired: the issue leaves the snapshot. Its receipt entry keeps the members and owners approved last (a first
-                // composition keeps every member under the default owner), so a restoration brings the same owners back. Decisions
-                // about it are kept, checked for shape, and not applied.
+                // composition keeps the valid members under the default owner), so a restoration brings the same owners back.
+                // Decisions about it are kept, checked for shape and real references, and not applied.
                 IssueOwners previous = previousOwners.get(publicId);
                 IssueOwners kept;
                 if (previous != null) {
                     if (!members.containsAll(previous.members()) || !members.containsAll(previous.headlineSources().values())) throw failure("basis_mismatch");
                     kept = previous;
                 } else {
+                    List<IssueRef> valid = members.stream().filter(r -> !excluded.contains(r)).toList();
+                    if (valid.isEmpty()) throw failure("request_invalid");
                     Map<String, IssueRef> owners = new TreeMap<>();
-                    for (String field : FIELDS) owners.put(field, defaultOwner(publicId, members, mappings));
-                    kept = new IssueOwners(publicId, members, owners);
+                    for (String field : FIELDS) owners.put(field, defaultOwner(publicId, valid, mappings));
+                    kept = new IssueOwners(publicId, valid, owners);
                 }
                 issueOwners.put(publicId, kept);
                 droppedMembers.addAll(members);
                 for (String field : FIELDS) {
                     Obj choice = fields.get(publicId + "\n" + field);
-                    if (choice != null) { dormantFields.add(publicId + "\n" + field); selectionShape(choice, originals, sources); }
+                    if (choice == null) continue;
+                    dormantFields.add(publicId + "\n" + field); selectionShape(choice, originals, sources);
+                    // Dormancy is no exception to reference checks: the chosen source must be a member of this public issue.
+                    if (!members.contains(issueRef(choice.object("takeFrom")))) throw failure("mapping_unproven");
                 }
                 Obj correction = corrections.get(publicId);
                 if (correction != null) { dormantCorrections.add(publicId); correctionShape(correction); correctionName(correction); evidenceRefs(correction, originals, sources); }

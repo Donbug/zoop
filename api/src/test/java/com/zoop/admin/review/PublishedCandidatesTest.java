@@ -142,6 +142,23 @@ class PublishedCandidatesTest {
         assertNull(shown.publicIssueId("snapshot-b"));
     }
 
+    @Test
+    void aRetiredIssuesMembersStayListedSoTheirCandidatesAreHiddenAndStillMapped() {
+        Publication full = publication();
+        var decisions = StrictJson.parseObject("""
+                {"schemaVersion":"zoop-graph-publication-decisions-3","issueMappings":[],"fieldSelections":[],"relationSelections":[],"labelCorrections":[],
+                 "memberExclusions":[],"issueRetirements":[{"issueId":"public-issue","status":"retired","reviewer":"operator","decisionRef":"scope-review","decisionVersion":"1"}]}
+                """);
+        var publication = new Publication(full.versionId(), full.publicationId(), full.compositionDigest(), null, null, null, null, full.snapshot(),
+                full.contributions(), decisions, full.issueSources(), full.relationSources());
+        // The issue is not in the snapshot, so nothing is shown; the members stay listed, so the candidates stay mapped to the retired id.
+        var shown = PublishedCandidates.read(publication, Set.of(), Set.of(), ignored -> true);
+        assertEquals(Set.of(), shown.events());
+        assertEquals(Set.of("s2-a\nevc-a", "s2-b\nevc-b"), shown.excludedEvents());
+        assertEquals(Set.of("s3-a\nrc-a", "s3-b\nrc-b"), shown.excludedRelations());
+        assertEquals("public-issue", shown.publicIssueId("snapshot-a"));
+    }
+
     private static SelectedGraphVersion selected() {
         return new SelectedGraphVersion(new GraphVersionRecord("publication-version", 4, "snapshot", "artifact", "uri",
                 "a".repeat(64), true), NOW, false);

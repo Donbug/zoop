@@ -1,7 +1,9 @@
 package com.zoop.admin.review;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -116,6 +118,7 @@ public class PublishedCandidates {
         Set<String> excludedEvents = new HashSet<>();
         Map<String, String> publicIssueIds = new HashMap<>();
         Set<String> ambiguous = new HashSet<>();
+        Map<String, Map<String, com.zoop.common.json.StrictJson.Obj>> index = new HashMap<>();
         for (var owners : publication.relationSources().values()) {
             var selected = publication.selectedRelationSources(owners.relationId());
             for (var ref : owners.sources()) {
@@ -125,12 +128,7 @@ public class PublishedCandidates {
                 if (relationIds.contains(owners.relationId()) && selected.contains(ref)
                         && source.projection().relations().stream().filter(r -> ref.relationId().equals(r.relationId()))
                                 .findFirst().orElseThrow().evidenceIds().stream().allMatch(shownNow)) into = relations;
-                var relation = source.bundle().objects("relations").stream()
-                        .filter(r -> ref.relationId().equals(r.string("id"))).findFirst().orElseThrow();
-                for (var candidate : relation.objects("sourceRefs")) {
-                    if ("s3-relation".equals(candidate.string("kind")))
-                        into.add(key(candidate.string("jobId"), candidate.string("id")));
-                }
+                into.addAll(relationCandidates(source, ref.relationId(), index));
             }
         }
         for (var owners : publication.issueSources().values()) {
@@ -141,12 +139,9 @@ public class PublishedCandidates {
                 Set<String> into = issueIds.contains(owners.issueId())
                         && original.evidenceIds().stream().allMatch(shownNow)
                         && original.geographyEvidenceIds().stream().allMatch(shownNow) ? events : excludedEvents;
-                var issue = source.bundle().objects("issues").stream()
-                        .filter(i -> ref.issueId().equals(i.string("id"))).findFirst().orElseThrow();
-                for (var event : issue.objects("sourceEvents")) {
-                    if ("event-candidate".equals(event.string("kind"))) {
-                        into.add(key(event.object("upstream").string("jobId"), event.string("ref")));
-                    } else if ("snapshot-event".equals(event.string("kind"))) {
+                into.addAll(eventCandidates(source, ref.issueId(), index));
+                for (var event : bundleObject(source, "issues", ref.issueId(), index).objects("sourceEvents")) {
+                    if ("snapshot-event".equals(event.string("kind"))) {
                         String previous = publicIssueIds.putIfAbsent(event.string("ref"), owners.issueId());
                         if (previous != null && !previous.equals(owners.issueId())) ambiguous.add(event.string("ref"));
                     }
@@ -164,21 +159,12 @@ public class PublishedCandidates {
             if (!"native".equals(source.sourceKind())) continue;
             for (var original : source.projection().issues()) {
                 var ref = source.issueRef(original.issueId());
-                if (listedMembers.contains(ref) || !effective.voided(ref)) continue;
-                var issue = source.bundle().objects("issues").stream()
-                        .filter(i -> ref.issueId().equals(i.string("id"))).findFirst().orElseThrow();
-                for (var event : issue.objects("sourceEvents")) {
-                    if ("event-candidate".equals(event.string("kind"))) excludedEvents.add(key(event.object("upstream").string("jobId"), event.string("ref")));
-                }
+                if (!listedMembers.contains(ref) && effective.voided(ref)) excludedEvents.addAll(eventCandidates(source, ref.issueId(), index));
             }
             for (var original : source.projection().relations()) {
                 var ref = new GraphPublicationReader.RelationRef(source.sourceVersionId(), original.relationId());
-                if (listedRelations.contains(ref) || !PublicationScope.gone(ref, original, effective)) continue;
-                var relation = source.bundle().objects("relations").stream()
-                        .filter(r -> ref.relationId().equals(r.string("id"))).findFirst().orElseThrow();
-                for (var candidate : relation.objects("sourceRefs")) {
-                    if ("s3-relation".equals(candidate.string("kind"))) excludedRelations.add(key(candidate.string("jobId"), candidate.string("id")));
-                }
+                if (!listedRelations.contains(ref) && PublicationScope.gone(ref, original, effective))
+                    excludedRelations.addAll(relationCandidates(source, ref.relationId(), index));
             }
         }
         ambiguous.forEach(publicIssueIds::remove);
@@ -189,4 +175,36 @@ public class PublishedCandidates {
                 Set.copyOf(excludedEvents), Map.copyOf(publicIssueIds));
     }
 
+    /** The S3 relation-candidate keys behind one relation record of a native source. */
+    private static List<String> relationCandidates(GraphPublicationReader.Contribution source, String relationId,
+            Map<String, Map<String, com.zoop.common.json.StrictJson.Obj>> index) {
+        List<String> keys = new ArrayList<>();
+        for (var candidate : bundleObject(source, "relations", relationId, index).objects("sourceRefs")) {
+            if ("s3-relation".equals(candidate.string("kind"))) keys.add(key(candidate.string("jobId"), candidate.string("id")));
+        }
+        return keys;
+    }
+
+    /** The S2 event-candidate keys behind one issue record of a native source. */
+    private static List<String> eventCandidates(GraphPublicationReader.Contribution source, String issueId,
+            Map<String, Map<String, com.zoop.common.json.StrictJson.Obj>> index) {
+        List<String> keys = new ArrayList<>();
+        for (var event : bundleObject(source, "issues", issueId, index).objects("sourceEvents")) {
+            if ("event-candidate".equals(event.string("kind"))) keys.add(key(event.object("upstream").string("jobId"), event.string("ref")));
+        }
+        return keys;
+    }
+
+    /** A bundle object by id, through an index built once per source and collection. */
+    private static com.zoop.common.json.StrictJson.Obj bundleObject(GraphPublicationReader.Contribution source, String collection, String id,
+            Map<String, Map<String, com.zoop.common.json.StrictJson.Obj>> index) {
+        var byId = index.computeIfAbsent(source.sourceVersionId() + "\n" + collection, ignored -> {
+            Map<String, com.zoop.common.json.StrictJson.Obj> objects = new HashMap<>();
+            source.bundle().objects(collection).forEach(o -> objects.put(o.string("id"), o));
+            return objects;
+        });
+        var found = byId.get(id);
+        if (found == null) throw new java.util.NoSuchElementException(collection + " " + id);
+        return found;
+    }
 }
