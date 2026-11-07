@@ -459,6 +459,12 @@ class PublicationMergerTest {
         assertEquals(PublicationMerger.DECISIONS_SCHEMA_3, restored.string("schemaVersion"));
         assertEquals(List.of("restored"), PublicationMerger.memberExclusions(restored).stream().map(o -> o.string("status")).toList());
         assertEquals(Set.of(), PublicationMerger.effective(restored).excludedMembers());
+        // The same status with other audit fields is a new record that replaces the old one whole: the combined document differs
+        // from the previous one (so an empty-incoming compose makes a candidate), while the identical record leaves it equal.
+        ObjectNode reaudited = exclude(scoped(), "same", incoming, "excluded");
+        ((ObjectNode) reaudited.get(PublicationMerger.MEMBER_EXCLUSIONS).get(0)).put("decisionRef", "scope-review-2");
+        assertNotEquals(combined.node(), PublicationMerger.combine(combined, Obj.of(reaudited)).node());
+        assertEquals(combined.node(), PublicationMerger.combine(combined, Obj.of(exclude(scoped(), "same", incoming, "excluded"))).node());
         // Without a scope record the lowest schema is recorded: -2 with a correction, -1 otherwise.
         assertEquals(PublicationMerger.DECISIONS_SCHEMA_2, PublicationMerger.combine(PublicationMerger.emptyDecisions(), Obj.of(corrected(published, "이름"))).string("schemaVersion"));
         assertEquals(PublicationMerger.DECISIONS_SCHEMA, PublicationMerger.combine(Obj.of(scoped()), PublicationMerger.emptyDecisions()).string("schemaVersion"));
