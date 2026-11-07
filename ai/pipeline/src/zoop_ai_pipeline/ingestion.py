@@ -12,11 +12,15 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from . import ingestion_parsers as parsers
-from .ingestion_contracts import (SCHEMA, reserved_state_roots, MAX_INPUT, Authority, Export, IngestionFailure, Inspect, Item,
+from .ingestion_contracts import (SCHEMA, COMPLETION_WITNESS_SCHEMA, CompletionWitnessRequest,
+    reserved_state_roots, MAX_INPUT, MAX_RAW, MAX_TEXT, Authority, Export, IngestionFailure, Inspect, Item,
     Manifest, Receipt, Registry, Run, PdfBodyProjection, PdfRightsReceipt, HtmlBodyProjection, JsonHtmlBodyProjection,
     HtmlRightsReceipt, byte_hash, canonical, digest, now, read_file, timestamp)
 
 PROVENANCE = {"authored-files": "authored_control", "collected-http": "collected_http", "retained-private": "retained_private"}
+
+# Prepared JSON repeats DOM paths per source slot; raw-body limits do not bound that amplification.
+MAX_WITNESS_PREPARED = 64 * 1024 * 1024
 
 _SQL = """
 CREATE TABLE IF NOT EXISTS blobs(hash TEXT PRIMARY KEY, data BLOB NOT NULL);
@@ -51,6 +55,7 @@ CREATE TABLE IF NOT EXISTS candidates(round TEXT, source TEXT, page INTEGER, ord
 
 class Store:
     def __init__(self, root: Path, *, existing: bool = False):
+        self.existing = existing
         # Explicit dedicated namespace, not merely another filename in app/S1 state.
         root = Path(os.path.abspath(root))
         forbidden = reserved_state_roots()
@@ -300,18 +305,26 @@ class Ingestor:
         collected = item.collection
         saved = self.store.one("SELECT data FROM blobs WHERE hash=?", (collected.receipt.sha256,))
         raw = saved["data"] if saved is not None else self.authority.fixture(source, collected.receipt, MAX_INPUT)
+        receipt = self._validate_receipt(row, item, ref, url, raw)
+        if (receipt.grant_id, receipt.grant_revision) != (source.grant.grant_id, source.grant.revision):
+            raise IngestionFailure("collection_receipt_invalid")
+        return raw
+
+    @staticmethod
+    def _validate_receipt(row, item, ref, url, raw):
         try:
             receipt = Receipt.model_validate_json(raw)
         except ValidationError as exc:
             raise IngestionFailure("collection_receipt_invalid") from exc
-        grant, scope_id = source.grant, Run.model_validate_json(row["request"]).scope_id
-        bound = ((receipt.collection_id, receipt.source_id, receipt.scope_id, receipt.candidate_id, receipt.grant_id, receipt.grant_revision, receipt.requested_url),
-                 (collected.collection_id, row["source"], scope_id, item.candidate_id, grant.grant_id, grant.revision, url))
+        collected = item.collection
+        scope_id = Run.model_validate_json(row["request"]).scope_id
+        bound = ((receipt.collection_id, receipt.source_id, receipt.scope_id, receipt.candidate_id, receipt.requested_url),
+                 (collected.collection_id, row["source"], scope_id, item.candidate_id, url))
         observed = ((receipt.final_url, receipt.fetched_at, receipt.http_status, receipt.content_type, receipt.media_type, receipt.body_sha256, receipt.network),
                     (collected.final_url, collected.fetched_at, collected.http_status, collected.content_type, item.media_type, collected.body_sha256, collected.network))
         if byte_hash(raw) != collected.receipt.sha256 or bound[0] != bound[1] or observed[0] != observed[1] or ref.sha256 != collected.body_sha256:
             raise IngestionFailure("collection_receipt_invalid")
-        return raw
+        return receipt
 
     def _candidate(self, row, candidate, source, scope, manifest):
         key = (row["id"], row["source"], candidate["page"], candidate["ordinal"])
@@ -570,6 +583,155 @@ class Ingestor:
                 "pages": [{"ordinal": p["ordinal"], "pageId": p["page_id"], "status": p["status"], "complete": bool(p["complete"])} for p in pages],
                 "pagination": {"offset": offset, "limit": limit, "nextOffset": offset + limit if counts["discoveredCandidates"] > offset + limit or self.store.one("SELECT COUNT(*) n FROM pages WHERE round=? AND source=?", (rid, source))["n"] > offset + limit else None},
                 "failure": {"code": row["failure"]} if row["failure"] else None}
+
+    def _witness_blob(self, key, maximum):
+        saved = self.store.one("SELECT data FROM blobs WHERE hash=? AND length(data)<=?", (key, maximum))
+        if saved is None or byte_hash(saved["data"]) != key:
+            raise IngestionFailure("ingestion_state_invalid")
+        return saved["data"]
+
+    def completion_witness(self, request: CompletionWitnessRequest):
+        """One cold shared-lock snapshot of an exact finite collected list; historical identity, current read authority."""
+        if not self.store.existing or not self.authority.public:
+            raise IngestionFailure("finite_collection_witness_unsupported")
+        try:
+            return self._completion_witness(request)
+        except (ValidationError, ValueError, TypeError, KeyError, IndexError, sqlite3.DatabaseError) as exc:
+            raise IngestionFailure("ingestion_state_invalid") from exc
+        except IngestionFailure as exc:
+            if exc.code in {"collection_receipt_invalid", "document_version_not_in_round", "preparation_profile_unbound", "source_host_not_allowed"}:
+                raise IngestionFailure("ingestion_state_invalid") from exc
+            raise
+
+    def _completion_witness(self, request):
+        row = self._round(request.round_id, request.source_id)
+        source, scope = self._authorize(row, ("read",))
+        run = Run.model_validate_json(row["request"])
+        config, parser = json.loads(row["config"]), json.loads(row["parser"])
+        if (run.round_id, run.source_id) != (request.round_id, request.source_id):
+            raise IngestionFailure("ingestion_state_invalid")
+        stored_digest = digest({"request": run.wire(), "configuration": config, "parser": parser})
+        if stored_digest != row["input_digest"]:
+            raise IngestionFailure("ingestion_state_invalid")
+        if stored_digest != request.expected_input_digest:
+            raise IngestionFailure("round_input_conflict")
+        manifest = Manifest.model_validate_json(self._witness_blob(run.fixture_manifest_hash, MAX_INPUT))
+        if (manifest.wire() != json.loads(row["manifest"]) or
+                (manifest.source_id, manifest.scope_id) != (run.source_id, run.scope_id)):
+            raise IngestionFailure("ingestion_state_invalid")
+        original = Registry.model_validate_json(self._witness_blob(row["registry_hash"], MAX_INPUT))
+        original_source = next((s for s in original.sources if s.source_id == run.source_id), None)
+        original_scope = next((s for s in original_source.scopes if s.scope_id == run.scope_id), None) if original_source else None
+        if original_scope is None or original_source.configuration(original_scope) != config:
+            raise IngestionFailure("ingestion_state_invalid")
+        if (source.adapter != "collected-http" or run.window is not None or len(manifest.pages) != 1):
+            raise IngestionFailure("finite_collection_witness_unsupported")
+        page = manifest.pages[0]
+        if not page.terminal or page.coverage_through is not None:
+            raise IngestionFailure("finite_collection_witness_unsupported")
+        if page.cursor != scope.initial_cursor:
+            raise IngestionFailure("ingestion_state_invalid")
+        if (row["state"] != "complete" or row["failure"] is not None or row["next_page"] != 1 or
+                row["completion"] != "nonzero-discovery" or page.status != "ok"):
+            raise IngestionFailure("native_completion_unproven")
+        pages = self.db.execute("SELECT * FROM pages WHERE round=? AND source=? LIMIT 2",
+                                (run.round_id, run.source_id)).fetchall()
+        if len(pages) != 1:
+            raise IngestionFailure("ingestion_state_invalid")
+        saved_page = pages[0]
+        if (saved_page["ordinal"], saved_page["page_id"], saved_page["raw_hash"], saved_page["status"]) != (
+                0, page.page_id, page.response.sha256, page.status):
+            raise IngestionFailure("ingestion_state_invalid")
+        if saved_page["complete"] != 1:
+            raise IngestionFailure("native_completion_unproven")
+        timestamp(saved_page["observed_at"])
+        payload = json.loads(self._witness_blob(page.response.sha256, MAX_INPUT))
+        if (not isinstance(payload, dict) or set(payload) != {"items", "more", "nextCursor"} or
+                payload["more"] is not False or payload["nextCursor"] is not None or not isinstance(payload["items"], list)):
+            raise IngestionFailure("ingestion_state_invalid")
+        if not 1 <= len(payload["items"]) <= 50:
+            raise IngestionFailure("finite_collection_witness_unsupported")
+        if row["expected_revision"] != run.checkpoint_revision + 1:
+            raise IngestionFailure("ingestion_state_invalid")
+        candidates = self.db.execute("SELECT * FROM candidates WHERE round=? AND source=? ORDER BY page,ordinal LIMIT 51",
+                                     (run.round_id, run.source_id)).fetchall()
+        if len(candidates) != len(payload["items"]):
+            raise IngestionFailure("ingestion_state_invalid")
+        observations, candidate_ids, receipt_ids, collection_ids = [], set(), set(), set()
+        for ordinal, (candidate, data) in enumerate(zip(candidates, payload["items"])):
+            item = Item.model_validate(data)
+            if (candidate["page"], candidate["ordinal"]) != (0, ordinal) or Item.model_validate_json(candidate["data"]).wire() != item.wire():
+                raise IngestionFailure("ingestion_state_invalid")
+            if item.collection is None or item.private is not None:
+                raise IngestionFailure("finite_collection_witness_unsupported")
+            collected = item.collection
+            if item.candidate_id in candidate_ids or collected.receipt.sha256 in receipt_ids:
+                raise IngestionFailure("ingestion_state_invalid")
+            candidate_ids.add(item.candidate_id)
+            receipt_ids.add(collected.receipt.sha256)
+            collection_ids.add(collected.collection_id)
+            if len(collection_ids) != 1:
+                raise IngestionFailure("finite_collection_witness_unsupported")
+            if (any(candidate[k] is not None for k in ("hold", "error", "ambiguity", "failure")) or
+                    any(candidate[k] is None for k in ("document", "raw_version", "version"))):
+                raise IngestionFailure("native_completion_unproven")
+            ref = manifest.documents[item.body_ref]
+            raw = self._witness_blob(ref.sha256, MAX_RAW)
+            receipt = self._validate_receipt(row, item, ref, parsers.normalize_url(item.url, source.allowed_hosts),
+                                            self._witness_blob(collected.receipt.sha256, MAX_INPUT))
+            if receipt.body_bytes != len(raw):
+                raise IngestionFailure("ingestion_state_invalid")
+            del raw
+            raw_version = self.store.one("SELECT * FROM raw_versions WHERE id=?", (candidate["raw_version"],))
+            document = self.store.one("SELECT source FROM documents WHERE id=?", (candidate["document"],))
+            if (raw_version is None or document is None or document["source"] != run.source_id or
+                    (raw_version["document"], raw_version["raw_hash"], json.loads(raw_version["metadata"])) !=
+                    (candidate["document"], ref.sha256, item.metadata()) or
+                    digest([candidate["document"], ref.sha256, item.metadata()]) != candidate["raw_version"]):
+                raise IngestionFailure("ingestion_state_invalid")
+            prepared_row = self.store.one("SELECT rowid FROM versions WHERE id=?", (candidate["version"],))
+            if prepared_row is None:
+                raise IngestionFailure("ingestion_state_invalid")
+            with self.db.blobopen("versions", "content", prepared_row["rowid"], readonly=True) as prepared_blob:
+                if len(prepared_blob) > MAX_WITNESS_PREPARED:
+                    raise IngestionFailure("completion_witness_resource_limit")
+            _, version, content, _, _ = self._prepared(row, run.round_id, run.source_id,
+                candidate["document"], candidate["version"], ("read",))
+            runs = [{"start": r["start"], "end": r["end"]} for r in content["rawLocators"]]
+            representation_hash = digest(content["sources"])
+            mapping_hash = digest({"representationHash": representation_hash, "segments": content["segments"], "runs": runs})
+            expected_version = digest([candidate["document"], candidate["raw_version"], parser, run.cleaner_version,
+                                       digest(content["text"]), mapping_hash])
+            if (len(content["text"]) > MAX_TEXT or
+                    (version["raw_version"], content["rawVersion"], content["rawHash"], content["rawArtifactId"],
+                     content["cleanerVersion"], content["textHash"], content["representationHash"], content["mappingHash"], version["id"]) !=
+                    (candidate["raw_version"], candidate["raw_version"], ref.sha256, "raw-" + ref.sha256,
+                     run.cleaner_version, digest(content["text"]), representation_hash, mapping_hash, expected_version)):
+                raise IngestionFailure("ingestion_state_invalid")
+            for locator, interval in zip(content["rawLocators"], runs):
+                if (set(locator) != {"locatorId", "start", "end"} or
+                        not 0 <= interval["start"] < interval["end"] <= len(content["text"]) or
+                        locator["locatorId"] != "loc-" + digest([expected_version, interval, mapping_hash])):
+                    raise IngestionFailure("ingestion_state_invalid")
+            observations.append({"page": 0, "ordinal": ordinal, "candidateId": item.candidate_id,
+                "collectionId": collected.collection_id, "documentId": candidate["document"],
+                "rawVersion": candidate["raw_version"], "documentVersion": candidate["version"],
+                "bodySha256": ref.sha256, "receiptSha256": collected.receipt.sha256,
+                "acquisitionGrant": {"grantId": receipt.grant_id, "revision": receipt.grant_revision},
+                "acquiredAt": receipt.fetched_at, "observedAt": saved_page["observed_at"]})
+            del version, content, runs
+        source, _ = self._authorize(row, ("read",))
+        result = {"schemaVersion": COMPLETION_WITNESS_SCHEMA, "status": "complete",
+            "evidence": {"roundId": run.round_id, "sourceId": run.source_id, "scopeId": run.scope_id,
+                "inputDigest": stored_digest, "manifestSha256": run.fixture_manifest_hash,
+                "configurationSha256": digest(config), "parserProfileSha256": digest(parser),
+                "originalRegistrySha256": row["registry_hash"], "roundRevision": row["expected_revision"],
+                "checkedWindow": None, "coverageThrough": None, "observations": observations},
+            "authorization": {"registrySha256": byte_hash(self.authority.raw),
+                "grant": {"grantId": source.grant.grant_id, "revision": source.grant.revision}, "operations": ["read"]}}
+        if len(canonical(result).encode("utf-8")) > MAX_INPUT:
+            raise IngestionFailure("ingestion_state_invalid")
+        return result
 
     def inspect(self, request: Inspect):
         row = self._round(request.round_id, request.source_id)
