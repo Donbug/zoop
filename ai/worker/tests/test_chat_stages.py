@@ -183,6 +183,9 @@ def test_verification_policy_holds_whatever_is_uncertain():
         {"claims": [{"claimId": "s1c0", "support": None, "unsupportedCausality": "no"}],
          "prohibitedAdvice": "no"}]
     assert verdicts(choice("supported", p=0.34, confidence=0.04), 0.02)[0]["claims"][0]["support"] == "hold"
+    assert verdicts(choice("supported", p=0.34, confidence=0.05), 0.02)[0]["claims"][0]["support"] == "supported"
+    assert verdicts(choice("contradicted", p=0.7, confidence=0.05), 0.02)[0]["claims"][0]["support"] == "contradicted"
+    assert verdicts(choice("insufficient", p=0.7, confidence=0.05), 0.02)[0]["claims"][0]["support"] == "hold"
     assert verdicts(choice("contradicted"), 0.02)[0]["claims"][0]["support"] == "contradicted"
     assert verdicts(choice("insufficient"), 0.02)[0]["claims"][0]["support"] == "hold"
     assert verdicts(choice("supported"), 0.02, 0.95)[0]["claims"][0]["unsupportedCausality"] == "yes"
@@ -261,7 +264,7 @@ def test_server_facts_reach_the_real_jev_http_builder_without_becoming_quotes(tm
         assert field not in outbound
 
 
-def test_chat_support_uses_the_calibrated_evidence_gate():
+def test_chat_support_uses_the_selected_verdict_and_evidence_gate():
     payload = facts_input()
     payload["sections"] = [payload["sections"][0]]
     payload["sections"][0]["claims"] = [{"claimId": "s0c0", "text":
@@ -277,7 +280,7 @@ def test_chat_support_uses_the_calibrated_evidence_gate():
     assert chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL).sections[0].claims[0].support == "hold"
 
     raw["answers"]["s0c0-support"] = choice("insufficient", 0.40, 0.80)
-    assert chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL).sections[0].claims[0].support == "supported"
+    assert chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL).sections[0].claims[0].support == "hold"
 
 
 def test_canonical_facts_do_not_bypass_quote_grants(tmp_path):

@@ -38,6 +38,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -232,8 +233,9 @@ public class ChatToolRunner implements AutoCloseable {
         if (!reservation(run, query, "mcp").inputDigest().equals(kept.inputDigest())) throw invalidKept();
         var result = StrictJson.parseObject(kept.result()).keys(Set.of("schemaVersion", "toolCallId", "capabilityId",
                 "dataVersion", "items", "evidenceIds", "truncated", "nextAllowed", "error"),
-                Set.of("paths", "cachedFrom", "withheld", "webResults"));
-        if (!ChatToolRegistry.SCHEMA_VERSION.equals(result.string("schemaVersion"))
+                Set.of("paths", "cachedFrom", "withheld", "webResults", "evidence"));
+        boolean v2 = com.zoop.chat.mcp.ChatMcpTools.SCHEMA_VERSION.equals(result.string("schemaVersion"));
+        if ((!v2 && !ChatToolRegistry.SCHEMA_VERSION.equals(result.string("schemaVersion")))
                 || !kept.toolCallId().equals(result.string("toolCallId"))
                 || !kept.capabilityId().equals(result.string("capabilityId")) || !result.isNull("error")) {
             throw invalidKept();
@@ -242,7 +244,13 @@ public class ChatToolRunner implements AutoCloseable {
         if (result.has("withheld")) {
             var withheld = result.object("withheld").keys(Set.of("reason", "items", "evidenceIds", "paths"),
                     Set.of("webResults"));
-            cut = withheld.count("items") > 0 || withheld.has("webResults") && withheld.count("webResults") > 0;
+            withheld.count("evidenceIds");
+            withheld.count("paths");
+            int withheldWeb = withheld.has("webResults") ? withheld.count("webResults") : 0;
+            if (v2 && !Set.of("source_grant_denied", "evidence_not_deliverable").contains(withheld.string("reason"))) {
+                throw invalidKept();
+            }
+            cut = withheld.count("items") > 0 || withheldWeb > 0;
         }
         List<ChatWebResult> web = result.has("webResults") ? MAPPER.convertValue(result.array("webResults"), WEB)
                 : List.of();
@@ -250,6 +258,8 @@ public class ChatToolRunner implements AutoCloseable {
                 result.strings("evidenceIds"), result.bool("truncated") || cut, result.bool("nextAllowed"),
                 result.has("paths") ? MAPPER.convertValue(result.array("paths"), PATHS) : List.of(), web);
         if (invalid(query, output) != null) throw invalidKept();
+        if (v2) validateEvidence(result.node(), output);
+        else if (result.has("evidence")) throw invalidKept();
         // A hit is kept only with its item, and only a web search has hits.
         List<String> hitItems = output.items().stream().filter(i -> "web_result".equals(i.kind())).map(ChatToolItem::id)
                 .toList();
@@ -263,11 +273,20 @@ public class ChatToolRunner implements AutoCloseable {
                     || output.nextAllowed() != earlier.nextAllowed()
                     || !earlier.evidenceIds().containsAll(output.evidenceIds())
                     || !earlier.webResults().containsAll(output.webResults())) throw invalidKept();
+            if (v2) {
+                var ancestor = StrictJson.parseObject(source.result());
+                if (!com.zoop.chat.mcp.ChatMcpTools.SCHEMA_VERSION.equals(ancestor.string("schemaVersion"))) throw invalidKept();
+                var original = evidenceTuples(ancestor.node());
+                if (!original.containsAll(evidenceTuples(result.node()))) throw invalidKept();
+            }
             for (var item : output.items()) {
                 if (earlier.items().stream().noneMatch(original -> Objects.equals(original.id(), item.id())
                         && Objects.equals(original.kind(), item.kind()) && Objects.equals(original.label(), item.label())
                         && original.companyIds().equals(item.companyIds())
                         && original.evidenceIds().containsAll(item.evidenceIds()))) throw invalidKept();
+            }
+            for (var path : output.paths()) {
+                if (earlier.paths().stream().noneMatch(original -> pathSubset(path, original))) throw invalidKept();
             }
             output = new ChatToolOutput(output.dataVersion(), output.items(), output.evidenceIds(),
                     output.truncated() || earlier.truncated() || output.items().size() < earlier.items().size(),
@@ -277,6 +296,40 @@ public class ChatToolRunner implements AutoCloseable {
         visiting.remove(kept.toolCallId());
         restored.put(kept.toolCallId(), bound);
         return bound;
+    }
+
+    private static boolean pathSubset(ChatToolPath path, ChatToolPath original) {
+        if (!Objects.equals(path.fromId(), original.fromId()) || !Objects.equals(path.toId(), original.toId())
+                || !Objects.equals(path.status(), original.status()) || path.steps().size() != original.steps().size()) return false;
+        for (int i = 0; i < path.steps().size(); i++) {
+            var step = path.steps().get(i);
+            var prior = original.steps().get(i);
+            if (!Objects.equals(step.edgeId(), prior.edgeId()) || !Objects.equals(step.sourceId(), prior.sourceId())
+                    || !Objects.equals(step.targetId(), prior.targetId()) || !Objects.equals(step.relation(), prior.relation())
+                    || !Objects.equals(step.role(), prior.role()) || !prior.evidenceIds().containsAll(step.evidenceIds())) return false;
+        }
+        return true;
+    }
+
+    private static List<com.zoop.chat.mcp.ChatMcpSources.Evidence> evidenceTuples(JsonNode node) {
+        if (!node.path("evidence").isArray()) throw invalidKept();
+        List<com.zoop.chat.mcp.ChatMcpSources.Evidence> tuples = new ArrayList<>();
+        for (var entry : node.path("evidence").values()) {
+            var tuple = StrictJson.parseObject(entry.toString()).exactly(Set.of("evidenceId", "sourceId", "quote"));
+            tuples.add(new com.zoop.chat.mcp.ChatMcpSources.Evidence(tuple.string("evidenceId"),
+                    tuple.string("sourceId"), tuple.string("quote")));
+        }
+        return tuples;
+    }
+
+    private static void validateEvidence(JsonNode node, ChatToolOutput output) {
+        var tuples = evidenceTuples(node);
+        if (!tuples.stream().map(com.zoop.chat.mcp.ChatMcpSources.Evidence::evidenceId).toList()
+                .equals(output.evidenceIds())) throw invalidKept();
+        var ids = new HashSet<>(output.evidenceIds());
+        if (output.items().stream().anyMatch(i -> "evidence".equals(i.kind()) && !ids.contains(i.id()))
+                || output.paths().stream().flatMap(p -> p.steps().stream())
+                        .anyMatch(s -> !ids.containsAll(s.evidenceIds()))) throw invalidKept();
     }
 
     private static ChatModels.Failure invalidKept() {

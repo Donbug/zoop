@@ -136,7 +136,7 @@ public class ChatMcpConfiguration {
     static McpStatelessSyncServer server(HttpServletStatelessServerTransport transport, ChatMcpTools tools,
             JsonMapper mapper) {
         return McpServer.sync(transport).jsonMapper(new JacksonMcpJsonMapper(mapper))
-                .serverInfo("zoop-chat", "1")
+                .serverInfo("zoop-chat", "2")
                 .capabilities(McpSchema.ServerCapabilities.builder().tools(false).build())
                 .requestTimeout(REQUEST_TIMEOUT)
                 .addToolFilter(ChatMcpTools::visible)

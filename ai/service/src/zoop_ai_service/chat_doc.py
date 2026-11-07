@@ -22,6 +22,12 @@ invocation id. The input carries the application's job-scoped MCP grant token; t
 and keeps it out of every identity and stored answer. The MCP server URL is never part of a request: it is the operator's `ZOOP_AI_CHAT_MCP_SERVER_URL`.
 `mcp.recipient` names the recipient the application checked its MCP results' send grants for (those results reach the provider from the application, not
 through this runtime); a step is sent only when it is exactly the stage's own recipient, otherwise it fails `mcp_recipient_mismatch` with nothing sent.
+Java's `chat-mcp/v2` callback retains exact bounded `evidenceId/sourceId/quote` tuples, with quotes limited to 2,000 Java UTF-16
+units. Java rechecks current citation and exact-recipient send rights for fresh/cached delivery and, within the existing step
+deadline, before every continuation, including finalizing/all-denied steps. Withdrawn/unavailable prior content refuses a new
+send; historical receipts remain records of content already received. Cache delivery only intersects original tuples.
+The agent adapter is `zoop-chat-agent-resource-2`; expected delivery contract and unchanged callback limits join the canonical
+MCP URL in its runtime fingerprint. Compatible API/service/worker deployment and current store/continuation permission are operator gates.
 
 **Once per invocation.** `invocationId` (equal to `Idempotency-Key`) names one stage of one attempt. The runtime sends it at most once: the same id and input
 return the stored outcome, changed input/resources under the same id are `invocation_conflict`, and a request whose outcome is unknown stays `unknown`.
@@ -99,7 +105,7 @@ def examples() -> dict[str, Any]:
         "answer": {"responseId": "resp_synthetic_1", "status": "approval_required", "answer": None, "mcpCalls": [],
                    "approvalRequests": [{"approvalRequestId": "mcpr_synthetic_1", "toolName": "company_read",
                                          "arguments": {"targets": ["KRX:000660"]}, "requirementIds": ["r1"]}]},
-        "failure": None, "receipt": {**receipt, "model": "authored-synthetic-chat-agent", "promptVersion": "zoop-chat-agent-resource-1"},
+        "failure": None, "receipt": {**receipt, "model": "authored-synthetic-chat-agent", "promptVersion": "zoop-chat-agent-resource-2"},
         "resourceBinding": allocations["chat-agent:replay"]["binding"]})
     reachable = ChatMcpHealth.model_validate({"schemaVersion": "zoop-ai-chat-6", "mcp": "reachable"})
     unreachable = ChatMcpHealth.model_validate({"schemaVersion": "zoop-ai-chat-6", "mcp": "unreachable", "reason": "mcp_timeout"})

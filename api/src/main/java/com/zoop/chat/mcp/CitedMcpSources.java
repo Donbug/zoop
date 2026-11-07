@@ -32,13 +32,16 @@ public class CitedMcpSources implements ChatMcpSources {
     }
 
     @Override
-    public Map<String, String> sourcesOf(ChatRun run, Collection<String> evidenceIds) {
-        Map<String, String> sources = new LinkedHashMap<>();
-        for (String id : evidenceIds) {
-            citations.cite(id, run.graphVersionId(), run.context().asOf(), run.jobId()).flatMap(this::source)
-                    .ifPresent(source -> sources.put(id, source));
+    public Map<String, Evidence> evidenceOf(ChatRun run, Collection<String> evidenceIds) {
+        Map<String, Evidence> evidence = new LinkedHashMap<>();
+        for (String id : new java.util.LinkedHashSet<>(evidenceIds)) {
+            citations.cite(id, run.graphVersionId(), run.context().asOf(), run.jobId())
+                    .filter(c -> id.equals(c.evidenceId()) && c.quote() != null
+                            && !c.quote().isEmpty() && c.quote().length() <= 2000)
+                    .ifPresent(c -> source(c).filter(s -> !s.isBlank())
+                            .ifPresent(s -> evidence.put(id, new Evidence(id, s, c.quote()))));
         }
-        return sources;
+        return evidence;
     }
 
     private Optional<String> source(Citation citation) {

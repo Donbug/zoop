@@ -40,6 +40,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.NullNode;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -551,6 +552,71 @@ class ChatExecutorPostgresTest {
         assertEquals("failed:" + ChatRunControl.RESULT_TOO_LARGE, jdbc.queryForObject("SELECT status || ':' || error_code "
                 + "FROM chat_tool_calls WHERE chat_job_id = ?", String.class, jobId));
         assertTrue(control.owned(), "the run goes on");
+    }
+
+    @Test
+    void quoteBearingJsonbLimitsRefuseOversizeAndSerializeConcurrentJobTotals() throws Exception {
+        String jobId = submit("인용문 저장 크기와 동시 합계");
+        executor.claimNext().orElseThrow();
+        var control = executor.attach(jobId, 1).orElseThrow().control();
+        control.reserveToolCalls(1, java.util.stream.IntStream.range(0, 6)
+                .mapToObj(i -> reservation("company.read")).toList());
+        int padding = (int) (ChatRunControl.MAX_CALL_RESULT_BYTES - runs.storedResultBytes(quoteEnvelope("tc-0", "")));
+        String label = "x".repeat(padding);
+        String over = quoteEnvelope("tc-0", label + "x");
+        assertTrue(over.getBytes(java.nio.charset.StandardCharsets.UTF_8).length < ChatRunControl.MAX_CALL_RESULT_BYTES);
+        assertEquals(ChatRunControl.MAX_CALL_RESULT_BYTES + 1, runs.storedResultBytes(over));
+        control.toolCallStarted("tc-0");
+        assertEquals(ChatRunControl.RESULT_TOO_LARGE, assertThrows(ChatToolCallRefused.class,
+                () -> control.toolCallFinished("tc-0", new ChatToolCallEnd("succeeded", null, "v1",
+                        List.of(EVIDENCE), false, false, over))).code());
+        for (String id : List.of("tc-1", "tc-2", "tc-3")) {
+            String envelope = quoteEnvelope(id, label);
+            assertEquals(ChatRunControl.MAX_CALL_RESULT_BYTES, runs.storedResultBytes(envelope));
+            control.toolCallStarted(id);
+            control.toolCallFinished(id, new ChatToolCallEnd("succeeded", null, "v1", List.of(EVIDENCE), false, false, envelope));
+        }
+        var start = new java.util.concurrent.CyclicBarrier(2);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            List<Future<String>> outcomes = new ArrayList<>();
+            for (String id : List.of("tc-4", "tc-5")) {
+                control.toolCallStarted(id);
+                outcomes.add(pool.submit(() -> {
+                    start.await(5, TimeUnit.SECONDS);
+                    try {
+                        control.toolCallFinished(id, new ChatToolCallEnd("succeeded", null, "v1",
+                                List.of(EVIDENCE), false, false, quoteEnvelope(id, label)));
+                        return "succeeded";
+                    } catch (ChatToolCallRefused refused) {
+                        return refused.code();
+                    }
+                }));
+            }
+            var results = outcomes.stream().map(f -> {
+                try { return f.get(10, TimeUnit.SECONDS); }
+                catch (Exception failure) { throw new AssertionError(failure); }
+            }).sorted().toList();
+            assertEquals(List.of(ChatRunControl.RESULTS_OVER_BUDGET, "succeeded").stream().sorted().toList(), results);
+        }
+        assertEquals(ChatRunControl.MAX_KEPT_RESULT_BYTES, runs.keptResultBytes(jobId));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM chat_tool_calls WHERE chat_job_id = ? "
+                + "AND status = 'failed' AND result IS NULL AND data_version IS NULL AND evidence_ids = '{}'::text[]",
+                Integer.class, jobId));
+        var stored = runs.keptToolResults(jobId, 1).getFirst();
+        assertEquals("합성 \"\\é😀".repeat(200), mapper.readTree(stored.result()).path("evidence").get(0).path("quote").asString());
+    }
+
+    private String quoteEnvelope(String callId, String label) {
+        return mapper.writeValueAsString(Map.ofEntries(
+                Map.entry("schemaVersion", "chat-mcp/v2"), Map.entry("toolCallId", callId),
+                Map.entry("capabilityId", "company.read"), Map.entry("dataVersion", "v1"),
+                Map.entry("items", List.of(Map.of("id", "KRX:000660", "kind", "company", "label", label,
+                        "companyIds", List.of("KRX:000660"), "evidenceIds", List.of(EVIDENCE)))),
+                Map.entry("evidenceIds", List.of(EVIDENCE)),
+                Map.entry("evidence", List.of(Map.of("evidenceId", EVIDENCE, "sourceId", "synthetic",
+                        "quote", "합성 \"\\é😀".repeat(200)))),
+                Map.entry("truncated", false), Map.entry("nextAllowed", false),
+                Map.entry("error", NullNode.getInstance())));
     }
 
     /** {@code {"items":[{"a":1,"b":2},...]}} with {@code n} objects, written without spaces. */

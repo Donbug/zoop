@@ -742,6 +742,55 @@ class ChatMcpAgentTest {
         assertEquals("succeeded", store.toolCalls(JOB).getFirst().status);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"read", "send", "unavailable", "metadata"})
+    void withdrawalBeforeAnAllDeniedFinalizingContinuationStopsBeforeProviderDispatch(String withdrawn) {
+        var readable = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var current = new CitedMcpSources((id, version, asOf, trace) -> readable.get()
+                ? Optional.of(new Citation("company_profile", id, "합성 MOU 원문", null, null, "KRX:000660", "1",
+                        0, 9, null, null, null, null)) : Optional.empty(), null);
+        tools = new ChatMcpTools(registry, runner, executor,
+                new ChatMcpSendGate(new ChatSendGrants(dir.resolve("chat-grants.json").toString(),
+                        ChatSendGrantsTest.RECIPIENT, clock), current), mapper);
+        List<String> receipts = new ArrayList<>();
+        luna.script.add(n -> held("mcpr_1", "company_read", Map.of("targets", List.of("KRX:000660"))));
+        luna.script.add(n -> {
+            receipts.add(store.keptToolResults(JOB, 1).getFirst().result());
+            switch (withdrawn) {
+                case "read" -> readable.set(false);
+                case "send" -> ChatSendGrantsTest.write(dir.resolve("chat-grants.json"));
+                case "metadata" -> ChatSendGrantsTest.write(dir.resolve("chat-grants.json"),
+                        List.of(ChatSendGrantsTest.grant(ChatCompanyProfiles.SOURCE_ID,
+                                Map.of("allowedOperations", List.of("read", "quote-display")))));
+                case "unavailable" -> {
+                    try { java.nio.file.Files.delete(dir.resolve("chat-grants.json")); }
+                    catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                }
+                default -> throw new AssertionError(withdrawn);
+            }
+            return held("mcpr_2", "issue_read", Map.of("targets", List.of("not-reachable")));
+        });
+        luna.script.add(n -> done());
+        var bounded = steps(false);
+        List<Boolean> finalizing = new ArrayList<>();
+        var failure = assertThrows(ChatModels.Failure.class, () -> run(new ChatAgentPath.Steps() {
+            public ChatModels.AgentStep run(Function<com.zoop.ai.chat.ChatModelPermit, ChatModels.AgentStep> step,
+                    boolean closing) {
+                finalizing.add(closing);
+                return bounded.run(step, closing);
+            }
+            public boolean closing() { return luna.inputs.size() >= 2; }
+            public boolean contextFits(long input, long output, long explicit, int approvals) {
+                return bounded.contextFits(input, output, explicit, approvals);
+            }
+        }));
+        assertEquals(withdrawn.equals("unavailable") ? "send_grants_unavailable" : "source_grant_withdrawn", failure.code());
+        assertEquals(2, luna.inputs.size(), "the next provider dispatch never occurs");
+        assertEquals(List.of(false, false, true), finalizing);
+        assertEquals(receipts.getFirst(), store.keptToolResults(JOB, 1).getFirst().result());
+        assertEquals("합성 MOU 원문", mapper.readTree(receipts.getFirst()).path("evidence").get(0).path("quote").asString());
+    }
+
     @Test
     void aCallTheServerCannotReserveIsDeniedAndNeverRuns() {
         luna.script.add(n -> held("mcpr_1", "company_read", Map.of("targets", List.of("KRX:000660"), "memberId", "member-b")));
@@ -959,6 +1008,40 @@ class ChatMcpAgentTest {
                 List.of(repeated, cached, withEnvelope(kept, cachedEnvelope))));
         envelope.put("unknown", true);
         assertThrows(ChatModels.Failure.class, () -> restored(attached, kept, envelope));
+    }
+
+    @Test
+    void retainedV2TuplesAreBoundToRootsCurrentSourcesAndCacheAncestry() {
+        luna.script.add(n -> held("mcpr_1", "company_read", Map.of("targets", List.of("KRX:000660"))));
+        luna.script.add(n -> done());
+        run(steps(false));
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        var kept = store.keptToolResults(JOB, 1).getFirst();
+        var original = (ObjectNode) mapper.readTree(kept.result());
+        for (String invalid : List.of("missing", "id", "empty", "overbound", "extra", "reference", "withheld")) {
+            var envelope = original.deepCopy();
+            var tuple = (ObjectNode) envelope.path("evidence").get(0);
+            switch (invalid) {
+                case "missing" -> envelope.remove("evidence");
+                case "id" -> tuple.put("evidenceId", "ev-other");
+                case "empty" -> tuple.put("quote", "");
+                case "overbound" -> tuple.put("quote", "😀".repeat(1001));
+                case "extra" -> tuple.put("article", "forbidden-extra");
+                case "reference" -> ((ObjectNode) envelope.path("items").get(0)).putArray("evidenceIds").add("ev-other");
+                case "withheld" -> envelope.putObject("withheld").put("reason", "evidence_not_deliverable")
+                        .put("items", 0).put("evidenceIds", -1).put("paths", 0);
+                default -> throw new AssertionError(invalid);
+            }
+            assertThrows(ChatModels.Failure.class, () -> restored(attached, kept, envelope), invalid);
+        }
+        var changed = original.deepCopy();
+        ((ObjectNode) changed.path("evidence").get(0)).put("sourceId", "different-source");
+        assertEquals("source_grant_withdrawn", assertThrows(ChatModels.Failure.class,
+                () -> tools.requireContinuationSendable(attached.run(), List.of(withEnvelope(kept, changed)))).code());
+        var cached = original.deepCopy();
+        cached.put("toolCallId", "cached-tuple").put("cachedFrom", kept.toolCallId());
+        ((ObjectNode) cached.path("evidence").get(0)).put("quote", "다른 인용");
+        assertThrows(ChatModels.Failure.class, () -> runner.restore(attached.run(), List.of(kept, withEnvelope(kept, cached))));
     }
 
     private ChatToolResult restored(ChatJobExecutor.Attached attached, ChatKeptToolResult kept,

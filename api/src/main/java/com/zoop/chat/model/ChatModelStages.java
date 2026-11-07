@@ -416,14 +416,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             wireCitations.add(quote(citation).orElseThrow(() -> new ChatModels.Failure(Fate.REFUSED,
                     "a cited quote cannot be sent for verification")));
         }
-        JsonNode answer;
-        try {
-            answer = call(run, VERIFICATION, "verify", input, permit);
-        } catch (ChatModels.Failure verifierUnavailable) {
-            if (verifierUnavailable.category() == ChatStageReply.FailureCategory.CONTRACT) throw verifierUnavailable;
-            // The existing semantic-unavailability outcome has its own release gate, separate from resource enforcement.
-            return verificationFallback(sections);
-        }
+        JsonNode answer = call(run, VERIFICATION, "verify", input, permit);
         return decode(() -> {
             List<ChatSemanticVerdicts.Verdict> verdicts = new ArrayList<>();
             for (JsonNode v : array(answer, "sections")) {
@@ -438,20 +431,6 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             }
             return new ChatSemanticVerdicts(verdicts);
         });
-    }
-
-    static ChatSemanticVerdicts verificationFallback(List<ChatGeneratedAnswer.Section> sections) {
-        List<ChatSemanticVerdicts.Verdict> verdicts = new ArrayList<>();
-        for (int index = 0; index < sections.size(); index++) {
-            ChatGeneratedAnswer.Section section = sections.get(index);
-            boolean general = "general_knowledge".equals(section.basis());
-            List<ChatSemanticVerdicts.ClaimVerdict> claims = ChatClaims.split(index, section.text()).stream()
-                    .map(claim -> new ChatSemanticVerdicts.ClaimVerdict(claim.id(),
-                            general ? null : "supported", "no"))
-                    .toList();
-            verdicts.add(new ChatSemanticVerdicts.Verdict("no", claims));
-        }
-        return new ChatSemanticVerdicts(List.copyOf(verdicts));
     }
 
     private static ObjectNode serverFact(ChatModels.ServerFact fact) {
@@ -573,7 +552,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         ChatStageCall request = new ChatStageCall(invocationId(run, suffix), stage, mode, input, permit);
         String execution;
         try {
-            execution = record(() -> recorder.start(run.jobId(), run.attemptNo(), stage, mode));
+            execution = record(() -> recorder.start(run.jobId(), run.attemptNo(), stage, mode), false);
         } catch (RuntimeException unrecorded) {
             throw new ChatModels.Failure(Fate.NOT_SENT, "the model call could not be recorded");
         }
@@ -658,7 +637,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             record(() -> {
                 recorder.finish(execution, status, sendState, receipt, code);
                 return true;
-            });
+            }, true);
         } catch (RuntimeException unrecorded) {
             org.slf4j.LoggerFactory.getLogger(ChatModelStages.class).warn("chat model outcome record did not finish", unrecorded);
         } finally {
@@ -666,18 +645,30 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         }
     }
 
-    private static <T> T record(java.util.concurrent.Callable<T> write) {
+    private static <T> T record(java.util.concurrent.Callable<T> write, boolean finishRecording) {
         var task = new java.util.concurrent.FutureTask<T>(write);
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(3);
+        boolean interrupted = false;
         Thread.ofVirtual().name("chat-model-record").start(task);
         try {
-            return task.get(3000, java.util.concurrent.TimeUnit.MILLISECONDS);
-        } catch (InterruptedException interrupted) {
-            task.cancel(true);
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("model recording interrupted", interrupted);
+            while (true) {
+                try {
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining <= 0) throw new java.util.concurrent.TimeoutException("model recording deadline expired");
+                    return task.get(remaining, java.util.concurrent.TimeUnit.NANOSECONDS);
+                } catch (InterruptedException stopped) {
+                    interrupted = true;
+                    if (!finishRecording) {
+                        task.cancel(true);
+                        throw new IllegalStateException("model recording interrupted", stopped);
+                    }
+                }
+            }
         } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException failed) {
             task.cancel(true);
             throw new IllegalStateException("model recording did not finish", failed);
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
         }
     }
 

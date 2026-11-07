@@ -289,6 +289,50 @@ class AiChatContractTest {
         assertEquals("succeeded null", recorded.getLast(), "the bound verifier must actually succeed");
     }
 
+    @Test
+    void theOrchestratorKeepsVerifierFailuresSeparateFromSemanticHolds() {
+        var registry = new ChatToolRegistry(List.of(new ChatTool() {
+            public ChatCapability capability() { return ChatCapability.COMPANY_READ; }
+            public ChatToolOutput read(ChatToolScope scope, ChatToolRequest query) {
+                return new ChatToolOutput(scope.graphVersionId(), List.of(new ChatToolItem(
+                        "c-samsung", "company", "삼성전자", List.of("c-samsung"), List.of(EVIDENCE))),
+                        List.of(EVIDENCE), false, false);
+            }
+        }));
+        ChatModels.Router router = (run, bound, permit) -> new ChatRouteDecision(List.of(
+                new ChatRouteDecision.Requirement("r1", ANSWER_QUESTION, true, Map.of(ChatQueryType.Q03, 0.9),
+                        Map.of("company.read", 0.9), List.of("c-samsung"), 0.0, null)), null);
+        ChatModelStages ports = stages();
+        try (var runner = new ChatToolRunner(registry);
+                var engine = new OrchestratedChatEngine(router, ports, ports, registry, runner,
+                        (id, version, asOf, trace) -> Optional.of(citation(id, "art-synthetic")),
+                        Clock.fixed(Instant.parse("2026-10-22T00:00:00Z"), ZoneOffset.UTC), ports)) {
+            for (String scenario : List.of("supported", "hold", "provider-error", "unknown", "contradicted", "insufficient")) {
+                ChatRun run = run(ANSWER_QUESTION, "chat-outcome-" + scenario);
+                ChatEngineOutcome outcome = engine.answer(run, new GateControl());
+                if (scenario.equals("provider-error") || scenario.equals("unknown")) {
+                    boolean unknown = scenario.equals("unknown");
+                    assertEquals(new ChatEngineOutcome.Failed("transient",
+                            unknown ? "response_unknown" : "provider_error", !unknown), outcome, scenario);
+                    assertEquals(unknown ? "unknown provider_response_unknown" : "failed provider_http_503",
+                            recorded.getLast());
+                    ChatStageReply.Receipt receipt = receipts.getLast();
+                    assertEquals(outcome, engine.answer(run, new GateControl()), "stored failure remains terminal");
+                    assertEquals(receipt, receipts.getLast(), "the same invocation retains its original receipt");
+                } else {
+                    var result = assertInstanceOf(ChatEngineOutcome.Completed.class, outcome, scenario).result();
+                    assertEquals(scenario.equals("supported") ? "answered" : "insufficient_evidence", result.outcome(), scenario);
+                    assertEquals(scenario.equals("supported") ? List.of(EVIDENCE) : List.of(),
+                            result.citations().stream().map(Citation::evidenceId).toList(), scenario);
+                    assertEquals("succeeded null", recorded.getLast());
+                }
+                String observed = outcome instanceof ChatEngineOutcome.Completed completed
+                        ? completed.result().outcome() : ((ChatEngineOutcome.Failed) outcome).reason();
+                System.out.println("chat-verification-outcome: scenario=" + scenario + ", outcome=" + observed);
+            }
+        }
+    }
+
     private static final class GateControl extends com.zoop.chat.executor.ChatResourceFixtures.Control {
         @Override protected Clock resourceClock() { return Clock.fixed(Instant.parse("2026-10-22T00:00:00Z"), ZoneOffset.UTC); }
         int modelCalls;

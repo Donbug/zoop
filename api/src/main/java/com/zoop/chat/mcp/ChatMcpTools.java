@@ -8,16 +8,13 @@ import com.zoop.chat.executor.ChatWebBudgetExhausted;
 import com.zoop.chat.repository.ChatKeptToolResult;
 import com.zoop.chat.orchestrator.ChatPeriods;
 import com.zoop.chat.tool.ChatCapability;
-import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolOutput;
-import com.zoop.chat.tool.ChatToolPath;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRequest;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.chat.tool.ChatToolRunner;
 import com.zoop.chat.tool.ChatToolUnavailable;
 import com.zoop.chat.tool.ChatWebQueryPolicy;
-import com.zoop.chat.tool.ChatWebResult;
 import com.zoop.chat.tool.ChatWebSearchTool;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
@@ -69,20 +66,16 @@ public final class ChatMcpTools {
      * and again as stored when it is recorded ({@link ChatRunControl#toolCallFinished}).
      */
     static final int MAX_RESULT_BYTES = ChatRunControl.MAX_CALL_RESULT_BYTES;
+    public static final String SCHEMA_VERSION = "chat-mcp/v2";
+    static final String CONTRACT_MISMATCH = "chat_runtime_contract_mismatch";
 
     /** The longest wait for an identical request being read: a tool stage (10 s) and its record (2 s). */
     static final Duration SINGLE_FLIGHT_WAIT = Duration.ofSeconds(12);
-    private static final TypeReference<List<ChatToolItem>> ITEMS = new TypeReference<>() { };
-    private static final TypeReference<List<ChatToolPath>> PATHS = new TypeReference<>() { };
-    private static final TypeReference<List<String>> STRINGS = new TypeReference<>() { };
-    private static final TypeReference<List<ChatWebResult>> WEB = new TypeReference<>() { };
 
     private static final Map<String, Object> REQUIREMENT_IDS_SCHEMA = Map.of("type", "array", "minItems", 1, "uniqueItems", true,
             "items", Map.of("type", "string", "minLength", 1, "maxLength", 32),
             "description", "이 호출이 답하는 요구의 requirementId. 구간은 자기 요구를 지목한 호출의 결과만 인용할 수 있음");
 
-    /** Room for the result envelope's own fields beyond the adapter output. */
-    private static final int ENVELOPE_BYTES = 1024;
 
     static final String NOT_GRANTED = "tool_not_granted";
     static final String NOT_APPROVED = "call_not_approved";
@@ -242,11 +235,30 @@ public final class ChatMcpTools {
             Optional<ChatKeptToolResult> reused = executor.keptToolResult(run.jobId(), run.attemptNo(),
                     call.capabilityId(), digest);
             if (reused.isPresent()) {
-                ChatToolResult kept = kept(mapper, reused.get());
-                delivery.cachedFrom = kept.toolCallId();
-                result = runner.runCached(run, control, approved.get(), call, new ChatToolOutput(
-                        kept.dataVersion(), kept.items(), kept.evidenceIds(), Boolean.TRUE.equals(kept.truncated()),
-                        Boolean.TRUE.equals(kept.nextAllowed()), kept.paths(), kept.webResults()), delivery);
+                ChatToolOutput cached = new ChatToolOutput(run.graphVersionId(), List.of(), List.of(), false, false);
+                try {
+                    var retained = executor.keptToolResults(run.jobId(), run.attemptNo());
+                    ChatToolResult kept = runner.restore(run, retained).stream()
+                            .filter(r -> r.toolCallId().equals(reused.get().toolCallId())).findFirst().orElseThrow();
+                    delivery.cachedFrom = kept.toolCallId();
+                    var envelope = mapper.readTree(reused.get().result());
+                    if (!SCHEMA_VERSION.equals(envelope.path("schemaVersion").asString())) {
+                        delivery.refusal = CONTRACT_MISMATCH;
+                    } else {
+                        delivery.original = evidence(envelope);
+                        cached = new ChatToolOutput(kept.dataVersion(), kept.items(), kept.evidenceIds(),
+                                Boolean.TRUE.equals(kept.truncated()), Boolean.TRUE.equals(kept.nextAllowed()),
+                                kept.paths(), kept.webResults());
+                        var left = envelope.path("withheld");
+                        delivery.inherited = new ChatMcpSendGate.Withheld(left.path("items").asInt(0),
+                                left.path("evidenceIds").asInt(0), left.path("paths").asInt(0),
+                                left.path("webResults").asInt(0),
+                                "evidence_not_deliverable".equals(left.path("reason").asString()) ? 1 : 0);
+                    }
+                } catch (com.zoop.chat.orchestrator.ChatModels.Failure invalid) {
+                    delivery.refusal = CONTRACT_MISMATCH;
+                }
+                result = runner.runCached(run, control, approved.get(), call, cached, delivery);
             } else {
                 result = runner.runClaimed(run, control, approved.get(), call, delivery);
             }
@@ -264,13 +276,52 @@ public final class ChatMcpTools {
                 || ChatRunControl.RESULTS_OVER_BUDGET.equals(result.error())) {
             return refused(result.error());
         }
-        return callback(result, delivery.withheld, delivery.cachedFrom);
+        return result.succeeded() ? delivery.wire : callback(structured(result, List.of(), delivery.withheld,
+                delivery.cachedFrom), true);
     }
 
-    private McpSchema.CallToolResult callback(ChatToolResult result, ChatMcpSendGate.Withheld withheld, String cachedFrom) {
-        Map<String, Object> structured = structured(result, withheld, cachedFrom);
+    private McpSchema.CallToolResult callback(Map<String, Object> structured, boolean error) {
         return McpSchema.CallToolResult.builder().structuredContent(structured)
-                .addTextContent(mapper.writeValueAsString(structured)).isError(!result.succeeded()).build();
+                .addTextContent(mapper.writeValueAsString(structured)).isError(error).build();
+    }
+
+    private List<ChatMcpSources.Evidence> evidence(JsonNode node) {
+        return mapper.convertValue(node.path("evidence"), new TypeReference<List<ChatMcpSources.Evidence>>() { });
+    }
+
+    public void requireContinuationSendable(ChatRun run, List<ChatKeptToolResult> retained) {
+        var restored = runner.restore(run, retained);
+        Map<String, ChatMcpSources.Evidence> originals = new LinkedHashMap<>();
+        for (var kept : retained) {
+            var node = mapper.readTree(kept.result());
+            if (!SCHEMA_VERSION.equals(node.path("schemaVersion").asString())) throw continuationFailure(CONTRACT_MISMATCH);
+            for (var quote : evidence(node)) {
+                var prior = originals.putIfAbsent(quote.evidenceId(), quote);
+                if (prior != null && !prior.equals(quote)) throw continuationFailure(CONTRACT_MISMATCH);
+            }
+        }
+        try {
+            var manifest = new ChatToolOutput(run.graphVersionId(), List.of(), List.copyOf(originals.keySet()), false, false);
+            var current = gate.pass(run, manifest);
+            if (!current.evidence().equals(List.copyOf(originals.values()))) throw continuationFailure("source_grant_withdrawn");
+            Map<String, ChatMcpSources.Evidence> placed = new LinkedHashMap<>();
+            current.evidence().forEach(e -> placed.put(e.evidenceId(), e));
+            for (var result : restored) {
+                var output = new ChatToolOutput(result.dataVersion(), result.items(), result.evidenceIds(), false, false,
+                        result.paths(), result.webResults());
+                var checked = gate.pass(run, output, placed);
+                if (checked.withheld().any()) {
+                    throw continuationFailure("source_grant_withdrawn");
+                }
+            }
+        } catch (ChatSendGrants.Unavailable | ChatToolUnavailable unavailable) {
+            throw continuationFailure(SEND_GRANTS_UNAVAILABLE);
+        }
+    }
+
+    private static com.zoop.chat.orchestrator.ChatModels.Failure continuationFailure(String code) {
+        return new com.zoop.chat.orchestrator.ChatModels.Failure(
+                com.zoop.chat.orchestrator.ChatModels.Failure.Fate.REFUSED, code, "retained MCP sources cannot be sent");
     }
 
     /**
@@ -286,6 +337,10 @@ public final class ChatMcpTools {
         private volatile ChatMcpSendGate.Withheld withheld = ChatMcpSendGate.Withheld.NONE;
         /** The call whose kept result this one reuses; null for a read. */
         private volatile String cachedFrom;
+        private volatile List<ChatMcpSources.Evidence> quotes = List.of();
+        private List<ChatMcpSources.Evidence> original;
+        private ChatMcpSendGate.Withheld inherited = ChatMcpSendGate.Withheld.NONE;
+        private McpSchema.CallToolResult wire;
 
         Delivery(ChatRun run) {
             this.run = run;
@@ -294,8 +349,13 @@ public final class ChatMcpTools {
         @Override
         public ChatToolOutput pass(ChatToolOutput output) {
             try {
-                var passed = gate.pass(run, output);
-                withheld = passed.withheld();
+                if (refusal != null) return output;
+                var passed = original == null ? gate.pass(run, output) : gate.passCached(run, output, original);
+                var left = passed.withheld();
+                withheld = new ChatMcpSendGate.Withheld(left.items() + inherited.items(),
+                        left.evidenceIds() + inherited.evidenceIds(), left.paths() + inherited.paths(),
+                        left.webResults() + inherited.webResults(), left.undeliverable() + inherited.undeliverable());
+                quotes = passed.evidence();
                 return passed.output();
             } catch (ChatSendGrants.Unavailable | ChatToolUnavailable unchecked) {
                 refusal = SEND_GRANTS_UNAVAILABLE;
@@ -306,19 +366,20 @@ public final class ChatMcpTools {
         @Override
         public String refuse(ChatToolOutput output) {
             if (refusal != null) return refusal;
-            // The envelope adds a few short fields (ids, versions, flags) to the output's own serialization.
-            int bytes = mapper.writeValueAsBytes(output).length + ENVELOPE_BYTES;
-            if (bytes > MAX_RESULT_BYTES) refusal = RESULT_TOO_LARGE;
+            if (mapper.writeValueAsBytes(output).length > MAX_RESULT_BYTES) refusal = RESULT_TOO_LARGE;
             return refusal;
         }
 
         @Override
         public String keep(ChatToolResult result) {
-            var wire = callback(result, withheld, cachedFrom);
-            if (mapper.writeValueAsBytes(wire).length > 790528) {
+            var envelope = structured(result, quotes, withheld, cachedFrom);
+            String json = mapper.writeValueAsString(envelope);
+            wire = McpSchema.CallToolResult.builder().structuredContent(envelope).addTextContent(json).isError(false).build();
+            if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_RESULT_BYTES
+                    || mapper.writeValueAsBytes(wire).length > 790528) {
                 throw new com.zoop.chat.executor.ChatToolCallRefused(ChatRunControl.RESULT_TOO_LARGE);
             }
-            return mapper.writeValueAsString(structured(result, withheld, cachedFrom));
+            return json;
         }
     }
 
@@ -435,15 +496,16 @@ public final class ChatMcpTools {
      * The envelope the model receives. When the send gate left something out, {@code withheld} says how much of each part and
      * why, so a short result is never read as everything there is.
      */
-    private static Map<String, Object> structured(ChatToolResult result, ChatMcpSendGate.Withheld withheld,
-            String cachedFrom) {
+    private static Map<String, Object> structured(ChatToolResult result, List<ChatMcpSources.Evidence> evidence,
+            ChatMcpSendGate.Withheld withheld, String cachedFrom) {
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("schemaVersion", result.schemaVersion());
+        out.put("schemaVersion", SCHEMA_VERSION);
         out.put("toolCallId", result.toolCallId());
         out.put("capabilityId", result.capabilityId());
         out.put("dataVersion", result.dataVersion());
         out.put("items", result.items());
         out.put("evidenceIds", result.evidenceIds());
+        if (result.succeeded()) out.put("evidence", evidence);
         out.put("truncated", result.truncated());
         out.put("nextAllowed", result.nextAllowed());
         out.put("error", result.error());
@@ -453,7 +515,7 @@ public final class ChatMcpTools {
         if (result.succeeded() && cachedFrom != null) out.put("cachedFrom", cachedFrom);
         if (result.succeeded() && withheld.any()) {
             Map<String, Object> left = new LinkedHashMap<>();
-            left.put("reason", SOURCE_GRANT_DENIED);
+            left.put("reason", withheld.undeliverable() > 0 ? "evidence_not_deliverable" : SOURCE_GRANT_DENIED);
             left.put("items", withheld.items());
             left.put("evidenceIds", withheld.evidenceIds());
             left.put("paths", withheld.paths());
@@ -478,18 +540,6 @@ public final class ChatMcpTools {
         }
     }
 
-    /** A result as the attempt's ledger kept it ({@code chat_tool_calls.result}): exactly the envelope the model received. */
-    static ChatToolResult kept(ObjectMapper mapper, ChatKeptToolResult kept) {
-        JsonNode node = mapper.readTree(kept.result());
-        return new ChatToolResult(node.path("schemaVersion").asString(), kept.toolCallId(), kept.capabilityId(),
-                node.path("dataVersion").asString(null), mapper.convertValue(node.path("items"), ITEMS),
-                mapper.convertValue(node.path("evidenceIds"), STRINGS),
-                node.path("truncated").isBoolean()
-                        ? node.path("truncated").asBoolean() || node.path("withheld").path("items").asInt(0) > 0 : null,
-                node.path("nextAllowed").isBoolean() ? node.path("nextAllowed").asBoolean() : null, null,
-                node.has("paths") ? mapper.convertValue(node.path("paths"), PATHS) : List.of(),
-                node.has("webResults") ? mapper.convertValue(node.path("webResults"), WEB) : List.of(), null);
-    }
 
     private static McpSchema.CallToolResult refused(String code) {
         Map<String, Object> error = new LinkedHashMap<>();
