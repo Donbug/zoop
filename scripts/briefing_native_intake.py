@@ -236,9 +236,11 @@ def configure_runtime(cfg,root,cutoff):
     start=datetime.now(timezone.utc)
     end=datetime.fromisoformat(cfg.get('recoveryDeadline') or cutoff).astimezone(timezone.utc)
     require((end-start).total_seconds()>190,'native_preparation_window')
+    calls = cfg.get('nativeDocumentCallLimit', 12)
+    output = 30000 if cfg.get('selectionContinuation') else 12000
     os.environ.update({'ZOOP_AI_PIPELINE_LIVE_ENABLED':'1','ZOOP_AI_PIPELINE_LIVE_MODEL':'gpt-6-luna',
-        'ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT':'high','ZOOP_AI_PIPELINE_LIVE_MAX_OUTPUT_TOKENS':'12000',
-        'ZOOP_AI_PIPELINE_LIVE_TIMEOUT_SECONDS':'180','ZOOP_AI_PIPELINE_LIVE_MAX_CALLS':'12','ZOOP_AI_PIPELINE_LIVE_MAX_USD':'1',
+        'ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT':'high','ZOOP_AI_PIPELINE_LIVE_MAX_OUTPUT_TOKENS':str(output),
+        'ZOOP_AI_PIPELINE_LIVE_TIMEOUT_SECONDS':'180','ZOOP_AI_PIPELINE_LIVE_MAX_CALLS':str(calls),'ZOOP_AI_PIPELINE_LIVE_MAX_USD':'1',
         'ZOOP_AI_PIPELINE_LIVE_SHARED_MAX_USD':'0.9','ZOOP_AI_PIPELINE_LIVE_PERSONAL_MAX_USD':'0.1',
         'ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR':str(root/'native-budget'),'ZOOP_AI_PIPELINE_LIVE_PROFILE':'admitted-set-capped-v4',
         'ZOOP_AI_PIPELINE_LIVE_RUN_ID':root.name,'ZOOP_AI_PIPELINE_LIVE_SET_ID':root.name,
@@ -314,21 +316,66 @@ def candidate_pin(entry):
         'collectionRoot':str(selected_root),'inputPriority':chosen['inputPriority'],'coverage':chosen.get('coverage',{})}
 
 
-def prepare_candidates(cfg,round,entries,collection_root,observer=None):
+def received_failure(result,cfg,round_id):
+    """A known received failure is not a missing response or an evidence rejection."""
+    code = (result.get('failure') or {}).get('code')
+    reasons = {'live_output_truncated': 'received_output_truncated',
+               'live_set_work_exhausted': 'native_document_capacity'}
+    usage = result.get('usage') or {}
+    if result.get('state') != 'stopped' or code not in reasons:
+        return None
+    received = usage.get('receivedCalls')
+    if received is None:
+        # S3 exposes its per-call receipts rather than the S2 receivedCalls aggregate.
+        calls=result.get('calls')
+        if not isinstance(calls,list) or any(c.get('state')!='received'
+                and not (c.get('state')=='refused' and c.get('verdict')==code) for c in calls):return None
+        finished=[c for c in calls if c.get('state')=='received']
+        if any(not re.fullmatch('[a-f0-9]{64}',str(c.get('responseDigest',''))) for c in finished):return None
+        received=len(finished)
+    if type(received) is not int or received<0 or type(usage.get('startedWithoutReceipt')) is not int \
+            or usage.get('startedWithoutReceipt') != 0 or type(usage.get('providerCalls')) is not int \
+            or usage.get('providerCalls') != received:
+        return None
+    # A shared write-ahead reservation without a response must never become a quiet bulletin.
+    limits.remaining_native(cfg, round_id)
+    return reasons[code]
+
+
+def prepare_candidates(cfg,round,entries,collection_root,observer=None,qualifier=None):
     """Terminal quality failures move to the next unsent document, never a verdict upgrade."""
     notify=observer or (lambda *args:None)
     attempt_root=collection_root/'candidates-v3';attempt_root.mkdir(mode=0o700,parents=True,exist_ok=True)
-    outcomes=[];reserved_common=limits.publication_reserve(cfg)
+    outcomes=[];reserved_common=limits.candidate_reserve(cfg)
+    def accepted(result, qualified, pin):
+        outcomes.append({'documentId':pin['documentId'],'status':'ready','reason':'selection_verified' if qualifier else 'native_verified'})
+        outcomes.extend({'documentId':entry[1]['document']['documentId'],'status':'not_examined','reason':'selection_satisfied'}
+                        for entry in entries[index+1:])
+        proof={'schemaVersion':SCHEMA,'status':'ready','candidates':outcomes,
+               'roundCallLimit':limits.round_limit(cfg),'publicationCallReserve':reserved_common}
+        path=attempt_root/('outcomes-'+b.digest(b.canonical(proof))[:16]+'.json');write_once(path,proof)
+        # Legacy import compares the request to the immutable ready.json byte-for-byte.
+        return {**result,**qualified,'outcomeFile':str(path.relative_to(collection_root))} if qualifier else result
     for index,entry in enumerate(entries):
         pin=candidate_pin(entry);root=attempt_root/(round['id']+'-'+b.digest(b.canonical([pin['documentId'],pin['documentVersion']]))[:16]+'-native-v2')
         root.mkdir(mode=0o700,parents=True,exist_ok=True)
         write_once(root/'selected-source.json',pin)
-        if (root/'ready.json').exists():return json.loads((root/'ready.json').read_bytes())
+        if (root/'ready.json').exists():
+            result=json.loads((root/'ready.json').read_bytes())
+            qualified=qualifier(result,root) if qualifier else {'status':'ready'}
+            if qualified['status']=='ready':return accepted(result,qualified,pin)
+            outcomes.append({'documentId':pin['documentId'],'status':'withheld','reason':qualified['reason']});continue
         if (root/'native.started.json').exists():
             # Closed/HOLD records remain preserved. Unknown sends are never replayed.
             if (root/'source-qualification.json').exists():
-                outcomes.append({'documentId':pin['documentId'],'status':'saved_withheld'});continue
+                if cfg.get('selectionContinuation'):limits.remaining_native(cfg,round['id'])
+                prior=json.loads((root/'source-qualification.json').read_bytes())
+                outcomes.append({'documentId':pin['documentId'],'status':'saved_withheld','reason':prior['reason']});continue
             raise ValueError('briefing_server_native_interrupted_requires_recovery')
+        if cfg.get('selectionContinuation') and datetime.now(timezone.utc)+timedelta(seconds=200)>=datetime.fromisoformat(round['windowTo']):
+            for remaining in entries[index:]:
+                outcomes.append({'documentId':remaining[1]['document']['documentId'],'status':'not_sent','reason':'preparation_deadline'})
+            break
         rows=[json.loads(p.read_bytes()) for p in (Path(cfg['work'])/'budget').glob('*.json')]
         own=[r for r in rows if r['roundId']==round['id']]
         native_calls=sum(r.get('phase')=='native' for r in own)
@@ -339,11 +386,25 @@ def prepare_candidates(cfg,round,entries,collection_root,observer=None):
             for remaining in entries[index+1:]:
                 outcomes.append({'documentId':remaining[1]['document']['documentId'],'status':'not_sent','reason':'remaining_shared_call_capacity'})
             break
-        result=prepare_candidate(cfg,round,entry,root)
+        document_cfg=dict(cfg)
+        if cfg.get('selectionContinuation'):
+            document_cfg['nativeDocumentCallLimit'],document_cfg['nativeWorkLimits']=limits.document_work(cfg,round['id'],len(entries)-index)
+        try:result=prepare_candidate(document_cfg,round,entry,root)
+        except ValueError as error:
+            if (not cfg.get('selectionContinuation') or (root/'native.started.json').exists()
+                    or str(error) not in ('briefing_server_native_dispatch_deadline','briefing_server_native_preparation_window')):raise
+            for remaining in entries[index:]:
+                outcomes.append({'documentId':remaining[1]['document']['documentId'],'status':'not_sent','reason':'preparation_deadline'})
+            break
         if result.get('status')!='withheld':
-            notify('native','completed');return result
+            qualified=qualifier(result,root) if qualifier else {'status':'ready'}
+            if qualified['status']=='ready':
+                notify('native','completed');return accepted(result,qualified,pin)
+            result=qualified
         outcomes.append({'documentId':pin['documentId'],'status':'withheld','reason':result['reason']})
-    reason='remaining_shared_call_capacity' if any(o['status']=='not_sent' for o in outcomes) else 'all_company_candidates_withheld'
+    reason=('preparation_deadline' if any(o['reason']=='preparation_deadline' for o in outcomes)
+            else 'remaining_shared_call_capacity' if any(o['status']=='not_sent' for o in outcomes)
+            else 'all_company_candidates_withheld')
     result={'schemaVersion':SCHEMA,'status':'withheld','reason':reason,'candidates':outcomes,
         'roundCallLimit':limits.round_limit(cfg),'nativeCallLimit':limits.native_limit(cfg),'publicationCallReserve':reserved_common}
     # New unique recovery roots keep older outcomes and unknown reservations intact.
@@ -353,17 +414,18 @@ def prepare_candidates(cfg,round,entries,collection_root,observer=None):
     return {**result,'outcomeFile':str(path.relative_to(collection_root))}
 
 
-def prepare(cfg,round,observer=None):
+def prepare(cfg,round,observer=None,qualifier=None):
     observer=observer or (lambda *args:None)
     collection_root=Path(cfg.get('recordedCollectionRoot') or Path(cfg['work'])/'native'/round['id'])
     legacy=collection_root/(round['id']+'-native-v2')/'ready.json'
-    if legacy.exists():return json.loads(legacy.read_bytes())
-    for ready in sorted((collection_root/'candidates-v3').glob('*/ready.json')):
-        return json.loads(ready.read_bytes())
+    if not qualifier:
+        if legacy.exists():return json.loads(legacy.read_bytes())
+        for ready in sorted((collection_root/'candidates-v3').glob('*/ready.json')):
+            return json.loads(ready.read_bytes())
     observer('collection','started')
     entries=collect(cfg,round,collection_root,all_candidates=True)
     observer('collection','completed');observer('native','started')
-    return prepare_candidates(cfg,round,entries,collection_root,observer)
+    return prepare_candidates(cfg,round,entries,collection_root,observer,qualifier)
 
 
 def prepare_candidate(cfg,round,entry,root):
@@ -399,9 +461,9 @@ def prepare_candidate(cfg,round,entry,root):
     from zoop_ai_pipeline.live_funding import capped_set_funding_policy
     policy=capped_set_funding_policy(root.name,os.environ['ZOOP_AI_PIPELINE_LIVE_ADMIT_FROM'],
         os.environ['ZOOP_AI_PIPELINE_LIVE_ADMIT_UNTIL'],1000000000,900000000,100000000)
-    metering=NativeBudget(root/'native-budget',1000000000,12,funding=policy,
+    metering=NativeBudget(root/'native-budget',1000000000,cfg.get('nativeDocumentCallLimit',12),funding=policy,
         bucket_caps={'shared':900000000,'personal':100000000},finish_by=os.environ['ZOOP_AI_PIPELINE_LIVE_FINISH_BY'])
-    metering.admit_set(root.name,b.digest(b.canonical(request)),{'extract':1,'compare':1,'topic':0,'relation':1,'impact':4,'verify-relation':4,'verify-impact':4})
+    metering.admit_set(root.name,b.digest(b.canonical(request)),cfg.get('nativeWorkLimits') or {'extract':1,'compare':1,'topic':0,'relation':1,'impact':4,'verify-relation':4,'verify-impact':4})
     claim={'round':round,'requestKey':'source-'+b.digest(b.canonical(request)),'purpose':'generation','trigger':'scheduler','adminId':None,
         'inputArtifactId':None,'inputDigest':b.digest(b.canonical(request))}
     pipe=CommandPipe(cfg['ledgerCommand']);session=UsageSession(pipe,claim,root/'usage')
@@ -415,13 +477,23 @@ def prepare_candidate(cfg,round,entry,root):
             store=extraction.Store(root/'s2',ingestion)
             try:s2=extraction.Extractor(store,source,extraction.LiveAccess(from_env=factory)).run(Submit.model_validate(request),extraction.Fixtures(None,None))
             finally:store.close()
-            write_once(root/'s2-result.json',s2);require(s2['state']=='ready' and s2['delivery']['status']=='current','native_s2_not_ready')
+            write_once(root/'s2-result.json',s2)
+            known=received_failure(s2,cfg,round['id']) if cfg.get('selectionContinuation') else None
+            if known:
+                result={'schemaVersion':SCHEMA,'status':'withheld','reason':known,'additionalModelCalls':0}
+                write_once(root/'source-qualification.json',result);session.stage='native_received_failure';session.outcome='withheld';return result
+            require(s2['state']=='ready' and s2['delivery']['status']=='current','native_s2_not_ready')
             store=relation.Store(root/'s3',root/'s2',ingestion)
             try:s3=relation.Engine(store,source,root/'s2',ingestion,lambda need_send:factory(need_send=need_send)).run(RelationSubmit.model_validate({
                 'schemaVersion':'zoop-relation-s3','jobId':root.name+'-s3','provenance':request['provenance'],
                 'upstream':{'jobId':s2['jobId'],'inputDigest':s2['inputDigest']}}),relation.Fixtures(None,None))
             finally:store.close()
-            write_once(root/'s3-result.json',s3);require(s3['state']=='ready' and s3['delivery']['status']=='current','native_s3_not_ready')
+            write_once(root/'s3-result.json',s3)
+            known=received_failure(s3,cfg,round['id']) if cfg.get('selectionContinuation') else None
+            if known:
+                result={'schemaVersion':SCHEMA,'status':'withheld','reason':known,'additionalModelCalls':0}
+                write_once(root/'source-qualification.json',result);session.stage='native_received_failure';session.outcome='withheld';return result
+            require(s3['state']=='ready' and s3['delivery']['status']=='current','native_s3_not_ready')
             qualification=source_qualification(root,s3,session)
             if qualification is not None:return qualification
             manifest,envelope=handoff(root,sources,ingestion,exported,s2,s3,companies)
@@ -552,16 +624,50 @@ def run_slot(cfg,edition,cutoff=None,recover_unpaid=False,*,producer=None,observ
             # A later failed native stage must not discard an already captured cutoff reference.
             capture_market(cfg,round,observer)
             print(json.dumps({'roundId':round['id'],'stage':'bounded_source_collection','cutoff':slot.isoformat()}),flush=True)
-            try:ready=prepare(cfg,round,observer=observer)
+            context=dict(cfg)
+            def qualify_ready(candidate,candidate_root):
+                # Each source is imported additively before cutoff, then assessed against the actual reader input.
+                from briefing_selection_gate import qualify, dispatch_window
+                if (candidate_root/'selection/qualification.json').is_file():
+                    activated=json.loads((candidate_root/'activated.json').read_bytes())
+                    selected=qualify(cfg,round,candidate_root,activated['graphVersion'])
+                    if selected['status']=='ready':
+                        context.update(expectedGraphVersion=activated['graphVersion'],qualifiedProducerWork=selected['producerWork'])
+                    return selected
+                try:dispatch_window(round)
+                except ValueError as error:
+                    if str(error)!='briefing_server_selection_dispatch_deadline':raise
+                    limits.remaining_native(cfg,round['id'])
+                    return {'status':'withheld','reason':'preparation_deadline'}
+                before=native_command(cfg,'state',{},candidate_root/'baseline.request.json')
+                observer('authority','started');register_authority(cfg,candidate);observer('authority','completed')
+                observer('import','started')
+                incoming=native_command(cfg,'import',candidate,candidate_root/'import.request.json')
+                write_once(candidate_root/'imported.json',incoming);observer('import','completed')
+                require(clock()<slot-timedelta(seconds=10),'native_after_cutoff')
+                observer('activation','started')
+                activated=native_command(cfg,'activate',{'baseline':before,'incoming':incoming},candidate_root/'activate.request.json')
+                write_once(candidate_root/'activated.json',activated)
+                observer('activation','completed',{'graphVersion':activated['graphVersion']})
+                try:selected=qualify(cfg,round,candidate_root,activated['graphVersion'])
+                except ValueError as error:
+                    if str(error)!='briefing_server_selection_dispatch_deadline':raise
+                    limits.remaining_native(cfg,round['id'])
+                    selected={'status':'withheld','reason':'preparation_deadline'}
+                if selected['status']=='ready':
+                    context['expectedGraphVersion']=activated['graphVersion']
+                    context['qualifiedProducerWork']=selected['producerWork']
+                return selected
+            try:
+                ready=prepare(cfg,round,observer=observer,qualifier=qualify_ready) if cfg.get('selectionContinuation') else prepare(cfg,round,observer=observer)
             except ValueError as error:
                 if str(error)!='briefing_server_no_current_company_source':raise
                 ready={'status':'withheld','reason':'no_current_company_source'}
-            context=dict(cfg)
             if ready.get('status')=='withheld':
                 from briefing_coverage_publication import record
                 context['coverageNoticeSha256']=record(cfg,round,ready['reason'],clock(),ready.get('outcomeFile'))
                 observer('native','failed',{'reason':ready['reason']})
-            else:
+            elif not cfg.get('selectionContinuation'):
                 observer('authority','started');register_authority(cfg,ready);observer('authority','completed')
                 observer('import','started')
                 incoming=native_command(cfg,'import',ready,root/'import.request.json');write_once(root/'imported.json',incoming)

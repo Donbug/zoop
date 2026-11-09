@@ -85,6 +85,17 @@ class IntakeTests(unittest.TestCase):
         self.assertEqual([cfg['originalSourceAuthority'],str(self.root/'authority/new-authorities.json')],json.loads(before)['delegates'])
         native.initialize_authority(cfg)
         self.assertEqual(before,(self.root/'authority/serving-delegates.json').read_bytes())
+    def test_continuation_reserves_reasoning_headroom_and_uses_the_shared_document_allowance(self):
+        for name,key in [('openai','OPENAI_API_KEY'),('typesafe','TYPESAFE_API_KEY')]:
+            p=self.root/name;p.write_text(key+'=synthetic-only\n');p.chmod(0o600)
+        cfg={'keyFile':str(self.root/'openai'),'verifierKeyFile':str(self.root/'typesafe'),
+             'selectionContinuation':True,'nativeDocumentCallLimit':15}
+        with patch.dict(os.environ,{},clear=True):
+            cls=native.configure_runtime(cfg,self.root,(datetime.now(timezone.utc)+timedelta(minutes=30)).isoformat())
+            cls.from_env(need_send=True)
+            self.assertEqual('30000',os.environ['ZOOP_AI_PIPELINE_LIVE_MAX_OUTPUT_TOKENS'])
+            self.assertEqual('15',os.environ['ZOOP_AI_PIPELINE_LIVE_MAX_CALLS'])
+            self.assertEqual('high',os.environ['ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT'])
     def test_completed_source_without_public_company_link_is_withheld_without_relabeling(self):
         session=Mock();source={'state':'ready','delivery':{'status':'current'},'relations':[]}
         result=native.source_qualification(self.root,source,session)

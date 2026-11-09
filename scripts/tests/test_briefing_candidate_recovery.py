@@ -89,5 +89,12 @@ class CandidateRecoveryTests(unittest.TestCase):
             self.assertEqual('saved',n.prepare(self.cfg,self.round)['documentId'])
             collect.assert_not_called();model.assert_not_called()
 
+    def test_legacy_import_request_stays_identical_to_the_immutable_ready_record(self):
+        ready={'documentId':'first','root':'synthetic-native-root','handoffReceipt':'synthetic-receipt'}
+        with patch.object(n,'prepare_candidate',return_value=ready):
+            result=n.prepare_candidates(self.cfg,self.round,[entry('first')],self.root)
+        self.assertEqual(ready,result)
+        self.assertNotIn('outcomeFile',result);self.assertNotIn('status',result)
+
 
 if __name__=='__main__':unittest.main()

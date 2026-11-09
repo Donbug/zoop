@@ -62,14 +62,18 @@ def produce(cfg, job):
     # Import only on execution; unit/schema tests cannot initialize provider or DB resources.
     import briefing_server_runtime as runtime
     runtime.require(cfg.get('priorityContract') == priority.VERSION, 'priority_opt_in')
-    work = Path(cfg['work']) / job['id']; work.mkdir(mode=0o700, exist_ok=True)
     r = {'id': job['id'], 'date': str(job['round_date']), 'edition': job['edition'],
          'scheduledAt': job['scheduled_at'].isoformat(), 'windowFrom': job['window_from'].isoformat(),
          'windowTo': job['scheduled_at'].isoformat()}
-    request = {'round': r}
-    if cfg.get('recordedRecoveryAuthorization'):
-        request['recordedRecovery'] = True
-    prepared = runtime.java(cfg, 'prepare', request, work / 'prepare.request.json')
+    if cfg.get('qualifiedProducerWork'):
+        from briefing_selection_gate import prepared_for_publication
+        work, prepared = prepared_for_publication(cfg, r)
+    else:
+        work = Path(cfg['work']) / job['id']; work.mkdir(mode=0o700, exist_ok=True)
+        request = {'round': r}
+        if cfg.get('recordedRecoveryAuthorization'):
+            request['recordedRecovery'] = True
+        prepared = runtime.java(cfg, 'prepare', request, work / 'prepare.request.json')
     runtime.require(not cfg.get('expectedGraphVersion') or prepared['graphVersion']==cfg['expectedGraphVersion'],'admitted_graph_changed')
     write_once(work / 'prepared.json', prepared)
     frozen = runtime.frozen_input(prepared); write_once(work / 'frozen.json', frozen)
@@ -99,6 +103,9 @@ def produce(cfg, job):
                 assessed, checked, _ = m.assess_candidates(client, frozen)
                 core = m.select(frozen, assessed, checked, prepared.get('previous', {}).get('selected', []))
                 chosen = priority_selection(frozen, assessed, checked, core)
+                if cfg.get('qualifiedProducerWork'):
+                    from briefing_selection_gate import check_replayed_selection
+                    check_replayed_selection(work, chosen)
             else:
                 assessed, checked = {'assessments': {}}, {'checks': {}}
                 core = chosen = {'selected': [], 'rejected': [], 'ranked': [], 'policyVersion': m.POLICY, 'inputSha256': frozen['inputSha256']}
