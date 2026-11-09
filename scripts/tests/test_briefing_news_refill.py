@@ -77,6 +77,16 @@ class NewsRefillTests(unittest.TestCase):
             entries,result=self.collect();self.assertEqual([],entries);self.assertFalse(self.sent)
             self.assertEqual('preparation_deadline',result['stopReason'])
 
+    def test_preconnection_refusal_does_not_invent_a_physical_request(self):
+        from zoop_ai_pipeline.ingestion_contracts import IngestionFailure
+        class Refused:
+            def __init__(self,*args):self.requests=0;self.downloaded=0;self.run_deadline=float('inf')
+            def fetch(self,url):raise IngestionFailure('private_address')
+        self.factory=Refused
+        entries,result=self.collect()
+        self.assertEqual([],entries);self.assertEqual(0,result['requests'])
+        self.assertEqual(1,result['sources'][0]['excluded']['private_address'])
+
     def test_expired_refill_window_appends_a_zero_call_boundary_without_rewriting_the_saved_result(self):
         entries,first=self.collect();self.clock=datetime.fromisoformat('2026-11-05T08:25:00+09:00')
         sent=list(self.sent);entries,last=self.collect(True)

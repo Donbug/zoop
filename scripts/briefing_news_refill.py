@@ -154,7 +154,7 @@ def collect(cfg,round_,parent,*,fetcher_factory=None,monotonic=time.monotonic,re
         start=monotonic();before=getattr(fetcher,'requests',0);bytes_before=getattr(fetcher,'downloaded',0)
         try:return fetcher.fetch(url)
         finally:
-            state['requests']+=max(1,getattr(fetcher,'requests',before+1)-before)
+            state['requests']+=max(0,getattr(fetcher,'requests',before+1)-before)
             state['downloadedBytes']+=max(0,getattr(fetcher,'downloaded',bytes_before)-bytes_before)
             state['networkSeconds']+=max(0,monotonic()-start);state['lastHosts'][host]=now().timestamp()
 
