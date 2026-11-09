@@ -1,5 +1,11 @@
 import { adminCall } from '@/apis/admin/auth';
 import { ApiError } from '@/apis/auth/ApiService';
+import {
+  mockDecideCandidate,
+  mockGetCandidate,
+  mockListCandidates,
+  withMockCandidateCounts,
+} from '@/mocks/admin/candidates';
 import type {
   CandidateDecisionRequest,
   CandidateDecisionResponse,
@@ -14,9 +20,25 @@ import type {
 
 const PIPELINE = '/api/v1/admin/pipeline';
 
+/**
+ * 개발 서버에서 지도 목업을 쓰는 동안(VITE_GRAPH_DATA_SOURCE≠api) 후보 목록·상세·결정도 지도 목업 이슈로 만든 합성 후보를 쓴다.
+ * 개요는 실제 API를 읽고 후보 판정 수만 목업과 맞춘다. 배포 빌드와 테스트에서는 항상 실제 API다.
+ */
+export function usesCandidateMock() {
+  return (
+    import.meta.env.DEV &&
+    import.meta.env.MODE !== 'test' &&
+    import.meta.env.VITE_GRAPH_DATA_SOURCE !== 'api'
+  );
+}
+
 /** getPipelineOverview: 후보 판정 수·검수 대기·공개 버전·분석 작업 요약 */
-export function getPipelineOverview() {
-  return adminCall<PipelineOverview>(`${PIPELINE}/overview`, 'GET');
+export async function getPipelineOverview() {
+  const overview = await adminCall<PipelineOverview>(
+    `${PIPELINE}/overview`,
+    'GET',
+  );
+  return usesCandidateMock() ? withMockCandidateCounts(overview) : overview;
 }
 
 /** listAnalysisCandidates: 서명된 불투명 커서. 커서는 같은 조건에서만 유효하다. */
@@ -24,6 +46,8 @@ export function listAnalysisCandidates(
   filters: CandidateFilters,
   cursor?: string,
 ) {
+  if (usesCandidateMock())
+    return Promise.resolve(mockListCandidates(filters, cursor));
   const query = new URLSearchParams();
   if (filters.status) query.set('status', filters.status);
   if (filters.decision) query.set('decision', filters.decision);
@@ -38,7 +62,8 @@ export function listAnalysisCandidates(
 }
 
 /** getAnalysisCandidate: 원문 인용·관계·검증 판정·검수 이력 */
-export function getAnalysisCandidate(candidateId: string) {
+export async function getAnalysisCandidate(candidateId: string) {
+  if (usesCandidateMock()) return mockGetCandidate(candidateId);
   return adminCall<CandidateDetail>(
     `${PIPELINE}/candidates/${encodeURIComponent(candidateId)}`,
     'GET',
@@ -54,12 +79,14 @@ export async function decideAnalysisCandidate(
   request: CandidateDecisionRequest,
   idempotencyKey: string,
 ) {
-  const result = await adminCall<CandidateDecisionResponse>(
-    `${PIPELINE}/candidates/${encodeURIComponent(candidateId)}/decision`,
-    'POST',
-    request,
-    { 'Idempotency-Key': idempotencyKey },
-  );
+  const result = usesCandidateMock()
+    ? mockDecideCandidate(candidateId, request)
+    : await adminCall<CandidateDecisionResponse>(
+        `${PIPELINE}/candidates/${encodeURIComponent(candidateId)}/decision`,
+        'POST',
+        request,
+        { 'Idempotency-Key': idempotencyKey },
+      );
   const expected = request.decision === 'allow' ? 'approved' : 'rejected';
   if (result.candidateId !== candidateId || result.decision !== expected)
     throw new ApiError(
