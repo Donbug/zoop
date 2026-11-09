@@ -155,6 +155,7 @@ raw receipt와 비용 정산은 같은 운영 원장 transaction에 저장합니
 | `zoop-ai-collect run` | `zoop_ai_pipeline.collection_cli` | `zoop-collection-1` (policy `zoop-collection-policy-1`) | 상태 DB 없음. source `inputRoot/collections/<collectionId>/`에만 원본 bytes·receipt·manifest를 쓴다 |
 | `zoop-ai-collector {run,checkpoint,restore,status}` | `zoop_ai_pipeline.collector_cli` | checkpoint manifest `zoop-collector-checkpoint-1` | 컨테이너 수집 entry. 아래 비공개 뉴스·Korea 코퍼스·official source 수집을 한 controller로 돌리고 `/var/lib/zoop-collector/{private,korea,official}` 상태를 S3 checkpoint로 보존한다. 계약·환경변수·종료 코드·SIGTERM 시간은 [`docs/development/collector-container.md`](../../docs/development/collector-container.md) |
 | `zoop-ai-ingest {run,tick,resume,inspect,export,round-inventory}` | `zoop_ai_pipeline.ingestion_cli` | `zoop-ingestion-s2-1`; 내부 metadata 읽기는 `zoop-ingestion-round-inventory-1` | `ingestion.sqlite3`; `round-inventory`는 읽기 전용 |
+| `zoop-ai-ingest completion-witness` | `zoop_ai_pipeline.ingestion_cli` | `zoop-ingestion-completion-witness-1` | cold `ingestion.sqlite3`의 공유 잠금 읽기 전용 검사 |
 | `zoop-ai-extract {run,submit,enqueue-round,plan-round,resume,inspect,cancel}` | `zoop_ai_pipeline.extraction_cli` | `zoop-extraction-s2-2` | `extraction.sqlite3` (`plan-round`는 원장을 열지 않고 새 계획 디렉터리 하나만 씀) |
 | `zoop-ai-relation {run,submit,inspect,resume,review,cancel,live-binding}` | `zoop_ai_pipeline.relation_cli` | `zoop-relation-s3` | `relation.sqlite3` |
 | `zoop-ai-dependents` (하위 명령 없음, stdin 변경 1건) | `zoop_ai_pipeline.dependency_cli` | `zoop-dependency-s4` | 위 세 원장을 읽기 전용으로만 연다(쓰는 상태 파일 없음) |
@@ -391,6 +392,16 @@ zoop-ai-ingest run --state-dir STATE --sources registry.json --fixture-manifest 
 - **디렉터리 안전**: `inputRoot`와 `collections/`는 심볼릭 링크를 따르지 않고(디렉터리 fd, `O_NOFOLLOW`) 열며, `.lock`으로 배타 잠금하고, 낯선 파일(예: 외부 SQLite)이나 같은 id의 낯선 디렉터리는 채택하지 않고(`collection_namespace_conflict`) 앱/S1/PoC 상태 루트와 겹치면 거부합니다. 기존 `collection.json`도 descriptor-relative `O_NONBLOCK|O_NOFOLLOW`로 열고 regular file/크기 한도를 확인한 뒤 제한된 길이만 읽습니다(FIFO 등은 즉시 거부·미수정). 자신이 만든 `.tmp-<id>-…`에만 쓰고 한 번의 rename으로 공개하며, 실패 시 자신이 만든 이름만 지웁니다(이전 프로세스가 남긴 임시 디렉터리는 채택도 삭제도 하지 않음).
 - **지원/미지원**: 지원은 명시된 `text/html`·`application/pdf` URL의 단발 수집뿐입니다(`text/plain` 등은 없음). 검색·RSS·DART/OpenDART 같은 API·인증·스케줄링·주기 갱신·시간 창 coverage 주장은 구현하지 않았으며 수집은 `coverageThrough`를 비웁니다. 실제 사이트에 대한 수집은 이 변경에서 실행하지 않았습니다.
 - **HTTPS 인증서 검증**은 끌 수 없고, 연결 IP가 아니라 원래 요청 호스트를 Host·SNI·인증서 이름으로 사용합니다. 공개 회귀 시험의 HTTP 루프백만으로 TLS의 신뢰 체인과 이름 검증까지 증명할 수 없으므로, TLS 변경 시 별도 신뢰된 로컬 테스트 CA/잘못된 이름/신뢰되지 않은 CA 검증이 필요합니다.
+
+### Finite collection completion witness
+
+Operators can query `zoop-ai-ingest completion-witness --state-dir ABS_NATIVE_NAMESPACE --sources CURRENT_PUBLIC_REGISTRY` with stdin `{"schemaVersion":"zoop-ingestion-completion-witness-1","roundId":"original-round","sourceId":"original-source","expectedInputDigest":"<original staged 64-character lowercase SHA-256>"}`. The strict request selects one completed public `collected-http` collection: one terminal `ok` page, 1–50 resolved items, `window: null` and `coverageThrough: null`.
+
+Exit 0 returns the complete ordered `evidence.observations` list with native-resolved IDs, body/receipt/version hashes and historical acquisition/page timestamps. Historical request, configuration, parser, manifest and original registry pins remain fixed; `authorization` separately reports the current read grant and registry hash. Current `read` permission is sufficient. The output contains identifiers and hashes rather than article content. Compare stable `evidence` separately from volatile `authorization`; a later scope checkpoint does not redefine this finite list.
+
+Prepared representations are checked one at a time with a 64 MiB serialized-JSON materialization budget. A larger representation yields `completion_witness_resource_limit` before loading its content into Python; this is an execution-resource refusal, separate from unsupported profiles or integrity failures. The complete original data stays unchanged, and the wrapper must keep it unknown/unacked. The command neither raises its budget automatically nor resumes ingestion. Raw-body limits and the `MAX_INPUT` output limit retain their existing meanings.
+
+The command holds one existing shared lock and cold read-only snapshot. A missing store stays missing, a cooperating writer yields `ingestion_busy`, and any nonempty WAL yields `ingestion_recovery_required`. Every refusal exits 2 with only the witness schema and sanitized error code. `--fixture-manifest`, `--private-processing` and `--require-store` are rejected. `observedAt` is the original page receipt time, not a completion commit timestamp. Native completion is evidence for a wrapper-owned atomic ack/dedup transaction, not the wrapper ack itself. Local advisory locking does not establish EFS/cross-host or power-loss guarantees.
 
 ### 비공개 뉴스 단독 수집 (`zoop-ai-private-news`)
 

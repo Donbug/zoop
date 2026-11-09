@@ -14,6 +14,7 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstra
 from pydantic.alias_generators import to_camel
 
 SCHEMA = "zoop-ingestion-s2-1"
+COMPLETION_WITNESS_SCHEMA = "zoop-ingestion-completion-witness-1"
 MAX_INPUT = 2_000_000
 MAX_RAW = 10_000_000
 MAX_TEXT = 500_000
@@ -168,6 +169,13 @@ class Run(Wire):
     checkpoint_revision: int = Field(ge=0)
     fixture_manifest_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
     cleaner_version: Literal["exact-copy-1"]
+
+
+class CompletionWitnessRequest(Wire):
+    schema_version: Literal["zoop-ingestion-completion-witness-1"]
+    round_id: str = Field(min_length=1, max_length=200)
+    source_id: str = Field(min_length=1, max_length=200)
+    expected_input_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
 class Inspect(Wire):
