@@ -582,7 +582,6 @@ function ChatPanel({
                   input.current?.focus();
                 }}
                 onRetry={(job) => void chat.retry(job)}
-                onCancel={(job) => void chat.cancel(job)}
                 onViewOnMap={onViewOnMap}
                 onRewrite={rewrite}
               />

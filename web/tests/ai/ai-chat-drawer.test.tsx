@@ -275,7 +275,7 @@ describe('D-AI-01 · asking with a linked target', () => {
     const card = await screen.findByRole('article', {
       name: '삼성전자 최근 이슈는?',
     });
-    expect(within(card).getByText('자료 확인 중이에요.')).toBeTruthy();
+    expect(within(card).getByText('자료를 확인하는 중이에요.')).toBeTruthy();
     expect(
       screen.getByRole('button', { name: '보내기' }).hasAttribute('disabled'),
     ).toBe(true);
@@ -725,10 +725,11 @@ describe('D-AI-02 · job states and stored results', () => {
     expect(
       within(card).getByRole('region', { name: '일반 개념 구간' }),
     ).toBeTruthy();
-    expect(
-      within(card).getByRole('region', { name: '근거 확인됨 구간' })
-        .textContent,
-    ).toContain('근거 [1]');
+    // The citation number sits inline at the end of the section and jumps to the citation.
+    const mark = within(
+      within(card).getByRole('region', { name: '근거 확인됨 구간' }),
+    ).getByRole('link', { name: '1' });
+    expect(mark.getAttribute('href')).toMatch(/^#cite-.+-1$/);
     const limits = within(card).getByRole('region', {
       name: '답하지 않은 부분',
     });
@@ -956,8 +957,9 @@ describe('D-AI-02 · job states and stored results', () => {
       name: '삼성전자는 어떤 기업이야?',
     });
     expect(
-      within(card).getAllByText(/삼성전자 기업 개요 · 줍 기업 카탈로그/),
+      within(card).getAllByText(/삼성전자 기업 개요/, { selector: 'p' }),
     ).toHaveLength(2);
+    expect(within(card).getAllByText('줍 기업 카탈로그')).toHaveLength(2);
     const links = within(card).getAllByRole('link', { name: /기업 홈페이지/ });
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
       'https://www.samsung.com/sec/',
@@ -1151,7 +1153,7 @@ describe('D-AI-02 · job states and stored results', () => {
     await open();
     const message = await screen.findByRole('article', { name: 'HBM이 뭐야?' });
     expect(within(message).getByRole('status').textContent).toContain(
-      '답변 작성 중이에요.',
+      '답변을 작성하는 중이에요.',
     );
     expect(within(message).queryByText('질문 이해')).toBeNull();
     expect(within(message).queryByText('자료 확인')).toBeNull();
@@ -1215,7 +1217,7 @@ describe('D-AI-02 · job states and stored results', () => {
     expect(screen.queryByText('이전 대화의 실패')).toBeNull();
   });
 
-  it('cancels a queued job', async () => {
+  it('shows a queued job as a waiting bubble without a cancel button', async () => {
     const queued = job({
       status: 'queued',
       outcome: null,
@@ -1224,13 +1226,10 @@ describe('D-AI-02 · job states and stored results', () => {
     });
     server.on('GET', CURRENT, () => json(conversation([queued])));
     server.on('GET', JOB, () => json(queued));
-    server.on('POST', CANCEL, () => json({ ...queued, status: 'cancelled' }));
-    const { user } = await open();
-    await user.click(await screen.findByRole('button', { name: '질문 취소' }));
-    await screen.findByText(/취소한 질문이에요/);
-    expect(
-      server.calls('POST', CANCEL)[0].headers.get('Idempotency-Key'),
-    ).toBeTruthy();
+    await open();
+    await screen.findByText('질문을 처리할 차례를 기다리고 있어요.');
+    expect(screen.queryByRole('button', { name: '질문 취소' })).toBeNull();
+    expect(server.calls('POST', CANCEL)).toHaveLength(0);
   });
 
   it('stops polling on a failed status read and resumes only when asked', async () => {
