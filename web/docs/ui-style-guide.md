@@ -321,3 +321,11 @@ Imported demo preferences have a separate server scope. Restore a saved demo eve
 ## Saved market indicators in personal reading (D-BRF-01/02)
 
 `withRoundMarket` fills a missing personal market section only from the same published, uncorrected common round, with matching slot and cutoff. Preserve both stored snapshots and prefer existing personal values. `MarketIndicators` labels values collected after the cutoff as historical later queries in both reading modes. Do not replace missing past values with live prices. Exact checked common analysis may be filtered to personal companies while retaining its real common prompt version. See `docs/development/briefing-market-capture.md`.
+
+## Chat answer Markdown (D-AI-02b)
+
+Use `ChatMarkdown` from `@/components/ai/ChatMarkdown` for server-provided
+chat answer sections. It supports headings (# through ###), bullet and numbered
+lists, bold, emphasis, inline code, paragraphs and line breaks. HTML is rendered
+as text; unsupported syntax stays literal. Pass citation links with `trailing`.
+Do not infer formatting or rewrite server text. Plain-text answers remain plain.

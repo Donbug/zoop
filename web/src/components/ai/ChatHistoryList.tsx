@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/apis/auth/ApiService';
 import { deleteConversation, listConversations } from '@/apis/chat/chat';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
@@ -12,6 +12,16 @@ import LoadingIndicator, {
 // D-AI-02 대화 기록(와이어프레임 없음, 임시 설계): AI 질문 창 안에서 지난 대화를 고르거나 삭제한다.
 // 목록은 저장된 대화만 읽고 모델을 부르지 않는다. 삭제는 서버가 deleteEnabled로 연 경우에만 보여 준다
 // (승인된 처리방침·약관은 개별 채팅 삭제 미제공이며, 개정본이 시행되면 서버 설정으로 연다).
+// 처리 중인 질문이 있으면(JOB_IN_PROGRESS) 따로 안내하지 않고, 질문이 끝날 때까지 기다렸다가 지운다.
+
+const IN_PROGRESS_RETRY_MS = 1500;
+const IN_PROGRESS_MAX_WAIT_MS = 3 * 60_000;
+
+const wait = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const inProgress = (error: unknown) =>
+  error instanceof ApiError && error.code === 'JOB_IN_PROGRESS';
 
 type Props = {
   /** 지금 보고 있는 대화. 목록에 "지금 대화"로 표시한다. */
@@ -37,20 +47,41 @@ export default function ChatHistoryList({
   const [confirming, setConfirming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  async function deleteWhenIdle(id: string) {
+    const deadline = Date.now() + IN_PROGRESS_MAX_WAIT_MS;
+    for (;;) {
+      try {
+        return await deleteConversation(id);
+      } catch (error) {
+        if (!inProgress(error) || Date.now() >= deadline) throw error;
+      }
+      await wait(IN_PROGRESS_RETRY_MS);
+      if (!mounted.current) return;
+    }
+  }
 
   async function remove(item: ChatConversationSummary) {
     setDeleting(item.id);
     setMessage(null);
     try {
-      await deleteConversation(item.id);
+      await deleteWhenIdle(item.id);
+      if (!mounted.current) return;
       setConfirming(null);
       onDeleted(item.id);
       setMessage('대화를 삭제했어요.');
       history.reload();
     } catch (error) {
-      setMessage(deleteFailure(error));
+      if (mounted.current) setMessage(deleteFailure(error));
     } finally {
-      setDeleting(null);
+      if (mounted.current) setDeleting(null);
     }
   }
 
@@ -209,8 +240,6 @@ export default function ChatHistoryList({
 
 function deleteFailure(error: unknown) {
   if (error instanceof ApiError) {
-    if (error.code === 'JOB_IN_PROGRESS')
-      return '처리 중인 질문이 있어 삭제할 수 없어요. 질문을 취소하거나 끝난 뒤에 삭제해 주세요.';
     if (error.status === 404)
       return '이미 삭제됐거나 지금은 삭제할 수 없는 대화예요.';
     if (error.status === 401 || error.status === 403)

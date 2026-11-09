@@ -39,7 +39,6 @@ vi.mock('@/components/ai/AiChatDrawer', () => ({
         onChoose={unexpectedQuestionMutation}
         onAnswerFreely={unexpectedQuestionMutation}
         onRetry={unexpectedQuestionMutation}
-        onCancel={unexpectedQuestionMutation}
         onViewOnMap={onViewOnMap}
       />
     ) : null;
