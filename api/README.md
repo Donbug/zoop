@@ -427,6 +427,23 @@ bundle `-8` 스테이징 뒤, 공개 제외 저장소가 연결된 기본 설정
 
 **bundle 계약 수정 이력:** 최초 실행에서는 `EventDetailService`가 bundle `-5`만 읽어 `-7` 사건 상세가 503 `SOURCE_UNAVAILABLE`로 차단됐습니다. 이후 읽기 소비자가 정확한 `-5`·`-6`·`-7` receipt를 지원하도록 수정했고, 당시 신규 수입은 `-7`만 허용했습니다. 당시 수정 후 새 jar의 실제 HTTP 28단계가 통과했으며, 공개 제외 저장소 통합 후 위 기본 설정 경로의 재검증과는 별개입니다. 스크립트는 미지원 계약을 성공으로 처리하거나 bundle 버전을 낮추지 않으며, 향후 같은 불일치가 생기면 `blocked`·종료 코드 1로 기록합니다. 로컬 실행 증거와 운영·수령자 확인은 구분합니다.
 
+### 같은 입력의 Neo4j·공개 앱 정합성 smoke
+
+`graph_handoff_reconciliation_smoke.py`는 같은 합성 S2/S3 입력과 `canonical.json`을 비공개 Neo4j projection과 앱 handoff 양쪽에 전달해 정합성을 비교합니다(#149). 현재 소스로 설치한 pipeline Python·세 CLI(`zoop-ai-handoff`, `zoop-ai-ingest`, `zoop-ai-graph`), 현재 API boot jar, JDK 21 이상과 로컬 OrbStack의 캐시된 PostgreSQL 16.13·Neo4j 5.26.32 이미지가 필요합니다. Neo4j 이미지는 `graph_tls_smoke.py`의 digest로 고정합니다.
+
+```sh
+ai/pipeline/.venv/bin/python api/scripts/graph_handoff_reconciliation_smoke.py \
+  --jar api/build/libs/zoop-api-0.0.1-SNAPSHOT.jar \
+  --java "$JAVA_HOME/bin/java" --result /tmp/zoop-graph-reconciliation-result.json
+```
+
+결과는 새 파일에 저장합니다. 명령은 자체 bridge·빈 tmpfs PostgreSQL·빈 tmpfs Neo4j·loopback JVM·합성 replay 원장을 만들고 종료 시 소유 자원만 정리합니다. DB·provider·Spring 설정은 상속하지 않으며, 빌드·설치·이미지 pull은 실행 전에 마칩니다. bundle `-9` / 정책 `-3` / decisions `-5`를 비활성 수입하고, fixture 포인터를 확인한 뒤 기본 공개 제외 reader와 실제 관리자 HTTP의 수동 CAS로 최초 원본을 활성화합니다. 비-fixture 공개 뒤의 누적 전환은 별도 composer 계약을 따릅니다. 시점 고정 조회를 위해 공장 기사의 발행 시각은 수집 전에 합성 입력으로 작성하며, 이후 JVM은 artifact source로만 기동합니다.
+
+비교 기준은 개수가 아니라 S2/S3 pin·canonical 기업/이슈·관계의 유형과 방향·`relationCandidateId`·구조 경로·문서 버전과 코드 포인트 구간입니다. 공개 graph·edge·event·모든 근거 인용을 실제 HTTP로 읽고, 같은 버전 재수입/재투영과 현재 권리 철회·복구를 검사합니다. 다른 canonical 기업에 투영한 실제 Neo4j 버전과 인용·방향·공개 간선 등을 바꾼 관측 사본은 같은 비교기가 실패로 검출해야 합니다.
+
+결과 JSON에는 도메인 매핑·세 digest·정확한 관계/근거 ID·인용 hash·HTTP 본문 hash·실행 모듈 경로와 소스 hash·HEAD·jar/image hash·명령 횟수·정리 결과를 남깁니다. `providerCalls`·`modelCalls`는 0이어야 합니다. 비공개 Neo4j projection은 공개 읽기 backend가 아니며, 이 합성 검증은 실제 기사 품질·규모나 운영 배포 수용을 대신하지 않습니다.
+
+
 
 ## 그래프 정기 회차 (#55)
 
