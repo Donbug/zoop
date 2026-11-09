@@ -68,9 +68,29 @@ worker 환경변수 `BRIEFING_NEWS_SOURCE_REGISTRY`에 비공개 0600 파일의 
 
 ## 한도와 수집 범위
 
-추가 뉴스 경로 전체가 최대 5분을 공유하고 native 준비 마감 190초 전에는 새 요청을 시작하지 않는다. 출처별 페이지·기사 시도·보관 개수를 제한하므로 한 출처가 다른 출처의 모든 요청 몫을 소모하지 않는다. robots·401/403/429·네트워크 제한은 기록하고 동일 실행에서 우회·반복하지 않는다. 한 출처의 실패는 나머지 출처 수집을 막지 않는다.
+새 자동화는 `briefing-news-refill-v1`을 사용한다. 기본 목표는 기업 카탈로그와 연결되는 원문 20개이며 **새 사건 20개 또는 핵심 이슈 3개를 보장하는 값이 아니다**. 기존 정부·삼성 자료도 같은 후보 풀에 포함한다. 목표에 못 미치면 새 수집 묶음을 더 받고, 이후 검증·선정에서 풀이 소진돼도 마감·호출 예산이 남으면 다시 보충한다. 동일 사건·근거·재보도·기업 관계 검증은 계속 적용한다.
 
-`native/<round>/source-coverage.json`과 `news-sources/result.json`에 출처별 확인·제외·보류를 저장한다. 미설정은 `not_configured`, 미확인 권한은 `rights_prerequisite`, 실행한 범위도 `complete=false`다. 수집이 부족한 것을 시장 전체에 새 소식이 없다고 설명하지 않는다. 이 경로 자체의 AI·회원별 수집 호출은 0회이며, 후속 native·브리핑 요청은 기존 물리 호출·일일 비용 원장을 그대로 사용한다.
+뉴스 출처들이 회차 전체에서 공유하는 기본 한도는 6묶음·요청 120회·네트워크/호스트 대기 300초·응답 100MB다. 마감 360초 전에는 새 수집을 시작하지 않아 후속 native 검증·선정 시간을 남긴다. 매 묶음에 출처별 목록 1페이지와 기사 최대 8개를 처리하고, 다음 묶음은 시작 출처를 바꾼다. 출처별 등록 한도도 누적 적용한다. 정부·삼성 경로는 원래 한도를 유지한다. 전체 시장의 모든 뉴스를 수집한다는 의미가 아니다.
+
+동일 회차의 이미 방문한 기사 URL은 다시 요청하지 않는다. 남은 목록 페이지·새 URL을 우선 검토하고, 목록과 대기열이 모두 소진되면 등록된 최초 피드를 최대 1회만 새로 확인한다. 같은 본문 SHA는 원문 획득본을 보존하되 후보에 중복 추가하지 않는다. 페이지 안 URL 중복도 제거한다. 보존 대기열은 출처별 기사 240개·목록 64개이며 잘린 개수는 별도로 기록한다. robots·401/403/429·네트워크 제한은 기록하고 그 출처를 뒤 묶음에서도 자동 반복하지 않는다. 다른 출처는 공유 예산 안에서 계속 확인한다.
+
+현재 v1 registry의 페이지 3·기사 시도 24·문서 8 상한과 실제 설정값은 그대로 유효하다. 확대 설정은 **새 `briefing-news-sources-v2` 리비전**으로 준비한다. v2의 출처별 최대치는 페이지 8·기사 시도 80·문서 30, 출처 개수는 최대 8개다. 코드가 운영 파일을 덮어쓰거나 새 출처를 자동 활성화하지 않는다.
+
+다음 명령은 운영 파일과 별도의 비공개 0600 설정만 생성한다. 기본 확대값은 출처별 페이지 5·기사 시도 60·문서 20이다. `--additional-sources`는 선택 사항이며, 위 형식의 완전한 source 항목 배열을 담은 별도 0600 JSON이다. 기존 grant·수신자·enabled는 보존하고, 활성 출처의 권한이 미확인이면 거부한다. 출력 경로는 Git checkout 밖이어야 한다.
+
+```sh
+python3 scripts/prepare_briefing_news_registry.py \
+  --current /private/briefing/news-sources-v1.json \
+  --output /private/briefing/news-sources-v2.json \
+  --revision reviewed-expanded-v2 \
+  --additional-sources /private/briefing/reviewed-additional-sources.json
+```
+
+생성한 설정을 확인한 뒤 별도 배포 단계에서 `BRIEFING_NEWS_SOURCE_REGISTRY`를 새 파일로 지정한다. 같은 회차 도중 registry·정책 SHA를 바꾸면 중단한다. 실제 등록 출처가 하나라면 이 도구만으로 여러 언론사를 수집하게 되지는 않는다. 추가 출처는 기존 adapter 지원과 현재 source/native 권한을 갖춘 항목을 등록해야 한다.
+
+새 획득은 `native/<round>/news-sources-refill-v1/pass-NN/` 아래에 원문 응답·수집 시각·SHA, 실제 collection/ingestion 결과, `state/result/aggregate/commit.json`을 추가한다. 이전 묶음을 덮어쓰지 않는다. 완료 묶음 읽기는 네트워크 0회이며, 명시적 refill만 다음 묶음을 만든다. 미완료 `started.json`은 자동 재전송하지 않고 복구 경계로 남긴다. 검토 과정의 coverage는 `coverage-passes/`에 보존하고 최종 `source-coverage.json`은 한 번 고정한다. 총 후보 수·남은 후보 수·수집 묶음 수·제외 사유·시간/요청/문서 한도 도달을 구분한다. 기존 `news-sources/result.json` 획득본은 원래 reader로 재사용하고 새 형태로 변환하지 않는다.
+
+미설정은 `not_configured`, 미확인 권한은 `rights_prerequisite`, 실행한 범위도 `complete=false`다. 수집이 부족한 것을 시장 전체에 새 소식이 없다고 설명하지 않는다. 이 경로 자체의 AI·회원별 수집 호출은 0회이며, 후속 native·브리핑 요청은 기존 물리 호출·일일 비용 원장을 그대로 사용한다. 다음 정상 문서 검토에 필요한 최소 호출 여유가 없거나 앞선 응답이 미확인 상태라면 보충 수집으로 이를 우회하지 않는다.
 
 OpenDART/SEC의 공식 수집 adapter는 별도 protocol이다. 이 변경은 해당 adapter의 인증·SEC 식별 연락처·공식 문서 변환을 임의로 채우거나 활성화하지 않는다. DART 키, SEC 회사/연락처·CIK와 해당 출처 권한을 준비한 후 별도 연결해야 한다.
 

@@ -71,7 +71,7 @@ def relevance_text(raw):
             if node.getparent() is not None:node.getparent().remove(node)
     return node_text(body[0])
 
-def collect(cfg,round,root,*,all_candidates=False):
+def collect(cfg,round,root,*,all_candidates=False,pass_mode=False,refill=False):
     from zoop_ai_pipeline.korea_corpus import Config,run,package
     base=Path(cfg['work'])/'native';root.mkdir(mode=0o700,parents=True,exist_ok=True)
     config_path=root/'collection-config.json'
@@ -150,7 +150,7 @@ def collect(cfg,round,root,*,all_candidates=False):
     import briefing_news_intake as news
     if cfg.get('recordedOnly') and cfg.get('newsSourceRegistry'):
         require((root/'news-sources/result.json').is_file(),'recorded_news_collection_required')
-    news_entries,news_result=news.collect(cfg,round,root)
+    news_entries,news_result=news.collect(cfg,round,root,refill=True) if refill else news.collect(cfg,round,root)
     for row,exported,selected_root in news_entries:
         identity=(row['documentId'],row['documentVersion'])
         if identity in seen or identity in processed:continue
@@ -163,6 +163,13 @@ def collect(cfg,round,root,*,all_candidates=False):
     coverage={'complete':False,'candidateDocuments':len(eligible),'selectedDocuments':min(1,len(eligible)),
         'collection':result['counts'],'samsungNewsroom':official_coverage,
         'newsSources':{k:news_result[k] for k in ('status','sources','modelCalls','memberSpecificRequests')}}
+    if news_result.get('collectionPolicy'):
+        coverage['newsSources'].update({k:news_result[k] for k in ('collectionPolicy','passCount','targetDocuments','targetReached','canRefill','stopReason','requests','networkSeconds','downloadedBytes')})
+    if pass_mode:
+        folder=root/'coverage-passes';folder.mkdir(mode=0o700,exist_ok=True)
+        write_once(folder/(b.digest(b.canonical(coverage))+'.json'),coverage)
+        return [({**row,'coverage':coverage,'matchedCompanyIds':matched},exported,companies,selected_root)
+                for row,exported,matched,selected_root in eligible],coverage,news_result
     write_once(root/'source-coverage.json',coverage)
     require(bool(eligible),'no_current_company_source')
     if all_candidates:
@@ -422,10 +429,59 @@ def prepare(cfg,round,observer=None,qualifier=None):
         if legacy.exists():return json.loads(legacy.read_bytes())
         for ready in sorted((collection_root/'candidates-v3').glob('*/ready.json')):
             return json.loads(ready.read_bytes())
+    if cfg.get('newsCollectionPolicy') and not cfg.get('recordedOnly'):
+        return prepare_with_refill(cfg,round,collection_root,observer,qualifier)
     observer('collection','started')
     entries=collect(cfg,round,collection_root,all_candidates=True)
     observer('collection','completed');observer('native','started')
     return prepare_candidates(cfg,round,entries,collection_root,observer,qualifier)
+
+
+def prepare_with_refill(cfg,round_,root,observer,qualifier):
+    """Freeze coverage once; immutable acquisition passes stay separate from AI attempts."""
+    import briefing_news_refill as refill
+    p=refill.policy(cfg);root.mkdir(mode=0o700,parents=True,exist_ok=True)
+    observer('collection','started')
+    entries,coverage,news_result=collect(cfg,round_,root,all_candidates=True,pass_mode=True)
+    seen={(e[1]['document']['documentId'],e[1]['document']['documentVersion']) for e in entries}
+    def freeze_coverage():
+        value={**coverage,'candidateDocuments':len(seen),'remainingCandidateDocuments':len(entries),
+               'collectionPolicy':refill.VERSION,'targetDocuments':p['targetDocuments']}
+        write_once(root/'source-coverage.json',value)
+    # Build a useful pool before paying for extraction. Counts are documents, not verified events.
+    while len(entries)<p['targetDocuments'] and news_result.get('canRefill'):
+        before=news_result.get('passCount',0)
+        entries,coverage,news_result=collect(cfg,round_,root,all_candidates=True,pass_mode=True,refill=True)
+        seen.update((e[1]['document']['documentId'],e[1]['document']['documentVersion']) for e in entries)
+        require(news_result.get('passCount',0)>before,'refill_progress_required')
+    observer('collection','completed');observer('native','started')
+    all_outcomes=[]
+    while True:
+        if not entries:
+            result={'status':'withheld','reason':'no_current_company_source','candidates':[]}
+        else:
+            result=prepare_candidates(cfg,round_,entries,root,observer,qualifier)
+        if result.get('status')!='withheld':
+            freeze_coverage()
+            return result
+        all_outcomes.extend(result.get('candidates',[]))
+        if (result['reason'] in ('remaining_shared_call_capacity','preparation_deadline')
+                or not news_result.get('canRefill')
+                or limits.remaining_native(cfg,round_['id'])<5):break
+        before=news_result.get('passCount',0)
+        observer('collection','started',{'reason':'candidate_pool_exhausted'})
+        entries,coverage,news_result=collect(cfg,round_,root,all_candidates=True,pass_mode=True,refill=True)
+        seen.update((e[1]['document']['documentId'],e[1]['document']['documentVersion']) for e in entries)
+        require(news_result.get('passCount',0)>before,'refill_progress_required')
+        observer('collection','completed')
+    freeze_coverage()
+    if all_outcomes:
+        value={**result,'status':'withheld','candidates':all_outcomes,
+               'reason':result['reason'] if result['reason']!='no_current_company_source' else 'all_company_candidates_withheld'}
+        value.pop('outcomeFile',None)
+        dest=root/'candidates-v3'/('outcomes-'+b.digest(b.canonical(value))[:16]+'.json');dest.parent.mkdir(exist_ok=True)
+        write_once(dest,value);return {**value,'outcomeFile':str(dest.relative_to(root))}
+    return result
 
 
 def prepare_candidate(cfg,round,entry,root):
