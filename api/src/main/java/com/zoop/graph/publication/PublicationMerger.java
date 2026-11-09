@@ -33,19 +33,32 @@ public final class PublicationMerger {
     /** {@link #DECISIONS_SCHEMA} plus {@code labelCorrections}: a person's display name for a public issue, which no source value supplies. */
     public static final String DECISIONS_SCHEMA_2 = "zoop-graph-publication-decisions-2";
     public static final String LABEL_CORRECTIONS = "labelCorrections";
+    /**
+     * {@link #DECISIONS_SCHEMA_2} plus {@code memberExclusions} and {@code issueRetirements}: a person's decision that a member leaves a
+     * public issue's union, or that a public issue leaves the snapshot, without touching any source (#407).
+     */
+    public static final String DECISIONS_SCHEMA_3 = "zoop-graph-publication-decisions-3";
+    public static final String MEMBER_EXCLUSIONS = "memberExclusions";
+    public static final String ISSUE_RETIREMENTS = "issueRetirements";
     /** Longest corrected name, in Unicode code points (not UTF-16 units); a longer one is refused, never cut or normalized. */
     public static final int MAX_LABEL_LENGTH = 120;
     public static final List<String> FIELDS = List.of("label", "action", "target", "assertionStatus", "eventTime", "period", "geography");
     private static final List<String> SELECTIONS = List.of("issueMappings", "fieldSelections", "relationSelections");
-    private static final List<String> COLLECTIONS = List.of("issueMappings", "fieldSelections", "relationSelections", LABEL_CORRECTIONS);
+    private static final List<String> COLLECTIONS = List.of("issueMappings", "fieldSelections", "relationSelections", LABEL_CORRECTIONS,
+            MEMBER_EXCLUSIONS, ISSUE_RETIREMENTS);
+    private static final List<String> SCOPE_COLLECTIONS = List.of(MEMBER_EXCLUSIONS, ISSUE_RETIREMENTS);
     private static final Comparator<IssueRef> ISSUE_ORDER = Comparator.comparing(IssueRef::sourceVersionId).thenComparing(IssueRef::issueId);
     private static final Comparator<RelationRef> RELATION_ORDER = Comparator.comparing(RelationRef::sourceVersionId).thenComparing(RelationRef::relationId);
 
     private PublicationMerger() {}
 
+    /**
+     * The composition. {@code memberExclusions} counts the members excluded from a public issue that is in the snapshot,
+     * {@code issueRetirements} the public issues retired from it.
+     */
     public record Merged(List<PublicGraphSnapshot.Company> companies, List<Issue> issues, List<Relation> relations,
             List<PublicGraphSnapshot.Article> articles, List<PublicGraphSnapshot.Evidence> evidence,
-            Map<String, IssueOwners> issueSources, Map<String, RelationOwners> relationSources) {
+            Map<String, IssueOwners> issueSources, Map<String, RelationOwners> relationSources, int memberExclusions, int issueRetirements) {
         public PublicGraphSnapshot snapshot(String versionId, String publicationId) {
             int format = issues.stream().anyMatch(Issue::hasExplicitUnknownGeography)
                     ? PublicGraphSnapshot.EXPLICIT_UNKNOWN_FORMAT : PublicGraphSnapshot.FORMAT;
@@ -60,8 +73,10 @@ public final class PublicationMerger {
     }
 
     /**
-     * {@code previous} with {@code incoming} applied: a later decision with the same key replaces the earlier one. The result is a
-     * {@link #DECISIONS_SCHEMA} document unless a label correction remains, which only {@link #DECISIONS_SCHEMA_2} can carry.
+     * {@code previous} with {@code incoming} applied: a later decision with the same key replaces the earlier one. The result is the
+     * lowest schema that carries what remains: {@link #DECISIONS_SCHEMA_3} while any exclusion or retirement record remains (a
+     * {@code restored} one too, since it is the record of that decision), else {@link #DECISIONS_SCHEMA_2} while a label correction
+     * remains, else {@link #DECISIONS_SCHEMA}.
      */
     public static Obj combine(Obj previous, Obj incoming) {
         validateRoot(previous); validateRoot(incoming);
@@ -79,10 +94,13 @@ public final class PublicationMerger {
             }
             combined.put(collection, List.copyOf(items.values()));
         }
-        boolean corrected = !combined.get(LABEL_CORRECTIONS).isEmpty();
-        ObjectNode root = StrictJson.newObject(); root.put("schemaVersion", corrected ? DECISIONS_SCHEMA_2 : DECISIONS_SCHEMA);
+        boolean scoped = SCOPE_COLLECTIONS.stream().anyMatch(c -> !combined.get(c).isEmpty());
+        boolean corrected = scoped || !combined.get(LABEL_CORRECTIONS).isEmpty();
+        ObjectNode root = StrictJson.newObject();
+        root.put("schemaVersion", scoped ? DECISIONS_SCHEMA_3 : corrected ? DECISIONS_SCHEMA_2 : DECISIONS_SCHEMA);
         combined.forEach((collection, items) -> {
-            if (corrected || !LABEL_CORRECTIONS.equals(collection)) { var array = root.putArray(collection); items.forEach(array::add); }
+            boolean carried = SCOPE_COLLECTIONS.contains(collection) ? scoped : LABEL_CORRECTIONS.equals(collection) ? corrected : true;
+            if (carried) { var array = root.putArray(collection); items.forEach(array::add); }
         });
         return Obj.of(root);
     }
@@ -95,13 +113,46 @@ public final class PublicationMerger {
     public static List<Obj> labelCorrections(Obj decisions) {
         return items(decisions, LABEL_CORRECTIONS);
     }
+    /** The member exclusion records (both statuses) of an accepted decisions document, none below {@link #DECISIONS_SCHEMA_3}. */
+    public static List<Obj> memberExclusions(Obj decisions) {
+        return items(decisions, MEMBER_EXCLUSIONS);
+    }
+    /** The issue retirement records (both statuses) of an accepted decisions document, none below {@link #DECISIONS_SCHEMA_3}. */
+    public static List<Obj> issueRetirements(Obj decisions) {
+        return items(decisions, ISSUE_RETIREMENTS);
+    }
+
+    /**
+     * The members and public issues the decisions in force remove from the public graph: a member whose exclusion record is
+     * {@code excluded}, and a public issue whose retirement record is {@code retired}. {@link #combine} keeps one record per key, so
+     * the record's status is the decision in force. Mappings resolve an original to its public issue.
+     */
+    public record Effective(Set<IssueRef> excludedMembers, Set<String> retiredIssues, Map<IssueRef, IssueRef> mappings) {
+        public Effective { excludedMembers = Set.copyOf(excludedMembers); retiredIssues = Set.copyOf(retiredIssues); mappings = Map.copyOf(mappings); }
+        /** True for an original a decision in force removed: an excluded member, or any member of a retired public issue. */
+        public boolean voided(IssueRef original) {
+            return excludedMembers.contains(original) || retiredIssues.contains(resolve(original, mappings).issueId());
+        }
+    }
+
+    /** The decisions in force of an accepted decisions document ({@link Effective}); nothing below {@link #DECISIONS_SCHEMA_3}. */
+    public static Effective effective(Obj decisions) {
+        validateRoot(decisions);
+        Map<IssueRef, IssueRef> mappings = new HashMap<>();
+        for (Obj mapping : decisions.objects("issueMappings")) mappings.put(issueRef(mapping.object("from")), issueRef(mapping.object("to")));
+        Set<IssueRef> excluded = new HashSet<>(); Set<String> retired = new HashSet<>();
+        for (Obj item : items(decisions, MEMBER_EXCLUSIONS)) if ("excluded".equals(item.string("status"))) excluded.add(issueRef(item.object("member")));
+        for (Obj item : items(decisions, ISSUE_RETIREMENTS)) if ("retired".equals(item.string("status"))) retired.add(item.string("issueId"));
+        return new Effective(excluded, retired, mappings);
+    }
 
     private static String decisionKey(String collection, Obj item) {
         return switch (collection) {
             case "issueMappings" -> Canonical.write(item.raw("from"));
             case "fieldSelections" -> item.string("issueId") + "\n" + item.string("field");
             case "relationSelections" -> item.string("relationId");
-            case LABEL_CORRECTIONS -> item.string("issueId");
+            case LABEL_CORRECTIONS, ISSUE_RETIREMENTS -> item.string("issueId");
+            case MEMBER_EXCLUSIONS -> item.string("issueId") + "\n" + Canonical.write(item.raw("member"));
             default -> throw new IllegalArgumentException(collection);
         };
     }
@@ -145,27 +196,77 @@ public final class PublicationMerger {
         groups.values().forEach(list -> list.sort(ISSUE_ORDER));
         Map<String, Obj> fields = indexed(decisions.objects("fieldSelections"), o -> o.string("issueId") + "\n" + o.string("field"));
         Map<String, Obj> corrections = indexed(items(decisions, LABEL_CORRECTIONS), o -> o.string("issueId"));
+        // Exclusions and retirements are checked whole: every record names a real member of its public issue, and every record counts
+        // as used whatever its status, so there is no unused check for them. Only the status in force removes anything.
+        Set<IssueRef> excluded = new HashSet<>(); Set<String> retired = new HashSet<>();
+        for (Obj item : indexed(items(decisions, MEMBER_EXCLUSIONS), o -> decisionKey(MEMBER_EXCLUSIONS, o)).values()) {
+            IssueRef member = exclusion(item);
+            if (!originals.containsKey(member) || !resolve(member, mappings).issueId().equals(item.string("issueId"))) throw failure("mapping_unproven");
+            if ("excluded".equals(item.string("status"))) excluded.add(member);
+        }
+        for (Obj item : indexed(items(decisions, ISSUE_RETIREMENTS), o -> decisionKey(ISSUE_RETIREMENTS, o)).values()) {
+            retirement(item);
+            if (!groups.containsKey(item.string("issueId"))) throw failure("mapping_unproven");
+            if ("retired".equals(item.string("status"))) retired.add(item.string("issueId"));
+        }
         Set<String> usedFields = new HashSet<>(); Set<String> usedCorrections = new HashSet<>();
+        Set<String> dormantFields = new HashSet<>(); Set<String> dormantCorrections = new HashSet<>();
+        Set<IssueRef> droppedMembers = new HashSet<>(); int exclusionsApplied = 0;
         Map<String, IssueOwners> issueOwners = new TreeMap<>();
         List<Issue> issues = new ArrayList<>();
         for (var group : groups.entrySet()) {
             String publicId = group.getKey(); List<IssueRef> members = group.getValue();
-            Issue first = originals.get(members.getFirst());
-            if (members.stream().anyMatch(ref -> !first.equals(originals.get(ref)))
-                    && members.stream().noneMatch(mappings::containsKey)
+            if (retired.contains(publicId)) {
+                // Retired: the issue leaves the snapshot. Its receipt entry keeps the members and owners approved last (a first
+                // composition keeps the valid members under the default owner), so a restoration brings the same owners back.
+                // Decisions about it are kept, checked for shape and real references, and not applied.
+                IssueOwners previous = previousOwners.get(publicId);
+                IssueOwners kept;
+                if (previous != null) {
+                    if (!members.containsAll(previous.members()) || !members.containsAll(previous.headlineSources().values())) throw failure("basis_mismatch");
+                    kept = previous;
+                } else {
+                    List<IssueRef> valid = members.stream().filter(r -> !excluded.contains(r)).toList();
+                    if (valid.isEmpty()) throw failure("request_invalid");
+                    Map<String, IssueRef> owners = new TreeMap<>();
+                    for (String field : FIELDS) owners.put(field, defaultOwner(publicId, valid, mappings));
+                    kept = new IssueOwners(publicId, valid, owners);
+                }
+                issueOwners.put(publicId, kept);
+                droppedMembers.addAll(members);
+                for (String field : FIELDS) {
+                    Obj choice = fields.get(publicId + "\n" + field);
+                    if (choice == null) continue;
+                    dormantFields.add(publicId + "\n" + field); selectionShape(choice, originals, sources);
+                    // Dormancy is no exception to reference checks: the chosen source must be a member of this public issue.
+                    if (!members.contains(issueRef(choice.object("takeFrom")))) throw failure("mapping_unproven");
+                }
+                Obj correction = corrections.get(publicId);
+                if (correction != null) { dormantCorrections.add(publicId); correctionShape(correction); correctionName(correction); evidenceRefs(correction, originals, sources); }
+                continue;
+            }
+            List<IssueRef> active = members.stream().filter(r -> !excluded.contains(r)).toList();
+            if (active.isEmpty()) throw failure("request_invalid");
+            members.stream().filter(excluded::contains).forEach(droppedMembers::add);
+            exclusionsApplied += members.size() - active.size();
+            Issue first = originals.get(active.getFirst());
+            if (active.stream().anyMatch(ref -> !first.equals(originals.get(ref)))
+                    && active.stream().noneMatch(mappings::containsKey)
                     && FIELDS.stream().noneMatch(field -> fields.containsKey(publicId + "\n" + field)))
                 throw failure("correction_required");
             Map<String, IssueRef> owners = new TreeMap<>();
             for (String field : FIELDS) {
                 Obj choice = fields.get(publicId + "\n" + field);
-                IssueRef owner = defaultOwner(publicId, members, mappings);
+                IssueRef owner = defaultOwner(publicId, active, mappings);
                 IssueOwners previous = previousOwners.get(publicId);
                 if (previous != null) {
                     owner = previous.headlineSources().get(field);
                     if (owner == null || !members.contains(owner)) throw failure("basis_mismatch");
+                    // The owner is the issue's atomic proof: it may leave only once a selection in this file moves the field.
+                    if (excluded.contains(owner) && choice == null) throw failure("identity_conflict");
                 }
-                JsonNode initial = field(originals.get(owner), field);
-                boolean conflict = members.stream().anyMatch(r -> !field(originals.get(r), field).equals(initial));
+                JsonNode initial = field(first, field);
+                boolean conflict = active.stream().anyMatch(r -> !field(originals.get(r), field).equals(initial));
                 if (choice == null && conflict) throw failure("correction_required");
                 // An automatic selection only merged sources that agreed (same-headline); once they disagree it decides nothing.
                 if (choice != null && conflict && automatic(choice)) throw failure("correction_required");
@@ -174,9 +275,9 @@ public final class PublicationMerger {
                     choice.exactly(Set.of("issueId", "field", "expectedValueDigest", "takeFrom", "evidenceRefs", "reviewer", "decisionRef", "decisionVersion"));
                     audit(choice);
                     IssueRef selected = issueRef(choice.object("takeFrom"));
-                    if (!members.contains(selected)) throw failure("mapping_unproven");
+                    if (!active.contains(selected)) throw failure("mapping_unproven");
                     String expected = choice.string("expectedValueDigest");
-                    if (!StrictJson.SHA256.matcher(expected).matches() || members.stream()
+                    if (!StrictJson.SHA256.matcher(expected).matches() || active.stream()
                             .noneMatch(r -> expected.equals(Canonical.digest(field(originals.get(r), field))))) throw failure("identity_conflict");
                     if (!evidenceRefs(choice, originals, sources).contains(selected)) throw failure("mapping_unproven");
                     owner = selected;
@@ -194,7 +295,7 @@ public final class PublicationMerger {
             TreeSet<String> articleIds = new TreeSet<>(); TreeSet<String> evidenceIds = new TreeSet<>();
             Map<String, PublicGraphSnapshot.MentionRef> mentions = new TreeMap<>();
             List<String> times = new ArrayList<>();
-            for (IssueRef ref : members) {
+            for (IssueRef ref : active) {
                 Issue issue = originals.get(ref); articleIds.addAll(issue.articleIds()); evidenceIds.addAll(issue.evidenceIds());
                 issue.mentions().forEach(m -> exact(mentions, m.mentionId(), m));
                 times.add(issue.latestPublishedAt());
@@ -204,16 +305,19 @@ public final class PublicationMerger {
                     originals.get(owners.get("assertionStatus")).assertionStatus(), originals.get(owners.get("action")).action(),
                     originals.get(owners.get("target")).target(), geo.geography(), geo.geographyPolicyVersion(), geo.geographyEvidenceIds(),
                     List.copyOf(articleIds), List.copyOf(evidenceIds), List.copyOf(mentions.values()), headline.representativeMentionId(), latest));
-            issueOwners.put(publicId, new IssueOwners(publicId, members, owners));
+            issueOwners.put(publicId, new IssueOwners(publicId, active, owners));
         }
+        usedFields.addAll(dormantFields); usedCorrections.addAll(dormantCorrections);
         if (!usedFields.equals(fields.keySet()) || !usedCorrections.equals(corrections.keySet())) throw failure("mapping_unproven");
+        Set<RelationRef> droppedRelations = PublicationScope.dropped(originalRelations, new Effective(excluded, retired, mappings));
         Map<String, List<RelationRef>> relationGroups = new TreeMap<>();
-        originalRelations.keySet().forEach(r -> relationGroups.computeIfAbsent(r.relationId(), ignored -> new ArrayList<>()).add(r));
+        originalRelations.keySet().forEach(r -> { if (!droppedRelations.contains(r)) relationGroups.computeIfAbsent(r.relationId(), ignored -> new ArrayList<>()).add(r); });
         Map<String, Obj> selections = indexed(decisions.objects("relationSelections"), o -> o.string("relationId"));
         Set<String> usedRelations = new HashSet<>();
         Map<String, RelationOwners> relationOwners = new TreeMap<>(); List<Relation> relations = new ArrayList<>();
         Map<RelationRef, Relation> projectedRelations = new HashMap<>();
         originalRelations.forEach((ref, relation) -> {
+            if (droppedRelations.contains(ref)) return;
             Relation projected = project(relation, ref, publicIds);
             if (projected.source() == null || projected.target() == null || projected.source().equals(projected.target())) throw failure("identity_conflict");
             projectedRelations.put(ref, projected);
@@ -256,14 +360,24 @@ public final class PublicationMerger {
             relations.add(projected);
             relationOwners.put(chosen.relationId(), new RelationOwners(chosen.relationId(), members, source, target));
         }
+        // A selection of a relation every provider of which left through a decision is kept dormant: checked for shape, not applied.
+        // A selection whose chosen provider left while the relation stays is not carried to another provider (identity_conflict above).
+        Set<String> droppedIds = new HashSet<>(); droppedRelations.forEach(r -> droppedIds.add(r.relationId()));
+        for (var selection : selections.entrySet()) {
+            if (usedRelations.contains(selection.getKey()) || !droppedIds.contains(selection.getKey())) continue;
+            relationSelectionShape(selection.getValue(), originals, originalRelations, sources);
+            usedRelations.add(selection.getKey());
+        }
         if (!usedRelations.equals(selections.keySet())) throw failure("mapping_unproven");
         checkAcyclic(relations);
         var companies = union(contributions, s -> s.projection().companies(), PublicGraphSnapshot.Company::companyId);
         var articles = union(contributions, s -> s.projection().articles(), a -> a.articleId() + "\n" + a.version());
         var evidence = union(contributions, s -> s.projection().evidence(), PublicGraphSnapshot.Evidence::evidenceId);
+        var cleaned = PublicationScope.clean(articles, evidence, issues, relations, droppedMembers, droppedRelations, originals, originalRelations);
         Set<String> companyIds = companies.stream().map(PublicGraphSnapshot.Company::companyId).collect(java.util.stream.Collectors.toSet());
         if (issues.stream().anyMatch(i -> companyIds.contains(i.issueId()))) throw failure("identity_conflict");
-        return new Merged(companies, List.copyOf(issues), List.copyOf(relations), articles, evidence, Map.copyOf(issueOwners), Map.copyOf(relationOwners));
+        return new Merged(companies, List.copyOf(issues), List.copyOf(relations), cleaned.articles(), cleaned.evidence(),
+                Map.copyOf(issueOwners), Map.copyOf(relationOwners), exclusionsApplied, retired.size());
     }
 
     /** The reviewer recorded on decisions the automatic preparation proposes; people's decisions use any other reviewer. */
@@ -320,19 +434,63 @@ public final class PublicationMerger {
      * Only people correct names: the automatic reviewer is refused here as well as by the operator compose.
      */
     private static String correctedLabel(Obj correction, IssueRef owner, Map<IssueRef, Issue> originals, Map<String, Contribution> sources) {
+        correctionShape(correction);
+        if (!correction.string("expectedLabelDigest").equals(Canonical.digest(field(originals.get(owner), "label")))) throw failure("identity_conflict");
+        String label = correctionName(correction);
+        if (!evidenceRefs(correction, originals, sources).equals(Set.of(owner))) throw failure("mapping_unproven");
+        return label;
+    }
+
+    /** A correction's shape, audit, reviewer and digest format: what a dormant correction is still held to, before any value is compared. */
+    private static void correctionShape(Obj correction) {
         correction.exactly(Set.of("issueId", "expectedLabelDigest", "label", "evidenceRefs", "reviewer", "decisionRef", "decisionVersion"));
         audit(correction);
         if (automatic(correction)) throw failure("request_invalid");
-        String expected = correction.string("expectedLabelDigest");
-        if (!StrictJson.SHA256.matcher(expected).matches()) throw failure("request_invalid");
-        if (!expected.equals(Canonical.digest(field(originals.get(owner), "label")))) throw failure("identity_conflict");
+        if (!StrictJson.SHA256.matcher(correction.string("expectedLabelDigest")).matches()) throw failure("request_invalid");
+    }
+
+    /** The corrected name, refused when it is not a name. */
+    private static String correctionName(Obj correction) {
         String label = correction.string("label");
         // Blank or padded in any Unicode sense: String.isBlank/strip ignore no-break spaces (U+00A0, U+202F), which are space characters.
         if (label.isEmpty() || label.codePoints().allMatch(PublicationMerger::space) || space(label.codePointAt(0))
                 || space(label.codePointBefore(label.length())) || label.codePointCount(0, label.length()) > MAX_LABEL_LENGTH
                 || !label.codePoints().allMatch(PublicationMerger::visible)) throw failure("request_invalid");
-        if (!evidenceRefs(correction, originals, sources).equals(Set.of(owner))) throw failure("mapping_unproven");
         return label;
+    }
+
+    /** A field selection's shape, audit, real source and real evidence (what a dormant selection is still held to); no value is compared. */
+    private static void selectionShape(Obj choice, Map<IssueRef, Issue> originals, Map<String, Contribution> sources) {
+        choice.exactly(Set.of("issueId", "field", "expectedValueDigest", "takeFrom", "evidenceRefs", "reviewer", "decisionRef", "decisionVersion"));
+        audit(choice);
+        if (!FIELDS.contains(choice.string("field"))) throw failure("request_invalid");
+        if (!originals.containsKey(issueRef(choice.object("takeFrom")))) throw failure("mapping_unproven");
+        if (!StrictJson.SHA256.matcher(choice.string("expectedValueDigest")).matches()) throw failure("identity_conflict");
+        evidenceRefs(choice, originals, sources);
+    }
+
+    /** A relation selection's shape, audit, real record and real evidence (what a dormant selection is still held to); no value is compared. */
+    private static void relationSelectionShape(Obj choice, Map<IssueRef, Issue> originals, Map<RelationRef, Relation> relations, Map<String, Contribution> sources) {
+        choice.exactly(Set.of("relationId", "expectedValueDigest", "takeFrom", "evidenceRefs", "reviewer", "decisionRef", "decisionVersion"));
+        audit(choice);
+        if (!relations.containsKey(relationRef(choice.object("takeFrom")))) throw failure("identity_conflict");
+        if (!StrictJson.SHA256.matcher(choice.string("expectedValueDigest")).matches()) throw failure("identity_conflict");
+        evidenceRefs(choice, originals, sources);
+    }
+
+    /** A member exclusion record: its member, after the shape, audit and status are checked. Only people exclude. */
+    private static IssueRef exclusion(Obj item) {
+        item.exactly(Set.of("issueId", "member", "status", "reviewer", "decisionRef", "decisionVersion"));
+        audit(item);
+        if (automatic(item) || !Set.of("excluded", "restored").contains(item.string("status"))) throw failure("request_invalid");
+        return issueRef(item.object("member"));
+    }
+
+    /** An issue retirement record's shape, audit and status. Only people retire. */
+    private static void retirement(Obj item) {
+        item.exactly(Set.of("issueId", "status", "reviewer", "decisionRef", "decisionVersion"));
+        audit(item);
+        if (automatic(item) || !Set.of("retired", "restored").contains(item.string("status"))) throw failure("request_invalid");
     }
 
     /** Whitespace by either Java definition: {@code isWhitespace} (ASCII, line/paragraph separators) or {@code isSpaceChar} (every Zs, including no-break spaces). */
@@ -369,13 +527,15 @@ public final class PublicationMerger {
             if (!index.sources().containsKey(id)) throw failure("request_invalid");
             order.put(id, order.size());
         }
-        Map<IssueRef, IssueRef> mappings = new HashMap<>();
-        for (Obj mapping : inherited.objects("issueMappings")) mappings.put(issueRef(mapping.object("from")), issueRef(mapping.object("to")));
+        Effective effective = effective(inherited);
+        Map<IssueRef, IssueRef> mappings = effective.mappings();
         Map<IssueRef, String> publicIds = new HashMap<>();
         Map<String, List<IssueRef>> groups = new TreeMap<>();
         for (IssueRef ref : index.originals().keySet()) {
             String id = resolve(ref, mappings).issueId();
-            publicIds.put(ref, id); groups.computeIfAbsent(id, ignored -> new ArrayList<>()).add(ref);
+            publicIds.put(ref, id);
+            // A retired issue gets no proposal and reports no change; an excluded member's values are not compared.
+            if (!effective.retiredIssues().contains(id) && !effective.excludedMembers().contains(ref)) groups.computeIfAbsent(id, ignored -> new ArrayList<>()).add(ref);
         }
         groups.values().forEach(list -> list.sort(ISSUE_ORDER));
         Map<String, Obj> fields = indexed(inherited.objects("fieldSelections"), o -> o.string("issueId") + "\n" + o.string("field"));
@@ -416,8 +576,9 @@ public final class PublicationMerger {
                     previous == null ? null : index.originals().get(previous.headlineSources().get("label")).representativeMentionId(),
                     index.originals().get(owner).representativeMentionId()));
         }
+        Set<RelationRef> droppedRelations = PublicationScope.dropped(index.relations(), effective);
         Map<String, List<RelationRef>> relationGroups = new TreeMap<>();
-        index.relations().keySet().forEach(r -> relationGroups.computeIfAbsent(r.relationId(), ignored -> new ArrayList<>()).add(r));
+        index.relations().keySet().forEach(r -> { if (!droppedRelations.contains(r)) relationGroups.computeIfAbsent(r.relationId(), ignored -> new ArrayList<>()).add(r); });
         for (var group : relationGroups.entrySet()) {
             List<RelationRef> members = group.getValue(); members.sort(RELATION_ORDER);
             if (members.stream().noneMatch(r -> order.containsKey(r.sourceVersionId())) || selections.containsKey(group.getKey())) continue;
@@ -527,11 +688,15 @@ public final class PublicationMerger {
     public static RelationRef relationRef(Obj value) {
         value.exactly(Set.of("sourceVersionId", "relationId")); return new RelationRef(value.string("sourceVersionId"), value.string("relationId"));
     }
-    /** A closed decisions document: {@link #DECISIONS_SCHEMA} with the three selections, or {@link #DECISIONS_SCHEMA_2} with label corrections too. */
+    /**
+     * A closed decisions document: {@link #DECISIONS_SCHEMA} with the three selections, {@link #DECISIONS_SCHEMA_2} with label corrections
+     * too, or {@link #DECISIONS_SCHEMA_3} with member exclusions and issue retirements as well.
+     */
     private static void validateRoot(Obj root) {
         Set<String> keys = new HashSet<>(SELECTIONS); keys.add("schemaVersion");
         String schema = root.has("schemaVersion") ? root.string("schemaVersion") : "";
-        if (DECISIONS_SCHEMA_2.equals(schema)) keys.add(LABEL_CORRECTIONS);
+        if (DECISIONS_SCHEMA_3.equals(schema)) { keys.add(LABEL_CORRECTIONS); keys.addAll(SCOPE_COLLECTIONS); }
+        else if (DECISIONS_SCHEMA_2.equals(schema)) keys.add(LABEL_CORRECTIONS);
         else if (!DECISIONS_SCHEMA.equals(schema)) throw failure("request_invalid");
         root.exactly(keys);
     }

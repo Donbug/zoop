@@ -116,6 +116,49 @@ class PublishedCandidatesTest {
         assertEquals(Set.of("s2-a\nevc-a", "s2-b\nevc-b"), shown.excludedEvents());
     }
 
+    @Test
+    void anExcludedMembersCandidatesAreHiddenNotPending() {
+        Publication full = publication();
+        var owners = full.issueSources().get("public-issue");
+        var excluded = new GraphPublicationReader.IssueRef("source-b", "issue-b");
+        var decisions = StrictJson.parseObject("""
+                {"schemaVersion":"zoop-graph-publication-decisions-3","issueMappings":[],"fieldSelections":[],"relationSelections":[],"labelCorrections":[],
+                 "memberExclusions":[{"issueId":"public-issue","member":{"sourceVersionId":"source-b","issueId":"issue-b"},"status":"excluded",
+                   "reviewer":"operator","decisionRef":"scope-review","decisionVersion":"1"}],"issueRetirements":[]}
+                """);
+        // The receipt lists the valid members and the surviving providers only, as the merge writes it.
+        var publication = new Publication(full.versionId(), full.publicationId(), full.compositionDigest(), null, null, null, null, full.snapshot(),
+                full.contributions(), decisions,
+                Map.of("public-issue", new GraphPublicationReader.IssueOwners("public-issue",
+                        owners.members().stream().filter(m -> !m.equals(excluded)).toList(), owners.headlineSources())),
+                Map.of("public-edge", new GraphPublicationReader.RelationOwners("public-edge",
+                        full.relationSources().get("public-edge").sources().stream().filter(r -> !r.sourceVersionId().equals("source-b")).toList(),
+                        "public-issue", "company")));
+        var shown = PublishedCandidates.read(publication, Set.of("public-edge"), Set.of("public-issue"), ignored -> true);
+        assertEquals(Set.of("s2-a\nevc-a"), shown.events());
+        assertEquals(Set.of("s2-b\nevc-b"), shown.excludedEvents());
+        assertEquals(Set.of("s3-a\nrc-a"), shown.relations());
+        assertEquals(Set.of("s3-b\nrc-b"), shown.excludedRelations());
+        assertNull(shown.publicIssueId("snapshot-b"));
+    }
+
+    @Test
+    void aRetiredIssuesMembersStayListedSoTheirCandidatesAreHiddenAndStillMapped() {
+        Publication full = publication();
+        var decisions = StrictJson.parseObject("""
+                {"schemaVersion":"zoop-graph-publication-decisions-3","issueMappings":[],"fieldSelections":[],"relationSelections":[],"labelCorrections":[],
+                 "memberExclusions":[],"issueRetirements":[{"issueId":"public-issue","status":"retired","reviewer":"operator","decisionRef":"scope-review","decisionVersion":"1"}]}
+                """);
+        var publication = new Publication(full.versionId(), full.publicationId(), full.compositionDigest(), null, null, null, null, full.snapshot(),
+                full.contributions(), decisions, full.issueSources(), full.relationSources());
+        // The issue is not in the snapshot, so nothing is shown; the members stay listed, so the candidates stay mapped to the retired id.
+        var shown = PublishedCandidates.read(publication, Set.of(), Set.of(), ignored -> true);
+        assertEquals(Set.of(), shown.events());
+        assertEquals(Set.of("s2-a\nevc-a", "s2-b\nevc-b"), shown.excludedEvents());
+        assertEquals(Set.of("s3-a\nrc-a", "s3-b\nrc-b"), shown.excludedRelations());
+        assertEquals("public-issue", shown.publicIssueId("snapshot-a"));
+    }
+
     private static SelectedGraphVersion selected() {
         return new SelectedGraphVersion(new GraphVersionRecord("publication-version", 4, "snapshot", "artifact", "uri",
                 "a".repeat(64), true), NOW, false);

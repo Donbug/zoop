@@ -446,6 +446,347 @@ class PublicationMergerTest {
     }
 
     /** The failure code a merge or combine reports: a malformed document is the composer's {@code request_invalid}. */
+    @Test
+    void scopeDecisionsHaveTheirOwnSchemaAndCombineToTheLowestOne() {
+        Contribution published = source(0, "same", "A"); Contribution incoming = sameHeadline(published, source(1, "same", "A"));
+        List<Contribution> all = List.of(published, incoming);
+        var combined = PublicationMerger.combine(PublicationMerger.emptyDecisions(), Obj.of(exclude(scoped(), "same", incoming, "excluded")));
+        assertEquals(PublicationMerger.DECISIONS_SCHEMA_3, combined.string("schemaVersion"));
+        assertEquals(1, PublicationMerger.memberExclusions(combined).size());
+        assertEquals(Set.of(incoming.issueRef("same")), PublicationMerger.effective(combined).excludedMembers());
+        // The same key again replaces the record: its status is the decision in force, and the record keeps the document at -3.
+        var restored = PublicationMerger.combine(combined, Obj.of(exclude(scoped(), "same", incoming, "restored")));
+        assertEquals(PublicationMerger.DECISIONS_SCHEMA_3, restored.string("schemaVersion"));
+        assertEquals(List.of("restored"), PublicationMerger.memberExclusions(restored).stream().map(o -> o.string("status")).toList());
+        assertEquals(Set.of(), PublicationMerger.effective(restored).excludedMembers());
+        // The same status with other audit fields is a new record that replaces the old one whole: the combined document differs
+        // from the previous one (so an empty-incoming compose makes a candidate), while the identical record leaves it equal.
+        ObjectNode reaudited = exclude(scoped(), "same", incoming, "excluded");
+        ((ObjectNode) reaudited.get(PublicationMerger.MEMBER_EXCLUSIONS).get(0)).put("decisionRef", "scope-review-2");
+        assertNotEquals(combined.node(), PublicationMerger.combine(combined, Obj.of(reaudited)).node());
+        assertEquals(combined.node(), PublicationMerger.combine(combined, Obj.of(exclude(scoped(), "same", incoming, "excluded"))).node());
+        // Without a scope record the lowest schema is recorded: -2 with a correction, -1 otherwise.
+        assertEquals(PublicationMerger.DECISIONS_SCHEMA_2, PublicationMerger.combine(PublicationMerger.emptyDecisions(), Obj.of(corrected(published, "이름"))).string("schemaVersion"));
+        assertEquals(PublicationMerger.DECISIONS_SCHEMA, PublicationMerger.combine(Obj.of(scoped()), PublicationMerger.emptyDecisions()).string("schemaVersion"));
+        // -3 is closed over six arrays; an unknown status, a duplicate key in one file or the automatic reviewer is refused.
+        ObjectNode missing = scoped(); missing.remove(PublicationMerger.ISSUE_RETIREMENTS);
+        assertEquals("request_invalid", code(() -> PublicationMerger.combine(PublicationMerger.emptyDecisions(), Obj.of(missing))));
+        assertEquals("request_invalid", code(() -> PublicationMerger.merge(all, Obj.of(exclude(scoped(), "same", incoming, "gone")), Set.of())));
+        assertEquals("request_invalid", code(() -> PublicationMerger.merge(all, Obj.of(retire(scoped(), "same", "excluded")), Set.of())));
+        ObjectNode twice = exclude(exclude(scoped(), "same", incoming, "excluded"), "same", incoming, "restored");
+        assertEquals("request_invalid", code(() -> PublicationMerger.combine(PublicationMerger.emptyDecisions(), Obj.of(twice))));
+        assertEquals("request_invalid", code(() -> PublicationMerger.merge(all, Obj.of(twice), Set.of())));
+        ObjectNode automatic = exclude(scoped(), "same", incoming, "excluded");
+        ((ObjectNode) automatic.get(PublicationMerger.MEMBER_EXCLUSIONS).get(0)).put("reviewer", PublicationMerger.AUTO_REVIEWER);
+        assertTrue(PublicationMerger.claimsAutomaticReviewer(Obj.of(automatic)));
+        assertEquals("request_invalid", code(() -> PublicationMerger.merge(all, Obj.of(automatic), Set.of())));
+    }
+
+    @Test
+    void anExcludedMemberLeavesTheUnionAndItsProofButNotTheOwnersValues() {
+        Contribution published = source(0, "same", "A"); Contribution incoming = sameHeadline(published, source(1, "same", "A"));
+        List<Contribution> all = List.of(published, incoming);
+        var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
+        // Two records that differ only in evidence merge under the owner's label selection (what the preparation proposes).
+        var both = PublicationMerger.merge(all, labelOnly(published), base.issueSources().keySet(), base.issueSources());
+        assertEquals(2, both.issueSources().get("same").members().size());
+        assertEquals(2, both.evidence().size());
+        Obj decisions = Obj.of(selectLabel(exclude(scoped(), "same", incoming, "excluded"), published));
+        var merged = PublicationMerger.merge(all, decisions, base.issueSources().keySet(), base.issueSources());
+        // The union is the owner's alone again; the headline values never depended on the excluded member.
+        assertEquals(base.issues().getFirst(), merged.issues().getFirst());
+        assertEquals(List.of(published.issueRef("same")), merged.issueSources().get("same").members());
+        assertEquals(base.issueSources().get("same").headlineSources(), merged.issueSources().get("same").headlineSources());
+        assertEquals(1, merged.memberExclusions()); assertEquals(0, merged.issueRetirements());
+        // Its own article, evidence and INVOLVES record leave the snapshot; the owner's stay.
+        assertEquals(base.articles(), merged.articles()); assertEquals(base.evidence(), merged.evidence());
+        assertEquals(List.of("relation-0"), merged.relations().stream().map(PublicGraphSnapshot.Relation::relationId).toList());
+        assertEquals(Set.of("relation-0"), merged.relationSources().keySet());
+        // The reader reproduces it from the stored owners, which list the valid members only.
+        assertEquals(merged, PublicationMerger.merge(all, decisions, Set.of(), merged.issueSources()));
+        // Later compositions inherit it; a third source's member of the issue is another member and merges by default.
+        Contribution third = sameHeadline(published, source(2, "same", "A"));
+        var inherited = PublicationMerger.merge(List.of(published, incoming, third), PublicationMerger.combine(decisions, PublicationMerger.emptyDecisions()),
+                merged.issueSources().keySet(), merged.issueSources());
+        assertEquals(Set.of(published.issueRef("same"), third.issueRef("same")), Set.copyOf(inherited.issueSources().get("same").members()));
+        assertEquals(published.issueRef("same"), inherited.issueSources().get("same").headlineSources().get("label"));
+        assertEquals(1, inherited.memberExclusions());
+    }
+
+    @Test
+    void theOwnerAndTheLastMemberCannotBeExcludedAndASelectionCannotTakeFromAnExcludedOne() {
+        Contribution published = source(0, "same", "A"); Contribution incoming = sameHeadline(published, source(1, "same", "A"));
+        List<Contribution> all = List.of(published, incoming);
+        var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
+        assertEquals("identity_conflict", code(() -> PublicationMerger.merge(all, Obj.of(exclude(scoped(), "same", published, "excluded")),
+                base.issueSources().keySet(), base.issueSources())));
+        ObjectNode every = exclude(exclude(scoped(), "same", published, "excluded"), "same", incoming, "excluded");
+        assertEquals("request_invalid", code(() -> PublicationMerger.merge(all, Obj.of(every), base.issueSources().keySet(), base.issueSources())));
+        // Selections in the same file move every field first; then the old owner may leave.
+        ObjectNode moved = selectAll(exclude(scoped(), "same", published, "excluded"), incoming);
+        var merged = PublicationMerger.merge(all, Obj.of(moved), base.issueSources().keySet(), base.issueSources());
+        assertEquals(List.of(incoming.issueRef("same")), merged.issueSources().get("same").members());
+        assertEquals(Set.of(incoming.issueRef("same")), Set.copyOf(merged.issueSources().get("same").headlineSources().values()));
+        assertEquals(incoming.projection().issues().getFirst().evidenceIds(), merged.issues().getFirst().evidenceIds());
+        // A selection that takes from the excluded member is not grounded in the composition.
+        ObjectNode fromExcluded = selectAll(exclude(scoped(), "same", incoming, "excluded"), incoming);
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(all, Obj.of(fromExcluded), base.issueSources().keySet(), base.issueSources())));
+        // A member outside the composition, or a member of another public issue, is no exclusion of this issue.
+        Contribution other = source(2, "other", "C");
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(all, Obj.of(exclude(scoped(), "same", other, "excluded")),
+                base.issueSources().keySet(), base.issueSources())));
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published, incoming, other), Obj.of(exclude(scoped(), "same", other, "excluded")),
+                base.issueSources().keySet(), base.issueSources())));
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(all, Obj.of(retire(scoped(), "other", "retired")), base.issueSources().keySet(), base.issueSources())));
+    }
+
+    @Test
+    void aRestoredMemberMergesAgainAndConflictsAreJudgedAmongValidMembersOnly() {
+        Contribution published = source(0, "same", "A"); Contribution incoming = source(1, "same", "B");
+        List<Contribution> all = List.of(published, incoming);
+        var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
+        assertEquals("correction_required", code(() -> PublicationMerger.merge(all, PublicationMerger.emptyDecisions(), base.issueSources().keySet(), base.issueSources())));
+        Obj excluded = Obj.of(exclude(scoped(), "same", incoming, "excluded"));
+        var merged = PublicationMerger.merge(all, excluded, base.issueSources().keySet(), base.issueSources());
+        assertEquals("A", merged.issues().getFirst().label());
+        // Restoring the member puts its value back into the comparison.
+        Obj restored = PublicationMerger.combine(excluded, Obj.of(exclude(scoped(), "same", incoming, "restored")));
+        assertEquals("correction_required", code(() -> PublicationMerger.merge(all, restored, merged.issueSources().keySet(), merged.issueSources())));
+        var back = PublicationMerger.merge(List.of(published, sameHeadline(published, incoming)), PublicationMerger.combine(restored, labelOnly(published)),
+                merged.issueSources().keySet(), merged.issueSources());
+        assertEquals(2, back.issueSources().get("same").members().size());
+        assertEquals(0, back.memberExclusions());
+        assertEquals(2, back.evidence().size());
+        // The automatic preparation compares valid members only: the excluded member's value is not a change.
+        assertTrue(propose(all, PublicationMerger.emptyDecisions(), base, incoming).changes().stream().anyMatch(c -> "label".equals(c.field())));
+        var silent = propose(all, excluded, base, incoming);
+        assertEquals(List.of(), silent.changes()); assertEquals(List.of(), silent.sameHeadlines());
+    }
+
+    @Test
+    void aRelationLosesOnlyTheExcludedProviderAndASelectionOfALostProviderIsNotCarried() {
+        Contribution published = relation(source(0, "same", "A"), "shared");
+        Contribution incoming = relation(sameHeadline(published, source(1, "same", "A")), "shared");
+        List<Contribution> all = List.of(published, incoming);
+        var base = PublicationMerger.merge(List.of(published), PublicationMerger.emptyDecisions(), Set.of());
+        // Two providers with different records need a selection, unless the disagreeing provider's member is excluded.
+        assertEquals("correction_required", code(() -> PublicationMerger.merge(all, PublicationMerger.emptyDecisions(), base.issueSources().keySet(), base.issueSources())));
+        var merged = PublicationMerger.merge(all, Obj.of(exclude(scoped(), "same", incoming, "excluded")), base.issueSources().keySet(), base.issueSources());
+        assertEquals(List.of(new GraphPublicationReader.RelationRef(published.sourceVersionId(), "shared")), merged.relationSources().get("shared").sources());
+        // A selection that takes the record from the excluded provider stays unresolved until a person reselects.
+        ObjectNode lost = exclude(relationSelection(scoped(), incoming, "shared"), "same", incoming, "excluded");
+        assertEquals("identity_conflict", code(() -> PublicationMerger.merge(all, Obj.of(lost), base.issueSources().keySet(), base.issueSources())));
+        // A relation only the excluded member provided leaves with it; its selection is kept dormant and counts as used...
+        Contribution only = relation(sameHeadline(published, source(2, "same", "A")), "only");
+        ObjectNode dormant = selectLabel(exclude(relationSelection(scoped(), only, "only"), "same", only, "excluded"), published);
+        var without = PublicationMerger.merge(List.of(published, only), Obj.of(dormant), base.issueSources().keySet(), base.issueSources());
+        assertEquals(Set.of("shared"), without.relationSources().keySet());
+        assertEquals(without, PublicationMerger.merge(List.of(published, only), Obj.of(dormant), Set.of(), without.issueSources()));
+        // ...while a forged record in it still fails, dormant or not.
+        ObjectNode forged = exclude(relationSelection(scoped(), only, "only"), "same", only, "excluded");
+        ((ObjectNode) forged.get("relationSelections").get(0).get("takeFrom")).put("relationId", "nowhere");
+        assertEquals("identity_conflict", code(() -> PublicationMerger.merge(List.of(published, only), Obj.of(forged), base.issueSources().keySet(), base.issueSources())));
+        // Once the provider is restored the dormant selection applies again.
+        Obj restored = PublicationMerger.combine(Obj.of(dormant), Obj.of(exclude(scoped(), "same", only, "restored")));
+        var back = PublicationMerger.merge(List.of(published, only), restored, without.issueSources().keySet(), without.issueSources());
+        assertEquals(Set.of("shared", "only"), back.relationSources().keySet());
+    }
+
+    @Test
+    void aRetiredIssueLeavesTheSnapshotKeepsItsReceiptEntryAndReturnsWithItsLastOwners() {
+        Contribution published = source(0, "same", "A"); Contribution incoming = sameHeadline(published, source(1, "same", "A"));
+        Contribution other = source(2, "other", "C");
+        List<Contribution> all = List.of(published, incoming, other);
+        // The published source owns every field, so a restoration that excludes it must reselect them all.
+        var base = PublicationMerger.merge(all, Obj.of(selectAll((ObjectNode) PublicationMerger.emptyDecisions().node().deepCopy(), published)), Set.of());
+        Obj retired = Obj.of(selectLabel(retire(scoped(), "same", "retired"), published));
+        var merged = PublicationMerger.merge(all, retired, base.issueSources().keySet(), base.issueSources());
+        assertEquals(List.of("other"), merged.issues().stream().map(Issue::issueId).toList());
+        assertEquals(List.of("relation-2"), merged.relations().stream().map(PublicGraphSnapshot.Relation::relationId).toList());
+        assertEquals(other.projection().articles(), merged.articles()); assertEquals(other.projection().evidence(), merged.evidence());
+        assertEquals(base.companies(), merged.companies());
+        assertEquals(base.issueSources().get("same"), merged.issueSources().get("same"));
+        assertEquals(1, merged.issueRetirements()); assertEquals(0, merged.memberExclusions());
+        assertEquals(merged, PublicationMerger.merge(all, retired, Set.of(), merged.issueSources()));
+        // A later source carrying the issue is not attached, reports no change, and the id stays taken.
+        Contribution later = sameHeadline(published, source(3, "same", "A"));
+        List<Contribution> four = List.of(published, incoming, other, later);
+        Obj carried = PublicationMerger.combine(retired, PublicationMerger.emptyDecisions());
+        var next = PublicationMerger.merge(four, carried, merged.issueSources().keySet(), merged.issueSources());
+        assertEquals(base.issueSources().get("same"), next.issueSources().get("same"));
+        assertEquals(List.of("other"), next.issues().stream().map(Issue::issueId).toList());
+        var proposal = PublicationMerger.propose(four, carried, merged.issueSources(), new PublicationMerger.Automatic(List.of(later.sourceVersionId())));
+        assertEquals(List.of(), proposal.changes()); assertEquals(List.of(), proposal.sameHeadlines());
+        assertEquals("identity_conflict", code(() -> PublicationMerger.merge(four, Obj.of(mapped(other, later)), merged.issueSources().keySet(), merged.issueSources())));
+        // Restored: every valid member merges again under the owners approved last, not the default ones.
+        Obj restored = PublicationMerger.combine(carried, Obj.of(retire(scoped(), "same", "restored")));
+        var back = PublicationMerger.merge(four, restored, next.issueSources().keySet(), next.issueSources());
+        assertEquals(List.of("other", "same"), back.issues().stream().map(Issue::issueId).toList());
+        assertEquals(base.issueSources().get("same").headlineSources(), back.issueSources().get("same").headlineSources());
+        assertEquals(3, back.issueSources().get("same").members().size());
+        assertEquals(0, back.issueRetirements());
+        // Restoring while the last owner is excluded in the same file needs a selection for every field it owned, not only label.
+        Obj conflicting = PublicationMerger.combine(carried, Obj.of(selectLabel(exclude(retire(scoped(), "same", "restored"), "same", published, "excluded"), incoming)));
+        assertEquals("identity_conflict", code(() -> PublicationMerger.merge(four, conflicting, next.issueSources().keySet(), next.issueSources())));
+        // retired, restored, retired again: the last record is in force.
+        Obj again = PublicationMerger.combine(restored, Obj.of(retire(scoped(), "same", "retired")));
+        assertEquals(List.of("other"), PublicationMerger.merge(four, again, back.issueSources().keySet(), back.issueSources()).issues().stream().map(Issue::issueId).toList());
+    }
+
+    @Test
+    void anIssueRetiredInItsFirstCompositionKeepsEveryMemberAndDormantDecisionsAreStillCheckedForShape() {
+        Contribution published = source(0, "same", "A"); Contribution incoming = sameHeadline(published, source(1, "same", "A"));
+        List<Contribution> all = List.of(published, incoming);
+        var merged = PublicationMerger.merge(all, Obj.of(retire(scoped(), "same", "retired")), Set.of());
+        assertEquals(List.of(), merged.issues());
+        assertEquals(List.of(), merged.relations());
+        var entry = merged.issueSources().get("same");
+        assertEquals(2, entry.members().size());
+        assertEquals(Set.of(entry.members().getFirst()), Set.copyOf(entry.headlineSources().values()));
+        // A selection about the retired issue is kept and counts as used, and nothing is applied...
+        ObjectNode dormant = retire(selectAll(scoped(), incoming), "same", "retired");
+        var kept = PublicationMerger.merge(all, Obj.of(dormant), merged.issueSources().keySet(), merged.issueSources());
+        assertEquals(entry, kept.issueSources().get("same"));
+        // ...but a forged source in it still fails.
+        ObjectNode forged = retire(selectAll(scoped(), incoming), "same", "retired");
+        ((ObjectNode) forged.get("fieldSelections").get(0).get("takeFrom")).put("sourceVersionId", "gv-nowhere");
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(all, Obj.of(forged), merged.issueSources().keySet(), merged.issueSources())));
+        // ...or a source that is a member of another public issue, dormant or not.
+        Contribution other = source(2, "other", "C");
+        ObjectNode elsewhere = retire(selectAll(scoped(), incoming), "same", "retired");
+        ((ObjectNode) elsewhere.get("fieldSelections").get(0).get("takeFrom")).put("sourceVersionId", other.sourceVersionId()).put("issueId", "other");
+        assertEquals("mapping_unproven", code(() -> PublicationMerger.merge(List.of(published, incoming, other), Obj.of(elsewhere), merged.issueSources().keySet(), merged.issueSources())));
+        // A member the same file excludes is not kept in the entry, and excluding every member while retiring is refused.
+        var trimmed = PublicationMerger.merge(all, Obj.of(exclude(retire(scoped(), "same", "retired"), "same", incoming, "excluded")), Set.of());
+        assertEquals(List.of(published.issueRef("same")), trimmed.issueSources().get("same").members());
+        assertEquals(Set.of(published.issueRef("same")), Set.copyOf(trimmed.issueSources().get("same").headlineSources().values()));
+        assertEquals("request_invalid", code(() -> PublicationMerger.merge(all,
+                Obj.of(exclude(exclude(retire(scoped(), "same", "retired"), "same", incoming, "excluded"), "same", published, "excluded")), Set.of())));
+        // On restoration the dormant selections apply: the owner moves.
+        Obj restored = PublicationMerger.combine(Obj.of(dormant), Obj.of(retire(scoped(), "same", "restored")));
+        var back = PublicationMerger.merge(all, restored, kept.issueSources().keySet(), kept.issueSources());
+        assertEquals(Set.of(incoming.issueRef("same")), Set.copyOf(back.issueSources().get("same").headlineSources().values()));
+    }
+
+    @Test
+    void sharedProofSurvivesARetirementAndUnionEntriesNoDecisionTouchedStay() {
+        Contribution published = source(0, "same", "A");
+        // One source carries issue "other" on the same article and evidence as its "same" record, and an article nothing cites.
+        Contribution c = sameHeadline(published, source(1, "same", "A"));
+        var p = c.projection(); Issue same = p.issues().getFirst();
+        Issue other = new Issue("other", "C", null, "unknown", null, "occurred", "action", "target", "domestic", "policy",
+                same.evidenceIds(), same.articleIds(), same.evidenceIds(), List.of(), null, "2026-10-01");
+        var stray = new PublicGraphSnapshot.Article("doc-stray", "e".repeat(64), "Stray", "https://example.invalid/stray", "2026-10-01");
+        var projection = new PublicGraphSnapshot(p.snapshotFormat(), p.versionId(), p.sourceBundleId(), p.companies(), List.of(same, other),
+                List.of(p.relations().getFirst(), new PublicGraphSnapshot.Relation("relation-other", "INVOLVES", "other", "company", null, "occurred", same.evidenceIds(), List.of())),
+                List.of(p.articles().getFirst(), stray), p.evidence());
+        Contribution sharing = new Contribution(c.sourceVersionId(), c.sourceId(), c.sourceKind(), c.receipt(), c.projectionArtifact(), projection, c.bundle());
+        List<Contribution> all = List.of(published, sharing);
+        var base = PublicationMerger.merge(all, labelOnly(published), Set.of());
+        assertTrue(base.articles().contains(stray));
+        Obj retired = Obj.of(selectLabel(retire(scoped(), "same", "retired"), published));
+        var merged = PublicationMerger.merge(all, retired, base.issueSources().keySet(), base.issueSources());
+        assertEquals(List.of("other"), merged.issues().stream().map(Issue::issueId).toList());
+        // The shared article and evidence stay for "other"; the owner's own proof leaves; the stray article was never a decision's target.
+        assertEquals(Set.of(p.articles().getFirst(), stray), Set.copyOf(merged.articles()));
+        assertEquals(p.evidence(), merged.evidence());
+        assertEquals(merged, PublicationMerger.merge(all, retired, Set.of(), merged.issueSources()));
+    }
+
+    @Test
+    void aFollowsRecordLeavesWithARetiredTargetAndItsBasisArticleGoesUnlessSomethingLiveCitesIt() {
+        Contribution published = source(0, "same", "A"); Contribution other = source(2, "other", "C");
+        var article = published.projection().articles().getFirst();
+        // The second source carries "same" as an identical record and a FOLLOWS record other → same on a basis pinned to "same"'s article.
+        var basis = new PublicGraphSnapshot.Basis("b-1", "FOLLOWS", "2026-10-01T00:00:00Z", null, null, List.of(),
+                List.of(new PublicGraphSnapshot.ArticleRef(article.articleId(), article.version())));
+        var follows = new PublicGraphSnapshot.Relation("follows-1", "FOLLOWS", "other", "same", null, "occurred", List.of(), List.of(basis));
+        var p = other.projection();
+        Contribution following = new Contribution(other.sourceVersionId(), other.sourceId(), other.sourceKind(), other.receipt(), other.projectionArtifact(),
+                new PublicGraphSnapshot(p.snapshotFormat(), p.versionId(), p.sourceBundleId(), p.companies(),
+                        List.of(p.issues().getFirst(), published.projection().issues().getFirst()), List.of(p.relations().getFirst(), follows), p.articles(), p.evidence()),
+                other.bundle());
+        List<Contribution> all = List.of(published, following);
+        var base = PublicationMerger.merge(all, PublicationMerger.emptyDecisions(), Set.of());
+        assertTrue(base.relations().stream().anyMatch(r -> r.relationId().equals("follows-1")));
+        assertTrue(base.articles().contains(article));
+        // Retiring the target drops the FOLLOWS record and the basis article nothing live cites any more.
+        var merged = PublicationMerger.merge(all, Obj.of(retire(scoped(), "same", "retired")), base.issueSources().keySet(), base.issueSources());
+        assertEquals(List.of("relation-2"), merged.relations().stream().map(PublicGraphSnapshot.Relation::relationId).toList());
+        assertFalse(merged.articles().contains(article));
+        assertEquals(merged, PublicationMerger.merge(all, Obj.of(retire(scoped(), "same", "retired")), Set.of(), merged.issueSources()));
+        // Retiring the follower drops the record too, while the target's article stays with the target.
+        var kept = PublicationMerger.merge(all, Obj.of(retire(scoped(), "other", "retired")), base.issueSources().keySet(), base.issueSources());
+        assertEquals(List.of("relation-0"), kept.relations().stream().map(PublicGraphSnapshot.Relation::relationId).toList());
+        assertTrue(kept.articles().contains(article));
+    }
+
+    @Test
+    void onlyTheArticleVersionsARemovedMemberCitedLeaveTheSnapshot() {
+        Contribution published = source(0, "same", "A"); Contribution incoming = sameHeadline(published, source(1, "same", "A"));
+        var cited = incoming.projection().articles().getFirst();
+        // The removed member's source also pins a second version of its article that nothing cites.
+        var uncited = new PublicGraphSnapshot.Article(cited.articleId(), "d".repeat(64), cited.title(), cited.url(), cited.publishedAt());
+        var p = incoming.projection();
+        Contribution versions = new Contribution(incoming.sourceVersionId(), incoming.sourceId(), incoming.sourceKind(), incoming.receipt(), incoming.projectionArtifact(),
+                new PublicGraphSnapshot(p.snapshotFormat(), p.versionId(), p.sourceBundleId(), p.companies(), p.issues(), p.relations(), List.of(cited, uncited), p.evidence()),
+                incoming.bundle());
+        List<Contribution> all = List.of(published, versions);
+        var base = PublicationMerger.merge(all, Obj.of(selectAll((ObjectNode) PublicationMerger.emptyDecisions().node().deepCopy(), published)), Set.of());
+        var merged = PublicationMerger.merge(all, Obj.of(selectAll(exclude(scoped(), "same", versions, "excluded"), published)), base.issueSources().keySet(), base.issueSources());
+        assertFalse(merged.articles().contains(cited));
+        assertTrue(merged.articles().contains(uncited));
+    }
+
+    private static ObjectNode scoped() {
+        ObjectNode root = (ObjectNode) PublicationMerger.emptyDecisions().node().deepCopy();
+        root.put("schemaVersion", PublicationMerger.DECISIONS_SCHEMA_3);
+        root.putArray(PublicationMerger.LABEL_CORRECTIONS); root.putArray(PublicationMerger.MEMBER_EXCLUSIONS); root.putArray(PublicationMerger.ISSUE_RETIREMENTS);
+        return root;
+    }
+    /** {@code root} with a record that {@code member}'s first issue is {@code status} as a member of public issue {@code issueId}. */
+    private static ObjectNode exclude(ObjectNode root, String issueId, Contribution member, String status) {
+        var item = ((tools.jackson.databind.node.ArrayNode) root.get(PublicationMerger.MEMBER_EXCLUSIONS)).addObject();
+        item.put("issueId", issueId); item.set("member", GraphPublicationReader.json(member.issueRef(member.projection().issues().getFirst().issueId())));
+        item.put("status", status); audit(item); return root;
+    }
+    private static ObjectNode retire(ObjectNode root, String issueId, String status) {
+        var item = ((tools.jackson.databind.node.ArrayNode) root.get(PublicationMerger.ISSUE_RETIREMENTS)).addObject();
+        item.put("issueId", issueId); item.put("status", status); audit(item); return root;
+    }
+    /** {@code root} with a {@code label} selection of {@code owner}'s first issue taken from {@code owner}: what two records that differ only in evidence need. */
+    private static ObjectNode selectLabel(ObjectNode root, Contribution owner) {
+        var issue = owner.projection().issues().getFirst();
+        var choice = ((tools.jackson.databind.node.ArrayNode) root.get("fieldSelections")).addObject();
+        choice.put("issueId", issue.issueId()); choice.put("field", "label");
+        choice.put("expectedValueDigest", Canonical.digest(PublicationMerger.field(issue, "label")));
+        choice.set("takeFrom", GraphPublicationReader.json(owner.issueRef(issue.issueId())));
+        choice.putArray("evidenceRefs").add(evidenceRef(owner)); audit(choice); return root;
+    }
+    private static Obj labelOnly(Contribution owner) {
+        return Obj.of(selectLabel((ObjectNode) PublicationMerger.emptyDecisions().node().deepCopy(), owner));
+    }
+    /** {@code root} with a selection of every headline field of {@code owner}'s first issue, taken from {@code owner}. */
+    private static ObjectNode selectAll(ObjectNode root, Contribution owner) {
+        var issue = owner.projection().issues().getFirst();
+        for (String field : PublicationMerger.FIELDS) {
+            var choice = ((tools.jackson.databind.node.ArrayNode) root.get("fieldSelections")).addObject();
+            choice.put("issueId", issue.issueId()); choice.put("field", field);
+            choice.put("expectedValueDigest", Canonical.digest(PublicationMerger.field(issue, field)));
+            choice.set("takeFrom", GraphPublicationReader.json(owner.issueRef(issue.issueId())));
+            choice.putArray("evidenceRefs").add(evidenceRef(owner)); audit(choice);
+        }
+        return root;
+    }
+    /** {@code root} with a selection of relation {@code relationId} that takes {@code owner}'s record and cites its evidence. */
+    private static ObjectNode relationSelection(ObjectNode root, Contribution owner, String relationId) {
+        var relation = owner.projection().relations().stream().filter(r -> r.relationId().equals(relationId)).findFirst().orElseThrow();
+        var choice = ((tools.jackson.databind.node.ArrayNode) root.get("relationSelections")).addObject();
+        choice.put("relationId", relationId); choice.put("expectedValueDigest", Canonical.digest(GraphPublicationReader.json(relation)));
+        choice.set("takeFrom", GraphPublicationReader.json(new GraphPublicationReader.RelationRef(owner.sourceVersionId(), relationId)));
+        choice.putArray("evidenceRefs").add(evidenceRef(owner)); audit(choice); return root;
+    }
+
     private static String code(org.junit.jupiter.api.function.Executable call) {
         try { call.execute(); } catch (PublicationException failure) { return failure.code(); }
         catch (StrictJson.Malformed malformed) { return "request_invalid"; }
