@@ -224,11 +224,14 @@ describe('D-AI-02 · conversation history', () => {
     await screen.findByText('무엇을 함께 살펴볼까요?');
   });
 
-  it('keeps a conversation with a question in progress and says why', async () => {
+  it('waits for a question in progress, then deletes without a notice', async () => {
     server.on('GET', LIST, () =>
       json(page([summary('conv-now', '지금 질문')], { deleteEnabled: true })),
     );
-    server.on('DELETE', SESSION, () => apiError(409, 'JOB_IN_PROGRESS'));
+    let attempts = 0;
+    server.on('DELETE', SESSION, () =>
+      ++attempts === 1 ? apiError(409, 'JOB_IN_PROGRESS') : noContent(),
+    );
     const user = await openHistory();
     await user.click(
       await screen.findByRole('button', { name: '“지금 질문” 대화 삭제' }),
@@ -239,8 +242,9 @@ describe('D-AI-02 · conversation history', () => {
         { name: '삭제' },
       ),
     );
-    await screen.findByText(/처리 중인 질문이 있어 삭제할 수 없어요/);
-    await user.click(screen.getByRole('button', { name: '대화로 돌아가기' }));
-    expect(await screen.findByText('지금 질문')).toBeTruthy();
-  });
+    expect(await screen.findByText('삭제하는 중')).toBeTruthy();
+    expect(screen.queryByText(/처리 중인 질문/)).toBeNull();
+    await screen.findByText('대화를 삭제했어요.', undefined, { timeout: 4000 });
+    expect(server.calls('DELETE', SESSION)).toHaveLength(2);
+  }, 8000);
 });
