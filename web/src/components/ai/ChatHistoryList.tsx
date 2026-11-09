@@ -210,7 +210,7 @@ export default function ChatHistoryList({
 function deleteFailure(error: unknown) {
   if (error instanceof ApiError) {
     if (error.code === 'JOB_IN_PROGRESS')
-      return '처리 중인 질문이 있어 삭제할 수 없어요. 질문을 취소하거나 끝난 뒤에 삭제해 주세요.';
+      return '처리 중인 질문이 있어 삭제할 수 없어요. 질문이 끝난 뒤에 삭제해 주세요.';
     if (error.status === 404)
       return '이미 삭제됐거나 지금은 삭제할 수 없는 대화예요.';
     if (error.status === 401 || error.status === 403)

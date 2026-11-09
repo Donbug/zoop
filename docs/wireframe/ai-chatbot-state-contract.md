@@ -63,7 +63,7 @@
 
 | API 상태 | UI 상태 |
 | --- | --- |
-| `queued` | “질문을 접수했어요”와 취소 동작 표시 |
+| `queued` | “질문을 접수했어요” 표시. 화면에 취소 동작은 두지 않는다(2026-11-09 결정) |
 | `running` | `phase`에 따라 진행 단계 표시(`planning` 질문 이해 → `retrieving` 자료 확인 → `writing` 답변 작성 → `verifying` 검증). 자료 조회가 없는 경로는 `retrieving`을 건너뛴다. 검증 전 답변 본문은 숨김 |
 | `completed` | 저장된 `ChatResult` 렌더링. polling 중단 |
 | `failed` | `ChatFailure.message`와 허용된 복구 동작만 표시 |
@@ -86,7 +86,7 @@
 | `nextCursor` | “더 보기”로 다음 쪽을 잇는다. 커서가 만료되면 첫 쪽부터 다시 읽는다 |
 
 - 항목을 고르면 `getConversation`으로 그 대화를 연다(모델 호출 없음). “새 대화”와 같은 조건(보내는 중·확인하지 못한 질문이 없을 때)에서만 바꾸고, 바꾼 뒤에는 이전 대화의 늦은 응답을 반영하지 않는다. 열지 못하면 지금 대화를 그대로 두고 안내한다.
-- 삭제는 `deleteEnabled`가 참일 때만 보인다. 항목의 “삭제” → 확인(“되돌릴 수 없어요”) → `deleteConversation`. 처리 중인 질문이 있으면(`JOB_IN_PROGRESS`) 지우지 않고 취소한 뒤 삭제하라고 안내한다. 지금 대화를 지우면 질문 창을 빈 상태로 바꾸고 다음 질문이 새 대화를 만든다.
+- 삭제는 `deleteEnabled`가 참일 때만 보인다. 항목의 “삭제” → 확인(“되돌릴 수 없어요”) → `deleteConversation`. 처리 중인 질문이 있으면(`JOB_IN_PROGRESS`) 지우지 않고 질문이 끝난 뒤 삭제하라고 안내한다. 지금 대화를 지우면 질문 창을 빈 상태로 바꾸고 다음 질문이 새 대화를 만든다.
 - `deleteEnabled`가 거짓이면(승인된 처리방침·약관은 개별 채팅 삭제 미제공) “대화 기록은 회원 탈퇴 시 모두 삭제돼요”만 안내한다. 개정 초안: [`docs/legal/drafts/revision-chat-deletion.md`](../legal/drafts/revision-chat-deletion.md).
 
 ### D-AI-02b · 대화 조회 오류
