@@ -49,6 +49,8 @@ MCP 자격 증명은 OpenAI 모델 API 키와 별개다. job·실행 세대·sub
 
 **모델 전송 gate:** hosted MCP 결과는 Java 생성 직전 gate를 우회해 OpenAI로 바로 들어간다. 따라서 MCP 서버가 반환 **전에** 공개·철회·source grant의 model-send 목적/수신자·최소화·크기 제한을 검사한다. 캐시 hit와 사전 direct 시작 경로에도 동일 규칙을 적용한다. 별도 Jev 검증 전송 grant도 유지한다.
 
+MCP 전달 계약은 `chat-mcp/v2`이며 성공의 `evidence[]`는 `{evidenceId, sourceId, quote}`만 담는다. 현재 인용 읽기로 얻은 원문을 Java UTF-16 2,000단위까지 전달하고 root ID와 tuple 순서를 일치시킨다. 부적격 인용문은 ID·참조도 함께 제외한다. 내부 `chat-tool/v1`과 웹 `webResults`의 역할은 유지한다.
+
 ### 3.1 후보·필수 요구와 중단 조건
 
 - 명시적 요구는 required=true로 고정한다. Jev p≥0.70 후보, 0.35≤p<0.70 검토 후보를 허용 목록에 넣되 실행은 Luna가 선택한다. p<0.35여도 명시 요구에 필요한 등록 도구는 포함한다. 확률로 권한을 넓히지 않는다.
@@ -96,7 +98,7 @@ MCP 자격 증명은 OpenAI 모델 API 키와 별개다. job·실행 세대·sub
 1. 같은 키가 실행 중이면 single-flight로 합류해 원 조회를 기다린다. 합류 요청도 남은 기한·시도 상한을 따른다.
 2. 성공 결과 및 성공한 0건을 job 종료까지 캐시한다. 같은 키 재요청은 실제 결과와 cached=true·원 toolCallId를 반환한다. 빈 result로 성공을 흉내 내지 않는다.
 3. timeout·권한 거부·invalid schema를 성공/0건 캐시로 넣지 않는다. 실패 원장으로 동일 실패의 무한 재호출을 막는다.
-4. 캐시 반환 직전에 현재 권한·철회·grant를 다시 검사한다. 과거 허용 결과로 현재 차단을 우회하지 않는다.
+4. 캐시 반환 직전에 현재 읽기·철회·전송 grant를 다시 검사한다. 원래 보관한 ID·출처·인용문이 같은 tuple만 전달하며 grant 확대 시에도 보충하지 않는다. v1 캐시는 이력으로 보존하고 새 callback은 계약 불일치로 실패시킨다.
 5. 대상·기간·페이지·hop 등 의미 있는 인자가 바뀌면 다른 키다. 같은 정보를 얻는 단순 재표현은 새 조회로 인정하지 않는다.
 6. 작업 종료 시 실행 캐시를 폐기한다. 재열람은 별도 권리·보유 기간이 적용된 저장 snapshot을 사용하며 캐시 TTL을 재열람 보관 정책으로 쓰지 않는다.
 
@@ -117,6 +119,8 @@ MCP endpoint와 direct adapter는 같은 Tool Service·스키마·scope·버전�
 5. 거부된 도구가 있어도 Java는 continuation에 임의의 MCP 결과나 direct 결과를 위조하지 않는다. Luna는 승인된 다른 결과로 답하거나 해당 요구를 limitation/guidance로 남긴다.
 
 각 continuation은 고정된 같은 job 마감과 호출별 permit 안에 포함된다. 승인 request/response ID, 동일 response chain, 예산 예약과 취소를 합성 replay로 검증하고 실제 지연·비용은 별도 승인된 실측으로 확인한다.
+
+Java는 모든 새 continuation의 기존 단계 시간 한도 안에서 보관된 전체 source manifest의 소유자·예약·고정 범위와 현재 읽기·전송 grant를 검사한다. 전부 거부한 마무리 단계도 같다. 철회·판단 불가 시 새 provider dispatch를 거부하며 과거 영수증은 유지한다. 이 검사는 공급자가 이미 받은 이력을 회수하는 기능이 아니다. `zoop-chat-agent-resource-2`의 runtime identity에는 정규화 MCP URL과 예상 전달 계약·크기 상한을 함께 묶는다.
 
 **공급자 저장 결정(2026-10-28 팀 결정):** continuation은 `previous_response_id`로 재개하고 Luna Responses 요청은 `store=true`로 보낸다. 따라서 정제 입력·MCP 도구 결과·모델 출력이 OpenAI 쪽 보관 대상이 된다. `store=false`와 이전 출력 재전송 방식은 사용하지 않는다.
 

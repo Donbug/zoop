@@ -43,6 +43,8 @@ import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.common.json.StrictJson;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import tools.jackson.databind.JsonNode;
 
 /** The model port adapters over a scripted chat stage client: what is sent, how answers and failures are read. No model runs. */
@@ -536,20 +538,23 @@ class ChatModelStagesTest {
         assertEquals(Fate.UNKNOWN, fate(() -> stages.route(run, Set.of(), com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"))));
     }
 
-    @Test
-    void verificationFallbackKeepsCheckedClaimsWhenTheSemanticVerifierIsUnavailable() {
+    @ParameterizedTest
+    @CsvSource({"true, false, NOT_SENT", "true, true, UNKNOWN", "false, false, REFUSED"})
+    void unavailableVerificationPreservesTheFailureInsteadOfApprovingClaims(boolean sent, boolean unknown, Fate expected) {
         var sections = List.of(
                 new ChatGeneratedAnswer.Section("general_knowledge", "HBM은 적층형 고대역폭 메모리입니다.",
                         List.of("r1"), List.of()),
                 new ChatGeneratedAnswer.Section("evidence_grounded", "두 기업은 같은 사건에 포함됩니다.",
                         List.of("r2"), List.of(EV_A)));
-        ChatSemanticVerdicts fallback = ChatModelStages.verificationFallback(sections);
-
-        assertEquals(2, fallback.sections().size());
-        assertNull(fallback.sections().get(0).claims().getFirst().support());
-        assertEquals("supported", fallback.sections().get(1).claims().getFirst().support());
-        assertTrue(fallback.sections().stream().allMatch(v -> "no".equals(v.prohibitedAdvice())
-                && v.claims().stream().allMatch(c -> "no".equals(c.unsupportedCausality()))));
+        answer = call -> failed(call, sent, unknown);
+        ChatRun run = run(root("HBM과 관련 기업을 알려줘"));
+        var failure = assertThrows(ChatModels.Failure.class, () -> stages.verify(run, sections,
+                List.of(citation(EV_A, "인용")), ChatModels.ServerFacts.withoutTools(run, sections),
+                com.zoop.chat.executor.ChatResourceFixtures.permit("chat-verification")));
+        assertEquals(expected, failure.fate());
+        assertEquals("some_failure", failure.code());
+        assertEquals("finish " + (unknown ? "unknown unknown" : sent ? "failed sent" : "failed not_sent")
+                + " " + (sent ? RECEIPT.model() : "-") + " some_failure", recorded.getLast());
     }
 
     @Test
@@ -593,6 +598,56 @@ class ChatModelStagesTest {
         assertEquals(List.of("finish succeeded"), recorded);
         assertFalse(writerInterrupted.get(), "the write never sees the stage's interrupt");
         assertTrue(restored.get(), "the stage thread keeps its interrupt for the engine");
+    }
+
+    @Test
+    void interruptedFinishRecordingStillStopsAtItsOriginalDeadline() throws Exception {
+        var writing = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var writes = new java.util.concurrent.atomic.AtomicInteger();
+        var restored = new AtomicBoolean();
+        var cancelled = new CountDownLatch(1);
+        var stages = stages(new ChatModelRecorder(null, Clock.systemUTC()) {
+            public String start(String jobId, int attemptNo, String stage, String mode) { return "aix-1"; }
+            public void finish(String id, String status, String sendState, ChatStageReply.Receipt receipt, String errorCode) {
+                writes.incrementAndGet();
+                writing.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException interrupted) {
+                    cancelled.countDown();
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        answer = call -> succeeded(call, """
+                {"requirements":[{"requirementId":"r1","types":{"Q02":0.9},"capabilities":{},"prohibitedAdvice":0.0,"dependsOn":null}]}""");
+        long started = System.nanoTime();
+        Thread stage = Thread.ofPlatform().start(() -> {
+            stages.route(run(root("PER이 뭐야")), Set.of(),
+                    com.zoop.chat.executor.ChatResourceFixtures.permit("chat-router"));
+            restored.set(Thread.currentThread().isInterrupted());
+        });
+        try {
+            assertTrue(writing.await(5, TimeUnit.SECONDS));
+            stage.interrupt();
+            Thread.sleep(1000);
+            stage.interrupt();
+            Thread.sleep(1000);
+            stage.interrupt();
+            stage.join(2500);
+            long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+            assertFalse(stage.isAlive(), "interruptions retain the original three-second recording deadline");
+            assertTrue(cancelled.await(1, TimeUnit.SECONDS));
+            assertEquals(1, writes.get());
+            assertTrue(restored.get());
+            assertTrue(elapsedMs >= 2900 && elapsedMs < 4500, "bounded finish wait: " + elapsedMs);
+            System.out.println("chat-recording-boundary: writes=" + writes.get() + ", elapsedMs=" + elapsedMs
+                    + ", interrupted=" + restored.get() + ", cancelled=true");
+        } finally {
+            release.countDown();
+            stage.join(5000);
+        }
     }
 
     private static AiServiceErrorException rejection(int status) {

@@ -8,8 +8,8 @@ Router: per requirement, one Noul per Q type, one per bound capability and one f
 as reported; the application applies its own thresholds (0.70 take, 0.35 review, advice > 0.10) and allowlist.
 
 Verification: per claim, a support Choice for grounded sections (`supported` / `contradicted` / `insufficient`) and an
-unsupported-causality Noul, plus a prohibited-advice Noul for every section. The dev-chat evidence gate accepts a supported
-probability >= 0.15 with confidence >= 0.05. Causality is held only above 0.75; prohibited advice keeps the conservative
+unsupported-causality Noul, plus a prohibited-advice Noul for every section. The dev-chat evidence gate accepts the selected
+`supported` choice with probability >= 0.15 and confidence >= 0.05. Causality is held only above 0.75; prohibited advice keeps the conservative
 >= 0.90 / <= 0.10 thresholds.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ from .contracts import digest
 
 API = "systemone"
 MODEL = native_jev.MODEL
-ADAPTER_REVISION = "zoop-jev-chat-9"
+ADAPTER_REVISION = "zoop-jev-chat-10"
 CHAT_CHOICE_PROBABILITY = 0.15
 CHAT_CHOICE_CONFIDENCE = 0.05
 CHAT_CAUSALITY_FALSE = 0.75
@@ -240,8 +240,8 @@ def interpret_verification(raw: Any, payload: VerificationInput, model: str) -> 
             if section.basis != "general_knowledge":
                 choice, probabilities, confidence = native_jev._choice(answers[f"s{index}c{claim_index}-support"])
                 supported = probabilities.get("supported", 0.0)
-                accepted = (supported >= CHAT_CHOICE_PROBABILITY and confidence >= CHAT_CHOICE_CONFIDENCE
-                            and bool(section.evidence_ids or section.server_facts))
+                accepted = (choice == "supported" and supported >= CHAT_CHOICE_PROBABILITY
+                            and confidence >= CHAT_CHOICE_CONFIDENCE and bool(section.evidence_ids or section.server_facts))
                 support = "supported" if accepted else choice if choice == "contradicted" else "hold"
             causality = _noul(answers[f"s{index}c{claim_index}-causality"])
             claims.append(ClaimVerdict(

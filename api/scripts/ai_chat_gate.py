@@ -57,6 +57,7 @@ CONTRACT_TESTS = frozenset({
     "theAnswerIsGeneratedFromTheGrantedQuote",
     "theVerifierJudgesEachSection",
     "theOrchestratorSendsBoundMemberAndComparisonFacts",
+    "theOrchestratorKeepsVerifierFailuresSeparateFromSemanticHolds",
     "theSameInvocationIsAnsweredFromTheLedgerAndNeverSentAgain",
     "aQuoteWithoutAChatGrantIsRefusedBeforeSending",
     "anInputTheFixtureDoesNotKnowIsRefusedNotGuessed",
@@ -106,6 +107,12 @@ VERIFICATION_INPUT = {
                  {"sectionId": "s1", "requirementIds": ["r2"], "serverFacts": [],
                   "basis": "general_knowledge", "claims": [{"claimId": "s1c0", "text": GENERAL_TEXT}],
                   "evidenceIds": []}],
+    "citations": [QUOTE],
+}
+OUTCOME_VERIFICATION_INPUT = {
+    "requestBinding": {"invocationId": "chat-outcome-supported.1.verify", "graphVersionId": "gv-synthetic",
+                       "asOf": "2026-10-21T00:00:00Z"},
+    "sections": [VERIFICATION_INPUT["sections"][0]],
     "citations": [QUOTE],
 }
 FACT_VERIFICATION_INPUT = {
@@ -211,6 +218,21 @@ def author_replay() -> dict[str, Any]:
                                                         "answers": {"s0c0-support": supported,
                                                                     "s0c0-causality": _noul(0.02),
                                                                     "s0-advice": _noul(0.02)}})
+    for outcome in ("supported", "hold", "provider-error", "unknown", "contradicted", "insufficient"):
+        payload = copy.deepcopy(OUTCOME_VERIFICATION_INPUT)
+        payload["requestBinding"]["invocationId"] = f"chat-outcome-{outcome}.1.verify"
+        verdict = supported if outcome != "hold" else _choice("insufficient", list(supported["probabilities"]))
+        if outcome in ("contradicted", "insufficient"):
+            verdict = {"type": "choice", "choice": outcome, "confidence": 0.05,
+                       "probabilities": {"supported": 0.15, "contradicted": 0.80 if outcome == "contradicted" else 0.05,
+                                         "insufficient": 0.80 if outcome == "insufficient" else 0.05}}
+        entry("chat-verification", payload, {"model": "authored-synthetic-chat-verification",
+                                            "answers": {"s0c0-support": verdict, "s0c0-causality": _noul(0.02),
+                                                        "s0-advice": _noul(0.02)}})
+        if outcome in ("provider-error", "unknown"):
+            entries[-1].pop("response")
+            entries[-1].update(error="provider_response_unknown" if outcome == "unknown" else "provider_http_503",
+                               uncertain=outcome == "unknown")
     return {"schemaVersion": SCHEMA, "recordingKind": "authored-test", "responses": entries}
 
 

@@ -150,7 +150,12 @@ public final class ChatMcpAgent implements ChatAgentPath {
             int number = step;
             ChatModels.AgentStep outcome;
             try {
-                outcome = steps.run(permit -> agent.step(run, number, input, permit), finalizing);
+                outcome = steps.run(permit -> {
+                    if (input.previousResponseId() != null) {
+                        tools.requireContinuationSendable(run, runs.keptToolResults(run.jobId(), run.attemptNo()));
+                    }
+                    return agent.step(run, number, input, permit);
+                }, finalizing);
             } catch (ChatModels.Failure failure) {
                 // This run remains failed. The observation affects only the path selected by later jobs.
                 if (circuit != null) circuit.agentFailed(failure.code());

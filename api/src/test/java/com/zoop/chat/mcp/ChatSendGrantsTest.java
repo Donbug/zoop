@@ -72,8 +72,8 @@ class ChatSendGrantsTest {
         Path file = write(dir.resolve("chat-grants.json"), ChatCompanyProfiles.SOURCE_ID, ChatZoopDocs.SOURCE_ID,
                 ChatMcpSendGate.GRAPH_SOURCE_ID, EVIDENCE_SOURCE);
         return new ChatMcpSendGate(new ChatSendGrants(file.toString(), RECIPIENT, CLOCK), (run, ids) -> {
-            Map<String, String> placed = new LinkedHashMap<>();
-            ids.forEach(id -> placed.put(id, EVIDENCE_SOURCE));
+            Map<String, ChatMcpSources.Evidence> placed = new LinkedHashMap<>();
+            ids.forEach(id -> placed.put(id, new ChatMcpSources.Evidence(id, EVIDENCE_SOURCE, "합성 인용: " + id)));
             return placed;
         });
     }

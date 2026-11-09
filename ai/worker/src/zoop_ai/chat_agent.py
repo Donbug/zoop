@@ -28,7 +28,10 @@ from .chat_contracts import (OUTPUT_BUDGET_EXCEEDED, PROVIDER_ID, AgentAnswer, A
                              McpCallSummary, LunaResources, MAX_APPROVALS, MAX_MCP_CALLS, MAX_REQUIREMENTS, REQUIREMENT_ID)
 from .contracts import canonical, digest
 
-PROMPT_REVISION = "zoop-chat-agent-resource-1"
+PROMPT_REVISION = "zoop-chat-agent-resource-2"
+MCP_DELIVERY = {"schemaVersion": "chat-mcp/v2", "serverName": "zoop-chat", "serverVersion": "2",
+                "maxResultBytes": 262144, "maxJobResultBytes": 1048576,
+                "maxCallbackBytes": 790528, "unknownCallbackReserveUnits": 296448}
 MODEL = "gpt-6-luna"
 SERVER_LABEL = "zoop"
 REDACTED = "[redacted]"
@@ -44,6 +47,8 @@ PROMPT = (
     "targets나 그 요구를 지목한 이전 도구 결과의 items에 나온 id만 쓰고 id를 추측하지 않는다. 조회가 거부되거나 "
     "실패하면 같은 조회를 반복하지 말고 확보한 자료로 답하거나 그 요구를 insufficientRequirementIds에 넣는다. "
     "근거 기반 구간(evidence_grounded)에는 도구 결과의 evidenceIds만 근거로 쓰고, 문장마다 뒷받침하는 evidenceIds를 넣는다. "
+    "내부 근거의 인용문은 evidence[].quote에 있다. 각 문장은 해당 quote가 뒷받침하는 범위에서만 쓰고, "
+    "제목이나 ID만으로 기사 세부 내용을 추론하지 않는다. "
     "도구 결과에 없는 사실·수치·날짜·인과·전망을 더하지 않는다. zoopPolicy_read 결과로 서비스 이용 방법이나 정책을 설명하는 "
     "구간은 ZOOP 문서 구간(zoop_documented)으로 두고, 근거 기반 구간과 섞지 않는다. "
     "web_search 결과(webResults)로 답하는 구간은 웹 보도 구간(web_reported)으로 두고, 그 결과의 id만 evidenceIds에 "

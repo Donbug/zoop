@@ -273,6 +273,12 @@
     and keeps it out of every identity and stored answer. The MCP server URL is never part of a request: it is the operator's `ZOOP_AI_CHAT_MCP_SERVER_URL`.
     `mcp.recipient` names the recipient the application checked its MCP results' send grants for (those results reach the provider from the application, not
     through this runtime); a step is sent only when it is exactly the stage's own recipient, otherwise it fails `mcp_recipient_mismatch` with nothing sent.
+    Java's `chat-mcp/v2` callback retains exact bounded `evidenceId/sourceId/quote` tuples, with quotes limited to 2,000 Java UTF-16
+    units. Java rechecks current citation and exact-recipient send rights for fresh/cached delivery and, within the existing step
+    deadline, before every continuation, including finalizing/all-denied steps. Withdrawn/unavailable prior content refuses a new
+    send; historical receipts remain records of content already received. Cache delivery only intersects original tuples.
+    The agent adapter is `zoop-chat-agent-resource-2`; expected delivery contract and unchanged callback limits join the canonical
+    MCP URL in its runtime fingerprint. Compatible API/service/worker deployment and current store/continuation permission are operator gates.
 
     **Once per invocation.** `invocationId` (equal to `Idempotency-Key`) names one stage of one attempt. The runtime sends it at most once: the same id and input
     return the stored outcome, changed input/resources under the same id are `invocation_conflict`, and a request whose outcome is unknown stays `unknown`.
@@ -8271,8 +8277,8 @@
                     "resourceBinding":
                       "schemaVersion": "zoop-chat-resource-binding-1"
                       "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
-                      "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
-                      "allocationDigest": "86965b868123416d6ad9a97be3abb55d586b5ee1c3f5a0845b6a0952c9769e18"
+                      "runtimeFingerprint": "f43a3f1286fd463a2a1433ab87c72eedede772b6433e5a573d02e09b8b04932f"
+                      "allocationDigest": "ea93f9b7fc05f389f9af49c7c98ff3246afd1719b635aa73df7d5f5f2130fff5"
                 "notSent":
                   "summary": "A quote without a matching chat grant: nothing was sent"
                   "value":
@@ -8289,8 +8295,8 @@
                     "resourceBinding":
                       "schemaVersion": "zoop-chat-resource-binding-1"
                       "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
-                      "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
-                      "allocationDigest": "68dc5bec08a7fb289544055ce5eef81d6b53650ebc429bb4713e2795e1abaffa"
+                      "runtimeFingerprint": "f43a3f1286fd463a2a1433ab87c72eedede772b6433e5a573d02e09b8b04932f"
+                      "allocationDigest": "a0ff923cd1cafd55082a31d5296824dc3ace44bea7cf0016f4b5480afc720d75"
                 "agentHeld":
                   "summary": "chat-agent step held at an approval request"
                   "value":
@@ -8316,7 +8322,7 @@
                       "provider": "authored-replay"
                       "providerRevision": "authored-replay-1"
                       "model": "authored-synthetic-chat-agent"
-                      "promptVersion": "zoop-chat-agent-resource-1"
+                      "promptVersion": "zoop-chat-agent-resource-2"
                       "executionMode": "replay"
                       "usage":
                         "inputTokens": null
@@ -8328,8 +8334,8 @@
                     "resourceBinding":
                       "schemaVersion": "zoop-chat-resource-binding-1"
                       "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
-                      "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
-                      "allocationDigest": "5cdc8ff9372b4809c0d7a1bc1bfd3fdd7908a9dca562afa391e1426a15bb6170"
+                      "runtimeFingerprint": "f43a3f1286fd463a2a1433ab87c72eedede772b6433e5a573d02e09b8b04932f"
+                      "allocationDigest": "85d09403d6319dd95066e0e1ed306ebd94e0754475a5986079aa08d146b93049"
         "401":
           "description": "authentication_required: missing, malformed or unknown bearer token."
           "content":
@@ -8465,11 +8471,11 @@
                     "schemaVersion": "zoop-chat-resource-1"
                     "policyRevision": "expanded-local-2026-11-05.1"
                     "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
-                    "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
+                    "runtimeFingerprint": "f43a3f1286fd463a2a1433ab87c72eedede772b6433e5a573d02e09b8b04932f"
                     "providerTimeoutMs": 15000
                     "finalizing": false
                     "luna": null
-                    "allocationDigest": "86965b868123416d6ad9a97be3abb55d586b5ee1c3f5a0845b6a0952c9769e18"
+                    "allocationDigest": "ea93f9b7fc05f389f9af49c7c98ff3246afd1719b635aa73df7d5f5f2130fff5"
               "agentContinuation":
                 "summary": "chat-agent continuation step with the application's decision (synthetic token)"
                 "value":
@@ -8500,7 +8506,7 @@
                     "schemaVersion": "zoop-chat-resource-1"
                     "policyRevision": "expanded-local-2026-11-05.1"
                     "policyDigest": "4b7bd28cb76bfd9b914a95df214a26b644daaae8f7d4f0696678a511fbbd4813"
-                    "runtimeFingerprint": "c97c012fd238b785bf27232a3b1f129a3c7bcc7feae801cedba57a1075475971"
+                    "runtimeFingerprint": "f43a3f1286fd463a2a1433ab87c72eedede772b6433e5a573d02e09b8b04932f"
                     "providerTimeoutMs": 600000
                     "finalizing": false
                     "luna":
@@ -8510,7 +8516,7 @@
                       "maxAnswerChars": 48000
                       "generatedTextMaxChars": 46976
                       "reasoningEffort": "high"
-                    "allocationDigest": "5cdc8ff9372b4809c0d7a1bc1bfd3fdd7908a9dca562afa391e1426a15bb6170"
+                    "allocationDigest": "85d09403d6319dd95066e0e1ed306ebd94e0754475a5986079aa08d146b93049"
   "/internal/v1/plan-admissions":
     "post":
       "tags":

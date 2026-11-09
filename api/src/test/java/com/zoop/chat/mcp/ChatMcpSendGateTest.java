@@ -1,7 +1,6 @@
 package com.zoop.chat.mcp;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,7 +40,9 @@ import org.junit.jupiter.api.io.TempDir;
 class ChatMcpSendGateTest {
     private static final Clock CLOCK = Clock.fixed(ChatMcpGrantsTest.NOW, ZoneOffset.UTC);
     /** ev-a is a granted article's, ev-b an ungranted one's, ev-c cannot be cited now. */
-    private static final Map<String, String> PLACED = Map.of("ev-a", "granted-news", "ev-b", "other-news");
+    private static final Map<String, ChatMcpSources.Evidence> PLACED = Map.of(
+            "ev-a", new ChatMcpSources.Evidence("ev-a", "granted-news", "허용 인용"),
+            "ev-b", new ChatMcpSources.Evidence("ev-b", "other-news", "다른 인용"));
 
     @TempDir
     Path dir;
@@ -86,14 +87,14 @@ class ChatMcpSendGateTest {
 
         var none = gate(ChatCompanyProfiles.SOURCE_ID).pass(null, output);
         assertTrue(none.output().webResults().isEmpty() && none.output().items().isEmpty());
-        assertEquals(new ChatMcpSendGate.Withheld(2, 0, 0, 2), none.withheld());
+        assertEquals(new ChatMcpSendGate.Withheld(2, 0, 0, 2, 0), none.withheld());
 
         var synthetic = gate(ChatMcpSendGate.webSource("synthetic")).pass(null, output);
         assertEquals(List.of("web-" + "a".repeat(32)),
                 synthetic.output().webResults().stream().map(h -> h.id()).toList());
         assertEquals(List.of("web-" + "a".repeat(32)), synthetic.output().items().stream().map(ChatToolItem::id).toList(),
                 "a hit's item goes with the hit");
-        assertEquals(new ChatMcpSendGate.Withheld(1, 0, 0, 1), synthetic.withheld());
+        assertEquals(new ChatMcpSendGate.Withheld(1, 0, 0, 1, 0), synthetic.withheld());
     }
 
     @Test
@@ -102,8 +103,8 @@ class ChatMcpSendGateTest {
                 new ChatToolItem("KRX:000660", "company", "SK하이닉스", List.of("KRX:000660"), List.of("ev-a"))),
                 List.of("ev-a"), false, false);
         var passed = gate(ChatCompanyProfiles.SOURCE_ID, "granted-news").pass(null, output);
-        assertSame(output, passed.output());
-        assertEquals(new ChatMcpSendGate.Withheld(0, 0, 0, 0), passed.withheld());
+        assertEquals(output, passed.output());
+        assertEquals(new ChatMcpSendGate.Withheld(0, 0, 0, 0, 0), passed.withheld());
         assertEquals(List.of(List.of("ev-a")), asked);
     }
 
@@ -118,8 +119,32 @@ class ChatMcpSendGateTest {
         assertEquals(List.of("ev-a"), out.paths().getFirst().steps().getFirst().evidenceIds());
         assertEquals("gv-1", out.dataVersion());
         assertTrue(out.nextAllowed());
-        assertEquals(new ChatMcpSendGate.Withheld(4, 2, 0, 0), passed.withheld());
+        assertEquals(new ChatMcpSendGate.Withheld(4, 2, 0, 0, 1), passed.withheld());
         assertEquals(List.of(List.of("ev-a", "ev-b", "ev-c")), asked, "every evidence id is placed once");
+    }
+
+    @Test
+    void grantExpiryAndRecipientAreCheckedAfterCitationResolution() {
+        var now = new java.util.concurrent.atomic.AtomicReference<>(ChatMcpGrantsTest.NOW);
+        Clock clock = new Clock() {
+            public java.time.ZoneId getZone() { return ZoneOffset.UTC; }
+            public Clock withZone(java.time.ZoneId zone) { return this; }
+            public Instant instant() { return now.get(); }
+        };
+        var file = ChatSendGrantsTest.write(dir.resolve("late-grants.json"),
+                List.of(ChatSendGrantsTest.grant("granted-news", Map.of("expiresAt",
+                        ChatMcpGrantsTest.NOW.plusSeconds(1).toString()))));
+        var gate = new ChatMcpSendGate(new ChatSendGrants(file.toString(), ChatSendGrantsTest.RECIPIENT, clock),
+                (run, ids) -> {
+                    now.set(ChatMcpGrantsTest.NOW.plusSeconds(2));
+                    return PLACED;
+                });
+        var output = new ChatToolOutput("gv-1", List.of(), List.of("ev-a"), false, false);
+        assertTrue(gate.pass(null, output).evidence().isEmpty());
+        ChatSendGrantsTest.write(file, "granted-news");
+        var wrongRecipient = new ChatMcpSendGate(new ChatSendGrants(file.toString(), "openai-compatible:other", clock),
+                (run, ids) -> PLACED);
+        assertTrue(wrongRecipient.pass(null, output).output().evidenceIds().isEmpty());
     }
 
     @Test
