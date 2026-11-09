@@ -150,11 +150,14 @@ function JobState({
         aria-busy="true"
       >
         <span aria-hidden="true" className="inline-flex items-center gap-1">
-          {[0, 1, 2].map((i) => (
+          {[
+            '[animation-delay:0ms]',
+            '[animation-delay:200ms]',
+            '[animation-delay:400ms]',
+          ].map((delay) => (
             <span
-              key={i}
-              className="size-1.5 rounded-full bg-zoop-muted motion-safe:animate-pulse"
-              style={{ animationDelay: `${i * 200}ms` }}
+              key={delay}
+              className={`size-1.5 rounded-full bg-zoop-muted motion-safe:animate-pulse ${delay}`}
             />
           ))}
         </span>
@@ -355,7 +358,7 @@ function Answer({
           <a
             key={n}
             href={`#cite-${job.id}-${n}`}
-            className="inline-grid h-4 min-w-4 place-items-center rounded-full bg-zoop-control px-1 text-[11px] leading-none font-semibold text-zoop-muted no-underline hover:bg-zoop-ink hover:text-zoop-on-ink"
+            className="inline-grid h-4 min-w-4 place-items-center rounded-full bg-zoop-control px-1 text-caption leading-none font-semibold text-zoop-muted no-underline hover:bg-zoop-ink hover:text-zoop-on-ink"
           >
             {n}
           </a>
@@ -719,7 +722,7 @@ function Citation({
     >
       <span
         aria-hidden="true"
-        className="mt-0.5 inline-grid size-5 shrink-0 place-items-center rounded-full bg-zoop-control text-[11px] font-semibold text-zoop-muted"
+        className="mt-0.5 inline-grid size-5 shrink-0 place-items-center rounded-full bg-zoop-control text-caption font-semibold text-zoop-muted"
       >
         {n}
       </span>
