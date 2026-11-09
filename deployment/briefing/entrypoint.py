@@ -45,8 +45,10 @@ def main():
     os.environ.update({'ZOOP_STATE_DIR':'/tmp/zoop-unused-app-state','ZOOP_AI_WORKER_STATE_DIR':'/tmp/zoop-unused-ai-worker-state'})
     if os.environ.get('BRIEFING_AUTO_CHAIN_ENABLED')=='true':
         import briefing_auto_chain
+        import briefing_news_refill
         cfg.update({'autoChain':briefing_auto_chain.VERSION,'priorityContract':'priority-business-producer-v1','selectionContinuation':True,'nativeCallLimit':6,'additiveGraphAllowed':os.environ.get('BRIEFING_SERVER_ADDITIVE_GRAPH_ALLOWED')=='true',
             'samsungNewsroomEnabled':os.environ.get('BRIEFING_SAMSUNG_NEWSROOM_ENABLED')=='true'})
+        cfg['newsCollectionPolicy']={'version':briefing_news_refill.VERSION,**briefing_news_refill.DEFAULTS}
         if os.environ.get('BRIEFING_SHARED_PRIORITY_ANALYSIS_ENABLED')=='true':
             cfg.update(sharePriorityAnalysis=True,nativeCallLimit=8)
         cfg['nativeCallLimit']=cfg['roundCallLimit']-limits.publication_reserve(cfg)

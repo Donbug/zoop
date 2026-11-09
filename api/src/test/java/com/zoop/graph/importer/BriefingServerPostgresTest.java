@@ -275,7 +275,14 @@ class BriefingServerPostgresTest {
     void heldFirstDocumentContinuesAndPersonalSharesVerifiedCommonWithinSixteenCalls() throws Exception {
         collectionAndPublication(true);
     }
+    @Test @Tag("briefing-auto-postgres")
+    void exhaustedInitialPoolCollectsNewArticleAndPublishesCommonAndPersonal() throws Exception {
+        collectionAndPublication(true,true);
+    }
     private void collectionAndPublication(boolean shared) throws Exception {
+        collectionAndPublication(shared,false);
+    }
+    private void collectionAndPublication(boolean shared,boolean refill) throws Exception {
         String previous=publish(importNative(HandoffFixtures.Spec.standard()));server();
         int previousIssues=reader().read(previous).snapshot().issues().size();
         jdbc.update("INSERT INTO companies(id,name,name_key,search_text) VALUES('SYNTH-1','합성기업','','')");
@@ -283,6 +290,7 @@ class BriefingServerPostgresTest {
         var process=new ProcessBuilder(System.getenv().getOrDefault("BRIEFING_AUTO_TEST_PYTHON","python3"),script.toString(),temp.toString(),System.getProperty("zoop.briefing.usage.classpath"));
         var e=process.environment();e.put("DB_URL",url);e.put("DB_USERNAME","company_test");e.put("DB_PASSWORD",password());
         if(shared)e.put("BRIEFING_AUTO_TEST_SHARED","true");
+        if(refill)e.put("BRIEFING_AUTO_TEST_REFILL","true");
         e.put("BRIEFING_USAGE_ARTIFACT_ROOT",temp.toRealPath().resolve("producer").toString());
         e.put("ZOOP_DOCUMENT_READ_GRANTS",grant.toString());e.put("ZOOP_DOCUMENT_READ_INGESTION_SOURCES",authority.toString());
         e.put("JAVA",Path.of(System.getProperty("java.home"),"bin/java").toString());
@@ -291,8 +299,9 @@ class BriefingServerPostgresTest {
         System.out.println("Synthetic chain proof: "+Files.readString(temp.resolve("auto-proof.json")));
         var round=new com.zoop.briefing.storage.BriefingRoundRepository(jdbc).findById("brf-2026-11-04-morning").orElseThrow();
         com.zoop.briefing.query.BriefingSnapshotValidator.validate(round);assertEquals("published",round.status());
-        assertTrue(round.publicSnapshot().at("/commonPriority/items/0/sources/0/publishedAt").isNull());
-        assertEquals("2026-11-04",round.publicSnapshot().at("/commonPriority/items/0/sources/0/publishedDate").asString());
+        if(refill)assertEquals(Instant.parse("2026-11-04T00:01:00Z"),Instant.parse(round.publicSnapshot().at("/commonPriority/items/0/sources/0/publishedAt").asString()));
+        else assertTrue(round.publicSnapshot().at("/commonPriority/items/0/sources/0/publishedAt").isNull());
+        if(!refill)assertEquals("2026-11-04",round.publicSnapshot().at("/commonPriority/items/0/sources/0/publishedDate").asString());
         assertEquals("completed",jdbc.queryForObject("SELECT status FROM briefing_common_schedule_jobs",String.class));
         assertEquals(shared?3:2,jdbc.queryForObject("SELECT count(*) FROM briefing_attempts WHERE status='completed'",Integer.class));
         assertTrue(jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class)<=16);
@@ -347,7 +356,8 @@ class BriefingServerPostgresTest {
             assertNotEquals(delivery.path("id"),peerDelivery.path("id"));
             assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM briefing_personal_slot_eligibility WHERE member_id=?",Integer.class,other));
             assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM briefing_personal_preferences WHERE member_id=?",Integer.class,other));
-            assertTrue(delivery.at("/selection/presentation/personalPriority/items/0/sources/0/publishedAt").isNull());
+            if(refill)assertEquals(round.publicSnapshot().at("/commonPriority/items/0/sources/0/publishedAt"),delivery.at("/selection/presentation/personalPriority/items/0/sources/0/publishedAt"));
+            else assertTrue(delivery.at("/selection/presentation/personalPriority/items/0/sources/0/publishedAt").isNull());
             transaction.executeWithoutResult(s->scheduler.tick());
             assertEquals(delivery,personal.get(round.id(),principal,false,"auto-repeat"));
             assertEquals(calls,jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class));

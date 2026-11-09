@@ -19,6 +19,7 @@ import briefing_replay as b
 from briefing_usage import write_once
 
 SCHEMA = 'briefing-news-sources-v1'
+EXPANDED_SCHEMA = 'briefing-news-sources-v2'
 RESULT = 'briefing-news-collection-v1'
 KST = ZoneInfo('Asia/Seoul')
 OPERATIONS = {'read', 'store', 'quote-display', 'model-send'}
@@ -46,7 +47,7 @@ def load_registry(cfg):
     require(len(raw) <= 1_000_000, 'registry_size')
     from zoop_ai_pipeline.private_intake import _json
     value = _json(raw)
-    require(set(value) == {'schemaVersion', 'revision', 'sources'} and value['schemaVersion'] == SCHEMA
+    require(set(value) == {'schemaVersion', 'revision', 'sources'} and value['schemaVersion'] in (SCHEMA,EXPANDED_SCHEMA)
             and isinstance(value['revision'], str) and value['revision'].strip(), 'registry_schema')
     require(isinstance(value['sources'], list) and len(value['sources']) <= 8, 'source_limit')
     seen = set()
@@ -56,7 +57,8 @@ def load_registry(cfg):
         require(source['sourceId'] not in seen and type(source['enabled']) is bool, 'duplicate_source')
         seen.add(source['sourceId'])
         profile(source['sourceId'])
-        for key, ceiling in [('maxListingPages', 3), ('maxArticleAttempts', 24), ('maxDocuments', 8)]:
+        expanded=value['schemaVersion']==EXPANDED_SCHEMA
+        for key, ceiling in [('maxListingPages', 8 if expanded else 3), ('maxArticleAttempts', 80 if expanded else 24), ('maxDocuments', 30 if expanded else 8)]:
             require(type(source[key]) is int and 1 <= source[key] <= ceiling, 'source_limit')
         require(source['maxDocuments'] <= source['maxArticleAttempts'], 'source_limit')
         require(isinstance(source['authorizationRef'], str) and source['authorizationRef'].strip(), 'authorization')
@@ -220,7 +222,11 @@ def retain(source, registry_sha, round_, root, response, companies=None):
     return row, exported, root
 
 
-def collect(cfg, round_, parent, *, fetcher_factory=None, monotonic=time.monotonic):
+def collect(cfg, round_, parent, *, fetcher_factory=None, monotonic=time.monotonic, refill=False):
+    # An old completed round remains readable through its original exact format.
+    if cfg.get('newsCollectionPolicy') and not (parent/'news-sources/result.json').exists() and not cfg.get('recordedOnly'):
+        from briefing_news_refill import collect as progressive
+        return progressive(cfg,round_,parent,fetcher_factory=fetcher_factory,monotonic=monotonic,refill=refill)
     from zoop_ai_pipeline.collection import Fetcher
     from zoop_ai_pipeline.news_archives import initial_tasks, parse_listing, validate_article_url
     registry = load_registry(cfg)

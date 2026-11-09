@@ -114,6 +114,8 @@ class EntrypointTests(unittest.TestCase):
             cfg,edition=run.call_args.args
             self.assertTrue(cfg['selectionContinuation']);self.assertEqual('morning',edition)
             self.assertEqual(32,cfg['roundCallLimit']);self.assertEqual(24,cfg['nativeCallLimit'])
+            import briefing_news_refill as refill
+            self.assertEqual({'version':refill.VERSION,**refill.DEFAULTS},cfg['newsCollectionPolicy'])
 
     def test_ecs_secret_becomes_the_existing_private_key_file_contract(self):
         spec=importlib.util.spec_from_file_location('briefing_entrypoint_test',Path(__file__).resolve().parents[2]/'deployment/briefing/entrypoint.py')
