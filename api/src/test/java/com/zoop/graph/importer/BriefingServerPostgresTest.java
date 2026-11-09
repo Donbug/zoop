@@ -142,6 +142,46 @@ class BriefingServerPostgresTest {
         publish(importNative(HandoffFixtures.Spec.standard()));
         return server().prepare(com.zoop.common.json.StrictJson.Obj.of(request("morning")));
     }
+    private ObjectNode selectionRequest(long seconds) throws Exception {
+        var request=request("morning");var r=(ObjectNode)request.get("round");
+        Instant cutoff=Instant.now().plusSeconds(seconds).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        String date=cutoff.atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate().toString(),id="brf-"+date+"-morning";
+        r.put("id",id).put("date",date).put("scheduledAt",cutoff.toString()).put("windowTo",cutoff.toString());
+        jdbc.update("INSERT INTO briefing_common_schedule_jobs(id,round_date,edition,scheduled_at,window_from,status) VALUES(?,?::date,'morning',?,'2026-10-07T00:00:00Z','queued')",id,date,Timestamp.from(cutoff));
+        return request;
+    }
+    @Test void selectionPreviewRequiresQueuedExactNearTermSlotAndCannotPublishEarly() throws Exception {
+        publish(importNative(HandoffFixtures.Spec.standard()));var command=server();var request=selectionRequest(600);
+        assertThrows(IllegalArgumentException.class,()->command.prepare(StrictJson.Obj.of(request)));
+        var prepared=command.prepareSelection(StrictJson.Obj.of(request));
+        assertTrue(prepared.path("selectionPreview").asBoolean());assertEquals(1,prepared.path("candidates").size());
+        command.check(StrictJson.Obj.of(prepared));
+        var premature=StrictJson.newObject();premature.set("prepared",prepared);
+        assertThrows(IllegalArgumentException.class,()->command.publish(StrictJson.Obj.of(premature)));
+        jdbc.update("UPDATE briefing_common_schedule_jobs SET status='requires_recovery'");
+        assertThrows(IllegalArgumentException.class,()->command.check(StrictJson.Obj.of(prepared)));
+        jdbc.update("UPDATE briefing_common_schedule_jobs SET status='queued'");
+        ((ObjectNode)request.path("round")).put("windowFrom","2026-10-07T00:00:01Z");
+        assertThrows(IllegalArgumentException.class,()->command.prepareSelection(StrictJson.Obj.of(request)));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ai_executions",Integer.class));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM briefing_rounds WHERE published_at IS NOT NULL",Integer.class));
+    }
+    @Test void distantSelectionSlotCannotSpendAgainstAFuturePublication() throws Exception {
+        publish(importNative(HandoffFixtures.Spec.standard()));var command=server();var request=selectionRequest(1900);
+        assertThrows(IllegalArgumentException.class,()->command.prepareSelection(StrictJson.Obj.of(request)));
+    }
+    @Test void qualifiedPreviewReusesSelectionReceiptsInRealLedgerAndPublisher() throws Exception {
+        publish(importNative(HandoffFixtures.Spec.standard()));server();var request=selectionRequest(45);
+        Files.write(temp.resolve("selection-request.json"),StrictJson.write(request));
+        runProducer("morning","qualified");
+        String id=request.path("round").path("id").asString();
+        var row=new com.zoop.briefing.storage.BriefingRoundRepository(jdbc).findById(id).orElseThrow();
+        assertEquals("published",row.status());assertEquals(1,row.payload().path("items").size());
+        com.zoop.briefing.query.BriefingSnapshotValidator.validate(row);
+        assertEquals(8,jdbc.queryForObject("SELECT count(*) FROM ai_executions WHERE execution_mode='live'",Integer.class));
+        assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM ai_executions WHERE execution_mode='replay'",Integer.class));
+        assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM briefing_attempts WHERE status='completed'",Integer.class));
+    }
     private ObjectNode failedRecoveryRequest() {
         var request=request("morning");var r=(ObjectNode)request.get("round");String cutoff=NOW.minusSeconds(120).toString();
         r.put("scheduledAt",cutoff).put("windowTo",cutoff);request.put("recordedRecovery",true);
@@ -349,13 +389,14 @@ class BriefingServerPostgresTest {
     }
 
     private void runProducer(String edition,String mode) throws Exception {
-        Path script=Path.of("../scripts/tests/fixtures/briefing_server_smoke.py").toAbsolutePath().normalize();
+        Path script=Path.of("../scripts/tests/fixtures/"+("qualified".equals(mode)?"briefing_selection_server_smoke.py":"briefing_server_smoke.py")).toAbsolutePath().normalize();
         var process=new ProcessBuilder("python3",script.toString(),temp.toString(),System.getProperty("zoop.briefing.usage.classpath"),edition,mode);
         var e=process.environment();e.put("DB_URL",url);e.put("DB_USERNAME","company_test");e.put("DB_PASSWORD",password());
         e.put("BRIEFING_SERVER_WORK_ROOT",work.toString());e.put("BRIEFING_USAGE_ARTIFACT_ROOT",temp.toRealPath().resolve("producer").toString());
         e.put("BRIEFING_SERVER_SOURCE_SCOPE",temp.toRealPath().resolve("model-scope.json").toString());e.put("ZOOP_DOCUMENT_READ_GRANTS",grant.toString());e.put("ZOOP_DOCUMENT_READ_INGESTION_SOURCES",authority.toString());
         e.put("JAVA",Path.of(System.getProperty("java.home"),"bin/java").toString());
         if("coverage".equals(mode))e.put("SYNTHETIC_COVERAGE_REQUEST",temp.resolve("coverage-request.json").toString());
+        if("qualified".equals(mode))e.put("SYNTHETIC_SELECTION_REQUEST",temp.resolve("selection-request.json").toString());
         Path log=temp.resolve("smoke-"+edition+".log");process.redirectErrorStream(true).redirectOutput(log.toFile());var child=process.start();
         assertTrue(child.waitFor(120,java.util.concurrent.TimeUnit.SECONDS));assertEquals(0,child.exitValue(),Files.readString(log));
     }
@@ -398,6 +439,13 @@ class BriefingServerPostgresTest {
             var result=StrictJson.parseObject(response.body());assertEquals("published",result.string("status"));
             assertEquals(1,result.object("continuity").object("recap").array("items").size());
             assertEquals("not_updated",result.object("continuity").object("forecast").string("status"));
+            var recapResponse=java.net.http.HttpClient.newHttpClient().send(java.net.http.HttpRequest.newBuilder(
+                java.net.URI.create("http://127.0.0.1:"+port+"/api/v1/briefings/"+row.id()+"/recap")).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,recapResponse.statusCode(),recapResponse.body());
+            var recapResult=StrictJson.parseObject(recapResponse.body());
+            assertEquals("available",recapResult.string("status"));
+            assertEquals("brf-2026-11-02-morning",recapResult.object("previous").string("id"));
+            assertEquals(1,recapResult.object("previous").array("items").size());
             var explicit=app.getBean(com.zoop.briefing.personal.ExplicitBriefingService.class);
             var principal=new com.zoop.auth.service.MemberSessionService.MemberPrincipal("synthetic-reader","test");
             String company=row.publicSnapshot().at("/continuity/recap/items/0/companies/0/id").asString();
@@ -446,6 +494,31 @@ class BriefingServerPostgresTest {
         jdbc.update("UPDATE ai_executions SET status='unknown' WHERE id=?",execution.path("executionId").asString());
         assertThrows(IllegalArgumentException.class,()->command.check(StrictJson.Obj.of(prepared)));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM briefing_rounds WHERE edition='evening' AND published_at IS NOT NULL",Integer.class));
+    }
+
+    @Test void completedSelectionRejectionIsDistinctFromUnfinishedOrDeadlineCoverage() throws Exception {
+        publish(importNative(HandoffFixtures.Spec.standard()));server();runProducer("morning","normal");
+        var request=coverageRequest();String id=request.path("round").path("id").asString();Path root=work.resolve("native/"+id);
+        var original=StrictJson.parseObject(Files.readAllBytes(root.resolve("coverage-notice.json"))).node().deepCopy();
+        var notice=(ObjectNode)original;notice.put("reason","all_company_candidates_withheld");
+        var outcomes=StrictJson.newObject().put("status","withheld").put("reason","all_company_candidates_withheld");
+        outcomes.putArray("candidates").addObject().put("documentId","synthetic-reviewed").put("status","withheld").put("reason","selection_no_fresh_priority_issue");
+        byte[] source="{\"complete\":false,\"candidateDocuments\":1}".getBytes(StandardCharsets.UTF_8);
+        Files.write(root.resolve("source-coverage.json"),source);byte[] closed=StrictJson.write(outcomes);Files.write(root.resolve("candidate-outcomes-v3.json"),closed);
+        notice.withObject("files").put("source-coverage.json",Canonical.sha256(source)).put("candidate-outcomes-v3.json",Canonical.sha256(closed));
+        byte[] raw=StrictJson.write(notice);Files.write(root.resolve("coverage-notice.json"),raw);request.put("noticeSha256",Canonical.sha256(raw));
+        var command=server();var prepared=command.prepareCoverage(StrictJson.Obj.of(request));
+        assertEquals("limited",prepared.at("/continuity/coverage/status").asString());
+        assertEquals(1,prepared.at("/continuity/coverage/confirmedDocuments").asInt());command.check(StrictJson.Obj.of(prepared));
+        assertTrue(prepared.at("/continuity/message").asString().contains("기준을 충족한"));
+        // A dispatch deadline remains an incomplete-input notice, not a completed rejection or a no-news assertion.
+        notice.put("reason","preparation_deadline");outcomes.put("reason","preparation_deadline");
+        ((ObjectNode)outcomes.path("candidates").get(0)).put("status","not_sent").put("reason","preparation_deadline");
+        closed=StrictJson.write(outcomes);Files.write(root.resolve("candidate-outcomes-v3.json"),closed);notice.withObject("files").put("candidate-outcomes-v3.json",Canonical.sha256(closed));
+        raw=StrictJson.write(notice);Files.write(root.resolve("coverage-notice.json"),raw);request.put("noticeSha256",Canonical.sha256(raw));
+        var held=command.prepareCoverage(StrictJson.Obj.of(request));
+        assertEquals("insufficient",held.at("/continuity/coverage/status").asString());
+        assertEquals(0,held.at("/continuity/coverage/confirmedDocuments").asInt());command.check(StrictJson.Obj.of(held));
     }
 
     @Test void coverageWithoutAPriorOriginalCannotInventARecap() throws Exception {

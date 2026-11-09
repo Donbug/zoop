@@ -8,7 +8,7 @@ import briefing_server_runtime as runtime
 from briefing_usage import CommandPipe, UsageSession, write_once
 
 VERSION = 'briefing-coverage-notice-v1'
-REASONS = {'no_current_company_source', 'all_company_candidates_withheld', 'remaining_shared_call_capacity'}
+REASONS = {'no_current_company_source', 'all_company_candidates_withheld', 'remaining_shared_call_capacity', 'preparation_deadline'}
 
 
 def record(cfg, round_, reason, now, outcome_file=None):

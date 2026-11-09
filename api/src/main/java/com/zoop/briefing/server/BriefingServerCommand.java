@@ -57,13 +57,14 @@ public final class BriefingServerCommand {
 
     public static void main(String[] args) throws Exception {
         try {
-            if(args.length!=2 || !Set.of("prepare","prepare-coverage","check","publish").contains(args[0])) throw new IllegalArgumentException("operation");
+            if(args.length!=2 || !Set.of("prepare","prepare-selection","prepare-coverage","check","publish").contains(args[0])) throw new IllegalArgumentException("operation");
             var command = new BriefingServerCommand(System.getenv());
             Path path = Path.of(args[1]).toAbsolutePath().normalize();
             if(!path.startsWith(command.work) || !path.toRealPath().startsWith(command.work.toRealPath()) || Files.isSymbolicLink(path) || Files.size(path)>4*1024*1024) throw new IllegalArgumentException("private_request");
             var request = StrictJson.parseObject(Files.readAllBytes(path));
             ObjectNode result = switch(args[0]) {
                 case "prepare" -> command.prepare(request);
+                case "prepare-selection" -> command.prepareSelection(request);
                 case "prepare-coverage" -> command.prepareCoverage(request);
                 case "check" -> { command.check(request.object("prepared")); yield StrictJson.newObject().put("status","current"); }
                 case "publish" -> command.publish(request);
@@ -76,9 +77,34 @@ public final class BriefingServerCommand {
     }
 
     public ObjectNode prepare(StrictJson.Obj request) {
+        return prepareInput(request, false);
+    }
+
+    /** Read-only selection input for a queued near-term slot; this cannot publish before its cutoff. */
+    public ObjectNode prepareSelection(StrictJson.Obj request) {
+        return prepareInput(request, true);
+    }
+
+    private void selectionSlot(StrictJson.Obj round, String preparedAt) {
+        Instant cutoff=Instant.parse(round.string("windowTo")),from=Instant.parse(round.string("windowFrom"));
+        Instant made=Instant.parse(preparedAt);
+        if(!made.isBefore(cutoff)||made.isBefore(cutoff.minus(Duration.ofMinutes(30)))||made.isAfter(Instant.now())
+                ||!cutoff.equals(Instant.parse(round.string("scheduledAt")))||!from.isBefore(cutoff)
+                ||!round.string("id").equals("brf-"+round.string("date")+"-"+round.string("edition"))
+                ||!Set.of("morning","evening").contains(round.string("edition"))
+                ||!round.string("date").equals(cutoff.atZone(ZoneId.of("Asia/Seoul")).toLocalDate().toString()))reject();
+        var jobs=jdbc.queryForList("SELECT status,scheduled_at,window_from FROM briefing_common_schedule_jobs WHERE id=?",round.string("id"));
+        if(jobs.size()!=1||!Set.of("queued","running").contains(jobs.getFirst().get("status"))
+                ||!cutoff.equals(((Timestamp)jobs.getFirst().get("scheduled_at")).toInstant())
+                ||!from.equals(((Timestamp)jobs.getFirst().get("window_from")).toInstant()))reject();
+    }
+
+    private ObjectNode prepareInput(StrictJson.Obj request, boolean preview) {
         var round=request.object("round"); String id=round.string("id");
         Instant cutoff=Instant.parse(round.string("windowTo")), from=Instant.parse(round.string("windowFrom"));
-        if(cutoff.isAfter(Instant.now()) || !cutoff.equals(Instant.parse(round.string("scheduledAt"))) || !from.isBefore(cutoff)) reject();
+        String preparedAt=Instant.now().toString();
+        if(preview)selectionSlot(round,preparedAt);
+        if((!preview&&cutoff.isAfter(Instant.now())) || !cutoff.equals(Instant.parse(round.string("scheduledAt"))) || !from.isBefore(cutoff)) reject();
         var graphRows=jdbc.queryForList("SELECT id,kind,published_at,review_revision,rule_revision FROM graph_versions WHERE active");
         if(graphRows.size()!=1 || !"snapshot".equals(graphRows.getFirst().get("kind"))) throw new IllegalStateException("published_graph_required");
         String version=graphRows.getFirst().get("id").toString();
@@ -104,7 +130,8 @@ public final class BriefingServerCommand {
         result.put("reviewRevision",((Number)graphRows.getFirst().get("review_revision")).longValue());
         Object ruleRevision=graphRows.getFirst().get("rule_revision");result.put("ruleRevision",ruleRevision==null?0:((Number)ruleRevision).longValue());
         result.put("exclusionRevision",excluded.revision());
-        result.put("preparedAt",Instant.now().toString()); result.put("model","gpt-6-luna");
+        result.put("preparedAt",preparedAt); result.put("model","gpt-6-luna");
+        if(preview)result.put("selectionPreview",true);
         result.put("schemaVersion","briefing-server-input-v1");
         if(recovery)result.putObject("recovery").put("kind","recorded-cutoff-recovery-v1")
                 .put("authorizationRef",recoveryAuthorization).put("graphPublishedAt",graphPublished.toString())
@@ -121,7 +148,8 @@ public final class BriefingServerCommand {
                 if(grant==null || !inScope(row.get("provider").toString(),e.articleId(),e.articleVersion(),row.get("sha256").toString())) {denied++;continue;}
                 BriefingSourceClock sourceClock;
                 try { sourceClock=BriefingSourceClock.read(row); } catch(IllegalArgumentException unknown) {outside++;continue;}
-                Instant at=sourceClock.availableAt(); if(!at.isAfter(from)||at.isAfter(cutoff)
+                Instant at=sourceClock.availableAt(); if(!at.isAfter(from)||at.isAfter(cutoff)||(preview&&(at.isAfter(Instant.parse(preparedAt))
+                        ||((Timestamp)row.get("collected_at")).toInstant().isAfter(Instant.parse(preparedAt))))
                         ||recovery&&((Timestamp)row.get("collected_at")).toInstant().isAfter(cutoff)) {outside++;continue;}
                 String docKey=e.articleId()+"\n"+e.articleVersion();
                 if(bound.add(docKey)) bindings.addObject().put("documentId",e.articleId()).put("documentVersion",e.articleVersion()).put("grantId",grant.grantId())
@@ -198,6 +226,7 @@ public final class BriefingServerCommand {
         }
         ObjectNode copy=(ObjectNode)prepared.node().deepCopy();String digest=prepared.string("inputSha256");copy.remove("inputSha256");
         if(!digest.equals(Canonical.sha256(Canonical.appBytes(copy))))reject();
+        if(prepared.node().path("selectionPreview").asBoolean(false))selectionSlot(prepared.object("round"),prepared.string("preparedAt"));
         var publication=reader.read(prepared.string("graphVersion"));
         if(!publication.snapshotArtifact().sha256().equals(prepared.string("graphSnapshotSha256")))reject();
         var exclusions=authority.current(publication,"briefing-server");if(exclusions.revision()!=prepared.raw("exclusionRevision").asLong(-1))reject();
@@ -240,6 +269,8 @@ public final class BriefingServerCommand {
                 if(!Objects.equals(row.get("title"),pin.stringOrNull("title"))||!Objects.equals(row.get("publisher"),pin.stringOrNull("publisher"))||!articleInfo.get("kind").equals(pin.string("sourceKind")))reject();
                 if(!inScope(provider,e.articleId(),e.articleVersion(),row.get("sha256").toString()))reject();
                 if(!at.isAfter(from)||at.isAfter(to)||!sourceClock.matches(pin)||!article.url().equals(pin.string("url"))||!row.get("sha256").equals(pin.string("bodySha256")))reject();
+                if(prepared.node().path("selectionPreview").asBoolean(false)&&(at.isAfter(Instant.parse(prepared.string("preparedAt")))
+                        ||((Timestamp)row.get("collected_at")).toInstant().isAfter(Instant.parse(prepared.string("preparedAt")))))reject();
                 if(prepared.has("recovery")&&((Timestamp)row.get("collected_at")).toInstant().isAfter(to))reject();
                 String text=new String(files.readVerified(row.get("storage_uri").toString(),row.get("sha256").toString(),((Number)row.get("bytes")).longValue()),java.nio.charset.StandardCharsets.UTF_8);
                 if(!text.substring(text.offsetByCodePoints(0,e.start()),text.offsetByCodePoints(0,e.end())).equals(pin.string("quote")))reject();
@@ -254,6 +285,7 @@ public final class BriefingServerCommand {
 
     public ObjectNode publish(StrictJson.Obj request) {
         var prepared=request.object("prepared"); check(prepared); var round=prepared.object("round");
+        if(Instant.parse(round.string("windowTo")).isAfter(Instant.now()))reject();
         var payload=request.object("payload"); var snapshot=request.object("snapshot");
         String admitted=jdbc.queryForObject("SELECT stages->>'inputSha256' FROM briefing_attempts WHERE id=?",String.class,request.string("attemptId"));
         if(!prepared.string("inputSha256").equals(admitted))reject();
@@ -328,8 +360,8 @@ public final class BriefingServerCommand {
             for(String key:List.of("scheduledAt","windowFrom","windowTo"))if(!Instant.parse(round.string(key)).equals(Instant.parse(pinned.string(key))))reject();
             Instant recorded=Instant.parse(notice.string("recordedAt"));if(!recorded.isAfter(from)||recorded.isAfter(cutoff))reject();
             String reason=notice.string("reason");
-            if(!Set.of("no_current_company_source","all_company_candidates_withheld","remaining_shared_call_capacity").contains(reason))reject();
-            String outcomeName=null;
+            if(!Set.of("no_current_company_source","all_company_candidates_withheld","remaining_shared_call_capacity","preparation_deadline").contains(reason))reject();
+            String outcomeName=null;int confirmedSelections=0;boolean selectionOnly=false;
             if(!"no_current_company_source".equals(reason)) {
                 for(String name:notice.object("files").node().properties().stream().map(Map.Entry::getKey).toList())
                     if(!"source-coverage.json".equals(name)) {
@@ -347,13 +379,19 @@ public final class BriefingServerCommand {
             } else {
                 var outcomes=readCoverageFile(root.resolve(outcomeName),notice.object("files").string(outcomeName));
                 if(!reason.equals(outcomes.string("reason"))||!"withheld".equals(outcomes.string("status"))||outcomes.array("candidates").isEmpty())reject();
-                boolean notSent=false;
+                boolean notSent=false,deadline=false;
+                boolean closedOnly=true;
                 for(JsonNode child:outcomes.array("candidates")) {
                     var item=StrictJson.Obj.of(child);String status=item.string("status");
-                    if("not_sent".equals(status)){if(!"remaining_shared_call_capacity".equals(item.string("reason")))reject();notSent=true;}
+                    if("selection_no_fresh_priority_issue".equals(item.string("reason")))confirmedSelections++;
+                    else if(!"no_verified_company_involvement".equals(item.string("reason")))closedOnly=false;
+                    if("preparation_deadline".equals(item.string("reason")))deadline=true;
+                    if("not_sent".equals(status)){if(!Set.of("remaining_shared_call_capacity","preparation_deadline").contains(item.string("reason")))reject();notSent=true;}
                     else if(!Set.of("withheld","saved_withheld").contains(status))reject();
                 }
-                if(notSent!="remaining_shared_call_capacity".equals(reason))reject();
+                if(deadline!="preparation_deadline".equals(reason)
+                        ||(!deadline&&notSent!="remaining_shared_call_capacity".equals(reason)))reject();
+                selectionOnly=closedOnly&&confirmedSelections>0;
             }
             var ids=jdbc.queryForList("""
                 SELECT id FROM briefing_rounds r WHERE status='published' AND published_at<=? AND window_to<=? AND id<>?
@@ -381,10 +419,10 @@ public final class BriefingServerCommand {
                 .put("snapshotSha256",Canonical.sha256(Canonical.appBytes(prior.publicSnapshot())));
             var continuity=out.putObject("continuity").put("schemaVersion","importance-continuity-v2").put("roundId",id).put("cutoff",cutoff.toString())
                 .put("mode","coverage_limited").putNull("importanceFloor")
-                .put("message","수집·근거 검증이 충분하지 않아 새 핵심 이슈의 유무를 판단하지 않습니다. 이전에 발행한 이슈와 확인 조건을 복기합니다.");
+                .put("message",selectionOnly?"검토한 후보에서 중요도·새 정보 기준을 충족한 핵심 이슈가 없어 이전 발행 이슈와 확인 조건을 복기합니다. 전체 시장에 새 소식이 없다는 뜻은 아닙니다.":"수집·근거 검증이 충분하지 않아 새 핵심 이슈의 유무를 판단하지 않습니다. 이전에 발행한 이슈와 확인 조건을 복기합니다.");
             continuity.putArray("references");
-            continuity.putObject("coverage").put("status","insufficient").put("confirmedDocuments",0)
-                .put("message","이번 회차의 신규 기업 이슈 검증이 완료되지 않았습니다. 새 소식이 없었다는 뜻은 아닙니다.");
+            continuity.putObject("coverage").put("status",selectionOnly?"limited":"insufficient").put("confirmedDocuments",selectionOnly?confirmedSelections:0)
+                .put("message",selectionOnly?"확인한 후보에 대한 선정 검증은 완료했지만 전체 시장을 수집한 결과는 아닙니다.":"이번 회차의 신규 기업 이슈 검증이 완료되지 않았습니다. 새 소식이 없었다는 뜻은 아닙니다.");
             var recap=continuity.putObject("recap").put("status","available").put("previousRoundId",prior.id()).put("date",prior.date().toString())
                 .put("edition",prior.edition()).put("dataAsOf",prior.windowTo().toString()).put("message","마감 이전의 검증된 발행본입니다. 이번 회차의 새 소식이나 새 전망으로 취급하지 않습니다.");
             recap.set("items",prior.payload().path("items").deepCopy());

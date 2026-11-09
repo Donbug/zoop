@@ -95,6 +95,26 @@ class AdmissionTests(unittest.TestCase):
                 self.assertEqual('analysis_verification',invoke.call_args.args[0])
 
 class EntrypointTests(unittest.TestCase):
+    def test_future_auto_slots_enable_selection_continuation_with_the_existing_explicit_shared_cap(self):
+        import briefing_auto_chain as chain
+        spec=importlib.util.spec_from_file_location('briefing_continuation_entry',Path(__file__).resolve().parents[2]/'deployment/briefing/entrypoint.py')
+        entry=importlib.util.module_from_spec(spec);spec.loader.exec_module(entry)
+        with tempfile.TemporaryDirectory() as temp:
+            template=Path(temp)/'selected.json';template.write_text('{}');template.chmod(0o600)
+            env={'BRIEFING_SERVER_ENABLED':'true','BRIEFING_AUTO_CHAIN_ENABLED':'true','BRIEFING_SHARED_PRIORITY_ANALYSIS_ENABLED':'true',
+                 'BRIEFING_SERVER_ADDITIVE_GRAPH_ALLOWED':'true','BRIEFING_ROUND_CALL_LIMIT':'32',
+                 'OPENAI_API_KEY':'synthetic-only','TYPESAFE_API_KEY':'synthetic-only','DB_URL':'jdbc:postgresql://example.invalid/db',
+                 'DB_USERNAME':'synthetic','DB_PASSWORD':'synthetic','BRIEFING_SERVER_WORK_ROOT':temp,
+                 'BRIEFING_SERVER_AUTHORIZATION_REF':'synthetic-budget','BRIEFING_ORIGINAL_SOURCE_AUTHORITY':'/synthetic/authority',
+                 'BRIEFING_ORIGINAL_READ_GRANTS':'/synthetic/grants','BRIEFING_SELECTED_WORKER_CONFIG':str(template)}
+            with patch.dict(os.environ,env,clear=True),patch.object(sys,'argv',['entrypoint','--slot','morning']), \
+                    patch.object(entry.tempfile,'mkdtemp',return_value=temp),patch.object(chain,'validate_selected_config'), \
+                    patch.object(chain,'run_slot') as run:
+                entry.main()
+            cfg,edition=run.call_args.args
+            self.assertTrue(cfg['selectionContinuation']);self.assertEqual('morning',edition)
+            self.assertEqual(32,cfg['roundCallLimit']);self.assertEqual(24,cfg['nativeCallLimit'])
+
     def test_ecs_secret_becomes_the_existing_private_key_file_contract(self):
         spec=importlib.util.spec_from_file_location('briefing_entrypoint_test',Path(__file__).resolve().parents[2]/'deployment/briefing/entrypoint.py')
         entry=importlib.util.module_from_spec(spec);spec.loader.exec_module(entry)

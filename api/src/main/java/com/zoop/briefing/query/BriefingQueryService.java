@@ -114,6 +114,21 @@ public class BriefingQueryService {
             if (repository.changes(id).stream().anyMatch(change -> "correction".equals(change.kind()))) {
                 return recapState(out, "unavailable", "current_corrected", "이번 회차의 정정 내용을 먼저 확인해 주세요.");
             }
+            if ("coverage_limited".equals(row.publicSnapshot().path("continuity").path("mode").asString())) {
+                // This prior original is pinned independently of the AM/PM comparison fields.
+                // Reuse the same current permission/correction checks as the normal briefing reader.
+                JsonNode reference = continuity(row, requestId).path("recap");
+                if (!"available".equals(reference.path("status").asString())) {
+                    return recapState(out, "unavailable", "previous_not_available", "고정된 이전 발행본을 현재 제공할 수 없습니다.");
+                }
+                var previous = repository.findById(reference.path("previousRoundId").asString()).orElseThrow();
+                var restored = restore(previous, repository.changes(previous.id()), requestId);
+                if (restored.path("items").isEmpty()) {
+                    return recapState(out, "unavailable", "previous_has_no_issues", "고정된 이전 발행본에 복기할 핵심 이슈가 없습니다.");
+                }
+                out.set("previous", restored);
+                return recapState(out, "available", null, "이번 회차는 수집·검증 자료가 부족해 이전 발행본을 복기합니다. 새 소식의 부재나 새 전망·재평가를 뜻하지 않습니다.");
+            }
             boolean evening = "evening".equals(row.edition());
             JsonNode reference = evening ? row.comparisonSnapshot() : row.publicSnapshot().path("previousComparison");
             if (reference == null || !"available".equals(reference.path("status").asString())) {
